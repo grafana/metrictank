@@ -17,6 +17,8 @@ type publisher struct {
 	*amqp.Channel
 }
 
+type PayloadProcessor func(*publisher, *amqp.Delivery) error
+
 // dev var declarations, until real config/flags are added
 var rabbitURL string = "amqp://rabbitmq"
 
@@ -30,51 +32,35 @@ func main() {
 	defer mdConn.Close()
 	log.Println("connected")
 
+	done := make(chan error, 1)
+	
 	// create a publisher
-	/*
 	pub, err := createPublisher(mdConn, "metricEvents", "fanout")
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
-	*/
+	testProc := func(pub *publisher, d *amqp.Delivery) error {
+		fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
+		return nil
+	}
 
-	devs, err := createConsumer(mdConn, "metrics", "topic", "metrics.*", "")
+	err = ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, testProc)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
-	
-	log.Printf("begin consuming")
-	done := make(chan error, 1)
-
-	go func() {
-		log.Printf("in goroutine")
-		for d := range devs {
-			fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
-		}
-		done <- nil
-	}()
-
-	// a queue for metric results
-	res, err := createConsumer(mdConn, "metricResults", "x-consistent-hash", "10", "")
+	err = ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, testProc)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}
 
-	resdone := make(chan error, 1)
-	go func() {
-		log.Printf("in results goroutine")
-		for d := range res {
-			fmt.Printf("Got us a results queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
-		}
-		resdone <- nil
-	}()
-	
-	<- done
-	<- resdone
+	err = <- done
 	fmt.Println("all done!")
+	if err != nil {
+		log.Printf("Had an error, aiiieeee! '%s'", err.Error())
+	}
 }
 
 func createConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern, consumer string) (<-chan amqp.Delivery, error) {
@@ -118,4 +104,22 @@ func createChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 	}
 	log.Printf("exchange declared")
 	return ch, nil
+}
+
+func ProcessQueue(conn *amqp.Connection, pub *publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qproc PayloadProcessor) error {
+	devs, err := createConsumer(conn, exchange, exchangeType, queuePattern, consumer)
+	if err != nil {
+		return nil
+	}
+	go func(devs <-chan amqp.Delivery) {
+		for d := range devs {
+			err := qproc(pub, &d)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+		errCh <- nil
+	}(devs)
+	return nil
 }
