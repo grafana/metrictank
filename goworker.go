@@ -42,6 +42,10 @@ func main() {
 	}
 	testProc := func(pub *publisher, d *amqp.Delivery) error {
 		fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
+		e := d.Ack(false)
+		if e != nil {
+			return e
+		}
 		return nil
 	}
 
