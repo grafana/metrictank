@@ -1,0 +1,73 @@
+package qproc
+
+import (
+	"github.com/streadway/amqp"
+	"log"
+)
+
+type Publisher struct {
+	*amqp.Channel
+}
+
+type PayloadProcessor func(*Publisher, *amqp.Delivery) error
+
+func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern, consumer string) (<-chan amqp.Delivery, error) {
+	ch, err := CreateChannel(conn, exchange, exchangeType)
+	if err != nil {
+		return nil, err
+	}
+	q, err := ch.QueueDeclare("", false, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("queue declared")
+	if err = ch.QueueBind(q.Name, queuePattern, exchange, false, nil); err != nil {
+		return nil, err
+	}
+	log.Printf("queue bound")
+	devs, err := ch.Consume(q.Name, consumer, false, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	return devs, nil
+}
+
+func CreatePublisher(conn *amqp.Connection, exchange, exchangeType string) (*Publisher, error) {
+	ch, err := CreateChannel(conn, exchange, exchangeType)
+	if err != nil {
+		return nil, err
+	}
+	return &Publisher{ ch }, nil
+}
+
+func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.Channel, error) {
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+	
+	log.Printf("channel created")
+	if err = ch.ExchangeDeclare(exchange, exchangeType, false, false, false, false, nil); err != nil {
+		return nil, err
+	}
+	log.Printf("exchange declared")
+	return ch, nil
+}
+
+func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor) error {
+	devs, err := CreateConsumer(conn, exchange, exchangeType, queuePattern, consumer)
+	if err != nil {
+		return nil
+	}
+	go func(devs <-chan amqp.Delivery) {
+		for d := range devs {
+			err := qprocessor(pub, &d)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+		errCh <- nil
+	}(devs)
+	return nil
+}
