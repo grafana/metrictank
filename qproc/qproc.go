@@ -2,7 +2,6 @@ package qproc
 
 import (
 	"github.com/streadway/amqp"
-	"log"
 )
 
 type Publisher struct {
@@ -20,11 +19,9 @@ func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern,
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("queue declared")
 	if err = ch.QueueBind(q.Name, queuePattern, exchange, false, nil); err != nil {
 		return nil, err
 	}
-	log.Printf("queue bound")
 	devs, err := ch.Consume(q.Name, consumer, false, false, false, false, nil)
 	if err != nil {
 		return nil, err
@@ -46,11 +43,9 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 		return nil, err
 	}
 	
-	log.Printf("channel created")
 	if err = ch.ExchangeDeclare(exchange, exchangeType, false, false, false, false, nil); err != nil {
 		return nil, err
 	}
-	log.Printf("exchange declared")
 	return ch, nil
 }
 
