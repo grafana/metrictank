@@ -7,6 +7,7 @@ https://github.com/mattbaird/elastigo -- elasticsearch
 https://github.com/marpaia/graphite-golang -- carbon
 */
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/raintank/raintank-metric/qproc"
 	"github.com/streadway/amqp"
@@ -66,4 +67,16 @@ func main() {
 	if err != nil {
 		log.Printf("Had an error, aiiieeee! '%s'", err.Error())
 	}
+}
+
+func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
+	metrics := make([]map[string]interface{})
+	if err := json.Unmarshal(d.Body, &metrics); err != nil {
+		return err
+	}
+	fmt.Printf("The parsed out json: %v\n", metrics)
+	if err := d.Ack(false); err != nil {
+		return err
+	}
+	return nil
 }

@@ -43,7 +43,7 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 		return nil, err
 	}
 	
-	if err = ch.ExchangeDeclare(exchange, exchangeType, false, false, false, false, nil); err != nil {
+	if err = ch.ExchangeDeclare(exchange, exchangeType, true, false, false, false, nil); err != nil {
 		return nil, err
 	}
 	return ch, nil
