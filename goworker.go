@@ -56,7 +56,7 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
-	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, testProc)
+	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
@@ -70,11 +70,17 @@ func main() {
 }
 
 func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
-	metrics := make([]map[string]interface{})
+	metrics := make([]map[string]interface{}, 0)
 	if err := json.Unmarshal(d.Body, &metrics); err != nil {
 		return err
 	}
+
 	fmt.Printf("The parsed out json: %v\n", metrics)
+
+	for _, metric := range metrics {
+		fmt.Printf("would process %s\n", metric["name"])
+	}
+
 	if err := d.Ack(false); err != nil {
 		return err
 	}
