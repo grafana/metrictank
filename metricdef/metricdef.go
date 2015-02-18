@@ -92,10 +92,10 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 
 func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 	log.Printf("searching for %s", filter)
-	body = make(map[string]interface{})
+	body := make(map[string]interface{})
 	body["query"] = filter
 	body["size"] = size
-	sort = make(map[string]map[string]string)
+	sort := make(map[string]map[string]string)
 	sort["name"] = map[string]string{"order":"desc"}
 	body["sort"] = []map[string]map[string]string{sort}
 
@@ -106,9 +106,7 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 	}
 
 	// temp: show us what we have before creating the objects from json
-	for _, r := range res {
-		log.Printf("returned: %q", r.RawJSON)
-	}
+	log.Printf("returned: %q", res.RawJSON)
 
 	return nil, nil
 }

@@ -10,19 +10,62 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/raintank/raintank-metric/qproc"
+	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/streadway/amqp"
 	"log"
 	"os"
+	"strings"
+	"sync"
+	"time"
 )
 
 type publisher struct {
 	*amqp.Channel
 }
 
+type metricDefCache struct {
+	mdefs map[string]*metric
+	m sync.RWMutex
+}
+
+// Fill this out once it's clear what should be in here
+type metric struct {
+	mdef *metricdef.MetricDefinition
+	cache *metricCache
+}
+
+type metricCache struct {
+	raw *cacheRaw
+	aggr *cacheAggr
+}
+
+type cacheRaw struct {
+	data []string
+	flushTime time.Time
+}
+
+type cacheAggr struct {
+	data *aggrData
+	flushTime time.Time
+}
+
+type aggrData struct {
+	avg []int
+	min []int
+	max []int
+}
+
+var metricDefs *metricDefCache
+
 type PayloadProcessor func(*publisher, *amqp.Delivery) error
 
 // dev var declarations, until real config/flags are added
 var rabbitURL string = "amqp://rabbitmq"
+
+func init() {
+	metricDefs = &metricDefCache{}
+	metricDefs.mdefs = make(map[string]*metric)
+}
 
 func main() {
 	// First fire up a queue to consume metric def events
@@ -42,6 +85,7 @@ func main() {
 		log.Println(err)
 		os.Exit(1)
 	}
+	/*
 	testProc := func(pub *qproc.Publisher, d *amqp.Delivery) error {
 		fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
 		e := d.Ack(false)
@@ -50,8 +94,9 @@ func main() {
 		}
 		return nil
 	}
+	*/
 
-	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, testProc)
+	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
@@ -88,6 +133,38 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 }
 
 func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
+	action := strings.Split(d.RoutingKey, ".")[1]
+	switch action {
+	case "update":
+		payload := make(map[string]interface{})
+		if err := json.Unmarshal(d.Body, &payload); err != nil {
+			return err
+		}
+		if err := updateMetricDef(payload); err != nil {
+			return err
+		}
+	case "remove":
+		payload := make(map[string]interface{})
+		if err := json.Unmarshal(d.Body, &payload); err != nil {
+			return err
+		}
+		if err := removeMetricDef(payload); err != nil {
+			return err
+		}
+	default:
+		err := fmt.Errorf("message has unknown action '%s'", action)
+		return err
+	}
 
+	return nil
+}
+
+func updateMetricDef(payload map[string]interface{}) error {
+	fmt.Printf("The parsed out json: %v", payload)
+	return nil
+}
+
+func removeMetricDef(payload map[string]interface{}) error {
+	fmt.Printf("The parsed out json: %v", payload)
 	return nil
 }
