@@ -86,3 +86,8 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 	}
 	return nil
 }
+
+func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
+
+	return nil
+}
