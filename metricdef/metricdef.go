@@ -1,6 +1,7 @@
 package metricdef
 
 import (
+	"encoding/json"
 	"fmt"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"log"
@@ -8,23 +9,25 @@ import (
 )
 
 type MetricDefinition struct {
-	ID string
-	Name string
-	Account int
-	Location string
-	Metric string
-	TargetType string // an emum ["derive","gauge"] in nodejs
-	Unit string
-	Interval int // minimum 10
-	Site int
-	LastUpdate int64 // unix epoch time, per the nodejs definition
-	Monitor int
-	WarnMin int
-	WarnMax int
-	CritMin int
-	CritMax int
-	KeepAlive bool
-	State int8
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Account int `json:"account"`
+	Location string `json:"location`
+	Metric string `json:"metric"`
+	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
+	Unit string `json:"unit"`
+	Interval int `json:"interval"` // minimum 10
+	Site int `json:"site"`
+	LastUpdate int64 `json:"lastUpdate"`// unix epoch time, per the nodejs definition
+	Monitor int `json:"monitor"`
+	Thresholds struct {
+		WarnMin int `json:"warnMin"`
+		WarnMax int `json:"warnMax"`
+		CritMin int `json:"critMin"`
+		CritMax int `json:"critMax"`
+	} `json:"thresholds"`
+	KeepAlive bool `json:"keepAlives"`
+	State int8 `json:"state"`
 }
 
 var es *elastigo.Conn
@@ -37,6 +40,15 @@ func init() {
 // required: name, account, target_type, interval, metric, unit
 
 // These validate, and save to elasticsearch
+
+func DefFromJSON(b []byte) (*MetricDefinition, error) {
+	def := new(MetricDefinition)
+	if err := json.Unmarshal(b, &def); err != nil {
+		return nil, err
+	}
+	def.ID = fmt.Sprintf("%d.%s", def.Account, def.Name)
+	return def, nil
+}
 
 func (m *MetricDefinition) Save() error {
 	if m.ID == "" {

@@ -55,6 +55,14 @@ type aggrData struct {
 	max []int
 }
 
+func buildMetricDefCache() *metricCache {
+	c := &metricCache{}
+	c.raw = &cacheRaw{}
+	c.aggr = &cacheAggr{}
+	c.aggr.data = &aggrData{}
+	return c
+}
+
 var metricDefs *metricDefCache
 
 type PayloadProcessor func(*publisher, *amqp.Delivery) error
@@ -134,21 +142,23 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 	action := strings.Split(d.RoutingKey, ".")[1]
+	// This should be able to craft the metric directly from the JSON, but
+	// waiting on that until we see this in action
 	switch action {
 	case "update":
-		payload := make(map[string]interface{})
-		if err := json.Unmarshal(d.Body, &payload); err != nil {
+		metric, err := metricdef.DefFromJSON(d.Body)
+		if err != nil {
 			return err
 		}
-		if err := updateMetricDef(payload); err != nil {
+		if err := updateMetricDef(metric); err != nil {
 			return err
 		}
 	case "remove":
-		payload := make(map[string]interface{})
-		if err := json.Unmarshal(d.Body, &payload); err != nil {
+		metric, err := metricdef.DefFromJSON(d.Body)
+		if err != nil {
 			return err
 		}
-		if err := removeMetricDef(payload); err != nil {
+		if err := removeMetricDef(metric); err != nil {
 			return err
 		}
 	default:
@@ -159,12 +169,17 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 	return nil
 }
 
-func updateMetricDef(payload map[string]interface{}) error {
-	fmt.Printf("The parsed out json: %v", payload)
+func updateMetricDef(metric *metricdef.MetricDefinition) error {
+	
+
 	return nil
 }
 
-func removeMetricDef(payload map[string]interface{}) error {
-	fmt.Printf("The parsed out json: %v", payload)
+func removeMetricDef(metric *metricdef.MetricDefinition) error {
+	log.Printf("Metric we have: %v :: %q", metric, metric)
+	log.Printf("Removing metric def for %s", metric.ID)
+	metricDefs.m.Lock()
+	defer metricDefs.m.Unlock()
+	delete(metricDefs.mdefs, metric.ID)
 	return nil
 }
