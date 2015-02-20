@@ -9,11 +9,14 @@ https://github.com/marpaia/graphite-golang -- carbon
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/marpaia/graphite-golang"
 	"github.com/raintank/raintank-metric/qproc"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/streadway/amqp"
 	"log"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,12 +27,12 @@ type publisher struct {
 }
 
 type metricDefCache struct {
-	mdefs map[string]*metric
+	mdefs map[string]*metricDef
 	m sync.RWMutex
 }
 
 // Fill this out once it's clear what should be in here
-type metric struct {
+type metricDef struct {
 	mdef *metricdef.MetricDefinition
 	cache *metricCache
 }
@@ -41,12 +44,12 @@ type metricCache struct {
 
 type cacheRaw struct {
 	data []string
-	flushTime time.Time
+	flushTime int64
 }
 
 type cacheAggr struct {
 	data *aggrData
-	flushTime time.Time
+	flushTime int64
 }
 
 type aggrData struct {
@@ -69,10 +72,21 @@ type PayloadProcessor func(*publisher, *amqp.Delivery) error
 
 // dev var declarations, until real config/flags are added
 var rabbitURL string = "amqp://rabbitmq"
+var bufCh chan graphite.Metric
 
 func init() {
 	metricDefs = &metricDefCache{}
-	metricDefs.mdefs = make(map[string]*metric)
+	metricDefs.mdefs = make(map[string]*metricDef)
+	bufCh = make(chan graphite.Metric, 0) // unbuffered for now, will buffer later
+	// currently using both a) hard-coded values for the server and b) using
+	// the graphite client instead of influxdb's client to connect here.
+	// Using graphite instead of influxdb should be more flexible, at least
+	// initially.
+	carbon, err := graphite.NewGraphite("graphite-api", 2003)
+	if err != nil {
+		panic(err)
+	}
+	go processBuffer(bufCh, carbon)
 }
 
 func main() {
@@ -130,8 +144,33 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 	fmt.Printf("The parsed out json: %v\n", metrics)
 
-	for _, metric := range metrics {
-		fmt.Printf("would process %s\n", metric["name"])
+	for _, m := range metrics {
+		fmt.Printf("would process %s\n", m["name"])
+		id := fmt.Sprintf("%d.%s", m["account"], m["name"])
+		metricDefs.m.RLock()
+		// Normally I would use defer unlock, but here we might need to
+		// release the r/w lock and take an exclusive lock, so we have
+		// to be more explicit about it.
+		md, ok := metricDefs.mdefs[id]
+		if !ok {
+			def, err := metricdef.GetMetricDefinition(id)
+			if err != nil {
+				metricDefs.m.RUnlock()
+				return err
+			}
+			md = &metricDef{mdef: def}
+			md.cache = buildMetricDefCache()
+			now := time.Now().Unix()
+			md.cache.raw.flushTime = now - 600
+			md.cache.aggr.flushTime = now - 26100
+			metricDefs.m.RUnlock()
+			metricDefs.m.Lock()
+			metricDefs.mdefs[id] = md
+			metricDefs.m.Unlock()
+		}
+		if err := storeMetric(m); err != nil {
+			return err
+		}
 	}
 
 	if err := d.Ack(false); err != nil {
@@ -170,7 +209,28 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 }
 
 func updateMetricDef(metric *metricdef.MetricDefinition) error {
-	
+	log.Printf("Metric we have: %v :: %q", metric, metric)
+	log.Printf("Updating metric def for %s", metric.ID)
+	metricDefs.m.Lock()
+	defer metricDefs.m.Unlock()
+
+	md, ok := metricDefs.mdefs[metric.ID]
+	newMd := &metricDef{ mdef: metric }
+	if ok {
+		log.Printf("metric %s found", metric.ID)
+		if md.mdef.LastUpdate >= metric.LastUpdate {
+			log.Printf("%s already up to date", metric.ID)
+			return nil
+		}
+		newMd.cache = md.cache
+	} else {
+		log.Printf("no definition for %s found, building new cache", metric.ID)
+		newMd.cache = buildMetricDefCache()
+		now := time.Now().Unix()
+		newMd.cache.raw.flushTime = now - 600
+		newMd.cache.aggr.flushTime = now - 21600
+	}
+	metricDefs.mdefs[metric.ID] = newMd
 
 	return nil
 }
@@ -182,4 +242,43 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	defer metricDefs.m.Unlock()
 	delete(metricDefs.mdefs, metric.ID)
 	return nil
+}
+
+func storeMetric(m map[string]interface{}) error {
+	if val, ok := m["value"].(float64); ok {
+		b := graphite.NewMetric(fmt.Sprintf("%d.%s", m["account"], m["name"]), strconv.FormatFloat(val, 'f', -1, 64), int64(math.Floor(m["time"].(float64))))
+		bufCh <- b
+	}
+
+	return nil
+}
+
+func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
+	buf := make([]graphite.Metric, 0)
+
+	t := time.NewTicker(time.Minute * 10)
+	for {
+		select {
+		case b := <- c:
+			buf = append(buf, b)
+		case <- t.C:
+			// A possibility: it might be worth it to hack up the
+			// carbon lib to allow batch submissions of metrics if
+			// doing them individually proves to be too slow
+			for _, m := range buf {
+				err := carbon.SendMetric(m)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}
+}
+
+func rollupRaw(m map[string]interface{}) {
+
+}
+
+func checkThresholds(m map[string]interface{}) {
+
 }
