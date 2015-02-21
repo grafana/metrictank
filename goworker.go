@@ -38,6 +38,7 @@ type metricDefCache struct {
 type metricDef struct {
 	mdef *metricdef.MetricDefinition
 	cache *metricCache
+	m sync.RWMutex
 }
 
 type metricCache struct {
@@ -181,8 +182,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 		// Normally I would use defer unlock, but here we might need to
 		// release the r/w lock and take an exclusive lock, so we have
 		// to be more explicit about it.
-		md, ok := metricDefs.mdefs[id]
-		if !ok {
+		if md, ok := metricDefs.mdefs[id]; !ok {
 			log.Printf("adding %s to metric defs", id)
 			def, err := metricdef.GetMetricDefinition(id)
 			if err != nil  {
@@ -256,6 +256,8 @@ func updateMetricDef(metric *metricdef.MetricDefinition) error {
 	defer metricDefs.m.Unlock()
 
 	md, ok := metricDefs.mdefs[metric.ID]
+	md.m.RLock()
+	defer md.m.RUnlock()
 	newMd := &metricDef{ mdef: metric }
 	if ok {
 		log.Printf("metric %s found", metric.ID)
@@ -281,6 +283,13 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	log.Printf("Removing metric def for %s", metric.ID)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
+	md, ok := metricDefs.mdefs[metric.ID]; 
+	if !ok {
+		return nil
+	}
+	md.m.Lock()
+	defer md.m.Unlock()
+
 	delete(metricDefs.mdefs, metric.ID)
 	return nil
 }
@@ -330,6 +339,8 @@ func rollupRaw(met *indvMetric) {
 	metricDefs.m.RLock()
 	defer metricDefs.m.RUnlock()
 	def := metricDefs.mdefs[met.id]
+	def.m.Lock()
+	defer def.m.Unlock()
 	if def.cache.raw.flushTime < (met.time - 600) {
 		if def.cache.aggr.flushTime < (met.time - 21600) {
 			var min, max, avg, sum *float64
@@ -421,7 +432,11 @@ func rollupRaw(met *indvMetric) {
 }
 
 func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
-
+	metricDefs.m.RLock()
+	defer metricDefs.m.RUnlock()
+	def := metricDefs.mdefs[met.id]
+	def.m.Lock()
+	defer def.m.Unlock()
 }
 
 func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
