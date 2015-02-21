@@ -25,6 +25,12 @@ import (
 	"time"
 )
 
+const (
+	stateOK = iota
+	stateWarn
+	stateCrit
+)
+
 type publisher struct {
 	*amqp.Channel
 }
@@ -437,6 +443,31 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	def := metricDefs.mdefs[met.id]
 	def.m.Lock()
 	defer def.m.Unlock()
+
+	var state int
+	var msg string
+	thresholds := def.thresholds
+
+	if thresholds.critMin != nil && met.value < thresholds.critMin.(float64) {
+		msg = fmt.Sprintf("%f less than criticalMin %f", met.value, thresholds.critMin.(float64))
+		log.Println(msg)
+		state = stateCrit
+	}
+	if state < stateCrit && thresholds.critMax != nil && met.value > thresholds.critMax.(float64) {
+		msg = fmt.Sprintf("%f greater than criticalMax %f", met.value, thresholds.critMax.(float64))
+		log.Println(msg)
+		state = stateCrit
+	}
+	if state < stateWarn && thresholds.warnMin != nil && met.value < thresholds.warnMin.(float64) {
+		msg = fmt.Sprintf("%f less than warnMin %f", met.value, thresholds.warnMin.(float64))
+		log.Println(msg)
+		state = stateWarn
+	}
+	if state < stateWarn && thresholds.warnMax != nil && met.value < thresholds.warnMax.(float64) {
+		msg = fmt.Sprintf("%f greater than warnMax %f", met.value, thresholds.warnMax.(float64))
+		log.Println(msg)
+		state = stateWarn
+	}
 }
 
 func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
