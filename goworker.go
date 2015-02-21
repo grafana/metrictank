@@ -46,7 +46,7 @@ type metricCache struct {
 }
 
 type cacheRaw struct {
-	data []string
+	data []float64
 	flushTime int64
 }
 
@@ -56,9 +56,9 @@ type cacheAggr struct {
 }
 
 type aggrData struct {
-	avg []int
-	min []int
-	max []int
+	avg []*float64
+	min []*float64
+	max []*float64
 }
 
 func buildMetricDefCache() *metricCache {
@@ -67,6 +67,22 @@ func buildMetricDefCache() *metricCache {
 	c.aggr = &cacheAggr{}
 	c.aggr.data = &aggrData{}
 	return c
+}
+
+type indvMetric struct {
+	id string
+	account int
+	name string
+	metric string
+	location string
+	interval int
+	value float64
+	valReal bool
+	unit string
+	time int64
+	site int
+	monitor int
+	targetType string
 }
 
 var metricDefs *metricDefCache
@@ -193,7 +209,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 			metricDefs.mdefs[id] = md
 			metricDefs.m.Unlock()
 		}
-		if err := storeMetric(m); err != nil {
+		if err := storeMetric(m, pub); err != nil {
 			return err
 		}
 	}
@@ -269,14 +285,19 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	return nil
 }
 
-func storeMetric(m map[string]interface{}) error {
+func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
 	log.Printf("storing metric: %+v", m)
-	if val, ok := m["value"].(float64); ok {
+	met, err := buildIndvMetric(m)
+	if err != nil {
+		return err
+	}
+	if met.valReal {
 		log.Printf("Adding to buffer")
-		b := graphite.NewMetric(fmt.Sprintf("%d.%s", m["account"], m["name"]), strconv.FormatFloat(val, 'f', -1, 64), int64(math.Floor(m["time"].(float64))))
+		b := graphite.NewMetric(met.id, strconv.FormatFloat(met.value, 'f', -1, 64), met.time)
 		bufCh <- b
 	}
-
+	rollupRaw(met)
+	checkThresholds(met, pub)
 	return nil
 }
 
@@ -300,14 +321,134 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 					log.Println(err)
 				}
 			}
+			buf = nil
 		}
 	}
 }
 
-func rollupRaw(m map[string]interface{}) {
+func rollupRaw(met *indvMetric) {
+	metricDefs.m.RLock()
+	defer metricDefs.m.RUnlock()
+	def := metricDefs.mdefs[met.id]
+	if def.cache.raw.flushTime < (met.time - 600) {
+		if def.cache.aggr.flushTime < (met.time - 21600) {
+			var min, max, avg, sum *float64
+			count := len(def.cache.aggr.data.min)
+			// not slavish; we need to manipulate three slices at
+			// once
+			for i := 0; i < count; i++ {
+				if min == nil || *def.cache.aggr.data.min[i] < *min {
+					min = def.cache.aggr.data.min[i]
+				}
+				if max == nil || *def.cache.aggr.data.max[i] < *max {
+					max = def.cache.aggr.data.max[i]
+				}
+				if def.cache.aggr.data.avg[i] != nil {
+					if sum == nil {
+						sum = def.cache.aggr.data.avg[i]
+					} else {
+						*sum += *def.cache.aggr.data.avg[i]
+					}
+				}
+			}
+			if count > 0 {
+				z := *sum / float64(count)
+				avg = &z
+			}
+			def.cache.aggr.data.avg = nil
+			def.cache.aggr.data.min = nil
+			def.cache.aggr.data.max = nil
+			def.cache.aggr.flushTime = met.time
+			if avg != nil {
+				log.Printf("writing 6 hour rollup for %s", met.id)
+				id := fmt.Sprintf("6hour.avg.%s", met.id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
+				bufCh <- b
+			}
+			if min != nil {
+				id := fmt.Sprintf("6hour.min.%s", met.id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
+				bufCh <- b
+			}
+			if max != nil {
+				id := fmt.Sprintf("6hour.max.%s", met.id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
+				bufCh <- b
+			}
+		}
+		var min, max, avg, sum *float64
+		count := len(def.cache.raw.data)
+		for _, p := range def.cache.raw.data {
+			if min == nil || p < *min {
+				min = &p
+			}
+			if max == nil || p < *max {
+				max = &p
+			}
+			if sum == nil {
+				sum = &p
+			} else {
+				*sum += p
+			}
+		}
+		if count > 0 {
+			z := *sum / float64(count)
+			avg = &z
+		}
+		if avg != nil {
+			log.Printf("writing 10 min rollup for %s:%f", met.id, *avg)
+			id := fmt.Sprintf("10min.avg.%s", met.id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
+			bufCh <- b
+		}
+		if min != nil {
+			id := fmt.Sprintf("10min.min.%s", met.id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
+			bufCh <- b
+		}
+		if max != nil {
+			id := fmt.Sprintf("10min.max.%s", met.id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
+			bufCh <- b
+		}
+		def.cache.aggr.data.min = append(def.cache.aggr.data.min, min)
+		def.cache.aggr.data.max = append(def.cache.aggr.data.max, max)
+		def.cache.aggr.data.avg = append(def.cache.aggr.data.avg, avg) 
+	}
+	if met.valReal {
+		def.cache.raw.data = append(def.cache.raw.data, met.value)
+	}
+}
+
+func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 
 }
 
-func checkThresholds(m map[string]interface{}) {
+func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
+	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
+	// TODO: validations.
+	var valReal bool
+	var val float64
 
+	if v, exists := m["value"]; exists {
+		if vf, ok := v.(float64); ok {
+			val = vf
+			valReal = true
+		}
+	}
+
+	met := &indvMetric{id: id,
+		account: int(m["account"].(float64)),
+		name: m["name"].(string),
+		metric: m["metric"].(string),
+		location: m["location"].(string),
+		interval: int(m["interval"].(float64)),
+		value: val,
+		valReal: valReal,
+		unit: m["unit"].(string),
+		time: int64(math.Floor(m["time"].(float64))),
+		site: int(m["site"].(float64)),
+		monitor: int(m["monitor"].(float64)),
+		targetType: m["target_type"].(string)}
+	return met, nil
 }
