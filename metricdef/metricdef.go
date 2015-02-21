@@ -21,10 +21,10 @@ type MetricDefinition struct {
 	LastUpdate int64 `json:"lastUpdate"`// unix epoch time, per the nodejs definition
 	Monitor int `json:"monitor"`
 	Thresholds struct {
-		WarnMin int `json:"warnMin"`
-		WarnMax int `json:"warnMax"`
-		CritMin int `json:"critMin"`
-		CritMax int `json:"critMax"`
+		WarnMin interface{} `json:"warnMin"`
+		WarnMax interface{} `json:"warnMax"`
+		CritMin interface{} `json:"critMin"`
+		CritMax interface{} `json:"critMax"`
 	} `json:"thresholds"`
 	KeepAlive bool `json:"keepAlives"`
 	State int8 `json:"state"`
@@ -34,7 +34,7 @@ var es *elastigo.Conn
 
 func init() {
 	es = elastigo.NewConn()
-	es.Domain = "elasi_domain" // needs to be configurable obviously
+	es.Domain = "elasticsearch" // needs to be configurable obviously
 }
 
 // required: name, account, target_type, interval, metric, unit
@@ -47,6 +47,32 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 		return nil, err
 	}
 	def.ID = fmt.Sprintf("%d.%s", def.Account, def.Name)
+	return def, nil
+}
+
+func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
+	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
+	now := time.Now().Unix()
+
+	// Thorough validation of the input needed once it's working.
+	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlive: m["keepAlives"].(bool), State: int8(m["state"].(float64))}
+
+	if t, exists := m["thresholds"]; exists {
+		thresh, _ := t.(map[string]interface{})
+		for k, v := range thresh {
+			switch k {
+			case "warnMin":
+				def.Thresholds.WarnMin = int(v.(float64))
+			case "warnMax":
+				def.Thresholds.WarnMax = int(v.(float64))
+			case "critMin":
+				def.Thresholds.CritMin = int(v.(float64))
+			case "critMax":
+				def.Thresholds.CritMax = int(v.(float64))
+			}
+		}
+	}
+
 	return def, nil
 }
 
@@ -94,12 +120,17 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 
 	res, err := es.Get("definitions", "metric", id, nil)
+	log.Printf("res is: %+v", res)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("get returned %q", res.Source)
+	def, err := DefFromJSON(*res.Source)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	return def, nil
 }
 
 func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {

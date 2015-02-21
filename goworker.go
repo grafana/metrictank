@@ -16,9 +16,12 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -82,7 +85,7 @@ func init() {
 	// the graphite client instead of influxdb's client to connect here.
 	// Using graphite instead of influxdb should be more flexible, at least
 	// initially.
-	carbon, err := graphite.NewGraphite("graphite-api", 2003)
+	carbon, err := graphite.NewGraphite("influxdb", 2003)
 	if err != nil {
 		panic(err)
 	}
@@ -129,6 +132,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	go func() {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGQUIT)
+		buf := make([]byte, 1<<20)
+		for {
+			<-sigs
+			runtime.Stack(buf, true)
+			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+		}
+	}()
+
 	err = <- done
 	fmt.Println("all done!")
 	if err != nil {
@@ -146,17 +160,28 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 	for _, m := range metrics {
 		fmt.Printf("would process %s\n", m["name"])
-		id := fmt.Sprintf("%d.%s", m["account"], m["name"])
+		id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 		metricDefs.m.RLock()
 		// Normally I would use defer unlock, but here we might need to
 		// release the r/w lock and take an exclusive lock, so we have
 		// to be more explicit about it.
 		md, ok := metricDefs.mdefs[id]
 		if !ok {
+			log.Printf("adding %s to metric defs", id)
 			def, err := metricdef.GetMetricDefinition(id)
-			if err != nil {
-				metricDefs.m.RUnlock()
-				return err
+			if err != nil  {
+				if err.Error() != "record not found" {
+					// create a new metric
+					log.Println("creating new metric")
+					def, err = metricdef.NewFromMessage(m)
+					if err != nil {
+						metricDefs.m.RUnlock()
+						return err
+					}
+				} else {
+					metricDefs.m.RUnlock()
+					return err
+				}
 			}
 			md = &metricDef{mdef: def}
 			md.cache = buildMetricDefCache()
@@ -245,7 +270,9 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 }
 
 func storeMetric(m map[string]interface{}) error {
+	log.Printf("storing metric: %+v", m)
 	if val, ok := m["value"].(float64); ok {
+		log.Printf("Adding to buffer")
 		b := graphite.NewMetric(fmt.Sprintf("%d.%s", m["account"], m["name"]), strconv.FormatFloat(val, 'f', -1, 64), int64(math.Floor(m["time"].(float64))))
 		bufCh <- b
 	}
@@ -260,11 +287,13 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	for {
 		select {
 		case b := <- c:
+			log.Println("appending to buffer")
 			buf = append(buf, b)
 		case <- t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
+			log.Printf("flushing buffer now")
 			for _, m := range buf {
 				err := carbon.SendMetric(m)
 				if err != nil {

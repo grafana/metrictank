@@ -1,6 +1,7 @@
 package qproc
 
 import (
+	"log"
 	"github.com/streadway/amqp"
 )
 
@@ -54,8 +55,10 @@ func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType,
 	if err != nil {
 		return nil
 	}
+	log.Printf("starting queue %s for %s", exchange, queuePattern)
 	go func(devs <-chan amqp.Delivery) {
 		for d := range devs {
+			log.Println("received delivery")
 			err := qprocessor(pub, &d)
 			if err != nil {
 				errCh <- err
