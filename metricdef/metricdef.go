@@ -9,25 +9,25 @@ import (
 )
 
 type MetricDefinition struct {
-	ID string `json:"id"`
-	Name string `json:"name"`
-	Account int `json:"account"`
-	Location string `json:"location`
-	Metric string `json:"metric"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Account    int    `json:"account"`
+	Location   string `json:"location`
+	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
-	Unit string `json:"unit"`
-	Interval int `json:"interval"` // minimum 10
-	Site int `json:"site"`
-	LastUpdate int64 `json:"lastUpdate"`// unix epoch time, per the nodejs definition
-	Monitor int `json:"monitor"`
+	Unit       string `json:"unit"`
+	Interval   int    `json:"interval"` // minimum 10
+	Site       int    `json:"site"`
+	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
+	Monitor    int    `json:"monitor"`
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
 		WarnMax interface{} `json:"warnMax"`
 		CritMin interface{} `json:"critMin"`
 		CritMax interface{} `json:"critMax"`
 	} `json:"thresholds"`
-	KeepAlives int `json:"keepAlives"`
-	State int8 `json:"state"`
+	KeepAlives int  `json:"keepAlives"`
+	State      int8 `json:"state"`
 }
 
 var es *elastigo.Conn
@@ -145,7 +145,7 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 	body["query"] = filter
 	body["size"] = size
 	sort := make(map[string]map[string]string)
-	sort["name"] = map[string]string{"order":"desc"}
+	sort["name"] = map[string]string{"order": "desc"}
 	body["sort"] = []map[string]map[string]string{sort}
 
 	res, err := es.Search("definitions", "metric", nil, body)

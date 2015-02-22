@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/marpaia/graphite-golang"
-	"github.com/raintank/raintank-metric/qproc"
 	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/raintank/raintank-metric/qproc"
 	"github.com/streadway/amqp"
 	"log"
 	"math"
@@ -33,28 +33,28 @@ const (
 
 type metricDefCache struct {
 	mdefs map[string]*metricDef
-	m sync.RWMutex
+	m     sync.RWMutex
 }
 
 // Fill this out once it's clear what should be in here
 type metricDef struct {
-	mdef *metricdef.MetricDefinition
+	mdef  *metricdef.MetricDefinition
 	cache *metricCache
-	m sync.RWMutex
+	m     sync.RWMutex
 }
 
 type metricCache struct {
-	raw *cacheRaw
+	raw  *cacheRaw
 	aggr *cacheAggr
 }
 
 type cacheRaw struct {
-	data []float64
+	data      []float64
 	flushTime int64
 }
 
 type cacheAggr struct {
-	data *aggrData
+	data      *aggrData
 	flushTime int64
 }
 
@@ -73,18 +73,18 @@ func buildMetricDefCache() *metricCache {
 }
 
 type indvMetric struct {
-	id string
-	account int
-	name string
-	metric string
-	location string
-	interval int
-	value float64
-	valReal bool
-	unit string
-	time int64
-	site int
-	monitor int
+	id         string
+	account    int
+	name       string
+	metric     string
+	location   string
+	interval   int
+	value      float64
+	valReal    bool
+	unit       string
+	time       int64
+	site       int
+	monitor    int
 	targetType string
 }
 
@@ -122,7 +122,7 @@ func main() {
 	log.Println("connected")
 
 	done := make(chan error, 1)
-	
+
 	// create a publisher
 	pub, err := qproc.CreatePublisher(mdConn, "metricEvents", "fanout")
 	if err != nil {
@@ -130,14 +130,14 @@ func main() {
 		os.Exit(1)
 	}
 	/*
-	testProc := func(pub *qproc.Publisher, d *amqp.Delivery) error {
-		fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
-		e := d.Ack(false)
-		if e != nil {
-			return e
+		testProc := func(pub *qproc.Publisher, d *amqp.Delivery) error {
+			fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
+			e := d.Ack(false)
+			if e != nil {
+				return e
+			}
+			return nil
 		}
-		return nil
-	}
 	*/
 
 	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent)
@@ -162,7 +162,7 @@ func main() {
 		}
 	}()
 
-	err = <- done
+	err = <-done
 	fmt.Println("all done!")
 	if err != nil {
 		log.Printf("Had an error, aiiieeee! '%s'", err.Error())
@@ -187,7 +187,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 		if md, ok := metricDefs.mdefs[id]; !ok {
 			log.Printf("adding %s to metric defs", id)
 			def, err := metricdef.GetMetricDefinition(id)
-			if err != nil  {
+			if err != nil {
 				if err.Error() == "record not found" {
 					// create a new metric
 					log.Println("creating new metric")
@@ -260,7 +260,7 @@ func updateMetricDef(metric *metricdef.MetricDefinition) error {
 	md, ok := metricDefs.mdefs[metric.ID]
 	md.m.RLock()
 	defer md.m.RUnlock()
-	newMd := &metricDef{ mdef: metric }
+	newMd := &metricDef{mdef: metric}
 	if ok {
 		log.Printf("metric %s found", metric.ID)
 		if md.mdef.LastUpdate >= metric.LastUpdate {
@@ -285,7 +285,7 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	log.Printf("Removing metric def for %s", metric.ID)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
-	md, ok := metricDefs.mdefs[metric.ID]; 
+	md, ok := metricDefs.mdefs[metric.ID]
 	if !ok {
 		return nil
 	}
@@ -319,10 +319,10 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	t := time.NewTicker(time.Second)
 	for {
 		select {
-		case b := <- c:
+		case b := <-c:
 			log.Println("appending to buffer")
 			buf = append(buf, b)
-		case <- t.C:
+		case <-t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
@@ -349,7 +349,7 @@ func rollupRaw(met *indvMetric) {
 	log.Printf("rolling up %s", met.id)
 
 	if def.cache.raw.flushTime < (met.time - 600) {
-		log.Printf("flushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time - 600)
+		log.Printf("flushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time-600)
 		if def.cache.aggr.flushTime < (met.time - 21600) {
 			log.Printf("rolling up 6 hour for %s", met.id)
 			var min, max, avg, sum *float64
@@ -434,7 +434,7 @@ func rollupRaw(met *indvMetric) {
 		}
 		def.cache.aggr.data.min = append(def.cache.aggr.data.min, min)
 		def.cache.aggr.data.max = append(def.cache.aggr.data.max, max)
-		def.cache.aggr.data.avg = append(def.cache.aggr.data.avg, avg) 
+		def.cache.aggr.data.avg = append(def.cache.aggr.data.avg, avg)
 	}
 	if met.valReal {
 		def.cache.raw.data = append(def.cache.raw.data, met.value)
@@ -474,14 +474,14 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		state = stateWarn
 	}
 
-	levelMap := []string{"ok","warning","critical"}
+	levelMap := []string{"ok", "warning", "critical"}
 	var updates bool
 	events := make([]map[string]interface{}, 0)
 	curState := def.State
 	if state != def.State {
 		log.Printf("state has changed for %s. Was '%s', now '%s'", def.ID, levelMap[state], levelMap[def.State])
 		def.State = state
-		// TODO: ask why in the node version lastUpdate is set with 
+		// TODO: ask why in the node version lastUpdate is set with
 		// 'new Date(metric.time * 1000).getTime()'
 		def.LastUpdate = time.Now().Unix()
 		updates = true
@@ -489,7 +489,7 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		log.Printf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
@@ -502,11 +502,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		log.Printf("%s update committed to elasticsearch", def.ID)
 	}
 	if state > stateOK {
-		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000 }
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
+		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
@@ -534,17 +534,17 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 	}
 
 	met := &indvMetric{id: id,
-		account: int(m["account"].(float64)),
-		name: m["name"].(string),
-		metric: m["metric"].(string),
-		location: m["location"].(string),
-		interval: int(m["interval"].(float64)),
-		value: val,
-		valReal: valReal,
-		unit: m["unit"].(string),
-		time: int64(math.Floor(m["time"].(float64))),
-		site: int(m["site"].(float64)),
-		monitor: int(m["monitor"].(float64)),
+		account:    int(m["account"].(float64)),
+		name:       m["name"].(string),
+		metric:     m["metric"].(string),
+		location:   m["location"].(string),
+		interval:   int(m["interval"].(float64)),
+		value:      val,
+		valReal:    valReal,
+		unit:       m["unit"].(string),
+		time:       int64(math.Floor(m["time"].(float64))),
+		site:       int(m["site"].(float64)),
+		monitor:    int(m["monitor"].(float64)),
 		targetType: m["target_type"].(string)}
 	return met, nil
 }

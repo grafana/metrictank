@@ -2,8 +2,8 @@ package qproc
 
 import (
 	"encoding/json"
-	"log"
 	"github.com/streadway/amqp"
+	"log"
 	"time"
 )
 
@@ -38,7 +38,7 @@ func CreatePublisher(conn *amqp.Connection, exchange, exchangeType string) (*Pub
 	if err != nil {
 		return nil, err
 	}
-	return &Publisher{ ch, exchange }, nil
+	return &Publisher{ch, exchange}, nil
 }
 
 func (p *Publisher) PublishMsg(key string, content map[string]interface{}) error {
@@ -48,9 +48,9 @@ func (p *Publisher) PublishMsg(key string, content map[string]interface{}) error
 	}
 	msg := amqp.Publishing{
 		DeliveryMode: amqp.Persistent,
-		Timestamp: time.Now(),
-		ContentType: "application/json",
-		Body: b,
+		Timestamp:    time.Now(),
+		ContentType:  "application/json",
+		Body:         b,
 	}
 	return p.Publish(p.exchange, key, false, false, msg)
 }
@@ -60,7 +60,7 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if err = ch.ExchangeDeclare(exchange, exchangeType, true, false, false, false, nil); err != nil {
 		return nil, err
 	}
