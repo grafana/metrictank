@@ -315,8 +315,8 @@ func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
 func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	buf := make([]graphite.Metric, 0)
 
-	// TODO: undo this: make buffer flushes happen much more quickly for now
-	t := time.NewTicker(time.Second * 30)
+	// flush buffer every second
+	t := time.NewTicker(time.Second)
 	for {
 		select {
 		case b := <- c:
@@ -345,8 +345,12 @@ func rollupRaw(met *indvMetric) {
 	def := metricDefs.mdefs[met.id]
 	def.m.Lock()
 	defer def.m.Unlock()
+
+	log.Printf("rolling up %s", met.id)
+
 	if def.cache.raw.flushTime < (met.time - 600) {
 		if def.cache.aggr.flushTime < (met.time - 21600) {
+			log.Printf("rolling up 6 hour for %s", met.id)
 			var min, max, avg, sum *float64
 			count := len(def.cache.aggr.data.min)
 			// not slavish; we need to manipulate three slices at
@@ -391,6 +395,7 @@ func rollupRaw(met *indvMetric) {
 				bufCh <- b
 			}
 		}
+		log.Printf("rolling up 10 min for %s", met.id)
 		var min, max, avg, sum *float64
 		count := len(def.cache.raw.data)
 		for _, p := range def.cache.raw.data {
@@ -483,7 +488,7 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		log.Printf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time }
+		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
@@ -496,11 +501,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		log.Printf("%s update committed to elasticsearch", def.ID)
 	}
 	if state > stateOK {
-		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time }
+		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000 }
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time }
+		metricEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
