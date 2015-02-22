@@ -5,6 +5,7 @@ Some important libs that have turned up - may or may not be in this file:
 https://github.com/streadway/amqp -- rabbitmq
 https://github.com/mattbaird/elastigo -- elasticsearch
 https://github.com/marpaia/graphite-golang -- carbon
+github.com/go-redis/redis -- redis
 */
 import (
 	"encoding/json"
@@ -146,6 +147,11 @@ func main() {
 		os.Exit(1)
 	}
 	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics)
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	err = initEventProcessing(mdConn, done)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
