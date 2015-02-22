@@ -22,5 +22,8 @@ func processEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 	if err = event.Save(); err != nil {
 		return err
 	}
+	if err := d.Ack(false); err != nil {
+		return err
+	}
 	return nil
 }
