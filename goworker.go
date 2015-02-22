@@ -328,6 +328,7 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 			// doing them individually proves to be too slow
 			log.Printf("flushing buffer now")
 			for _, m := range buf {
+				log.Printf("sending metric %+v", m)
 				err := carbon.SendMetric(m)
 				if err != nil {
 					log.Println(err)
