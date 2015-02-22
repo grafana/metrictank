@@ -1,12 +1,15 @@
 package qproc
 
 import (
+	"encoding/json"
 	"log"
 	"github.com/streadway/amqp"
+	"time"
 )
 
 type Publisher struct {
 	*amqp.Channel
+	exchange string
 }
 
 type PayloadProcessor func(*Publisher, *amqp.Delivery) error
@@ -35,7 +38,21 @@ func CreatePublisher(conn *amqp.Connection, exchange, exchangeType string) (*Pub
 	if err != nil {
 		return nil, err
 	}
-	return &Publisher{ ch }, nil
+	return &Publisher{ ch, exchange }, nil
+}
+
+func (p *Publisher) PublishMsg(key string, content map[string]interface{}) error {
+	b, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+	msg := amqp.Publishing{
+		DeliveryMode: amqp.Persistent,
+		Timestamp: time.Now(),
+		ContentType: "application/json",
+		Body: b,
+	}
+	return p.Publish(p.exchange, key, false, false, msg)
 }
 
 func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.Channel, error) {

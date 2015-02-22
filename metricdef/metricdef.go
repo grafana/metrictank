@@ -26,7 +26,7 @@ type MetricDefinition struct {
 		CritMin interface{} `json:"critMin"`
 		CritMax interface{} `json:"critMax"`
 	} `json:"thresholds"`
-	KeepAlive bool `json:"keepAlives"`
+	KeepAlives int `json:"keepAlives"`
 	State int8 `json:"state"`
 }
 
@@ -35,6 +35,10 @@ var es *elastigo.Conn
 func init() {
 	es = elastigo.NewConn()
 	es.Domain = "elasticsearch" // needs to be configurable obviously
+	// TODO: once this has gotten far enough to be able to start running
+	// on its own without running in tandem with the nodejs client, the
+	// elasticsearch indexes will need to be checked for existence and
+	// created if necessary.
 }
 
 // required: name, account, target_type, interval, metric, unit
@@ -55,7 +59,7 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	now := time.Now().Unix()
 
 	// Thorough validation of the input needed once it's working.
-	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlive: m["keepAlives"].(bool), State: int8(m["state"].(float64))}
+	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: int(m["keepAlives"].(float64)), State: int8(m["state"].(float64))}
 
 	if t, exists := m["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
@@ -92,7 +96,7 @@ func (m *MetricDefinition) Save() error {
 
 func (m *MetricDefinition) Update() error {
 	if err := m.validate(); err != nil {
-		return nil
+		return err
 	}
 	// save in elasticsearch
 	return m.indexMetric()
@@ -149,6 +153,7 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 	}
 
 	// temp: show us what we have before creating the objects from json
+	// TODO: once we have that, render the objects
 	log.Printf("returned: %q", res.RawJSON)
 
 	return nil, nil

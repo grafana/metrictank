@@ -26,14 +26,10 @@ import (
 )
 
 const (
-	stateOK = iota
+	stateOK int8 = iota
 	stateWarn
 	stateCrit
 )
-
-type publisher struct {
-	*amqp.Channel
-}
 
 type metricDefCache struct {
 	mdefs map[string]*metricDef
@@ -94,7 +90,7 @@ type indvMetric struct {
 
 var metricDefs *metricDefCache
 
-type PayloadProcessor func(*publisher, *amqp.Delivery) error
+type PayloadProcessor func(*qproc.Publisher, *amqp.Delivery) error
 
 // dev var declarations, until real config/flags are added
 var rabbitURL string = "amqp://rabbitmq"
@@ -440,33 +436,79 @@ func rollupRaw(met *indvMetric) {
 func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	metricDefs.m.RLock()
 	defer metricDefs.m.RUnlock()
-	def := metricDefs.mdefs[met.id]
-	def.m.Lock()
-	defer def.m.Unlock()
+	d := metricDefs.mdefs[met.id]
+	d.m.Lock()
+	defer d.m.Unlock()
+	def := d.mdef
 
-	var state int
+	state := stateOK
 	var msg string
-	thresholds := def.thresholds
+	thresholds := def.Thresholds
 
-	if thresholds.critMin != nil && met.value < thresholds.critMin.(float64) {
-		msg = fmt.Sprintf("%f less than criticalMin %f", met.value, thresholds.critMin.(float64))
+	if thresholds.CritMin != nil && met.value < thresholds.CritMin.(float64) {
+		msg = fmt.Sprintf("%f less than criticalMin %f", met.value, thresholds.CritMin.(float64))
 		log.Println(msg)
 		state = stateCrit
 	}
-	if state < stateCrit && thresholds.critMax != nil && met.value > thresholds.critMax.(float64) {
-		msg = fmt.Sprintf("%f greater than criticalMax %f", met.value, thresholds.critMax.(float64))
+	if state < stateCrit && thresholds.CritMax != nil && met.value > thresholds.CritMax.(float64) {
+		msg = fmt.Sprintf("%f greater than criticalMax %f", met.value, thresholds.CritMax.(float64))
 		log.Println(msg)
 		state = stateCrit
 	}
-	if state < stateWarn && thresholds.warnMin != nil && met.value < thresholds.warnMin.(float64) {
-		msg = fmt.Sprintf("%f less than warnMin %f", met.value, thresholds.warnMin.(float64))
+	if state < stateWarn && thresholds.WarnMin != nil && met.value < thresholds.WarnMin.(float64) {
+		msg = fmt.Sprintf("%f less than warnMin %f", met.value, thresholds.WarnMin.(float64))
 		log.Println(msg)
 		state = stateWarn
 	}
-	if state < stateWarn && thresholds.warnMax != nil && met.value < thresholds.warnMax.(float64) {
-		msg = fmt.Sprintf("%f greater than warnMax %f", met.value, thresholds.warnMax.(float64))
+	if state < stateWarn && thresholds.WarnMax != nil && met.value < thresholds.WarnMax.(float64) {
+		msg = fmt.Sprintf("%f greater than warnMax %f", met.value, thresholds.WarnMax.(float64))
 		log.Println(msg)
 		state = stateWarn
+	}
+
+	levelMap := []string{"ok","warning","critical"}
+	var updates bool
+	events := make([]map[string]interface{}, 0)
+	curState := def.State
+	if state != def.State {
+		log.Printf("state has changed for %s. Was '%s', now '%s'", def.ID, levelMap[state], levelMap[def.State])
+		def.State = state
+		// TODO: ask why in the node version lastUpdate is set with 
+		// 'new Date(metric.time * 1000).getTime()'
+		def.LastUpdate = time.Now().Unix()
+		updates = true
+	} else if def.KeepAlives != 0 && (def.LastUpdate < (met.time - int64(def.KeepAlives))) {
+		log.Printf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
+		updates = true
+		def.LastUpdate = time.Now().Unix()
+		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time }
+		events = append(events, checkEvent)
+	}
+	if updates {
+		err := def.Save()
+		if err != nil {
+			log.Printf("Error updating metric definition for %s: %s", def.ID, err.Error())
+			delete(metricDefs.mdefs, def.ID)
+			return
+		}
+		log.Printf("%s update committed to elasticsearch", def.ID)
+	}
+	if state > stateOK {
+		checkEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time }
+		events = append(events, checkEvent)
+	}
+	if state != curState {
+		metricEvent := map[string]interface{}{ "source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time }
+		events = append(events, metricEvent)
+	}
+	if len(events) > 0 {
+		log.Println("publishing events")
+		for _, e := range events {
+			err := pub.PublishMsg(e["type"].(string), e)
+			if err != nil {
+				log.Printf("Failed to publish event: %s", err.Error())
+			}
+		}
 	}
 }
 
