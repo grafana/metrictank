@@ -188,7 +188,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 			log.Printf("adding %s to metric defs", id)
 			def, err := metricdef.GetMetricDefinition(id)
 			if err != nil  {
-				if err.Error() != "record not found" {
+				if err.Error() == "record not found" {
 					// create a new metric
 					log.Println("creating new metric")
 					def, err = metricdef.NewFromMessage(m)
@@ -326,7 +326,7 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
-			log.Printf("flushing buffer now")
+			log.Printf("flushing %d items in buffer now", len(buf))
 			for _, m := range buf {
 				log.Printf("sending metric %+v", m)
 				err := carbon.SendMetric(m)
@@ -349,6 +349,7 @@ func rollupRaw(met *indvMetric) {
 	log.Printf("rolling up %s", met.id)
 
 	if def.cache.raw.flushTime < (met.time - 600) {
+		log.Printf("flushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time - 600)
 		if def.cache.aggr.flushTime < (met.time - 21600) {
 			log.Printf("rolling up 6 hour for %s", met.id)
 			var min, max, avg, sum *float64

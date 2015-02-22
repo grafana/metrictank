@@ -58,8 +58,10 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 	now := time.Now().Unix()
 
+	ka, _ := m["keepAlives"].(float64)
+
 	// Thorough validation of the input needed once it's working.
-	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: int(m["keepAlives"].(float64)), State: int8(m["state"].(float64))}
+	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: int(ka), State: int8(m["state"].(float64))}
 
 	if t, exists := m["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
