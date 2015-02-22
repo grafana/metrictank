@@ -55,6 +55,7 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 }
 
 func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
+	log.Printf("incoming message: %+v", m)
 	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 	now := time.Now().Unix()
 
