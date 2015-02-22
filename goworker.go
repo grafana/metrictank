@@ -315,7 +315,8 @@ func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
 func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	buf := make([]graphite.Metric, 0)
 
-	t := time.NewTicker(time.Minute * 10)
+	// TODO: undo this: make buffer flushes happen much more quickly for now
+	t := time.NewTicker(time.Second * 30)
 	for {
 		select {
 		case b := <- c:
