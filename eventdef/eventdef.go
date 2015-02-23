@@ -13,9 +13,9 @@ import (
 )
 
 type EventDefinition struct {
-	Id        string                 `json:"id"`
+	ID        string                 `json:"id"`
 	EventType string                 `json:"event_type"`
-	AccountId int64                  `json:"account_id"`
+	AccountID int64                  `json:"account_id"`
 	Severity  string                 `json:"severity"` // enum "INFO" "WARN" "ERROR" "OK"
 	Source    string                 `json:"source"`
 	Timestamp int64                  `json:"timestamp"`
@@ -144,9 +144,9 @@ func init() {
 }
 
 func (e *EventDefinition) Save() error {
-	if e.Id == "" {
+	if e.ID == "" {
 		u := uuid.NewRandom()
-		e.Id = u.String()
+		e.ID = u.String()
 	}
 	if e.Timestamp == 0 {
 		// looks like this expects timestamps in milliseconds
@@ -155,7 +155,7 @@ func (e *EventDefinition) Save() error {
 	if err := e.validate(); err != nil {
 		return err
 	}
-	resp, err := es.Index("events", e.EventType, e.Id, nil, e)
+	resp, err := es.Index("events", e.EventType, e.ID, nil, e)
 	log.Printf("response ok? %v", resp.Ok)
 	if err != nil {
 		return err
@@ -165,7 +165,7 @@ func (e *EventDefinition) Save() error {
 }
 
 func (e *EventDefinition) validate() error {
-	if e.EventType == "" || e.AccountId == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
+	if e.EventType == "" || e.AccountID == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
 		err := fmt.Errorf("event definition not valid")
 		return err
 	}
