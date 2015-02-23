@@ -10,6 +10,7 @@ github.com/go-redis/redis -- redis
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ctdk/goas/v2/logger"
 	"github.com/marpaia/graphite-golang"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/qproc"
@@ -91,8 +92,6 @@ type indvMetric struct {
 
 var metricDefs *metricDefCache
 
-type PayloadProcessor func(*qproc.Publisher, *amqp.Delivery) error
-
 // dev var declarations, until real config/flags are added
 var rabbitURL string = "amqp://rabbitmq"
 var bufCh chan graphite.Metric
@@ -116,44 +115,34 @@ func main() {
 	// First fire up a queue to consume metric def events
 	mdConn, err := amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Println(err)
+		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
 	defer mdConn.Close()
-	log.Println("connected")
+	logger.Debugf("connected")
 
 	done := make(chan error, 1)
 
 	// create a publisher
 	pub, err := qproc.CreatePublisher(mdConn, "metricEvents", "fanout")
 	if err != nil {
-		log.Println(err)
+		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
-	/*
-		testProc := func(pub *qproc.Publisher, d *amqp.Delivery) error {
-			fmt.Printf("Got us a queue item: %d B, [%v], %q :: %+v\n", len(d.Body), d.DeliveryTag, d.Body, d)
-			e := d.Ack(false)
-			if e != nil {
-				return e
-			}
-			return nil
-		}
-	*/
 
 	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent)
 	if err != nil {
-		log.Println(err)
+		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
 	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics)
 	if err != nil {
-		log.Println(err)
+		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
 	err = initEventProcessing(mdConn, done)
 	if err != nil {
-		log.Println(err)
+		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
 
@@ -171,7 +160,7 @@ func main() {
 	err = <-done
 	fmt.Println("all done!")
 	if err != nil {
-		log.Printf("Had an error, aiiieeee! '%s'", err.Error())
+		logger.Criticalf("Had an error, aiiieeee! '%s'", err.Error())
 	}
 }
 
@@ -191,12 +180,12 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 		// release the r/w lock and take an exclusive lock, so we have
 		// to be more explicit about it.
 		if md, ok := metricDefs.mdefs[id]; !ok {
-			log.Printf("adding %s to metric defs", id)
+			logger.Debugf("adding %s to metric defs", id)
 			def, err := metricdef.GetMetricDefinition(id)
 			if err != nil {
 				if err.Error() == "record not found" {
 					// create a new metric
-					log.Println("creating new metric")
+					logger.Debugf("creating new metric")
 					def, err = metricdef.NewFromMessage(m)
 					if err != nil {
 						metricDefs.m.RUnlock()
@@ -258,8 +247,8 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 }
 
 func updateMetricDef(metric *metricdef.MetricDefinition) error {
-	log.Printf("Metric we have: %v :: %q", metric, metric)
-	log.Printf("Updating metric def for %s", metric.ID)
+	logger.Debugf("Metric we have: %v :: %q", metric, metric)
+	logger.Debugf("Updating metric def for %s", metric.ID)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
 
@@ -268,14 +257,14 @@ func updateMetricDef(metric *metricdef.MetricDefinition) error {
 	defer md.m.RUnlock()
 	newMd := &metricDef{mdef: metric}
 	if ok {
-		log.Printf("metric %s found", metric.ID)
+		logger.Debugf("metric %s found", metric.ID)
 		if md.mdef.LastUpdate >= metric.LastUpdate {
-			log.Printf("%s already up to date", metric.ID)
+			logger.Debugf("%s already up to date", metric.ID)
 			return nil
 		}
 		newMd.cache = md.cache
 	} else {
-		log.Printf("no definition for %s found, building new cache", metric.ID)
+		logger.Infof("no definition for %s found, building new cache", metric.ID)
 		newMd.cache = buildMetricDefCache()
 		now := time.Now().Unix()
 		newMd.cache.raw.flushTime = now - 600
@@ -287,8 +276,8 @@ func updateMetricDef(metric *metricdef.MetricDefinition) error {
 }
 
 func removeMetricDef(metric *metricdef.MetricDefinition) error {
-	log.Printf("Metric we have: %v :: %q", metric, metric)
-	log.Printf("Removing metric def for %s", metric.ID)
+	logger.Debugf("Metric we have: %v :: %q", metric, metric)
+	logger.Debugf("Removing metric def for %s", metric.ID)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
 	md, ok := metricDefs.mdefs[metric.ID]
@@ -303,13 +292,13 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 }
 
 func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
-	log.Printf("storing metric: %+v", m)
+	logger.Debugf("storing metric: %+v", m)
 	met, err := buildIndvMetric(m)
 	if err != nil {
 		return err
 	}
 	if met.valReal {
-		log.Printf("Adding to buffer")
+		logger.Debugf("Adding to buffer")
 		b := graphite.NewMetric(met.id, strconv.FormatFloat(met.value, 'f', -1, 64), met.time)
 		bufCh <- b
 	}
@@ -326,18 +315,18 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	for {
 		select {
 		case b := <-c:
-			log.Println("appending to buffer")
+			logger.Debugf("appending to buffer")
 			buf = append(buf, b)
 		case <-t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
-			log.Printf("flushing %d items in buffer now", len(buf))
+			logger.Debugf("flushing %d items in buffer now", len(buf))
 			for _, m := range buf {
-				log.Printf("sending metric %+v", m)
+				logger.Debugf("sending metric %+v", m)
 				err := carbon.SendMetric(m)
 				if err != nil {
-					log.Println(err)
+					logger.Errorf(err.Error())
 				}
 			}
 			buf = nil
@@ -352,12 +341,12 @@ func rollupRaw(met *indvMetric) {
 	def.m.Lock()
 	defer def.m.Unlock()
 
-	log.Printf("rolling up %s", met.id)
+	logger.Debugf("rolling up %s", met.id)
 
 	if def.cache.raw.flushTime < (met.time - 600) {
-		log.Printf("flushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time-600)
+		logger.Debugf("\nflushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time-600)
 		if def.cache.aggr.flushTime < (met.time - 21600) {
-			log.Printf("rolling up 6 hour for %s", met.id)
+			logger.Debugf("rolling up 6 hour for %s", met.id)
 			var min, max, avg, sum *float64
 			count := len(def.cache.aggr.data.min)
 			// not slavish; we need to manipulate three slices at
@@ -386,7 +375,7 @@ func rollupRaw(met *indvMetric) {
 			def.cache.aggr.data.max = nil
 			def.cache.aggr.flushTime = met.time
 			if avg != nil {
-				log.Printf("writing 6 hour rollup for %s", met.id)
+				logger.Debugf("writing 6 hour rollup for %s", met.id)
 				id := fmt.Sprintf("6hour.avg.%s", met.id)
 				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
 				bufCh <- b
@@ -402,7 +391,7 @@ func rollupRaw(met *indvMetric) {
 				bufCh <- b
 			}
 		}
-		log.Printf("rolling up 10 min for %s", met.id)
+		logger.Debugf("rolling up 10 min for %s", met.id)
 		var min, max, avg, sum *float64
 		count := len(def.cache.raw.data)
 		for _, p := range def.cache.raw.data {
@@ -423,7 +412,7 @@ func rollupRaw(met *indvMetric) {
 			avg = &z
 		}
 		if avg != nil {
-			log.Printf("writing 10 min rollup for %s:%f", met.id, *avg)
+			logger.Debugf("writing 10 min rollup for %s:%f", met.id, *avg)
 			id := fmt.Sprintf("10min.avg.%s", met.id)
 			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
 			bufCh <- b
@@ -461,22 +450,22 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 
 	if thresholds.CritMin != nil && met.value < thresholds.CritMin.(float64) {
 		msg = fmt.Sprintf("%f less than criticalMin %f", met.value, thresholds.CritMin.(float64))
-		log.Println(msg)
+		logger.Debugf(msg)
 		state = stateCrit
 	}
 	if state < stateCrit && thresholds.CritMax != nil && met.value > thresholds.CritMax.(float64) {
 		msg = fmt.Sprintf("%f greater than criticalMax %f", met.value, thresholds.CritMax.(float64))
-		log.Println(msg)
+		logger.Debugf(msg)
 		state = stateCrit
 	}
 	if state < stateWarn && thresholds.WarnMin != nil && met.value < thresholds.WarnMin.(float64) {
 		msg = fmt.Sprintf("%f less than warnMin %f", met.value, thresholds.WarnMin.(float64))
-		log.Println(msg)
+		logger.Debugf(msg)
 		state = stateWarn
 	}
 	if state < stateWarn && thresholds.WarnMax != nil && met.value < thresholds.WarnMax.(float64) {
 		msg = fmt.Sprintf("%f greater than warnMax %f", met.value, thresholds.WarnMax.(float64))
-		log.Println(msg)
+		logger.Debugf(msg)
 		state = stateWarn
 	}
 
@@ -485,14 +474,14 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	events := make([]map[string]interface{}, 0)
 	curState := def.State
 	if state != def.State {
-		log.Printf("state has changed for %s. Was '%s', now '%s'", def.ID, levelMap[state], levelMap[def.State])
+		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.ID, levelMap[state], levelMap[def.State])
 		def.State = state
 		// TODO: ask why in the node version lastUpdate is set with
 		// 'new Date(metric.time * 1000).getTime()'
 		def.LastUpdate = time.Now().Unix()
 		updates = true
 	} else if def.KeepAlives != 0 && (def.LastUpdate < (met.time - int64(def.KeepAlives))) {
-		log.Printf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
+		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
 		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
@@ -501,11 +490,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	if updates {
 		err := def.Save()
 		if err != nil {
-			log.Printf("Error updating metric definition for %s: %s", def.ID, err.Error())
+			logger.Errorf("Error updating metric definition for %s: %s", def.ID, err.Error())
 			delete(metricDefs.mdefs, def.ID)
 			return
 		}
-		log.Printf("%s update committed to elasticsearch", def.ID)
+		logger.Debugf("%s update committed to elasticsearch", def.ID)
 	}
 	if state > stateOK {
 		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
@@ -516,11 +505,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
-		log.Println("publishing events")
+		logger.Infof("publishing events")
 		for _, e := range events {
 			err := pub.PublishMsg(e["type"].(string), e)
 			if err != nil {
-				log.Printf("Failed to publish event: %s", err.Error())
+				logger.Errorf("Failed to publish event: %s", err.Error())
 			}
 		}
 	}

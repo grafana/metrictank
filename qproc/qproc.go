@@ -2,8 +2,8 @@ package qproc
 
 import (
 	"encoding/json"
+	"github.com/ctdk/goas/v2/logger"
 	"github.com/streadway/amqp"
-	"log"
 	"time"
 )
 
@@ -72,10 +72,10 @@ func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType,
 	if err != nil {
 		return nil
 	}
-	log.Printf("starting queue %s for %s", exchange, queuePattern)
+	logger.Infof("starting queue %s for %s", exchange, queuePattern)
 	go func(devs <-chan amqp.Delivery) {
 		for d := range devs {
-			log.Println("received delivery")
+			logger.Debugf("received delivery")
 			err := qprocessor(pub, &d)
 			if err != nil {
 				errCh <- err

@@ -1,13 +1,13 @@
 package eventdef
 
 import (
-	"reflect"
 	"encoding/json"
-	"fmt"
 	"errors"
+	"fmt"
 	"github.com/codeskyblue/go-uuid"
+	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
-	"log"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -33,7 +33,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 	event := make(map[string]interface{})
 	err := json.Unmarshal(raw, &event)
 	if err != nil {
-			return err
+		return err
 	}
 
 	//lets get a list of our required fields.
@@ -50,16 +50,16 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 			name = tag
 		}
 		//all fields except 'Extra' are required.
-		if (name != "Extra") {
+		if name != "Extra" {
 			requiredFields[name] = &RequiredField{
 				StructName: field.Name,
-				Seen: false,
+				Seen:       false,
 			}
 		}
 	}
 
 	e.Extra = make(map[string]interface{})
-	for k,v := range event {
+	for k, v := range event {
 		def, ok := requiredFields[k]
 		// anything that is not a required field gets
 		// stored in our 'Extra' field.
@@ -77,7 +77,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 	}
 
 	//make sure all required fields were present.
-	for _,v := range requiredFields {
+	for _, v := range requiredFields {
 		if !v.Seen {
 			return errors.New("Required field missing")
 		}
@@ -97,9 +97,9 @@ func (e *EventDefinition) MarshalJSON() ([]byte, error) {
 		if tag != "" && tag != "-" {
 			name = tag
 		}
-		if (name == "Extra") {
+		if name == "Extra" {
 			//anything that was in Extra[] becomes a toplevel property again.
-			for k,v := range e.Extra {
+			for k, v := range e.Extra {
 				event[k] = v
 			}
 		} else {
@@ -113,7 +113,7 @@ func (e *EventDefinition) MarshalJSON() ([]byte, error) {
 	//Marshal our map[string] into a JSON string (byte[]).
 	raw, err := json.Marshal(&event)
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 	return raw, nil
 }
@@ -156,7 +156,7 @@ func (e *EventDefinition) Save() error {
 		return err
 	}
 	resp, err := es.Index("events", e.EventType, e.ID, nil, e)
-	log.Printf("response ok? %v", resp.Ok)
+	logger.Debugf("response ok? %v", resp.Ok)
 	if err != nil {
 		return err
 	}

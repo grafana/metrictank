@@ -3,8 +3,8 @@ package metricdef
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
-	"log"
 	"time"
 )
 
@@ -55,7 +55,7 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 }
 
 func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
-	log.Printf("incoming message: %+v", m)
+	logger.Debugf("incoming message: %+v", m)
 	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 	now := time.Now().Unix()
 
@@ -125,7 +125,7 @@ func (m *MetricDefinition) validate() error {
 
 func (m *MetricDefinition) indexMetric() error {
 	resp, err := es.Index("definitions", "metric", m.ID, nil, m)
-	log.Printf("response ok? %v", resp.Ok)
+	logger.Debugf("response ok? %v", resp.Ok)
 	if err != nil {
 		return err
 	}
@@ -136,11 +136,11 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 
 	res, err := es.Get("definitions", "metric", id, nil)
-	log.Printf("res is: %+v", res)
+	logger.Debugf("res is: %+v", res)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("get returned %q", res.Source)
+	logger.Debugf("get returned %q", res.Source)
 	def, err := DefFromJSON(*res.Source)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 }
 
 func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
-	log.Printf("searching for %s", filter)
+	logger.Debugf("searching for %s", filter)
 	body := make(map[string]interface{})
 	body["query"] = filter
 	body["size"] = size
@@ -160,13 +160,13 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 
 	res, err := es.Search("definitions", "metric", nil, body)
 	if err != nil {
-		log.Println(err)
+		logger.Errorf("%s", err.Error())
 		return nil, err
 	}
 
 	// temp: show us what we have before creating the objects from json
 	// TODO: once we have that, render the objects
-	log.Printf("returned: %q", res.RawJSON)
+	logger.Debugf("returned: %q", res.RawJSON)
 
 	return nil, nil
 }
