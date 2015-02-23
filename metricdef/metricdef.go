@@ -61,14 +61,14 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 
 	var ka int
 	switch k := m["keepAlives"].(type) {
-        case float64:
-                ka = int(k)
-        }
-        var state int8
-        switch s := m["state"].(type) {
-        case float64:
-                state = int8(s)
-        }
+	case float64:
+		ka = int(k)
+	}
+	var state int8
+	switch s := m["state"].(type) {
+	case float64:
+		state = int8(s)
+	}
 
 	// Thorough validation of the input needed once it's working.
 	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: ka, State: state}
