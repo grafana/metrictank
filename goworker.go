@@ -93,7 +93,6 @@ type indvMetric struct {
 var metricDefs *metricDefCache
 
 // dev var declarations, until real config/flags are added
-var rabbitURL string = "amqp://rabbitmq"
 var bufCh chan graphite.Metric
 
 func init() {
@@ -113,7 +112,7 @@ func init() {
 
 func main() {
 	// First fire up a queue to consume metric def events
-	mdConn, err := amqp.Dial(rabbitURL)
+	mdConn, err := amqp.Dial(config.RabbitMQURL)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
@@ -158,7 +157,7 @@ func main() {
 	}()
 
 	err = <-done
-	fmt.Println("all done!")
+	logger.Criticalf("all done!")
 	if err != nil {
 		logger.Criticalf("Had an error, aiiieeee! '%s'", err.Error())
 	}
@@ -170,10 +169,10 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 		return err
 	}
 
-	fmt.Printf("The parsed out json: %v\n", metrics)
+	logger.Debugf("The parsed out json: %v\n", metrics)
 
 	for _, m := range metrics {
-		fmt.Printf("would process %s\n", m["name"])
+		logger.Debugf("would process %s\n", m["name"])
 		id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 		metricDefs.m.RLock()
 		// Normally I would use defer unlock, but here we might need to
