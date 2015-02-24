@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"time"
 	//"github.com/go-redis/redis"
+	"reflect"
+	"errors"
 )
 
 type MetricDefinition struct {
@@ -46,6 +48,122 @@ type MetricDefinition struct {
 	} `json:"thresholds"`
 	KeepAlives int  `json:"keepAlives"`
 	State      int8 `json:"state"`
+	Extra     map[string]interface{} `json:"-"`
+}
+
+// The JSON marshal/unmarshal with metric definitions is a little less
+// complicated than it is with the event definitions. The main wrinkle is that
+// there are two fields that should be in the metric definition struct that
+// can't be required, but on the other hand it doesn't need to coerce any float
+// into in64, because floats are reasonable values here.
+// Anything though that's not state or keepAlives gets stuffed into Extra in
+// metric definitions, in any case.
+
+type requiredField struct {
+	StructName string
+	Seen       bool
+}
+
+func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
+	//lets start by unmashaling into a basic map datastructure
+	metric := make(map[string]interface{})
+	err := json.Unmarshal(raw, &metric)
+	if err != nil {
+		return err
+	}
+
+	//lets get a list of our required fields.
+	s := reflect.TypeOf(*m)
+	requiredFields := make(map[string]*requiredField)
+
+	for i := 0; i < s.NumField(); i++ {
+		field := s.Field(i)
+		name := field.Name
+		// look at the field Tags to work out the property named used in the
+		// JSON document.
+		tag := field.Tag.Get("json")
+		if tag != "" && tag != "-" {
+			name = tag
+		}
+		//all fields except 'Extra' are required.
+		if name != "Extra" {
+			requiredFields[name] = &requiredField{
+				StructName: field.Name,
+				Seen:       false,
+			}
+		}
+	}
+
+	m.Extra = make(map[string]interface{})
+	for k, v := range metric {
+		def, ok := requiredFields[k]
+		// anything that is not a required field gets
+		// stored in our 'Extra' field.
+		if !ok {
+			m.Extra[k] = v
+		} else {
+			value := reflect.ValueOf(v)
+			reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
+			def.Seen = true
+		}
+	}
+
+	//make sure all required fields were present.
+	for _, v := range requiredFields {
+		if !v.Seen && !(v.StructName == "state" || v.StructName == "keepAlives") {
+			return errors.New("Required field missing")
+		}
+	}
+	return nil
+}
+
+func (m *MetricDefinition) MarshalJSON() ([]byte, error) {
+	metric := make(map[string]interface{})
+
+	value := reflect.ValueOf(*m)
+	for i := 0; i < value.Type().NumField(); i++ {
+		field := value.Type().Field(i)
+		name := field.Name
+		tag := field.Tag.Get("json")
+		if tag != "" && tag != "-" {
+			name = tag
+		}
+		if name == "Extra" {
+			//anything that was in Extra[] becomes a toplevel property again.
+			for k, v := range m.Extra {
+				metric[k] = v
+			}
+		} else {
+			v, err := encode(value.FieldByName(field.Name))
+			if err != nil {
+				return nil, err
+			}
+			metric[name] = v
+		}
+	}
+	//Marshal our map[string] into a JSON string (byte[]).
+	raw, err := json.Marshal(&metric)
+	if err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func encode(v reflect.Value) (interface{}, error) {
+	switch v.Type().Kind() {
+	case reflect.Bool:
+		return v.Bool(), nil
+	case reflect.String:
+		return v.String(), nil
+	case reflect.Int64:
+		return v.Int(), nil
+	case reflect.Float64:
+		return v.Float(), nil
+	case reflect.Struct:
+		return v.Interface(), nil
+	default:
+		return nil, errors.New("Unsupported type")
+	}
 }
 
 var es *elastigo.Conn

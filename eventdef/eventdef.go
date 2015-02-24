@@ -40,7 +40,7 @@ type EventDefinition struct {
 	Extra     map[string]interface{} `json:"-"`
 }
 
-type RequiredField struct {
+type requiredField struct {
 	StructName string
 	Seen       bool
 }
@@ -55,7 +55,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 
 	//lets get a list of our required fields.
 	s := reflect.TypeOf(*e)
-	requiredFields := make(map[string]*RequiredField)
+	requiredFields := make(map[string]*requiredField)
 
 	for i := 0; i < s.NumField(); i++ {
 		field := s.Field(i)
@@ -68,7 +68,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 		}
 		//all fields except 'Extra' are required.
 		if name != "Extra" {
-			requiredFields[name] = &RequiredField{
+			requiredFields[name] = &requiredField{
 				StructName: field.Name,
 				Seen:       false,
 			}
