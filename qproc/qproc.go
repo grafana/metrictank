@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2015, Raintank Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+//Package qproc has functions to simplify processing metrics queues.
 package qproc
 
 import (
@@ -7,13 +24,18 @@ import (
 	"time"
 )
 
+// Publisher is a rabbitmq channel configured for a processing function to
+// publish results.
 type Publisher struct {
 	*amqp.Channel
 	exchange string
 }
 
+// PayloadProcessor is a function type that can be passed as an argument to
+// ProcessQueue to process deliveries from rabbitmq.
 type PayloadProcessor func(*Publisher, *amqp.Delivery) error
 
+// CreateConsumer creates a consumer queue.
 func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern, consumer string) (<-chan amqp.Delivery, error) {
 	ch, err := CreateChannel(conn, exchange, exchangeType)
 	if err != nil {
@@ -33,6 +55,7 @@ func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern,
 	return devs, nil
 }
 
+// CreatePublisher creates a publishing queue.
 func CreatePublisher(conn *amqp.Connection, exchange, exchangeType string) (*Publisher, error) {
 	ch, err := CreateChannel(conn, exchange, exchangeType)
 	if err != nil {
@@ -41,6 +64,8 @@ func CreatePublisher(conn *amqp.Connection, exchange, exchangeType string) (*Pub
 	return &Publisher{ch, exchange}, nil
 }
 
+// PublishMsg publishes a message to the rabbitmq queue it was configured with
+// when it was set up.
 func (p *Publisher) PublishMsg(key string, content map[string]interface{}) error {
 	b, err := json.Marshal(content)
 	if err != nil {
@@ -55,6 +80,8 @@ func (p *Publisher) PublishMsg(key string, content map[string]interface{}) error
 	return p.Publish(p.exchange, key, false, false, msg)
 }
 
+// CreateChannel is a wrapper to simplify creating a channel with its attendant
+// exchange.
 func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.Channel, error) {
 	ch, err := conn.Channel()
 	if err != nil {
@@ -67,6 +94,12 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 	return ch, nil
 }
 
+// ProcessQueue creates a consumer queue on the given connection using the
+// supplied exchange, exchange type, and queue pattern. A function that
+// satisfies the PayloadProcessor function type is also passed in to process
+// the jobs off the queue, and if the payload processor should publish the
+// results of its work a Publisher may be supplied. Otherwise nil for the
+// Publisher is fine.
 func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor) error {
 	devs, err := CreateConsumer(conn, exchange, exchangeType, queuePattern, consumer)
 	if err != nil {

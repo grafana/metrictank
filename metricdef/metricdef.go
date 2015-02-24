@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2015, Raintank Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package metricdef
 
 import (
@@ -5,8 +21,8 @@ import (
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
-	"time"
 	"strconv"
+	"time"
 	//"github.com/go-redis/redis"
 )
 
@@ -74,18 +90,18 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 // TODO: Fix redis lib import
 func InitRedis(addr, passwd string, db int64) error {
 	/*
-	var err error
-	opts := &redis.Client{}
-	opts.Addr = addr
-	if passwd != 0 {
-		opts.Password = pass
-	}
-	opts.Password = passwd
-	opts.DB = 0
-	rs, err = redis.NewClient(opts)
-	if err != nil {
-		return err
-	}
+		var err error
+		opts := &redis.Client{}
+		opts.Addr = addr
+		if passwd != 0 {
+			opts.Password = pass
+		}
+		opts.Password = passwd
+		opts.DB = 0
+		rs, err = redis.NewClient(opts)
+		if err != nil {
+			return err
+		}
 	*/
 	return nil
 }
@@ -215,7 +231,23 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 
 	// temp: show us what we have before creating the objects from json
 	// TODO: once we have that, render the objects
+	// There is no assurance yet that this works at all.
 	logger.Debugf("returned: %q", res.RawJSON)
+	objs := make([]interface{}, 0)
+	if err := json.Unmarshal(res.RawJSON, &objs); err != nil {
+		return nil, err
+	}
+	defs := make([]*MetricDefinition, 0, len(objs))
+	for _, o := range objs {
+		m, ok := o.(map[string]interface{})
+		if ok {
+			met, err := NewFromMessage(m)
+			if err != nil {
+				return nil, err
+			}
+			defs = append(defs, met)
+		}
+	}
 
-	return nil, nil
+	return defs, nil
 }
