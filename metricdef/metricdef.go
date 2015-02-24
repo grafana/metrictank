@@ -6,6 +6,8 @@ import (
 	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"time"
+	"strconv"
+	//"github.com/go-redis/redis"
 )
 
 type MetricDefinition struct {
@@ -32,13 +34,60 @@ type MetricDefinition struct {
 
 var es *elastigo.Conn
 
-func init() {
+func InitElasticsearch(domain string, port int, user, pass string) error {
 	es = elastigo.NewConn()
-	es.Domain = "elasticsearch" // needs to be configurable obviously
-	// TODO: once this has gotten far enough to be able to start running
-	// on its own without running in tandem with the nodejs client, the
-	// elasticsearch indexes will need to be checked for existence and
-	// created if necessary.
+	es.Domain = domain // needs to be configurable obviously
+	es.Port = strconv.Itoa(port)
+	if user != "" && pass != "" {
+		es.Username = user
+		es.Password = pass
+	}
+	// TODO: Elasticsearch indexes may be being created. Need checking that
+	// it works.
+	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil {
+		return err
+	} else {
+		args := make(map[string]map[string]string)
+		args["properties"] = make(map[string]string)
+		args["properties"]["type"] = "string"
+		args["properties"]["index"] = "not_analyzed"
+		if !exists {
+			_, err = es.CreateIndex("definitions")
+			if err != nil {
+				return err
+			}
+		}
+		esopts := elastigo.MappingOptions{}
+		// hmm
+		m := &MetricDefinition{}
+		err = es.PutMapping("definitions", "metric", m, esopts)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+//var rs *redis.Client
+// TODO: check if redis works
+// TODO: Fix redis lib import
+func InitRedis(addr, passwd string, db int64) error {
+	/*
+	var err error
+	opts := &redis.Client{}
+	opts.Addr = addr
+	if passwd != 0 {
+		opts.Password = pass
+	}
+	opts.Password = passwd
+	opts.DB = 0
+	rs, err = redis.NewClient(opts)
+	if err != nil {
+		return err
+	}
+	*/
+	return nil
 }
 
 // required: name, account, target_type, interval, metric, unit

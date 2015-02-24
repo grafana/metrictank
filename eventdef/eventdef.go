@@ -9,6 +9,7 @@ import (
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"reflect"
 	"strings"
+	"strconv"
 	"time"
 )
 
@@ -134,13 +135,16 @@ func encode(v reflect.Value) (interface{}, error) {
 
 var es *elastigo.Conn
 
-func init() {
+func InitElasticsearch(domain string, port int, user, pass string) error {
 	es = elastigo.NewConn()
-	es.Domain = "elasticsearch" // needs to be configurable obviously
-	// TODO: once this has gotten far enough to be able to start running
-	// on its own without running in tandem with the nodejs client, the
-	// elasticsearch indexes will need to be checked for existence and
-	// created if necessary.
+	es.Domain = domain // needs to be configurable obviously
+	es.Port = strconv.Itoa(port)
+	if user != "" && pass != "" {
+		es.Username = user
+		es.Password = pass
+	}
+
+	return nil
 }
 
 func (e *EventDefinition) Save() error {

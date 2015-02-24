@@ -46,7 +46,7 @@ var config *conf
 
 var logLevelNames = map[string]int{"debug": 4, "info": 3, "warning": 2, "error": 1, "critical": 0}
 
-func init() {
+func initConfig() {
 	config = new(conf)
 	err := parseConfig()
 	if err != nil {

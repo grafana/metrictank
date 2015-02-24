@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/marpaia/graphite-golang"
+	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/qproc"
 	"github.com/streadway/amqp"
@@ -92,10 +93,10 @@ type indvMetric struct {
 
 var metricDefs *metricDefCache
 
-// dev var declarations, until real config/flags are added
 var bufCh chan graphite.Metric
 
 func init() {
+	initConfig()
 	metricDefs = &metricDefCache{}
 	metricDefs.mdefs = make(map[string]*metricDef)
 	bufCh = make(chan graphite.Metric, 0) // unbuffered for now, will buffer later
@@ -103,10 +104,19 @@ func init() {
 	// the graphite client instead of influxdb's client to connect here.
 	// Using graphite instead of influxdb should be more flexible, at least
 	// initially.
-	carbon, err := graphite.NewGraphite("influxdb", 2003)
+	carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
 	if err != nil {
 		panic(err)
 	}
+	err = eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
+	if err != nil {
+		panic(err)
+	}
+	err = metricdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
+	if err != nil {
+		panic(err)
+	}
+	err = metricdef.InitRedis(config.RedisAddr, config.RedisPasswd, config.RedisDB)
 	go processBuffer(bufCh, carbon)
 }
 
