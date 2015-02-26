@@ -23,7 +23,7 @@ import (
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"strconv"
 	"time"
-	//"gopkg.in/redis.v2"
+	"gopkg.in/redis.v2"
 	"reflect"
 	"errors"
 )
@@ -221,11 +221,9 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 	return nil
 }
 
-//var rs *redis.Client
+var rs *redis.Client
 // TODO: check if redis works
-// TODO: Fix redis lib import
 func InitRedis(addr, passwd string, db int64) error {
-	/*
 	var err error
 	opts := &redis.Client{}
 	opts.Addr = addr
@@ -238,7 +236,6 @@ func InitRedis(addr, passwd string, db int64) error {
 	if err != nil {
 		return err
 	}
-	*/
 
 	return nil
 }
@@ -336,6 +333,8 @@ func (m *MetricDefinition) indexMetric() error {
 
 func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
+	v, err := rs.Get(id).Result()
+	logger.Debugf("%q %q %v", v, err, err == redis.Nil)
 
 	res, err := es.Get("definitions", "metric", id, nil)
 	logger.Debugf("res is: %+v", res)
@@ -343,6 +342,10 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		return nil, err
 	}
 	logger.Debugf("get returned %q", res.Source)
+	if rerr := rs.Set(id, ).Err(); err != nil {
+		logger.Debugf("redis err: %s", rerr.Error())
+	}
+
 	def, err := DefFromJSON(*res.Source)
 	if err != nil {
 		return nil, err
