@@ -32,7 +32,7 @@ type MetricDefinition struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
 	Account    int    `json:"account"`
-	Location   string `json:"location`
+	Location   string `json:"location"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
@@ -85,8 +85,9 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 		if tag != "" && tag != "-" {
 			name = tag
 		}
-		//all fields except 'Extra' are required.
-		if name != "Extra" {
+		//all fields except 'Extra', 'ID', "KeepAlives", and "state"
+		// are required.
+		if name != "Extra" && name != "id" && name != "keepAlives" && name != "state" {
 			requiredFields[name] = &requiredField{
 				StructName: field.Name,
 				Seen:       false,
@@ -102,6 +103,27 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 		if !ok {
 			m.Extra[k] = v
 		} else {
+			switch reflect.ValueOf(m).Elem().FieldByName(def.StructName).Kind() {
+			case reflect.Int:
+				v = int(v.(float64))
+			case reflect.Int8:
+				v = int8(v.(float64))
+			case reflect.Int64:
+				v = int64(v.(float64))
+			case reflect.Struct:
+				y := v.(map[string]interface{})
+				v = struct {
+					WarnMin interface{}
+					WarnMax interface{}
+					CritMin interface{}
+					CritMax interface{} 
+				}{
+					y["warnMin"],
+					y["warnMax"],
+					y["critMix"],
+					y["critMax"],
+				}
+			}
 			value := reflect.ValueOf(v)
 			reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
 			def.Seen = true
@@ -110,8 +132,8 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 
 	//make sure all required fields were present.
 	for _, v := range requiredFields {
-		if !v.Seen && !(v.StructName == "state" || v.StructName == "keepAlives") {
-			return errors.New("Required field missing")
+		if !v.Seen && !(v.StructName == "State" || v.StructName == "KeepAlives") {
+			return fmt.Errorf("Required field '%s' missing", v.StructName)
 		}
 	}
 	return nil
@@ -181,10 +203,6 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil {
 		return err
 	} else {
-		args := make(map[string]map[string]string)
-		args["properties"] = make(map[string]string)
-		args["properties"]["type"] = "string"
-		args["properties"]["index"] = "not_analyzed"
 		if !exists {
 			_, err = es.CreateIndex("definitions")
 			if err != nil {
@@ -193,7 +211,7 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 		}
 		esopts := elastigo.MappingOptions{}
 		// hmm
-		m := &MetricDefinition{}
+		m := MetricDefinition{}
 		err = es.PutMapping("definitions", "metric", m, esopts)
 		if err != nil {
 			return err

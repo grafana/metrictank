@@ -66,8 +66,8 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 		if tag != "" && tag != "-" {
 			name = tag
 		}
-		//all fields except 'Extra' are required.
-		if name != "Extra" {
+		//all fields except 'Extra' and 'ID' are required.
+		if name != "Extra" && name != "id" {
 			requiredFields[name] = &requiredField{
 				StructName: field.Name,
 				Seen:       false,
@@ -96,7 +96,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 	//make sure all required fields were present.
 	for _, v := range requiredFields {
 		if !v.Seen {
-			return errors.New("Required field missing")
+			return fmt.Errorf("Required field '%s' missing", v.StructName)
 		}
 	}
 	return nil
