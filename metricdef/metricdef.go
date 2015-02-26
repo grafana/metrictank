@@ -225,6 +225,7 @@ var rs *redis.Client
 // TODO: check if redis works
 func InitRedis(addr, passwd string, db int64) error {
 	opts := &redis.Options{}
+	opts.Network = "tcp"
 	opts.Addr = addr
 	if passwd != "" {
 		opts.Password = passwd
