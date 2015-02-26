@@ -437,6 +437,8 @@ func rollupRaw(met *indvMetric) {
 			z := *sum / float64(count)
 			avg = &z
 		}
+		def.cache.raw.data = nil
+		def.cache.raw.flushTime = met.time
 		if avg != nil {
 			logger.Debugf("writing 10 min rollup for %s:%f", met.id, *avg)
 			id := fmt.Sprintf("10min.avg.%s", met.id)
