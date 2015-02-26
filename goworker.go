@@ -174,12 +174,24 @@ func main() {
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGQUIT)
+		signal.Notify(sigs, syscall.SIGQUIT, os.Interrupt, syscall.SIGTERM)
 		buf := make([]byte, 1<<20)
-		for {
-			<-sigs
-			runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+		for sig := range sigs {
+			if sig == syscall.SIGQUIT {
+				// print out the current stack on SIGQUIT
+				runtime.Stack(buf, true)
+				log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+			} else {
+				// finish our existing work, clean up, and exit
+				// in an orderly fashion
+				logger.Infof("Closing rabbitmq connection")
+				cerr := mdConn.Close()
+				if cerr != nil {
+					logger.Errorf("Received error closing rabbitmq connection: %s", cerr.Error())
+				}
+				logger.Infof("Closing processing buffer channel")
+				close(bufCh)
+			}
 		}
 	}()
 
