@@ -224,18 +224,13 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 var rs *redis.Client
 // TODO: check if redis works
 func InitRedis(addr, passwd string, db int64) error {
-	var err error
-	opts := &redis.Client{}
+	opts := &redis.Options{}
 	opts.Addr = addr
 	if passwd != "" {
-		opts.Password = pass
+		opts.Password = passwd
 	}
-	opts.Password = passwd
 	opts.DB = db
-	rs, err = redis.NewClient(opts)
-	if err != nil {
-		return err
-	}
+	rs = redis.NewClient(opts)
 
 	return nil
 }
@@ -342,7 +337,7 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		return nil, err
 	}
 	logger.Debugf("get returned %q", res.Source)
-	if rerr := rs.Set(id, ).Err(); err != nil {
+	if rerr := rs.SetEx(id, 300, string(*res.Source)).Err(); err != nil {
 		logger.Debugf("redis err: %s", rerr.Error())
 	}
 
