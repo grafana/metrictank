@@ -23,7 +23,7 @@ import (
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"strconv"
 	"time"
-	//"github.com/go-redis/redis"
+	//"gopkg.in/redis.v2"
 	"reflect"
 	"errors"
 )
@@ -113,10 +113,10 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 			case reflect.Struct:
 				y := v.(map[string]interface{})
 				v = struct {
-					WarnMin interface{}
-					WarnMax interface{}
-					CritMin interface{}
-					CritMax interface{} 
+					WarnMin interface{} `json:"warnMin"`
+					WarnMax interface{} `json:"warnMax"`
+					CritMin interface{} `json:"critMin"`
+					CritMax interface{} `json:"critMax"` 
 				}{
 					y["warnMin"],
 					y["warnMax"],
@@ -226,19 +226,20 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 // TODO: Fix redis lib import
 func InitRedis(addr, passwd string, db int64) error {
 	/*
-		var err error
-		opts := &redis.Client{}
-		opts.Addr = addr
-		if passwd != 0 {
-			opts.Password = pass
-		}
-		opts.Password = passwd
-		opts.DB = 0
-		rs, err = redis.NewClient(opts)
-		if err != nil {
-			return err
-		}
+	var err error
+	opts := &redis.Client{}
+	opts.Addr = addr
+	if passwd != "" {
+		opts.Password = pass
+	}
+	opts.Password = passwd
+	opts.DB = db
+	rs, err = redis.NewClient(opts)
+	if err != nil {
+		return err
+	}
 	*/
+
 	return nil
 }
 
