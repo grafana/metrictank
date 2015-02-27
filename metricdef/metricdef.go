@@ -329,15 +329,26 @@ func (m *MetricDefinition) indexMetric() error {
 
 func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
-	v, err := rs.Get(id).Result()
-	logger.Debugf("%q %q %v", v, err, err == redis.Nil)
+	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
+		logger.Errorf("the redis client bombed: %s", err.Error())
+		return nil, err
+	} else if err == nil {
+		logger.Debugf("json for %s found in elasticsearch: %s", id)
+		def, err := DefFromJSON([]byte(v))
+		if err != nil {
+			return nil, err
+		}
+		return def, nil
+	}
 
+	logger.Debugf("getting %s from elasticsearch", id)
 	res, err := es.Get("definitions", "metric", id, nil)
 	logger.Debugf("res is: %+v", res)
 	if err != nil {
 		return nil, err
 	}
 	logger.Debugf("get returned %q", res.Source)
+	logger.Debugf("placing %s into redis", id)
 	if rerr := rs.SetEx(id, time.Duration(300) * time.Second, string(*res.Source)).Err(); err != nil {
 		logger.Debugf("redis err: %s", rerr.Error())
 	}
