@@ -30,7 +30,7 @@ import (
 
 type MetricDefinition struct {
 	ID         string `json:"id"`
-	Name       string `json:"name"`
+	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
 	Account    int    `json:"account"`
 	Location   string `json:"location"`
 	Metric     string `json:"metric"`
@@ -338,7 +338,7 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		return nil, err
 	}
 	logger.Debugf("get returned %q", res.Source)
-	if rerr := rs.SetEx(id, 300, string(*res.Source)).Err(); err != nil {
+	if rerr := rs.SetEx(id, time.Duration(300) * time.Second, string(*res.Source)).Err(); err != nil {
 		logger.Debugf("redis err: %s", rerr.Error())
 	}
 

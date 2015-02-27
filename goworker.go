@@ -211,7 +211,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 	logger.Debugf("The parsed out json: %v\n", metrics)
 
 	for _, m := range metrics {
-		logger.Debugf("would process %s\n", m["name"])
+		logger.Debugf("processing %s\n", m["name"])
 		id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
 		metricDefs.m.RLock()
 		// Normally I would use defer unlock, but here we might need to
