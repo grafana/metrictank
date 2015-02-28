@@ -1,6 +1,8 @@
+## raintank-metrics
+
 This is "raintank-metrics", a golang implementation of the nodejs
-raintank-worker program. The documentation is a work in progress, but in the
-meantime here are the command-line flags while the documention gets written:
+raintank-worker program. It reads metric and event data from rabbitmq and writes
+that information to elasticsearch and influxdb.
 
 ```
 	Usage:
@@ -26,12 +28,14 @@ meantime here are the command-line flags while the documention gets written:
 	  -y, --redis-passwd=         Optional password to use when connecting to redis.
 	  -D, --redis-db=             Option database number to use when connecting to
 				      redis.
+	  -q, --rabbitmq-url=         RabbitMQ server URL.
 
 	Help Options:
 	  -h, --help                  Show this help message
 ```
 
 License
+=======
 
 This software is copyright 2015 by Raintank, Inc. and is licensed under the
 terms of the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at

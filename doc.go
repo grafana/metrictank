@@ -42,6 +42,7 @@ meantime here are the command-line flags while the documention gets written:
 	  -y, --redis-passwd=         Optional password to use when connecting to redis.
 	  -D, --redis-db=             Option database number to use when connecting to
 				      redis.
+	  -q, --rabbitmq-url=         RabbitMQ server URL.
 
 	Help Options:
 	  -h, --help                  Show this help message

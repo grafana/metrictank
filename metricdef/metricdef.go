@@ -177,7 +177,7 @@ func encode(v reflect.Value) (interface{}, error) {
 		return v.Bool(), nil
 	case reflect.String:
 		return v.String(), nil
-	case reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int64:
 		return v.Int(), nil
 	case reflect.Float64:
 		return v.Float(), nil
@@ -266,7 +266,7 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	}
 
 	// Thorough validation of the input needed once it's working.
-	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: ka, State: state}
+	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: ka, State: state, Unit: m["unit"].(string)}
 
 	if t, exists := m["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})

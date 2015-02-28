@@ -56,6 +56,7 @@ type options struct {
 	RedisAddr           string `short:"r" long:"redis-addr" description:"Hostname or IP address of redis server."`
 	RedisPasswd         string `short:"y" long:"redis-passwd" description:"Optional password to use when connecting to redis."`
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
+	RabbitMQURL string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
 }
 
 var config *conf
