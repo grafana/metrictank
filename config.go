@@ -20,6 +20,8 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/jessevdk/go-flags"
+	"fmt"
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -42,8 +44,11 @@ type conf struct {
 	DebugLevel          int    `toml:"debug-level"`
 }
 
+const version = "0.1.0"
+
 type options struct {
 	Verbose             []bool `short:"V" long:"verbose" description:"Show verbose debug information. Repeat for more verbosity."`
+	Version bool `short:"v" long:"version" description:"Show version information."`
 	ConfFile            string `short:"c" long:"config" description:"Specify a configuration file."`
 	LogFile             string `short:"L" long:"log-file" description:"Log to file X"`
 	SysLog              bool   `short:"s" long:"syslog" description:"Log to syslog rather than a log file. Incompatible with -L/--log-file."`
@@ -83,6 +88,11 @@ func parseConfig() error {
 		}
 	}
 
+	if opts.Version {
+		fmt.Printf("raintank-metric version %s\n", version)
+		os.Exit(0)
+	}
+
 	if opts.ConfFile != "" {
 		if _, err := toml.DecodeFile(opts.ConfFile, config); err != nil {
 			return err
@@ -101,6 +111,10 @@ func parseConfig() error {
 			return lerr
 		}
 		log.SetOutput(lfp)
+	}
+	if config.LogFile != "" && config.SysLog {
+		lerr := errors.New("cannot use both log-file and syslog options at the same time.")
+		return lerr
 	}
 	if dlev := len(opts.Verbose); dlev != 0 {
 		config.DebugLevel = dlev
