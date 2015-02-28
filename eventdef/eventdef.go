@@ -32,7 +32,7 @@ import (
 type EventDefinition struct {
 	ID        string                 `json:"id"`
 	EventType string                 `json:"event_type"`
-	AccountID int64                  `json:"account_id"`
+	OrgID int64                  `json:"org_id"`
 	Severity  string                 `json:"severity"` // enum "INFO" "WARN" "ERROR" "OK"
 	Source    string                 `json:"source"`
 	Timestamp int64                  `json:"timestamp"`
@@ -185,7 +185,7 @@ func (e *EventDefinition) Save() error {
 }
 
 func (e *EventDefinition) validate() error {
-	if e.EventType == "" || e.AccountID == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
+	if e.EventType == "" || e.OrgID == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
 		err := fmt.Errorf("event definition not valid")
 		return err
 	}
