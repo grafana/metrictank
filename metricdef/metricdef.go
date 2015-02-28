@@ -222,7 +222,7 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 }
 
 var rs *redis.Client
-// TODO: check if redis works
+
 func InitRedis(addr, passwd string, db int64) error {
 	opts := &redis.Options{}
 	opts.Network = "tcp"
