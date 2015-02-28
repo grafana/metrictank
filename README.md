@@ -4,13 +4,17 @@ This is "raintank-metrics", a golang implementation of the nodejs
 raintank-worker program. It reads metric and event data from rabbitmq and writes
 that information to elasticsearch and influxdb.
 
-```
-	Usage:
-	  raintank-metric [OPTIONS]
+INSTALLATION
+------------
 
+USAGE
+-----
+
+```
 	Application Options:
 	  -V, --verbose               Show verbose debug information. Repeat for more
 				      verbosity.
+	  -v, --version               Show version information.
 	  -c, --config=               Specify a configuration file.
 	  -L, --log-file=             Log to file X
 	  -s, --syslog                Log to syslog rather than a log file.
@@ -29,10 +33,10 @@ that information to elasticsearch and influxdb.
 	  -D, --redis-db=             Option database number to use when connecting to
 				      redis.
 	  -q, --rabbitmq-url=         RabbitMQ server URL.
-
-	Help Options:
-	  -h, --help                  Show this help message
 ```
+
+A sample configuration file can be found in the `etc` directory of this 
+repository.
 
 License
 =======
