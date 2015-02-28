@@ -117,10 +117,9 @@ func init() {
 	metricDefs = &metricDefCache{}
 	metricDefs.mdefs = make(map[string]*metricDef)
 	bufCh = make(chan graphite.Metric, 0) // unbuffered for now, will buffer later
-	// currently using both a) hard-coded values for the server and b) using
-	// the graphite client instead of influxdb's client to connect here.
-	// Using graphite instead of influxdb should be more flexible, at least
-	// initially.
+	// currently using the graphite client instead of influxdb's client to
+	// connect here. Using graphite instead of influxdb should be more 
+	// flexible, at least initially.
 	carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
 	if err != nil {
 		panic(err)
@@ -243,6 +242,8 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 			metricDefs.m.Lock()
 			metricDefs.mdefs[id] = md
 			metricDefs.m.Unlock()
+		} else {
+			metricDefs.m.RUnlock()
 		}
 		if err := storeMetric(m, pub); err != nil {
 			return err
