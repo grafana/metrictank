@@ -92,7 +92,7 @@ func buildMetricDefCache() *metricCache {
 // rabbitmq
 type indvMetric struct {
 	id         string
-	account    int
+	orgID    int
 	name       string
 	metric     string
 	location   string
@@ -101,8 +101,8 @@ type indvMetric struct {
 	valReal    bool
 	unit       string
 	time       int64
-	site       int
-	monitor    int
+	siteID       int
+	monitorID    int
 	targetType string
 }
 
@@ -224,7 +224,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 	for _, m := range metrics {
 		logger.Debugf("processing %s", m["name"])
-		id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
+		id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
 		metricDefs.m.RLock()
 		// Normally I would use defer unlock, but here we might need to
 		// release the r/w lock and take an exclusive lock, so we have
@@ -539,7 +539,7 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
@@ -552,11 +552,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		logger.Debugf("%s update committed to elasticsearch", def.ID)
 	}
 	if state > stateOK {
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "account": met.account, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
+		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
@@ -571,8 +571,6 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 }
 
 func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
-	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
-
 	var valReal bool
 	var val float64
 
@@ -585,7 +583,7 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 
 	// validate input
 	strs := [...]string{"name","metric","location","unit","target_type"}
-	floats := [...]string{"account","interval","time","site","monitor"}
+	floats := [...]string{"org_id","interval","time","site_id","monitor_id"}
 
 	for _, s := range strs {
 		if _, ok := m[s].(string); !ok && m[s] != nil {
@@ -597,9 +595,10 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 			return nil, fmt.Errorf("%s is not a number", f)
 		}
 	}
+	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
 
 	met := &indvMetric{id: id,
-		account:    int(m["account"].(float64)),
+		orgID:    int(m["org_id"].(float64)),
 		name:       m["name"].(string),
 		metric:     m["metric"].(string),
 		location:   m["location"].(string),
@@ -608,8 +607,8 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 		valReal:    valReal,
 		unit:       m["unit"].(string),
 		time:       int64(math.Floor(m["time"].(float64))),
-		site:       int(m["site"].(float64)),
-		monitor:    int(m["monitor"].(float64)),
+		siteID:       int(m["site_id"].(float64)),
+		monitorID:    int(m["monitor_id"].(float64)),
 		targetType: m["target_type"].(string)}
 	return met, nil
 }

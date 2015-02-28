@@ -31,15 +31,15 @@ import (
 type MetricDefinition struct {
 	ID         string `json:"id"`
 	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
-	Account    int    `json:"account"`
+	OrgID    int    `json:"org_id"`
 	Location   string `json:"location"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
 	Interval   int    `json:"interval"` // minimum 10
-	Site       int    `json:"site"`
+	SiteID       int    `json:"site_id"`
 	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	Monitor    int    `json:"monitor"`
+	MonitorID    int    `json:"monitor_id"`
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
 		WarnMax interface{} `json:"warnMax"`
@@ -234,7 +234,7 @@ func InitRedis(addr, passwd string, db int64) error {
 	return nil
 }
 
-// required: name, account, target_type, interval, metric, unit
+// required: name, org_id, target_type, interval, metric, unit
 
 // These validate, and save to elasticsearch
 
@@ -243,13 +243,13 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 	if err := json.Unmarshal(b, &def); err != nil {
 		return nil, err
 	}
-	def.ID = fmt.Sprintf("%d.%s", def.Account, def.Name)
+	def.ID = fmt.Sprintf("%d.%s", def.OrgID, def.Name)
 	return def, nil
 }
 
 func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	logger.Debugf("incoming message: %+v", m)
-	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
+	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
 	now := time.Now().Unix()
 
 	var ka int
@@ -265,7 +265,7 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 
 	// validate input
 	strs := [...]string{"name","metric","location","unit","target_type"}
-	floats := [...]string{"account","interval","site","monitor"}
+	floats := [...]string{"org_id","interval","site_id","monitor_id"}
 
 	for _, s := range strs {
 		if _, ok := m[s].(string); !ok && m[s] != nil {
@@ -280,14 +280,14 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 
 	def := &MetricDefinition{ID: id,
 		Name: m["name"].(string),
-		Account: int(m["account"].(float64)),
+		OrgID: int(m["org_id"].(float64)),
 		Location: m["location"].(string),
 		Metric: m["metric"].(string),
 		TargetType: m["target_type"].(string),
 		Interval: int(m["interval"].(float64)),
-		Site: int(m["site"].(float64)),
+		SiteID: int(m["site_id"].(float64)),
 		LastUpdate: now,
-		Monitor: int(m["monitor"].(float64)),
+		MonitorID: int(m["monitor_id"].(float64)),
 		KeepAlives: ka,
 		State: state,
 		Unit: m["unit"].(string)}
@@ -318,7 +318,7 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 
 func (m *MetricDefinition) Save() error {
 	if m.ID == "" {
-		m.ID = fmt.Sprintf("%d.%s", m.Account, m.Name)
+		m.ID = fmt.Sprintf("%d.%s", m.OrgID, m.Name)
 	}
 	if m.LastUpdate == 0 {
 		m.LastUpdate = time.Now().Unix()
@@ -339,7 +339,7 @@ func (m *MetricDefinition) Update() error {
 }
 
 func (m *MetricDefinition) validate() error {
-	if m.Name == "" || m.Account == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
+	if m.Name == "" || m.OrgID == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
 		// TODO: this error message ought to be more informative
 		err := fmt.Errorf("metric is not valid!")
 		return err
