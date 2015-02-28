@@ -1,17 +1,29 @@
 ## raintank-metrics
 
-This is "raintank-metrics", a golang implementation of the nodejs
+This is "raintank-metric", a golang implementation of the nodejs
 raintank-worker program. It reads metric and event data from rabbitmq and writes
 that information to elasticsearch and influxdb.
 
 INSTALLATION
 ------------
 
+Installing raintank-metric is easy. Just run
+
+```
+	$ go get -u github.com/raintank/raintank-metric
+```
+
+from the command line, assuming you have your golang environment properly set
+up, and it will pull down and install all the dependencies and compile the
+program.
+
 USAGE
 -----
 
+The raintank-metric worker can be configured from the command line, or it can
+use a configuration file. The available options are:
+
 ```
-	Application Options:
 	  -V, --verbose               Show verbose debug information. Repeat for more
 				      verbosity.
 	  -v, --version               Show version information.
