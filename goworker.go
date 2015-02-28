@@ -114,17 +114,16 @@ var bufCh chan graphite.Metric
 
 func init() {
 	initConfig()
+
+	numCPU := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPU)	
+
 	metricDefs = &metricDefCache{}
 	metricDefs.mdefs = make(map[string]*metricDef)
-	bufCh = make(chan graphite.Metric, 0) // unbuffered for now, will buffer later
-	// currently using the graphite client instead of influxdb's client to
-	// connect here. Using graphite instead of influxdb should be more 
-	// flexible, at least initially.
-	carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
-	if err != nil {
-		panic(err)
-	}
-	err = eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
+	bufCh = make(chan graphite.Metric, numCPU)
+
+	
+	err := eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
 	if err != nil {
 		panic(err)
 	}
@@ -133,7 +132,17 @@ func init() {
 		panic(err)
 	}
 	err = metricdef.InitRedis(config.RedisAddr, config.RedisPasswd, config.RedisDB)
-	go processBuffer(bufCh, carbon)
+	
+	// currently using the graphite client instead of influxdb's client to
+	// connect here. Using graphite instead of influxdb should be more 
+	// flexible, at least initially.
+	for i := 0; i < numCPU; i++ {
+		carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
+		if err != nil {
+			panic(err)
+		}
+		go processBuffer(bufCh, carbon, i)
+	}
 }
 
 func main() {
@@ -155,17 +164,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent)
+	numCPU := runtime.NumCPU()
+
+	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent, numCPU)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
-	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics)
+	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics, numCPU)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
-	err = initEventProcessing(mdConn, done)
+	err = initEventProcessing(mdConn, numCPU, done)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
@@ -346,7 +357,7 @@ func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
 	return nil
 }
 
-func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
+func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerID int) {
 	buf := make([]graphite.Metric, 0)
 
 	// flush buffer every second
@@ -355,16 +366,16 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 		select {
 		case b := <-c:
 			if b.Name != "" {
-				logger.Debugf("appending to buffer")
+				logger.Debugf("worker %d appending to buffer", workerID)
 				buf = append(buf, b)
 			}
 		case <-t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
-			logger.Debugf("flushing %d items in buffer now", len(buf))
+			logger.Debugf("worker %d flushing %d items in buffer now", workerID, len(buf))
 			for _, m := range buf {
-				logger.Debugf("sending metric %+v", m)
+				logger.Debugf("worker %d sending metric %+v", workerID, m)
 				err := carbon.SendMetric(m)
 				if err != nil {
 					logger.Errorf(err.Error())

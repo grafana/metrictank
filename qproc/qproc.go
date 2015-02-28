@@ -19,6 +19,7 @@ package qproc
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/streadway/amqp"
 	"time"
@@ -95,27 +96,33 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 }
 
 // ProcessQueue creates a consumer queue on the given connection using the
-// supplied exchange, exchange type, and queue pattern. A function that
-// satisfies the PayloadProcessor function type is also passed in to process
-// the jobs off the queue, and if the payload processor should publish the
-// results of its work a Publisher may be supplied. Otherwise nil for the
-// Publisher is fine.
-func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor) error {
-	devs, err := CreateConsumer(conn, exchange, exchangeType, queuePattern, consumer)
-	if err != nil {
-		return nil
+// supplied exchange, exchange type, queue pattern, and number of workers. A 
+// function that satisfies the PayloadProcessor function type is also passed in
+// to process the jobs off the queue, and if the payload processor should 
+// publish the results of its work a Publisher may be supplied. Otherwise nil 
+// for the Publisher is fine.
+func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor, numWorkers int) error {
+	if numWorkers < 1 {
+		err := errors.New("numWorkers must be at least 1")
+		return err
 	}
-	logger.Infof("starting queue %s for %s", exchange, queuePattern)
-	go func(devs <-chan amqp.Delivery) {
-		for d := range devs {
-			logger.Debugf("received delivery")
-			err := qprocessor(pub, &d)
-			if err != nil {
-				errCh <- err
-				return
-			}
+	for i := 0; i < numWorkers; i++ {
+		devs, err := CreateConsumer(conn, exchange, exchangeType, queuePattern, consumer)
+		if err != nil {
+			return nil
 		}
-		errCh <- nil
-	}(devs)
+		logger.Infof("starting queue %s for %s", exchange, queuePattern)
+		go func(i int, exchange string, devs <-chan amqp.Delivery) {
+			for d := range devs {
+				logger.Debugf("worker %s %d received delivery", exchange, i)
+				err := qprocessor(pub, &d)
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}
+			errCh <- nil
+		}(i, exchange, devs)
+	}
 	return nil
 }

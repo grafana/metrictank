@@ -22,8 +22,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func initEventProcessing(mdConn *amqp.Connection, errCh chan error) error {
-	err := qproc.ProcessQueue(mdConn, nil, "grafana_events", "topic", "EVENT.#", "", errCh, processEvent)
+func initEventProcessing(mdConn *amqp.Connection, numWorkers int, errCh chan error) error {
+	err := qproc.ProcessQueue(mdConn, nil, "grafana_events", "topic", "EVENT.#", "", errCh, processEvent, numWorkers)
 	if err != nil {
 		return err
 	}
