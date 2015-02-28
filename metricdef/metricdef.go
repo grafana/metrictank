@@ -198,8 +198,6 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
-	// TODO: Elasticsearch indexes may be being created. Need checking that
-	// it works.
 	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil {
 		return err
 	} else {
@@ -265,8 +263,34 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 		state = int8(s)
 	}
 
-	// Thorough validation of the input needed once it's working.
-	def := &MetricDefinition{ID: id, Name: m["name"].(string), Account: int(m["account"].(float64)), Location: m["location"].(string), Metric: m["metric"].(string), TargetType: m["target_type"].(string), Interval: int(m["interval"].(float64)), Site: int(m["site"].(float64)), LastUpdate: now, Monitor: int(m["monitor"].(float64)), KeepAlives: ka, State: state, Unit: m["unit"].(string)}
+	// validate input
+	strs := [...]string{"name","metric","location","unit","target_type"}
+	floats := [...]string{"account","interval","site","monitor"}
+
+	for _, s := range strs {
+		if _, ok := m[s].(string); !ok && m[s] != nil {
+			return nil, fmt.Errorf("%s is not a string", s)
+		}
+	}
+	for _, f := range floats {
+		if _, ok := m[f].(float64); !ok && m[f] != nil {
+			return nil, fmt.Errorf("%s is not a number", f)
+		}
+	}
+
+	def := &MetricDefinition{ID: id,
+		Name: m["name"].(string),
+		Account: int(m["account"].(float64)),
+		Location: m["location"].(string),
+		Metric: m["metric"].(string),
+		TargetType: m["target_type"].(string),
+		Interval: int(m["interval"].(float64)),
+		Site: int(m["site"].(float64)),
+		LastUpdate: now,
+		Monitor: int(m["monitor"].(float64)),
+		KeepAlives: ka,
+		State: state,
+		Unit: m["unit"].(string)}
 
 	if t, exists := m["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
@@ -381,9 +405,11 @@ func FindMetricDefinitions(filter, size string) ([]*MetricDefinition, error) {
 		return nil, err
 	}
 
-	// temp: show us what we have before creating the objects from json
-	// TODO: once we have that, render the objects
-	// There is no assurance yet that this works at all.
+	// There is no assurance yet that this works at all. It should, but
+	// while this function was present in the nodejs metrics worker, it
+	// didn't appear to be used anywhere, and similarly this isn't being
+	// used here either. It's only here for completeness, but may be removed
+	// later.
 	logger.Debugf("returned: %q", res.RawJSON)
 	objs := make([]interface{}, 0)
 	if err := json.Unmarshal(res.RawJSON, &objs); err != nil {

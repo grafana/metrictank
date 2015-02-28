@@ -16,14 +16,6 @@ package main
  * limitations under the License.
  */
 
-/*
-Some important libs that have turned up - may or may not be in this file:
-https://github.com/streadway/amqp -- rabbitmq
-https://github.com/mattbaird/elastigo -- elasticsearch
-https://github.com/marpaia/graphite-golang -- carbon
-github.com/go-redis/redis -- redis
-*/
-
 import (
 	"encoding/json"
 	"fmt"
@@ -45,24 +37,28 @@ import (
 	"time"
 )
 
+// Monitor states
 const (
 	stateOK int8 = iota
 	stateWarn
 	stateCrit
 )
 
+// cache to hold metric definitions
 type metricDefCache struct {
 	mdefs map[string]*metricDef
 	m     sync.RWMutex
 }
 
-// Fill this out once it's clear what should be in here
+// a struct to hold metric definitions and their cached information, along with
+// a mutex to keep data safe from concurrent access.
 type metricDef struct {
 	mdef  *metricdef.MetricDefinition
 	cache *metricCache
 	m     sync.RWMutex
 }
 
+// Below are some structs for caching metric information.
 type metricCache struct {
 	raw  *cacheRaw
 	aggr *cacheAggr
@@ -92,6 +88,8 @@ func buildMetricDefCache() *metricCache {
 	return c
 }
 
+// Holds the information from an individual metric item coming in from 
+// rabbitmq
 type indvMetric struct {
 	id         string
 	account    int
@@ -182,6 +180,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Signal handling. If SIGQUIT is received, print out the current
+	// stack. Otherwise if SIGINT or SIGTERM are received clean up and exit
+	// in an orderly fashion.
 	go func() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGQUIT, os.Interrupt, syscall.SIGTERM)
@@ -205,6 +206,7 @@ func main() {
 		}
 	}()
 
+	// this channel returns when one of the workers exits.
 	err = <-done
 	logger.Criticalf("all done!")
 	if err != nil {
@@ -269,8 +271,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 	action := strings.Split(d.RoutingKey, ".")[1]
-	// This should be able to craft the metric directly from the JSON, but
-	// waiting on that until we see this in action
+
 	switch action {
 	case "update":
 		metric, err := metricdef.DefFromJSON(d.Body)
@@ -571,7 +572,7 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 
 func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 	id := fmt.Sprintf("%d.%s", int64(m["account"].(float64)), m["name"])
-	// TODO: validations.
+
 	var valReal bool
 	var val float64
 
@@ -579,6 +580,21 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 		if vf, ok := v.(float64); ok {
 			val = vf
 			valReal = true
+		}
+	}
+
+	// validate input
+	strs := [...]string{"name","metric","location","unit","target_type"}
+	floats := [...]string{"account","interval","time","site","monitor"}
+
+	for _, s := range strs {
+		if _, ok := m[s].(string); !ok && m[s] != nil {
+			return nil, fmt.Errorf("%s is not a string", s)
+		}
+	}
+	for _, f := range floats {
+		if _, ok := m[f].(float64); !ok && m[f] != nil {
+			return nil, fmt.Errorf("%s is not a number", f)
 		}
 	}
 
