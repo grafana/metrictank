@@ -353,8 +353,10 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite) {
 	for {
 		select {
 		case b := <-c:
-			logger.Debugf("appending to buffer")
-			buf = append(buf, b)
+			if b.Name != "" {
+				logger.Debugf("appending to buffer")
+				buf = append(buf, b)
+			}
 		case <-t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if

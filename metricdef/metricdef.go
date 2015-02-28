@@ -284,6 +284,11 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 		}
 	}
 
+	err := def.Save()
+	if err != nil {
+		return nil, err
+	}
+
 	return def, nil
 }
 
