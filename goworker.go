@@ -88,11 +88,11 @@ func buildMetricDefCache() *metricCache {
 	return c
 }
 
-// Holds the information from an individual metric item coming in from 
+// Holds the information from an individual metric item coming in from
 // rabbitmq
 type indvMetric struct {
 	id         string
-	orgID    int
+	orgID      int
 	name       string
 	metric     string
 	location   string
@@ -101,8 +101,8 @@ type indvMetric struct {
 	valReal    bool
 	unit       string
 	time       int64
-	siteID       int
-	monitorID    int
+	siteID     int
+	monitorID  int
 	targetType string
 }
 
@@ -114,13 +114,12 @@ func init() {
 	initConfig()
 
 	numCPU := runtime.NumCPU()
-	runtime.GOMAXPROCS(numCPU)	
+	runtime.GOMAXPROCS(numCPU)
 
 	metricDefs = &metricDefCache{}
 	metricDefs.mdefs = make(map[string]*metricDef)
 	bufCh = make(chan graphite.Metric, numCPU)
 
-	
 	err := eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
 	if err != nil {
 		panic(err)
@@ -130,9 +129,9 @@ func init() {
 		panic(err)
 	}
 	err = metricdef.InitRedis(config.RedisAddr, config.RedisPasswd, config.RedisDB)
-	
+
 	// currently using the graphite client instead of influxdb's client to
-	// connect here. Using graphite instead of influxdb should be more 
+	// connect here. Using graphite instead of influxdb should be more
 	// flexible, at least initially.
 	for i := 0; i < numCPU; i++ {
 		carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
@@ -582,8 +581,8 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 	}
 
 	// validate input
-	strs := [...]string{"name","metric","location","unit","target_type"}
-	floats := [...]string{"org_id","interval","time","site_id","monitor_id"}
+	strs := [...]string{"name", "metric", "location", "unit", "target_type"}
+	floats := [...]string{"org_id", "interval", "time", "site_id", "monitor_id"}
 
 	for _, s := range strs {
 		if _, ok := m[s].(string); !ok && m[s] != nil {
@@ -598,7 +597,7 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
 
 	met := &indvMetric{id: id,
-		orgID:    int(m["org_id"].(float64)),
+		orgID:      int(m["org_id"].(float64)),
 		name:       m["name"].(string),
 		metric:     m["metric"].(string),
 		location:   m["location"].(string),
@@ -607,8 +606,8 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 		valReal:    valReal,
 		unit:       m["unit"].(string),
 		time:       int64(math.Floor(m["time"].(float64))),
-		siteID:       int(m["site_id"].(float64)),
-		monitorID:    int(m["monitor_id"].(float64)),
+		siteID:     int(m["site_id"].(float64)),
+		monitorID:  int(m["monitor_id"].(float64)),
 		targetType: m["target_type"].(string)}
 	return met, nil
 }

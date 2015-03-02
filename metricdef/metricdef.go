@@ -18,37 +18,37 @@ package metricdef
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
-	"strconv"
-	"time"
 	"gopkg.in/redis.v2"
 	"reflect"
-	"errors"
+	"strconv"
+	"time"
 )
 
 type MetricDefinition struct {
 	ID         string `json:"id"`
 	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
-	OrgID    int    `json:"org_id"`
+	OrgID      int    `json:"org_id"`
 	Location   string `json:"location"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
 	Interval   int    `json:"interval"` // minimum 10
-	SiteID       int    `json:"site_id"`
+	SiteID     int    `json:"site_id"`
 	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	MonitorID    int    `json:"monitor_id"`
+	MonitorID  int    `json:"monitor_id"`
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
 		WarnMax interface{} `json:"warnMax"`
 		CritMin interface{} `json:"critMin"`
 		CritMax interface{} `json:"critMax"`
 	} `json:"thresholds"`
-	KeepAlives int  `json:"keepAlives"`
-	State      int8 `json:"state"`
-	Extra     map[string]interface{} `json:"-"`
+	KeepAlives int                    `json:"keepAlives"`
+	State      int8                   `json:"state"`
+	Extra      map[string]interface{} `json:"-"`
 }
 
 // The JSON marshal/unmarshal with metric definitions is a little less
@@ -116,7 +116,7 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 					WarnMin interface{} `json:"warnMin"`
 					WarnMax interface{} `json:"warnMax"`
 					CritMin interface{} `json:"critMin"`
-					CritMax interface{} `json:"critMax"` 
+					CritMax interface{} `json:"critMax"`
 				}{
 					y["warnMin"],
 					y["warnMax"],
@@ -264,8 +264,8 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	}
 
 	// validate input
-	strs := [...]string{"name","metric","location","unit","target_type"}
-	floats := [...]string{"org_id","interval","site_id","monitor_id"}
+	strs := [...]string{"name", "metric", "location", "unit", "target_type"}
+	floats := [...]string{"org_id", "interval", "site_id", "monitor_id"}
 
 	for _, s := range strs {
 		if _, ok := m[s].(string); !ok && m[s] != nil {
@@ -279,18 +279,18 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 	}
 
 	def := &MetricDefinition{ID: id,
-		Name: m["name"].(string),
-		OrgID: int(m["org_id"].(float64)),
-		Location: m["location"].(string),
-		Metric: m["metric"].(string),
+		Name:       m["name"].(string),
+		OrgID:      int(m["org_id"].(float64)),
+		Location:   m["location"].(string),
+		Metric:     m["metric"].(string),
 		TargetType: m["target_type"].(string),
-		Interval: int(m["interval"].(float64)),
-		SiteID: int(m["site_id"].(float64)),
+		Interval:   int(m["interval"].(float64)),
+		SiteID:     int(m["site_id"].(float64)),
 		LastUpdate: now,
-		MonitorID: int(m["monitor_id"].(float64)),
+		MonitorID:  int(m["monitor_id"].(float64)),
 		KeepAlives: ka,
-		State: state,
-		Unit: m["unit"].(string)}
+		State:      state,
+		Unit:       m["unit"].(string)}
 
 	if t, exists := m["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
@@ -378,7 +378,7 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	}
 	logger.Debugf("get returned %q", res.Source)
 	logger.Debugf("placing %s into redis", id)
-	if rerr := rs.SetEx(id, time.Duration(300) * time.Second, string(*res.Source)).Err(); err != nil {
+	if rerr := rs.SetEx(id, time.Duration(300)*time.Second, string(*res.Source)).Err(); err != nil {
 		logger.Debugf("redis err: %s", rerr.Error())
 	}
 

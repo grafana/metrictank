@@ -96,10 +96,10 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 }
 
 // ProcessQueue creates a consumer queue on the given connection using the
-// supplied exchange, exchange type, queue pattern, and number of workers. A 
+// supplied exchange, exchange type, queue pattern, and number of workers. A
 // function that satisfies the PayloadProcessor function type is also passed in
-// to process the jobs off the queue, and if the payload processor should 
-// publish the results of its work a Publisher may be supplied. Otherwise nil 
+// to process the jobs off the queue, and if the payload processor should
+// publish the results of its work a Publisher may be supplied. Otherwise nil
 // for the Publisher is fine.
 func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor, numWorkers int) error {
 	if numWorkers < 1 {

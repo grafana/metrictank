@@ -32,7 +32,7 @@ import (
 type EventDefinition struct {
 	ID        string                 `json:"id"`
 	EventType string                 `json:"event_type"`
-	OrgID int64                  `json:"org_id"`
+	OrgID     int64                  `json:"org_id"`
 	Severity  string                 `json:"severity"` // enum "INFO" "WARN" "ERROR" "OK"
 	Source    string                 `json:"source"`
 	Timestamp int64                  `json:"timestamp"`

@@ -17,11 +17,11 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/jessevdk/go-flags"
-	"fmt"
-	"errors"
 	"log"
 	"os"
 	"strings"
@@ -48,7 +48,7 @@ const version = "0.1.0"
 
 type options struct {
 	Verbose             []bool `short:"V" long:"verbose" description:"Show verbose debug information. Repeat for more verbosity."`
-	Version bool `short:"v" long:"version" description:"Show version information."`
+	Version             bool   `short:"v" long:"version" description:"Show version information."`
 	ConfFile            string `short:"c" long:"config" description:"Specify a configuration file."`
 	LogFile             string `short:"L" long:"log-file" description:"Log to file X"`
 	SysLog              bool   `short:"s" long:"syslog" description:"Log to syslog rather than a log file. Incompatible with -L/--log-file."`
@@ -61,7 +61,7 @@ type options struct {
 	RedisAddr           string `short:"r" long:"redis-addr" description:"Hostname or IP address of redis server."`
 	RedisPasswd         string `short:"y" long:"redis-passwd" description:"Optional password to use when connecting to redis."`
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
-	RabbitMQURL string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
+	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
 }
 
 var config *conf

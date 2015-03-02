@@ -56,7 +56,7 @@ use a configuration file. The available options are:
 				      redis.
 	  -q, --rabbitmq-url=         RabbitMQ server URL.
 
-A sample configuration file can be found in the `etc` directory of this 
+A sample configuration file can be found in the `etc` directory of this
 repository.
 
 License
