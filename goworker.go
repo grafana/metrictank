@@ -113,7 +113,12 @@ var bufCh chan graphite.Metric
 func init() {
 	initConfig()
 
-	numCPU := runtime.NumCPU()
+	var numCPU int
+	if config.NumWorkers != 0 {
+		numCPU = config.NumWorkers
+	} else {
+		numCPU = runtime.NumCPU()
+	}
 	runtime.GOMAXPROCS(numCPU)
 
 	metricDefs = &metricDefCache{}
@@ -161,7 +166,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	numCPU := runtime.NumCPU()
+	var numCPU int
+	if config.NumWorkers != 0 {
+		numCPU = config.NumWorkers
+	} else {
+		numCPU = runtime.NumCPU()
+	}
 
 	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent, numCPU)
 	if err != nil {

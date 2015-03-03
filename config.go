@@ -42,6 +42,7 @@ type conf struct {
 	LogFile             string `toml:"log-file"`
 	SysLog              bool   `toml:"syslog"`
 	DebugLevel          int    `toml:"debug-level"`
+	NumWorkers int `toml:"num-workers"`
 }
 
 const version = "0.1.0"
@@ -62,6 +63,7 @@ type options struct {
 	RedisPasswd         string `short:"y" long:"redis-passwd" description:"Optional password to use when connecting to redis."`
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
 	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
+	NumWorkers int `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
 }
 
 var config *conf
@@ -167,6 +169,12 @@ func parseConfig() error {
 	}
 	if opts.RedisDB != 0 {
 		config.RedisDB = opts.RedisDB
+	}
+	if opts.NumWorkers != 0 {
+		config.NumWorkers = opts.NumWorkers
+	}
+	if config.NumWorkers < 0 {
+		return errors.New("--num-workers must be a number greater than zero")
 	}
 
 	if config.ElasticsearchPort == 0 {
