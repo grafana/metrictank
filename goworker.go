@@ -26,7 +26,6 @@ import (
 	"github.com/raintank/raintank-metric/qproc"
 	"github.com/streadway/amqp"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"runtime"
@@ -86,24 +85,6 @@ func buildMetricDefCache() *metricCache {
 	c.aggr = &cacheAggr{}
 	c.aggr.data = &aggrData{}
 	return c
-}
-
-// Holds the information from an individual metric item coming in from
-// rabbitmq
-type indvMetric struct {
-	id         string
-	orgId      int
-	name       string
-	metric     string
-	location   string
-	interval   int
-	value      float64
-	valReal    bool
-	unit       string
-	time       int64
-	siteId     int
-	monitorId  int
-	targetType string
 }
 
 var metricDefs *metricDefCache
@@ -224,7 +205,7 @@ func main() {
 }
 
 func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
-	metrics := make([]map[string]interface{}, 0)
+	metrics := make([]*metricdef.IndvMetric, 0)
 	if err := json.Unmarshal(d.Body, &metrics); err != nil {
 		return err
 	}
@@ -232,8 +213,12 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 	logger.Debugf("The parsed out json: %v", metrics)
 
 	for _, m := range metrics {
-		logger.Debugf("processing %s", m["name"])
-		id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
+		logger.Debugf("processing %s", m.Name)
+		id := fmt.Sprintf("%d.%s", m.OrgId, m.Name)
+		if m.Id == "" {
+			m.Id = id
+		}
+
 		metricDefs.m.RLock()
 		// Normally I would use defer unlock, but here we might need to
 		// release the r/w lock and take an exclusive lock, so we have
@@ -351,17 +336,10 @@ func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	return nil
 }
 
-func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
-	logger.Debugf("storing metric: %+v", m)
-	met, err := buildIndvMetric(m)
-	if err != nil {
-		return err
-	}
-	if met.valReal {
-		logger.Debugf("Adding to buffer")
-		b := graphite.NewMetric(met.id, strconv.FormatFloat(met.value, 'f', -1, 64), met.time)
-		bufCh <- b
-	}
+func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
+	logger.Debugf("storing metric: %+v", met)
+	b := graphite.NewMetric(met.Id, strconv.FormatFloat(met.Value, 'f', -1, 64), met.Time)
+	bufCh <- b
 	rollupRaw(met)
 	checkThresholds(met, pub)
 	return nil
@@ -396,18 +374,18 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerId
 	}
 }
 
-func rollupRaw(met *indvMetric) {
+func rollupRaw(met *metricdef.IndvMetric) {
 	metricDefs.m.RLock()
 	defer metricDefs.m.RUnlock()
-	def := metricDefs.mdefs[met.id]
+	def := metricDefs.mdefs[met.Id]
 	def.m.Lock()
 	defer def.m.Unlock()
 
-	logger.Debugf("rolling up %s", met.id)
+	logger.Debugf("rolling up %s", met.Id)
 
-	if def.cache.raw.flushTime < (met.time - int64(config.shortDuration)) {
-		if def.cache.aggr.flushTime < (met.time - int64(config.longDuration)) {
-			logger.Debugf("rolling up 6 hour for %s", met.id)
+	if def.cache.raw.flushTime < (met.Time - int64(config.shortDuration)) {
+		if def.cache.aggr.flushTime < (met.Time - int64(config.longDuration)) {
+			logger.Debugf("rolling up 6 hour for %s", met.Id)
 			var min, max, avg, sum *float64
 			count := len(def.cache.aggr.data.min)
 			// not slavish; we need to manipulate three slices at
@@ -434,27 +412,27 @@ func rollupRaw(met *indvMetric) {
 			def.cache.aggr.data.avg = nil
 			def.cache.aggr.data.min = nil
 			def.cache.aggr.data.max = nil
-			def.cache.aggr.flushTime = met.time
+			def.cache.aggr.flushTime = met.Time
 			rollupTime := durationStr(config.longDuration)
 			if avg != nil {
-				logger.Debugf("writing %s rollup for %s", rollupTime, met.id)
-				id := fmt.Sprintf("%s.avg.%s", rollupTime, met.id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
+				logger.Debugf("writing %s rollup for %s", rollupTime, met.Id)
+				id := fmt.Sprintf("%s.avg.%s", rollupTime, met.Id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.Time)
 				bufCh <- b
 			}
 			if min != nil {
-				id := fmt.Sprintf("%s.min.%s", rollupTime, met.id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
+				id := fmt.Sprintf("%s.min.%s", rollupTime, met.Id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.Time)
 				bufCh <- b
 			}
 			if max != nil {
-				id := fmt.Sprintf("%s.max.%s", rollupTime, met.id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
+				id := fmt.Sprintf("%s.max.%s", rollupTime, met.Id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
 				bufCh <- b
 			}
 		}
 		rollupTime := durationStr(config.shortDuration)
-		logger.Debugf("rolling up %s for %s", rollupTime, met.id)
+		logger.Debugf("rolling up %s for %s", rollupTime, met.Id)
 		var min, max, avg, sum *float64
 		count := len(def.cache.raw.data)
 		for _, p := range def.cache.raw.data {
@@ -475,36 +453,34 @@ func rollupRaw(met *indvMetric) {
 			avg = &z
 		}
 		def.cache.raw.data = nil
-		def.cache.raw.flushTime = met.time
+		def.cache.raw.flushTime = met.Time
 		if avg != nil {
-			logger.Debugf("writing %s rollup for %s:%f", rollupTime, met.id, *avg)
-			id := fmt.Sprintf("%s.avg.%s", rollupTime, met.id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
+			logger.Debugf("writing %s rollup for %s:%f", rollupTime, met.Id, *avg)
+			id := fmt.Sprintf("%s.avg.%s", rollupTime, met.Id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.Time)
 			bufCh <- b
 		}
 		if min != nil {
-			id := fmt.Sprintf("%s.min.%s", rollupTime, met.id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
+			id := fmt.Sprintf("%s.min.%s", rollupTime, met.Id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.Time)
 			bufCh <- b
 		}
 		if max != nil {
-			id := fmt.Sprintf("%s.max.%s", rollupTime, met.id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
+			id := fmt.Sprintf("%s.max.%s", rollupTime, met.Id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
 			bufCh <- b
 		}
 		def.cache.aggr.data.min = append(def.cache.aggr.data.min, min)
 		def.cache.aggr.data.max = append(def.cache.aggr.data.max, max)
 		def.cache.aggr.data.avg = append(def.cache.aggr.data.avg, avg)
 	}
-	if met.valReal {
-		def.cache.raw.data = append(def.cache.raw.data, met.value)
-	}
+	def.cache.raw.data = append(def.cache.raw.data, met.Value)
 }
 
-func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
+func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 	metricDefs.m.RLock()
 	defer metricDefs.m.RUnlock()
-	d := metricDefs.mdefs[met.id]
+	d := metricDefs.mdefs[met.Id]
 	d.m.Lock()
 	defer d.m.Unlock()
 	def := d.mdef
@@ -513,23 +489,23 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	var msg string
 	thresholds := def.Thresholds
 
-	if thresholds.CritMin != nil && met.value < thresholds.CritMin.(float64) {
-		msg = fmt.Sprintf("%f less than criticalMin %f", met.value, thresholds.CritMin.(float64))
+	if thresholds.CritMin != nil && met.Value < thresholds.CritMin.(float64) {
+		msg = fmt.Sprintf("%f less than criticalMin %f", met.Value, thresholds.CritMin.(float64))
 		logger.Debugf(msg)
 		state = stateCrit
 	}
-	if state < stateCrit && thresholds.CritMax != nil && met.value > thresholds.CritMax.(float64) {
-		msg = fmt.Sprintf("%f greater than criticalMax %f", met.value, thresholds.CritMax.(float64))
+	if state < stateCrit && thresholds.CritMax != nil && met.Value > thresholds.CritMax.(float64) {
+		msg = fmt.Sprintf("%f greater than criticalMax %f", met.Value, thresholds.CritMax.(float64))
 		logger.Debugf(msg)
 		state = stateCrit
 	}
-	if state < stateWarn && thresholds.WarnMin != nil && met.value < thresholds.WarnMin.(float64) {
-		msg = fmt.Sprintf("%f less than warnMin %f", met.value, thresholds.WarnMin.(float64))
+	if state < stateWarn && thresholds.WarnMin != nil && met.Value < thresholds.WarnMin.(float64) {
+		msg = fmt.Sprintf("%f less than warnMin %f", met.Value, thresholds.WarnMin.(float64))
 		logger.Debugf(msg)
 		state = stateWarn
 	}
-	if state < stateWarn && thresholds.WarnMax != nil && met.value < thresholds.WarnMax.(float64) {
-		msg = fmt.Sprintf("%f greater than warnMax %f", met.value, thresholds.WarnMax.(float64))
+	if state < stateWarn && thresholds.WarnMax != nil && met.Value < thresholds.WarnMax.(float64) {
+		msg = fmt.Sprintf("%f greater than warnMax %f", met.Value, thresholds.WarnMax.(float64))
 		logger.Debugf(msg)
 		state = stateWarn
 	}
@@ -545,11 +521,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		// 'new Date(metric.time * 1000).getTime()'
 		def.LastUpdate = time.Now().Unix()
 		updates = true
-	} else if def.KeepAlives != 0 && (def.LastUpdate < (met.time - int64(def.KeepAlives))) {
+	} else if def.KeepAlives != 0 && (def.LastUpdate < (met.Time - int64(def.KeepAlives))) {
 		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.Time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
@@ -562,11 +538,11 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		logger.Debugf("%s update committed to elasticsearch", def.Id)
 	}
 	if state > stateOK {
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.Time * 1000}
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
+		metricEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.Time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
@@ -578,49 +554,6 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 			}
 		}
 	}
-}
-
-func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
-	var valReal bool
-	var val float64
-
-	if v, exists := m["value"]; exists {
-		if vf, ok := v.(float64); ok {
-			val = vf
-			valReal = true
-		}
-	}
-
-	// validate input
-	strs := [...]string{"name", "metric", "location", "unit", "target_type"}
-	floats := [...]string{"org_id", "interval", "time", "site_id", "monitor_id"}
-
-	for _, s := range strs {
-		if _, ok := m[s].(string); !ok && m[s] != nil {
-			return nil, fmt.Errorf("%s is not a string", s)
-		}
-	}
-	for _, f := range floats {
-		if _, ok := m[f].(float64); !ok && m[f] != nil {
-			return nil, fmt.Errorf("%s is not a number", f)
-		}
-	}
-	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
-
-	met := &indvMetric{id: id,
-		orgId:      int(m["org_id"].(float64)),
-		name:       m["name"].(string),
-		metric:     m["metric"].(string),
-		location:   m["location"].(string),
-		interval:   int(m["interval"].(float64)),
-		value:      val,
-		valReal:    valReal,
-		unit:       m["unit"].(string),
-		time:       int64(math.Floor(m["time"].(float64))),
-		siteId:     int(m["site_id"].(float64)),
-		monitorId:  int(m["monitor_id"].(float64)),
-		targetType: m["target_type"].(string)}
-	return met, nil
 }
 
 func durationStr(d time.Duration) string {

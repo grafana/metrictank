@@ -32,14 +32,11 @@ type MetricDefinition struct {
 	Id         string `json:"id"`
 	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
 	OrgId      int    `json:"org_id"`
-	Location   string `json:"location"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
 	Interval   int    `json:"interval"` // minimum 10
-	SiteId     int    `json:"site_id"`
 	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	MonitorId  int    `json:"monitor_id"`
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
 		WarnMax interface{} `json:"warnMax"`
@@ -49,24 +46,6 @@ type MetricDefinition struct {
 	KeepAlives int                    `json:"keepAlives"`
 	State      int8                   `json:"state"`
 	Extra      map[string]interface{} `json:"-"`
-}
-
-// IndvMetric holds the information from an individual metric item coming in 
-// from rabbitmq.
-type IndvMetric struct {
-	Id         string
-	orgId      int
-	name       string
-	metric     string
-	location   string
-	interval   int
-	value      float64
-	valReal    bool
-	unit       string
-	time       int64
-	siteId     int
-	monitorId  int
-	targetType string
 }
 
 // The JSON marshal/unmarshal with metric definitions is a little less
@@ -265,52 +244,36 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 	return def, nil
 }
 
-func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
+func NewFromMessage(m *IndvMetric) (*MetricDefinition, error) {
 	logger.Debugf("incoming message: %+v", m)
-	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
+	id := m.Id
 	now := time.Now().Unix()
 
 	var ka int
-	switch k := m["keepAlives"].(type) {
+	switch k := m.Extra["keepAlives"].(type) {
 	case float64:
 		ka = int(k)
 	}
 	var state int8
-	switch s := m["state"].(type) {
+	switch s := m.Extra["state"].(type) {
 	case float64:
 		state = int8(s)
 	}
 
-	// validate input
-	strs := [...]string{"name", "metric", "location", "unit", "target_type"}
-	floats := [...]string{"org_id", "interval", "site_id", "monitor_id"}
-
-	for _, s := range strs {
-		if _, ok := m[s].(string); !ok && m[s] != nil {
-			return nil, fmt.Errorf("%s is not a string", s)
-		}
-	}
-	for _, f := range floats {
-		if _, ok := m[f].(float64); !ok && m[f] != nil {
-			return nil, fmt.Errorf("%s is not a number", f)
-		}
-	}
+	// input is now validated by json unmarshal
 
 	def := &MetricDefinition{Id: id,
-		Name:       m["name"].(string),
-		OrgId:      int(m["org_id"].(float64)),
-		Location:   m["location"].(string),
-		Metric:     m["metric"].(string),
-		TargetType: m["target_type"].(string),
-		Interval:   int(m["interval"].(float64)),
-		SiteId:     int(m["site_id"].(float64)),
+		Name:       m.Name,
+		OrgId:      m.OrgId,
+		Metric:     m.Metric,
+		TargetType: m.TargetType,
+		Interval:   m.Interval,
 		LastUpdate: now,
-		MonitorId:  int(m["monitor_id"].(float64)),
 		KeepAlives: ka,
 		State:      state,
-		Unit:       m["unit"].(string)}
+		Unit:       m.Unit}
 
-	if t, exists := m["thresholds"]; exists {
+	if t, exists := m.Extra["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
 		for k, v := range thresh {
 			switch k {
@@ -407,3 +370,4 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 
 	return def, nil
 }
+
