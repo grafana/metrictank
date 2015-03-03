@@ -29,17 +29,17 @@ import (
 )
 
 type MetricDefinition struct {
-	ID         string `json:"id"`
+	Id         string `json:"id"`
 	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
-	OrgID      int    `json:"org_id"`
+	OrgId      int    `json:"org_id"`
 	Location   string `json:"location"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
 	Interval   int    `json:"interval"` // minimum 10
-	SiteID     int    `json:"site_id"`
+	SiteId     int    `json:"site_id"`
 	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	MonitorID  int    `json:"monitor_id"`
+	MonitorId  int    `json:"monitor_id"`
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
 		WarnMax interface{} `json:"warnMax"`
@@ -49,6 +49,24 @@ type MetricDefinition struct {
 	KeepAlives int                    `json:"keepAlives"`
 	State      int8                   `json:"state"`
 	Extra      map[string]interface{} `json:"-"`
+}
+
+// IndvMetric holds the information from an individual metric item coming in 
+// from rabbitmq.
+type IndvMetric struct {
+	Id         string
+	orgId      int
+	name       string
+	metric     string
+	location   string
+	interval   int
+	value      float64
+	valReal    bool
+	unit       string
+	time       int64
+	siteId     int
+	monitorId  int
+	targetType string
 }
 
 // The JSON marshal/unmarshal with metric definitions is a little less
@@ -85,7 +103,7 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 		if tag != "" && tag != "-" {
 			name = tag
 		}
-		//all fields except 'Extra', 'ID', "KeepAlives", and "state"
+		//all fields except 'Extra', 'Id', "KeepAlives", and "state"
 		// are required.
 		if name != "Extra" && name != "id" && name != "keepAlives" && name != "state" {
 			requiredFields[name] = &requiredField{
@@ -243,7 +261,7 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 	if err := json.Unmarshal(b, &def); err != nil {
 		return nil, err
 	}
-	def.ID = fmt.Sprintf("%d.%s", def.OrgID, def.Name)
+	def.Id = fmt.Sprintf("%d.%s", def.OrgId, def.Name)
 	return def, nil
 }
 
@@ -278,16 +296,16 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 		}
 	}
 
-	def := &MetricDefinition{ID: id,
+	def := &MetricDefinition{Id: id,
 		Name:       m["name"].(string),
-		OrgID:      int(m["org_id"].(float64)),
+		OrgId:      int(m["org_id"].(float64)),
 		Location:   m["location"].(string),
 		Metric:     m["metric"].(string),
 		TargetType: m["target_type"].(string),
 		Interval:   int(m["interval"].(float64)),
-		SiteID:     int(m["site_id"].(float64)),
+		SiteId:     int(m["site_id"].(float64)),
 		LastUpdate: now,
-		MonitorID:  int(m["monitor_id"].(float64)),
+		MonitorId:  int(m["monitor_id"].(float64)),
 		KeepAlives: ka,
 		State:      state,
 		Unit:       m["unit"].(string)}
@@ -317,8 +335,8 @@ func NewFromMessage(m map[string]interface{}) (*MetricDefinition, error) {
 }
 
 func (m *MetricDefinition) Save() error {
-	if m.ID == "" {
-		m.ID = fmt.Sprintf("%d.%s", m.OrgID, m.Name)
+	if m.Id == "" {
+		m.Id = fmt.Sprintf("%d.%s", m.OrgId, m.Name)
 	}
 	if m.LastUpdate == 0 {
 		m.LastUpdate = time.Now().Unix()
@@ -339,7 +357,7 @@ func (m *MetricDefinition) Update() error {
 }
 
 func (m *MetricDefinition) validate() error {
-	if m.Name == "" || m.OrgID == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
+	if m.Name == "" || m.OrgId == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
 		// TODO: this error message ought to be more informative
 		err := fmt.Errorf("metric is not valid!")
 		return err
@@ -348,7 +366,7 @@ func (m *MetricDefinition) validate() error {
 }
 
 func (m *MetricDefinition) indexMetric() error {
-	resp, err := es.Index("definitions", "metric", m.ID, nil, m)
+	resp, err := es.Index("definitions", "metric", m.Id, nil, m)
 	logger.Debugf("response ok? %v", resp.Ok)
 	if err != nil {
 		return err

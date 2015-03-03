@@ -30,9 +30,9 @@ import (
 )
 
 type EventDefinition struct {
-	ID        string                 `json:"id"`
+	Id        string                 `json:"id"`
 	EventType string                 `json:"event_type"`
-	OrgID     int64                  `json:"org_id"`
+	OrgId     int64                  `json:"org_id"`
 	Severity  string                 `json:"severity"` // enum "INFO" "WARN" "ERROR" "OK"
 	Source    string                 `json:"source"`
 	Timestamp int64                  `json:"timestamp"`
@@ -66,7 +66,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 		if tag != "" && tag != "-" {
 			name = tag
 		}
-		//all fields except 'Extra' and 'ID' are required.
+		//all fields except 'Extra' and 'Id' are required.
 		if name != "Extra" && name != "id" {
 			requiredFields[name] = &requiredField{
 				StructName: field.Name,
@@ -164,9 +164,9 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 }
 
 func (e *EventDefinition) Save() error {
-	if e.ID == "" {
+	if e.Id == "" {
 		u := uuid.NewRandom()
-		e.ID = u.String()
+		e.Id = u.String()
 	}
 	if e.Timestamp == 0 {
 		// looks like this expects timestamps in milliseconds
@@ -175,7 +175,7 @@ func (e *EventDefinition) Save() error {
 	if err := e.validate(); err != nil {
 		return err
 	}
-	resp, err := es.Index("events", e.EventType, e.ID, nil, e)
+	resp, err := es.Index("events", e.EventType, e.Id, nil, e)
 	logger.Debugf("response ok? %v", resp.Ok)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (e *EventDefinition) Save() error {
 }
 
 func (e *EventDefinition) validate() error {
-	if e.EventType == "" || e.OrgID == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
+	if e.EventType == "" || e.OrgId == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
 		err := fmt.Errorf("event definition not valid")
 		return err
 	}

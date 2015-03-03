@@ -92,7 +92,7 @@ func buildMetricDefCache() *metricCache {
 // rabbitmq
 type indvMetric struct {
 	id         string
-	orgID      int
+	orgId      int
 	name       string
 	metric     string
 	location   string
@@ -101,8 +101,8 @@ type indvMetric struct {
 	valReal    bool
 	unit       string
 	time       int64
-	siteID     int
-	monitorID  int
+	siteId     int
+	monitorId  int
 	targetType string
 }
 
@@ -308,46 +308,46 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 func updateMetricDef(metric *metricdef.MetricDefinition) error {
 	logger.Debugf("Metric we have: %v :: %q", metric, metric)
-	logger.Debugf("Updating metric def for %s", metric.ID)
+	logger.Debugf("Updating metric def for %s", metric.Id)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
 
-	md, ok := metricDefs.mdefs[metric.ID]
+	md, ok := metricDefs.mdefs[metric.Id]
 	md.m.RLock()
 	defer md.m.RUnlock()
 	newMd := &metricDef{mdef: metric}
 	if ok {
-		logger.Debugf("metric %s found", metric.ID)
+		logger.Debugf("metric %s found", metric.Id)
 		if md.mdef.LastUpdate >= metric.LastUpdate {
-			logger.Debugf("%s already up to date", metric.ID)
+			logger.Debugf("%s already up to date", metric.Id)
 			return nil
 		}
 		newMd.cache = md.cache
 	} else {
-		logger.Infof("no definition for %s found, building new cache", metric.ID)
+		logger.Infof("no definition for %s found, building new cache", metric.Id)
 		newMd.cache = buildMetricDefCache()
 		now := time.Now().Unix()
 		newMd.cache.raw.flushTime = now - int64(config.shortDuration)
 		newMd.cache.aggr.flushTime = now - int64(config.longDuration)
 	}
-	metricDefs.mdefs[metric.ID] = newMd
+	metricDefs.mdefs[metric.Id] = newMd
 
 	return nil
 }
 
 func removeMetricDef(metric *metricdef.MetricDefinition) error {
 	logger.Debugf("Metric we have: %v :: %q", metric, metric)
-	logger.Debugf("Removing metric def for %s", metric.ID)
+	logger.Debugf("Removing metric def for %s", metric.Id)
 	metricDefs.m.Lock()
 	defer metricDefs.m.Unlock()
-	md, ok := metricDefs.mdefs[metric.ID]
+	md, ok := metricDefs.mdefs[metric.Id]
 	if !ok {
 		return nil
 	}
 	md.m.Lock()
 	defer md.m.Unlock()
 
-	delete(metricDefs.mdefs, metric.ID)
+	delete(metricDefs.mdefs, metric.Id)
 	return nil
 }
 
@@ -367,7 +367,7 @@ func storeMetric(m map[string]interface{}, pub *qproc.Publisher) error {
 	return nil
 }
 
-func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerID int) {
+func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerId int) {
 	buf := make([]graphite.Metric, 0)
 
 	// flush buffer every second
@@ -376,16 +376,16 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerID
 		select {
 		case b := <-c:
 			if b.Name != "" {
-				logger.Debugf("worker %d appending to buffer", workerID)
+				logger.Debugf("worker %d appending to buffer", workerId)
 				buf = append(buf, b)
 			}
 		case <-t.C:
 			// A possibility: it might be worth it to hack up the
 			// carbon lib to allow batch submissions of metrics if
 			// doing them individually proves to be too slow
-			logger.Debugf("worker %d flushing %d items in buffer now", workerID, len(buf))
+			logger.Debugf("worker %d flushing %d items in buffer now", workerId, len(buf))
 			for _, m := range buf {
-				logger.Debugf("worker %d sending metric %+v", workerID, m)
+				logger.Debugf("worker %d sending metric %+v", workerId, m)
 				err := carbon.SendMetric(m)
 				if err != nil {
 					logger.Errorf(err.Error())
@@ -539,7 +539,7 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 	events := make([]map[string]interface{}, 0)
 	curState := def.State
 	if state != def.State {
-		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.ID, levelMap[state], levelMap[def.State])
+		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.Id, levelMap[state], levelMap[def.State])
 		def.State = state
 		// TODO: ask why in the node version lastUpdate is set with
 		// 'new Date(metric.time * 1000).getTime()'
@@ -549,24 +549,24 @@ func checkThresholds(met *indvMetric, pub *qproc.Publisher) {
 		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
 		err := def.Save()
 		if err != nil {
-			logger.Errorf("Error updating metric definition for %s: %s", def.ID, err.Error())
-			delete(metricDefs.mdefs, def.ID)
+			logger.Errorf("Error updating metric definition for %s: %s", def.Id, err.Error())
+			delete(metricDefs.mdefs, def.Id)
 			return
 		}
-		logger.Debugf("%s update committed to elasticsearch", def.ID)
+		logger.Debugf("%s update committed to elasticsearch", def.Id)
 	}
 	if state > stateOK {
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.time * 1000}
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgID, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
+		metricEvent := map[string]interface{}{"source": "metric", "metric": met.name, "org_id": met.orgId, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
@@ -608,7 +608,7 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 	id := fmt.Sprintf("%d.%s", int64(m["org_id"].(float64)), m["name"])
 
 	met := &indvMetric{id: id,
-		orgID:      int(m["org_id"].(float64)),
+		orgId:      int(m["org_id"].(float64)),
 		name:       m["name"].(string),
 		metric:     m["metric"].(string),
 		location:   m["location"].(string),
@@ -617,8 +617,8 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 		valReal:    valReal,
 		unit:       m["unit"].(string),
 		time:       int64(math.Floor(m["time"].(float64))),
-		siteID:     int(m["site_id"].(float64)),
-		monitorID:  int(m["monitor_id"].(float64)),
+		siteId:     int(m["site_id"].(float64)),
+		monitorId:  int(m["monitor_id"].(float64)),
 		targetType: m["target_type"].(string)}
 	return met, nil
 }
