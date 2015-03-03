@@ -42,7 +42,7 @@ func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern,
 	if err != nil {
 		return nil, err
 	}
-	q, err := ch.QueueDeclare("", false, false, false, false, nil)
+	q, err := ch.QueueDeclare("", false, true, true, false, nil)
 	if err != nil {
 		return nil, err
 	}
