@@ -258,8 +258,8 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 			md = &metricDef{mdef: def}
 			md.cache = buildMetricDefCache()
 			now := time.Now().Unix()
-			md.cache.raw.flushTime = now - 600
-			md.cache.aggr.flushTime = now - 26100
+			md.cache.raw.flushTime = now - int64(config.shortDuration)
+			md.cache.aggr.flushTime = now - int64(config.longDuration)
 			metricDefs.m.RUnlock()
 			metricDefs.m.Lock()
 			metricDefs.mdefs[id] = md
@@ -327,8 +327,8 @@ func updateMetricDef(metric *metricdef.MetricDefinition) error {
 		logger.Infof("no definition for %s found, building new cache", metric.ID)
 		newMd.cache = buildMetricDefCache()
 		now := time.Now().Unix()
-		newMd.cache.raw.flushTime = now - 600
-		newMd.cache.aggr.flushTime = now - 21600
+		newMd.cache.raw.flushTime = now - int64(config.shortDuration)
+		newMd.cache.aggr.flushTime = now - int64(config.longDuration)
 	}
 	metricDefs.mdefs[metric.ID] = newMd
 
@@ -405,9 +405,8 @@ func rollupRaw(met *indvMetric) {
 
 	logger.Debugf("rolling up %s", met.id)
 
-	if def.cache.raw.flushTime < (met.time - 600) {
-		logger.Debugf("\nflushTime: %d\nmet.time\n%d\nmet.time - 600 %d", def.cache.raw.flushTime, met.time, met.time-600)
-		if def.cache.aggr.flushTime < (met.time - 21600) {
+	if def.cache.raw.flushTime < (met.time - int64(config.shortDuration)) {
+		if def.cache.aggr.flushTime < (met.time - int64(config.longDuration)) {
 			logger.Debugf("rolling up 6 hour for %s", met.id)
 			var min, max, avg, sum *float64
 			count := len(def.cache.aggr.data.min)
@@ -436,24 +435,26 @@ func rollupRaw(met *indvMetric) {
 			def.cache.aggr.data.min = nil
 			def.cache.aggr.data.max = nil
 			def.cache.aggr.flushTime = met.time
+			rollupTime := durationStr(config.longDuration)
 			if avg != nil {
-				logger.Debugf("writing 6 hour rollup for %s", met.id)
-				id := fmt.Sprintf("6hour.avg.%s", met.id)
+				logger.Debugf("writing %s rollup for %s", rollupTime, met.id)
+				id := fmt.Sprintf("%s.avg.%s", rollupTime, met.id)
 				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
 				bufCh <- b
 			}
 			if min != nil {
-				id := fmt.Sprintf("6hour.min.%s", met.id)
+				id := fmt.Sprintf("%s.min.%s", rollupTime, met.id)
 				b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
 				bufCh <- b
 			}
 			if max != nil {
-				id := fmt.Sprintf("6hour.max.%s", met.id)
+				id := fmt.Sprintf("%s.max.%s", rollupTime, met.id)
 				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
 				bufCh <- b
 			}
 		}
-		logger.Debugf("rolling up 10 min for %s", met.id)
+		rollupTime := durationStr(config.shortDuration)
+		logger.Debugf("rolling up %s for %s", rollupTime, met.id)
 		var min, max, avg, sum *float64
 		count := len(def.cache.raw.data)
 		for _, p := range def.cache.raw.data {
@@ -476,18 +477,18 @@ func rollupRaw(met *indvMetric) {
 		def.cache.raw.data = nil
 		def.cache.raw.flushTime = met.time
 		if avg != nil {
-			logger.Debugf("writing 10 min rollup for %s:%f", met.id, *avg)
-			id := fmt.Sprintf("10min.avg.%s", met.id)
+			logger.Debugf("writing %s rollup for %s:%f", rollupTime, met.id, *avg)
+			id := fmt.Sprintf("%s.avg.%s", rollupTime, met.id)
 			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.time)
 			bufCh <- b
 		}
 		if min != nil {
-			id := fmt.Sprintf("10min.min.%s", met.id)
+			id := fmt.Sprintf("%s.min.%s", rollupTime, met.id)
 			b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.time)
 			bufCh <- b
 		}
 		if max != nil {
-			id := fmt.Sprintf("10min.max.%s", met.id)
+			id := fmt.Sprintf("%s.max.%s", rollupTime, met.id)
 			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.time)
 			bufCh <- b
 		}
@@ -620,4 +621,14 @@ func buildIndvMetric(m map[string]interface{}) (*indvMetric, error) {
 		monitorID:  int(m["monitor_id"].(float64)),
 		targetType: m["target_type"].(string)}
 	return met, nil
+}
+
+func durationStr(d time.Duration) string {
+	if d.Hours() >= 1 {
+		return fmt.Sprintf("%dhour", int(d.Hours()))
+	} else if d.Minutes() >= 1 {
+		return fmt.Sprintf("%dmin", int(d.Minutes()))
+	} else {
+		return fmt.Sprintf("%dseconds", int(d.Seconds()))
+	}
 }

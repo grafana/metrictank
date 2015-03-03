@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 type conf struct {
@@ -43,6 +44,10 @@ type conf struct {
 	SysLog              bool   `toml:"syslog"`
 	DebugLevel          int    `toml:"debug-level"`
 	NumWorkers int `toml:"num-workers"`
+	ShortRollup string `toml:"short-rollup"`
+	LongRollup string `toml:"long-rollup"`
+	shortDuration time.Duration
+	longDuration time.Duration
 }
 
 const version = "0.1.0"
@@ -64,6 +69,8 @@ type options struct {
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
 	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
 	NumWorkers int `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
+	ShortRollup string `long:"short-rollup" description:"Interval to do short-term metric rollups. Defaults to '10m', for 10 minutes."`
+	LongRollup string `long:"long-rollup" description:"Interval to do long-term metric rollups. Defaults to '6h', for 6 hours."`
 }
 
 var config *conf
@@ -175,6 +182,27 @@ func parseConfig() error {
 	}
 	if config.NumWorkers < 0 {
 		return errors.New("--num-workers must be a number greater than zero")
+	}
+	if opts.ShortRollup != "" {
+		config.ShortRollup = opts.ShortRollup
+	}
+	if opts.LongRollup != "" {
+		config.LongRollup = opts.LongRollup
+	}
+	if config.ShortRollup == "" {
+		config.ShortRollup = "10m"
+	}
+	if config.LongRollup == "" {
+		config.LongRollup = "6h"
+	}
+	var terr error
+	config.shortDuration, terr = time.ParseDuration(config.ShortRollup)
+	if terr != nil {
+		return terr
+	}
+	config.longDuration, terr = time.ParseDuration(config.LongRollup)
+	if terr != nil {
+		return terr
 	}
 
 	if config.ElasticsearchPort == 0 {
