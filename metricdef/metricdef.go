@@ -195,7 +195,7 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
-	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil {
+	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil && err.Error() != "record not found" {
 		return err
 	} else {
 		if !exists {
