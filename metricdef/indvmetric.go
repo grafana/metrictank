@@ -83,7 +83,11 @@ func (m *IndvMetric) UnmarshalJSON(raw []byte) error {
 				v = int64(v.(float64))
 			}
 			value := reflect.ValueOf(v)
-			reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
+			if value.IsValid() {
+				reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
+			} else {
+				logger.Warningf("Yikes, in indvmetric %s had the zero value! %v", k, v)
+			}
 			def.Seen = true
 		}
 	}

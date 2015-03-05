@@ -122,7 +122,11 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 				}
 			}
 			value := reflect.ValueOf(v)
-			reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
+			if value.IsValid() {
+				reflect.ValueOf(m).Elem().FieldByName(def.StructName).Set(value)
+			} else {
+				logger.Warningf("Yikes, in metricdef %s had the zero value! %v", k, v)
+			}
 			def.Seen = true
 		}
 	}
