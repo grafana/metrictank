@@ -28,6 +28,15 @@ import (
 	"time"
 )
 
+// Monitor states
+const (
+	StateOK int8 = iota
+	StateWarn
+	StateCrit
+)
+
+var LevelMap = [...]string{"ok", "warning", "critical"}
+
 type MetricDefinition struct {
 	Id         string `json:"id"`
 	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`

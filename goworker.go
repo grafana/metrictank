@@ -31,63 +31,11 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
 
-// Monitor states
-const (
-	stateOK int8 = iota
-	stateWarn
-	stateCrit
-)
-
-// cache to hold metric definitions
-type metricDefCache struct {
-	mdefs map[string]*metricDef
-	m     sync.RWMutex
-}
-
-// a struct to hold metric definitions and their cached information, along with
-// a mutex to keep data safe from concurrent access.
-type metricDef struct {
-	mdef  *metricdef.MetricDefinition
-	cache *metricCache
-	m     sync.RWMutex
-}
-
-// Below are some structs for caching metric information.
-type metricCache struct {
-	raw  *cacheRaw
-	aggr *cacheAggr
-}
-
-type cacheRaw struct {
-	data      []float64
-	flushTime int64
-}
-
-type cacheAggr struct {
-	data      *aggrData
-	flushTime int64
-}
-
-type aggrData struct {
-	avg []*float64
-	min []*float64
-	max []*float64
-}
-
-func buildMetricDefCache() *metricCache {
-	c := &metricCache{}
-	c.raw = &cacheRaw{}
-	c.aggr = &cacheAggr{}
-	c.aggr.data = &aggrData{}
-	return c
-}
-
-var metricDefs *metricDefCache
+var metricDefs *metricdef.MetricDefCache
 
 var bufCh chan graphite.Metric
 
@@ -115,6 +63,14 @@ func init() {
 		panic(err)
 	}
 	err = metricdef.InitRedis(config.RedisAddr, config.RedisPasswd, config.RedisDB)
+	if err != nil {
+		panic(err)
+	}
+
+	metricDefs, err = metricdef.InitMetricDefCache(config.shortDuration, config.longDuration)
+	if err != nil {
+		panic(err)
+	}
 
 	// currently using the graphite client instead of influxdb's client to
 	// connect here. Using graphite instead of influxdb should be more
@@ -218,40 +174,10 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 		if m.Id == "" {
 			m.Id = id
 		}
-
-		metricDefs.m.RLock()
-		// Normally I would use defer unlock, but here we might need to
-		// release the r/w lock and take an exclusive lock, so we have
-		// to be more explicit about it.
-		if md, ok := metricDefs.mdefs[id]; !ok {
-			logger.Debugf("adding %s to metric defs", id)
-			def, err := metricdef.GetMetricDefinition(id)
-			if err != nil {
-				if err.Error() == "record not found" {
-					// create a new metric
-					logger.Debugf("creating new metric")
-					def, err = metricdef.NewFromMessage(m)
-					if err != nil {
-						metricDefs.m.RUnlock()
-						return err
-					}
-				} else {
-					metricDefs.m.RUnlock()
-					return err
-				}
-			}
-			md = &metricDef{mdef: def}
-			md.cache = buildMetricDefCache()
-			now := time.Now().Unix()
-			md.cache.raw.flushTime = now - int64(config.shortDuration)
-			md.cache.aggr.flushTime = now - int64(config.longDuration)
-			metricDefs.m.RUnlock()
-			metricDefs.m.Lock()
-			metricDefs.mdefs[id] = md
-			metricDefs.m.Unlock()
-		} else {
-			metricDefs.m.RUnlock()
+		if err := metricDefs.CheckMetricDef(id, m); err != nil {
+			return err
 		}
+
 		if err := storeMetric(m, pub); err != nil {
 			return err
 		}
@@ -340,8 +266,11 @@ func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
 	logger.Debugf("storing metric: %+v", met)
 	b := graphite.NewMetric(met.Id, strconv.FormatFloat(met.Value, 'f', -1, 64), met.Time)
 	bufCh <- b
-	rollupRaw(met)
-	checkThresholds(met, pub)
+	go func(met *metricdef.IndvMetric, pub *qproc.Publisher) {
+		// align to a minute boundary without holding everything up
+		rollupRaw(met)
+		checkThresholds(met, pub)
+	}(met, pub)
 	return nil
 }
 
@@ -485,37 +414,36 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 	defer d.m.Unlock()
 	def := d.mdef
 
-	state := stateOK
+	state := metricdef.StateOK
 	var msg string
 	thresholds := def.Thresholds
 
 	if thresholds.CritMin != nil && met.Value < thresholds.CritMin.(float64) {
 		msg = fmt.Sprintf("%f less than criticalMin %f", met.Value, thresholds.CritMin.(float64))
 		logger.Debugf(msg)
-		state = stateCrit
+		state = metricdef.StateCrit
 	}
-	if state < stateCrit && thresholds.CritMax != nil && met.Value > thresholds.CritMax.(float64) {
+	if state < metricdef.StateCrit && thresholds.CritMax != nil && met.Value > thresholds.CritMax.(float64) {
 		msg = fmt.Sprintf("%f greater than criticalMax %f", met.Value, thresholds.CritMax.(float64))
 		logger.Debugf(msg)
-		state = stateCrit
+		state = metricdef.StateCrit
 	}
-	if state < stateWarn && thresholds.WarnMin != nil && met.Value < thresholds.WarnMin.(float64) {
+	if state < metricdef.StateWarn && thresholds.WarnMin != nil && met.Value < thresholds.WarnMin.(float64) {
 		msg = fmt.Sprintf("%f less than warnMin %f", met.Value, thresholds.WarnMin.(float64))
 		logger.Debugf(msg)
-		state = stateWarn
+		state = metricdef.StateWarn
 	}
-	if state < stateWarn && thresholds.WarnMax != nil && met.Value < thresholds.WarnMax.(float64) {
+	if state < metricdef.StateWarn && thresholds.WarnMax != nil && met.Value < thresholds.WarnMax.(float64) {
 		msg = fmt.Sprintf("%f greater than warnMax %f", met.Value, thresholds.WarnMax.(float64))
 		logger.Debugf(msg)
-		state = stateWarn
+		state = metricdef.StateWarn
 	}
 
-	levelMap := []string{"ok", "warning", "critical"}
 	var updates bool
 	events := make([]map[string]interface{}, 0)
 	curState := def.State
 	if state != def.State {
-		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.Id, levelMap[state], levelMap[def.State])
+		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.Id, metricdef.LevelMap[state], metricdef.LevelMap[def.State])
 		def.State = state
 		// TODO: ask why in the node version lastUpdate is set with
 		// 'new Date(metric.time * 1000).getTime()'
@@ -525,7 +453,7 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
 		updates = true
 		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "keepAlive", "state": levelMap[state], "details": msg, "timestamp": met.Time * 1000}
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "keepAlive", "state": metricdef.LevelMap[state], "details": msg, "timestamp": met.Time * 1000}
 		events = append(events, checkEvent)
 	}
 	if updates {
@@ -537,12 +465,12 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 		}
 		logger.Debugf("%s update committed to elasticsearch", def.Id)
 	}
-	if state > stateOK {
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "checkFailure", "state": levelMap[state], "details": msg, "timestamp": met.Time * 1000}
+	if state > metricdef.StateOK {
+		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "checkFailure", "state": metricdef.LevelMap[state], "details": msg, "timestamp": met.Time * 1000}
 		events = append(events, checkEvent)
 	}
 	if state != curState {
-		metricEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "stateChange", "state": levelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", levelMap[curState], levelMap[state]), "timestamp": met.Time * 1000}
+		metricEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "stateChange", "state": metricdef.LevelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", metricdef.LevelMap[curState], metricdef.LevelMap[state]), "timestamp": met.Time * 1000}
 		events = append(events, metricEvent)
 	}
 	if len(events) > 0 {
@@ -562,6 +490,6 @@ func durationStr(d time.Duration) string {
 	} else if d.Minutes() >= 1 {
 		return fmt.Sprintf("%dmin", int(d.Minutes()))
 	} else {
-		return fmt.Sprintf("%dseconds", int(d.Seconds()))
+		return fmt.Sprintf("%dsecond", int(d.Seconds()))
 	}
 }

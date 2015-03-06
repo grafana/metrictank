@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"encoding/json"
 	"reflect"
+	"github.com/ctdk/goas/v2/logger"
 )
 
 // IndvMetric holds the information from an individual metric item coming in 

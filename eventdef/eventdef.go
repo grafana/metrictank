@@ -87,6 +87,7 @@ func (e *EventDefinition) UnmarshalJSON(raw []byte) error {
 			if reflect.ValueOf(v).Type().Name() == "float64" {
 				v = int64(v.(float64))
 			}
+			value := reflect.ValueOf(v)
 			if value.IsValid() {
 				reflect.ValueOf(e).Elem().FieldByName(def.StructName).Set(value)
 			} else {
