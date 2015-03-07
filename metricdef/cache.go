@@ -17,11 +17,14 @@
 package metricdef
 
 import (
-	//"gopkg.in/redis.v2"
+	"gopkg.in/redis.v2"
 	"sync"
 	"time"
 	"github.com/ctdk/goas/v2/logger"
+	"errors"
 )
+
+var DefNotFound = errors.New("definition not found")
 
 // Thar be redis-based locking. Worth investigating
 
@@ -31,6 +34,7 @@ type MetricDefCache struct {
 	m sync.RWMutex
 	shortDur time.Duration
 	longDur time.Duration
+	rs *redis.Client
 }
 
 // a struct to hold metric definitions and their cached information, along with
@@ -56,8 +60,20 @@ type MetricCache struct {
 	}
 }
 
-func InitMetricDefCache(shortDur, longDur time.Duration) (*MetricDefCache, error) {
-	return nil, nil
+func InitMetricDefCache(shortDur, longDur time.Duration, addr, passwd string, db int64) (*MetricDefCache, error) {
+	mdc := new(MetricDefCache)
+	mdc.mdefs = make(map[string]*MetricDefinition)
+	mdc.shortDur = shortDur
+	mdc.longDur = longDur
+	opts := &redis.Options{}
+	opts.Network = "tcp"
+	opts.Addr = addr
+	if passwd != "" {
+		opts.Password = passwd
+	}
+	opts.DB = db
+	mdc.rs = redis.NewClient(opts)
+	return mdc, nil
 }
 
 func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
@@ -103,4 +119,41 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 	// save the cached info here
 
 	return nil
+}
+
+func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
+	mdc.m.Lock()
+	defer mdc.m.Unlock()
+	md, ok := mdc.mdefs[mdef.Id]
+	// get cache from redis
+	if ok {
+		logger.Debugf("metric %s found", mdef.Id)
+
+	}
+}
+
+func (mdc *MetricDefCache) RemoveDefCache(id string) {
+	logger.Debugf("Removing metric def for %s", id)
+	mdc.m.Lock()
+	defer mdc.m.Unlock()
+	md, ok := mdc.mdefs[id]
+	if !ok {
+		return
+	}
+	md.m.Lock()
+	defer md.m.Unlock()
+	delete(mdc.mdefs, id)
+	return
+}
+
+func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
+
+}
+
+func (mci *MetricCacheItem) Lock() {
+	mci.m.Lock()
+}
+
+func (mci *MetricCacheItem) Unlock() {
+	mci.m.Unlock()
 }

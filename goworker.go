@@ -50,8 +50,6 @@ func init() {
 	}
 	runtime.GOMAXPROCS(numCPU)
 
-	metricDefs = &metricDefCache{}
-	metricDefs.mdefs = make(map[string]*metricDef)
 	bufCh = make(chan graphite.Metric, numCPU)
 
 	err := eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
@@ -67,7 +65,7 @@ func init() {
 		panic(err)
 	}
 
-	metricDefs, err = metricdef.InitMetricDefCache(config.shortDuration, config.longDuration)
+	metricDefs, err = metricdef.InitMetricDefCache(config.shortDuration, config.longDuration, config.RedisAddr, config.RedisPasswd, config.RedisDB)
 	if err != nil {
 		panic(err)
 	}
