@@ -17,25 +17,25 @@
 package metricdef
 
 import (
-	"fmt"
 	"encoding/json"
-	"reflect"
+	"fmt"
 	"github.com/ctdk/goas/v2/logger"
+	"reflect"
 )
 
-// IndvMetric holds the information from an individual metric item coming in 
+// IndvMetric holds the information from an individual metric item coming in
 // from rabbitmq.
 type IndvMetric struct {
-	Id         string `json:"id"`
-	OrgId      int `json:"org_id"`
-	Name       string `json:"name"`
-	Metric     string `json:"metric"`
-	Interval   int `json:"interval"`
-	Value      float64 `json:"value"`
-	Unit       string `json:"unit"`
-	Time       int64 `json:"time"`
-	TargetType string `json:"target_type"`
-	Extra map[string]interface{} `json:"-"`
+	Id         string                 `json:"id"`
+	OrgId      int                    `json:"org_id"`
+	Name       string                 `json:"name"`
+	Metric     string                 `json:"metric"`
+	Interval   int                    `json:"interval"`
+	Value      float64                `json:"value"`
+	Unit       string                 `json:"unit"`
+	Time       int64                  `json:"time"`
+	TargetType string                 `json:"target_type"`
+	Extra      map[string]interface{} `json:"-"`
 }
 
 func (m *IndvMetric) UnmarshalJSON(raw []byte) error {

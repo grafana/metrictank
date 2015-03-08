@@ -18,14 +18,14 @@ package metricdef
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/ctdk/goas/v2/logger"
 	"gopkg.in/redis.v2"
+	"math/rand"
+	"strconv"
 	"sync"
 	"time"
-	"github.com/ctdk/goas/v2/logger"
-	"errors"
-	"strconv"
-	"math/rand"
 )
 
 var DefNotFound = errors.New("definition not found")
@@ -34,27 +34,27 @@ var DefNotFound = errors.New("definition not found")
 
 // cache to hold metric definitions
 type MetricDefCache struct {
-	mdefs map[string]*MetricDefinition
-	m sync.RWMutex
+	mdefs    map[string]*MetricDefinition
+	m        sync.RWMutex
 	shortDur time.Duration
-	longDur time.Duration
-	rs *redis.Client
+	longDur  time.Duration
+	rs       *redis.Client
 }
 
 // a struct to hold metric definitions and their cached information, along with
 // a mutex to keep data safe from concurrent access.
 type MetricCacheItem struct {
-	Def  *MetricDefinition
-	Cache *MetricCache
-	m     sync.RWMutex
+	Def    *MetricDefinition
+	Cache  *MetricCache
+	m      sync.RWMutex
 	parent *MetricDefCache
-	id string
-	rl *redisLock
+	id     string
+	rl     *redisLock
 }
 
 type MetricCache struct {
 	Raw struct {
-		Data []float64
+		Data      []float64
 		FlushTime int64
 	}
 	Aggr struct {
@@ -67,12 +67,12 @@ type MetricCache struct {
 	}
 }
 
-// inspiration for the locking taken from 
+// inspiration for the locking taken from
 // https://github.com/atomic-labs/redislock/blob/master/redislock.go
 type redisLock struct {
-	id string
+	id     string
 	secret string
-	rs *redis.Client
+	rs     *redis.Client
 }
 
 func InitMetricDefCache(shortDur, longDur time.Duration, addr, passwd string, db int64) (*MetricDefCache, error) {
@@ -111,7 +111,7 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 			}
 		}
 		mdc.mdefs[id] = def
-	} 
+	}
 
 	// Fetch cache info from redis here, and if it doesn't exist:
 	if rl, err := lockItem(mdc.rs, id); err != nil {
@@ -140,8 +140,8 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 func (mdc *MetricDefCache) initMetricCache() *MetricCache {
 	c := &MetricCache{}
 	now := time.Now().Unix()
-	c.Raw.FlushTime = now - int64(mdc.shortDur / time.Second)
-	c.Aggr.FlushTime = now - int64(mdc.longDur / time.Second)
+	c.Raw.FlushTime = now - int64(mdc.shortDur/time.Second)
+	c.Aggr.FlushTime = now - int64(mdc.longDur/time.Second)
 	return c
 }
 
@@ -149,7 +149,7 @@ func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 	mdc.m.Lock()
 	defer mdc.m.Unlock()
 	md, ok := mdc.mdefs[mdef.Id]
-	
+
 	if ok {
 		logger.Debugf("metric %s found", mdef.Id)
 		if md.LastUpdate >= mdef.LastUpdate {
@@ -229,7 +229,7 @@ func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
 			return nil, err
 		}
 	}
-	return &MetricCacheItem{ Def: def, Cache: c, parent: mdc, id: id, rl: rl }, nil
+	return &MetricCacheItem{Def: def, Cache: c, parent: mdc, id: id, rl: rl}, nil
 }
 
 func (mci *MetricCacheItem) Save() error {
@@ -291,8 +291,8 @@ func (r *redisLock) key() string {
 func lockItem(rs *redis.Client, id string) (*redisLock, error) {
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	s := strconv.FormatInt(rnd.Int63(), 16)
-	r := &redisLock{ id: id, secret: s, rs: rs }
-	if err := rs.SetEx(r.key(), 5 * time.Second, r.secret).Err(); err != nil {
+	r := &redisLock{id: id, secret: s, rs: rs}
+	if err := rs.SetEx(r.key(), 5*time.Second, r.secret).Err(); err != nil {
 		if err == redis.Nil {
 			return nil, nil
 		}

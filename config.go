@@ -43,11 +43,11 @@ type conf struct {
 	LogFile             string `toml:"log-file"`
 	SysLog              bool   `toml:"syslog"`
 	DebugLevel          int    `toml:"debug-level"`
-	NumWorkers int `toml:"num-workers"`
-	ShortRollup string `toml:"short-rollup"`
-	LongRollup string `toml:"long-rollup"`
-	shortDuration time.Duration
-	longDuration time.Duration
+	NumWorkers          int    `toml:"num-workers"`
+	ShortRollup         string `toml:"short-rollup"`
+	LongRollup          string `toml:"long-rollup"`
+	shortDuration       time.Duration
+	longDuration        time.Duration
 }
 
 const version = "0.1.0"
@@ -68,9 +68,9 @@ type options struct {
 	RedisPasswd         string `short:"y" long:"redis-passwd" description:"Optional password to use when connecting to redis."`
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
 	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
-	NumWorkers int `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
-	ShortRollup string `long:"short-rollup" description:"Interval to do short-term metric rollups. Defaults to '10m', for 10 minutes."`
-	LongRollup string `long:"long-rollup" description:"Interval to do long-term metric rollups. Defaults to '6h', for 6 hours."`
+	NumWorkers          int    `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
+	ShortRollup         string `long:"short-rollup" description:"Interval to do short-term metric rollups. Defaults to '10m', for 10 minutes."`
+	LongRollup          string `long:"long-rollup" description:"Interval to do long-term metric rollups. Defaults to '6h', for 6 hours."`
 }
 
 var config *conf

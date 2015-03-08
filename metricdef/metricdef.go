@@ -44,7 +44,7 @@ type MetricDefinition struct {
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Unit       string `json:"unit"`
-	Interval   int    `json:"interval"` // minimum 10
+	Interval   int    `json:"interval"`   // minimum 10
 	LastUpdate int64  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
 	Thresholds struct {
 		WarnMin interface{} `json:"warnMin"`
@@ -383,4 +383,3 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 
 	return def, nil
 }
-

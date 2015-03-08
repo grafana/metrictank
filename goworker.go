@@ -265,8 +265,8 @@ func rollupRaw(met *metricdef.IndvMetric) {
 
 	logger.Debugf("rolling up %s", met.Id)
 
-	if def.Cache.Raw.FlushTime < (met.Time - int64(config.shortDuration / time.Second)) {
-		if def.Cache.Aggr.FlushTime < (met.Time - int64(config.longDuration / time.Second)) {
+	if def.Cache.Raw.FlushTime < (met.Time - int64(config.shortDuration/time.Second)) {
+		if def.Cache.Aggr.FlushTime < (met.Time - int64(config.longDuration/time.Second)) {
 			logger.Debugf("rolling up 6 hour for %s", met.Id)
 			var min, max, avg, sum *float64
 			count := len(def.Cache.Aggr.Data.Min)
