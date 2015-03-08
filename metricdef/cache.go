@@ -17,6 +17,8 @@
 package metricdef
 
 import (
+	"encoding/json"
+	"fmt"
 	"gopkg.in/redis.v2"
 	"sync"
 	"time"
@@ -77,18 +79,8 @@ func InitMetricDefCache(shortDur, longDur time.Duration, addr, passwd string, db
 }
 
 func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
-	mdc.m.RLock()
-
-	// Fetch cache info from redis here, and if it doesn't exist:
-	var c *MetricCache 
-	if false {
-
-	} else {
-		c = &MetricCache{}
-		now := time.Now().Unix()
-		c.Raw.FlushTime = now - int64(mdc.shortDur)
-		c.Aggr.FlushTime = now - int64(mdc.longDur)
-	}
+	mdc.m.Lock()
+	defer mdc.m.Unlock()
 
 	def, exists := mdc.mdefs[id]
 	if !exists {
@@ -105,49 +97,125 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 				return err
 			}
 		}
-		mdc.m.RUnlock()
-		mdc.m.Lock()
 		mdc.mdefs[id] = def
-		mdc.m.Unlock()
-	} else {
-		mdc.m.RUnlock()
+	} 
+
+	// Fetch cache info from redis here, and if it doesn't exist:
+	c, err := mdc.getRedisCache(id)
+	if err != nil {
+		return err
+	}
+	if c == nil {
+		c = mdc.initMetricCache()
 	}
 
-	md := &MetricCacheItem{ Def: def, Cache: c }
-	_ = md
-
 	// save the cached info here
+	if err = mdc.setRedisCache(id, c); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (mdc *MetricDefCache) initMetricCache() *MetricCache {
+	c := &MetricCache{}
+	now := time.Now().Unix()
+	c.Raw.FlushTime = now - int64(mdc.shortDur)
+	c.Aggr.FlushTime = now - int64(mdc.longDur)
+	return c
 }
 
 func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 	mdc.m.Lock()
 	defer mdc.m.Unlock()
 	md, ok := mdc.mdefs[mdef.Id]
-	// get cache from redis
+	
 	if ok {
 		logger.Debugf("metric %s found", mdef.Id)
-
+		if md.LastUpdate >= mdef.LastUpdate {
+			logger.Debugf("%s is already up to date", mdef.Id)
+			return nil
+		}
 	}
+	// make sure the rollup info is in place
+	if c, err := mdc.getRedisCache(mdef.Id); err != nil {
+		return err
+	} else if c == nil {
+		c = mdc.initMetricCache()
+		if err = mdc.setRedisCache(mdef.Id, c); err != nil {
+			return err
+		}
+	}
+	mdc.mdefs[mdef.Id] = mdef
+	return nil
 }
 
 func (mdc *MetricDefCache) RemoveDefCache(id string) {
-	logger.Debugf("Removing metric def for %s", id)
 	mdc.m.Lock()
 	defer mdc.m.Unlock()
-	md, ok := mdc.mdefs[id]
-	if !ok {
-		return
-	}
-	md.m.Lock()
-	defer md.m.Unlock()
 	delete(mdc.mdefs, id)
-	return
+	mdc.delRedisCache(id)
+}
+
+func (mdc *MetricDefCache) RemoveDefFromMap(id string) {
+	mdc.m.Lock()
+	defer mdc.m.Unlock()
+	delete(mdc.mdefs, id)
 }
 
 func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
+	mdc.m.RLock()
+	defer mdc.m.RUnlock()
+	def, ok := mdc.mdefs[id]
+	if !ok {
+		// try and get it from elasticsearch/redis
+		var err error
+		def, err = GetMetricDefinition(id)
+		if err != nil {
+			return nil, err
+		}
+	}
+	c, err := mdc.getRedisCache(id)
+	if err != nil {
+		return nil, err
+	} else if c == nil {
+		logger.Debugf("Nothing found for %s in metric def redis cache for %s", id)
+		c = mdc.initMetricCache()
+		if err = mdc.setRedisCache(id, c); err != nil {
+			return nil, err
+		}
+	}
+	return &MetricCacheItem{ Def: def, Cache: c }, nil
+}
 
+func (mdc *MetricDefCache) getRedisCache(id string) (*MetricCache, error) {
+	v, err := mdc.rs.Get(redisCacheId(id)).Result()
+	if err != nil && err != redis.Nil {
+		logger.Errorf("Getting metric cache info failed: %s", err.Error())
+		return nil, err
+	} else if err == redis.Nil {
+		return nil, nil
+	}
+	c := new(MetricCache)
+	if err = json.Unmarshal([]byte(v), &c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (mdc *MetricDefCache) setRedisCache(id string, c *MetricCache) error {
+	j, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	if err = mdc.rs.Set(redisCacheId(id), string(j)).Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mdc *MetricDefCache) delRedisCache(id string) {
+	mdc.rs.Del(redisCacheId(id))
 }
 
 func (mci *MetricCacheItem) Lock() {
@@ -156,4 +224,8 @@ func (mci *MetricCacheItem) Lock() {
 
 func (mci *MetricCacheItem) Unlock() {
 	mci.m.Unlock()
+}
+
+func redisCacheId(id string) string {
+	return fmt.Sprintf("cache:%s", id)
 }

@@ -196,7 +196,7 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 		if err != nil {
 			return err
 		}
-		if err := updateMetricDef(metric); err != nil {
+		if err := metricDefs.UpdateDefCache(metric); err != nil {
 			return err
 		}
 	case "remove":
@@ -204,59 +204,12 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 		if err != nil {
 			return err
 		}
-		if err := removeMetricDef(metric); err != nil {
-			return err
-		}
+		metricDefs.RemoveDefCache(metric.Id)
 	default:
 		err := fmt.Errorf("message has unknown action '%s'", action)
 		return err
 	}
 
-	return nil
-}
-
-func updateMetricDef(metric *metricdef.MetricDefinition) error {
-	logger.Debugf("Metric we have: %v :: %q", metric, metric)
-	logger.Debugf("Updating metric def for %s", metric.Id)
-	metricDefs.m.Lock()
-	defer metricDefs.m.Unlock()
-
-	md, ok := metricDefs.mdefs[metric.Id]
-	md.m.RLock()
-	defer md.m.RUnlock()
-	newMd := &metricDef{mdef: metric}
-	if ok {
-		logger.Debugf("metric %s found", metric.Id)
-		if md.mdef.LastUpdate >= metric.LastUpdate {
-			logger.Debugf("%s already up to date", metric.Id)
-			return nil
-		}
-		newMd.cache = md.cache
-	} else {
-		logger.Infof("no definition for %s found, building new cache", metric.Id)
-		newMd.cache = buildMetricDefCache()
-		now := time.Now().Unix()
-		newMd.cache.raw.flushTime = now - int64(config.shortDuration)
-		newMd.cache.aggr.flushTime = now - int64(config.longDuration)
-	}
-	metricDefs.mdefs[metric.Id] = newMd
-
-	return nil
-}
-
-func removeMetricDef(metric *metricdef.MetricDefinition) error {
-	logger.Debugf("Metric we have: %v :: %q", metric, metric)
-	logger.Debugf("Removing metric def for %s", metric.Id)
-	metricDefs.m.Lock()
-	defer metricDefs.m.Unlock()
-	md, ok := metricDefs.mdefs[metric.Id]
-	if !ok {
-		return nil
-	}
-	md.m.Lock()
-	defer md.m.Unlock()
-
-	delete(metricDefs.mdefs, metric.Id)
 	return nil
 }
 
@@ -302,33 +255,35 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerId
 }
 
 func rollupRaw(met *metricdef.IndvMetric) {
-	metricDefs.m.RLock()
-	defer metricDefs.m.RUnlock()
-	def := metricDefs.mdefs[met.Id]
-	def.m.Lock()
-	defer def.m.Unlock()
+	def, err := metricDefs.GetDefItem(met.Id)
+	if err != nil {
+		logger.Errorf(err.Error())
+		return
+	}
+	def.Lock()
+	defer def.Unlock()
 
 	logger.Debugf("rolling up %s", met.Id)
 
-	if def.cache.raw.flushTime < (met.Time - int64(config.shortDuration)) {
-		if def.cache.aggr.flushTime < (met.Time - int64(config.longDuration)) {
+	if def.Cache.Raw.FlushTime < (met.Time - int64(config.shortDuration)) {
+		if def.Cache.Aggr.FlushTime < (met.Time - int64(config.longDuration)) {
 			logger.Debugf("rolling up 6 hour for %s", met.Id)
 			var min, max, avg, sum *float64
-			count := len(def.cache.aggr.data.min)
+			count := len(def.Cache.Aggr.Data.Min)
 			// not slavish; we need to manipulate three slices at
 			// once
 			for i := 0; i < count; i++ {
-				if min == nil || *def.cache.aggr.data.min[i] < *min {
-					min = def.cache.aggr.data.min[i]
+				if min == nil || *def.Cache.Aggr.Data.Min[i] < *min {
+					min = def.Cache.Aggr.Data.Min[i]
 				}
-				if max == nil || *def.cache.aggr.data.max[i] < *max {
-					max = def.cache.aggr.data.max[i]
+				if max == nil || *def.Cache.Aggr.Data.Max[i] < *max {
+					max = def.Cache.Aggr.Data.Max[i]
 				}
-				if def.cache.aggr.data.avg[i] != nil {
+				if def.Cache.Aggr.Data.Avg[i] != nil {
 					if sum == nil {
-						sum = def.cache.aggr.data.avg[i]
+						sum = def.Cache.Aggr.Data.Avg[i]
 					} else {
-						*sum += *def.cache.aggr.data.avg[i]
+						*sum += *def.Cache.Aggr.Data.Avg[i]
 					}
 				}
 			}
@@ -336,10 +291,10 @@ func rollupRaw(met *metricdef.IndvMetric) {
 				z := *sum / float64(count)
 				avg = &z
 			}
-			def.cache.aggr.data.avg = nil
-			def.cache.aggr.data.min = nil
-			def.cache.aggr.data.max = nil
-			def.cache.aggr.flushTime = met.Time
+			def.Cache.Aggr.Data.Avg = nil
+			def.Cache.Aggr.Data.Min = nil
+			def.Cache.Aggr.Data.Max = nil
+			def.Cache.Aggr.FlushTime = met.Time
 			rollupTime := durationStr(config.longDuration)
 			if avg != nil {
 				logger.Debugf("writing %s rollup for %s", rollupTime, met.Id)
@@ -361,8 +316,8 @@ func rollupRaw(met *metricdef.IndvMetric) {
 		rollupTime := durationStr(config.shortDuration)
 		logger.Debugf("rolling up %s for %s", rollupTime, met.Id)
 		var min, max, avg, sum *float64
-		count := len(def.cache.raw.data)
-		for _, p := range def.cache.raw.data {
+		count := len(def.Cache.Raw.Data)
+		for _, p := range def.Cache.Raw.Data {
 			if min == nil || p < *min {
 				min = &p
 			}
@@ -379,8 +334,8 @@ func rollupRaw(met *metricdef.IndvMetric) {
 			z := *sum / float64(count)
 			avg = &z
 		}
-		def.cache.raw.data = nil
-		def.cache.raw.flushTime = met.Time
+		def.Cache.Raw.Data = nil
+		def.Cache.Raw.FlushTime = met.Time
 		if avg != nil {
 			logger.Debugf("writing %s rollup for %s:%f", rollupTime, met.Id, *avg)
 			id := fmt.Sprintf("%s.avg.%s", rollupTime, met.Id)
@@ -397,20 +352,22 @@ func rollupRaw(met *metricdef.IndvMetric) {
 			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
 			bufCh <- b
 		}
-		def.cache.aggr.data.min = append(def.cache.aggr.data.min, min)
-		def.cache.aggr.data.max = append(def.cache.aggr.data.max, max)
-		def.cache.aggr.data.avg = append(def.cache.aggr.data.avg, avg)
+		def.Cache.Aggr.Data.Min = append(def.Cache.Aggr.Data.Min, min)
+		def.Cache.Aggr.Data.Max = append(def.Cache.Aggr.Data.Max, max)
+		def.Cache.Aggr.Data.Avg = append(def.Cache.Aggr.Data.Avg, avg)
 	}
-	def.cache.raw.data = append(def.cache.raw.data, met.Value)
+	def.Cache.Raw.Data = append(def.Cache.Raw.Data, met.Value)
 }
 
 func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
-	metricDefs.m.RLock()
-	defer metricDefs.m.RUnlock()
-	d := metricDefs.mdefs[met.Id]
-	d.m.Lock()
-	defer d.m.Unlock()
-	def := d.mdef
+	d, err := metricDefs.GetDefItem(met.Id)
+	if err != nil {
+		logger.Errorf(err.Error())
+		return
+	}
+	d.Lock()
+	defer d.Unlock()
+	def := d.Def
 
 	state := metricdef.StateOK
 	var msg string
@@ -458,7 +415,7 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 		err := def.Save()
 		if err != nil {
 			logger.Errorf("Error updating metric definition for %s: %s", def.Id, err.Error())
-			delete(metricDefs.mdefs, def.Id)
+			metricDefs.RemoveDefFromMap(met.Id)
 			return
 		}
 		logger.Debugf("%s update committed to elasticsearch", def.Id)
