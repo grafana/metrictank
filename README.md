@@ -45,6 +45,12 @@ use a configuration file. The available options are:
 	  -D, --redis-db=             Option database number to use when connecting to
 				      redis.
 	  -q, --rabbitmq-url=         RabbitMQ server URL.
+	  -w, --num-workers=          Number of workers to launch. Defaults to the
+            	                      number of CPUs on the system.
+	      --short-rollup=         Interval to do short-term metric rollups.
+                   	              Defaults to '10m', for 10 minutes.
+	      --long-rollup=          Interval to do long-term metric rollups. Defaults
+                                      to '6h', for 6 hours.
 ```
 
 A sample configuration file can be found in the `etc` directory of this 
