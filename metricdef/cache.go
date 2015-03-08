@@ -45,6 +45,8 @@ type MetricCacheItem struct {
 	Def  *MetricDefinition
 	Cache *MetricCache
 	m     sync.RWMutex
+	parent *MetricDefCache
+	id string
 }
 
 type MetricCache struct {
@@ -185,7 +187,16 @@ func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
 			return nil, err
 		}
 	}
-	return &MetricCacheItem{ Def: def, Cache: c }, nil
+	return &MetricCacheItem{ Def: def, Cache: c, parent: mdc, id: id }, nil
+}
+
+func (mci *MetricCacheItem) Save() error {
+	mci.parent.m.RLock()
+	defer mci.parent.m.RUnlock()
+	if err := mci.parent.setRedisCache(mci.id, mci.Cache); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (mdc *MetricDefCache) getRedisCache(id string) (*MetricCache, error) {

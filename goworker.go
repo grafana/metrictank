@@ -357,6 +357,9 @@ func rollupRaw(met *metricdef.IndvMetric) {
 		def.Cache.Aggr.Data.Avg = append(def.Cache.Aggr.Data.Avg, avg)
 	}
 	def.Cache.Raw.Data = append(def.Cache.Raw.Data, met.Value)
+	if err = def.Save(); err != nil {
+		logger.Errorf(err.Error())
+	}
 }
 
 func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
