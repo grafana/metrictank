@@ -24,6 +24,8 @@ import (
 	"time"
 	"github.com/ctdk/goas/v2/logger"
 	"errors"
+	"strconv"
+	"math/rand"
 )
 
 var DefNotFound = errors.New("definition not found")
@@ -47,6 +49,7 @@ type MetricCacheItem struct {
 	m     sync.RWMutex
 	parent *MetricDefCache
 	id string
+	rl *redisLock
 }
 
 type MetricCache struct {
@@ -62,6 +65,14 @@ type MetricCache struct {
 		}
 		FlushTime int64
 	}
+}
+
+// inspiration for the locking taken from 
+// https://github.com/atomic-labs/redislock/blob/master/redislock.go
+type redisLock struct {
+	id string
+	secret string
+	rs *redis.Client
 }
 
 func InitMetricDefCache(shortDur, longDur time.Duration, addr, passwd string, db int64) (*MetricDefCache, error) {
@@ -103,17 +114,24 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 	} 
 
 	// Fetch cache info from redis here, and if it doesn't exist:
-	c, err := mdc.getRedisCache(id)
-	if err != nil {
-		return err
-	}
-	if c == nil {
-		c = mdc.initMetricCache()
-	}
+	if rl, err := lockItem(mdc.rs, id); err != nil {
+		if rl == nil {
+			logger.Warningf("Couldn't get a redis lock for item %s", id)
+			return nil
+		}
+		defer rl.unlockItem()
+		c, err := mdc.getRedisCache(id)
+		if err != nil {
+			return err
+		}
+		if c == nil {
+			c = mdc.initMetricCache()
+		}
 
-	// save the cached info here
-	if err = mdc.setRedisCache(id, c); err != nil {
-		return err
+		// save the cached info here
+		if err = mdc.setRedisCache(id, c); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -140,12 +158,19 @@ func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 		}
 	}
 	// make sure the rollup info is in place
-	if c, err := mdc.getRedisCache(mdef.Id); err != nil {
-		return err
-	} else if c == nil {
-		c = mdc.initMetricCache()
-		if err = mdc.setRedisCache(mdef.Id, c); err != nil {
-			return err
+	if rl, err := lockItem(mdc.rs, mdef.Id); err != nil {
+		if rl == nil {
+			logger.Warningf("Couldn't get a redis lock for item %s when updating cache def", mdef.Id)
+		} else {
+			defer rl.unlockItem()
+			if c, err := mdc.getRedisCache(mdef.Id); err != nil {
+				return err
+			} else if c == nil {
+				c = mdc.initMetricCache()
+				if err = mdc.setRedisCache(mdef.Id, c); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	mdc.mdefs[mdef.Id] = mdef
@@ -155,8 +180,17 @@ func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 func (mdc *MetricDefCache) RemoveDefCache(id string) {
 	mdc.m.Lock()
 	defer mdc.m.Unlock()
+	rl, err := lockItem(mdc.rs, id)
+	if err != nil {
+		logger.Errorf("Error getting redis lock while deleting %s: %s", id, err.Error())
+		return
+	} else if rl == nil {
+		logger.Warningf("Can't get a lock to remove cache def %s, bailing", id)
+		return
+	}
 	delete(mdc.mdefs, id)
 	mdc.delRedisCache(id)
+	rl.unlockItem()
 }
 
 func (mdc *MetricDefCache) RemoveDefFromMap(id string) {
@@ -177,17 +211,25 @@ func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
 			return nil, err
 		}
 	}
+	rl, err := lockItem(mdc.rs, id)
+	if err != nil {
+		return nil, err
+	} else if rl == nil {
+		return nil, fmt.Errorf("couldn't get redis lock for def item %s", id)
+	}
 	c, err := mdc.getRedisCache(id)
 	if err != nil {
+		rl.unlockItem()
 		return nil, err
 	} else if c == nil {
 		logger.Debugf("Nothing found for %s in metric def redis cache for %s", id)
 		c = mdc.initMetricCache()
 		if err = mdc.setRedisCache(id, c); err != nil {
+			rl.unlockItem()
 			return nil, err
 		}
 	}
-	return &MetricCacheItem{ Def: def, Cache: c, parent: mdc, id: id }, nil
+	return &MetricCacheItem{ Def: def, Cache: c, parent: mdc, id: id, rl: rl }, nil
 }
 
 func (mci *MetricCacheItem) Save() error {
@@ -196,6 +238,7 @@ func (mci *MetricCacheItem) Save() error {
 	if err := mci.parent.setRedisCache(mci.id, mci.Cache); err != nil {
 		return err
 	}
+	mci.rl.unlockItem()
 	return nil
 }
 
@@ -239,4 +282,33 @@ func (mci *MetricCacheItem) Unlock() {
 
 func redisCacheId(id string) string {
 	return fmt.Sprintf("cache:%s", id)
+}
+
+func (r *redisLock) key() string {
+	return fmt.Sprintf("lock:%s", r.id)
+}
+
+func lockItem(rs *redis.Client, id string) (*redisLock, error) {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	s := strconv.FormatInt(rnd.Int63(), 16)
+	r := &redisLock{ id: id, secret: s, rs: rs }
+	if err := rs.SetEx(r.key(), 5 * time.Second, r.secret).Err(); err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return r, nil
+}
+
+func (r *redisLock) unlockItem() error {
+	unlock := redis.NewScript(`
+	if redis.call("get", KEYS[1]) == ARGV[1]
+		then
+			return redis.call("del", KEYS[1])
+		else
+			return 0
+		end
+	`)
+	return unlock.Run(rs, []string{r.key()}, []string{r.secret}).Err()
 }
