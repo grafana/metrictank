@@ -120,8 +120,8 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 func (mdc *MetricDefCache) initMetricCache() *MetricCache {
 	c := &MetricCache{}
 	now := time.Now().Unix()
-	c.Raw.FlushTime = now - int64(mdc.shortDur)
-	c.Aggr.FlushTime = now - int64(mdc.longDur)
+	c.Raw.FlushTime = now - int64(mdc.shortDur / time.Second)
+	c.Aggr.FlushTime = now - int64(mdc.longDur / time.Second)
 	return c
 }
 
