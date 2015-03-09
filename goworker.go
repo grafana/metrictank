@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -38,6 +39,17 @@ import (
 var metricDefs *metricdef.MetricDefCache
 
 var bufCh chan graphite.Metric
+
+type pFloat64Slice []*float64
+   	
+func (p pFloat64Slice) Len() int           { return len(p) }
+func (p pFloat64Slice) Less(i, j int) bool { return *p[i] < *p[j] || isNaN(p[i]) && !isNaN(p[j]) }
+func (p pFloat64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// isNaN is a copy of math.IsNaN to avoid a dependency on the math package.
+func isNaN(f *float64) bool {
+	return *f != *f
+}
 
 func init() {
 	initConfig()
@@ -291,9 +303,11 @@ func rollupRaw(met *metricdef.IndvMetric) {
 				z := *sum / float64(count)
 				avg = &z
 			}
+			med := getPtrMedian(def.Cache.Aggr.Data.Med)
 			def.Cache.Aggr.Data.Avg = nil
 			def.Cache.Aggr.Data.Min = nil
 			def.Cache.Aggr.Data.Max = nil
+			def.Cache.Aggr.Data.Med = nil
 			def.Cache.Aggr.FlushTime = met.Time
 			rollupTime := durationStr(config.longDuration)
 			if avg != nil {
@@ -310,6 +324,11 @@ func rollupRaw(met *metricdef.IndvMetric) {
 			if max != nil {
 				id := fmt.Sprintf("%s.max.%s", rollupTime, met.Id)
 				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
+				bufCh <- b
+			}
+			if med != nil {
+				id := fmt.Sprintf("%s.med.%s", rollupTime, met.Id)
+				b := graphite.NewMetric(id, strconv.FormatFloat(*med, 'f', -1, 64), met.Time)
 				bufCh <- b
 			}
 		}
@@ -330,6 +349,7 @@ func rollupRaw(met *metricdef.IndvMetric) {
 				*sum += p
 			}
 		}
+		med := getMedian(def.Cache.Raw.Data)
 		if count > 0 {
 			z := *sum / float64(count)
 			avg = &z
@@ -352,14 +372,55 @@ func rollupRaw(met *metricdef.IndvMetric) {
 			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
 			bufCh <- b
 		}
+		if med != nil {
+			id := fmt.Sprintf("%s.med.%s", rollupTime, met.Id)
+			b := graphite.NewMetric(id, strconv.FormatFloat(*med, 'f', -1, 64), met.Time)
+			bufCh <- b
+
+		}
 		def.Cache.Aggr.Data.Min = append(def.Cache.Aggr.Data.Min, min)
 		def.Cache.Aggr.Data.Max = append(def.Cache.Aggr.Data.Max, max)
 		def.Cache.Aggr.Data.Avg = append(def.Cache.Aggr.Data.Avg, avg)
+		def.Cache.Aggr.Data.Med = append(def.Cache.Aggr.Data.Med, med)
 	}
 	def.Cache.Raw.Data = append(def.Cache.Raw.Data, met.Value)
 	if err = def.Save(); err != nil {
 		logger.Errorf(err.Error())
 	}
+}
+
+func getPtrMedian(d []*float64) *float64 {
+	dlen := len(d)
+	res := 0.0
+	if dlen == 0 {
+		return &res
+	}
+	meds := make([]*float64, dlen)
+	copy(meds, d)
+	sort.Sort(pFloat64Slice(meds))
+	mid := dlen / 2
+	res = *meds[mid]
+	if dlen % 2 == 0 {
+		res = (res + *meds[mid - 1]) / 2
+	}
+	return &res
+}
+
+func getMedian(d []float64) *float64 {
+	dlen := len(d)
+	res := 0.0
+	if dlen == 0 {
+		return &res
+	}
+	meds := make([]float64, dlen)
+	copy(meds, d)
+	sort.Sort(sort.Float64Slice(meds))
+	mid := dlen / 2
+	res = meds[mid]
+	if dlen % 2 == 0 {
+		res = (res + meds[mid - 1]) / 2
+	}
+	return &res
 }
 
 func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {

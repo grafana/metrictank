@@ -62,6 +62,7 @@ type MetricCache struct {
 			Avg []*float64
 			Min []*float64
 			Max []*float64
+			Med []*float64
 		}
 		FlushTime int64
 	}
