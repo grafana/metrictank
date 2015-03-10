@@ -115,7 +115,7 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 	}
 
 	// Fetch cache info from redis here, and if it doesn't exist:
-	if rl, err := lockItem(mdc.rs, id); err != nil {
+	if rl, err := lockItem(mdc.rs, id); err == nil {
 		if rl == nil {
 			logger.Warningf("Couldn't get a redis lock for item %s", id)
 			return nil
@@ -133,6 +133,8 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 		if err = mdc.setRedisCache(id, c); err != nil {
 			return err
 		}
+	} else {
+		return err
 	}
 
 	return nil
@@ -159,7 +161,7 @@ func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 		}
 	}
 	// make sure the rollup info is in place
-	if rl, err := lockItem(mdc.rs, mdef.Id); err != nil {
+	if rl, err := lockItem(mdc.rs, mdef.Id); err == nil {
 		if rl == nil {
 			logger.Warningf("Couldn't get a redis lock for item %s when updating cache def", mdef.Id)
 		} else {
@@ -173,6 +175,8 @@ func (mdc *MetricDefCache) UpdateDefCache(mdef *MetricDefinition) error {
 				}
 			}
 		}
+	} else {
+		return err
 	}
 	mdc.mdefs[mdef.Id] = mdef
 	return nil
@@ -300,6 +304,7 @@ func lockItem(rs *redis.Client, id string) (*redisLock, error) {
 	errCh := make(chan error, 1)
 	stop := make(chan struct{})
 	go func(r *redisLock, stop chan struct{}) {
+		ForLoop:
 		for {
 			select {
 			case <-stop:
@@ -315,9 +320,12 @@ func lockItem(rs *redis.Client, id string) (*redisLock, error) {
 						errCh <- err
 						return
 					}
+					// if we're trying again, wait just a
+					// little to give redis room to breathe
+					time.Sleep(time.Microsecond)
 				} else {
 					// got the lock
-					break
+					break ForLoop
 				}
 			}
 		}
