@@ -305,7 +305,9 @@ func lockItem(rs *redis.Client, id string) (*redisLock, error) {
 			case <-stop:
 				return
 			default:
-				if err := rs.SetEx(r.key(), 5*time.Second, r.secret).Err(); err != nil {
+				c := redis.NewStatusCmd("SET", r.key(), r.secret, "EX", "5", "NX")
+				rs.Process(c)
+				if err := c.Err(); err != nil {
 					// If trying to get a lock returned an error
 					// besides redis.Nil, return the error. If it
 					// was redis nil, try again.
