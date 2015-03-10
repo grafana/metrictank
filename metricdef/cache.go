@@ -293,11 +293,40 @@ func lockItem(rs *redis.Client, id string) (*redisLock, error) {
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	s := strconv.FormatInt(rnd.Int63(), 16)
 	r := &redisLock{id: id, secret: s, rs: rs}
-	if err := rs.SetEx(r.key(), 5*time.Second, r.secret).Err(); err != nil {
-		if err == redis.Nil {
-			return nil, nil
+	errCh := make(chan error, 1)
+	stop := make(chan struct{})
+	go func(r *redisLock, stop chan struct{}) {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				if err := rs.SetEx(r.key(), 5*time.Second, r.secret).Err(); err != nil {
+					// If trying to get a lock returned an error
+					// besides redis.Nil, return the error. If it
+					// was redis nil, try again.
+					if err != redis.Nil {
+						errCh <- err
+						return
+					}
+				} else {
+					// got the lock
+					break
+				}
+			}
 		}
-		return nil, err
+		errCh <- nil
+	}(r, stop)
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return nil, err
+		}
+	case <-time.After(5 * time.Second):
+		logger.Infof("Could not get redis lock for %s", id)
+		stop <- struct{}{}
+		return nil, nil
 	}
 	return r, nil
 }
