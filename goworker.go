@@ -280,7 +280,7 @@ func rollupRaw(met *metricdef.IndvMetric) {
 	if def.Cache.Raw.FlushTime < (met.Time - int64(config.shortDuration/time.Second)) {
 		if def.Cache.Aggr.FlushTime < (met.Time - int64(config.longDuration/time.Second)) {
 			logger.Debugf("rolling up 6 hour for %s", met.Id)
-			var min, max, avg, sum *float64
+			var min, max, avg, sum, med *float64
 			count := len(def.Cache.Aggr.Data.Min)
 			// not slavish; we need to manipulate three slices at
 			// once
@@ -303,7 +303,9 @@ func rollupRaw(met *metricdef.IndvMetric) {
 				z := *sum / float64(count)
 				avg = &z
 			}
-			med := getPtrMedian(def.Cache.Aggr.Data.Med)
+			if def.Cache.Aggr.Data.Med != nil {
+				med = getPtrMedian(def.Cache.Aggr.Data.Med)
+			}
 			def.Cache.Aggr.Data.Avg = nil
 			def.Cache.Aggr.Data.Min = nil
 			def.Cache.Aggr.Data.Max = nil
@@ -334,7 +336,7 @@ func rollupRaw(met *metricdef.IndvMetric) {
 		}
 		rollupTime := durationStr(config.shortDuration)
 		logger.Debugf("rolling up %s for %s", rollupTime, met.Id)
-		var min, max, avg, sum *float64
+		var min, max, avg, sum, med *float64
 		count := len(def.Cache.Raw.Data)
 		for _, p := range def.Cache.Raw.Data {
 			if min == nil || p < *min {
@@ -349,7 +351,9 @@ func rollupRaw(met *metricdef.IndvMetric) {
 				*sum += p
 			}
 		}
-		med := getMedian(def.Cache.Raw.Data)
+		if def.Cache.Raw.Data != nil {
+			med = getMedian(def.Cache.Raw.Data)
+		}
 		if count > 0 {
 			z := *sum / float64(count)
 			avg = &z
