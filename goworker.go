@@ -435,6 +435,7 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 	}
 	d.Lock()
 	defer d.Unlock()
+	defer d.Release()
 	def := d.Def
 
 	state := metricdef.StateOK
@@ -488,6 +489,7 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 		}
 		logger.Debugf("%s update committed to elasticsearch", def.Id)
 	}
+
 	if state > metricdef.StateOK {
 		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "checkFailure", "state": metricdef.LevelMap[state], "details": msg, "timestamp": met.Time * 1000}
 		events = append(events, checkEvent)

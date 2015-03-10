@@ -236,11 +236,15 @@ func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
 func (mci *MetricCacheItem) Save() error {
 	mci.parent.m.RLock()
 	defer mci.parent.m.RUnlock()
+	defer mci.rl.unlockItem()
 	if err := mci.parent.setRedisCache(mci.id, mci.Cache); err != nil {
 		return err
 	}
-	mci.rl.unlockItem()
 	return nil
+}
+
+func (mci *MetricCacheItem) Release() {
+	mci.rl.unlockItem()
 }
 
 func (mdc *MetricDefCache) getRedisCache(id string) (*MetricCache, error) {
