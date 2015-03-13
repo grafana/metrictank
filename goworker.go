@@ -229,11 +229,8 @@ func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
 	logger.Debugf("storing metric: %+v", met)
 	b := graphite.NewMetric(met.Id, strconv.FormatFloat(met.Value, 'f', -1, 64), met.Time)
 	bufCh <- b
-	go func(met *metricdef.IndvMetric, pub *qproc.Publisher) {
-		// align to a minute boundary without holding everything up
-		rollupRaw(met)
-		checkThresholds(met, pub)
-	}(met, pub)
+	rollupRaw(met)
+	checkThresholds(met, pub)
 	return nil
 }
 
