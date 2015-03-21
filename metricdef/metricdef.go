@@ -39,7 +39,7 @@ var LevelMap = [...]string{"ok", "warning", "critical"}
 
 type MetricDefinition struct {
 	Id         string `json:"id"`
-	Name       string `json:"name",elastic:"type:string,index:not_analyzed"`
+	Name       string `json:"name" elastic:"type:string,index:not_analyzed"`
 	OrgId      int    `json:"org_id"`
 	Metric     string `json:"metric"`
 	TargetType string `json:"target_type"` // an emum ["derive","gauge"] in nodejs
