@@ -86,6 +86,9 @@ func (m *MetricDefinition) UnmarshalJSON(raw []byte) error {
 
 	for i := 0; i < s.NumField(); i++ {
 		field := s.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
 		name := field.Name
 		// look at the field Tags to work out the property named used in the
 		// JSON document.
@@ -157,6 +160,9 @@ func (m *MetricDefinition) MarshalJSON() ([]byte, error) {
 	value := reflect.ValueOf(*m)
 	for i := 0; i < value.Type().NumField(); i++ {
 		field := value.Type().Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
 		name := field.Name
 		tag := field.Tag.Get("json")
 		if tag != "" && tag != "-" {
