@@ -29,7 +29,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,17 +38,6 @@ import (
 var metricDefs *metricdef.MetricDefCache
 
 var bufCh chan graphite.Metric
-
-type pFloat64Slice []*float64
-   	
-func (p pFloat64Slice) Len() int           { return len(p) }
-func (p pFloat64Slice) Less(i, j int) bool { return *p[i] < *p[j] || isNaN(p[i]) && !isNaN(p[j]) }
-func (p pFloat64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// isNaN is a copy of math.IsNaN to avoid a dependency on the math package.
-func isNaN(f *float64) bool {
-	return *f != *f
-}
 
 func init() {
 	initConfig()
@@ -77,7 +65,7 @@ func init() {
 		panic(err)
 	}
 
-	metricDefs, err = metricdef.InitMetricDefCache(config.shortDuration, config.longDuration, config.RedisAddr, config.RedisPasswd, config.RedisDB)
+	metricDefs, err = metricdef.InitMetricDefCache()
 	if err != nil {
 		panic(err)
 	}
@@ -229,7 +217,6 @@ func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
 	logger.Debugf("storing metric: %+v", met)
 	b := graphite.NewMetric(met.Id, strconv.FormatFloat(met.Value, 'f', -1, 64), met.Time)
 	bufCh <- b
-	rollupRaw(met)
 	checkThresholds(met, pub)
 	return nil
 }
@@ -263,167 +250,6 @@ func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerId
 	}
 }
 
-func rollupRaw(met *metricdef.IndvMetric) {
-	def, err := metricDefs.GetDefItem(met.Id)
-	if err != nil {
-		logger.Errorf(err.Error())
-		return
-	}
-	def.Lock()
-	defer def.Unlock()
-
-	logger.Debugf("rolling up %s", met.Id)
-
-	if def.Cache.Raw.FlushTime < (met.Time - int64(config.shortDuration/time.Second)) {
-		if def.Cache.Aggr.FlushTime < (met.Time - int64(config.longDuration/time.Second)) {
-			logger.Debugf("rolling up 6 hour for %s", met.Id)
-			var min, max, avg, sum, med *float64
-			count := len(def.Cache.Aggr.Data.Min)
-			// not slavish; we need to manipulate three slices at
-			// once
-			for i := 0; i < count; i++ {
-				if min == nil || *def.Cache.Aggr.Data.Min[i] < *min {
-					min = def.Cache.Aggr.Data.Min[i]
-				}
-				if max == nil || *def.Cache.Aggr.Data.Max[i] < *max {
-					max = def.Cache.Aggr.Data.Max[i]
-				}
-				if def.Cache.Aggr.Data.Avg[i] != nil {
-					if sum == nil {
-						sum = def.Cache.Aggr.Data.Avg[i]
-					} else {
-						*sum += *def.Cache.Aggr.Data.Avg[i]
-					}
-				}
-			}
-			if count > 0 {
-				z := *sum / float64(count)
-				avg = &z
-			}
-			if def.Cache.Aggr.Data.Med != nil {
-				med = getPtrMedian(def.Cache.Aggr.Data.Med)
-			}
-			def.Cache.Aggr.Data.Avg = nil
-			def.Cache.Aggr.Data.Min = nil
-			def.Cache.Aggr.Data.Max = nil
-			def.Cache.Aggr.Data.Med = nil
-			def.Cache.Aggr.FlushTime = met.Time
-			rollupTime := durationStr(config.longDuration)
-			if avg != nil {
-				logger.Debugf("writing %s rollup for %s", rollupTime, met.Id)
-				id := fmt.Sprintf("%s.avg.%s", rollupTime, met.Id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.Time)
-				bufCh <- b
-			}
-			if min != nil {
-				id := fmt.Sprintf("%s.min.%s", rollupTime, met.Id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.Time)
-				bufCh <- b
-			}
-			if max != nil {
-				id := fmt.Sprintf("%s.max.%s", rollupTime, met.Id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
-				bufCh <- b
-			}
-			if med != nil {
-				id := fmt.Sprintf("%s.med.%s", rollupTime, met.Id)
-				b := graphite.NewMetric(id, strconv.FormatFloat(*med, 'f', -1, 64), met.Time)
-				bufCh <- b
-			}
-		}
-		rollupTime := durationStr(config.shortDuration)
-		logger.Debugf("rolling up %s for %s", rollupTime, met.Id)
-		var min, max, avg, sum, med *float64
-		count := len(def.Cache.Raw.Data)
-		for _, p := range def.Cache.Raw.Data {
-			if min == nil || p < *min {
-				min = &p
-			}
-			if max == nil || p < *max {
-				max = &p
-			}
-			if sum == nil {
-				sum = &p
-			} else {
-				*sum += p
-			}
-		}
-		if def.Cache.Raw.Data != nil {
-			med = getMedian(def.Cache.Raw.Data)
-		}
-		if count > 0 {
-			z := *sum / float64(count)
-			avg = &z
-		}
-		def.Cache.Raw.Data = nil
-		def.Cache.Raw.FlushTime = met.Time
-		if avg != nil {
-			logger.Debugf("writing %s rollup for %s:%f", rollupTime, met.Id, *avg)
-			id := fmt.Sprintf("%s.avg.%s", rollupTime, met.Id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*avg, 'f', -1, 64), met.Time)
-			bufCh <- b
-		}
-		if min != nil {
-			id := fmt.Sprintf("%s.min.%s", rollupTime, met.Id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*min, 'f', -1, 64), met.Time)
-			bufCh <- b
-		}
-		if max != nil {
-			id := fmt.Sprintf("%s.max.%s", rollupTime, met.Id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*max, 'f', -1, 64), met.Time)
-			bufCh <- b
-		}
-		if med != nil {
-			id := fmt.Sprintf("%s.med.%s", rollupTime, met.Id)
-			b := graphite.NewMetric(id, strconv.FormatFloat(*med, 'f', -1, 64), met.Time)
-			bufCh <- b
-
-		}
-		def.Cache.Aggr.Data.Min = append(def.Cache.Aggr.Data.Min, min)
-		def.Cache.Aggr.Data.Max = append(def.Cache.Aggr.Data.Max, max)
-		def.Cache.Aggr.Data.Avg = append(def.Cache.Aggr.Data.Avg, avg)
-		def.Cache.Aggr.Data.Med = append(def.Cache.Aggr.Data.Med, med)
-	}
-	def.Cache.Raw.Data = append(def.Cache.Raw.Data, met.Value)
-	if err = def.Save(); err != nil {
-		logger.Errorf(err.Error())
-	}
-}
-
-func getPtrMedian(d []*float64) *float64 {
-	dlen := len(d)
-	res := 0.0
-	if dlen == 0 {
-		return &res
-	}
-	meds := make([]*float64, dlen)
-	copy(meds, d)
-	sort.Sort(pFloat64Slice(meds))
-	mid := dlen / 2
-	res = *meds[mid]
-	if dlen % 2 == 0 {
-		res = (res + *meds[mid - 1]) / 2
-	}
-	return &res
-}
-
-func getMedian(d []float64) *float64 {
-	dlen := len(d)
-	res := 0.0
-	if dlen == 0 {
-		return &res
-	}
-	meds := make([]float64, dlen)
-	copy(meds, d)
-	sort.Sort(sort.Float64Slice(meds))
-	mid := dlen / 2
-	res = meds[mid]
-	if dlen % 2 == 0 {
-		res = (res + meds[mid - 1]) / 2
-	}
-	return &res
-}
-
 func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 	d, err := metricDefs.GetDefItem(met.Id)
 	if err != nil {
@@ -432,7 +258,6 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 	}
 	d.Lock()
 	defer d.Unlock()
-	defer d.Release()
 	def := d.Def
 
 	state := metricdef.StateOK
@@ -481,7 +306,7 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 		err := def.Save()
 		if err != nil {
 			logger.Errorf("Error updating metric definition for %s: %s", def.Id, err.Error())
-			metricDefs.RemoveDefFromMap(met.Id)
+			metricDefs.RemoveDefCacheLocked(met.Id)
 			return
 		}
 		logger.Debugf("%s update committed to elasticsearch", def.Id)
@@ -503,15 +328,5 @@ func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
 				logger.Errorf("Failed to publish event: %s", err.Error())
 			}
 		}
-	}
-}
-
-func durationStr(d time.Duration) string {
-	if d.Hours() >= 1 {
-		return fmt.Sprintf("%dhour", int(d.Hours()))
-	} else if d.Minutes() >= 1 {
-		return fmt.Sprintf("%dmin", int(d.Minutes()))
-	} else {
-		return fmt.Sprintf("%dsecond", int(d.Seconds()))
 	}
 }
