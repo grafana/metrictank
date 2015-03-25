@@ -54,12 +54,15 @@ func (mStore MetricStore) ProcessBuffer(c <-chan metricdef.IndvMetric, workerId 
 			logger.Debugf("worker %d flushing %d items in buffer now", workerId, len(currentBuf))
 			if err := mStore.InfluxDB.SendMetrics(&currentBuf); err != nil {
 				logger.Errorf(err.Error())
+			} else {
+				logger.Debugf("worker %d flushed metrics buffer to Influxdb", workerId)
 			}
-			logger.Debugf("worker %d flushed metrics buffer to Influxdb", workerId)
+
 			if err := mStore.KairosDB.SendMetrics(&currentBuf); err != nil {
 				logger.Errorf(err.Error())
+			} else {
+				logger.Debugf("worker %d flushed metrics buffer to Kairosdb", workerId)
 			}
-			logger.Debugf("worker %d flushed metrics buffer to Kairosdb", workerId)
 		}
 	}
 }

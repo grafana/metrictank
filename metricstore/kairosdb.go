@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/ctdk/goas/v2/logger"
 )
 
 // Kairosdb client
@@ -17,6 +18,7 @@ type Kairosdb struct {
 }
 
 func NewKairosdb(host string) (*Kairosdb, error) {
+	logger.Debugf("initializing kairosdb client to %s", host)
 	return &Kairosdb{
 		client: &http.Client{Timeout: (10 * time.Second)},
 		host: host,
@@ -41,8 +43,8 @@ func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 			tags[k] = fmt.Sprintf("%v", v)
 		}
 		datapoints[i] = Datapoint{
-			Name: m.Name,
-			Timestamp: m.Time,
+			Name: m.Metric,
+			Timestamp: m.Time * 1000,
 			Value: m.Value,
 			Tags: tags,
 		}
@@ -55,6 +57,7 @@ func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
 
 	json, err := json.Marshal(datapoints)
+	logger.Debugf("sending datapoints to kairosdb. %s", json)
 	if err != nil {
 		return err
 	}
