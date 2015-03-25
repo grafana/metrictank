@@ -31,6 +31,7 @@ type conf struct {
 	RabbitMQURL         string `toml:"rabbitmq-url"`
 	GraphiteAddr        string `toml:"graphite-addr"`
 	GraphitePort        int    `toml:"graphite-port"`
+	KairosdbHostPort    string `toml:"kairosdb-host"`
 	ElasticsearchDomain string `toml:"elasticsearch-domain"`
 	ElasticsearchPort   int    `toml:"elasticsearch-port"`
 	ElasticsearchUser   string `toml:"elasticsearch-user"`
@@ -55,6 +56,7 @@ type options struct {
 	SysLog              bool   `short:"s" long:"syslog" description:"Log to syslog rather than a log file. Incompatible with -L/--log-file."`
 	GraphiteAddr        string `short:"g" long:"graphite-addr" description:"Graphite IP address or hostname."`
 	GraphitePort        int    `short:"p" long:"graphite-port" description:"Port graphite listens on."`
+	KairosdbHostPort    string `short:"k" long:"kairosdb-host" description:"KairosDB host:port"`
 	ElasticsearchDomain string `short:"d" long:"elasticsearch-domain" description:"Elasticseach domain."`
 	ElasticsearchPort   int    `short:"t" long:"elasticsearch-port" description:"Port to connect to for Elasticsearch, defaults to 9200."`
 	ElasticsearchUser   string `short:"u" long:"elasticsearch-user" description:"Optional username to use when connecting to elasticsearch."`
@@ -145,6 +147,9 @@ func parseConfig() error {
 	}
 	if opts.GraphiteAddr != "" {
 		config.GraphiteAddr = opts.GraphiteAddr
+	}
+	if opts.KairosdbHostPort != "" {
+		config.KairosdbHostPort = opts.KairosdbHostPort
 	}
 	if opts.GraphitePort != 0 {
 		config.GraphitePort = opts.GraphitePort
