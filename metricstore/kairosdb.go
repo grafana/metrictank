@@ -38,10 +38,11 @@ func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 	// marshal metrics into datapoint structs
 	datapoints := make([]Datapoint, len(*metrics))
 	for i, m := range *metrics {
-		tags := make(map[string]string, len(m.Extra))
+		tags := make(map[string]string)
 		for k,v := range m.Extra {
 			tags[k] = fmt.Sprintf("%v", v)
 		}
+		tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
 		datapoints[i] = Datapoint{
 			Name: m.Metric,
 			Timestamp: m.Time * 1000,
@@ -57,7 +58,6 @@ func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
 
 	json, err := json.Marshal(datapoints)
-	logger.Debugf("sending datapoints to kairosdb. %s", json)
 	if err != nil {
 		return err
 	}
