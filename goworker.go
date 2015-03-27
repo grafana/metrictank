@@ -20,16 +20,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
-	"github.com/marpaia/graphite-golang"
 	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/qproc"
+	"github.com/raintank/raintank-metric/metricstore"
 	"github.com/streadway/amqp"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,7 +36,7 @@ import (
 
 var metricDefs *metricdef.MetricDefCache
 
-var bufCh chan graphite.Metric
+var bufCh chan metricdef.IndvMetric
 
 func init() {
 	initConfig()
@@ -50,7 +49,7 @@ func init() {
 	}
 	runtime.GOMAXPROCS(numCPU)
 
-	bufCh = make(chan graphite.Metric, numCPU)
+	bufCh = make(chan metricdef.IndvMetric, numCPU)
 
 	err := eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
 	if err != nil {
@@ -70,15 +69,13 @@ func init() {
 		panic(err)
 	}
 
-	// currently using the graphite client instead of influxdb's client to
-	// connect here. Using graphite instead of influxdb should be more
-	// flexible, at least initially.
 	for i := 0; i < numCPU; i++ {
-		carbon, err := graphite.NewGraphite(config.GraphiteAddr, config.GraphitePort)
+		mStore, err := metricstore.NewMetricStore(config.GraphiteAddr, config.GraphitePort, config.KairosdbHostPort)
 		if err != nil {
 			panic(err)
 		}
-		go processBuffer(bufCh, carbon, i)
+
+		go mStore.ProcessBuffer(bufCh, i)
 	}
 }
 
@@ -215,39 +212,8 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 
 func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
 	logger.Debugf("storing metric: %+v", met)
-	b := graphite.NewMetric(met.Id, strconv.FormatFloat(met.Value, 'f', -1, 64), met.Time)
-	bufCh <- b
-	checkThresholds(met, pub)
+	bufCh <- *met
 	return nil
-}
-
-func processBuffer(c <-chan graphite.Metric, carbon *graphite.Graphite, workerId int) {
-	buf := make([]graphite.Metric, 0)
-
-	// flush buffer every second
-	t := time.NewTicker(time.Second)
-	for {
-		select {
-		case b := <-c:
-			if b.Name != "" {
-				logger.Debugf("worker %d appending to buffer", workerId)
-				buf = append(buf, b)
-			}
-		case <-t.C:
-			// A possibility: it might be worth it to hack up the
-			// carbon lib to allow batch submissions of metrics if
-			// doing them individually proves to be too slow
-			logger.Debugf("worker %d flushing %d items in buffer now", workerId, len(buf))
-			for _, m := range buf {
-				logger.Debugf("worker %d sending metric %+v", workerId, m)
-				err := carbon.SendMetric(m)
-				if err != nil {
-					logger.Errorf(err.Error())
-				}
-			}
-			buf = nil
-		}
-	}
 }
 
 func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {

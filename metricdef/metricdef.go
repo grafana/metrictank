@@ -56,7 +56,7 @@ type MetricDefinition struct {
 	KeepAlives int                    `json:"keepAlives"`
 	State      int8                   `json:"state"`
 	Extra      map[string]interface{} `json:"-"`
-	m sync.RWMutex
+	m sync.RWMutex					  `json:"-"`
 }
 
 // The JSON marshal/unmarshal with metric definitions is a little less
@@ -164,16 +164,16 @@ func (m *MetricDefinition) MarshalJSON() ([]byte, error) {
 			continue
 		}
 		name := field.Name
-		tag := field.Tag.Get("json")
-		if tag != "" && tag != "-" {
-			name = tag
-		}
 		if name == "Extra" {
 			//anything that was in Extra[] becomes a toplevel property again.
 			for k, v := range m.Extra {
 				metric[k] = v
 			}
 		} else {
+			tag := field.Tag.Get("json")
+			if tag != "" && tag != "-" {
+				name = tag
+			}
 			v, err := encode(value.FieldByName(field.Name))
 			if err != nil {
 				return nil, err
@@ -226,9 +226,8 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 			}
 		}
 		esopts := elastigo.MappingOptions{}
-		// hmm
-		m := MetricDefinition{}
-		err = es.PutMapping("definitions", "metric", m, esopts)
+
+		err = es.PutMapping("definitions", "metric", MetricDefinition{}, esopts)
 		if err != nil {
 			return err
 		}
@@ -292,7 +291,9 @@ func NewFromMessage(m *IndvMetric) (*MetricDefinition, error) {
 		LastUpdate: now,
 		KeepAlives: ka,
 		State:      state,
-		Unit:       m.Unit}
+		Unit:       m.Unit,
+		Extra:      m.Extra,
+	}
 
 	if t, exists := m.Extra["thresholds"]; exists {
 		thresh, _ := t.(map[string]interface{})
