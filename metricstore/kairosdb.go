@@ -2,13 +2,13 @@ package metricstore
 
 import (
 	"bytes"
-	"fmt"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/ctdk/goas/v2/logger"
+	"github.com/raintank/raintank-metric/metricdef"
 	"net/http"
 	"time"
-	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/ctdk/goas/v2/logger"
 )
 
 // Kairosdb client
@@ -21,7 +21,7 @@ func NewKairosdb(host string) (*Kairosdb, error) {
 	logger.Debugf("initializing kairosdb client to %s", host)
 	return &Kairosdb{
 		client: &http.Client{Timeout: (10 * time.Second)},
-		host: host,
+		host:   host,
 	}, nil
 }
 
@@ -33,26 +33,24 @@ type Datapoint struct {
 	Tags      map[string]string `json:"tags"`
 }
 
-
 func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 	// marshal metrics into datapoint structs
 	datapoints := make([]Datapoint, len(*metrics))
 	for i, m := range *metrics {
 		tags := make(map[string]string)
-		for k,v := range m.Extra {
+		for k, v := range m.Extra {
 			tags[k] = fmt.Sprintf("%v", v)
 		}
 		tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
 		datapoints[i] = Datapoint{
-			Name: m.Metric,
+			Name:      m.Metric,
 			Timestamp: m.Time * 1000,
-			Value: m.Value,
-			Tags: tags,
+			Value:     m.Value,
+			Tags:      tags,
 		}
 	}
 	return kdb.AddDatapoints(datapoints)
 }
-
 
 // AddDatapoints add datapoints to configured kairosdb instance
 func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
@@ -70,4 +68,3 @@ func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
 	}
 	return nil
 }
-

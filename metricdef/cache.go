@@ -28,13 +28,13 @@ var DefNotFound = errors.New("definition not found")
 
 // cache to hold metric definitions
 type MetricDefCache struct {
-	mdefs    map[string]*MetricCacheItem
-	m        sync.RWMutex
+	mdefs map[string]*MetricCacheItem
+	m     sync.RWMutex
 }
 
 type MetricCacheItem struct {
 	Def *MetricDefinition
-	m sync.RWMutex
+	m   sync.RWMutex
 }
 
 func InitMetricDefCache() (*MetricDefCache, error) {
@@ -61,7 +61,7 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 				return err
 			}
 		}
-		mdc.mdefs[id] = &MetricCacheItem{ Def: def }
+		mdc.mdefs[id] = &MetricCacheItem{Def: def}
 	}
 
 	return nil
@@ -115,7 +115,7 @@ func (mdc *MetricDefCache) GetDefItem(id string) (*MetricCacheItem, error) {
 		if err != nil {
 			return nil, err
 		}
-		def = &MetricCacheItem{ Def: d }
+		def = &MetricCacheItem{Def: d}
 	}
 	return def, nil
 }

@@ -56,7 +56,7 @@ type MetricDefinition struct {
 	KeepAlives int                    `json:"keepAlives"`
 	State      int8                   `json:"state"`
 	Extra      map[string]interface{} `json:"-"`
-	m sync.RWMutex					  `json:"-"`
+	m          sync.RWMutex           `json:"-"`
 }
 
 // The JSON marshal/unmarshal with metric definitions is a little less

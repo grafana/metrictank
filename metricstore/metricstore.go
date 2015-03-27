@@ -1,9 +1,9 @@
 package metricstore
 
 import (
-	"time"
-	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/ctdk/goas/v2/logger"
+	"github.com/raintank/raintank-metric/metricdef"
+	"time"
 )
 
 type MetricStore struct {
@@ -12,7 +12,7 @@ type MetricStore struct {
 }
 
 func NewMetricStore(GraphiteAddr string, GraphitePort int, KairosdbHostPort string) (*MetricStore, error) {
-	
+
 	kairosdb, err := NewKairosdb(KairosdbHostPort)
 	if err != nil {
 		return nil, err
@@ -28,7 +28,6 @@ func NewMetricStore(GraphiteAddr string, GraphitePort int, KairosdbHostPort stri
 	}
 	return &mStore, nil
 }
-
 
 func (mStore MetricStore) ProcessBuffer(c <-chan metricdef.IndvMetric, workerId int) {
 	buf := make([]metricdef.IndvMetric, 0)
