@@ -31,7 +31,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 )
 
 var metricDefs *metricdef.MetricDefCache
@@ -91,13 +90,6 @@ func main() {
 
 	done := make(chan error, 1)
 
-	// create a publisher
-	pub, err := qproc.CreatePublisher(mdConn, "metricEvents", "fanout")
-	if err != nil {
-		logger.Criticalf(err.Error())
-		os.Exit(1)
-	}
-
 	var numCPU int
 	if config.NumWorkers != 0 {
 		numCPU = config.NumWorkers
@@ -105,12 +97,12 @@ func main() {
 		numCPU = runtime.NumCPU()
 	}
 
-	err = qproc.ProcessQueue(mdConn, nil, "metrics", "topic", "metrics.*", "", done, processMetricDefEvent, numCPU)
+	err = qproc.ProcessQueue(mdConn, "metrics", "topic", "", "metrics.*", false, true, true, done, processMetricDefEvent, numCPU)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
 	}
-	err = qproc.ProcessQueue(mdConn, pub, "metricResults", "x-consistent-hash", "10", "", done, processMetrics, numCPU)
+	err = qproc.ProcessQueue(mdConn, "metricResults", "x-consistent-hash", "", "10", false, true, true, done, processMetrics, numCPU)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
@@ -149,13 +141,13 @@ func main() {
 
 	// this channel returns when one of the workers exits.
 	err = <-done
-	logger.Criticalf("all done!")
+	logger.Criticalf("all done!", err)
 	if err != nil {
 		logger.Criticalf("Had an error, aiiieeee! '%s'", err.Error())
 	}
 }
 
-func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
+func processMetrics(d *amqp.Delivery) error {
 	metrics := make([]*metricdef.IndvMetric, 0)
 	if err := json.Unmarshal(d.Body, &metrics); err != nil {
 		return err
@@ -173,7 +165,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 			return err
 		}
 
-		if err := storeMetric(m, pub); err != nil {
+		if err := storeMetric(m); err != nil {
 			return err
 		}
 	}
@@ -184,7 +176,7 @@ func processMetrics(pub *qproc.Publisher, d *amqp.Delivery) error {
 	return nil
 }
 
-func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
+func processMetricDefEvent(d *amqp.Delivery) error {
 	action := strings.Split(d.RoutingKey, ".")[1]
 
 	switch action {
@@ -210,89 +202,9 @@ func processMetricDefEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
 	return nil
 }
 
-func storeMetric(met *metricdef.IndvMetric, pub *qproc.Publisher) error {
+func storeMetric(met *metricdef.IndvMetric) error {
 	logger.Debugf("storing metric: %+v", met)
 	bufCh <- *met
 	return nil
 }
 
-func checkThresholds(met *metricdef.IndvMetric, pub *qproc.Publisher) {
-	d, err := metricDefs.GetDefItem(met.Id)
-	if err != nil {
-		logger.Errorf(err.Error())
-		return
-	}
-	d.Lock()
-	defer d.Unlock()
-	def := d.Def
-
-	state := metricdef.StateOK
-	var msg string
-	thresholds := def.Thresholds
-
-	if thresholds.CritMin != nil && met.Value < thresholds.CritMin.(float64) {
-		msg = fmt.Sprintf("%f less than criticalMin %f", met.Value, thresholds.CritMin.(float64))
-		logger.Debugf(msg)
-		state = metricdef.StateCrit
-	}
-	if state < metricdef.StateCrit && thresholds.CritMax != nil && met.Value > thresholds.CritMax.(float64) {
-		msg = fmt.Sprintf("%f greater than criticalMax %f", met.Value, thresholds.CritMax.(float64))
-		logger.Debugf(msg)
-		state = metricdef.StateCrit
-	}
-	if state < metricdef.StateWarn && thresholds.WarnMin != nil && met.Value < thresholds.WarnMin.(float64) {
-		msg = fmt.Sprintf("%f less than warnMin %f", met.Value, thresholds.WarnMin.(float64))
-		logger.Debugf(msg)
-		state = metricdef.StateWarn
-	}
-	if state < metricdef.StateWarn && thresholds.WarnMax != nil && met.Value < thresholds.WarnMax.(float64) {
-		msg = fmt.Sprintf("%f greater than warnMax %f", met.Value, thresholds.WarnMax.(float64))
-		logger.Debugf(msg)
-		state = metricdef.StateWarn
-	}
-
-	var updates bool
-	events := make([]map[string]interface{}, 0)
-	curState := def.State
-	if state != def.State {
-		logger.Infof("state has changed for %s. Was '%s', now '%s'", def.Id, metricdef.LevelMap[state], metricdef.LevelMap[def.State])
-		def.State = state
-		// TODO: ask why in the node version lastUpdate is set with
-		// 'new Date(metric.time * 1000).getTime()'
-		def.LastUpdate = time.Now().Unix()
-		updates = true
-	} else if def.KeepAlives != 0 && (def.LastUpdate < (met.Time - int64(def.KeepAlives))) {
-		logger.Debugf("No updates in %d seconds, sending keepAlive", def.KeepAlives)
-		updates = true
-		def.LastUpdate = time.Now().Unix()
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "keepAlive", "state": metricdef.LevelMap[state], "details": msg, "timestamp": met.Time * 1000}
-		events = append(events, checkEvent)
-	}
-	if updates {
-		err := def.Save()
-		if err != nil {
-			logger.Errorf("Error updating metric definition for %s: %s", def.Id, err.Error())
-			metricDefs.RemoveDefCacheLocked(met.Id)
-			return
-		}
-		logger.Debugf("%s update committed to elasticsearch", def.Id)
-	}
-
-	if state > metricdef.StateOK {
-		checkEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "checkFailure", "state": metricdef.LevelMap[state], "details": msg, "timestamp": met.Time * 1000}
-		events = append(events, checkEvent)
-	}
-	if state != curState {
-		metricEvent := map[string]interface{}{"source": "metric", "metric": met.Name, "org_id": met.OrgId, "type": "stateChange", "state": metricdef.LevelMap[state], "details": fmt.Sprintf("state transitioned from %s to %s", metricdef.LevelMap[curState], metricdef.LevelMap[state]), "timestamp": met.Time * 1000}
-		events = append(events, metricEvent)
-	}
-	if len(events) > 0 {
-		logger.Infof("publishing events")
-		for _, e := range events {
-			err := pub.PublishMsg(e["type"].(string), e)
-			if err != nil {
-				logger.Errorf("Failed to publish event: %s", err.Error())
-			}
-		}
-	}
-}

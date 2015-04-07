@@ -34,22 +34,22 @@ type Publisher struct {
 
 // PayloadProcessor is a function type that can be passed as an argument to
 // ProcessQueue to process deliveries from rabbitmq.
-type PayloadProcessor func(*Publisher, *amqp.Delivery) error
+type PayloadProcessor func(*amqp.Delivery) error
 
 // CreateConsumer creates a consumer queue.
-func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queuePattern, consumer string) (<-chan amqp.Delivery, error) {
+func CreateConsumer(conn *amqp.Connection, exchange, exchangeType, queueName, queuePattern string, durable, autoDelete, exclusive bool) (<-chan amqp.Delivery, error) {
 	ch, err := CreateChannel(conn, exchange, exchangeType)
 	if err != nil {
 		return nil, err
 	}
-	q, err := ch.QueueDeclare("", false, true, true, false, nil)
+	q, err := ch.QueueDeclare(queueName, durable, autoDelete, exclusive, false, nil)
 	if err != nil {
 		return nil, err
 	}
 	if err = ch.QueueBind(q.Name, queuePattern, exchange, false, nil); err != nil {
 		return nil, err
 	}
-	devs, err := ch.Consume(q.Name, consumer, false, false, false, false, nil)
+	devs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +101,13 @@ func CreateChannel(conn *amqp.Connection, exchange, exchangeType string) (*amqp.
 // to process the jobs off the queue, and if the payload processor should
 // publish the results of its work a Publisher may be supplied. Otherwise nil
 // for the Publisher is fine.
-func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType, queuePattern, consumer string, errCh chan<- error, qprocessor PayloadProcessor, numWorkers int) error {
+func ProcessQueue(conn *amqp.Connection, exchange, exchangeType, queueName, queuePattern string, durable, autoDelete, exclusive bool, errCh chan<- error, qprocessor PayloadProcessor, numWorkers int) error {
 	if numWorkers < 1 {
 		err := errors.New("numWorkers must be at least 1")
 		return err
 	}
 	for i := 0; i < numWorkers; i++ {
-		devs, err := CreateConsumer(conn, exchange, exchangeType, queuePattern, consumer)
+		devs, err := CreateConsumer(conn, exchange, exchangeType, queueName, queuePattern, durable, autoDelete, exclusive)
 		if err != nil {
 			return nil
 		}
@@ -115,7 +115,7 @@ func ProcessQueue(conn *amqp.Connection, pub *Publisher, exchange, exchangeType,
 		go func(i int, exchange string, devs <-chan amqp.Delivery) {
 			for d := range devs {
 				logger.Debugf("worker %s %d received delivery", exchange, i)
-				err := qprocessor(pub, &d)
+				err := qprocessor(&d)
 				if err != nil {
 					errCh <- err
 					return

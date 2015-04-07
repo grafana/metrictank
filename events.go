@@ -23,14 +23,14 @@ import (
 )
 
 func initEventProcessing(mdConn *amqp.Connection, numWorkers int, errCh chan error) error {
-	err := qproc.ProcessQueue(mdConn, nil, "grafana_events", "topic", "EVENT.#", "", errCh, processEvent, numWorkers)
+	err := qproc.ProcessQueue(mdConn, "grafana_events", "topic", "eventQueue", "EVENT.#", true, false, false, errCh, processEvent, numWorkers)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func processEvent(pub *qproc.Publisher, d *amqp.Delivery) error {
+func processEvent(d *amqp.Delivery) error {
 	event, err := eventdef.EventFromJSON(d.Body)
 	if err != nil {
 		return err
