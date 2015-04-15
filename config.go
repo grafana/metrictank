@@ -44,8 +44,6 @@ type conf struct {
 	SysLog              bool   `toml:"syslog"`
 	DebugLevel          int    `toml:"debug-level"`
 	NumWorkers          int    `toml:"num-workers"`
-	ApiUrl              string `toml:"api-url"`
-	ApiKey              string `toml:"api-key"`
 }
 
 const version = "0.1.0"
@@ -196,13 +194,7 @@ func parseConfig() error {
 	if config.RedisAddr == "" {
 		config.RedisAddr = "localhost"
 	}
-	if config.ApiUrl == "" {
-		config.ApiUrl = "http://localhost:3000"
-	}
 
-	if config.ApiKey == "" {
-		return errors.New("No Api Key Provided.")
-	}
 	logger.Debugf("configuration: %q", config)
 	return nil
 }
