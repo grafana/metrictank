@@ -68,3 +68,7 @@ func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
 	}
 	return nil
 }
+
+func (kdb *Kairosdb) Type() string {
+	return "Kairosdb"
+}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package setting
 
 import (
 	"errors"
@@ -27,11 +27,13 @@ import (
 	"strings"
 )
 
-type conf struct {
+type Conf struct {
 	RabbitMQURL         string `toml:"rabbitmq-url"`
-	GraphiteAddr        string `toml:"graphite-addr"`
-	GraphitePort        int    `toml:"graphite-port"`
-	KairosdbHostPort    string `toml:"kairosdb-host"`
+	CarbonAddr          string `toml:"carbon-addr"`
+	CarbonPort          int    `toml:"carbon-port"`
+	EnableCarbon        bool   `toml:"enable-carbon"`
+	KairosdbUrl         string `toml:"kairosdb-url"`
+	EnableKairosdb      bool   `toml:"enable-kairosdb"`
 	ElasticsearchDomain string `toml:"elasticsearch-domain"`
 	ElasticsearchPort   int    `toml:"elasticsearch-port"`
 	ElasticsearchUser   string `toml:"elasticsearch-user"`
@@ -54,9 +56,11 @@ type options struct {
 	ConfFile            string `short:"c" long:"config" description:"Specify a configuration file."`
 	LogFile             string `short:"L" long:"log-file" description:"Log to file X"`
 	SysLog              bool   `short:"s" long:"syslog" description:"Log to syslog rather than a log file. Incompatible with -L/--log-file."`
-	GraphiteAddr        string `short:"g" long:"graphite-addr" description:"Graphite IP address or hostname."`
-	GraphitePort        int    `short:"p" long:"graphite-port" description:"Port graphite listens on."`
-	KairosdbHostPort    string `short:"k" long:"kairosdb-host" description:"KairosDB host:port"`
+	EnableCarbon        bool   `short:"C" long:"enable-carbon" description:"Enable writing metrics to carbon server."`
+	CarbonAddr          string `short:"g" long:"carbon-addr" description:"Carbon IP address or hostname."`
+	CarbonPort          int    `short:"p" long:"carbon-port" description:"Port Carbon server listens on."`
+	KairosdbUrl         string `short:"k" long:"kairosdb-url" description:"KairosDB url"`
+	EnableKairosdb      bool   `short:"K" long:"enable-kairosdb" description:"Enable writing metrics to Kairosdb."`
 	ElasticsearchDomain string `short:"d" long:"elasticsearch-domain" description:"Elasticseach domain."`
 	ElasticsearchPort   int    `short:"t" long:"elasticsearch-port" description:"Port to connect to for Elasticsearch, defaults to 9200."`
 	ElasticsearchUser   string `short:"u" long:"elasticsearch-user" description:"Optional username to use when connecting to elasticsearch."`
@@ -68,12 +72,12 @@ type options struct {
 	NumWorkers          int    `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
 }
 
-var config *conf
+var Config *Conf
 
 var logLevelNames = map[string]int{"debug": 4, "info": 3, "warning": 2, "error": 1, "critical": 0}
 
-func initConfig() {
-	config = new(conf)
+func InitConfig() {
+	Config = new(Conf)
 	err := parseConfig()
 	if err != nil {
 		log.Println(err)
@@ -98,45 +102,45 @@ func parseConfig() error {
 	}
 
 	if opts.ConfFile != "" {
-		if _, err := toml.DecodeFile(opts.ConfFile, config); err != nil {
+		if _, err := toml.DecodeFile(opts.ConfFile, Config); err != nil {
 			return err
 		}
 	}
 
 	if opts.LogFile != "" {
-		config.LogFile = opts.LogFile
+		Config.LogFile = opts.LogFile
 	}
 	if opts.SysLog {
-		config.SysLog = opts.SysLog
+		Config.SysLog = opts.SysLog
 	}
-	if config.LogFile != "" {
-		lfp, lerr := os.Create(config.LogFile)
+	if Config.LogFile != "" {
+		lfp, lerr := os.Create(Config.LogFile)
 		if lerr != nil {
 			return lerr
 		}
 		log.SetOutput(lfp)
 	}
-	if config.LogFile != "" && config.SysLog {
+	if Config.LogFile != "" && Config.SysLog {
 		lerr := errors.New("cannot use both log-file and syslog options at the same time.")
 		return lerr
 	}
 	if dlev := len(opts.Verbose); dlev != 0 {
-		config.DebugLevel = dlev
+		Config.DebugLevel = dlev
 	}
-	if config.LogLevel != "" {
-		if lev, ok := logLevelNames[strings.ToLower(config.LogLevel)]; ok && config.DebugLevel == 0 {
-			config.DebugLevel = lev
+	if Config.LogLevel != "" {
+		if lev, ok := logLevelNames[strings.ToLower(Config.LogLevel)]; ok && Config.DebugLevel == 0 {
+			Config.DebugLevel = lev
 		}
 	}
-	if config.DebugLevel > 4 {
-		config.DebugLevel = 4
+	if Config.DebugLevel > 4 {
+		Config.DebugLevel = 4
 	}
 
-	config.DebugLevel = int(logger.LevelCritical) - config.DebugLevel
-	logger.SetLevel(logger.LogLevel(config.DebugLevel))
+	Config.DebugLevel = int(logger.LevelCritical) - Config.DebugLevel
+	logger.SetLevel(logger.LogLevel(Config.DebugLevel))
 	debugLevel := map[int]string{0: "debug", 1: "info", 2: "warning", 3: "error", 4: "critical"}
-	log.Printf("Logging at %s level", debugLevel[config.DebugLevel])
-	if config.SysLog {
+	log.Printf("Logging at %s level", debugLevel[Config.DebugLevel])
+	if Config.SysLog {
 		sl, err := logger.NewSysLogger("raintank-metric")
 		if err != nil {
 			return err
@@ -145,56 +149,62 @@ func parseConfig() error {
 	} else {
 		logger.SetLogger(logger.NewGoLogger())
 	}
-	if opts.GraphiteAddr != "" {
-		config.GraphiteAddr = opts.GraphiteAddr
+	if opts.EnableCarbon {
+		Config.EnableCarbon = true
 	}
-	if opts.KairosdbHostPort != "" {
-		config.KairosdbHostPort = opts.KairosdbHostPort
+	if opts.CarbonAddr != "" {
+		Config.CarbonAddr = opts.CarbonAddr
 	}
-	if opts.GraphitePort != 0 {
-		config.GraphitePort = opts.GraphitePort
+	if opts.CarbonPort != 0 {
+		Config.CarbonPort = opts.CarbonPort
+	}
+	if opts.EnableKairosdb {
+		Config.EnableKairosdb = true
+	}
+	if opts.KairosdbUrl != "" {
+		Config.KairosdbUrl = opts.KairosdbUrl
 	}
 	if opts.ElasticsearchDomain != "" {
-		config.ElasticsearchDomain = opts.ElasticsearchDomain
+		Config.ElasticsearchDomain = opts.ElasticsearchDomain
 	}
 	if opts.ElasticsearchPort != 0 {
-		config.ElasticsearchPort = opts.ElasticsearchPort
+		Config.ElasticsearchPort = opts.ElasticsearchPort
 	}
 	if opts.ElasticsearchUser != "" {
-		config.ElasticsearchUser = opts.ElasticsearchUser
+		Config.ElasticsearchUser = opts.ElasticsearchUser
 	}
 	if opts.ElasticsearchPasswd != "" {
-		config.ElasticsearchPasswd = opts.ElasticsearchPasswd
+		Config.ElasticsearchPasswd = opts.ElasticsearchPasswd
 	}
 	if opts.RedisAddr != "" {
-		config.RedisAddr = opts.RedisAddr
+		Config.RedisAddr = opts.RedisAddr
 	}
 	if opts.RedisPasswd != "" {
-		config.RedisPasswd = opts.RedisPasswd
+		Config.RedisPasswd = opts.RedisPasswd
 	}
 	if opts.RedisDB != 0 {
-		config.RedisDB = opts.RedisDB
+		Config.RedisDB = opts.RedisDB
 	}
 	if opts.NumWorkers != 0 {
-		config.NumWorkers = opts.NumWorkers
+		Config.NumWorkers = opts.NumWorkers
 	}
-	if config.NumWorkers < 0 {
+	if Config.NumWorkers < 0 {
 		return errors.New("--num-workers must be a number greater than zero")
 	}
 
-	if config.ElasticsearchPort == 0 {
-		config.ElasticsearchPort = 9200
+	if Config.ElasticsearchPort == 0 {
+		Config.ElasticsearchPort = 9200
 	}
-	if config.RabbitMQURL == "" {
-		config.RabbitMQURL = "amqp://localhost"
+	if Config.RabbitMQURL == "" {
+		Config.RabbitMQURL = "amqp://localhost"
 	}
-	if config.ElasticsearchDomain == "" {
-		config.ElasticsearchDomain = "localhost"
+	if Config.ElasticsearchDomain == "" {
+		Config.ElasticsearchDomain = "localhost"
 	}
-	if config.RedisAddr == "" {
-		config.RedisAddr = "localhost"
+	if Config.RedisAddr == "" {
+		Config.RedisAddr = "localhost"
 	}
 
-	logger.Debugf("configuration: %q", config)
+	logger.Debugf("Configuration: %q", Config)
 	return nil
 }

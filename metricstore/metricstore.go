@@ -3,29 +3,39 @@ package metricstore
 import (
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/raintank/raintank-metric/setting"
 	"time"
 )
 
-type MetricStore struct {
-	KairosDB *Kairosdb
-	InfluxDB *Influxdb
+type MetricBackend interface {
+	SendMetrics(*[]metricdef.IndvMetric) error
+	Type() string
 }
 
-func NewMetricStore(GraphiteAddr string, GraphitePort int, KairosdbHostPort string) (*MetricStore, error) {
+type MetricStore struct {
+	Backends []MetricBackend
+}
 
-	kairosdb, err := NewKairosdb(KairosdbHostPort)
-	if err != nil {
-		return nil, err
+func NewMetricStore() (*MetricStore, error) {
+	mStore := MetricStore{}
+	if setting.Config.EnableKairosdb {
+		kairosdb, err := NewKairosdb(setting.Config.KairosdbUrl)
+		logger.Debugf("Adding kairosdb to list of backends.")
+		if err != nil {
+			return nil, err
+		}
+		mStore.Backends = append(mStore.Backends, kairosdb)
 	}
 
-	influx, err := NewInfluxdb(GraphiteAddr, GraphitePort)
-	if err != nil {
-		return nil, err
+	if setting.Config.EnableCarbon {
+		carbon, err := NewCarbon(setting.Config.CarbonAddr, setting.Config.CarbonPort)
+		logger.Debugf("Adding Carbon to list of backends.")
+		if err != nil {
+			return nil, err
+		}
+		mStore.Backends = append(mStore.Backends, carbon)
 	}
-	mStore := MetricStore{
-		KairosDB: kairosdb,
-		InfluxDB: influx,
-	}
+
 	return &mStore, nil
 }
 
@@ -51,16 +61,12 @@ func (mStore MetricStore) ProcessBuffer(c <-chan metricdef.IndvMetric, workerId 
 			copy(currentBuf, buf)
 			buf = nil
 			logger.Debugf("worker %d flushing %d items in buffer now", workerId, len(currentBuf))
-			if err := mStore.InfluxDB.SendMetrics(&currentBuf); err != nil {
-				logger.Errorf(err.Error())
-			} else {
-				logger.Debugf("worker %d flushed metrics buffer to Influxdb", workerId)
-			}
-
-			if err := mStore.KairosDB.SendMetrics(&currentBuf); err != nil {
-				logger.Errorf(err.Error())
-			} else {
-				logger.Debugf("worker %d flushed metrics buffer to Kairosdb", workerId)
+			for _, backend := range mStore.Backends {
+				if err := backend.SendMetrics(&currentBuf); err != nil {
+					logger.Errorf(err.Error())
+				} else {
+					logger.Debugf("worker %d flushed metrics buffer to %s backend", workerId, backend.Type())
+				}
 			}
 		}
 	}
