@@ -43,5 +43,3 @@ func processEvent(d *amqp.Delivery) error {
 	}
 	return nil
 }
-
-

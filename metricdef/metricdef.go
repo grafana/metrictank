@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
+	"github.com/raintank/raintank-metric/setting"
 	"gopkg.in/redis.v2"
 	"reflect"
 	"strconv"
@@ -208,13 +209,13 @@ func encode(v reflect.Value) (interface{}, error) {
 
 var es *elastigo.Conn
 
-func InitElasticsearch(domain string, port int, user, pass string) error {
+func InitElasticsearch() error {
 	es = elastigo.NewConn()
-	es.Domain = domain // needs to be configurable obviously
-	es.Port = strconv.Itoa(port)
-	if user != "" && pass != "" {
-		es.Username = user
-		es.Password = pass
+	es.Domain = setting.Config.ElasticsearchDomain // needs to be configurable obviously
+	es.Port = strconv.Itoa(setting.Config.ElasticsearchPort)
+	if setting.Config.ElasticsearchUser != "" && setting.Config.ElasticsearchPasswd != "" {
+		es.Username = setting.Config.ElasticsearchUser
+		es.Password = setting.Config.ElasticsearchPasswd
 	}
 	if exists, err := es.ExistsIndex("definitions", "metric", nil); err != nil && err.Error() != "record not found" {
 		return err
@@ -238,14 +239,14 @@ func InitElasticsearch(domain string, port int, user, pass string) error {
 
 var rs *redis.Client
 
-func InitRedis(addr, passwd string, db int64) error {
+func InitRedis() error {
 	opts := &redis.Options{}
 	opts.Network = "tcp"
-	opts.Addr = addr
-	if passwd != "" {
-		opts.Password = passwd
+	opts.Addr = setting.Config.RedisAddr
+	if setting.Config.RedisPasswd != "" {
+		opts.Password = setting.Config.RedisPasswd
 	}
-	opts.DB = db
+	opts.DB = setting.Config.RedisDB
 	rs = redis.NewClient(opts)
 
 	return nil

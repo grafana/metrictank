@@ -7,19 +7,19 @@ import (
 )
 
 // Kairosdb client
-type Influxdb struct {
+type Carbon struct {
 	Graphite *graphite.Graphite
 }
 
-func NewInfluxdb(host string, port int) (*Influxdb, error) {
+func NewCarbon(host string, port int) (*Carbon, error) {
 	graphite, err := graphite.NewGraphite(host, port)
 	if err != nil {
 		return nil, err
 	}
-	return &Influxdb{Graphite: graphite}, nil
+	return &Carbon{Graphite: graphite}, nil
 }
 
-func (influx Influxdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
+func (carbon *Carbon) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 	// marshal metrics into datapoint structs
 	datapoints := make([]graphite.Metric, len(*metrics))
 	for i, m := range *metrics {
@@ -29,5 +29,9 @@ func (influx Influxdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 			Value:     strconv.FormatFloat(m.Value, 'f', -1, 64),
 		}
 	}
-	return influx.Graphite.SendMetrics(datapoints)
+	return carbon.Graphite.SendMetrics(datapoints)
+}
+
+func (carbon *Carbon) Type() string {
+	return "Carbon"
 }

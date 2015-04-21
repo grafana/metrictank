@@ -24,6 +24,7 @@ import (
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/metricstore"
 	"github.com/raintank/raintank-metric/qproc"
+	"github.com/raintank/raintank-metric/setting"
 	"github.com/streadway/amqp"
 	"log"
 	"os"
@@ -38,11 +39,11 @@ var metricDefs *metricdef.MetricDefCache
 var bufCh chan metricdef.IndvMetric
 
 func init() {
-	initConfig()
+	setting.InitConfig()
 
 	var numCPU int
-	if config.NumWorkers != 0 {
-		numCPU = config.NumWorkers
+	if setting.Config.NumWorkers != 0 {
+		numCPU = setting.Config.NumWorkers
 	} else {
 		numCPU = runtime.NumCPU()
 	}
@@ -50,15 +51,15 @@ func init() {
 
 	bufCh = make(chan metricdef.IndvMetric, numCPU)
 
-	err := eventdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
+	err := eventdef.InitElasticsearch()
 	if err != nil {
 		panic(err)
 	}
-	err = metricdef.InitElasticsearch(config.ElasticsearchDomain, config.ElasticsearchPort, config.ElasticsearchUser, config.ElasticsearchPasswd)
+	err = metricdef.InitElasticsearch()
 	if err != nil {
 		panic(err)
 	}
-	err = metricdef.InitRedis(config.RedisAddr, config.RedisPasswd, config.RedisDB)
+	err = metricdef.InitRedis()
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +70,7 @@ func init() {
 	}
 
 	for i := 0; i < numCPU; i++ {
-		mStore, err := metricstore.NewMetricStore(config.GraphiteAddr, config.GraphitePort, config.KairosdbHostPort)
+		mStore, err := metricstore.NewMetricStore()
 		if err != nil {
 			panic(err)
 		}
@@ -80,7 +81,7 @@ func init() {
 
 func main() {
 	// First fire up a queue to consume metric def events
-	mdConn, err := amqp.Dial(config.RabbitMQURL)
+	mdConn, err := amqp.Dial(setting.Config.RabbitMQURL)
 	if err != nil {
 		logger.Criticalf(err.Error())
 		os.Exit(1)
@@ -91,8 +92,8 @@ func main() {
 	done := make(chan error, 1)
 
 	var numCPU int
-	if config.NumWorkers != 0 {
-		numCPU = config.NumWorkers
+	if setting.Config.NumWorkers != 0 {
+		numCPU = setting.Config.NumWorkers
 	} else {
 		numCPU = runtime.NumCPU()
 	}
@@ -207,4 +208,3 @@ func storeMetric(met *metricdef.IndvMetric) error {
 	bufCh <- *met
 	return nil
 }
-
