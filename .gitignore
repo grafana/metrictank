@@ -1,3 +1,5 @@
 .*.sw?
 raintank-metric
 raintank-metric_*
+*.deb
+*.rpm
