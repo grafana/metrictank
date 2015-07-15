@@ -38,6 +38,7 @@ type Conf struct {
 	ElasticsearchPort   int    `toml:"elasticsearch-port"`
 	ElasticsearchUser   string `toml:"elasticsearch-user"`
 	ElasticsearchPasswd string `toml:"elasticsearch-passwd"`
+	ExpvarAddr          string `toml:"expvar-addr"`
 	RedisAddr           string `toml:"redis-addr"`
 	RedisPasswd         string `toml:"redis-passwd"`
 	RedisDB             int64  `toml:"redis-db"`
@@ -70,6 +71,7 @@ type options struct {
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
 	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
 	NumWorkers          int    `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
+	ExpvarAddr          string `short:"e" long:"expvar-addr" description:"address to expose expvars on."`
 }
 
 var Config *Conf
@@ -101,10 +103,11 @@ func parseConfig() error {
 		os.Exit(0)
 	}
 
-	if opts.ConfFile != "" {
-		if _, err := toml.DecodeFile(opts.ConfFile, Config); err != nil {
-			return err
-		}
+	if opts.ConfFile == "" {
+		opts.ConfFile = "/etc/raintank-metric/raintank.conf"
+	}
+	if _, err := toml.DecodeFile(opts.ConfFile, Config); err != nil {
+		return err
 	}
 
 	if opts.LogFile != "" {
