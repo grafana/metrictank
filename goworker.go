@@ -18,7 +18,16 @@ package main
 
 import (
 	"encoding/json"
+	_ "expvar"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"runtime"
+	"strings"
+	"syscall"
+
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/metricdef"
@@ -26,12 +35,6 @@ import (
 	"github.com/raintank/raintank-metric/qproc"
 	"github.com/raintank/raintank-metric/setting"
 	"github.com/streadway/amqp"
-	"log"
-	"os"
-	"os/signal"
-	"runtime"
-	"strings"
-	"syscall"
 )
 
 var metricDefs *metricdef.MetricDefCache
@@ -80,6 +83,16 @@ func init() {
 }
 
 func main() {
+	if setting.Config.ExpvarAddr != "" {
+		go func() {
+			err := http.ListenAndServe(setting.Config.ExpvarAddr, nil)
+			if err != nil {
+				fmt.Println("Error starting expvar http listener:", err.Error())
+				os.Exit(1)
+			}
+		}()
+	}
+
 	// First fire up a queue to consume metric def events
 	mdConn, err := amqp.Dial(setting.Config.RabbitMQURL)
 	if err != nil {

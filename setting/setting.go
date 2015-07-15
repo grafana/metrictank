@@ -188,6 +188,9 @@ func parseConfig() error {
 	if opts.RedisDB != 0 {
 		Config.RedisDB = opts.RedisDB
 	}
+	if opts.ExpvarAddr != "" {
+		Config.ExpvarAddr = opts.ExpvarAddr
+	}
 	if opts.NumWorkers != 0 {
 		Config.NumWorkers = opts.NumWorkers
 	}
