@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NAME=raintank-metric
-VERSION="$(${GOPATH}/bin/${NAME} -v | cut -f3 -d' ')"
+VERSION="$(${HOME}/.go_workspace/bin/${NAME} -v | cut -f3 -d' ')"
 BUILD="$(pwd)/${NAME}-${VERSION}"
 ARCH="$(uname -m)"
 PACKAGE_NAME="artifacts/${NAME}-VERSION-ITERATION_ARCH.deb"
