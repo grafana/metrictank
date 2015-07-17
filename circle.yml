@@ -1,6 +1,6 @@
 test:
   post:
-    - package.sh
+    - ./package.sh
 dependencies:
   pre:
     - gem install fpm
