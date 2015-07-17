@@ -9,3 +9,7 @@ dependencies:
 general:
   artifacts:
     - artifacts
+deployment:
+  production:
+    commands:
+      - package_cloud push splaspood/raintank/ubuntu/trusty artifacts/*.deb
