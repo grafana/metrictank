@@ -11,5 +11,6 @@ general:
     - artifacts
 deployment:
   production:
+    branch: circleci
     commands:
       - package_cloud push splaspood/raintank/ubuntu/trusty artifacts/*.deb
