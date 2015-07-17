@@ -11,4 +11,4 @@ general:
     - artifacts
 machine:
   environment:
-    GOPATH: "/tmp/raintank-metric-go"
+    GOPATH: "raintank-metric-go"
