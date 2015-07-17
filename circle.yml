@@ -1,0 +1,14 @@
+test:
+  post:
+    - package.sh
+dependencies:
+  pre:
+    - gem install fpm
+    - gem install package_cloud
+    - mkdir artifacts
+general:
+  artifacts:
+    - artifacts
+machine:
+  environment:
+    GOPATH: "/tmp/raintank-metric-go"
