@@ -9,6 +9,3 @@ dependencies:
 general:
   artifacts:
     - artifacts
-machine:
-  environment:
-    GOPATH: "${HOME}/.go_workspace"
