@@ -1,0 +1,16 @@
+test:
+  post:
+    - ./package.sh
+dependencies:
+  pre:
+    - gem install fpm
+    - gem install package_cloud
+    - mkdir artifacts
+general:
+  artifacts:
+    - artifacts
+deployment:
+  production:
+    branch: circleci
+    commands:
+      - package_cloud push raintank/raintank-unstable/ubuntu/trusty artifacts/*.deb
