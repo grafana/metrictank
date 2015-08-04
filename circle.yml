@@ -1,13 +1,13 @@
 machine:
   pre:
-    - pkg/depends.sh
+    - ./pkg/depends.sh
   post:
-    - pkg/package.sh
+    - ./pkg/package.sh
 general:
   artifacts:
-    - pkg/artifacts
+    - ./pkg/artifacts
 deployment:
   production:
     branch: master
     commands:
-      - pkg/deploy.sh
+      - ./pkg/deploy.sh
