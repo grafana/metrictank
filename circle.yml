@@ -8,6 +8,6 @@ general:
     - pkg/artifacts
 deployment:
   production:
-    branch: circleci
+    branch: master
     commands:
-      - package_cloud push raintank/raintank-unstable/ubuntu/trusty artifacts/*.deb
+      - pkg/deploy.sh
