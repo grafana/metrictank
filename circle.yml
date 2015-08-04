@@ -1,14 +1,11 @@
-test:
-  post:
-    - ./package.sh
-dependencies:
+machine:
   pre:
-    - gem install fpm
-    - gem install package_cloud
-    - mkdir artifacts
+    - pkg/depends.sh
+  post:
+    - pkg/package.sh
 general:
   artifacts:
-    - artifacts
+    - pkg/artifacts
 deployment:
   production:
     branch: circleci
