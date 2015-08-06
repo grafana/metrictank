@@ -10,6 +10,7 @@ BUILD="${DIR}/${NAME}-${VERSION}"
 ARCH="$(uname -m)"
 PACKAGE_NAME="${DIR}/artifacts/${NAME}-VERSION-ITERATION_ARCH.deb"
 GOBIN="${DIR}/.."
+ITERATION=`date +%s`ubuntu1
 
 mkdir -p ${BUILD}/usr/bin
 
@@ -17,6 +18,6 @@ cp ../${NAME} ${BUILD}/usr/bin/
 cp -r ${DIR}/config/ubuntu/trusty/* ${BUILD}/
 
 fpm -s dir -t deb \
-  -v ${VERSION} -n ${NAME} -a ${ARCH} --iteration 1ubuntu1 --description "Raintank Metric" \
+  -v ${VERSION} -n ${NAME} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric" \
   --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
   -C ${BUILD} -p ${PACKAGE_NAME} .
