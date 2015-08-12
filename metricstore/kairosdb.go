@@ -33,21 +33,32 @@ type Datapoint struct {
 	Tags      map[string]string `json:"tags"`
 }
 
+func MetricToDataPoint(m metricdef.IndvMetric) Datapoint {
+	tags := make(map[string]string)
+	for k, v := range m.Extra {
+		tags[k] = fmt.Sprintf("%v", v)
+	}
+	tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
+	return Datapoint{
+		Name:      m.Metric,
+		Timestamp: m.Time * 1000,
+		Value:     m.Value,
+		Tags:      tags,
+	}
+}
+
+func (kdb *Kairosdb) SendMetricPointers(metrics []*metricdef.IndvMetric) error {
+	datapoints := make([]Datapoint, len(metrics))
+	for i, m := range metrics {
+		datapoints[i] = MetricToDataPoint(*m)
+	}
+	return kdb.AddDatapoints(datapoints)
+}
+
 func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
-	// marshal metrics into datapoint structs
 	datapoints := make([]Datapoint, len(*metrics))
 	for i, m := range *metrics {
-		tags := make(map[string]string)
-		for k, v := range m.Extra {
-			tags[k] = fmt.Sprintf("%v", v)
-		}
-		tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
-		datapoints[i] = Datapoint{
-			Name:      m.Metric,
-			Timestamp: m.Time * 1000,
-			Value:     m.Value,
-			Tags:      tags,
-		}
+		datapoints[i] = MetricToDataPoint(m)
 	}
 	return kdb.AddDatapoints(datapoints)
 }

@@ -5,7 +5,7 @@ init_cmds = [
 	["./raintank-metric"]
 ]						# Commands run in start
 watch_all = true		# Watch all sub-directories
-watch_dirs = ["metricstore", "metricdef", "eventdef", "qproc", "setting"]			# Directories to watch
+watch_dirs = ["metricstore", "metricdef", "eventdef", "qproc", "setting", "nsq_to_kairos"]
 watch_exts = [".go"]	# Extensions to watch
 build_delay = 1500		# Minimal interval to Trigger build event
 cmds = [
