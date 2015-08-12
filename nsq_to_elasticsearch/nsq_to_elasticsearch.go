@@ -13,7 +13,6 @@ import (
 
 	"github.com/bitly/go-nsq"
 	"github.com/bitly/nsq/internal/app"
-	"github.com/ctdk/goas/v2/logger"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/setting"
 )
@@ -74,12 +73,12 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	for _, m := range metrics {
-		logger.Debugf("processing %s", m.Name)
 		id := fmt.Sprintf("%d.%s", m.OrgId, m.Name)
 		if m.Id == "" {
 			m.Id = id
 		}
 		if err := metricDefs.CheckMetricDef(id, m); err != nil {
+			fmt.Printf("ERROR: couldn't process %s: %s\n", id, err)
 			return err
 		}
 	}
@@ -122,8 +121,9 @@ func main() {
 		*maxInFlight = *totalMessages
 	}
 
-	setting.InitConfig()
+	setting.Config = new(setting.Conf)
 	setting.Config.ElasticsearchDomain = "elasticsearch"
+	setting.Config.ElasticsearchPort = 9200
 	setting.Config.RedisAddr = "redis:6379"
 
 	cfg := nsq.NewConfig()
