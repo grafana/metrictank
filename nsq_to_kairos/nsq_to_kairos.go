@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -11,65 +10,31 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bitly/go-hostpool"
 	"github.com/bitly/go-nsq"
 	"github.com/bitly/nsq/internal/app"
-	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/metricstore"
 )
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
 
-	topic         = flag.String("topic", "", "NSQ topic")
-	channel       = flag.String("channel", "", "NSQ channel")
-	maxInFlight   = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	totalMessages = flag.Int("n", 0, "total messages to process (will wait if starved)")
+	topic        = flag.String("topic", "metrics", "NSQ topic")
+	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
+	channel      = flag.String("channel", "", "NSQ channel")
+	maxInFlight  = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 
 	consumerOpts     = app.StringArray{}
+	producerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
 	lookupdHTTPAddrs = app.StringArray{}
 )
 
 func init() {
 	flag.Var(&consumerOpts, "consumer-opt", "option to passthrough to nsq.Consumer (may be given multiple times, http://godoc.org/github.com/bitly/go-nsq#Config)")
+	flag.Var(&producerOpts, "producer-opt", "option to passthrough to nsq.Producer (may be given multiple times, see http://godoc.org/github.com/bitly/go-nsq#Config)")
+
 	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
 	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
-}
-
-type KairosHandler struct {
-	totalMessages int
-	messagesDone  int
-	kairos        *metricstore.Kairosdb
-}
-
-func NewKairosHandler(totalMessages int) (*KairosHandler, error) {
-	kairos, err := metricstore.NewKairosdb("http://kairosdb:8080")
-	if err != nil {
-		return nil, err
-	}
-	return &KairosHandler{
-		totalMessages: totalMessages,
-		kairos:        kairos,
-	}, nil
-}
-
-func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
-	k.messagesDone++
-	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(m.Body, &metrics); err != nil {
-		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
-		return nil
-	}
-	err := k.kairos.SendMetricPointers(metrics)
-	if err != nil {
-		log.Printf("ERROR: can't send to kairosdb: %s. retrying later", err)
-		return err
-	}
-
-	if k.totalMessages > 0 && k.messagesDone >= k.totalMessages {
-		os.Exit(0)
-	}
-	return nil
 }
 
 func main() {
@@ -99,11 +64,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Don't ask for more messages than we want
-	if *totalMessages > 0 && *totalMessages < *maxInFlight {
-		*maxInFlight = *totalMessages
-	}
-
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_to_kairos"
 	err := app.ParseOpts(cfg, consumerOpts)
@@ -117,12 +77,38 @@ func main() {
 		log.Fatal(err)
 	}
 
-	handler, err := NewKairosHandler(*totalMessages)
+	consumerLowPrio, err := nsq.NewConsumer(*topicLowPrio, *channel, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	consumer.AddHandler(handler)
+	pCfg := nsq.NewConfig()
+	pCfg.UserAgent = "nsq_to_kairos"
+	err = app.ParseOpts(pCfg, producerOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hostPool := hostpool.NewEpsilonGreedy(nsqdTCPAddrs, 0, &hostpool.LinearEpsilonValueCalculator{})
+	producers := make(map[string]*nsq.Producer)
+	for _, addr := range nsqdTCPAddrs {
+		producer, err := nsq.NewProducer(addr, pCfg)
+		if err != nil {
+			log.Fatalf("failed creating producer %s", err)
+		}
+		producers[addr] = producer
+	}
+
+	gateway, err := NewKairosGateway()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	handler := NewKairosHandler(gateway, hostPool, producers)
+	consumer.AddConcurrentHandlers(handler, 4)
+
+	handlerLowPrio := NewKairosLowPrioHandler(gateway)
+	consumerLowPrio.AddConcurrentHandlers(handlerLowPrio, 2)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {
@@ -135,12 +121,28 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = consumerLowPrio.ConnectToNSQDs(nsqdTCPAddrs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("connected to nsqd")
+
+	err = consumerLowPrio.ConnectToNSQLookupds(lookupdHTTPAddrs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
 		select {
 		case <-consumer.StopChan:
+			consumerLowPrio.Stop()
+			return
+		case <-consumerLowPrio.StopChan:
+			consumer.Stop()
 			return
 		case <-sigChan:
 			consumer.Stop()
+			consumerLowPrio.Stop()
 		}
 	}
 }
