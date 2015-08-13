@@ -58,9 +58,13 @@ func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 }
 
 func (kg *KairosGateway) process(qualifier string, msg *nsq.Message) error {
-	fmt.Printf("processing %s msg. timestamp: %s. attempts: %d\n", qualifier, time.Unix(0, msg.Timestamp), msg.Attempts)
+	format := "unknown"
+	if msg.Body[0] == '\x00' {
+		format = "msgFormatMetricDefinitionArrayJson"
+	}
+	log.Printf("DEBUG: processing %s msg %s. timestamp: %s. format: %s. attempts: %d\n", qualifier, msg.ID, time.Unix(0, msg.Timestamp), format, msg.Attempts)
 	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(msg.Body, &metrics); err != nil {
+	if err := json.Unmarshal(msg.Body[1:], &metrics); err != nil {
 		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
 		return nil
 	}
