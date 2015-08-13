@@ -18,6 +18,7 @@ package metricdef
 
 import (
 	"errors"
+	"fmt"
 	"github.com/ctdk/goas/v2/logger"
 	"sync"
 )
@@ -43,16 +44,17 @@ func InitMetricDefCache() (*MetricDefCache, error) {
 	return mdc, nil
 }
 
-func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
+func (mdc *MetricDefCache) CheckMetricDef(m *IndvMetric) error {
 	mdc.m.Lock()
 	defer mdc.m.Unlock()
-
-	_, exists := mdc.mdefs[id]
+	_, exists := mdc.mdefs[m.Id]
 	if !exists {
-		def, err := GetMetricDefinition(id)
+		fmt.Printf("%s not in local cache.\n", m.Id)
+		def, err := GetMetricDefinition(m.Id)
 		if err != nil {
+			fmt.Println(err)
 			if err.Error() == "record not found" {
-				logger.Debugf("adding %s to metric defs", id)
+				fmt.Printf("adding %s to metric defs\n", m.Id)
 				def, err = NewFromMessage(m)
 				if err != nil {
 					return err
@@ -61,7 +63,7 @@ func (mdc *MetricDefCache) CheckMetricDef(id string, m *IndvMetric) error {
 				return err
 			}
 		}
-		mdc.mdefs[id] = &MetricCacheItem{Def: def}
+		mdc.mdefs[m.Id] = &MetricCacheItem{Def: def}
 	}
 
 	return nil

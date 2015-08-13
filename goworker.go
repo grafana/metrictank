@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"strings"
 	"syscall"
 
 	"github.com/ctdk/goas/v2/logger"
@@ -111,11 +110,6 @@ func main() {
 		numCPU = runtime.NumCPU()
 	}
 
-	err = qproc.ProcessQueue(mdConn, "metrics", "topic", "", "metrics.*", false, true, true, done, processMetricDefEvent, numCPU)
-	if err != nil {
-		logger.Criticalf(err.Error())
-		os.Exit(1)
-	}
 	err = qproc.ProcessQueue(mdConn, "metricResults", "x-consistent-hash", "", "10", false, true, true, done, processMetrics, numCPU)
 	if err != nil {
 		logger.Criticalf(err.Error())
@@ -171,11 +165,8 @@ func processMetrics(d *amqp.Delivery) error {
 
 	for _, m := range metrics {
 		logger.Debugf("processing %s", m.Name)
-		id := fmt.Sprintf("%d.%s", m.OrgId, m.Name)
-		if m.Id == "" {
-			m.Id = id
-		}
-		if err := metricDefs.CheckMetricDef(id, m); err != nil {
+		m.SetId()
+		if err := metricDefs.CheckMetricDef(m); err != nil {
 			return err
 		}
 
@@ -187,32 +178,6 @@ func processMetrics(d *amqp.Delivery) error {
 	if err := d.Ack(false); err != nil {
 		return err
 	}
-	return nil
-}
-
-func processMetricDefEvent(d *amqp.Delivery) error {
-	action := strings.Split(d.RoutingKey, ".")[1]
-
-	switch action {
-	case "update":
-		metric, err := metricdef.DefFromJSON(d.Body)
-		if err != nil {
-			return err
-		}
-		if err := metricDefs.UpdateDefCache(metric); err != nil {
-			return err
-		}
-	case "remove":
-		metric, err := metricdef.DefFromJSON(d.Body)
-		if err != nil {
-			return err
-		}
-		metricDefs.RemoveDefCache(metric.Id)
-	default:
-		err := fmt.Errorf("message has unknown action '%s'", action)
-		return err
-	}
-
 	return nil
 }
 

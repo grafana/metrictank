@@ -73,12 +73,9 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	for _, m := range metrics {
-		id := fmt.Sprintf("%d.%s", m.OrgId, m.Name)
-		if m.Id == "" {
-			m.Id = id
-		}
-		if err := metricDefs.CheckMetricDef(id, m); err != nil {
-			fmt.Printf("ERROR: couldn't process %s: %s\n", id, err)
+		m.SetId()
+		if err := metricDefs.CheckMetricDef(m); err != nil {
+			fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
 			return err
 		}
 	}

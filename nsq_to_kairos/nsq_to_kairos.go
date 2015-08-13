@@ -54,6 +54,7 @@ func NewKairosHandler(totalMessages int) (*KairosHandler, error) {
 }
 
 func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
+	fmt.Printf("got message: %v", m)
 	k.messagesDone++
 	metrics := make([]*metricdef.IndvMetric, 0)
 	if err := json.Unmarshal(m.Body, &metrics); err != nil {
