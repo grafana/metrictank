@@ -117,7 +117,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("connected to nsqd")
+	log.Println("INFO : connected to nsqd")
 
 	err = consumer.ConnectToNSQLookupds(lookupdHTTPAddrs)
 	if err != nil {
@@ -128,7 +128,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("connected to nsqd")
+	log.Println("INFO : connected to nsqd")
 
 	err = consumerLowPrio.ConnectToNSQLookupds(lookupdHTTPAddrs)
 	if err != nil {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"time"
 
@@ -41,7 +40,7 @@ func (kg *KairosGateway) Run() {
 			case job := <-kg.inHighPrio:
 				job.done <- kg.process("high prio", job.msg)
 			case job := <-kg.inLowPrio:
-				job.done <- kg.process("low prio", job.msg)
+				job.done <- kg.process("low  prio", job.msg)
 			}
 		}
 	}
@@ -70,7 +69,7 @@ func (kg *KairosGateway) process(qualifier string, msg *nsq.Message) error {
 	}
 	err := kg.kairos.SendMetricPointers(metrics)
 	if err != nil {
-		log.Printf("ERROR: can't send to kairosdb: %s. retrying later", err)
+		log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
 	}
 	return err
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -27,7 +26,7 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 	p := k.producers[hostPoolResponse.Host()]
 	err := p.Publish(*topicLowPrio, body)
 	if err != nil {
-		log.Printf("WARNING: publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+		log.Printf("WARN : publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
 		hostPoolResponse.Mark(err)
 	}
 	return err
@@ -36,7 +35,7 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 	created := time.Unix(0, m.Timestamp)
 	if time.Now().Add(-time.Duration(4) * time.Minute).After(created) {
-		fmt.Println("DEBUG: requeing msg", m.Attempts, "with timestamp", created)
+		log.Printf("DEBUG: requeuing msg %s. timestamp: %s. attempts: %d\n ", m.ID, time.Unix(0, m.Timestamp), m.Attempts)
 		attempts := 3 // try 3 different hosts before giving up and requeuing
 		var err error
 		for attempt := 1; attempt <= attempts; attempt++ {
@@ -45,7 +44,7 @@ func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 				return nil // we published the msg as lowprio and can mark it as processed
 			}
 		}
-		fmt.Println("WARNING: failed to publish out of date message as low-prio. reprocessing later")
+		log.Println("WARN : failed to publish out of date message as low-prio. reprocessing later")
 		return err
 	}
 	return k.gateway.ProcessHighPrio(m)
