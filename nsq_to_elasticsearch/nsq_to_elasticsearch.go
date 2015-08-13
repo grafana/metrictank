@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -156,6 +159,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	go func() {
+		log.Println("INFO starting listener for http/debug on :6060")
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
 
 	for {
 		select {
