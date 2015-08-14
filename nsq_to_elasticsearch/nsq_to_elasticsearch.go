@@ -75,7 +75,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(m.Body[1:], &metrics); err != nil {
+	if err := json.Unmarshal(m.Body[9:], &metrics); err != nil {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}

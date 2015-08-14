@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"log"
 	"time"
 
@@ -25,6 +27,10 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 	hostPoolResponse := k.hostPool.Get()
 	p := k.producers[hostPoolResponse.Host()]
 	err := p.Publish(*topicLowPrio, body)
+	buf := bytes.NewReader(body[1:9])
+	var id int64
+	binary.Read(buf, binary.BigEndian, &id)
+	log.Printf("DEBUG: DIETER-MOVE-TO-LOW-PRIO %d\n", id)
 	if err != nil {
 		log.Printf("WARN : publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
 		hostPoolResponse.Mark(err)
