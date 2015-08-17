@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,8 +19,6 @@ import (
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/setting"
 )
-
-var metricDefs *metricdef.MetricDefCache
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
@@ -54,11 +55,6 @@ func NewESHandler(totalMessages int) (*ESHandler, error) {
 		return nil, err
 	}
 
-	metricDefs, err = metricdef.InitMetricDefCache()
-	if err != nil {
-		return nil, err
-	}
-
 	return &ESHandler{
 		totalMessages: totalMessages,
 	}, nil
@@ -66,15 +62,19 @@ func NewESHandler(totalMessages int) (*ESHandler, error) {
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	k.messagesDone++
+	format := "unknown"
+	if m.Body[0] == '\x00' {
+		format = "msgFormatMetricDefinitionArrayJson"
+	}
+
 	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(m.Body, &metrics); err != nil {
-		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
+	if err := json.Unmarshal(m.Body[9:], &metrics); err != nil {
+		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
 
 	for _, m := range metrics {
-		m.SetId()
-		if err := metricDefs.CheckMetricDef(m); err != nil {
+		if err := m.EnsureIndex(); err != nil {
 			fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
 			return err
 		}
@@ -153,6 +153,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	go func() {
+		log.Println("INFO starting listener for http/debug on :6060")
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
 
 	for {
 		select {

@@ -18,6 +18,7 @@ package metricdef
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
@@ -26,7 +27,6 @@ import (
 	"gopkg.in/redis.v2"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -40,7 +40,6 @@ type MetricDefinition struct {
 	Interval   int                    `json:"interval"`   // minimum 10
 	LastUpdate int64                  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
 	Tags       map[string]interface{} `json:"tags"`
-	m          sync.RWMutex           `json:"-"`
 }
 
 type IndvMetric struct {
@@ -71,7 +70,33 @@ func (m *IndvMetric) SetId() {
 		buffer.WriteString(fmt.Sprintf(":%s=%v", k, m.Tags[k]))
 	}
 
-	m.Id = fmt.Sprintf("%d.%s%s", m.OrgId, m.Name, buffer.String())
+	m.Id = base64.URLEncoding.EncodeToString([]byte(fmt.Sprintf("%d.%s%s", m.OrgId, m.Name, buffer.String())))
+}
+
+func (m *IndvMetric) EnsureIndex() error {
+	m.SetId()
+	def, err := GetMetricDefinition(m.Id)
+	if err != nil && err.Error() != "record not found" {
+		return err
+	}
+	//if the definition does not exist, or is older then 10minutes. update it.
+	if def == nil || def.LastUpdate < (time.Now().Unix()-600) {
+		mdef := &MetricDefinition{
+			Id:         m.Id,
+			Name:       m.Name,
+			OrgId:      m.OrgId,
+			Metric:     m.Metric,
+			TargetType: m.TargetType,
+			Interval:   m.Interval,
+			LastUpdate: time.Now().Unix(),
+			Unit:       m.Unit,
+			Tags:       m.Tags,
+		}
+		if err := mdef.Save(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var es *elastigo.Conn
@@ -132,61 +157,7 @@ func DefFromJSON(b []byte) (*MetricDefinition, error) {
 	return def, nil
 }
 
-func NewFromMessage(m *IndvMetric) (*MetricDefinition, error) {
-	logger.Debugf("incoming message: %+v", m)
-	now := time.Now().Unix()
-
-	// input is now validated by json unmarshal
-	def := &MetricDefinition{
-		Id:         "",
-		Name:       m.Name,
-		OrgId:      m.OrgId,
-		Metric:     m.Metric,
-		TargetType: m.TargetType,
-		Interval:   m.Interval,
-		LastUpdate: now,
-		Unit:       m.Unit,
-		Tags:       m.Tags,
-	}
-	err := def.Save()
-	if err != nil {
-		return nil, err
-	}
-
-	return def, nil
-}
-
-func (m *MetricDefinition) SetId() {
-	if m.Id != "" {
-		//id already set.
-		return
-	}
-	var buffer bytes.Buffer
-	keys := make([]string, 0)
-	for k, _ := range m.Tags {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		buffer.WriteString(fmt.Sprintf(":%s=%v", k, m.Tags[k]))
-	}
-
-	m.Id = fmt.Sprintf("%d.%s%s", m.OrgId, m.Name, buffer.String())
-}
-
 func (m *MetricDefinition) Save() error {
-	m.SetId()
-	if m.LastUpdate == 0 {
-		m.LastUpdate = time.Now().Unix()
-	}
-	if err := m.validate(); err != nil {
-		return err
-	}
-	// save in elasticsearch
-	return m.indexMetric()
-}
-
-func (m *MetricDefinition) Update() error {
 	if err := m.validate(); err != nil {
 		return err
 	}
@@ -204,8 +175,9 @@ func (m *MetricDefinition) validate() error {
 }
 
 func (m *MetricDefinition) indexMetric() error {
+	fmt.Printf("indexing %s in elasticsearch\n", m.Id)
 	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
-	fmt.Printf("response ok? %v", resp.Ok)
+	fmt.Printf("elasticsearch response: %v\n", resp)
 	if err != nil {
 		return err
 	}
@@ -226,14 +198,14 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		return def, nil
 	}
 
-	fmt.Printf("getting %s from elasticsearch\n", id)
+	fmt.Printf("checking elasticsearch for %s\n", id)
 	res, err := es.Get("metric", "metric_index", id, nil)
-	fmt.Printf("res is: %+v\n", res)
 	if err != nil {
+		fmt.Printf("elasticsearch query failed. %s\n", err.Error())
 		return nil, err
 	}
-	fmt.Printf("get returned %q\n", res.Source)
-	fmt.Printf("placing %s into redis", id)
+	fmt.Printf("elasticsearch query returned %q\n", res.Source)
+	fmt.Printf("placing %s into redis\n", id)
 	if rerr := rs.SetEx(id, time.Duration(300)*time.Second, string(*res.Source)).Err(); err != nil {
 		fmt.Printf("redis err: %s", rerr.Error())
 	}
