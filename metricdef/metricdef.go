@@ -65,7 +65,7 @@ func (m *IndvMetric) SetId() {
 		return
 	}
 	var buffer bytes.Buffer
-	buffer.WriteString(n.Name)
+	buffer.WriteString(m.Name)
 	keys := make([]string, 0)
 	for k, _ := range m.Tags {
 		keys = append(keys, k)
