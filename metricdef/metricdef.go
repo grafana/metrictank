@@ -18,7 +18,7 @@ package metricdef
 
 import (
 	"bytes"
-	"encoding/base64"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"github.com/ctdk/goas/v2/logger"
@@ -31,46 +31,51 @@ import (
 )
 
 type MetricDefinition struct {
-	Id         string                 `json:"id"`
-	Name       string                 `json:"name" elastic:"type:string,index:not_analyzed"`
-	OrgId      int                    `json:"org_id"`
-	Metric     string                 `json:"metric"`
-	TargetType string                 `json:"target_type"` // an emum ["derive","gauge"] in nodejs
-	Unit       string                 `json:"unit"`
-	Interval   int                    `json:"interval"`   // minimum 10
-	LastUpdate int64                  `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	Tags       map[string]interface{} `json:"tags"`
+	Id         string            `json:"id"`
+	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"`
+	OrgId      int               `json:"org_id"`
+	Metric     string            `json:"metric"`
+	TargetType string            `json:"target_type"` // an emum ["derive","gauge"] in nodejs
+	Unit       string            `json:"unit"`
+	Interval   int               `json:"interval"`   // minimum 10
+	LastUpdate int64             `json:"lastUpdate"` // unix epoch time, per the nodejs definition
+	Tags       map[string]string `json:"tags"`
 }
 
 type IndvMetric struct {
-	Id         string                 `json:"id"`
-	OrgId      int                    `json:"org_id"`
-	Name       string                 `json:"name"`
-	Metric     string                 `json:"metric"`
-	Interval   int                    `json:"interval"`
-	Value      float64                `json:"value"`
-	Unit       string                 `json:"unit"`
-	Time       int64                  `json:"time"`
-	TargetType string                 `json:"target_type"`
-	Tags       map[string]interface{} `json:"tags"`
+	Id         string            `json:"id"`
+	OrgId      int               `json:"org_id"`
+	Name       string            `json:"name"`
+	Metric     string            `json:"metric"`
+	Interval   int               `json:"interval"`
+	Value      float64           `json:"value"`
+	Unit       string            `json:"unit"`
+	Time       int64             `json:"time"`
+	TargetType string            `json:"target_type"`
+	Tags       map[string]string `json:"tags"`
 }
 
+// sets the ID of the metric.
+// the id is in the format  OrgId.md5Sum
+// the md5sum is a hash of the the concatination of the
+// series name + each tag key:value pair, sorted alphabetically.
 func (m *IndvMetric) SetId() {
 	if m.Id != "" {
 		//id already set.
 		return
 	}
 	var buffer bytes.Buffer
+	buffer.WriteString(n.Name)
 	keys := make([]string, 0)
 	for k, _ := range m.Tags {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		buffer.WriteString(fmt.Sprintf(":%s=%v", k, m.Tags[k]))
+		buffer.WriteString(fmt.Sprintf(":%s=%s", k, m.Tags[k]))
 	}
 
-	m.Id = base64.URLEncoding.EncodeToString([]byte(fmt.Sprintf("%d.%s%s", m.OrgId, m.Name, buffer.String())))
+	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
 }
 
 func (m *IndvMetric) EnsureIndex() error {
