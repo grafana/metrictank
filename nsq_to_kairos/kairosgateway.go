@@ -16,9 +16,10 @@ type KairosGateway struct {
 	kairos     *metricstore.Kairosdb
 	inHighPrio chan Job
 	inLowPrio  chan Job
+	dryRun     bool
 }
 
-func NewKairosGateway() (*KairosGateway, error) {
+func NewKairosGateway(dryRun bool) (*KairosGateway, error) {
 	kairos, err := metricstore.NewKairosdb("http://kairosdb:8080")
 	if err != nil {
 		return nil, err
@@ -27,6 +28,7 @@ func NewKairosGateway() (*KairosGateway, error) {
 		kairos:     kairos,
 		inHighPrio: make(chan Job, 4), // always useful to have some packets queue up to enforce the prio
 		inLowPrio:  make(chan Job),
+		dryRun:     dryRun,
 	}
 	go kg.Run()
 	return kg, nil
@@ -73,9 +75,12 @@ func (kg *KairosGateway) process(qualifier string, msg *nsq.Message) error {
 		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
 		return nil
 	}
-	err := kg.kairos.SendMetricPointers(metrics)
-	if err != nil {
-		log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
+	var err error
+	if !kg.dryRun {
+		err = kg.kairos.SendMetricPointers(metrics)
+		if err != nil {
+			log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
+		}
 	}
 	log.Printf("DEBUG: DIETER-FINISHED-%s %d\n", qualifier, id)
 	return err

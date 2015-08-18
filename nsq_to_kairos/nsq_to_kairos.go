@@ -20,6 +20,7 @@ import (
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
+	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into kairosdb")
 
 	topic        = flag.String("topic", "metrics", "NSQ topic")
 	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
@@ -102,7 +103,7 @@ func main() {
 		producers[addr] = producer
 	}
 
-	gateway, err := NewKairosGateway()
+	gateway, err := NewKairosGateway(*dryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
