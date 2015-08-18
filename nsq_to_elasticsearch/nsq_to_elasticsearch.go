@@ -72,12 +72,20 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
-
-	for _, m := range metrics {
-		if err := m.EnsureIndex(); err != nil {
-			fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
-			return err
+	done := make(chan error, 1)
+	go func() {
+		for _, m := range metrics {
+			if err := m.EnsureIndex(); err != nil {
+				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
+				done <- err
+				return
+			}
 		}
+		done <- nil
+	}()
+
+	if err := <-done; err != nil {
+		return err
 	}
 
 	if k.totalMessages > 0 && k.messagesDone >= k.totalMessages {
