@@ -77,6 +77,6 @@ func (kg *KairosGateway) process(qualifier string, msg *nsq.Message) error {
 	if err != nil {
 		log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
 	}
-	log.Printf("DEBUG: DIETER-FINISHED-%s %d\n", qualifier, id)
+	log.Printf("DEBUG: DIETER-FINISHED-%s %d  - %d metrics sent\n", qualifier, id, len(metrics))
 	return err
 }
