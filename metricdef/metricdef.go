@@ -173,7 +173,7 @@ func (m *MetricDefinition) Save() error {
 func (m *MetricDefinition) validate() error {
 	if m.Name == "" || m.OrgId == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
 		// TODO: this error message ought to be more informative
-		err := log.Printf("Error: metric is not valid!")
+		err := fmt.Errorf("metric is not valid!")
 		return err
 	}
 	return nil
