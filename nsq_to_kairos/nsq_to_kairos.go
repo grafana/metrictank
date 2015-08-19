@@ -22,6 +22,7 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into kairosdb")
 
+	concurrency  = flag.Int("concurrency", 10, "number of workers parsing messages and writing into kairosdb. also number of nsq consumers for both high and low prio topic")
 	topic        = flag.String("topic", "metrics", "NSQ topic")
 	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
 	channel      = flag.String("channel", "", "NSQ channel")
@@ -103,16 +104,16 @@ func main() {
 		producers[addr] = producer
 	}
 
-	gateway, err := NewKairosGateway(*dryRun)
+	gateway, err := NewKairosGateway(*dryRun, *concurrency)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	handler := NewKairosHandler(gateway, hostPool, producers)
-	consumer.AddConcurrentHandlers(handler, 4)
+	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	handlerLowPrio := NewKairosLowPrioHandler(gateway)
-	consumerLowPrio.AddConcurrentHandlers(handlerLowPrio, 2)
+	consumerLowPrio.AddConcurrentHandlers(handlerLowPrio, *concurrency)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {

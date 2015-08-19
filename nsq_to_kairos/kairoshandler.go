@@ -30,7 +30,6 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 	buf := bytes.NewReader(body[1:9])
 	var id int64
 	binary.Read(buf, binary.BigEndian, &id)
-	log.Printf("DEBUG: DIETER-MOVE-TO-LOW-PRIO %d\n", id)
 	if err != nil {
 		log.Printf("WARN : publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
 		hostPoolResponse.Mark(err)
@@ -50,7 +49,7 @@ func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 				return nil // we published the msg as lowprio and can mark it as processed
 			}
 		}
-		log.Println("WARN : failed to publish out of date message as low-prio. reprocessing later")
+		log.Printf("WARN : failed to publish out of date message %s as low-prio. reprocessing later\n", m.ID)
 		return err
 	}
 	return k.gateway.ProcessHighPrio(m)
