@@ -21,10 +21,10 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/ctdk/goas/v2/logger"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/setting"
 	"gopkg.in/redis.v2"
+	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -173,18 +173,25 @@ func (m *MetricDefinition) Save() error {
 func (m *MetricDefinition) validate() error {
 	if m.Name == "" || m.OrgId == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
 		// TODO: this error message ought to be more informative
-		err := fmt.Errorf("metric is not valid!")
+		err := log.Printf("Error: metric is not valid!")
 		return err
 	}
 	return nil
 }
 
 func (m *MetricDefinition) indexMetric() error {
-	fmt.Printf("indexing %s in elasticsearch\n", m.Id)
+	log.Printf("indexing %s in elasticsearch\n", m.Id)
 	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
-	fmt.Printf("elasticsearch response: %v\n", resp)
+	log.Printf("elasticsearch response: %v\n", resp)
 	if err != nil {
 		return err
+	}
+	metricStr, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	if rerr := rs.SetEx(m.Id, time.Duration(300)*time.Second, string(metricStr)).Err(); err != nil {
+		fmt.Printf("redis err: %s", rerr.Error())
 	}
 	return nil
 }
@@ -192,10 +199,10 @@ func (m *MetricDefinition) indexMetric() error {
 func GetMetricDefinition(id string) (*MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
-		logger.Errorf("the redis client bombed: %s", err.Error())
+		log.Printf("Error: the redis client bombed: %s", err.Error())
 		return nil, err
 	} else if err == nil {
-		fmt.Printf("json for %s found in redis\n", id)
+		//fmt.Printf("json for %s found in redis\n", id)
 		def, err := DefFromJSON([]byte(v))
 		if err != nil {
 			return nil, err
@@ -203,16 +210,16 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		return def, nil
 	}
 
-	fmt.Printf("checking elasticsearch for %s\n", id)
+	log.Printf("checking elasticsearch for %s\n", id)
 	res, err := es.Get("metric", "metric_index", id, nil)
 	if err != nil {
-		fmt.Printf("elasticsearch query failed. %s\n", err.Error())
+		log.Printf("elasticsearch query failed. %s\n", err.Error())
 		return nil, err
 	}
-	fmt.Printf("elasticsearch query returned %q\n", res.Source)
-	fmt.Printf("placing %s into redis\n", id)
+	//fmt.Printf("elasticsearch query returned %q\n", res.Source)
+	//fmt.Printf("placing %s into redis\n", id)
 	if rerr := rs.SetEx(id, time.Duration(300)*time.Second, string(*res.Source)).Err(); err != nil {
-		fmt.Printf("redis err: %s", rerr.Error())
+		log.Printf("redis err: %s", rerr.Error())
 	}
 
 	def, err := DefFromJSON(*res.Source)
