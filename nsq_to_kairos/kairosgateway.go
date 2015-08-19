@@ -40,7 +40,9 @@ func (kg *KairosGateway) Run() {
 		default:
 			select {
 			case job := <-kg.inHighPrio:
-				job.done <- kg.process("high-prio", job.msg)
+				go func() {
+					job.done <- kg.process("high-prio", job.msg)
+				}()
 			case job := <-kg.inLowPrio:
 				job.done <- kg.process("low--prio", job.msg)
 			}
