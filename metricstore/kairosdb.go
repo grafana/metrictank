@@ -35,8 +35,8 @@ type Datapoint struct {
 
 func MetricToDataPoint(m metricdef.IndvMetric) Datapoint {
 	tags := make(map[string]string)
-	for k, v := range m.Extra {
-		tags[k] = fmt.Sprintf("%v", v)
+	for k, v := range m.Tags {
+		tags[k] = v
 	}
 	tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
 	return Datapoint{

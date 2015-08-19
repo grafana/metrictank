@@ -54,7 +54,6 @@ use a configuration file. The available options are:
 	  -y, --redis-passwd=         Optional password to use when connecting to redis.
 	  -D, --redis-db=             Option database number to use when connecting to
 				      redis.
-	  -q, --rabbitmq-url=         RabbitMQ server URL.
 	  -w, --num-workers=          Number of workers to launch. Defaults to the
             	                      number of CPUs on the system.
 	      --short-rollup=         Interval to do short-term metric rollups.

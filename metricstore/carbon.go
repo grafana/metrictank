@@ -1,6 +1,7 @@
 package metricstore
 
 import (
+	"fmt"
 	"github.com/marpaia/graphite-golang"
 	"github.com/raintank/raintank-metric/metricdef"
 	"strconv"
@@ -24,7 +25,7 @@ func (carbon *Carbon) SendMetrics(metrics *[]metricdef.IndvMetric) error {
 	datapoints := make([]graphite.Metric, len(*metrics))
 	for i, m := range *metrics {
 		datapoints[i] = graphite.Metric{
-			Name:      m.Id,
+			Name:      fmt.Sprintf("%d.%s", m.OrgId, m.Name),
 			Timestamp: m.Time,
 			Value:     strconv.FormatFloat(m.Value, 'f', -1, 64),
 		}

@@ -16,7 +16,7 @@ import (
 
 	"github.com/bitly/go-nsq"
 	"github.com/bitly/nsq/internal/app"
-	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/setting"
 )
 
@@ -46,11 +46,7 @@ type ESHandler struct {
 
 func NewESHandler(totalMessages int) (*ESHandler, error) {
 
-	err := metricdef.InitElasticsearch()
-	if err != nil {
-		return nil, err
-	}
-	err = metricdef.InitRedis()
+	err := eventdef.InitElasticsearch()
 	if err != nil {
 		return nil, err
 	}
@@ -61,25 +57,24 @@ func NewESHandler(totalMessages int) (*ESHandler, error) {
 }
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
+	log.Printf("recieved message.")
 	k.messagesDone++
 	format := "unknown"
 	if m.Body[0] == '\x00' {
-		format = "msgFormatMetricDefinitionArrayJson"
+		format = "msgFormatJson"
 	}
 
-	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(m.Body[9:], &metrics); err != nil {
+	event := new(eventdef.EventDefinition)
+	if err := json.Unmarshal(m.Body[9:], &event); err != nil {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
 	done := make(chan error, 1)
 	go func() {
-		for _, m := range metrics {
-			if err := m.EnsureIndex(); err != nil {
-				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
-				done <- err
-				return
-			}
+		if err := event.Save(); err != nil {
+			fmt.Printf("ERROR: couldn't process %s: %s\n", event.Id, err)
+			done <- err
+			return
 		}
 		done <- nil
 	}()
@@ -129,10 +124,9 @@ func main() {
 	setting.Config = new(setting.Conf)
 	setting.Config.ElasticsearchDomain = "elasticsearch"
 	setting.Config.ElasticsearchPort = 9200
-	setting.Config.RedisAddr = "redis:6379"
 
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_to_elasticsearch"
+	cfg.UserAgent = "nsq_events"
 	err := app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)
