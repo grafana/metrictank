@@ -28,7 +28,6 @@ import (
 )
 
 type Conf struct {
-	RabbitMQURL         string `toml:"rabbitmq-url"`
 	CarbonAddr          string `toml:"carbon-addr"`
 	CarbonPort          int    `toml:"carbon-port"`
 	EnableCarbon        bool   `toml:"enable-carbon"`
@@ -69,7 +68,6 @@ type options struct {
 	RedisAddr           string `short:"r" long:"redis-addr" description:"Hostname or IP address of redis server."`
 	RedisPasswd         string `short:"y" long:"redis-passwd" description:"Optional password to use when connecting to redis."`
 	RedisDB             int64  `short:"D" long:"redis-db" description:"Option database number to use when connecting to redis."`
-	RabbitMQURL         string `short:"q" long:"rabbitmq-url" description:"RabbitMQ server URL."`
 	NumWorkers          int    `short:"w" long:"num-workers" description:"Number of workers to launch. Defaults to the number of CPUs on the system."`
 	ExpvarAddr          string `short:"e" long:"expvar-addr" description:"address to expose expvars on."`
 }
@@ -201,9 +199,7 @@ func parseConfig() error {
 	if Config.ElasticsearchPort == 0 {
 		Config.ElasticsearchPort = 9200
 	}
-	if Config.RabbitMQURL == "" {
-		Config.RabbitMQURL = "amqp://localhost"
-	}
+
 	if Config.ElasticsearchDomain == "" {
 		Config.ElasticsearchDomain = "localhost"
 	}
