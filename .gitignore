@@ -3,5 +3,6 @@ raintank-metric
 raintank-metric_*
 nsq_to_elasticsearch/nsq_to_elasticsearch
 nsq_to_kairos/nsq_to_kairos
+nsq_events/nsq_events
 *.deb
 *.rpm
