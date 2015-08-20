@@ -25,7 +25,7 @@ var (
 	concurrency  = flag.Int("concurrency", 10, "number of workers parsing messages and writing into kairosdb. also number of nsq consumers for both high and low prio topic")
 	topic        = flag.String("topic", "metrics", "NSQ topic")
 	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
-	channel      = flag.String("channel", "", "NSQ channel")
+	channel      = flag.String("channel", "kairos", "NSQ channel")
 	maxInFlight  = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 
 	consumerOpts     = app.StringArray{}
