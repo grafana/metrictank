@@ -46,7 +46,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("nsq_to_kairos")
+		fmt.Println("nsq_metrics_to_kairos")
 		return
 	}
 
@@ -70,7 +70,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_to_kairos"
+	cfg.UserAgent = "nsq_metrics_to_kairos"
 	err := app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)
@@ -88,7 +88,7 @@ func main() {
 	}
 
 	pCfg := nsq.NewConfig()
-	pCfg.UserAgent = "nsq_to_kairos"
+	pCfg.UserAgent = "nsq_metrics_to_kairos"
 	err = app.ParseOpts(pCfg, producerOpts)
 	if err != nil {
 		log.Fatal(err)

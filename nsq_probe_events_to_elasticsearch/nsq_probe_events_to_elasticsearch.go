@@ -93,7 +93,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("nsq_to_elasticsearch")
+		fmt.Println("nsq_probe_events_to_elasticsearch")
 		return
 	}
 
@@ -126,7 +126,7 @@ func main() {
 	setting.Config.ElasticsearchPort = 9200
 
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_events"
+	cfg.UserAgent = "nsq_probe_events_to_elasticsearch"
 	err := app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)

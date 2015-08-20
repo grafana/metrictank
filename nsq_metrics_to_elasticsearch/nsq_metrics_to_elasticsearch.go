@@ -98,7 +98,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("nsq_to_elasticsearch")
+		fmt.Println("nsq_metrics_to_elasticsearch")
 		return
 	}
 
@@ -132,7 +132,7 @@ func main() {
 	setting.Config.RedisAddr = "redis:6379"
 
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_to_elasticsearch"
+	cfg.UserAgent = "nsq_metrics_to_elasticsearch"
 	err := app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)

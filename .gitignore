@@ -1,8 +1,8 @@
 .*.sw?
 raintank-metric
 raintank-metric_*
-nsq_to_elasticsearch/nsq_to_elasticsearch
-nsq_to_kairos/nsq_to_kairos
-nsq_events/nsq_events
+nsq_metrics_to_elasticsearch/nsq_metrics_to_elasticsearch
+nsq_probe_events_to_elasticsearch/nsq_probe_events_to_elasticsearch
+nsq_metrics_to_kairos/nsq_metrics_to_kairos
 *.deb
 *.rpm
