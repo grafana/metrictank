@@ -16,18 +16,21 @@
 
 package metricdef
 
+//go:generate msgp
+
 import (
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	elastigo "github.com/mattbaird/elastigo/lib"
-	"github.com/raintank/raintank-metric/setting"
-	"gopkg.in/redis.v2"
 	"log"
 	"sort"
 	"strconv"
 	"time"
+
+	elastigo "github.com/mattbaird/elastigo/lib"
+	"github.com/raintank/raintank-metric/setting"
+	"gopkg.in/redis.v2"
 )
 
 type MetricDefinition struct {
@@ -54,6 +57,8 @@ type IndvMetric struct {
 	TargetType string            `json:"target_type"`
 	Tags       map[string]string `json:"tags"`
 }
+
+type MetricsArray []*IndvMetric
 
 // sets the ID of the metric.
 // the id is in the format  OrgId.md5Sum

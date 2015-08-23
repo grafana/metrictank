@@ -75,15 +75,25 @@ func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 
 func (kg *KairosGateway) process(job Job) error {
 	msg := job.msg
+	messagesSize.Value(int64(len(job.Body)))
 	log.Printf("DEBUG: processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.id, time.Unix(0, msg.Timestamp), job.format, msg.Attempts)
 	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(job.Body, &metrics); err != nil {
-		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
+	var err error
+	switch job.format {
+	case "msgFormatMetricDefinitionArrayJson":
+		err = json.Unmarshal(job.Body, &metrics)
+	case "msgFormatMetricsArrayMsgp":
+		var out metricdef.MetricsArray
+		_, err = out.UnmarshalMsg(job.Body)
+		metrics = []*metricdef.IndvMetric(out)
+	}
+
+	if err != nil {
+		log.Printf("ERROR: failure to unmarshal message body in format %s: %s. skipping message", job.format, err)
 		return nil
 	}
-	messagesSize.Value(int64(len(job.Body)))
+
 	metricsPerMessage.Value(int64(len(metrics)))
-	var err error
 	if !kg.dryRun {
 		pre := time.Now()
 		err = kg.kairos.SendMetricPointers(metrics)

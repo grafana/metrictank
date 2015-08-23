@@ -80,19 +80,29 @@ func NewESHandler(totalMessages int) (*ESHandler, error) {
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	k.messagesDone++
-	format := "unknown"
-	if m.Body[0] == '\x00' {
-		format = "msgFormatMetricDefinitionArrayJson"
-	}
+	messagesSize.Value(int64(len(m.Body)))
+
 	var id int64
 	buf := bytes.NewReader(m.Body[1:9])
 	binary.Read(buf, binary.BigEndian, &id)
 	produced := time.Unix(0, id)
-
 	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
-	messagesSize.Value(int64(len(m.Body)))
+
 	metrics := make([]*metricdef.IndvMetric, 0)
-	if err := json.Unmarshal(m.Body[9:], &metrics); err != nil {
+	var err error
+	format := "unknown"
+	if m.Body[0] == '\x00' {
+		format = "msgFormatMetricDefinitionArrayJson"
+		err = json.Unmarshal(m.Body[9:], &metrics)
+	}
+	if m.Body[0] == '\x01' {
+		format = "msgFormatMetricsArrayMsgp"
+		var out metricdef.MetricsArray
+		_, err = out.UnmarshalMsg(m.Body[9:])
+		metrics = []*metricdef.IndvMetric(out)
+	}
+
+	if err != nil {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}

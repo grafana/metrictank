@@ -31,6 +31,10 @@ func NewJob(msg *nsq.Message, qualifier string) Job {
 	if msg.Body[0] == '\x00' {
 		job.format = "msgFormatMetricDefinitionArrayJson"
 	}
+	if msg.Body[0] == '\x01' {
+		job.format = "msgFormatMetricsArrayMsgp"
+	}
+
 	buf := bytes.NewReader(msg.Body[1:9])
 	binary.Read(buf, binary.BigEndian, &job.id)
 	job.Produced = time.Unix(0, job.id)
