@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,11 +13,15 @@ import (
 
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/bitly/go-nsq"
 	"github.com/bitly/nsq/internal/app"
+	met "github.com/grafana/grafana/pkg/metric"
+	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/setting"
 )
@@ -28,9 +34,21 @@ var (
 	maxInFlight   = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	totalMessages = flag.Int("n", 0, "total messages to process (will wait if starved)")
 
+	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
+	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
+
 	consumerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
 	lookupdHTTPAddrs = app.StringArray{}
+
+	metricsToEsOK     met.Count
+	metricsToEsFail   met.Count
+	messagesSize      met.Meter
+	metricsPerMessage met.Meter
+	msgsAge           met.Meter // in ms
+	esPutDuration     met.Timer
+	msgsHandleOK      met.Count
+	msgsHandleFail    met.Count
 )
 
 func init() {
@@ -66,31 +84,45 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	if m.Body[0] == '\x00' {
 		format = "msgFormatMetricDefinitionArrayJson"
 	}
+	var id int64
+	buf := bytes.NewReader(m.Body[1:9])
+	binary.Read(buf, binary.BigEndian, &id)
+	produced := time.Unix(0, id)
 
+	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
+	messagesSize.Value(int64(len(m.Body)))
 	metrics := make([]*metricdef.IndvMetric, 0)
 	if err := json.Unmarshal(m.Body[9:], &metrics); err != nil {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
+	metricsPerMessage.Value(int64(len(metrics)))
+
 	done := make(chan error, 1)
 	go func() {
-		for _, m := range metrics {
+		pre := time.Now()
+		for i, m := range metrics {
 			if err := m.EnsureIndex(); err != nil {
 				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
+				metricsToEsFail.Inc(int64(len(metrics) - i))
 				done <- err
 				return
 			}
 		}
+		esPutDuration.Value(time.Now().Sub(pre))
 		done <- nil
 	}()
 
 	if err := <-done; err != nil {
+		msgsHandleFail.Inc(1)
 		return err
 	}
+	metricsToEsOK.Inc(int64(len(metrics)))
 
 	if k.totalMessages > 0 && k.messagesDone >= k.totalMessages {
 		os.Exit(0)
 	}
+	msgsHandleOK.Inc(1)
 	return nil
 }
 
@@ -118,6 +150,15 @@ func main() {
 		log.Fatal("use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_to_elasticsearch", strings.Replace(hostname, ".", "_", -1))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -133,13 +174,13 @@ func main() {
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_metrics_to_elasticsearch"
-	err := app.ParseOpts(cfg, consumerOpts)
+	err = app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := nsq.NewConsumer(*topic, *channel, cfg)
+	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", metrics)
 	if err != nil {
 		log.Fatal(err)
 	}
