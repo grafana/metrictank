@@ -75,7 +75,7 @@ func NewESHandler(totalMessages int) (*ESHandler, error) {
 }
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
-	log.Printf("recieved message.")
+	log.Printf("received message.")
 	k.messagesDone++
 	format := "unknown"
 	if m.Body[0] == '\x00' {
