@@ -165,6 +165,14 @@ func main() {
 	setting.Config.ElasticsearchDomain = "elasticsearch"
 	setting.Config.ElasticsearchPort = 9200
 
+	eventsToEsOK = metrics.NewCount("events_to_es.ok")
+	eventsToEsFail = metrics.NewCount("events_to_es.fail")
+	messagesSize = metrics.NewMeter("message_size", 0)
+	msgsAge = metrics.NewMeter("message_age", 0)
+	esPutDuration = metrics.NewTimer("es_put_duration", 0)
+	msgsHandleOK = metrics.NewCount("handle.ok")
+	msgsHandleFail = metrics.NewCount("handle.fail")
+
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_probe_events_to_elasticsearch"
 	err = app.ParseOpts(cfg, consumerOpts)
