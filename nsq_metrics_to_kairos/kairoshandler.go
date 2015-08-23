@@ -46,11 +46,19 @@ func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 		for attempt := 1; attempt <= attempts; attempt++ {
 			err = k.trySubmit(m.Body)
 			if err == nil {
+				msgsToLowPrioOK.Inc(1)
 				return nil // we published the msg as lowprio and can mark it as processed
 			}
 		}
+		msgsToLowPrioFail.Inc(1)
 		log.Printf("WARN : failed to publish out of date message %s as low-prio. reprocessing later\n", m.ID)
 		return err
 	}
-	return k.gateway.ProcessHighPrio(m)
+	err := k.gateway.ProcessHighPrio(m)
+	if err != nil {
+		msgsHandleHighPrioFail.Inc(1)
+	} else {
+		msgsHandleHighPrioOK.Inc(1)
+	}
+	return err
 }

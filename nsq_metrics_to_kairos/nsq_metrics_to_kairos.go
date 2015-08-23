@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 	"github.com/bitly/go-hostpool"
 	"github.com/bitly/go-nsq"
 	"github.com/bitly/nsq/internal/app"
+	met "github.com/grafana/grafana/pkg/metric"
+	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/raintank-metric/instrumented_nsq"
 )
 
 var (
@@ -27,6 +31,9 @@ var (
 	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
 	channel      = flag.String("channel", "kairos", "NSQ channel")
 	maxInFlight  = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+
+	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
+	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
 
 	consumerOpts     = app.StringArray{}
 	producerOpts     = app.StringArray{}
@@ -42,12 +49,36 @@ func init() {
 	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
 }
 
+var metricsToKairosOK met.Count
+var metricsToKairosFail met.Count
+var messagesSize met.Meter
+var metricsPerMessage met.Meter
+var msgsLowPrioAge met.Meter  // in ms
+var msgsHighPrioAge met.Meter // in ms
+var kairosPutDuration met.Timer
+var inHighPrioItems met.Meter
+var inLowPrioItems met.Meter
+var msgsToLowPrioOK met.Count
+var msgsToLowPrioFail met.Count
+var msgsHandleHighPrioOK met.Count
+var msgsHandleHighPrioFail met.Count
+var msgsHandleLowPrioOK met.Count
+var msgsHandleLowPrioFail met.Count
+
 func main() {
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_kairos")
 		return
+	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_to_kairos", strings.Replace(hostname, ".", "_", -1))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if *channel == "" {
@@ -71,18 +102,18 @@ func main() {
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_metrics_to_kairos"
-	err := app.ParseOpts(cfg, consumerOpts)
+	err = app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := nsq.NewConsumer(*topic, *channel, cfg)
+	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", metrics)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	consumerLowPrio, err := nsq.NewConsumer(*topicLowPrio, *channel, cfg)
+	consumerLowPrio, err := insq.NewConsumer(*topicLowPrio, *channel, cfg, "low_prio.%s", metrics)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -93,6 +124,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	metricsToKairosOK = metrics.NewCount("metrics_to_kairos.ok")
+	metricsToKairosFail = metrics.NewCount("metrics_to_kairos.fail")
+	messagesSize = metrics.NewMeter("message_size", 0)
+	metricsPerMessage = metrics.NewMeter("metrics_per_message", 0)
+	msgsLowPrioAge = metrics.NewMeter("low_prio.message_age", 0)
+	msgsHighPrioAge = metrics.NewMeter("high_prio.message_age", 0)
+	kairosPutDuration = metrics.NewTimer("kairos_put_duration", 0)
+	inHighPrioItems = metrics.NewMeter("in_high_prio.items", 0)
+	inLowPrioItems = metrics.NewMeter("in_low_prio.items", 0)
+	msgsToLowPrioOK = metrics.NewCount("to_kairos.to_low_prio.ok")
+	msgsToLowPrioFail = metrics.NewCount("to_low_prio.fail")
+	msgsHandleHighPrioOK = metrics.NewCount("handle_high_prio.ok")
+	msgsHandleHighPrioFail = metrics.NewCount("handle_high_prio.fail")
+	msgsHandleLowPrioOK = metrics.NewCount("handle_low_prio.ok")
+	msgsHandleLowPrioFail = metrics.NewCount("handle_low_prio.fail")
 
 	hostPool := hostpool.NewEpsilonGreedy(nsqdTCPAddrs, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers := make(map[string]*nsq.Producer)

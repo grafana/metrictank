@@ -13,5 +13,11 @@ func NewKairosLowPrioHandler(gateway *KairosGateway) *KairosLowPrioHandler {
 }
 
 func (k *KairosLowPrioHandler) HandleMessage(m *nsq.Message) error {
-	return k.gateway.ProcessLowPrio(m)
+	err := k.gateway.ProcessLowPrio(m)
+	if err != nil {
+		msgsHandleLowPrioFail.Inc(1)
+	} else {
+		msgsHandleLowPrioOK.Inc(1)
+	}
+	return err
 }

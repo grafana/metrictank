@@ -46,10 +46,13 @@ func (kg *KairosGateway) work() {
 	for {
 		select {
 		case job = <-kg.inHighPrio:
+			inHighPrioItems.Value(int64(len(kg.inHighPrio)))
 		default:
 			select {
 			case job = <-kg.inHighPrio:
+				inHighPrioItems.Value(int64(len(kg.inHighPrio)))
 			case job = <-kg.inLowPrio:
+				inLowPrioItems.Value(int64(len(kg.inLowPrio)))
 			}
 		}
 		job.done <- kg.process(job)
@@ -57,11 +60,15 @@ func (kg *KairosGateway) work() {
 }
 func (kg *KairosGateway) ProcessHighPrio(msg *nsq.Message) error {
 	job := NewJob(msg, "high-prio")
+	inHighPrioItems.Value(int64(len(kg.inHighPrio)))
+	msgsHighPrioAge.Value(time.Now().Sub(job.Produced).Nanoseconds() / 1000)
 	kg.inHighPrio <- job
 	return <-job.done
 }
 func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 	job := NewJob(msg, "low-prio")
+	inLowPrioItems.Value(int64(len(kg.inLowPrio)))
+	msgsLowPrioAge.Value(time.Now().Sub(job.Produced).Nanoseconds() / 1000)
 	kg.inLowPrio <- job
 	return <-job.done
 }
@@ -74,11 +81,18 @@ func (kg *KairosGateway) process(job Job) error {
 		log.Printf("ERROR: failure to unmarshal message body: %s. skipping message", err)
 		return nil
 	}
+	messagesSize.Value(int64(len(job.Body)))
+	metricsPerMessage.Value(int64(len(metrics)))
 	var err error
 	if !kg.dryRun {
+		pre := time.Now()
 		err = kg.kairos.SendMetricPointers(metrics)
 		if err != nil {
+			metricsToKairosFail.Inc(int64(len(metrics)))
 			log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
+		} else {
+			metricsToKairosOK.Inc(int64(len(metrics)))
+			kairosPutDuration.Value(time.Now().Sub(pre))
 		}
 	}
 	log.Printf("DEBUG: finished metrics %s %d - %d metrics sent\n", job.qualifier, job.id, len(metrics))
