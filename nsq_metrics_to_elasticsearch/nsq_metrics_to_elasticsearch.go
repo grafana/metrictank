@@ -18,9 +18,9 @@ import (
 	"time"
 
 	"github.com/bitly/go-nsq"
-	"github.com/bitly/nsq/internal/app"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/setting"
