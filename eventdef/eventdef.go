@@ -17,27 +17,15 @@
 package eventdef
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/codeskyblue/go-uuid"
-	elastigo "github.com/mattbaird/elastigo/lib"
-	"github.com/raintank/raintank-metric/setting"
 	"log"
 	"strconv"
-	"strings"
 	"time"
-)
 
-type EventDefinition struct {
-	Id        string            `json:"id"`
-	EventType string            `json:"event_type"`
-	OrgId     int64             `json:"org_id"`
-	Severity  string            `json:"severity"` // enum "INFO" "WARN" "ERROR" "OK"
-	Source    string            `json:"source"`
-	Timestamp int64             `json:"timestamp"`
-	Message   string            `json:"message"`
-	Tags      map[string]string `json:"tags"`
-}
+	"github.com/codeskyblue/go-uuid"
+	elastigo "github.com/mattbaird/elastigo/lib"
+	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/raintank-metric/setting"
+)
 
 var es *elastigo.Conn
 
@@ -53,7 +41,7 @@ func InitElasticsearch() error {
 	return nil
 }
 
-func (e *EventDefinition) Save() error {
+func Save(e *schema.ProbeEvent) error {
 	if e.Id == "" {
 		u := uuid.NewRandom()
 		e.Id = u.String()
@@ -62,7 +50,7 @@ func (e *EventDefinition) Save() error {
 		// looks like this expects timestamps in milliseconds
 		e.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
 	}
-	if err := e.validate(); err != nil {
+	if err := e.Validate(); err != nil {
 		return err
 	}
 	log.Printf("saving event to elasticsearch.")
@@ -73,27 +61,4 @@ func (e *EventDefinition) Save() error {
 	}
 
 	return nil
-}
-
-func (e *EventDefinition) validate() error {
-	if e.EventType == "" || e.OrgId == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
-		err := fmt.Errorf("event definition not valid")
-		return err
-	}
-	switch strings.ToLower(e.Severity) {
-	case "info", "ok", "warn", "error", "warning", "critical":
-		// nop
-	default:
-		err := fmt.Errorf("'%s' is not a valid severity level", e.Severity)
-		return err
-	}
-	return nil
-}
-
-func EventFromJSON(b []byte) (*EventDefinition, error) {
-	e := new(EventDefinition)
-	if err := json.Unmarshal(b, &e); err != nil {
-		return nil, err
-	}
-	return e, nil
 }

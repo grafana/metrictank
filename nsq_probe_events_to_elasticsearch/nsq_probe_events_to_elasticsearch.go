@@ -24,6 +24,7 @@ import (
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 
 	"github.com/raintank/raintank-metric/eventdef"
+	"github.com/raintank/raintank-metric/schema"
 	"github.com/raintank/raintank-metric/setting"
 )
 
@@ -89,7 +90,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
 	messagesSize.Value(int64(len(m.Body)))
 
-	event := new(eventdef.EventDefinition)
+	event := new(schema.ProbeEvent)
 	if err := json.Unmarshal(m.Body[9:], &event); err != nil {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
@@ -97,7 +98,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	done := make(chan error, 1)
 	go func() {
 		pre := time.Now()
-		if err := event.Save(); err != nil {
+		if err := eventdef.Save(event); err != nil {
 			fmt.Printf("ERROR: couldn't process %s: %s\n", event.Id, err)
 			eventsToEsFail.Inc(1)
 			done <- err
