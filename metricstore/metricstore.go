@@ -1,14 +1,15 @@
 package metricstore
 
 import (
-	"github.com/ctdk/goas/v2/logger"
-	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/setting"
 	"time"
+
+	"github.com/ctdk/goas/v2/logger"
+	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/raintank-metric/setting"
 )
 
 type MetricBackend interface {
-	SendMetrics(*[]metricdef.IndvMetric) error
+	SendMetrics(*[]schema.MetricData) error
 	Type() string
 }
 
@@ -39,8 +40,8 @@ func NewMetricStore() (*MetricStore, error) {
 	return &mStore, nil
 }
 
-func (mStore MetricStore) ProcessBuffer(c <-chan metricdef.IndvMetric, workerId int) {
-	buf := make([]metricdef.IndvMetric, 0)
+func (mStore MetricStore) ProcessBuffer(c <-chan schema.MetricData, workerId int) {
+	buf := make([]schema.MetricData, 0)
 
 	// flush buffer every second
 	t := time.NewTicker(time.Second)
@@ -57,7 +58,7 @@ func (mStore MetricStore) ProcessBuffer(c <-chan metricdef.IndvMetric, workerId 
 			// doing them individually proves to be too slow
 
 			//copy contents of buffer
-			currentBuf := make([]metricdef.IndvMetric, len(buf))
+			currentBuf := make([]schema.MetricData, len(buf))
 			copy(currentBuf, buf)
 			buf = nil
 			logger.Debugf("worker %d flushing %d items in buffer now", workerId, len(currentBuf))

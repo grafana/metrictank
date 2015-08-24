@@ -2,9 +2,10 @@ package metricstore
 
 import (
 	"fmt"
-	"github.com/marpaia/graphite-golang"
-	"github.com/raintank/raintank-metric/metricdef"
 	"strconv"
+
+	"github.com/marpaia/graphite-golang"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 // Kairosdb client
@@ -20,7 +21,7 @@ func NewCarbon(host string, port int) (*Carbon, error) {
 	return &Carbon{Graphite: graphite}, nil
 }
 
-func (carbon *Carbon) SendMetrics(metrics *[]metricdef.IndvMetric) error {
+func (carbon *Carbon) SendMetrics(metrics *[]schema.MetricData) error {
 	// marshal metrics into datapoint structs
 	datapoints := make([]graphite.Metric, len(*metrics))
 	for i, m := range *metrics {

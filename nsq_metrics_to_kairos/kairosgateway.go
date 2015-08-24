@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/bitly/go-nsq"
-	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/metricstore"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 type KairosGateway struct {
@@ -77,15 +77,15 @@ func (kg *KairosGateway) process(job Job) error {
 	msg := job.msg
 	messagesSize.Value(int64(len(job.Body)))
 	log.Printf("DEBUG: processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.id, time.Unix(0, msg.Timestamp), job.format, msg.Attempts)
-	metrics := make([]*metricdef.IndvMetric, 0)
+	metrics := make([]*schema.MetricData, 0)
 	var err error
 	switch job.format {
 	case "msgFormatMetricDefinitionArrayJson":
 		err = json.Unmarshal(job.Body, &metrics)
-	case "msgFormatMetricsArrayMsgp":
-		var out metricdef.MetricsArray
+	case "msgFormatMetricDataArrayMsgp":
+		var out schema.MetricDataArray
 		_, err = out.UnmarshalMsg(job.Body)
-		metrics = []*metricdef.IndvMetric(out)
+		metrics = []*schema.MetricData(out)
 	}
 
 	if err != nil {

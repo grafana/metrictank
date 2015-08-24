@@ -32,7 +32,7 @@ func NewJob(msg *nsq.Message, qualifier string) Job {
 		job.format = "msgFormatMetricDefinitionArrayJson"
 	}
 	if msg.Body[0] == '\x01' {
-		job.format = "msgFormatMetricsArrayMsgp"
+		job.format = "msgFormatMetricDataArrayMsgp"
 	}
 
 	buf := bytes.NewReader(msg.Body[1:9])

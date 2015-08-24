@@ -23,6 +23,7 @@ import (
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/raintank/raintank-metric/schema"
 	"github.com/raintank/raintank-metric/setting"
 )
 
@@ -88,7 +89,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	produced := time.Unix(0, id)
 	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
 
-	metrics := make([]*metricdef.IndvMetric, 0)
+	metrics := make([]*schema.MetricData, 0)
 	var err error
 	format := "unknown"
 	if m.Body[0] == '\x00' {
@@ -96,10 +97,10 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		err = json.Unmarshal(m.Body[9:], &metrics)
 	}
 	if m.Body[0] == '\x01' {
-		format = "msgFormatMetricsArrayMsgp"
-		var out metricdef.MetricsArray
+		format = "msgFormatMetricDataArrayMsgp"
+		var out schema.MetricDataArray
 		_, err = out.UnmarshalMsg(m.Body[9:])
-		metrics = []*metricdef.IndvMetric(out)
+		metrics = []*schema.MetricData(out)
 	}
 
 	if err != nil {
@@ -112,7 +113,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	go func() {
 		pre := time.Now()
 		for i, m := range metrics {
-			if err := m.EnsureIndex(); err != nil {
+			if err := metricdef.EnsureIndex(m); err != nil {
 				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
 				metricsToEsFail.Inc(int64(len(metrics) - i))
 				done <- err

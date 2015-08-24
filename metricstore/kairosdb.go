@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ctdk/goas/v2/logger"
-	"github.com/raintank/raintank-metric/metricdef"
 	"net/http"
 	"time"
+
+	"github.com/ctdk/goas/v2/logger"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 // Kairosdb client
@@ -33,7 +34,7 @@ type Datapoint struct {
 	Tags      map[string]string `json:"tags"`
 }
 
-func MetricToDataPoint(m metricdef.IndvMetric) Datapoint {
+func MetricToDataPoint(m schema.MetricData) Datapoint {
 	tags := make(map[string]string)
 	for k, v := range m.Tags {
 		tags[k] = v
@@ -47,7 +48,7 @@ func MetricToDataPoint(m metricdef.IndvMetric) Datapoint {
 	}
 }
 
-func (kdb *Kairosdb) SendMetricPointers(metrics []*metricdef.IndvMetric) error {
+func (kdb *Kairosdb) SendMetricPointers(metrics []*schema.MetricData) error {
 	datapoints := make([]Datapoint, len(metrics))
 	for i, m := range metrics {
 		datapoints[i] = MetricToDataPoint(*m)
@@ -55,7 +56,7 @@ func (kdb *Kairosdb) SendMetricPointers(metrics []*metricdef.IndvMetric) error {
 	return kdb.AddDatapoints(datapoints)
 }
 
-func (kdb *Kairosdb) SendMetrics(metrics *[]metricdef.IndvMetric) error {
+func (kdb *Kairosdb) SendMetrics(metrics *[]schema.MetricData) error {
 	datapoints := make([]Datapoint, len(*metrics))
 	for i, m := range *metrics {
 		datapoints[i] = MetricToDataPoint(m)

@@ -16,93 +16,29 @@
 
 package metricdef
 
-//go:generate msgp
-
 import (
-	"bytes"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"log"
-	"sort"
 	"strconv"
 	"time"
 
 	elastigo "github.com/mattbaird/elastigo/lib"
+	"github.com/raintank/raintank-metric/schema"
 	"github.com/raintank/raintank-metric/setting"
 	"gopkg.in/redis.v2"
 )
 
-type MetricDefinition struct {
-	Id         string            `json:"id"`
-	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"`
-	OrgId      int               `json:"org_id"`
-	Metric     string            `json:"metric"`
-	TargetType string            `json:"target_type"` // an emum ["derive","gauge"] in nodejs
-	Unit       string            `json:"unit"`
-	Interval   int               `json:"interval"`   // minimum 10
-	LastUpdate int64             `json:"lastUpdate"` // unix epoch time, per the nodejs definition
-	Tags       map[string]string `json:"tags"`
-}
-
-type IndvMetric struct {
-	Id         string            `json:"id"`
-	OrgId      int               `json:"org_id"`
-	Name       string            `json:"name"`
-	Metric     string            `json:"metric"`
-	Interval   int               `json:"interval"`
-	Value      float64           `json:"value"`
-	Unit       string            `json:"unit"`
-	Time       int64             `json:"time"`
-	TargetType string            `json:"target_type"`
-	Tags       map[string]string `json:"tags"`
-}
-
-type MetricsArray []*IndvMetric
-
-// sets the ID of the metric.
-// the id is in the format  OrgId.md5Sum
-// the md5sum is a hash of the the concatination of the
-// series name + each tag key:value pair, sorted alphabetically.
-func (m *IndvMetric) SetId() {
-	if m.Id != "" {
-		//id already set.
-		return
-	}
-	var buffer bytes.Buffer
-	buffer.WriteString(m.Name)
-	keys := make([]string, 0)
-	for k, _ := range m.Tags {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		buffer.WriteString(fmt.Sprintf(":%s=%s", k, m.Tags[k]))
-	}
-
-	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
-}
-
-func (m *IndvMetric) EnsureIndex() error {
-	m.SetId()
-	def, err := GetMetricDefinition(m.Id)
+func EnsureIndex(m *schema.MetricData) error {
+	id := m.Id()
+	def, err := GetMetricDefinition(id)
 	if err != nil && err.Error() != "record not found" {
 		return err
 	}
 	//if the definition does not exist, or is older then 10minutes. update it.
 	if def == nil || def.LastUpdate < (time.Now().Unix()-600) {
-		mdef := &MetricDefinition{
-			Id:         m.Id,
-			Name:       m.Name,
-			OrgId:      m.OrgId,
-			Metric:     m.Metric,
-			TargetType: m.TargetType,
-			Interval:   m.Interval,
-			LastUpdate: time.Now().Unix(),
-			Unit:       m.Unit,
-			Tags:       m.Tags,
-		}
-		if err := mdef.Save(); err != nil {
+		mdef := schema.MetricDefinitionFromMetricData(id, m)
+		if err := Save(mdef); err != nil {
 			return err
 		}
 	}
@@ -130,7 +66,7 @@ func InitElasticsearch() error {
 		}
 		esopts := elastigo.MappingOptions{}
 
-		err = es.PutMapping("metric", "metric_index", MetricDefinition{}, esopts)
+		err = es.PutMapping("metric", "metric_index", schema.MetricDefinition{}, esopts)
 		if err != nil {
 			return err
 		}
@@ -154,37 +90,15 @@ func InitRedis() error {
 	return nil
 }
 
-// required: name, org_id, target_type, interval, metric, unit
-
-// These validate, and save to elasticsearch
-
-func DefFromJSON(b []byte) (*MetricDefinition, error) {
-	def := new(MetricDefinition)
-	if err := json.Unmarshal(b, &def); err != nil {
-		return nil, err
-	}
-	def.Id = fmt.Sprintf("%d.%s", def.OrgId, def.Name)
-	return def, nil
-}
-
-func (m *MetricDefinition) Save() error {
-	if err := m.validate(); err != nil {
+func Save(m *schema.MetricDefinition) error {
+	if err := m.Validate(); err != nil {
 		return err
 	}
 	// save in elasticsearch
-	return m.indexMetric()
+	return indexMetric(m)
 }
 
-func (m *MetricDefinition) validate() error {
-	if m.Name == "" || m.OrgId == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
-		// TODO: this error message ought to be more informative
-		err := fmt.Errorf("metric is not valid!")
-		return err
-	}
-	return nil
-}
-
-func (m *MetricDefinition) indexMetric() error {
+func indexMetric(m *schema.MetricDefinition) error {
 	log.Printf("indexing %s in elasticsearch\n", m.Id)
 	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
 	log.Printf("elasticsearch response: %v\n", resp)
@@ -201,14 +115,14 @@ func (m *MetricDefinition) indexMetric() error {
 	return nil
 }
 
-func GetMetricDefinition(id string) (*MetricDefinition, error) {
+func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
 		log.Printf("Error: the redis client bombed: %s", err.Error())
 		return nil, err
 	} else if err == nil {
 		//fmt.Printf("json for %s found in redis\n", id)
-		def, err := DefFromJSON([]byte(v))
+		def, err := schema.MetricDefinitionFromJSON([]byte(v))
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +141,7 @@ func GetMetricDefinition(id string) (*MetricDefinition, error) {
 		log.Printf("redis err: %s", rerr.Error())
 	}
 
-	def, err := DefFromJSON(*res.Source)
+	def, err := schema.MetricDefinitionFromJSON(*res.Source)
 	if err != nil {
 		return nil, err
 	}
