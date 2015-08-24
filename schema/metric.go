@@ -42,8 +42,6 @@ func (m *MetricData) Id() string {
 	return fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
 }
 
-// for ES: Id         string            `json:"id"`
-
 // can be used by some encoders, such as msgp
 type MetricDataArray []*MetricData
 
@@ -74,7 +72,6 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 	if err := json.Unmarshal(b, &def); err != nil {
 		return nil, err
 	}
-	def.Id = fmt.Sprintf("%d.%s", def.OrgId, def.Name)
 	return def, nil
 }
 
