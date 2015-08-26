@@ -14,7 +14,6 @@ ITERATION=`date +%s`ubuntu1
 TAG="pkg-${VERSION}-${ITERATION}"
 
 git tag $TAG
-git push --tags
 
 mkdir -p ${BUILD}/usr/bin
 

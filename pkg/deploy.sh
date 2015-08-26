@@ -9,3 +9,4 @@ if [ -z ${PACKAGECLOUD_REPO} ] ; then
 fi
 
 package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty ${DIR}/artifacts/*.deb
+git push --tags
