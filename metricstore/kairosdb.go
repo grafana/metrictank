@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ctdk/goas/v2/logger"
@@ -36,8 +37,11 @@ type Datapoint struct {
 
 func MetricToDataPoint(m schema.MetricData) Datapoint {
 	tags := make(map[string]string)
-	for k, v := range m.Tags {
-		tags[k] = v
+	for _, t := range m.Tags {
+		parts := strings.Split(t, ":")
+		if len(parts) == 2 {
+			tags[parts[0]] = tags[parts[1]]
+		}
 	}
 	tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
 	return Datapoint{
