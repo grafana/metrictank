@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/bitly/go-nsq"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/metricstore"
 	"github.com/raintank/raintank-metric/schema"
 )

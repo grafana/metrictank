@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-hostpool"
-	"github.com/bitly/go-nsq"
+	"github.com/nsqio/go-nsq"
 )
 
 type KairosHandler struct {

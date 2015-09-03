@@ -1,6 +1,6 @@
 package main
 
-import "github.com/bitly/go-nsq"
+import "github.com/nsqio/go-nsq"
 
 type KairosLowPrioHandler struct {
 	gateway *KairosGateway
