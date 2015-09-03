@@ -40,7 +40,7 @@ func MetricToDataPoint(m schema.MetricData) Datapoint {
 	for _, t := range m.Tags {
 		parts := strings.Split(t, ":")
 		if len(parts) == 2 {
-			tags[parts[0]] = tags[parts[1]]
+			tags[parts[0]] = parts[1]
 		}
 	}
 	tags["org_id"] = fmt.Sprintf("%v", m.OrgId)
