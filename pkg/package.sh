@@ -13,6 +13,10 @@ GOBIN="${DIR}/.."
 ITERATION=`date +%s`ubuntu1
 
 mkdir -p ${BUILD}/usr/bin
+mkdir -p ${BUILD}/etc/init
+mkdir -p ${BUILD}/etc/raintank
+cp ${DIR}/config/ubuntu/trusty/etc/init/${NAME}.conf ${BUILD}/etc/init
+cp ${DIR}/config/ubuntu/trusty/etc/raintank/* ${BUILD}/etc/raintank
 
 cp ../${NAME} ${BUILD}/usr/bin/
 cp -r ${DIR}/config/ubuntu/trusty/* ${BUILD}/
@@ -21,3 +25,15 @@ fpm -s dir -t deb \
   -v ${VERSION} -n ${NAME} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric" \
   --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
   -C ${BUILD} -p ${PACKAGE_NAME} .
+
+for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch; do
+	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
+	NSQ_PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
+	mkdir -p ${NSQ_BUILD}/usr/bin
+	mkdir -p ${NSQ_BUILD}/etc/init
+	cp ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf ${NSQ_BUILD}/etc/init
+	fpm -s dir -t deb \
+	  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric $VAR worker" \
+	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf \
+	  -C ${NSQ_BUILD} -p ${NSQ_PACKAGE_NAME} .
+end
