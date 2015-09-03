@@ -24,10 +24,10 @@ git clone https://github.com/raintank/grafana.git
 ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/grafana/grafana
 # Only until this is done being in a different branch
 cd ${GOPATH}/src/github.com/raintank/grafana
-git checkout nsq
+#git checkout nsq
 go run build.go setup
 godep restore
 
-go get github.com/bitly/go-nsq
+go get github.com/nsqio/go-nsq
 go get github.com/tinylib/msgp/msgp
 go get github.com/ctdk/goas/v2/logger
