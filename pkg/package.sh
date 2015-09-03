@@ -32,9 +32,10 @@ fpm -s dir -t deb \
 for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch; do
 	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
 	NSQ_PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
-	mkdir -p ${NSQ_BUILD}/usr/bin
+	mkdir -p ${NSQ_BUILD}/usr/sbin
 	mkdir -p ${NSQ_BUILD}/etc/init
 	cp ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf ${NSQ_BUILD}/etc/init
+	cp ${DIR}/artifacts/$VAR ${NSQ_BUILD}/usr/sbin
 	fpm -s dir -t deb \
 	  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric $VAR worker" \
 	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf \

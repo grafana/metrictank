@@ -25,7 +25,6 @@ git clone https://github.com/raintank/grafana.git
 ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/grafana/grafana
 # Only until this is done being in a different branch
 cd ${GOPATH}/src/github.com/raintank/grafana
-#git checkout nsq
 go run build.go setup
 godep restore
 
