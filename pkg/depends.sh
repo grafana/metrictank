@@ -17,9 +17,6 @@ export PATH=$GOPATH/bin:$PATH
 mkdir -p artifacts
 bundle install
 
-mkdir -p ${GOPATH}/src/github.com/raintank
-ln -s $CHECKOUT $GOPATH/src/github.com/raintank/raintank-metric
-
 mkdir -p ${GOPATH}/src/github.com/grafana/grafana
 mv ${GOPATH}/src/github.com/grafana/grafana ${GOPATH}/src/github.com/grafana/grafana-bak
 cd ${GOPATH}/src/github.com/raintank
