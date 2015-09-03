@@ -1,0 +1,13 @@
+test:
+  pre:
+    - pkg/depends.sh
+  post:
+    - pkg/package.sh
+general:
+  artifacts:
+    - pkg/artifacts
+deployment:
+  production:
+    branch: master
+    commands:
+      - pkg/deploy.sh
