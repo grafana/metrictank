@@ -11,6 +11,9 @@ ARCH="$(uname -m)"
 PACKAGE_NAME="${DIR}/artifacts/${NAME}-VERSION-ITERATION_ARCH.deb"
 GOBIN="${DIR}/.."
 ITERATION=`date +%s`ubuntu1
+TAG="pkg-${VERSION}-${ITERATION}"
+
+git tag $TAG
 
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/init
