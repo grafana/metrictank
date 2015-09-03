@@ -30,3 +30,4 @@ godep restore
 
 go get github.com/bitly/go-nsq
 go get github.com/tinylib/msgp/msgp
+go get github.com/ctdk/goas/v2/logger
