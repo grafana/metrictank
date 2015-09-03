@@ -22,6 +22,10 @@ mv ${GOPATH}/src/github.com/grafana/grafana ${GOPATH}/src/github.com/grafana/gra
 mkdir -p ${GOPATH}/src/github.com/raintank
 cd ${GOPATH}/src/github.com/raintank
 git clone https://github.com/raintank/grafana.git
+echo "raintank"
+ls ${GOPATH}/src/github.com/raintank
+echo "grafana"
+ls ${GOPATH}/src/github.com/grafana
 ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/grafana/grafana
 # Only until this is done being in a different branch
 cd ${GOPATH}/src/github.com/raintank/grafana
