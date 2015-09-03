@@ -1,3 +1,6 @@
+machine:
+  environment:
+    GOPATH: "/home/ubuntu/.go_workspace"
 test:
   post:
     - pkg/package.sh
