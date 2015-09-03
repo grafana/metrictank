@@ -1,10 +1,9 @@
 test:
-  pre:
-    - pkg/depends.sh
   post:
     - pkg/package.sh
 dependencies:
   override:
+    - pkg/depends.sh
     - pkg/build.sh
 general:
   artifacts:
