@@ -31,6 +31,5 @@ git checkout nsq
 go run build.go setup
 godep restore
 
-go get -u -f github.com/raintank/raintank-metric
 go get github.com/bitly/go-nsq
 go get github.com/tinylib/msgp/msgp
