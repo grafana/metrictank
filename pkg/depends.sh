@@ -4,7 +4,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
-: ${GOPATH:="${HOME}/.go_workspace"}
+#: ${GOPATH:="${HOME}/.go_workspace"}
 
 if [ ! -z ${CIRCLECI} ] ; then
   : ${CHECKOUT:="/home/ubuntu/${CIRCLE_PROJECT_REPONAME}"}
