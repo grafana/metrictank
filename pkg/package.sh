@@ -25,9 +25,9 @@ mkdir -p ${BUILD}/etc/raintank
 #cp -r ${DIR}/config/ubuntu/trusty/* ${BUILD}/
 
 #fpm -s dir -t deb \
-  -v ${VERSION} -n ${NAME} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric" \
-  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
-  -C ${BUILD} -p ${PACKAGE_NAME} .
+  #-v ${VERSION} -n ${NAME} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric" \
+  #--deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
+  #-C ${BUILD} -p ${PACKAGE_NAME} .
 
 for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch; do
 	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
