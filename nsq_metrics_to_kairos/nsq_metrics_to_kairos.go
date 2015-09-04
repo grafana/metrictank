@@ -15,9 +15,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/bitly/go-hostpool"
-	"github.com/nsqio/go-nsq"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 )
@@ -31,6 +31,8 @@ var (
 	topicLowPrio = flag.String("topic-lowprio", "metrics-lowprio", "NSQ topic")
 	channel      = flag.String("channel", "kairos", "NSQ channel")
 	maxInFlight  = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+
+	kairosAddr = flag.String("kairos-addr", "localhost:8080", "kairosdb address (default: localhost:8080)")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
@@ -151,7 +153,7 @@ func main() {
 		producers[addr] = producer
 	}
 
-	gateway, err := NewKairosGateway(*dryRun, *concurrency)
+	gateway, err := NewKairosGateway("http://"+*kairosAddr, *dryRun, *concurrency)
 	if err != nil {
 		log.Fatal(err)
 	}
