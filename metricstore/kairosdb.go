@@ -77,10 +77,11 @@ func (kdb *Kairosdb) AddDatapoints(datapoints []Datapoint) error {
 	}
 	resp, err := kdb.client.Post(kdb.host+"/api/v1/datapoints", "application/json", bytes.NewBuffer(json))
 	if err != nil {
+		// error doing the request. retry later
 		return err
 	}
-	if resp.Status != "204 No Content" {
-		return errors.New("Response was non-200: " + resp.Status)
+	if resp.StatusCode != 204 {
+		return errors.New(resp.Status)
 	}
 	return nil
 }
