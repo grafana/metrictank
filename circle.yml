@@ -2,6 +2,8 @@ machine:
   environment:
     GOPATH: "/home/ubuntu/.go_workspace"
 test:
+  override:
+    - go test -v -race ./schema
   post:
     - pkg/package.sh
 dependencies:
