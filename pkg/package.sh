@@ -40,4 +40,4 @@ for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_t
 	  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric $VAR worker" \
 	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf \
 	  -C ${NSQ_BUILD} -p ${NSQ_PACKAGE_NAME} .
-end
+done
