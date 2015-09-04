@@ -99,12 +99,7 @@ func Save(m *schema.MetricDefinition) error {
 }
 
 func indexMetric(m *schema.MetricDefinition) error {
-	log.Printf("indexing %s in elasticsearch\n", m.Id)
-	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
-	log.Printf("elasticsearch response: %v\n", resp)
-	if err != nil {
-		return err
-	}
+	log.Printf("indexing %s in redis\n", m.Id)
 	metricStr, err := json.Marshal(m)
 	if err != nil {
 		return err
@@ -112,6 +107,14 @@ func indexMetric(m *schema.MetricDefinition) error {
 	if rerr := rs.SetEx(m.Id, time.Duration(300)*time.Second, string(metricStr)).Err(); err != nil {
 		fmt.Printf("redis err: %s", rerr.Error())
 	}
+
+	log.Printf("indexing %s in elasticsearch\n", m.Id)
+	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
+	log.Printf("elasticsearch response: %v\n", resp)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

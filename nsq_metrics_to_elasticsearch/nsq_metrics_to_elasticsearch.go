@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nsqio/go-nsq"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
@@ -210,7 +210,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	consumer.AddHandler(handler)
+	consumer.AddConcurrentHandlers(handler, 40)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {
