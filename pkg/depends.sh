@@ -19,9 +19,9 @@ bundle install
 
 mkdir -p ${GOPATH}/src/github.com/grafana/grafana
 mv ${GOPATH}/src/github.com/grafana/grafana ${GOPATH}/src/github.com/grafana/grafana-bak
-#mkdir -p ${GOPATH}/src/github.com/raintank
-#cd ${GOPATH}/src/github.com/raintank
-#git clone https://github.com/raintank/grafana.git
+mkdir -p ${GOPATH}/src/github.com/raintank
+cd ${GOPATH}/src/github.com/raintank
+git clone https://github.com/raintank/grafana.git
 #echo "raintank"
 #ls ${GOPATH}/src/github.com/raintank
 #echo "grafana"
