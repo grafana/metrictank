@@ -43,3 +43,4 @@ go get gopkg.in/redis.v2
 go get github.com/bitly/go-hostpool
 go get github.com/marpaia/graphite-golang
 go get github.com/codeskyblue/go-uuid
+go get github.com/raintank/raintank-metric
