@@ -8,6 +8,7 @@ cd ${DIR}
 export PATH=$GOPATH/bin:$PATH
 
 for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch; do
-	go install github.com/raintank/raintank-metric/$VAR
-	cp $(which $VAR) ${DIR}/artifacts
+	cd $GOPATH/src/github.com/raintank/raintank-metric/$VAR
+	go build
+	cp $VAR ${DIR}/artifacts
 done
