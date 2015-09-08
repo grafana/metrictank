@@ -176,7 +176,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	consumer.AddHandler(handler)
+	consumer.AddConcurrentHandlers(handler, 80)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {
