@@ -24,16 +24,17 @@ import (
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
-	"github.com/raintank/raintank-metric/setting"
 )
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
 
-	topic         = flag.String("topic", "metrics", "NSQ topic")
-	channel       = flag.String("channel", "elasticsearch", "NSQ channel")
-	maxInFlight   = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	totalMessages = flag.Int("n", 0, "total messages to process (will wait if starved)")
+	topic       = flag.String("topic", "metrics", "NSQ topic")
+	channel     = flag.String("channel", "elasticsearch", "NSQ channel")
+	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+
+	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address (default: localhost:9200)")
+	redisAddr = flag.String("redis-addr", "localhost:6379", "redis address (default: localhost:6379)")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
@@ -59,18 +60,14 @@ func init() {
 }
 
 type ESHandler struct {
-	totalMessages int
-	messagesDone  int
 }
 
-func NewESHandler(totalMessages int) (*ESHandler, error) {
-	return &ESHandler{
-		totalMessages: totalMessages,
-	}, nil
+func NewESHandler() (*ESHandler, error) {
+
+	return &ESHandler{}, nil
 }
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
-	k.messagesDone++
 	messagesSize.Value(int64(len(m.Body)))
 
 	var id int64
@@ -120,9 +117,6 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}
 	metricsToEsOK.Inc(int64(len(metrics)))
 
-	if k.totalMessages > 0 && k.messagesDone >= k.totalMessages {
-		os.Exit(0)
-	}
 	msgsHandleOK.Inc(1)
 	return nil
 }
@@ -163,16 +157,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Don't ask for more messages than we want
-	if *totalMessages > 0 && *totalMessages < *maxInFlight {
-		*maxInFlight = *totalMessages
-	}
-
-	setting.Config = new(setting.Conf)
-	setting.Config.ElasticsearchDomain = "elasticsearch"
-	setting.Config.ElasticsearchPort = 9200
-	setting.Config.RedisAddr = "redis:6379"
-
 	metricsToEsOK = metrics.NewCount("metrics_to_es.ok")
 	metricsToEsFail = metrics.NewCount("metrics_to_es.fail")
 	messagesSize = metrics.NewMeter("message_size", 0)
@@ -182,11 +166,11 @@ func main() {
 	msgsHandleOK = metrics.NewCount("handle.ok")
 	msgsHandleFail = metrics.NewCount("handle.fail")
 
-	err = metricdef.InitElasticsearch()
+	err = metricdef.InitElasticsearch(*esAddr, "", "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = metricdef.InitRedis()
+	err = metricdef.InitRedis(*redisAddr, "", "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -204,12 +188,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	handler, err := NewESHandler(*totalMessages)
+	handler, err := NewESHandler()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	consumer.AddConcurrentHandlers(handler, 40)
+	consumer.AddConcurrentHandlers(handler, 80)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {

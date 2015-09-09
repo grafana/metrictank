@@ -5,7 +5,6 @@ import (
 
 	"github.com/ctdk/goas/v2/logger"
 	"github.com/raintank/raintank-metric/schema"
-	"github.com/raintank/raintank-metric/setting"
 )
 
 type MetricBackend interface {
@@ -17,26 +16,13 @@ type MetricStore struct {
 	Backends []MetricBackend
 }
 
-func NewMetricStore() (*MetricStore, error) {
+func NewMetricStore(kairosAddr string) (*MetricStore, error) {
 	mStore := MetricStore{}
-	if setting.Config.EnableKairosdb {
-		kairosdb, err := NewKairosdb(setting.Config.KairosdbUrl)
-		logger.Debugf("Adding kairosdb to list of backends.")
-		if err != nil {
-			return nil, err
-		}
-		mStore.Backends = append(mStore.Backends, kairosdb)
+	kairosdb, err := NewKairosdb(kairosAddr)
+	if err != nil {
+		return nil, err
 	}
-
-	if setting.Config.EnableCarbon {
-		carbon, err := NewCarbon(setting.Config.CarbonAddr, setting.Config.CarbonPort)
-		logger.Debugf("Adding Carbon to list of backends.")
-		if err != nil {
-			return nil, err
-		}
-		mStore.Backends = append(mStore.Backends, carbon)
-	}
-
+	mStore.Backends = append(mStore.Backends, kairosdb)
 	return &mStore, nil
 }
 

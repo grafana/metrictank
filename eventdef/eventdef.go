@@ -17,25 +17,29 @@
 package eventdef
 
 import (
+	"fmt"
 	"log"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/codeskyblue/go-uuid"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
-	"github.com/raintank/raintank-metric/setting"
 )
 
 var es *elastigo.Conn
 
-func InitElasticsearch() error {
+func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
-	es.Domain = setting.Config.ElasticsearchDomain // needs to be configurable obviously
-	es.Port = strconv.Itoa(setting.Config.ElasticsearchPort)
-	if setting.Config.ElasticsearchUser != "" && setting.Config.ElasticsearchPasswd != "" {
-		es.Username = setting.Config.ElasticsearchUser
-		es.Password = setting.Config.ElasticsearchPasswd
+	parts := strings.Split(addr, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid tcp addr %q", addr)
+	}
+	es.Domain = parts[0]
+	es.Port = parts[1]
+	if user != "" && pass != "" {
+		es.Username = user
+		es.Password = pass
 	}
 
 	return nil

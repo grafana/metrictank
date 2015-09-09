@@ -18,8 +18,8 @@ type KairosGateway struct {
 	workers    int
 }
 
-func NewKairosGateway(dryRun bool, workers int) (*KairosGateway, error) {
-	kairos, err := metricstore.NewKairosdb("http://kairosdb:8080")
+func NewKairosGateway(addr string, dryRun bool, workers int) (*KairosGateway, error) {
+	kairos, err := metricstore.NewKairosdb(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +73,7 @@ func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 	return <-job.done
 }
 
+// error is what is used to determine to ACK or NACK
 func (kg *KairosGateway) process(job Job) error {
 	msg := job.msg
 	messagesSize.Value(int64(len(job.Body)))
