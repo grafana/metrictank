@@ -46,6 +46,7 @@ func EnsureIndex(m *schema.MetricData) error {
 }
 
 var es *elastigo.Conn
+var Indexer *elastigo.BulkIndexer
 
 func InitElasticsearch() error {
 	es = elastigo.NewConn()
@@ -71,7 +72,15 @@ func InitElasticsearch() error {
 			return err
 		}
 	}
-
+	Indexer = es.NewBulkIndexer(20)
+	//dont retry sends.
+	Indexer.RetryForSeconds = 0
+	// index at most 10k docs per request.
+	Indexer.BulkMaxDocs = 10000
+	//flush at least every 10seconds.
+	Indexer.BufferDelayMax = time.Second * 10
+	Indexer.Refresh = true
+	Indexer.Start()
 	return nil
 }
 
@@ -109,9 +118,9 @@ func indexMetric(m *schema.MetricDefinition) error {
 	}
 
 	log.Printf("indexing %s in elasticsearch\n", m.Id)
-	resp, err := es.Index("metric", "metric_index", m.Id, nil, m)
-	log.Printf("elasticsearch response: %v\n", resp)
+	err = Indexer.Index("metric", "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
+		log.Printf("failed to send payload to BulkApi indexer.")
 		return err
 	}
 

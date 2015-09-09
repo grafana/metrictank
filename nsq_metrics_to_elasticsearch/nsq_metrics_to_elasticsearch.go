@@ -64,16 +64,6 @@ type ESHandler struct {
 }
 
 func NewESHandler(totalMessages int) (*ESHandler, error) {
-
-	err := metricdef.InitElasticsearch()
-	if err != nil {
-		return nil, err
-	}
-	err = metricdef.InitRedis()
-	if err != nil {
-		return nil, err
-	}
-
 	return &ESHandler{
 		totalMessages: totalMessages,
 	}, nil
@@ -192,6 +182,15 @@ func main() {
 	msgsHandleOK = metrics.NewCount("handle.ok")
 	msgsHandleFail = metrics.NewCount("handle.fail")
 
+	err = metricdef.InitElasticsearch()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = metricdef.InitRedis()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_metrics_to_elasticsearch"
 	err = app.ParseOpts(cfg, consumerOpts)
@@ -233,6 +232,8 @@ func main() {
 			return
 		case <-sigChan:
 			consumer.Stop()
+			//flush elastic BulkAPi buffer
+			metricdef.Indexer.Stop()
 		}
 	}
 }
