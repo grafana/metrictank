@@ -216,6 +216,7 @@ func main() {
 			return
 		case <-sigChan:
 			consumer.Stop()
+			<-consumer.StopChan
 			//flush elastic BulkAPi buffer
 			metricdef.Indexer.Stop()
 		}
