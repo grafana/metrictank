@@ -1,6 +1,7 @@
 .*.sw?
 raintank-metric
 raintank-metric_*
+nsq_metrics_to_stdout/nsq_metrics_to_stdout
 nsq_metrics_to_elasticsearch/nsq_metrics_to_elasticsearch
 nsq_probe_events_to_elasticsearch/nsq_probe_events_to_elasticsearch
 nsq_metrics_to_kairos/nsq_metrics_to_kairos
