@@ -1,9 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -23,7 +20,7 @@ import (
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/raintank-metric/msg"
 )
 
 var (
@@ -70,39 +67,27 @@ func NewESHandler() (*ESHandler, error) {
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	messagesSize.Value(int64(len(m.Body)))
 
-	var id int64
-	buf := bytes.NewReader(m.Body[1:9])
-	binary.Read(buf, binary.BigEndian, &id)
-	produced := time.Unix(0, id)
-	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
-
-	metrics := make([]*schema.MetricData, 0)
-	var err error
-	format := "unknown"
-	if m.Body[0] == '\x00' {
-		format = "msgFormatMetricDefinitionArrayJson"
-		err = json.Unmarshal(m.Body[9:], &metrics)
-	}
-	if m.Body[0] == '\x01' {
-		format = "msgFormatMetricDataArrayMsgp"
-		var out schema.MetricDataArray
-		_, err = out.UnmarshalMsg(m.Body[9:])
-		metrics = []*schema.MetricData(out)
-	}
-
+	ms, err := msg.MetricDataFromMsg(m.Body)
 	if err != nil {
-		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
+		log.Println("ERROR:", err, "skipping message")
 		return nil
 	}
-	metricsPerMessage.Value(int64(len(metrics)))
+	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
+
+	err = ms.DecodeMetricData()
+	if err != nil {
+		log.Println("ERROR:", err, "skipping message")
+		return nil
+	}
+	metricsPerMessage.Value(int64(len(ms.Metrics)))
 
 	done := make(chan error, 1)
 	go func() {
 		pre := time.Now()
-		for i, m := range metrics {
+		for i, m := range ms.Metrics {
 			if err := metricdef.EnsureIndex(m); err != nil {
 				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
-				metricsToEsFail.Inc(int64(len(metrics) - i))
+				metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
 				done <- err
 				return
 			}
@@ -115,7 +100,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		msgsHandleFail.Inc(1)
 		return err
 	}
-	metricsToEsOK.Inc(int64(len(metrics)))
+	metricsToEsOK.Inc(int64(len(ms.Metrics)))
 
 	msgsHandleOK.Inc(1)
 	return nil

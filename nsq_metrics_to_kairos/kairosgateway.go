@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/metricstore"
-	"github.com/raintank/raintank-metric/schema"
 )
 
 type KairosGateway struct {
@@ -59,16 +57,22 @@ func (kg *KairosGateway) work() {
 	}
 }
 func (kg *KairosGateway) ProcessHighPrio(msg *nsq.Message) error {
-	job := NewJob(msg, "high-prio")
+	job, err := NewJob(msg, "high-prio")
+	if err != nil {
+		return err
+	}
 	inHighPrioItems.Value(int64(len(kg.inHighPrio)))
-	msgsHighPrioAge.Value(time.Now().Sub(job.Produced).Nanoseconds() / 1000)
+	msgsHighPrioAge.Value(time.Now().Sub(job.Msg.Produced).Nanoseconds() / 1000)
 	kg.inHighPrio <- job
 	return <-job.done
 }
 func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
-	job := NewJob(msg, "low-prio")
+	job, err := NewJob(msg, "low-prio")
+	if err != nil {
+		return err
+	}
 	inLowPrioItems.Value(int64(len(kg.inLowPrio)))
-	msgsLowPrioAge.Value(time.Now().Sub(job.Produced).Nanoseconds() / 1000)
+	msgsLowPrioAge.Value(time.Now().Sub(job.Msg.Produced).Nanoseconds() / 1000)
 	kg.inLowPrio <- job
 	return <-job.done
 }
@@ -76,36 +80,27 @@ func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 // error is what is used to determine to ACK or NACK
 func (kg *KairosGateway) process(job Job) error {
 	msg := job.msg
-	messagesSize.Value(int64(len(job.Body)))
-	log.Printf("DEBUG: processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.id, time.Unix(0, msg.Timestamp), job.format, msg.Attempts)
-	metrics := make([]*schema.MetricData, 0)
-	var err error
-	switch job.format {
-	case "msgFormatMetricDefinitionArrayJson":
-		err = json.Unmarshal(job.Body, &metrics)
-	case "msgFormatMetricDataArrayMsgp":
-		var out schema.MetricDataArray
-		_, err = out.UnmarshalMsg(job.Body)
-		metrics = []*schema.MetricData(out)
-	}
+	messagesSize.Value(int64(len(job.Msg.Msg)))
+	log.Printf("DEBUG: processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.Msg.Id, time.Unix(0, msg.Timestamp), job.Msg.Format, msg.Attempts)
 
+	err := job.Msg.DecodeMetricData()
 	if err != nil {
-		log.Printf("ERROR: failure to unmarshal message body in format %s: %s. skipping message", job.format, err)
+		log.Println(err, "skipping message")
 		return nil
 	}
 
-	metricsPerMessage.Value(int64(len(metrics)))
+	metricsPerMessage.Value(int64(len(job.Msg.Metrics)))
 	if !kg.dryRun {
 		pre := time.Now()
-		err = kg.kairos.SendMetricPointers(metrics)
+		err = kg.kairos.SendMetricPointers(job.Msg.Metrics)
 		if err != nil {
-			metricsToKairosFail.Inc(int64(len(metrics)))
+			metricsToKairosFail.Inc(int64(len(job.Msg.Metrics)))
 			log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
 		} else {
-			metricsToKairosOK.Inc(int64(len(metrics)))
+			metricsToKairosOK.Inc(int64(len(job.Msg.Metrics)))
 			kairosPutDuration.Value(time.Now().Sub(pre))
 		}
 	}
-	log.Printf("DEBUG: finished metrics %s %d - %d metrics sent\n", job.qualifier, job.id, len(metrics))
+	log.Printf("DEBUG: finished metrics %s %d - %d metrics sent\n", job.qualifier, job.Msg.Id, len(job.Msg.Metrics))
 	return err
 }
