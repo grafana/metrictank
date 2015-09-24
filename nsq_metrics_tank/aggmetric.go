@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -19,6 +20,7 @@ import (
 // and informing aggregators when their periods have lapsed
 type AggMetric struct {
 	sync.Mutex
+	key         string
 	lastTs      uint32 // last timestamp seen
 	firstStart  uint32 // rounded to chunkSpan. denotes the very first start seen, ever, even if no longer in range
 	lastStart   uint32 // rounded to chunkSpan. denotes last start seen.
@@ -47,14 +49,32 @@ type AggMetric struct {
 
 //(4 - start) + end + 1
 
-// like slices,
-// from inclusive
-// to exclusive
+// using user input, which has to be verified, and could be any input
+func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
+	if from >= to {
+		return nil, errors.New("invalid request. to must > from")
+	}
+	a.Lock()
+	firstStart := from - (from % a.chunkSpan)
+	lastStart := (to - 1) - ((to - 1) % a.chunkSpan) // TODO verify /rethink/simplify this
+	if firstStart < a.lastStart-a.numChunks*a.chunkSpan {
+		firstStart = a.lastStart - a.numChunks*a.chunkSpan
+	}
+	if lastStart > a.lastStart {
+		lastStart = a.lastStart
+	}
+
+	defer a.Unlock()
+	return a.get(firstStart, lastStart), nil
+}
+
+// using input from our software, which should already be solid.
 // returns a range that includes the requested range, but typically more.
-func (a *AggMetric) Get(from, to uint32) []*tsz.Iter {
+func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
+	a.Lock()
 	firstStart := from - (from % a.chunkSpan)
 	lastStart := (to - 1) - ((to - 1) % a.chunkSpan) // TODO verify /rethink/simplify this
 	if firstStart < a.lastStart-a.numChunks*a.chunkSpan {
@@ -63,11 +83,15 @@ func (a *AggMetric) Get(from, to uint32) []*tsz.Iter {
 	if lastStart > a.lastStart {
 		panic("requested a lastStart that doesn't exist yet")
 	}
-	if lastStart%a.chunkSpan != 0 || firstStart%a.chunkSpan != 0 {
-		panic("lastStart or firstStart is not aligned to chunkSpan")
-	}
-	a.Lock()
 	defer a.Unlock()
+	return a.get(firstStart, lastStart)
+}
+
+// like slices,
+// from inclusive
+// to exclusive
+// firstStart and lastStart must be aligned to marker intervals
+func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 	first := ((firstStart - a.firstStart) / a.chunkSpan) % a.numChunks
 	last := ((lastStart - a.firstStart) / a.chunkSpan) % a.numChunks
 	var data []*tsz.Series
@@ -86,18 +110,22 @@ func (a *AggMetric) Get(from, to uint32) []*tsz.Iter {
 			data = append(data, a.chunks[i])
 		}
 	}
-	iters := make([]*tsz.Iter, len(data))
-	for i, chunk := range data {
-		iters[i] = chunk.Iter()
+	iters := make([]*tsz.Iter, 0, len(data))
+	for _, chunk := range data {
+		if chunk != nil {
+			iters = append(iters, chunk.Iter())
+		}
 	}
 	return iters
 }
 
-func NewAggMetric() *AggMetric {
+func NewAggMetric(key string) *AggMetric {
 	numChunks := uint32(5)
 	m := AggMetric{
+		key: key,
 		//		chunkSpan:   60 * 60 * 2, // 2 hours
 		chunkSpan: 60 * 2,
+		numChunks: numChunks,
 		chunks:    make([]*tsz.Series, numChunks),
 	}
 	return &m
@@ -113,34 +141,43 @@ func (a *AggMetric) signalAggregators(ts uint32) {
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
+	fmt.Println(a.key, "adding", val, ts)
 	if ts <= a.lastTs {
 		fmt.Println("ERROR: ts <= last seen ts")
 		return
 	}
 	start := ts - (ts % a.chunkSpan)
 
-	if len(a.chunks) == 0 {
+	// if we're adding first point ever..
+	if a.firstStart == 0 {
 		a.firstStart = start
 		a.lastStart = start
 		series := tsz.New(start)
 		series.Push(ts, val)
-		a.chunks = append(a.chunks, series)
+		a.chunks[0] = series
 		a.signalAggregators(ts)
 		return
 	}
 
 	if start == a.lastStart {
-		// append to last chunk
-		a.chunks[len(a.chunks)-1].Push(ts, val)
+		// last prior data was in same chunk as new point
+		index := ((start - a.firstStart) / a.chunkSpan) % a.numChunks
+		a.chunks[index].Push(ts, val)
 	} else {
-		// start must be higher than lastStart, because we already checked the ts
-		a.chunks[len(a.chunks)-1].Finish()
+		// the point needs a newer chunk than points we've seen before
+		// start is higher than lastStart, because we already checked the ts
+
+		// finish last chunk
+		lastIndex := ((a.lastStart - a.firstStart) / a.chunkSpan) % a.numChunks
+		a.chunks[lastIndex].Finish()
+
 		// create new chunk
-		// should we also fill the gap with empty chunks if needed? gaps are possible, but no need for explicit fill here i think
-		a.lastStart = start
 		series := tsz.New(start)
 		series.Push(ts, val)
-		a.chunks = append(a.chunks, series)
+		newIndex := ((start - a.firstStart) / a.chunkSpan) % a.numChunks
+		a.chunks[newIndex] = series
+
+		// create empty series in between, if there's a gap. TODO
 	}
 	a.signalAggregators(ts)
 }

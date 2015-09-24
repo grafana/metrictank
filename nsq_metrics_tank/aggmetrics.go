@@ -8,7 +8,9 @@ type AggMetrics struct {
 }
 
 func NewAggMetrics() *AggMetrics {
-	ms := AggMetrics{}
+	ms := AggMetrics{
+		metrics: make(map[string]*AggMetric),
+	}
 	return &ms
 }
 
@@ -16,7 +18,7 @@ func (ms *AggMetrics) Get(key string) Metric {
 	ms.Lock()
 	m, ok := ms.metrics[key]
 	if !ok {
-		m = NewAggMetric()
+		m = NewAggMetric(key)
 		ms.metrics[key] = m
 	}
 	ms.Unlock()

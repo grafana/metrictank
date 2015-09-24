@@ -40,6 +40,8 @@ var (
 	producerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
 	lookupdHTTPAddrs = app.StringArray{}
+
+	metrics *AggMetrics
 )
 
 func init() {
@@ -71,7 +73,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_tank", strings.Replace(hostname, ".", "_", -1))
+	stats, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,7 +105,7 @@ func main() {
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", metrics)
+	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", stats)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -115,17 +117,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	metricsToKairosOK = metrics.NewCount("metrics_to_kairos.ok")
-	metricsToKairosFail = metrics.NewCount("metrics_to_kairos.fail")
-	messagesSize = metrics.NewMeter("message_size", 0)
-	metricsPerMessage = metrics.NewMeter("metrics_per_message", 0)
-	msgsHighPrioAge = metrics.NewMeter("high_prio.message_age", 0)
-	kairosPutDuration = metrics.NewTimer("kairos_put_duration", 0)
-	inHighPrioItems = metrics.NewMeter("in_high_prio.items", 0)
-	msgsHandleHighPrioOK = metrics.NewCount("handle_high_prio.ok")
-	msgsHandleHighPrioFail = metrics.NewCount("handle_high_prio.fail")
+	metricsToKairosOK = stats.NewCount("metrics_to_kairos.ok")
+	metricsToKairosFail = stats.NewCount("metrics_to_kairos.fail")
+	messagesSize = stats.NewMeter("message_size", 0)
+	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
+	msgsHighPrioAge = stats.NewMeter("high_prio.message_age", 0)
+	kairosPutDuration = stats.NewTimer("kairos_put_duration", 0)
+	inHighPrioItems = stats.NewMeter("in_high_prio.items", 0)
+	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
+	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
 
-	handler := NewHandler(NewAggMetrics())
+	metrics = NewAggMetrics()
+	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
@@ -140,7 +143,8 @@ func main() {
 	}
 
 	go func() {
-		log.Println("INFO starting listener for http/debug on :6060")
+		http.HandleFunc("/get", Get)
+		log.Println("INFO starting listener for metrics and http/debug on :6060")
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
 

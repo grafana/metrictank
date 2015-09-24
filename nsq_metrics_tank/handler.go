@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/nsqio/go-nsq"
@@ -34,8 +33,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 	//	metricsPerMessage.Value(int64(len(ms.Metrics)))
 
 	for _, metric := range ms.Metrics {
-		fmt.Println(metric.Metric, metric.Value, metric.Time)
-		m := h.metrics.Get(metric.Metric)
+		m := h.metrics.Get(metric.Name)
 		m.Add(uint32(metric.Time), metric.Value)
 	}
 

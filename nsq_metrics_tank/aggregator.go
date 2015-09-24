@@ -12,7 +12,7 @@ type Aggregator struct {
 func (agg *Aggregator) Signal(a *AggMetric, ts uint32) {
 	boundary := ts - (ts % a.chunkSpan)
 	if boundary > agg.lastBoundary {
-		iters := a.Get(agg.lastBoundary+1, boundary+1)
+		iters := a.GetSafe(agg.lastBoundary+1, boundary+1)
 		fmt.Println("aggregating data from", agg.lastBoundary, "to", boundary+1)
 		for _, iter := range iters {
 			for iter.Next() {
