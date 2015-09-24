@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/dgryski/go-tsz"
@@ -14,7 +15,8 @@ import (
 // 2. aggregator spans may be larger (e.g. chunkSpan is 2 hours but we decide to collect daily aggregates)
 // we want to be able to keep multiple chunks per AggMetric, to satisfy (2) but also because it makes sense to be able
 // to serve the data from RAM if we have RAM available.
-// so, numChunks must at least cover the highest aggregation interval
+// in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
+// so, numChunks must at least cover the highest aggregation interval + one additional chunk
 
 // responsible for taking in new values, updating the in-memory data
 // and informing aggregators when their periods have lapsed
@@ -47,10 +49,17 @@ func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
 		return nil, errors.New("invalid request. to must > from")
 	}
 	a.Lock()
+	log.Printf("GetUnsafe(%d, %d)\n", from, to)
 	firstStart := from - (from % a.chunkSpan)
 	lastStart := (to - 1) - ((to - 1) % a.chunkSpan)
-	if firstStart < a.lastStart-a.numChunks*a.chunkSpan {
-		firstStart = a.lastStart - a.numChunks*a.chunkSpan
+	// we cannot satisfy data older than our retention
+	oldestStartWeMayHave := a.lastStart - (a.numChunks-1)*a.chunkSpan
+	if firstStart < oldestStartWeMayHave {
+		firstStart = oldestStartWeMayHave
+	}
+	// no point in requesting data older then what we have. common shortly after server start
+	if firstStart < a.firstStart {
+		firstStart = a.firstStart
 	}
 	if lastStart > a.lastStart {
 		lastStart = a.lastStart
@@ -87,8 +96,10 @@ func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
 
 // firstStart and lastStart must be aligned to marker intervals
 func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
+	log.Printf("get(%d, %d)\n", firstStart, lastStart)
 	first := ((firstStart - a.firstStart) / a.chunkSpan) % a.numChunks
 	last := ((lastStart - a.firstStart) / a.chunkSpan) % a.numChunks
+	log.Printf("first chunk: %d, last chunk: %d\n", first, last)
 	var data []*tsz.Series
 	if last >= first {
 		data = a.chunks[first : last+1]
@@ -108,7 +119,10 @@ func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 	iters := make([]*tsz.Iter, 0, len(data))
 	for _, chunk := range data {
 		if chunk != nil {
+			log.Println("> chunk not nil. adding iter")
 			iters = append(iters, chunk.Iter())
+		} else {
+			log.Println("> chunk nil. skipping")
 		}
 	}
 	return iters
@@ -124,12 +138,14 @@ func (a *AggMetric) signalAggregators(ts uint32) {
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
-	fmt.Println(a.key, "adding", val, ts)
 	if ts <= a.lastTs {
-		fmt.Println("ERROR: ts <= last seen ts")
+		log.Println("ERROR: ts <= last seen ts")
 		return
 	}
 	start := ts - (ts % a.chunkSpan)
+	if a.key == "litmus.localhost.dev1.dns.ok_state" {
+		log.Println(a.key, "adding", val, ts, "start is", start)
+	}
 
 	// if we're adding first point ever..
 	if a.firstStart == 0 {
@@ -138,6 +154,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		series := tsz.New(start)
 		series.Push(ts, val)
 		a.chunks[0] = series
+		log.Printf("chunk 0 for %d", start)
 		a.signalAggregators(ts)
 		return
 	}
@@ -159,6 +176,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		series.Push(ts, val)
 		newIndex := ((start - a.firstStart) / a.chunkSpan) % a.numChunks
 		a.chunks[newIndex] = series
+		log.Printf("chunk %d for %d", newIndex, start)
 
 		// create empty series in between, if there's a gap. TODO
 
