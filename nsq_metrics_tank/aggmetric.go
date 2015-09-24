@@ -21,42 +21,34 @@ import (
 type AggMetric struct {
 	sync.Mutex
 	key         string
-	lastTs      uint32 // last timestamp seen
-	firstStart  uint32 // rounded to chunkSpan. denotes the very first start seen, ever, even if no longer in range
-	lastStart   uint32 // rounded to chunkSpan. denotes last start seen.
-	numChunks   uint32 // amount of chunks to keep
-	chunkSpan   uint32 // span of individual chunks in seconds
-	chunks      []*tsz.Series
+	lastTs      uint32        // last timestamp seen
+	firstStart  uint32        // rounded to chunkSpan. denotes the very first start seen, ever, even if no longer in range
+	lastStart   uint32        // rounded to chunkSpan. denotes last start seen.
+	numChunks   uint32        // amount of chunks to keep
+	chunkSpan   uint32        // span of individual chunks in seconds
+	chunks      []*tsz.Series // a circular buffer of size numChunks. firstStart's data is at index 0, indexes go up and wrap around from numChunks-1 to 0
 	aggregators []*Aggregator
 }
 
-//first Start 100 at 0
-//(lastStart - firstStart) / span % 4
-//100 - 100 -> 0
-//200 - 100 -> 1
-//300 - 100 -> 2
-//400 - 100 -> 3
-//500 - 100 -> 0
-//600 - 100 -> 1
-//700 - 100 -> 2
-//800 - 100 -> 3
-// start pos 100, 200, 300, 400 - lastTs 425 -> 400 : 100 200 300 400
-// start pos 200, 300, 400, 500 - lastTs 585 -> 500 : 500 200 300 400 / 300-400 -> 2:3 / 300-500 -> 2:0
-// start pos 500, 600, 700, 800 - lastTs 885 -> 800 : 500 600 700 800 / 500-700 -> 0:2
-// 1:0 -> 4
-// 2:0 -> 3
-// 3:0 -> 2
-
-//(4 - start) + end + 1
+func NewAggMetric(key string, chunkSpan, numChunks uint32) *AggMetric {
+	m := AggMetric{
+		key:       key,
+		chunkSpan: chunkSpan,
+		numChunks: numChunks,
+		chunks:    make([]*tsz.Series, numChunks),
+	}
+	return &m
+}
 
 // using user input, which has to be verified, and could be any input
+// from inclusive, to exclusive. just like slices
 func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
 	if from >= to {
 		return nil, errors.New("invalid request. to must > from")
 	}
 	a.Lock()
 	firstStart := from - (from % a.chunkSpan)
-	lastStart := (to - 1) - ((to - 1) % a.chunkSpan) // TODO verify /rethink/simplify this
+	lastStart := (to - 1) - ((to - 1) % a.chunkSpan)
 	if firstStart < a.lastStart-a.numChunks*a.chunkSpan {
 		firstStart = a.lastStart - a.numChunks*a.chunkSpan
 	}
@@ -70,26 +62,29 @@ func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
 
 // using input from our software, which should already be solid.
 // returns a range that includes the requested range, but typically more.
+// from inclusive, to exclusive. just like slices
 func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
 	a.Lock()
 	firstStart := from - (from % a.chunkSpan)
-	lastStart := (to - 1) - ((to - 1) % a.chunkSpan) // TODO verify /rethink/simplify this
-	if firstStart < a.lastStart-a.numChunks*a.chunkSpan {
+	lastStart := (to - 1) - ((to - 1) % a.chunkSpan)
+	aggFirstStart := int(a.lastStart) - int(a.numChunks*a.chunkSpan)
+	// this can happen in contrived, testing scenarios
+	if aggFirstStart < 0 {
+		aggFirstStart = 0
+	}
+	if int(firstStart) < aggFirstStart {
 		panic("requested a firstStart that is too old")
 	}
 	if lastStart > a.lastStart {
-		panic("requested a lastStart that doesn't exist yet")
+		panic(fmt.Sprintf("requested lastStart %d that doesn't exist yet. last is %d", lastStart, a.lastStart))
 	}
 	defer a.Unlock()
 	return a.get(firstStart, lastStart)
 }
 
-// like slices,
-// from inclusive
-// to exclusive
 // firstStart and lastStart must be aligned to marker intervals
 func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 	first := ((firstStart - a.firstStart) / a.chunkSpan) % a.numChunks
@@ -117,18 +112,6 @@ func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 		}
 	}
 	return iters
-}
-
-func NewAggMetric(key string) *AggMetric {
-	numChunks := uint32(5)
-	m := AggMetric{
-		key: key,
-		//		chunkSpan:   60 * 60 * 2, // 2 hours
-		chunkSpan: 60 * 2,
-		numChunks: numChunks,
-		chunks:    make([]*tsz.Series, numChunks),
-	}
-	return &m
 }
 
 // this function must only be called while holding the lock
@@ -178,6 +161,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.chunks[newIndex] = series
 
 		// create empty series in between, if there's a gap. TODO
+
+		a.lastStart = start
 	}
 	a.signalAggregators(ts)
 }

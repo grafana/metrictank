@@ -18,7 +18,7 @@ func (ms *AggMetrics) Get(key string) Metric {
 	ms.Lock()
 	m, ok := ms.metrics[key]
 	if !ok {
-		m = NewAggMetric(key)
+		m = NewAggMetric(key, 60*2, 5)
 		ms.metrics[key] = m
 	}
 	ms.Unlock()
