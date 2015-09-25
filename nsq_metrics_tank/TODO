@@ -1,0 +1,1 @@
+remove old chunks and/or whole metrics when they expire, currently requires new data to trigger GC

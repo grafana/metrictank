@@ -7,10 +7,12 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	gometrics "github.com/rcrowley/go-metrics"
 )
 
 var (
@@ -29,9 +32,13 @@ var (
 	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages and writing into kairosdb. also number of nsq consumers for both high and low prio topic")
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 	channel     = flag.String("channel", "tank", "NSQ channel")
+	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
 	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds (default: 120)")
+	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules (default: 5)")
 
 	kairosAddr = flag.String("kairos-addr", "localhost:8080", "kairosdb address (default: localhost:8080)")
+	listenAddr = flag.String("listen", ":6060", "http listener address. (default ':6060')")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
@@ -68,6 +75,9 @@ func main() {
 	if *showVersion {
 		fmt.Println("nsq_metrics_tank")
 		return
+	}
+	if *instance == "" {
+		log.Fatal("instance can't be empty")
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -127,7 +137,7 @@ func main() {
 	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
 	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
 
-	metrics = NewAggMetrics()
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks))
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
@@ -143,9 +153,28 @@ func main() {
 	}
 
 	go func() {
+		alloc := gometrics.NewGauge()
+		totalAlloc := gometrics.NewGauge()
+		sys := gometrics.NewGauge()
+		gometrics.Register("bytes_alloc_not_freed", alloc)
+		gometrics.Register("bytes_alloc_incl_freed", totalAlloc)
+		gometrics.Register("bytes_sys", sys)
+		m := &runtime.MemStats{}
+		for range time.Tick(time.Duration(1) * time.Second) {
+			runtime.ReadMemStats(m)
+			alloc.Update(int64(m.Alloc))
+			totalAlloc.Update(int64(m.TotalAlloc))
+			sys.Update(int64(m.Sys))
+		}
+	}()
+
+	addr, _ := net.ResolveTCPAddr("tcp", "influxdb:2003")
+	go gometrics.Graphite(gometrics.DefaultRegistry, 10e9, fmt.Sprintf("metrics.nsq_metrics_tank.%s.", *instance), addr)
+
+	go func() {
 		http.HandleFunc("/get", Get)
-		log.Println("INFO starting listener for metrics and http/debug on :6060")
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Println("INFO starting listener for metrics and http/debug on ", *listenAddr)
+		log.Println(http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {
