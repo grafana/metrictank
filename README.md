@@ -1,59 +1,17 @@
-## raintank-metrics
+this repo contains some common libraries, schema and message definitions, as well as the following apps who all pull data from NSQ:
 
-This is "raintank-metric", a golang implementation of the nodejs
-raintank-worker program. It reads metric and event data from rabbitmq and writes
-that information to elasticsearch and influxdb.
+nmt nsq_metrics_tank (`tank` branch)
+nme nsq_metrics_to_elasticsearch (maintains metric definitions in ES)
+nmk nsq_metrics_to_kairos (stores metrics data in kairosdb)
+nms nsq_metrics_to_stdout: handy for manually looking which metrics are going through NSQ
+npee nsq_probe_events_to_elasticsearch (stores prove events to ES)
 
-INSTALLATION
-------------
+# format used
 
-Installing raintank-metric is easy. Just run
+aims to be generic, and at the very least not litmus-specific.
+metrics are defined in schema.MetricData, but multiple are packed in 1 NSQ message, see msg.MetricData
+probe events are in 1 message per event, and is defined in schema.ProbeEvent
 
-```
-	$ go get -u github.com/raintank/raintank-metric
-```
-
-from the command line, assuming you have your golang environment properly set
-up, and it will pull down and install all the dependencies and compile the
-program.
-
-USAGE
------
-
-The raintank-metric worker can be configured from the command line, or it can
-use a configuration file. The available options are:
-
-```
-	  -V, --verbose               Show verbose debug information. Repeat for more
-				      verbosity.
-	  -v, --version               Show version information.
-	  -c, --config=               Specify a configuration file.
-	  -L, --log-file=             Log to file X
-	  -s, --syslog                Log to syslog rather than a log file.
-				      Incompatible with -L/--log-file.
-	  -g, --graphite-addr=        Graphite IP address or hostname.
-	  -p, --graphite-port=        Port graphite listens on.
-	  -d, --elasticsearch-domain= Elasticseach domain.
-	  -t, --elasticsearch-port=   Port to connect to for Elasticsearch, defaults to
-				      9200.
-	  -u, --elasticsearch-user=   Optional username to use when connecting to
-				      elasticsearch.
-	  -P, --elasticsearch-passwd= Optional password to use when connecting to
-				      elasticsearch.
-	  -r, --redis-addr=           Hostname or IP address of redis server.
-	  -y, --redis-passwd=         Optional password to use when connecting to redis.
-	  -D, --redis-db=             Option database number to use when connecting to
-				      redis.
-	  -w, --num-workers=          Number of workers to launch. Defaults to the
-            	                      number of CPUs on the system.
-	      --short-rollup=         Interval to do short-term metric rollups.
-                   	              Defaults to '10m', for 10 minutes.
-	      --long-rollup=          Interval to do long-term metric rollups. Defaults
-                                      to '6h', for 6 hours.
-```
-
-A sample configuration file can be found in the `etc` directory of this 
-repository.
 
 License
 =======
