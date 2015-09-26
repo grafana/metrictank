@@ -22,7 +22,7 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 
 	topic       = flag.String("topic", "metrics", "NSQ topic")
-	channel     = flag.String("channel", "stdout", "NSQ channel")
+	channel     = flag.String("channel", "stdout<random-number>#ephemeral", "NSQ channel")
 	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 
 	consumerOpts     = app.StringArray{}
@@ -71,9 +71,9 @@ func main() {
 		return
 	}
 
-	if *channel == "" {
+	if *channel == "" || *channel == "stdout<random-number>#ephemeral" {
 		rand.Seed(time.Now().UnixNano())
-		*channel = fmt.Sprintf("tail%06d#ephemeral", rand.Int()%999999)
+		*channel = fmt.Sprintf("stdout%06d#ephemeral", rand.Int()%999999)
 	}
 
 	if *topic == "" {
