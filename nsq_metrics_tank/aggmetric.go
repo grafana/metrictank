@@ -73,6 +73,11 @@ func (a *AggMetric) stats() {
 	}
 }
 
+// this function must only be called while holding the lock
+func (a *AggMetric) indexFor(start uint32) uint32 {
+	return ((start - a.firstStart) / a.chunkSpan) % a.numChunks
+}
+
 // using user input, which has to be verified, and could be any input
 // from inclusive, to exclusive. just like slices
 func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
@@ -111,7 +116,7 @@ func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
 	firstStart := from - (from % a.chunkSpan)
 	lastStart := (to - 1) - ((to - 1) % a.chunkSpan)
 	aggFirstStart := int(a.lastStart) - int(a.numChunks*a.chunkSpan)
-	// this can happen in contrived, testing scenarios
+	// this can happen in contrived, testing scenarios that use very low timestamps
 	if aggFirstStart < 0 {
 		aggFirstStart = 0
 	}
@@ -127,18 +132,17 @@ func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
 
 // firstStart and lastStart must be aligned to marker intervals
 func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
-	//log.Printf("get(%d, %d)\n", firstStart, lastStart)
-	first := ((firstStart - a.firstStart) / a.chunkSpan) % a.numChunks
-	last := ((lastStart - a.firstStart) / a.chunkSpan) % a.numChunks
-	//log.Printf("first chunk: %d, last chunk: %d\n", first, last)
+	first := a.indexFor(firstStart)
+	last := a.indexFor(lastStart)
 	var data []*Chunk
 	if last >= first {
 		data = a.chunks[first : last+1]
 	} else {
-		//     the values at the end + values at the beginning
-		num := (a.numChunks - first) + last + 1
+		numAtSliceEnd := (a.numChunks - first)
+		numAtSliceBegin := last + 1
+		num := numAtSliceEnd + numAtSliceBegin
 		data = make([]*Chunk, 0, num)
-		// at the values at the end of chunks slice first (they are first in time)
+		// add the values at the end of chunks slice first (they are first in time)
 		for i := first; i < a.numChunks; i++ {
 			data = append(data, a.chunks[i])
 		}
@@ -150,10 +154,7 @@ func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 	iters := make([]*tsz.Iter, 0, len(data))
 	for _, chunk := range data {
 		if chunk != nil {
-			//log.Println("> chunk not nil. adding iter")
 			iters = append(iters, chunk.Iter())
-		} else {
-			//log.Println("> chunk nil. skipping")
 		}
 	}
 	return iters
@@ -170,43 +171,29 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
 	if ts <= a.lastTs {
-		log.Println("ERROR: ts <= last seen ts")
+		log.Printf("ERROR: ts %d <= last seen ts %d. can only append newer data", ts, a.lastTs)
 		return
 	}
 	start := ts - (ts % a.chunkSpan)
-	if a.key == "litmus.localhost.dev1.dns.ok_state" {
-		//log.Println(a.key, "adding", val, ts, "start is", start)
-	}
 
-	// if we're adding first point ever..
 	if a.firstStart == 0 {
-		a.firstStart = start
-		a.lastStart = start
+		// we're adding first point ever..
+		a.firstStart, a.lastStart = start, start
 		a.chunks[0] = NewChunk(start).Push(ts, val)
-		//log.Printf("chunk 0 for %d", start)
 		a.signalAggregators(ts)
 		return
 	}
 
 	if start == a.lastStart {
 		// last prior data was in same chunk as new point
-		index := ((start - a.firstStart) / a.chunkSpan) % a.numChunks
-		a.chunks[index].Push(ts, val)
+		a.chunks[a.indexFor(start)].Push(ts, val)
 	} else {
 		// the point needs a newer chunk than points we've seen before
-		// start is higher than lastStart, because we already checked the ts
+		a.chunks[a.indexFor(a.lastStart)].Finish()
 
-		// finish last chunk
-		lastIndex := ((a.lastStart - a.firstStart) / a.chunkSpan) % a.numChunks
-		a.chunks[lastIndex].Finish()
+		// TODO: create empty series in between, if there's a gap.
 
-		// create new chunk
-		newIndex := ((start - a.firstStart) / a.chunkSpan) % a.numChunks
-		a.chunks[newIndex] = NewChunk(start).Push(ts, val)
-		//log.Printf("chunk %d for %d", newIndex, start)
-
-		// create empty series in between, if there's a gap. TODO
-
+		a.chunks[a.indexFor(start)] = NewChunk(start).Push(ts, val)
 		a.lastStart = start
 	}
 	a.signalAggregators(ts)
