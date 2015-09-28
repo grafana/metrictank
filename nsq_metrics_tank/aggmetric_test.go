@@ -127,6 +127,14 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(800, 1299, 1299, 1299)
 }
 
+// basic expected RAM usage for 1 iteration (= 1 days)
+// 1000 metrics * (3600 * 24 / 10 ) points per metric * 1.3 B/point = 11 MB
+// 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
+// total -> 13 MB
+// go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out -cpuprofile cpu.out
+// go tool pprof -inuse_space nsq_metrics_tank.test mem.out -> shows 17 MB in use
+
+// TODO update once we clean old data, then we should look at numChunks
 func BenchmarkAggMetrics(b *testing.B) {
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
@@ -136,25 +144,17 @@ func BenchmarkAggMetrics(b *testing.B) {
 	aggChunkSpan := uint32(24 * 3600)
 	numAggChunks := uint32(1)
 
-	// 4 days of data in seconds
-	fourdays := uint32(60 * 60 * 24 * 4)
-
-	// start ts
-	t := uint32(1)
-
 	keys := make([]string, 1000)
 	for i := 0; i < 1000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
 	metrics := NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, numAggChunks)
-	for i := 0; i < b.N; i++ {
-		maxT := fourdays * uint32(i+1)
-		for ; t < maxT; t += 10 {
-			for metricI := 0; metricI < 1000; metricI++ {
-				m := metrics.Get(keys[metricI])
-				m.Add(t, float64(i)*float64(t))
-			}
+	maxT := 3600 * 24 * uint32(b.N) // b.N in days
+	for t := uint32(1); t < maxT; t += 10 {
+		for metricI := 0; metricI < 1000; metricI++ {
+			m := metrics.Get(keys[metricI])
+			m.Add(t, float64(t))
 		}
 	}
 }
