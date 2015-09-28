@@ -44,8 +44,16 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := aggBoundary(ts, agg.span)
 
 	if boundary > agg.currentBoundary {
-		agg.agg.Flush(agg.currentBoundary)
-		agg.agg = NewAggregation()
+		if agg.agg.cnt == 0 {
+			// nothing to do. in fact, we can reuse the aggregation
+		} else {
+			agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
+			agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
+			agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
+			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
+			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
+			agg.agg = NewAggregation()
+		}
 		agg.currentBoundary = boundary
 	} else {
 		agg.agg.Add(ts, val)

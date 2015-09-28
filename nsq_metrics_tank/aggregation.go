@@ -28,9 +28,3 @@ func (a *Aggregation) Add(ts uint32, val float64) {
 	a.sum += val
 	a.cnt += 1
 }
-func (a *Aggregation) Flush(ts uint32) {
-	if a.cnt == 0 {
-		// there was no data, so nothing to flush
-	}
-	// flush here
-}

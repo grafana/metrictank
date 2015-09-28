@@ -131,8 +131,8 @@ func TestAggMetric(t *testing.T) {
 // 1000 metrics * (3600 * 24 / 10 ) points per metric * 1.3 B/point = 11 MB
 // 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
 // total -> 13 MB
-// go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out -cpuprofile cpu.out
-// go tool pprof -inuse_space nsq_metrics_tank.test mem.out -> shows 17 MB in use
+// go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out
+// go tool pprof -inuse_space nsq_metrics_tank.test mem.out -> shows 25 MB in use
 
 // TODO update once we clean old data, then we should look at numChunks
 func BenchmarkAggMetrics(b *testing.B) {
