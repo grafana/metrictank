@@ -38,6 +38,12 @@ func (c *Chunk) Push(t uint32, v float64) *Chunk {
 	return c
 }
 
+var statsPeriod time.Duration
+
+func init() {
+	statsPeriod = time.Duration(1) * time.Second
+}
+
 // responsible for taking in new values, updating the in-memory data
 // and streaming the updates to aggregators
 type AggMetric struct {
@@ -70,7 +76,7 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 }
 
 func (a *AggMetric) stats() {
-	for range time.Tick(time.Duration(1) * time.Second) {
+	for range time.Tick(statsPeriod) {
 		sum := 0
 		a.Lock()
 		for _, chunk := range a.chunks {

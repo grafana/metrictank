@@ -150,7 +150,6 @@ func BenchmarkAggMetrics(b *testing.B) {
 	metrics := NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, numAggChunks)
 	for i := 0; i < b.N; i++ {
 		maxT := fourdays * uint32(i+1)
-		b.Logf("%d/%d adding points from %d until %d", i+1, b.N, t, maxT)
 		for ; t < maxT; t += 10 {
 			for metricI := 0; metricI < 1000; metricI++ {
 				m := metrics.Get(keys[metricI])
