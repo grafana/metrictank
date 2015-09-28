@@ -137,7 +137,7 @@ func main() {
 	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
 	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks))
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 

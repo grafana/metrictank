@@ -10,6 +10,10 @@ import (
 	"github.com/dgryski/go-tsz"
 )
 
+// the below is outdated, aggregators will now get their points streamed, no need to call get()
+// however, we may still need to accept get queries here for aggregators, if we implement crash recovery by loading chunks from disk
+// though we could also have the agg's maintain a write-ahead log, or refill aggregators from the metric's write ahead log.
+
 // while AggMetric typically has 1 static chunkSpan (we decide what is the preferred way to encode the data),
 // it must support different aggregator spans. in particular:
 // 1. aggregator spans may be shorter (e.g. chunkSpan is 4hours but we collect aggregates on 5/10/30 minute level)
@@ -35,7 +39,7 @@ func (c *Chunk) Push(t uint32, v float64) *Chunk {
 }
 
 // responsible for taking in new values, updating the in-memory data
-// and informing aggregators when their periods have lapsed
+// and streaming the updates to aggregators
 type AggMetric struct {
 	sync.Mutex
 	key         string
@@ -48,12 +52,17 @@ type AggMetric struct {
 	aggregators []*Aggregator
 }
 
-func NewAggMetric(key string, chunkSpan, numChunks uint32) *AggMetric {
+// NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
+// it optionally also creates aggregations with the given settings
+func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
 		key:       key,
 		chunkSpan: chunkSpan,
 		numChunks: numChunks,
 		chunks:    make([]*Chunk, numChunks),
+	}
+	for _, as := range aggsetting {
+		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
 	}
 	go m.stats()
 	return &m
@@ -161,9 +170,9 @@ func (a *AggMetric) get(firstStart, lastStart uint32) []*tsz.Iter {
 }
 
 // this function must only be called while holding the lock
-func (a *AggMetric) signalAggregators(ts uint32) {
+func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
-		agg.Signal(a, ts)
+		agg.Add(ts, val)
 	}
 }
 
@@ -180,7 +189,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// we're adding first point ever..
 		a.firstStart, a.lastStart = start, start
 		a.chunks[0] = NewChunk(start).Push(ts, val)
-		a.signalAggregators(ts)
+		a.addAggregators(ts, val)
 		return
 	}
 
@@ -196,5 +205,5 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.chunks[a.indexFor(start)] = NewChunk(start).Push(ts, val)
 		a.lastStart = start
 	}
-	a.signalAggregators(ts)
+	a.addAggregators(ts, val)
 }

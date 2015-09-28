@@ -8,16 +8,22 @@ var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
 
 type AggMetrics struct {
 	sync.Mutex
-	metrics   map[string]*AggMetric
-	chunkSpan uint32
-	numChunks uint32
+	metrics      map[string]*AggMetric
+	chunkSpan    uint32
+	numChunks    uint32
+	aggSpan      uint32
+	aggChunkSpan uint32
+	aggNumChunks uint32
 }
 
-func NewAggMetrics(chunkSpan, numChunks uint32) *AggMetrics {
+func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uint32) *AggMetrics {
 	ms := AggMetrics{
-		metrics:   make(map[string]*AggMetric),
-		chunkSpan: chunkSpan,
-		numChunks: numChunks,
+		metrics:      make(map[string]*AggMetric),
+		chunkSpan:    chunkSpan,
+		numChunks:    numChunks,
+		aggSpan:      aggSpan,
+		aggChunkSpan: aggChunkSpan,
+		aggNumChunks: aggNumChunks,
 	}
 	go ms.stats()
 	return &ms
@@ -38,7 +44,7 @@ func (ms *AggMetrics) Get(key string) Metric {
 	ms.Lock()
 	m, ok := ms.metrics[key]
 	if !ok {
-		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks)
+		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, aggSetting{ms.aggSpan, ms.aggChunkSpan, ms.aggNumChunks})
 		ms.metrics[key] = m
 	}
 	ms.Unlock()
