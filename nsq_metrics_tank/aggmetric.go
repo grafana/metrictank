@@ -185,6 +185,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
+// don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
@@ -194,9 +195,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	}
 	start := ts - (ts % a.chunkSpan)
 
-	if a.firstStart == 0 {
+	if a.lastTs == 0 {
 		// we're adding first point ever..
 		a.firstStart, a.lastStart = start, start
+		a.lastTs = ts
 		a.chunks[0] = NewChunk(start).Push(ts, val)
 		a.addAggregators(ts, val)
 		return
@@ -213,6 +215,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 		a.chunks[a.indexFor(start)] = NewChunk(start).Push(ts, val)
 		a.lastStart = start
+		a.lastTs = ts
 	}
 	a.addAggregators(ts, val)
 }

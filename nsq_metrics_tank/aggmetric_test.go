@@ -126,3 +126,36 @@ func TestAggMetric(t *testing.T) {
 	// TODO: implement skips and enable this
 	//	c.Verify(800, 1299, 1299, 1299)
 }
+
+func BenchmarkAggMetrics(b *testing.B) {
+	// we will store 10s metrics in 5 chunks of 2 hours
+	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
+	chunkSpan := uint32(2 * 3600)
+	numChunks := uint32(5)
+	aggSpan := uint32(300)
+	aggChunkSpan := uint32(24 * 3600)
+	numAggChunks := uint32(1)
+
+	// 4 days of data in seconds
+	fourdays := uint32(60 * 60 * 24 * 4)
+
+	// start ts
+	t := uint32(1)
+
+	keys := make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	}
+
+	metrics := NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, numAggChunks)
+	for i := 0; i < b.N; i++ {
+		maxT := fourdays * uint32(i+1)
+		b.Logf("%d/%d adding points from %d until %d", i+1, b.N, t, maxT)
+		for ; t < maxT; t += 10 {
+			for metricI := 0; metricI < 1000; metricI++ {
+				m := metrics.Get(keys[metricI])
+				m.Add(t, float64(i)*float64(t))
+			}
+		}
+	}
+}
