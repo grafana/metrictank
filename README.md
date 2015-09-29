@@ -1,10 +1,10 @@
 this repo contains some common libraries, schema and message definitions, as well as the following apps who all pull data from NSQ:
 
-nmt nsq_metrics_tank (`tank` branch)
-nme nsq_metrics_to_elasticsearch (maintains metric definitions in ES)
-nmk nsq_metrics_to_kairos (stores metrics data in kairosdb)
-nms nsq_metrics_to_stdout: handy for manually looking which metrics are going through NSQ
-npee nsq_probe_events_to_elasticsearch (stores prove events to ES)
+* nmt : nsq_metrics_tank (`tank` branch)
+* nme : nsq_metrics_to_elasticsearch (maintains metric definitions in ES)
+* nmk : nsq_metrics_to_kairos (stores metrics data in kairosdb)
+* nms : nsq_metrics_to_stdout: handy for manually looking which metrics are going through NSQ
+* npee: nsq_probe_events_to_elasticsearch (stores prove events to ES)
 
 # format used
 
