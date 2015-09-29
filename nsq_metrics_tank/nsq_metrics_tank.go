@@ -37,12 +37,13 @@ var (
 	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds (default: 120)")
 	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules (default: 5)")
 
-	kairosAddr = flag.String("kairos-addr", "localhost:8080", "kairosdb address (default: localhost:8080)")
-	listenAddr = flag.String("listen", ":6060", "http listener address. (default ':6060')")
+	cassandraPort = flag.Int("cassandra-port", 9042, "cassandra port (default: 9042)")
+	listenAddr    = flag.String("listen", ":6060", "http listener address. (default ':6060')")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
 
+	cassandraAddrs   = app.StringArray{}
 	consumerOpts     = app.StringArray{}
 	producerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
@@ -57,6 +58,7 @@ func init() {
 
 	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
 	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
+	flag.Var(&cassandraAddrs, "cassandra-addrs", "cassandra host (may be given multiple times)")
 }
 
 var metricsToKairosOK met.Count
@@ -103,6 +105,10 @@ func main() {
 	if len(nsqdTCPAddrs) > 0 && len(lookupdHTTPAddrs) > 0 {
 		log.Fatal("use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
+	// set default cassandra address if none is set.
+	if len(cassandraAddrs) == 0 {
+		cassandraAddrs = append(cassandraAddrs, "localhost")
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -127,15 +133,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	metricsToKairosOK = stats.NewCount("metrics_to_kairos.ok")
-	metricsToKairosFail = stats.NewCount("metrics_to_kairos.fail")
+	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
+	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
 	msgsHighPrioAge = stats.NewMeter("high_prio.message_age", 0)
-	kairosPutDuration = stats.NewTimer("kairos_put_duration", 0)
+	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
 	inHighPrioItems = stats.NewMeter("in_high_prio.items", 0)
 	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
 	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
+
+	InitCassandra()
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
 	handler := NewHandler(metrics)
@@ -181,9 +189,11 @@ func main() {
 		select {
 		case <-consumer.StopChan:
 			consumer.Stop()
+			cSession.Close()
 			return
 		case <-sigChan:
 			consumer.Stop()
+			cSession.Close()
 		}
 	}
 }
