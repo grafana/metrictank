@@ -262,14 +262,39 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.chunks[a.indexFor(start)].Push(ts, val)
 	} else {
 		// the point needs a newer chunk than points we've seen before
-		last := a.chunks[a.indexFor(a.lastStart)]
+		prev := a.indexFor(a.lastStart)
+		last := a.chunks[prev]
 		last.Finish()
 		a.Persist(last)
 
-		// TODO: create empty series in between, if there's a gap.
-		// TODO: update firstTs to get oldest mark
+		// TODO: create empty series in between, if there's a gap. -> actually no, we may just as well keep the old data
+		// but we have to make sure we don't accidentally return the old data out of order
 
-		a.chunks[a.indexFor(start)] = NewChunk(start).Push(ts, val)
+		now := a.indexFor(start)
+		a.chunks[now] = NewChunk(start).Push(ts, val)
+
+		// update firstTs to oldest mark
+		var found *Chunk
+		if now > prev {
+			for i := prev; i <= now && found == nil; i++ {
+				if a.chunks[i] != nil {
+					found = a.chunks[i]
+				}
+			}
+		} else {
+			for i := prev; i < uint32(len(a.chunks)) && found == nil; i++ {
+				if a.chunks[i] != nil {
+					found = a.chunks[i]
+				}
+			}
+			for i := uint32(0); i <= now && found == nil; i++ {
+				if a.chunks[i] != nil {
+					found = a.chunks[i]
+				}
+			}
+		}
+		a.firstTs = found.start
+
 		a.lastStart = start
 		a.lastTs = ts
 	}

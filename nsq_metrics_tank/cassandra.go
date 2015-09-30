@@ -104,7 +104,6 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	}()
 	wg.Wait()
 	close(results)
-	fmt.Println("got", len(outcomes), "outcomes")
 	sort.Sort(asc(outcomes))
 
 	var b []byte
@@ -117,6 +116,6 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 			iters = append(iters, iter)
 		}
 	}
-	log.Println("cassandra results", len(iters))
+	log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
 	return iters, nil
 }
