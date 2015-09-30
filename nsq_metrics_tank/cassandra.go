@@ -1,10 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"log"
-	"sync"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -18,13 +15,15 @@ Session is the interface used by users to interact with the database.
 It's safe for concurrent use by multiple goroutines and a typical usage scenario is to have one global session
 object to interact with the whole Cassandra cluster.
 */
-var cSession *gocql.cSession
+var cSession *gocql.Session
 
-func InitCassandra() {
-	cluster := gocql.NewCluster(cassandraAddrs)
+func InitCassandra() error {
+	cluster := gocql.NewCluster(cassandraAddrs...)
 	cluster.Keyspace = "raintank"
 	cluster.Consistency = gocql.One
-	cSession = cluster.CreateSession()
+	var err error
+	cSession, err = cluster.CreateSession()
+	return err
 }
 
 // Insert metric into Cassandra.

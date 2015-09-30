@@ -61,12 +61,12 @@ func init() {
 	flag.Var(&cassandraAddrs, "cassandra-addrs", "cassandra host (may be given multiple times)")
 }
 
-var metricsToKairosOK met.Count
-var metricsToKairosFail met.Count
+var metricsToCassandraOK met.Count
+var metricsToCassandraFail met.Count
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
 var msgsHighPrioAge met.Meter // in ms
-var kairosPutDuration met.Timer
+var cassandraPutDuration met.Timer
 var inHighPrioItems met.Meter
 var msgsHandleHighPrioOK met.Count
 var msgsHandleHighPrioFail met.Count
@@ -143,7 +143,11 @@ func main() {
 	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
 	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
 
-	InitCassandra()
+	err = InitCassandra()
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
 	handler := NewHandler(metrics)
