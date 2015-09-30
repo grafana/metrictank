@@ -135,7 +135,7 @@ func TestAggMetric(t *testing.T) {
 // go tool pprof -inuse_space nsq_metrics_tank.test mem.out -> shows 25 MB in use
 
 // TODO update once we clean old data, then we should look at numChunks
-func BenchmarkAggMetrics(b *testing.B) {
+func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
 	chunkSpan := uint32(2 * 3600)
