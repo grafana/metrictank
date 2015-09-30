@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gocql/gocql"
 )
@@ -31,10 +30,8 @@ func InitCassandra() error {
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func InsertMetric(key string, ts time.Time, data []byte) error {
+func InsertMetric(key string, ts uint32, data []byte) error {
 	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
-	//get YYYYMM format of ts.
-	row_ts := ts.Format("200601")
-	row_key := fmt.Sprintf("%s_%s", key, row_ts)
+	row_key := fmt.Sprintf("%s_%d", key, (ts / 3600 / 24 / 28)) // "month number" based on unix timestamp (rounded down)
 	return cSession.Query(query, row_key, ts, data).Exec()
 }

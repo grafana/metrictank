@@ -24,12 +24,14 @@ import (
 // so, numChunks must at least cover the highest aggregation interval + one additional chunk
 
 type Chunk struct {
+	start uint32
 	*tsz.Series
 	points uint32 // number of points in this chunk
+	saved  bool
 }
 
 func NewChunk(start uint32) *Chunk {
-	return &Chunk{tsz.New(start), 0}
+	return &Chunk{start, tsz.New(start), 0, false}
 }
 
 func (c *Chunk) Push(t uint32, v float64) *Chunk {
@@ -191,6 +193,22 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
+func (a *AggMetric) Persist(c *Chunk) {
+	go func() {
+		fmt.Println("saving chunk", c)
+		err := InsertMetric(a.key, c.start, c.Series.Bytes())
+		a.Lock()
+		defer a.Unlock()
+		if err != nil {
+			c.saved = true
+			fmt.Println("saved chunk", c)
+		} else {
+			fmt.Println("ERROR: could not save chunk", c, err)
+			// TODO
+		}
+	}()
+}
+
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
@@ -215,7 +233,9 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.chunks[a.indexFor(start)].Push(ts, val)
 	} else {
 		// the point needs a newer chunk than points we've seen before
-		a.chunks[a.indexFor(a.lastStart)].Finish()
+		last := a.chunks[a.indexFor(a.lastStart)]
+		last.Finish()
+		a.Persist(last)
 
 		// TODO: create empty series in between, if there's a gap.
 
