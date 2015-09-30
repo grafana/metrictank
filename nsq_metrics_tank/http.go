@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/dgryski/go-tsz"
+	"log"
 	"strconv"
 	"time"
 
@@ -40,12 +42,25 @@ func Get(w http.ResponseWriter, req *http.Request) {
 	}
 	out := make([]Series, len(keys))
 	for i, key := range keys {
+		iters := make([]*tsz.Iter, 0)
 		metric := metrics.Get(key)
-		iters, err := metric.GetUnsafe(uint32(fromUnix), uint32(time.Now().Unix()))
+		oldest, memIters, err := metric.GetUnsafe(uint32(fromUnix), uint32(time.Now().Unix()))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if oldest > uint32(fromUnix) {
+			log.Println(key, "mem:", oldest, "- now.  cassandra:", fromUnix, "-", oldest)
+			storeIters, err := searchCassandra(key, uint32(fromUnix), oldest)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			iters = append(iters, storeIters...)
+		} else {
+			log.Println(key, "mem:", oldest, "- now")
+		}
+		iters = append(iters, memIters...)
 		points := make([]Point, 0)
 		for _, iter := range iters {
 			for iter.Next() {

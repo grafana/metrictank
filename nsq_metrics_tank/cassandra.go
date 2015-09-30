@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 )
 
 // write aggregated data to cassandra.
+
+const month = 60 * 60 * 24 * 28
 
 /*
 https://godoc.org/github.com/gocql/gocql#Session
@@ -32,28 +36,27 @@ func InitCassandra() error {
 // data: is the payload as bytes.
 func InsertMetric(key string, ts uint32, data []byte) error {
 	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
-	row_key := fmt.Sprintf("%s_%d", key, (ts / 3600 / 24 / 28)) // "month number" based on unix timestamp (rounded down)
+	row_key := fmt.Sprintf("%s_%d", key, ts/month) // "month number" based on unix timestamp (rounded down)
 	return cSession.Query(query, row_key, ts, data).Exec()
 }
 
 // Basic search of cassandra.
 // TODO:(Awoods) this needs to be refactored to run each query in a separate goroutine.
 // then concatenate the results at the end.
-func SearchCassandra(key string, start, end time.Time) ([]Point, error) {
-	start_epoch := uint32(start.Unix())
-	end_epoch := uint32(end.Unix())
-	points := make([]Point, 0)
-	//get row_keys we need to query.
-	row_ts, err := MonthsInRange(start, end)
-	if err != nil {
-		return points, err
+// TODO fine tune the details (inclusive/exclusive, make sure we don't query for an extra month if we don't need to)
+func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
+	iters := make([]*tsz.Iter, 0)
+	// we need to send a query for each row holding data
+	// get row_keys we need to query.
+	row_keys := make([]string, 0)
+	start_month := start - (start % month)   // start has to be at, or before, requested start
+	end_month := end - (end % month) + month // end has to be at, or after requested end
+	for mark := start_month; mark <= end_month; mark += month {
+		row_keys = append(row_keys, fmt.Sprintf("%s_%d", key, mark))
 	}
-	// we need to send a query for each row holding data.
-	// this is 1 row per calender month.
-	num_rows := len(row_ts)
+	num_rows := len(row_keys)
 
-	for i, ts := range row_ts {
-		row_key := fmt.Sprintf("%s_%s", key, ts)
+	for i, row_key := range row_keys {
 		var query string
 		params := make([]interface{}, 0)
 
@@ -61,8 +64,8 @@ func SearchCassandra(key string, start, end time.Time) ([]Point, error) {
 		params = append(params, row_key)
 		if num_rows == 1 {
 			// we need a selection of the row between startTs and endTs
-			query = "SELECT data FROM metric WHERE key = ? AND ts < ? AND ts >= ?"
-			params = append(params, end, start)
+			query = "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ?"
+			params = append(params, start, end)
 		} else if i < 1 {
 			// we want from startTs to the end of the row.
 			query = "SELECT data FROM metric WHERE key = ? AND ts >= ?"
@@ -79,39 +82,8 @@ func SearchCassandra(key string, start, end time.Time) ([]Point, error) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			for iter.Next() {
-				ts, val := iter.Values()
-				if ts > start_epoch && ts <= end_epoch {
-					points = append(points, Point{val, ts})
-				}
-			}
+			iters = append(iters, iter)
 		}
 	}
-	return points, nil
-}
-
-func MonthsInRange(start, end time.Time) ([]string, error) {
-	if start.After(end) {
-		return nil, fmt.Errorf("start time after end time.")
-	}
-	months := make([]string, 0)
-
-	year := start.Year()
-	month := int(start.Month())
-
-	if year != end.Year() {
-		for month <= 12 {
-			months = append(months, fmt.Sprintf("%d%02d", year, month))
-			month++
-		}
-		//start new year.
-		month = 1
-		year++
-	}
-
-	for month <= int(end.Month()) {
-		months = append(months, fmt.Sprintf("%d%02d", year, month))
-		month++
-	}
-	return months, nil
+	return iters, nil
 }

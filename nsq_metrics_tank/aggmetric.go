@@ -106,9 +106,13 @@ func (a *AggMetric) indexFor(start uint32) uint32 {
 
 // using user input, which has to be verified, and could be any input
 // from inclusive, to exclusive. just like slices
-func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
+// we return the oldest point that we may possibly know
+// that way you know if you should also query the datastore
+// you can't just rely on the first point, because if it's sparse data the first returned point
+// could be much later than the ts we know from which to have captured all data
+func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 	if from >= to {
-		return nil, errors.New("invalid request. to must > from")
+		return 0, nil, errors.New("invalid request. to must > from")
 	}
 	a.Lock()
 	//log.Printf("GetUnsafe(%d, %d)\n", from, to)
@@ -128,7 +132,7 @@ func (a *AggMetric) GetUnsafe(from, to uint32) ([]*tsz.Iter, error) {
 	}
 
 	defer a.Unlock()
-	return a.get(firstStart, lastStart), nil
+	return oldestStartWeMayHave, a.get(firstStart, lastStart), nil
 }
 
 // using input from our software, which should already be solid.
@@ -195,15 +199,15 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 func (a *AggMetric) Persist(c *Chunk) {
 	go func() {
-		fmt.Println("saving chunk", c)
+		log.Println("saving chunk", c)
 		err := InsertMetric(a.key, c.start, c.Series.Bytes())
 		a.Lock()
 		defer a.Unlock()
 		if err != nil {
 			c.saved = true
-			fmt.Println("saved chunk", c)
+			log.Println("saved chunk", c)
 		} else {
-			fmt.Println("ERROR: could not save chunk", c, err)
+			log.Println("ERROR: could not save chunk", c, err)
 			// TODO
 		}
 	}()
