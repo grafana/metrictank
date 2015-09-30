@@ -40,6 +40,10 @@ func NewChunk(start uint32) *Chunk {
 	return &Chunk{start, tsz.New(start), 0, false}
 }
 
+func (c *Chunk) String() string {
+	return fmt.Sprintf("<chunk start at %d, %d points>", c.start, c.points)
+
+}
 func (c *Chunk) Push(t uint32, v float64) *Chunk {
 	c.Series.Push(t, v)
 	c.points += 1

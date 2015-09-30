@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
+	"sync"
 
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
@@ -40,44 +42,74 @@ func InsertMetric(key string, ts uint32, data []byte) error {
 	return cSession.Query(query, row_key, ts, data).Exec()
 }
 
+type outcome struct {
+	mark uint32
+	i    *gocql.Iter
+}
+type asc []outcome
+
+func (o asc) Len() int           { return len(o) }
+func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
+func (o asc) Less(i, j int) bool { return o[i].mark < o[j].mark }
+
 // Basic search of cassandra.
-// TODO:(Awoods) this needs to be refactored to run each query in a separate goroutine.
-// then concatenate the results at the end.
 // TODO fine tune the details (inclusive/exclusive, make sure we don't query for an extra month if we don't need to)
 func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
-	iters := make([]*tsz.Iter, 0)
-	// we need to send a query for each row holding data
-	// get row_keys we need to query.
-	row_keys := make([]string, 0)
-	start_month := start - (start % month)   // start has to be at, or before, requested start
-	end_month := end - (end % month) + month // end has to be at, or after requested end
-	for mark := start_month; mark <= end_month; mark += month {
-		row_keys = append(row_keys, fmt.Sprintf("%s_%d", key, mark))
+	if start > end {
+		panic(fmt.Sprintf("searchCassandra start %d > end %d", start, end))
 	}
-	num_rows := len(row_keys)
 
-	for i, row_key := range row_keys {
-		var query string
-		params := make([]interface{}, 0)
+	results := make(chan outcome)
+	wg := &sync.WaitGroup{}
 
-		// all queries need the row_key
-		params = append(params, row_key)
-		if num_rows == 1 {
-			// we need a selection of the row between startTs and endTs
-			query = "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ?"
-			params = append(params, start, end)
-		} else if i < 1 {
-			// we want from startTs to the end of the row.
-			query = "SELECT data FROM metric WHERE key = ? AND ts >= ?"
-			params = append(params, start)
-		} else {
-			// we want from start of the row till the endTs.
-			query = "SELECT data FROM metric WHERE key = ? AND ts < ?"
-			params = append(params, end)
+	query := func(mark uint32, q string, p ...interface{}) {
+		wg.Add(1)
+		go func() {
+			log.Println("querying cassandra for", q, p)
+			results <- outcome{mark, cSession.Query(q, p).Iter()}
+			log.Println("query cassandra for", q, p, "DONE")
+			wg.Done()
+		}()
+	}
+
+	start_month := start - (start % month) // starting row has to be at, or before, requested start
+	end_month := end - (end % month)       // ending row has to be include the requested end
+
+	if start_month == end_month {
+		// we need a selection of the row between startTs and endTs
+		row_key := fmt.Sprintf("%s_%d", key, start_month)
+		query(start_month, "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ?", row_key, start, end)
+	} else {
+		// get row_keys for each row we need to query.
+		for mark := start_month; mark <= end_month; mark += month {
+			row_key := fmt.Sprintf("%s_%d", key, mark)
+			if mark == start_month {
+				// we want from startTs to the end of the row.
+				query(mark, "SELECT data FROM metric WHERE key = ? AND ts >= ?", row_key, start)
+			} else if mark == end_month {
+				// we want from start of the row till the endTs.
+				query(mark, "SELECT data FROM metric WHERE key = ? AND ts < ?", row_key, end)
+			} else {
+				// we want all columns
+				query(mark, "SELECT data FROM metric WHERE key = ?", row_key)
+			}
 		}
-		var b []byte
-		result := cSession.Query(query, params...).Iter()
-		for result.Scan(&b) {
+	}
+	outcomes := make([]outcome, 0)
+	iters := make([]*tsz.Iter, 0)
+	go func() {
+		for o := range results {
+			outcomes = append(outcomes, o)
+		}
+	}()
+	wg.Wait()
+	close(results)
+	fmt.Println("got", len(outcomes), "outcomes")
+	sort.Sort(asc(outcomes))
+
+	var b []byte
+	for _, outcome := range outcomes {
+		for outcome.i.Scan(&b) {
 			iter, err := tsz.NewIterator(b)
 			if err != nil {
 				log.Fatal(err)
@@ -85,5 +117,6 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 			iters = append(iters, iter)
 		}
 	}
+	log.Println("cassandra results", len(iters))
 	return iters, nil
 }
