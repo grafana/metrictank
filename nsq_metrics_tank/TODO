@@ -1,2 +1,1 @@
-'oldest' does not take into account server start time
 remove old chunks and/or whole metrics when they expire, currently requires new data to trigger GC

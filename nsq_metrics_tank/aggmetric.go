@@ -10,6 +10,12 @@ import (
 	"github.com/dgryski/go-tsz"
 )
 
+var serverStart uint32
+
+func init() {
+	serverStart = uint32(time.Now().Unix())
+}
+
 // the below is outdated, aggregators will now get their points streamed, no need to call get()
 // however, we may still need to accept get queries here for aggregators, if we implement crash recovery by loading chunks from disk
 // though we could also have the agg's maintain a write-ahead log, or refill aggregators from the metric's write ahead log.
@@ -51,6 +57,7 @@ func init() {
 type AggMetric struct {
 	sync.Mutex
 	key         string
+	firstTs     uint32   // first timestamp from which we have seen data. (a point ts during our first chunk, or start of a chunk if we've dropped old chunks)
 	lastTs      uint32   // last timestamp seen
 	firstStart  uint32   // rounded to chunkSpan. denotes the very first start seen, ever, even if no longer in range
 	lastStart   uint32   // rounded to chunkSpan. denotes last start seen.
@@ -106,10 +113,15 @@ func (a *AggMetric) indexFor(start uint32) uint32 {
 
 // using user input, which has to be verified, and could be any input
 // from inclusive, to exclusive. just like slices
-// we return the oldest point that we may possibly know
-// that way you know if you should also query the datastore
-// you can't just rely on the first point, because if it's sparse data the first returned point
-// could be much later than the ts we know from which to have captured all data
+// we also need to be accurately say from which point on we have data.
+// that way you know if you should also query another datastore
+// this is trickier than it sounds:
+// 1) we can't just use server start, because older data may have come in with a bit of a delay
+// 2) we can't just use oldest point that we still hold, because data may have arrived long after server start,
+//    i.e. after a period of nothingness. and we know we would have had the data after start if it had come in
+// 3) we can't just compute based on chunks how far back in time we would have had the data,
+//    because this could be before server start, if invoked soon after starting.
+// so we use a combination of all factors..
 func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 	if from >= to {
 		return 0, nil, errors.New("invalid request. to must > from")
@@ -132,7 +144,15 @@ func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 	}
 
 	defer a.Unlock()
-	return oldestStartWeMayHave, a.get(firstStart, lastStart), nil
+	oldest := oldestStartWeMayHave
+	if oldest < serverStart {
+		oldest = serverStart
+	}
+	if oldest > a.firstTs {
+		oldest = a.firstTs
+	}
+
+	return oldest, a.get(firstStart, lastStart), nil
 }
 
 // using input from our software, which should already be solid.
@@ -228,6 +248,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.firstStart, a.lastStart = start, start
 		a.lastTs = ts
 		a.chunks[0] = NewChunk(start).Push(ts, val)
+		a.firstTs = ts
 		a.addAggregators(ts, val)
 		return
 	}
@@ -242,6 +263,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.Persist(last)
 
 		// TODO: create empty series in between, if there's a gap.
+		// TODO: update firstTs to get oldest mark
 
 		a.chunks[a.indexFor(start)] = NewChunk(start).Push(ts, val)
 		a.lastStart = start
