@@ -33,7 +33,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 	//	metricsPerMessage.Value(int64(len(ms.Metrics)))
 
 	for _, metric := range ms.Metrics {
-		m := h.metrics.Get(metric.Name)
+		m := h.metrics.Get(metric.Id())
 		m.Add(uint32(metric.Time), metric.Value)
 	}
 
