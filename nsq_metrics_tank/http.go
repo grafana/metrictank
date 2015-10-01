@@ -17,7 +17,7 @@ type Point struct {
 }
 
 func (p *Point) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("[%d, %f]", p.Val, p.Ts)), nil
+	return []byte(fmt.Sprintf("[%f, %d]", p.Val, p.Ts)), nil
 }
 
 type Series struct {
