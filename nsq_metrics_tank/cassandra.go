@@ -93,7 +93,13 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	query := func(mark uint32, q string, p ...interface{}) {
 		wg.Add(1)
 		go func() {
-			log.Println("querying cassandra for", q, p)
+			if len(p) == 3 {
+				log.Println("querying cassandra for", q, p[0], TS(p[1]), TS(p[2]))
+			} else if len(p) == 2 {
+				log.Println("querying cassandra for", q, p[0], TS(p[1]))
+			} else {
+				log.Println("querying cassandra for", q, p)
+			}
 			results <- outcome{mark, cSession.Query(q, p...).Iter()}
 			wg.Done()
 		}()
@@ -105,20 +111,20 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key := fmt.Sprintf("%s_%d", key, start_month/month)
-		query(start_month, "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ?", row_key, start, end)
+		query(start_month, "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for mark := start_month; mark <= end_month; mark += month {
 			row_key := fmt.Sprintf("%s_%d", key, mark/month)
 			if mark == start_month {
 				// we want from startTs to the end of the row.
-				query(mark, "SELECT data FROM metric WHERE key = ? AND ts >= ?", row_key, start)
+				query(mark, "SELECT data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start)
 			} else if mark == end_month {
 				// we want from start of the row till the endTs.
-				query(mark, "SELECT data FROM metric WHERE key = ? AND ts < ?", row_key, end)
+				query(mark, "SELECT data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
 			} else {
 				// we want all columns
-				query(mark, "SELECT data FROM metric WHERE key = ?", row_key)
+				query(mark, "SELECT data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
 			}
 		}
 	}

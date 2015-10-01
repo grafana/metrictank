@@ -71,12 +71,18 @@ func Get(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+			for _, i := range storeIters {
+				fmt.Println("c>", TS(i.T0()))
+			}
 			iters = append(iters, storeIters...)
 		} else {
 			log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix))
 		}
 		// TODO filter out points we didn't ask for
 		iters = append(iters, memIters...)
+		for _, i := range memIters {
+			fmt.Println("m>", TS(i.T0()))
+		}
 		points := make([]Point, 0)
 		for _, iter := range iters {
 			for iter.Next() {
