@@ -2,18 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/dgryski/go-tsz"
 	"log"
-	"strconv"
-	"time"
-
 	"net/http"
 	_ "net/http/pprof"
+	"strconv"
+	"time"
 )
 
 type Point struct {
 	Val float64
 	Ts  uint32
+}
+
+func (p *Point) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("[%d, %f]", p.Val, p.Ts)), nil
 }
 
 type Series struct {

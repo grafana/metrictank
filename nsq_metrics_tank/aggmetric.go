@@ -227,7 +227,7 @@ func (a *AggMetric) Persist(c *Chunk) {
 		err := InsertMetric(a.key, c.start, c.Series.Bytes())
 		a.Lock()
 		defer a.Unlock()
-		if err != nil {
+		if err == nil {
 			c.saved = true
 			log.Println("saved chunk", c)
 		} else {

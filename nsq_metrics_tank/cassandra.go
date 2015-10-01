@@ -14,6 +14,15 @@ import (
 
 const month = 60 * 60 * 24 * 28
 
+const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
+const table_schema = `CREATE TABLE IF NOT EXISTS raintank.metric (
+    key ascii,
+    ts int,
+    data blob,
+    PRIMARY KEY (key, ts)
+) WITH COMPACT STORAGE
+    AND CLUSTERING ORDER BY (ts DESC)`
+
 /*
 https://godoc.org/github.com/gocql/gocql#Session
 Session is the interface used by users to interact with the database.
@@ -24,9 +33,23 @@ var cSession *gocql.Session
 
 func InitCassandra() error {
 	cluster := gocql.NewCluster(cassandraAddrs...)
-	cluster.Keyspace = "raintank"
 	cluster.Consistency = gocql.One
 	var err error
+	tmpSession, err := cluster.CreateSession()
+	if err != nil {
+		return err
+	}
+	// ensure the keyspace and table exist.
+	err = tmpSession.Query(keyspace_schema).Exec()
+	if err != nil {
+		return err
+	}
+	err = tmpSession.Query(table_schema).Exec()
+	if err != nil {
+		return err
+	}
+	tmpSession.Close()
+	cluster.Keyspace = "raintank"
 	cSession, err = cluster.CreateSession()
 	return err
 }
