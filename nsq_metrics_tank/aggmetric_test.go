@@ -30,8 +30,8 @@ func (c *Checker) Add(ts uint32, val float64) {
 	c.points = append(c.points, point{ts, val})
 }
 
-// from to is the range that gets fed to AggMetric
-// first/last is what we use as data range to compare to
+// from to is the range that gets requested from AggMetric
+// first/last is what we use as data range to compare to (both inclusive)
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(from, to, first, last uint32) {
 	_, iters := c.agg.Get(from, to)
@@ -42,12 +42,13 @@ func (c *Checker) Verify(from, to, first, last uint32) {
 	}
 	for pj = pi; c.points[pj].ts != last; pj++ {
 	}
-	c.t.Logf("cmp AggMetric.GetSafe(%d,%d) to %d <= ts <= %d, i.e. p[%d]=%s until p[%d]=%s (inclusive)", from, to, first, last, pi, c.points[pi], pj, c.points[pj])
+	c.t.Logf("verifying AggMetric.Get(%d,%d) =?= %d <= ts <= %d", from, to, first, last)
 	index := pi - 1
 	for _, iter := range iters {
 		for iter.Next() {
 			index++
 			tt, vv := iter.Values()
+			//c.t.Logf("got (%v,%v).. should be (%v,%v)", tt, vv, c.points[index].ts, c.points[index].val)
 			if index > pj {
 				c.t.Fatalf("Values()=(%v,%v), want end of stream\n", tt, vv)
 			}
