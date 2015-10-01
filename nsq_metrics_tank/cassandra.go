@@ -94,7 +94,6 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 		go func() {
 			log.Println("querying cassandra for", q, p)
 			results <- outcome{mark, cSession.Query(q, p).Iter()}
-			log.Println("query cassandra for", q, p, "DONE")
 			wg.Done()
 		}()
 	}

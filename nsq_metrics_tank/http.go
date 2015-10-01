@@ -65,7 +65,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if oldest > uint32(fromUnix) {
-			log.Println("data load from cassandra:", ts(fromUnix), "-", ts(oldest), " from mem:", ts(oldest), "- ", ts(toUnix))
+			log.Println("data load from cassandra:", TS(fromUnix), "-", TS(oldest), " from mem:", TS(oldest), "- ", TS(toUnix))
 			storeIters, err := searchCassandra(key, uint32(fromUnix), oldest)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -73,7 +73,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			}
 			iters = append(iters, storeIters...)
 		} else {
-			log.Println("data load from mem:", ts(fromUnix), "-", ts(toUnix))
+			log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix))
 		}
 		// TODO filter out points we didn't ask for
 		iters = append(iters, memIters...)
