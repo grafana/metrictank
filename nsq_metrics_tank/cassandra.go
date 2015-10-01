@@ -59,10 +59,14 @@ func InitCassandra() error {
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func InsertMetric(key string, ts uint32, data []byte) error {
-	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
-	row_key := fmt.Sprintf("%s_%d", key, ts/month) // "month number" based on unix timestamp (rounded down)
-	return cSession.Query(query, row_key, ts, data).Exec()
+func InsertMetric(key string, t0 uint32, data []byte) error {
+	// for unit tests
+	if cSession == nil {
+		return nil
+	}
+	query := "INSERT INTO metric (key, t0, data) values(?,?,?)"
+	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
+	return cSession.Query(query, row_key, t0, data).Exec()
 }
 
 type outcome struct {
