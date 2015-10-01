@@ -1,1 +1,2 @@
 remove old chunks and/or whole metrics when they expire, currently requires new data to trigger GC
+we don't have a list of all keys inside the tsdb. consequences: you can't get lists/search/autocomplete and for non-existant keys we still query cassandra
