@@ -66,6 +66,7 @@ func InsertMetric(key string, t0 uint32, data []byte) error {
 	}
 	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
 	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
+	log.Println("saving chunk key", row_key, "timestamp", t0)
 	return cSession.Query(query, row_key, t0, data).Exec()
 }
 
@@ -103,12 +104,12 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
-		row_key := fmt.Sprintf("%s_%d", key, start_month)
+		row_key := fmt.Sprintf("%s_%d", key, start_month/month)
 		query(start_month, "SELECT data FROM metric WHERE key = ? AND ts >= ? AND ts < ?", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for mark := start_month; mark <= end_month; mark += month {
-			row_key := fmt.Sprintf("%s_%d", key, mark)
+			row_key := fmt.Sprintf("%s_%d", key, mark/month)
 			if mark == start_month {
 				// we want from startTs to the end of the row.
 				query(mark, "SELECT data FROM metric WHERE key = ? AND ts >= ?", row_key, start)
