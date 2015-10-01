@@ -101,8 +101,6 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// doesn't exactly match standard graphite output, not sure how to do it like arrays
-	// [{"target": "error", "datapoints": [[null, 1443070801]], ...}]
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(js)
