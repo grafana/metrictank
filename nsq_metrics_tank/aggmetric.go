@@ -263,7 +263,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.firstTs = found.t0
 
 		a.lastT0 = t0
-		a.lastTs = ts
 	}
+	a.lastTs = ts
 	a.addAggregators(ts, val)
 }
