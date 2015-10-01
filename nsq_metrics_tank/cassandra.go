@@ -64,7 +64,7 @@ func InsertMetric(key string, t0 uint32, data []byte) error {
 	if cSession == nil {
 		return nil
 	}
-	query := "INSERT INTO metric (key, t0, data) values(?,?,?)"
+	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
 	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
 	return cSession.Query(query, row_key, t0, data).Exec()
 }
