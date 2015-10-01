@@ -18,12 +18,8 @@ func NewAggregation() *Aggregation {
 }
 
 func (a *Aggregation) Add(ts uint32, val float64) {
-	if val < a.min {
-		a.min = val
-	}
-	if val > a.max {
-		a.max = val
-	}
+	a.min = math.Min(val, a.min)
+	a.max = math.Max(val, a.max)
 	a.sos += math.Pow(val, 2)
 	a.sum += val
 	a.cnt += 1

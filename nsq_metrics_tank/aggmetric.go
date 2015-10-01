@@ -102,30 +102,16 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	lastT0 := (to - 1) - ((to - 1) % a.chunkSpan)
 	// we cannot satisfy data older than our retention
 	// note lastT0 will be > 0 because this AggMetric can only exist by adding at least 1 point
-	tmp := int(a.lastT0) - int((a.numChunks-1)*a.chunkSpan)
-	// this can happen in contrived, testing scenarios that use very low timestamps
-	if tmp < 0 {
-		tmp = 0
-	}
+	// we could go under 0 in contrived, testing scenarios that use very low timestamps
+	tmp := maxInt(int(a.lastT0)-int((a.numChunks-1)*a.chunkSpan), 0)
 	oldestT0WeMayHave := uint32(tmp)
-	if firstT0 < oldestT0WeMayHave {
-		firstT0 = oldestT0WeMayHave
-	}
-	// no point in requesting data older then what we have. common shortly after server start
-	if firstT0 < a.firstT0 {
-		firstT0 = a.firstT0
-	}
-	if lastT0 > a.lastT0 {
-		lastT0 = a.lastT0
-	}
 
-	oldest := oldestT0WeMayHave
-	if oldest < serverStart {
-		oldest = serverStart
-	}
-	if oldest > a.firstTs {
-		oldest = a.firstTs
-	}
+	// don't request data older than what we have (common shortly after server restart) or possibly could have
+	firstT0 = max(max(firstT0, oldestT0WeMayHave), a.firstT0)
+
+	lastT0 = min(lastT0, a.lastT0)
+
+	oldest := min(max(oldestT0WeMayHave, serverStart), a.firstTs)
 
 	return oldest, a.get(firstT0, lastT0)
 }
