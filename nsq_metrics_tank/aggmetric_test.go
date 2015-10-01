@@ -34,7 +34,7 @@ func (c *Checker) Add(ts uint32, val float64) {
 // first/last is what we use as data range to compare to
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(from, to, first, last uint32) {
-	iters := c.agg.GetSafe(from, to)
+	_, iters := c.agg.Get(from, to)
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
 	var pi int // index of first point we want
 	var pj int // index of last point we want
@@ -153,7 +153,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
-			m := metrics.Get(keys[metricI])
+			m := metrics.GetOrCreate(keys[metricI])
 			m.Add(t, float64(t))
 		}
 	}

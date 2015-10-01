@@ -35,8 +35,8 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	now := time.Now()
-	fromUnix := now.Add(-time.Duration(24) * time.Hour).Unix()
-	toUnix := now.Add(time.Duration(1) * time.Second).Unix()
+	fromUnix := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+	toUnix := uint32(now.Add(time.Duration(1) * time.Second).Unix())
 	from := values.Get("from")
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
@@ -44,7 +44,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fromUnix = int64(fromUnixInt)
+		fromUnix = uint32(fromUnixInt)
 	}
 	to := values.Get("to")
 	if to != "" {
@@ -53,20 +53,26 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		toUnix = int64(toUnixInt)
+		toUnix = uint32(toUnixInt)
 	}
+	if fromUnix >= toUnix {
+		http.Error(w, "to must be higher than from", http.StatusBadRequest)
+		return
+	}
+
 	out := make([]Series, len(keys))
 	for i, key := range keys {
 		iters := make([]*tsz.Iter, 0)
-		metric := metrics.Get(key)
-		oldest, memIters, err := metric.GetUnsafe(uint32(fromUnix), uint32(toUnix))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		var memIters []*tsz.Iter
+		oldest := toUnix
+		if metric, ok := metrics.Get(key); ok {
+			oldest, memIters = metric.Get(fromUnix, toUnix)
+		} else {
+			memIters = make([]*tsz.Iter, 0)
 		}
-		if oldest > uint32(fromUnix) {
+		if oldest > fromUnix {
 			log.Println("data load from cassandra:", TS(fromUnix), "-", TS(oldest), " from mem:", TS(oldest), "- ", TS(toUnix))
-			storeIters, err := searchCassandra(key, uint32(fromUnix), oldest)
+			storeIters, err := searchCassandra(key, fromUnix, oldest)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -76,7 +82,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			}
 			iters = append(iters, storeIters...)
 		} else {
-			log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix))
+			log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix), "oldest (", oldest, ")")
 		}
 		iters = append(iters, memIters...)
 		for _, i := range memIters {
@@ -86,7 +92,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		for _, iter := range iters {
 			for iter.Next() {
 				ts, val := iter.Values()
-				if ts >= uint32(fromUnix) && ts < uint32(toUnix) {
+				if ts >= fromUnix && ts < toUnix {
 					points = append(points, Point{val, ts})
 				}
 			}

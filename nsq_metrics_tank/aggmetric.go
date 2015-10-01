@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -83,7 +81,7 @@ func (a *AggMetric) indexFor(t0 uint32) uint32 {
 }
 
 // using user input, which has to be verified, and could be any input
-// from inclusive, to exclusive. just like slices
+// from inclusive, to exclusive. just like slices. may include more points that you asked for
 // we also need to be accurately say from which point on we have data.
 // that way you know if you should also query another datastore
 // this is trickier than it sounds:
@@ -94,18 +92,23 @@ func (a *AggMetric) indexFor(t0 uint32) uint32 {
 //    because this could be before server start, if invoked soon after starting.
 // so we use a combination of all factors..
 // note that this value may lie before the timestamp of actual data returned
-func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
+func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	if from >= to {
-		return 0, nil, errors.New("invalid request. to must > from")
+		panic("invalid request. to must > from")
 	}
 	a.Lock()
-	//log.Printf("GetUnsafe(%d, %d)\n", from, to)
+	defer a.Unlock()
 	firstT0 := from - (from % a.chunkSpan)
 	lastT0 := (to - 1) - ((to - 1) % a.chunkSpan)
 	// we cannot satisfy data older than our retention
+	// note lastT0 will be > 0 because this AggMetric can only exist by adding at least 1 point
 	oldestT0WeMayHave := a.lastT0 - (a.numChunks-1)*a.chunkSpan
 	if firstT0 < oldestT0WeMayHave {
 		firstT0 = oldestT0WeMayHave
+	}
+	// this can happen in contrived, testing scenarios that use very low timestamps
+	if firstT0 < 0 {
+		firstT0 = 0
 	}
 	// no point in requesting data older then what we have. common shortly after server start
 	if firstT0 < a.firstT0 {
@@ -115,7 +118,6 @@ func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 		lastT0 = a.lastT0
 	}
 
-	defer a.Unlock()
 	oldest := oldestT0WeMayHave
 	if oldest < serverStart {
 		oldest = serverStart
@@ -124,32 +126,7 @@ func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 		oldest = a.firstTs
 	}
 
-	return oldest, a.get(firstT0, lastT0), nil
-}
-
-// using input from our software, which should already be solid.
-// returns a range that includes the requested range, but typically more.
-// from inclusive, to exclusive. just like slices
-func (a *AggMetric) GetSafe(from, to uint32) []*tsz.Iter {
-	if from >= to {
-		panic("invalid request. to must > from")
-	}
-	a.Lock()
-	firstT0 := from - (from % a.chunkSpan)
-	lastT0 := (to - 1) - ((to - 1) % a.chunkSpan)
-	aggFirstT0 := int(a.lastT0) - int(a.numChunks*a.chunkSpan)
-	// this can happen in contrived, testing scenarios that use very low timestamps
-	if aggFirstT0 < 0 {
-		aggFirstT0 = 0
-	}
-	if int(firstT0) < aggFirstT0 {
-		panic("requested a firstT0 that is too old")
-	}
-	if lastT0 > a.lastT0 {
-		panic(fmt.Sprintf("requested lastT0 %d that doesn't exist yet. last is %d", lastT0, a.lastT0))
-	}
-	defer a.Unlock()
-	return a.get(firstT0, lastT0)
+	return oldest, a.get(firstT0, lastT0)
 }
 
 // remember: firstT0 and lastT0 must be cleanly divisible by chunkSpan!

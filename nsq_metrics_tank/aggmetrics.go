@@ -40,7 +40,14 @@ func (ms *AggMetrics) stats() {
 	}
 }
 
-func (ms *AggMetrics) Get(key string) Metric {
+func (ms *AggMetrics) Get(key string) (Metric, bool) {
+	ms.Lock()
+	m, ok := ms.metrics[key]
+	ms.Unlock()
+	return m, ok
+}
+
+func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.metrics[key]
 	if !ok {
