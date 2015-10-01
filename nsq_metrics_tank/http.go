@@ -87,7 +87,9 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		for _, iter := range iters {
 			for iter.Next() {
 				ts, val := iter.Values()
-				points = append(points, Point{val, ts})
+				if ts > uint32(fromUnix) && ts <= uint32(toUnix) {
+					points = append(points, Point{val, ts})
+				}
 			}
 		}
 		out[i] = Series{
