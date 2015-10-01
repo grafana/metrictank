@@ -81,7 +81,7 @@ func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
 func (o asc) Less(i, j int) bool { return o[i].mark < o[j].mark }
 
 // Basic search of cassandra.
-// TODO fine tune the details (inclusive/exclusive, make sure we don't query for an extra month if we don't need to)
+// start inclusive, end exclusive
 func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	if start > end {
 		panic(fmt.Sprintf("searchCassandra start %d > end %d", start, end))
@@ -105,8 +105,8 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 		}()
 	}
 
-	start_month := start - (start % month) // starting row has to be at, or before, requested start
-	end_month := end - (end % month)       // ending row has to be include the requested end
+	start_month := start - (start % month)       // starting row has to be at, or before, requested start
+	end_month := (end - 1) - ((end - 1) % month) // ending row has to be include the last point we might need
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs

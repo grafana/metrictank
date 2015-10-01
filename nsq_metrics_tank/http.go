@@ -78,7 +78,6 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		} else {
 			log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix))
 		}
-		// TODO filter out points we didn't ask for
 		iters = append(iters, memIters...)
 		for _, i := range memIters {
 			fmt.Println("m>", TS(i.T0()))
@@ -87,7 +86,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		for _, iter := range iters {
 			for iter.Next() {
 				ts, val := iter.Values()
-				if ts > uint32(fromUnix) && ts <= uint32(toUnix) {
+				if ts >= uint32(fromUnix) && ts < uint32(toUnix) {
 					points = append(points, Point{val, ts})
 				}
 			}
