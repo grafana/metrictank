@@ -94,7 +94,7 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 		wg.Add(1)
 		go func() {
 			log.Println("querying cassandra for", q, p)
-			results <- outcome{mark, cSession.Query(q, p).Iter()}
+			results <- outcome{mark, cSession.Query(q, p...).Iter()}
 			wg.Done()
 		}()
 	}
@@ -125,12 +125,12 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	outcomes := make([]outcome, 0)
 	iters := make([]*tsz.Iter, 0)
 	go func() {
-		for o := range results {
-			outcomes = append(outcomes, o)
-		}
+		wg.Wait()
+		close(results)
 	}()
-	wg.Wait()
-	close(results)
+	for o := range results {
+		outcomes = append(outcomes, o)
+	}
 	sort.Sort(asc(outcomes))
 
 	var b []byte
@@ -141,6 +141,10 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 				log.Fatal(err)
 			}
 			iters = append(iters, iter)
+		}
+		err := outcome.i.Close()
+		if err != nil {
+			log.Println("ERROR:", err)
 		}
 	}
 	log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
