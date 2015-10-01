@@ -34,7 +34,9 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "missing render arg", http.StatusBadRequest)
 		return
 	}
-	fromUnix := time.Now().Add(-time.Duration(24) * time.Hour).Unix()
+	now := time.Now()
+	fromUnix := now.Add(-time.Duration(24) * time.Hour).Unix()
+	toUnix := now.Add(time.Duration(1) * time.Second).Unix()
 	from := values.Get("from")
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
@@ -44,17 +46,26 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		}
 		fromUnix = int64(fromUnixInt)
 	}
+	to := values.Get("to")
+	if to != "" {
+		toUnixInt, err := strconv.Atoi(to)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		toUnix = int64(toUnixInt)
+	}
 	out := make([]Series, len(keys))
 	for i, key := range keys {
 		iters := make([]*tsz.Iter, 0)
 		metric := metrics.Get(key)
-		oldest, memIters, err := metric.GetUnsafe(uint32(fromUnix), uint32(time.Now().Unix()))
+		oldest, memIters, err := metric.GetUnsafe(uint32(fromUnix), uint32(toUnix))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if oldest > uint32(fromUnix) {
-			log.Println(key, "mem:", oldest, "- now.  cassandra:", fromUnix, "-", oldest)
+			log.Println("data load from cassandra:", ts(fromUnix), "-", ts(oldest), " from mem:", ts(oldest), "- ", ts(toUnix))
 			storeIters, err := searchCassandra(key, uint32(fromUnix), oldest)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -62,8 +73,9 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			}
 			iters = append(iters, storeIters...)
 		} else {
-			log.Println(key, "mem:", oldest, "- now")
+			log.Println("data load from mem:", ts(fromUnix), "-", ts(toUnix))
 		}
+		// TODO filter out points we didn't ask for
 		iters = append(iters, memIters...)
 		points := make([]Point, 0)
 		for _, iter := range iters {

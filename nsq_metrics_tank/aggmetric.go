@@ -93,6 +93,7 @@ func (a *AggMetric) indexFor(t0 uint32) uint32 {
 // 3) we can't just compute based on chunks how far back in time we would have had the data,
 //    because this could be before server start, if invoked soon after starting.
 // so we use a combination of all factors..
+// note that this value may lie before the timestamp of actual data returned
 func (a *AggMetric) GetUnsafe(from, to uint32) (uint32, []*tsz.Iter, error) {
 	if from >= to {
 		return 0, nil, errors.New("invalid request. to must > from")
