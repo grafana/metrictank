@@ -49,7 +49,6 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
 	}
 	go m.stats()
-	go m.trimOldData()
 	return &m
 }
 
@@ -65,14 +64,6 @@ func (a *AggMetric) stats() {
 		a.Unlock()
 		points.Update(int64(sum))
 	}
-}
-
-func (a *AggMetric) trimOldData() {
-	a.Lock()
-	//for t := range time.Tick(time.Duration(a.chunkSpan) * time.Second) {
-	// Finish // it's ok to re-finish if already finished
-	//	}
-	a.Unlock()
 }
 
 // this function must only be called while holding the lock
