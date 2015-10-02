@@ -43,15 +43,17 @@ type MetricDataArray []*MetricData
 
 // for ES
 type MetricDefinition struct {
-	Id         string   `json:"id"`
-	OrgId      int      `json:"org_id"`
-	Name       string   `json:"name" elastic:"type:string,index:not_analyzed"`
-	Metric     string   `json:"metric"`
-	Interval   int      `json:"interval"` // minimum 10
-	Unit       string   `json:"unit"`
-	TargetType string   `json:"target_type"` // an emum ["derive","gauge"] in nodejs
-	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
-	LastUpdate int64    `json:"lastUpdate"` // unix epoch time, per the nodejs definition
+	Id         string            `json:"id"`
+	OrgId      int               `json:"org_id"`
+	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"`
+	Metric     string            `json:"metric"`
+	Interval   int               `json:"interval"` // minimum 10
+	Unit       string            `json:"unit"`
+	TargetType string            `json:"target_type"` // an emum ["derive","gauge"] in nodejs
+	Tags       []string          `json:"tags" elastic:"type:string,index:not_analyzed"`
+	LastUpdate int64             `json:"lastUpdate"` // unix epoch time, per the nodejs definition
+	Nodes      map[string]string `json:"nodes"`
+	NodeCount  int               `json:"node_count"`
 }
 
 func (m *MetricDefinition) Validate() error {
@@ -72,6 +74,12 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 }
 
 func MetricDefinitionFromMetricData(id string, d *MetricData) *MetricDefinition {
+	nodesMap := make(map[string]string)
+	nodes := strings.Split(d.Name, ".")
+	for i, n := range nodes {
+		key := fmt.Sprintf("n%d", i)
+		nodesMap[key] = n
+	}
 	return &MetricDefinition{
 		Id:         id,
 		Name:       d.Name,
@@ -82,5 +90,7 @@ func MetricDefinitionFromMetricData(id string, d *MetricData) *MetricDefinition 
 		LastUpdate: time.Now().Unix(),
 		Unit:       d.Unit,
 		Tags:       d.Tags,
+		Nodes:      nodesMap,
+		NodeCount:  len(nodes),
 	}
 }
