@@ -169,7 +169,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		return
 	}
 	t0 := ts - (ts % a.chunkSpan)
-	log.Println("t0=", TS(t0), "adding", TS(ts), val)
+	//log.Println("t0=", TS(t0), "adding", TS(ts), val)
 
 	if a.lastTs == 0 {
 		// we're adding first point ever..

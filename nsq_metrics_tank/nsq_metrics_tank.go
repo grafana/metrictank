@@ -61,15 +61,17 @@ func init() {
 	flag.Var(&cassandraAddrs, "cassandra-addrs", "cassandra host (may be given multiple times)")
 }
 
+var reqSpanMem met.Meter
+var reqSpanBoth met.Meter
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
-var msgsHighPrioAge met.Meter // in ms
+var msgsAge met.Meter // in ms
 var cassandraPutDuration met.Timer
-var inHighPrioItems met.Meter
-var msgsHandleHighPrioOK met.Count
-var msgsHandleHighPrioFail met.Count
+var inItems met.Meter
+var msgsHandleOK met.Count
+var msgsHandleFail met.Count
 
 func main() {
 	flag.Parse()
@@ -121,7 +123,7 @@ func main() {
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", stats)
+	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,15 +135,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	reqSpanMem = stats.NewMeter("request_span.mem", 0)
+	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
-	msgsHighPrioAge = stats.NewMeter("high_prio.message_age", 0)
+	msgsAge = stats.NewMeter("message_age", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
-	inHighPrioItems = stats.NewMeter("in_high_prio.items", 0)
-	msgsHandleHighPrioOK = stats.NewCount("handle_high_prio.ok")
-	msgsHandleHighPrioFail = stats.NewCount("handle_high_prio.fail")
+	inItems = stats.NewMeter("in.items", 0)
+	msgsHandleOK = stats.NewCount("handle.ok")
+	msgsHandleFail = stats.NewCount("handle.fail")
 
 	err = InitCassandra()
 
@@ -189,6 +193,7 @@ func main() {
 		log.Println(http.ListenAndServe(*listenAddr, nil))
 	}()
 
+	// TODO lots of cassandra write errors cause we still write after closing the session
 	for {
 		select {
 		case <-consumer.StopChan:

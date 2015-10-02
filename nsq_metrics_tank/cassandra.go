@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
@@ -67,7 +68,10 @@ func InsertMetric(key string, t0 uint32, data []byte) error {
 	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
 	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
 	log.Println("saving chunk key", row_key, "timestamp", t0)
-	return cSession.Query(query, row_key, t0, data).Exec()
+	pre := time.Now()
+	ret := cSession.Query(query, row_key, t0, data).Exec()
+	cassandraPutDuration.Value(time.Now().Sub(pre))
+	return ret
 }
 
 type outcome struct {
@@ -93,13 +97,13 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	query := func(mark uint32, q string, p ...interface{}) {
 		wg.Add(1)
 		go func() {
-			if len(p) == 3 {
-				log.Println("querying cassandra for", q, p[0], TS(p[1]), TS(p[2]))
-			} else if len(p) == 2 {
-				log.Println("querying cassandra for", q, p[0], TS(p[1]))
-			} else {
-				log.Println("querying cassandra for", q, p)
-			}
+			//		if len(p) == 3 {
+			//		log.Println("querying cassandra for", q, p[0], TS(p[1]), TS(p[2]))
+			//		} else if len(p) == 2 {
+			//		log.Println("querying cassandra for", q, p[0], TS(p[1]))
+			//		} else {
+			//		log.Println("querying cassandra for", q, p)
+			//		}
 			results <- outcome{mark, cSession.Query(q, p...).Iter()}
 			wg.Done()
 		}()
@@ -153,6 +157,6 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 			log.Println("ERROR:", err)
 		}
 	}
-	log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
+	//log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
 	return iters, nil
 }
