@@ -36,7 +36,10 @@ func (ms *AggMetrics) stats() {
 	metricsActive := gometrics.NewGauge()
 	gometrics.Register("metrics_active", metricsActive)
 	for range time.Tick(time.Duration(1) * time.Second) {
-		metricsActive.Update(int64(len(ms.metrics)))
+		ms.Lock()
+		l := len(ms.metrics)
+		ms.Unlock()
+		metricsActive.Update(int64(l))
 	}
 }
 
