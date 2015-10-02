@@ -63,12 +63,26 @@ func init() {
 
 var reqSpanMem met.Meter
 var reqSpanBoth met.Meter
+
+// it's pretty expensive/impossible to do chunk sive in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
+var chunkSizeAtSave met.Meter
+var chunkSizeAtLoad met.Meter
+var chunkCreate met.Count
+var chunkClear met.Count
+var chunkSaveOk met.Count
+var chunkSaveFail met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
+var cassandraRowsPerResponse met.Meter
+var cassandraChunksPerRow met.Meter
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
 var msgsAge met.Meter // in ms
+// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
+// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
+var reqHandleDuration met.Timer
 var cassandraPutDuration met.Timer
+var cassandraGetDuration met.Timer
 var inItems met.Meter
 var msgsHandleOK met.Count
 var msgsHandleFail met.Count
@@ -135,13 +149,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	reqSpanMem = stats.NewMeter("request_span.mem", 0)
+	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
 	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
+	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
+	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
+	chunkCreate = stats.NewCount("chunks.create")
+	chunkClear = stats.NewCount("chunks.clear")
+	chunkSaveOk = stats.NewCount("chunks.save_ok")
+	chunkSaveFail = stats.NewCount("chunks.save_fail")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
+	cassandraRowsPerResponse = stats.NewMeter("cassandra_rows_per_response", 0)
+	cassandraChunksPerRow = stats.NewMeter("cassandra_chunks_per_row", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
 	msgsAge = stats.NewMeter("message_age", 0)
+	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
+	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")

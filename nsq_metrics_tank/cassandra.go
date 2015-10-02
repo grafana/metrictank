@@ -112,6 +112,7 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	start_month := start - (start % month)       // starting row has to be at, or before, requested start
 	end_month := (end - 1) - ((end - 1) % month) // ending row has to be include the last point we might need
 
+	pre := time.Now()
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key := fmt.Sprintf("%s_%d", key, start_month/month)
@@ -136,6 +137,7 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 	iters := make([]*tsz.Iter, 0)
 	go func() {
 		wg.Wait()
+		cassandraGetDuration.Value(time.Now().Sub(pre))
 		close(results)
 	}()
 	for o := range results {
@@ -145,18 +147,23 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 
 	var b []byte
 	for _, outcome := range outcomes {
+		chunks := int64(0)
 		for outcome.i.Scan(&b) {
+			chunks += 1
+			chunkSizeAtLoad.Value(int64(len(b)))
 			iter, err := tsz.NewIterator(b)
 			if err != nil {
 				log.Fatal(err)
 			}
 			iters = append(iters, iter)
 		}
+		cassandraChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
 			log.Println("ERROR:", err)
 		}
 	}
+	cassandraRowsPerResponse.Value(int64(len(outcomes)))
 	//log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
 	return iters, nil
 }

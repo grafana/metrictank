@@ -28,6 +28,7 @@ type Series struct {
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
 func Get(w http.ResponseWriter, req *http.Request) {
+	pre := time.Now()
 	values := req.URL.Query()
 	keys, ok := values["render"]
 	if !ok {
@@ -111,5 +112,6 @@ func Get(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
 }

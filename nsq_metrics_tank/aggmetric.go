@@ -147,14 +147,18 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 func (a *AggMetric) Persist(c *Chunk) {
 	go func() {
 		log.Println("if c* enabled, saving chunk", c)
-		err := InsertMetric(a.key, c.t0, c.Series.Bytes())
+		data := c.Series.Bytes()
+		chunkSizeAtSave.Value(int64(len(data)))
+		err := InsertMetric(a.key, c.t0, data)
 		a.Lock()
 		defer a.Unlock()
 		if err == nil {
 			c.saved = true
 			log.Println("saved chunk", c)
+			chunkSaveOk.Inc(1)
 		} else {
 			log.Println("ERROR: could not save chunk", c, err)
+			chunkSaveFail.Inc(1)
 			// TODO
 		}
 	}()
@@ -175,6 +179,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// we're adding first point ever..
 		a.firstT0, a.lastT0 = t0, t0
 		a.firstTs, a.lastTs = ts, ts
+		chunkCreate.Inc(1)
 		a.chunks[0] = NewChunk(t0).Push(ts, val)
 		a.addAggregators(ts, val)
 		return
@@ -193,6 +198,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// but we have to make sure we don't accidentally return the old data out of order
 
 		now := a.indexFor(t0)
+		if a.chunks[now] != nil {
+			chunkClear.Inc(1)
+		}
+		chunkCreate.Inc(1)
 		a.chunks[now] = NewChunk(t0).Push(ts, val)
 
 		// update firstTs to oldest t0
