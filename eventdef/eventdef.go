@@ -57,8 +57,11 @@ func Save(e *schema.ProbeEvent) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
+	
+	y, m, d := time.Now().Date()
+	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
 	log.Printf("saving event to elasticsearch.")
-	resp, err := es.Index("events", e.EventType, e.Id, nil, e)
+	resp, err := es.Index(idxName, e.EventType, e.Id, nil, e)
 	log.Printf("elasticsearch response: %v", resp)
 	if err != nil {
 		return err
