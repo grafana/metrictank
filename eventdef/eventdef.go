@@ -34,6 +34,7 @@ var es *elastigo.Conn
 type idxTrack struct {
 	m sync.Mutex
 	idxMap map[string]bool
+	mapping map[string]map[string]bool
 }
 var esIdxTrack *idxTrack
 
@@ -51,6 +52,7 @@ func InitElasticsearch(addr, user, pass string) error {
 	}
 	esIdxTrack = new(idxTrack)
 	esIdxTrack.idxMap = make(map[string]bool)
+	esIdxTrack.mapping = make(map[string]map[string]bool)
 
 	return nil
 }
@@ -72,7 +74,7 @@ func Save(e *schema.ProbeEvent) error {
 	
 	y, m, d := time.Now().Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
-	if err := checkIdx(idxName); err != nil {
+	if err := checkIdx(idxName, e); err != nil {
 		return err
 	}
 	log.Printf("saving event to elasticsearch.")
@@ -85,26 +87,39 @@ func Save(e *schema.ProbeEvent) error {
 	return nil
 }
 
-func checkIdx(idxName string) error {
+func checkIdx(idxName string, e *schema.ProbeEvent) error {
 	esIdxTrack.m.Lock()
 	defer esIdxTrack.m.Lock()
+	
 	if !esIdxTrack.idxName[idxName] {
 		// make the index with the name and mapping
 		exists, err := es.IncidesExists(idxName)
 		if exists {
-			if err == nil {
-				esIdxTrack.idxName[idxName] = true
-				return nil
-			} else {
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = es.CreateIndex(idxName)
+			if err != nil {
 				return err
 			}
 		}
-		// TODO: use CreateIndexWithSettings
-		_, err = es.CreateIndex(idxName)
+		esIdxTrack.idxName[idxName] = true
+	}
+	
+	if _, ok := es.IdxTrack.mapping[idxName]; !ok {
+		esIdxTrack.mapping[idxName] = make(map[string]bool)
+	}
+	
+	if !esIdxTrack.mapping[idxName][e.EventType] {
+		var opt elastigo.MappingOptions
+		err = es.PutMapping(idxName, e.EventType, e, opt)
 		if err != nil {
 			return err
 		}
-		esIdxTrack.idxName[idxName] = true
+		esIdxTrack.mapping[idxName][e.EventType] = true
 	}
+	
+	
 	return nil
 }
