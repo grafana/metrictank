@@ -19,6 +19,7 @@ package eventdef
 import (
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"time"
 	"sync"
@@ -38,12 +39,12 @@ var esIdxTrack *idxTrack
 
 func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
-	parts := strings.Split(addr, ":")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid tcp addr %q", addr)
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
 	}
-	es.Domain = parts[0]
-	es.Port = parts[1]
+	es.Domain = host
+	es.Port = port
 	if user != "" && pass != "" {
 		es.Username = user
 		es.Password = pass
@@ -56,7 +57,9 @@ func InitElasticsearch(addr, user, pass string) error {
 
 func Save(e *schema.ProbeEvent) error {
 	if e.Id == "" {
-		u := uuid.NewRandom()
+		// per http://blog.mikemccandless.com/2014/05/choosing-fast-unique-identifier-uuid.html,
+		// using V1 UUIDs is much faster than v4 like we were using
+		u := uuid.NewUUID()
 		e.Id = u.String()
 	}
 	if e.Timestamp == 0 {
