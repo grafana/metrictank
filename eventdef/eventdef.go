@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 	"sync"
 
@@ -30,6 +33,11 @@ import (
 )
 
 var es *elastigo.Conn
+var bulk *elastigo.BulkIndexer
+
+const maxCons = 10
+const retry = 60
+const flushBulk = 60
 
 type idxTrack struct {
 	m sync.Mutex
@@ -50,9 +58,17 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
+
+	bulk = es.NewBulkIndexerErrors(maxCons, retry)
+	// start the indexer
+	bulk.Start()
+
 	esIdxTrack = new(idxTrack)
 	esIdxTrack.idxMap = make(map[string]bool)
 	esIdxTrack.mapping = make(map[string]map[string]bool)
+
+	handleSignals()
+	setErrorTicker()
 
 	return nil
 }
@@ -78,8 +94,8 @@ func Save(e *schema.ProbeEvent) error {
 		return err
 	}
 	log.Printf("saving event to elasticsearch.")
-	resp, err := es.Index(idxName, e.EventType, e.Id, nil, e)
-	log.Printf("elasticsearch response: %v", resp)
+	err := bulk.Index(idxName, e.EventType, e.Id, nil, e)
+	log.Printf("event queued to bulk indexer")
 	if err != nil {
 		return err
 	}
@@ -122,4 +138,25 @@ func checkIdx(idxName string, e *schema.ProbeEvent) error {
 	
 	
 	return nil
+}
+
+func handleSignals() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for range c {
+			log.Println("closing bulk indexer...")
+			bulk.Stop()
+		}
+		os.Exit(0)
+	}()
+}
+
+func setErrorTicker() {
+	// log elasticsearch errors 
+	go func() {
+		for e := range bulk.ErrorChannel {
+			log.Printf("elasticsearch bulk error: %s", e.Err.Error())
+		}
+	}
 }
