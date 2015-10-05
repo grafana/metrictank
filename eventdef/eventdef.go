@@ -21,6 +21,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/codeskyblue/go-uuid"
 	elastigo "github.com/mattbaird/elastigo/lib"
@@ -28,6 +29,12 @@ import (
 )
 
 var es *elastigo.Conn
+
+type idxTrack struct {
+	m sync.Mutex
+	idxMap map[string]bool
+}
+var esIdxTrack *idxTrack
 
 func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
@@ -41,6 +48,8 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
+	esIdxTrack = new(idxTrack)
+	esIdxTrack.idxMap = make(map[string]bool)
 
 	return nil
 }
@@ -60,6 +69,9 @@ func Save(e *schema.ProbeEvent) error {
 	
 	y, m, d := time.Now().Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
+	if err := checkIdx(idxName); err != nil {
+		return err
+	}
 	log.Printf("saving event to elasticsearch.")
 	resp, err := es.Index(idxName, e.EventType, e.Id, nil, e)
 	log.Printf("elasticsearch response: %v", resp)
@@ -67,5 +79,29 @@ func Save(e *schema.ProbeEvent) error {
 		return err
 	}
 
+	return nil
+}
+
+func checkIdx(idxName string) error {
+	esIdxTrack.m.Lock()
+	defer esIdxTrack.m.Lock()
+	if !esIdxTrack.idxName[idxName] {
+		// make the index with the name and mapping
+		exists, err := es.IncidesExists(idxName)
+		if exists {
+			if err == nil {
+				esIdxTrack.idxName[idxName] = true
+				return nil
+			} else {
+				return err
+			}
+		}
+		// TODO: use CreateIndexWithSettings
+		_, err = es.CreateIndex(idxName)
+		if err != nil {
+			return err
+		}
+		esIdxTrack.idxName[idxName] = true
+	}
 	return nil
 }
