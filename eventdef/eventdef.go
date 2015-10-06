@@ -158,5 +158,5 @@ func setErrorTicker() {
 		for e := range bulk.ErrorChannel {
 			log.Printf("elasticsearch bulk error: %s", e.Err.Error())
 		}
-	}
+	}()
 }
