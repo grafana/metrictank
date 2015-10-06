@@ -34,14 +34,14 @@ var (
 	channel     = flag.String("channel", "tank", "NSQ channel")
 	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
 	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds (default: 120)")
-	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules (default: 5)")
+	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
+	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 
-	cassandraPort = flag.Int("cassandra-port", 9042, "cassandra port (default: 9042)")
-	listenAddr    = flag.String("listen", ":6060", "http listener address. (default ':6060')")
+	cassandraPort = flag.Int("cassandra-port", 9042, "cassandra port")
+	listenAddr    = flag.String("listen", ":6060", "http listener address.")
 
-	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
-	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
+	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
 	cassandraAddrs   = app.StringArray{}
 	consumerOpts     = app.StringArray{}
