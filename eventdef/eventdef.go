@@ -88,13 +88,14 @@ func Save(e *schema.ProbeEvent) error {
 		return err
 	}
 	
-	y, m, d := time.Now().Date()
+	t := time.Now()
+	y, m, d := t.Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
 	if err := checkIdx(idxName, e); err != nil {
 		return err
 	}
 	log.Printf("saving event to elasticsearch.")
-	err := bulk.Index(idxName, e.EventType, e.Id, nil, e)
+	err := bulk.Index(idxName, e.EventType, e.Id, "", "", t, e)
 	log.Printf("event queued to bulk indexer")
 	if err != nil {
 		return err
@@ -120,7 +121,7 @@ func checkIdx(idxName string, e *schema.ProbeEvent) error {
 				return err
 			}
 		}
-		esIdxTrack.idxName[idxName] = true
+		esIdxTrack.idxMap[idxName] = true
 	}
 	
 	if _, ok := esIdxTrack.mapping[idxName]; !ok {
