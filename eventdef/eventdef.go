@@ -105,7 +105,7 @@ func Save(e *schema.ProbeEvent) error {
 
 func checkIdx(idxName string, e *schema.ProbeEvent) error {
 	esIdxTrack.m.Lock()
-	defer esIdxTrack.m.Lock()
+	defer esIdxTrack.m.Unlock()
 	
 	if !esIdxTrack.idxMap[idxName] {
 		// make the index with the name and mapping
@@ -129,7 +129,7 @@ func checkIdx(idxName string, e *schema.ProbeEvent) error {
 	
 	if !esIdxTrack.mapping[idxName][e.EventType] {
 		var opt elastigo.MappingOptions
-		err := es.PutMapping(idxName, e.EventType, e, opt)
+		err := es.PutMapping(idxName, e.EventType, *e, opt)
 		if err != nil {
 			return err
 		}
