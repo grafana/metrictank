@@ -22,7 +22,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 	"sync"
@@ -95,7 +94,7 @@ func Save(e *schema.ProbeEvent) error {
 		return err
 	}
 	log.Printf("saving event to elasticsearch.")
-	err := bulk.Index(idxName, e.EventType, e.Id, "", "", t, e)
+	err := bulk.Index(idxName, e.EventType, e.Id, "", "", &t, e)
 	log.Printf("event queued to bulk indexer")
 	if err != nil {
 		return err

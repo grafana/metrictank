@@ -1,0 +1,12 @@
+[Unit]
+Description=no description given
+ 
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/raintank-metric "-c" "/etc/raintank/raintank-metric.conf"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
