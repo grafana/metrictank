@@ -17,12 +17,11 @@
 package eventdef
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 	"sync"
 
@@ -38,12 +37,21 @@ const maxCons = 10
 const retry = 60
 const flushBulk = 60
 
-type idxTrack struct {
-	m sync.Mutex
-	idxMap map[string]bool
-	mapping map[string]map[string]bool
+type bulkSender struct {
+	m sync.RWMutex
+	conn *elastigo.Conn
+	queued map[string]chan *BulkSaveStatus
+	bulkIndexer *elastigo.BulkIndexer
+	numErrors uint64
 }
-var esIdxTrack *idxTrack
+
+type BulkSaveStatus struct {
+	Id string
+	Ok bool
+	Requeue bool
+}
+
+var bSender *bulkSender
 
 func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
@@ -58,21 +66,20 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Password = pass
 	}
 
+	bSender = new(bulkSender)
+	bSender.conn = es
+
 	bulk = es.NewBulkIndexerErrors(maxCons, retry)
+	bSender.bulkIndexer = bulk
 	// start the indexer
 	bulk.Start()
 
-	esIdxTrack = new(idxTrack)
-	esIdxTrack.idxMap = make(map[string]bool)
-	esIdxTrack.mapping = make(map[string]map[string]bool)
-
-	handleSignals()
 	setErrorTicker()
 
 	return nil
 }
 
-func Save(e *schema.ProbeEvent) error {
+func Save(e *schema.ProbeEvent, status chan *BulkSaveStatus) error {
 	if e.Id == "" {
 		// per http://blog.mikemccandless.com/2014/05/choosing-fast-unique-identifier-uuid.html,
 		// using V1 UUIDs is much faster than v4 like we were using
@@ -90,10 +97,8 @@ func Save(e *schema.ProbeEvent) error {
 	t := time.Now()
 	y, m, d := t.Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
-	if err := checkIdx(idxName, e); err != nil {
-		return err
-	}
 	log.Printf("saving event to elasticsearch.")
+	bSender.saveQueued(e.Id, status)
 	err := bulk.Index(idxName, e.EventType, e.Id, "", "", &t, e)
 	log.Printf("event queued to bulk indexer")
 	if err != nil {
@@ -103,53 +108,67 @@ func Save(e *schema.ProbeEvent) error {
 	return nil
 }
 
-func checkIdx(idxName string, e *schema.ProbeEvent) error {
-	esIdxTrack.m.Lock()
-	defer esIdxTrack.m.Unlock()
-	
-	if !esIdxTrack.idxMap[idxName] {
-		// make the index with the name and mapping
-		exists, err := es.IndicesExists(idxName)
-		if exists {
-			if err != nil {
-				return err
-			}
-		} else {
-			_, err = es.CreateIndex(idxName)
-			if err != nil {
-				return err
+func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
+	b.m.Lock()
+	defer b.m.Unlock()
+	// lovingly adaped from the elastigo bulk indexer Send function
+	type responseStruct struct {
+		Took   int64                    `json:"took"`
+		Errors bool                     `json:"errors"`
+		Items  []map[string]interface{} `json:"items"`
+	}
+
+	response := responseStruct{}
+
+	body, err := b.conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", b.bulkIndexer.Refresh), nil, buf)
+
+	if err != nil {
+		b.numErrors += 1
+		return err
+	}
+	// check for response errors, bulk insert will give 200 OK but then include errors in response
+	jsonErr := json.Unmarshal(body, &response)
+	var errSend error
+	if jsonErr == nil {
+		if response.Errors {
+			b.numErrors += uint64(len(response.Items))
+			errSend = fmt.Errorf("Bulk Insertion Error. Failed item count [%d]", len(response.Items))
+			// But what is in response.Items?
+			for k, v := range response.Items {
+				log.Printf("Contents of error item %s: %T %q", k, v, v)
 			}
 		}
-		esIdxTrack.idxMap[idxName] = true
+		queued := b.queued
+		b.queued = make(map[string]chan *BulkSaveStatus)
+		// ack/requeue in a goroutine and let the sender move on
+		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}){
+			// This will be easier once we know what response.Items
+			// looks like. For now, ack everything
+			for k, v := range q {
+				stat := new(BulkSaveStatus)
+				stat.Id = k
+				stat.Ok = true
+				v <- stat
+			}
+		}(queued, response.Items)
+	} else {
+		return fmt.Errorf("something went terribly wrong bulk loading: %s", jsonErr.Error())
 	}
-	
-	if _, ok := esIdxTrack.mapping[idxName]; !ok {
-		esIdxTrack.mapping[idxName] = make(map[string]bool)
+	if errSend != nil {
+		return errSend
 	}
-	
-	if !esIdxTrack.mapping[idxName][e.EventType] {
-		var opt elastigo.MappingOptions
-		err := es.PutMapping(idxName, e.EventType, *e, opt)
-		if err != nil {
-			return err
-		}
-		esIdxTrack.mapping[idxName][e.EventType] = true
-	}
-	
-	
 	return nil
 }
 
-func handleSignals() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		for range c {
-			log.Println("closing bulk indexer...")
-			bulk.Stop()
-		}
-		os.Exit(0)
-	}()
+func (b *bulkSender) saveQueued(id string, status chan *BulkSaveStatus) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	b.queued[id] = status
+}
+
+func StopBulkIndexer() {
+	log.Println("closing bulk indexer...")
+	bulk.Stop()
 }
 
 func setErrorTicker() {

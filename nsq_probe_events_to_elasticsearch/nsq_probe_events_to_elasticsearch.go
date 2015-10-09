@@ -77,6 +77,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	if m.Body[0] == '\x00' {
 		format = "msgFormatJson"
 	}
+	
 	var id int64
 	buf := bytes.NewReader(m.Body[1:9])
 	binary.Read(buf, binary.BigEndian, &id)
@@ -90,10 +91,16 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
+
+	// Since these messages are being batched, we'll need to hold onto this
+	// and ack or requeue it on our own
+	m.DisableAutoResponse()
+
 	done := make(chan error, 1)
+	status := make(chan *eventdef.BulkSaveStatus)
 	go func() {
 		pre := time.Now()
-		if err := eventdef.Save(event); err != nil {
+		if err := eventdef.Save(event, status); err != nil {
 			fmt.Printf("ERROR: couldn't process %s: %s\n", event.Id, err)
 			eventsToEsFail.Inc(1)
 			done <- err
@@ -105,10 +112,19 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}()
 
 	if err := <-done; err != nil {
+		m.Requeue(-1)
 		msgsHandleFail.Inc(1)
 		return err
 	}
+	estat := <- status
+	if estat.Requeue {
+		m.Requeue(-1)
+		msgsHandleFail.Inc(1)
+		err := fmt.Errorf("event %s failed to save, requeueing", estat.Id)
+		return err
+	}
 
+	m.Finish()
 	msgsHandleOK.Inc(1)
 
 	return nil
@@ -199,6 +215,7 @@ func main() {
 			return
 		case <-sigChan:
 			consumer.Stop()
+			eventdef.StopBulkIndexer()
 		}
 	}
 }
