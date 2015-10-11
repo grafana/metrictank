@@ -10,8 +10,7 @@ oldest_start = start - 5*120
 
 print ("now: %d - start %d"%( now, start))
 print ("oldest start should be %d" % oldest_start)
-url = 'http://localhost:6064/get?render=litmus.fake_org_79_endpoint_2.dev1.http.ok_state'
-# url = 'http://localhost:6063/get?render=litmus.localhost.dev1.dns.ok_state'
+url = 'http://localhost:6063/get?render=litmus.localhost.dev1.dns.ok_state'
 r = requests.get(url)
 gaps = {}
 data = r.json()
