@@ -17,13 +17,13 @@ echo "list is at $fulllist -- it is $(wc -l $fulllist) lines long"
 echo "> max diversity"
 for i in $instances; do
   echo $i
-  cat $fulllist | sed 's#^#GET http://localhost:6063/get?render=#' | vegeta attack -rate 2000 | vegeta report
+  sed 's#^#GET http://localhost:'$i'/get?render=#' $fulllist | vegeta attack -rate 2000 | vegeta report
 done
 
 echo "> min diversity"
 for i in $instances; do
   echo $i
-  cat $fulllist | head -n 1 | sed 's#^#GET http://localhost:6063/get?render=#' | vegeta attack -rate 2000 | vegeta report
+  head -n 1 $fulllist | sed 's#^#GET http://localhost:'$i'/get?render=#' | vegeta attack -rate 2000 | vegeta report
 done
 
 
