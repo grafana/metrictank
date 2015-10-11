@@ -2,7 +2,6 @@
 echo "run this first: ./env-load -auth admin:admin -orgs 100 load"
 
 echo "creating list of all metrics you should have after an env-load with 100 orgs, 4 endpoints each, using dev-stack with 1 standard collector"
-instances="6063 6064"
 
 
 fulllist=$(mktemp)
@@ -14,16 +13,8 @@ done
 
 echo "list is at $fulllist -- it is $(wc -l $fulllist) lines long"
 
-echo "> max diversity"
-for i in $instances; do
-  echo $i
-  sed 's#^#GET http://localhost:'$i'/get?render=#' $fulllist | vegeta attack -rate 2000 | vegeta report
-done
-
 echo "> min diversity"
-for i in $instances; do
-  echo $i
-  head -n 1 $fulllist | sed 's#^#GET http://localhost:'$i'/get?render=#' | vegeta attack -rate 2000 | vegeta report
-done
+head -n 1 $fulllist | sed 's#^#GET http://localhost:6063/get?render=#' | vegeta attack -rate 2000 | vegeta report
 
-
+echo "> max diversity"
+sed 's#^#GET http://localhost:6063/get?render=#' $fulllist | vegeta attack -rate 2000 | vegeta report
