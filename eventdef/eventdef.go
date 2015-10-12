@@ -67,6 +67,7 @@ func InitElasticsearch(addr, user, pass string) error {
 	}
 
 	bSender = new(bulkSender)
+	bSender.queued = make(map[string]chan *BulkSaveStatus)
 	bSender.conn = es
 
 	bulk = es.NewBulkIndexerErrors(maxCons, retry)
