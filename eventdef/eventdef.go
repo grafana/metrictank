@@ -71,6 +71,7 @@ func InitElasticsearch(addr, user, pass string) error {
 	bSender.conn = es
 
 	bulk = es.NewBulkIndexerErrors(maxCons, retry)
+	bulk.Sender = bSender.bulkSend
 	bSender.bulkIndexer = bulk
 	// start the indexer
 	bulk.Start()
