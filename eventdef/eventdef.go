@@ -121,11 +121,21 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 	}
 
 	response := responseStruct{}
+	queued := b.queued
+	b.queued = make(map[string]chan *BulkSaveStatus)
 
 	body, err := b.conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", b.bulkIndexer.Refresh), nil, buf)
 
 	if err != nil {
 		b.numErrors += 1
+		go func(q map[string]chan *BulkSaveStatus) {
+			for k, v := range q {
+				stat := new(BulkSaveStatus)
+				stat.Id = k
+				stat.Requeue = true
+				v <- stat
+			}
+		}(queued)
 		return err
 	}
 	// check for response errors, bulk insert will give 200 OK but then include errors in response
@@ -140,8 +150,6 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 				log.Printf("Contents of error item %s: %T %q", k, v, v)
 			}
 		}
-		queued := b.queued
-		b.queued = make(map[string]chan *BulkSaveStatus)
 		// ack/requeue in a goroutine and let the sender move on
 		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}){
 			// This will be easier once we know what response.Items

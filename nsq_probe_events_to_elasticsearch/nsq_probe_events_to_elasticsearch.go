@@ -121,6 +121,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		m.Requeue(-1)
 		msgsHandleFail.Inc(1)
 		err := fmt.Errorf("event %s failed to save, requeueing", estat.Id)
+		log.Println(err)
 		return err
 	}
 
