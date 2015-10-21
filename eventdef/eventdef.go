@@ -152,12 +152,26 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 		}
 		// ack/requeue in a goroutine and let the sender move on
 		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}){
+			errReqs := make(map[string]bool)
+			if len(items) > 0 {
+				for _, m := range items {
+					for _, v := range m {
+						if _, ok := v.(map[string]interface{})["error"]; ok {
+							errReqs[v.(map[string]interface{})["_id"].(string)] = true
+						}
+					}
+				}
+			}
 			// This will be easier once we know what response.Items
 			// looks like. For now, ack everything
 			for k, v := range q {
 				stat := new(BulkSaveStatus)
 				stat.Id = k
-				stat.Ok = true
+				if errReqs[k] {
+					stat.Requeue = true
+				} else {
+					stat.Ok = true
+				}
 				v <- stat
 			}
 		}(queued, response.Items)
