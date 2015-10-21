@@ -58,7 +58,7 @@ func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	for _, m := range ms.Metrics {
-		fmt.Println(m.Name, m.Tags)
+		fmt.Println(m.Name, m.Time, m.Value, m.Tags)
 	}
 	return nil
 }
