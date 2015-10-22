@@ -65,7 +65,7 @@ func main() {
 	}
 
 	test := func(wg *sync.WaitGroup, curTs int64, name string, orgId, interval int) {
-		g := graphite.HostHeader{Host: "http://localhost:32818/render", Header: http.Header{}}
+		g := graphite.HostHeader{Host: "http://localhost:8888/render", Header: http.Header{}}
 		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(orgId), 10))
 		q := graphite.Request{Targets: []string{name}}
 		series, err := g.Query(&q)
