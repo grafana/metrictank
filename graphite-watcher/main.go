@@ -4,9 +4,13 @@ import (
 	"bosun.org/graphite"
 	"encoding/json"
 	"fmt"
+	"github.com/Dieterbe/go-metrics"
 	"github.com/raintank/raintank-metric/schema"
 	"io/ioutil"
+	"log"
+	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -39,12 +43,18 @@ type EsResult struct {
 
 func perror(err error) {
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
 func main() {
 	expectMetrics := 400 /* endpoints */ * 300 /* metrics per endpoint */
+	addr, _ := net.ResolveTCPAddr("tcp", "localhost:2003")
+	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "graphite-watcher.", addr)
+	lag := metrics.NewMeter()
+	metrics.Register("lag", lag)
+	lag.Mark(0)
+
 	start := time.Now().Unix()
 	// get targets from ES
 	res, err := http.Get("http://localhost:9200/metric/_search?q=*:*&size=10000000")
@@ -57,7 +67,7 @@ func main() {
 	perror(err)
 	amount := len(data.Hits.Hits)
 	if amount != expectMetrics {
-		fmt.Println("ERROR: amount of metrics is", amount)
+		log.Println("ERROR: amount of metrics is", amount)
 	}
 	targets := make([]schema.MetricDefinition, amount, amount)
 	for i, h := range data.Hits.Hits {
@@ -76,7 +86,10 @@ func main() {
 			}
 
 			lastTs := int64(0)
-			oldestNull := curTs
+			oldestNull := int64(math.MaxInt64)
+			if len(serie.Datapoints) == 0 {
+				fmt.Println("ERROR: series for", name, "contains no points!")
+			}
 			for _, p := range serie.Datapoints {
 				ts, err := p[1].Int64()
 				if err != nil {
@@ -105,10 +118,17 @@ func main() {
 			if lastTs < curTs-int64(interval) || lastTs > curTs+int64(interval) {
 				fmt.Println("ERROR: last point at ", lastTs, "is out of range")
 			}
+			// if there was no null, we treat the point after the last one we had as null
+			if oldestNull == math.MaxInt64 {
+				oldestNull = lastTs + int64(interval)
+			}
+			// lag cannot be < 0
+			if oldestNull > curTs {
+				oldestNull = curTs
+			}
 			// lag is from first null, even if there were non-nulls after it
-			// if there were no non-null values, we can treat lastvalue+interval as the "oldest null"
-			// but since we checked that lastTs must be >= curTs-interval we can just leverage the default initialized oldestNull value of curTs
 			fmt.Printf("%60s - lag %d\n", name, curTs-oldestNull)
+			lag.Mark(curTs - oldestNull)
 		}
 		wg.Done()
 	}
