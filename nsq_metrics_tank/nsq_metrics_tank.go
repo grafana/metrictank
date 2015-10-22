@@ -71,6 +71,7 @@ var chunkCreate met.Count
 var chunkClear met.Count
 var chunkSaveOk met.Count
 var chunkSaveFail met.Count
+var metricsReceived met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
 var cassandraRowsPerResponse met.Meter
@@ -157,6 +158,7 @@ func main() {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
+	metricsReceived = stats.NewCount("metrics_received")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
 	cassandraRowsPerResponse = stats.NewMeter("cassandra_rows_per_response", 0)
