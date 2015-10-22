@@ -67,7 +67,6 @@ func InsertMetric(key string, t0 uint32, data []byte) error {
 	}
 	query := "INSERT INTO metric (key, ts, data) values(?,?,?)"
 	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
-	log.Println("saving chunk key", row_key, "timestamp", t0)
 	pre := time.Now()
 	ret := cSession.Query(query, row_key, t0, data).Exec()
 	cassandraPutDuration.Value(time.Now().Sub(pre))
