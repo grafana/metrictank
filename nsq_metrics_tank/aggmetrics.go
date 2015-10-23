@@ -54,7 +54,8 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.metrics[key]
 	if !ok {
-		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, aggSetting{ms.aggSpan, ms.aggChunkSpan, ms.aggNumChunks})
+		//m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, aggSetting{ms.aggSpan, ms.aggChunkSpan, ms.aggNumChunks})
+		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks)
 		ms.metrics[key] = m
 	}
 	ms.Unlock()
