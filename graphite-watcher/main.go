@@ -47,31 +47,45 @@ func perror(err error) {
 	}
 }
 
+var targets []schema.MetricDefinition
+var targetsLock sync.Mutex
+
+func init() {
+	targets = make([]schema.MetricDefinition, 0)
+}
+
 func main() {
-	expectMetrics := 400 /* endpoints */ * 300 /* metrics per endpoint */
 	addr, _ := net.ResolveTCPAddr("tcp", "localhost:2003")
 	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "graphite-watcher.", addr)
-	lag := metrics.NewMeter()
+	lag := metrics.NewHistogram(metrics.NewExpDecaySample(1028, 0.015))
 	metrics.Register("lag", lag)
-	lag.Mark(0)
+	numMetrics := metrics.NewGauge()
+	metrics.Register("num_metrics", numMetrics)
 
 	start := time.Now().Unix()
-	// get targets from ES
-	res, err := http.Get("http://localhost:9200/metric/_search?q=*:*&size=10000000")
-	perror(err)
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	perror(err)
-	var data EsResult
-	err = json.Unmarshal(body, &data)
-	perror(err)
-	amount := len(data.Hits.Hits)
-	if amount != expectMetrics {
-		log.Println("ERROR: amount of metrics is", amount)
-	}
-	targets := make([]schema.MetricDefinition, amount, amount)
-	for i, h := range data.Hits.Hits {
-		targets[i] = h.Source
+
+	updateTargets := func() {
+		getEsTick := time.NewTicker(time.Second * time.Duration(10))
+		for range getEsTick.C {
+			res, err := http.Get("http://localhost:9200/metric/_search?q=*:*&size=10000000")
+			perror(err)
+			defer res.Body.Close()
+			body, err := ioutil.ReadAll(res.Body)
+			perror(err)
+			var data EsResult
+			err = json.Unmarshal(body, &data)
+			perror(err)
+			amount := len(data.Hits.Hits)
+			numMetrics.Update(int64(amount))
+			newTargets := make([]schema.MetricDefinition, amount, amount)
+			for i, h := range data.Hits.Hits {
+				//fmt.Println(h.Source.Name)
+				newTargets[i] = h.Source
+			}
+			targetsLock.Lock()
+			targets = newTargets
+			targetsLock.Unlock()
+		}
 	}
 
 	test := func(wg *sync.WaitGroup, curTs int64, name string, orgId, interval int) {
@@ -110,6 +124,7 @@ func main() {
 						oldestNull = ts
 					}
 					if ts < curTs-30 {
+						// will show up in lag metric too
 						fmt.Println("ERROR: point has a recent null value", p)
 					}
 				}
@@ -127,18 +142,27 @@ func main() {
 				oldestNull = curTs
 			}
 			// lag is from first null, even if there were non-nulls after it
-			fmt.Printf("%60s - lag %d\n", name, curTs-oldestNull)
-			lag.Mark(curTs - oldestNull)
+			//fmt.Printf("%60s - lag %d\n", name, curTs-oldestNull)
+			lag.Update(curTs - oldestNull)
 		}
 		wg.Done()
 	}
 
+	go updateTargets()
+
 	tick := time.NewTicker(time.Millisecond * time.Duration(100))
 	wg := &sync.WaitGroup{}
 	for ts := range tick.C {
-		wg.Add(1)
-		t := targets[rand.Intn(len(targets))]
-		go test(wg, ts.Unix(), t.Name, t.OrgId, t.Interval)
+		var t schema.MetricDefinition
+		targetsLock.Lock()
+		if len(targets) > 0 {
+			t = targets[rand.Intn(len(targets))]
+		}
+		targetsLock.Unlock()
+		if len(targets) > 0 {
+			wg.Add(1)
+			go test(wg, ts.Unix(), t.Name, t.OrgId, t.Interval)
+		}
 	}
 	wg.Wait()
 }
