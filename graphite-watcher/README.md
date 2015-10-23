@@ -1,8 +1,11 @@
 run this tool against a graphite server
 
-* it gets all known metrics from ES and then verifies the number of known metrics
+* at 0.1Hz checks which metrics are in ES
+* at 10Hz selects random metrics and executes graphite queries on them
+
+it verifies the graphite output on format, ordering, null values etc.
+and throws errors if anything about the data looks off,
+and also submits some useful metrics into the monitoring system.
+
 (protip: 1 endpoint with default settings has 30 metrics)
 useful when running with env-load.
-
-* then it runs queries at 10Hz, by selecting random metrics,
-  and verifies the graphite output on format, ordering, null values etc.
