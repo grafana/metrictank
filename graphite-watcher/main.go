@@ -107,6 +107,7 @@ func main() {
 	test := func(wg *sync.WaitGroup, curTs int64, met stat) {
 		g := graphite.HostHeader{Host: "http://" + os.Args[3] + "/render", Header: http.Header{}}
 		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(met.def.OrgId), 10))
+		g.Header.Set("User-Agent", "graphite-watcher")
 		q := graphite.Request{Targets: []string{met.def.Name}}
 		series, err := g.Query(&q)
 		perror(err)
