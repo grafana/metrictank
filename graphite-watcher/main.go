@@ -142,7 +142,7 @@ func main() {
 					}
 					if ts < curTs-30 {
 						// will show up in lag metric too
-						fmt.Println("ERROR: point has a recent null value", p)
+						fmt.Println("ERROR: ", met.def.Name, " at", curTs, "seeing a null for ts", p[1])
 					}
 				}
 				lastTs = ts
