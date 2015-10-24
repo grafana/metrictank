@@ -48,11 +48,18 @@ func perror(err error) {
 	}
 }
 
-var targets []schema.MetricDefinition
+type stat struct {
+	def       schema.MetricDefinition
+	firstSeen int64
+}
+
+var targets map[string]stat
+var targetKeys []string
 var targetsLock sync.Mutex
 
 func init() {
-	targets = make([]schema.MetricDefinition, 0)
+	targets = make(map[string]stat)
+	targetKeys = make([]string, 0)
 }
 
 func main() {
@@ -66,11 +73,15 @@ func main() {
 	numMetrics := metrics.NewGauge()
 	metrics.Register("num_metrics", numMetrics)
 
-	start := time.Now().Unix()
-
+	// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
+	// at a time X where X < Y.  Hence, we confidently say that if we see a metric at Y, we can
+	// demand data to show up for that metric at >=Y
+	// for our data check to be useful we need metrics to show up in ES soon after being in the pipeline,
+	// which seems to be true (see nsqadmin)
 	updateTargets := func() {
 		getEsTick := time.NewTicker(time.Second * time.Duration(10))
-		for range getEsTick.C {
+		for ts := range getEsTick.C {
+			tsUnix := ts.Unix()
 			res, err := http.Get("http://" + os.Args[1] + "/metric/_search?q=*:*&size=10000000")
 			perror(err)
 			defer res.Body.Close()
@@ -81,32 +92,33 @@ func main() {
 			perror(err)
 			amount := len(data.Hits.Hits)
 			numMetrics.Update(int64(amount))
-			newTargets := make([]schema.MetricDefinition, amount, amount)
-			for i, h := range data.Hits.Hits {
+			for _, h := range data.Hits.Hits {
 				//fmt.Println(h.Source.Name)
-				newTargets[i] = h.Source
+				targetsLock.Lock()
+				if _, ok := targets[h.Source.Name]; !ok {
+					targets[h.Source.Name] = stat{h.Source, tsUnix}
+					targetKeys = append(targetKeys, h.Source.Name)
+				}
+				targetsLock.Unlock()
 			}
-			targetsLock.Lock()
-			targets = newTargets
-			targetsLock.Unlock()
 		}
 	}
 
-	test := func(wg *sync.WaitGroup, curTs int64, name string, orgId, interval int) {
+	test := func(wg *sync.WaitGroup, curTs int64, met stat) {
 		g := graphite.HostHeader{Host: "http://" + os.Args[3] + "/render", Header: http.Header{}}
-		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(orgId), 10))
-		q := graphite.Request{Targets: []string{name}}
+		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(met.def.OrgId), 10))
+		q := graphite.Request{Targets: []string{met.def.Name}}
 		series, err := g.Query(&q)
 		perror(err)
 		for _, serie := range series {
-			if name != serie.Target {
-				fmt.Println("ERROR: name != target name:", name, serie.Target)
+			if met.def.Name != serie.Target {
+				fmt.Println("ERROR: name != target name:", met.def.Name, serie.Target)
 			}
 
 			lastTs := int64(0)
 			oldestNull := int64(math.MaxInt64)
 			if len(serie.Datapoints) == 0 {
-				fmt.Println("ERROR: series for", name, "contains no points!")
+				fmt.Println("ERROR: series for", met.def.Name, "contains no points!")
 			}
 			for _, p := range serie.Datapoints {
 				ts, err := p[1].Int64()
@@ -119,11 +131,11 @@ func main() {
 				if lastTs == 0 && (ts < curTs-24*3600-60 || ts > curTs-24*3600+60) {
 					fmt.Println("ERROR: first point", p, "should have been about 24h ago")
 				}
-				if lastTs != 0 && ts != lastTs+int64(interval) {
-					fmt.Println("ERROR: point", p, " is not interval ", interval, "apart from previous point")
+				if lastTs != 0 && ts != lastTs+int64(met.def.Interval) {
+					fmt.Println("ERROR: point", p, " is not interval ", met.def.Interval, "apart from previous point")
 				}
 				_, err = p[0].Float64()
-				if err != nil && ts > start {
+				if err != nil && ts > met.firstSeen {
 					if ts < oldestNull {
 						oldestNull = ts
 					}
@@ -134,12 +146,12 @@ func main() {
 				}
 				lastTs = ts
 			}
-			if lastTs < curTs-int64(interval) || lastTs > curTs+int64(interval) {
+			if lastTs < curTs-int64(met.def.Interval) || lastTs > curTs+int64(met.def.Interval) {
 				fmt.Println("ERROR: last point at ", lastTs, "is out of range")
 			}
 			// if there was no null, we treat the point after the last one we had as null
 			if oldestNull == math.MaxInt64 {
-				oldestNull = lastTs + int64(interval)
+				oldestNull = lastTs + int64(met.def.Interval)
 			}
 			// lag cannot be < 0
 			if oldestNull > curTs {
@@ -157,15 +169,16 @@ func main() {
 	tick := time.NewTicker(time.Millisecond * time.Duration(100))
 	wg := &sync.WaitGroup{}
 	for ts := range tick.C {
-		var t schema.MetricDefinition
+		var t stat
 		targetsLock.Lock()
-		if len(targets) > 0 {
-			t = targets[rand.Intn(len(targets))]
+		if len(targetKeys) > 0 {
+			key := targetKeys[rand.Intn(len(targets))]
+			t = targets[key]
 		}
 		targetsLock.Unlock()
-		if len(targets) > 0 {
+		if len(targetKeys) > 0 {
 			wg.Add(1)
-			go test(wg, ts.Unix(), t.Name, t.OrgId, t.Interval)
+			go test(wg, ts.Unix(), t)
 		}
 	}
 	wg.Wait()
