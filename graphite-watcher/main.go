@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -55,7 +56,10 @@ func init() {
 }
 
 func main() {
-	addr, _ := net.ResolveTCPAddr("tcp", "localhost:2003")
+	if len(os.Args) != 4 {
+		log.Fatal("usage: graphite-watcher <elasticsearch-addr> <metrics-addr> <graphite-addr>")
+	}
+	addr, _ := net.ResolveTCPAddr("tcp", os.Args[2])
 	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "graphite-watcher.", addr)
 	lag := metrics.NewHistogram(metrics.NewExpDecaySample(1028, 0.015))
 	metrics.Register("lag", lag)
@@ -67,7 +71,7 @@ func main() {
 	updateTargets := func() {
 		getEsTick := time.NewTicker(time.Second * time.Duration(10))
 		for range getEsTick.C {
-			res, err := http.Get("http://localhost:9200/metric/_search?q=*:*&size=10000000")
+			res, err := http.Get("http://" + os.Args[1] + "/metric/_search?q=*:*&size=10000000")
 			perror(err)
 			defer res.Body.Close()
 			body, err := ioutil.ReadAll(res.Body)
@@ -89,7 +93,7 @@ func main() {
 	}
 
 	test := func(wg *sync.WaitGroup, curTs int64, name string, orgId, interval int) {
-		g := graphite.HostHeader{Host: "http://localhost:8888/render", Header: http.Header{}}
+		g := graphite.HostHeader{Host: "http://" + os.Args[3] + "/render", Header: http.Header{}}
 		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(orgId), 10))
 		q := graphite.Request{Targets: []string{name}}
 		series, err := g.Query(&q)
