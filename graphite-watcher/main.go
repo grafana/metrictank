@@ -105,12 +105,16 @@ func main() {
 	}
 
 	test := func(wg *sync.WaitGroup, curTs int64, met stat) {
+		defer wg.Done()
 		g := graphite.HostHeader{Host: "http://" + os.Args[3] + "/render", Header: http.Header{}}
 		g.Header.Add("X-Org-Id", strconv.FormatInt(int64(met.def.OrgId), 10))
 		g.Header.Set("User-Agent", "graphite-watcher")
 		q := graphite.Request{Targets: []string{met.def.Name}}
 		series, err := g.Query(&q)
-		perror(err)
+		if err != nil {
+			log.Println("ERROR querying graphite:", err)
+			return
+		}
 		for _, serie := range series {
 			if met.def.Name != serie.Target {
 				fmt.Println("ERROR: name != target name:", met.def.Name, serie.Target)
@@ -162,7 +166,6 @@ func main() {
 			//fmt.Printf("%60s - lag %d\n", name, curTs-oldestNull)
 			lag.Update(curTs - oldestNull)
 		}
-		wg.Done()
 	}
 
 	go updateTargets()
