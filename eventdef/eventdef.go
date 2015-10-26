@@ -66,12 +66,19 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Password = pass
 	}
 
+	// Create the custom bulk sender, its map of queued event setatuses, and
+	// add the elasticsearhc connection
 	bSender = new(bulkSender)
 	bSender.queued = make(map[string]chan *BulkSaveStatus)
 	bSender.conn = es
 
+	// Now create the actual bulk indexer and assign the custom bulkSend
+	// function to it as its sending function (so we have more control over
+	// how it handles errors)
 	bulk = es.NewBulkIndexerErrors(maxCons, retry)
 	bulk.Sender = bSender.bulkSend
+	// The custom bulk sender needs to have access to the parent bulk
+	// indexer
 	bSender.bulkIndexer = bulk
 	// start the indexer
 	bulk.Start()
@@ -96,11 +103,16 @@ func Save(e *schema.ProbeEvent, status chan *BulkSaveStatus) error {
 		return err
 	}
 	
-	t := time.Now()
+	// Craft the elasticsearch index name from the event's timestamp
+	t := time.Unix(e.Timestamp / 1000, 0)
 	y, m, d := t.Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
-	log.Printf("saving event to elasticsearch.")
+
+	// Add the event's status channel to the map of event statuses
 	bSender.saveQueued(e.Id, status)
+
+	log.Printf("saving event to elasticsearch.")
+	// Add the event to the bulk indexer's queue
 	err := bulk.Index(idxName, e.EventType, e.Id, "", "", &t, e)
 	log.Printf("event queued to bulk indexer")
 	if err != nil {
@@ -121,21 +133,20 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 	}
 
 	response := responseStruct{}
+
+	// Take map of channels of event statuses to save, and assign a new one
+	// to the bulk sender
 	queued := b.queued
 	b.queued = make(map[string]chan *BulkSaveStatus)
 
 	body, err := b.conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", b.bulkIndexer.Refresh), nil, buf)
 
+	// If something goes wrong at this stage, everything needs to be
+	// requeued and submitted again. If it fails here it's because
+	// elasticsearch itself isn't running or can't be reached.
 	if err != nil {
 		b.numErrors += 1
-		go func(q map[string]chan *BulkSaveStatus) {
-			for k, v := range q {
-				stat := new(BulkSaveStatus)
-				stat.Id = k
-				stat.Requeue = true
-				v <- stat
-			}
-		}(queued)
+		go resubmitAll(queued)
 		return err
 	}
 	// check for response errors, bulk insert will give 200 OK but then include errors in response
@@ -145,13 +156,15 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 		if response.Errors {
 			b.numErrors += uint64(len(response.Items))
 			errSend = fmt.Errorf("Bulk Insertion Error. Failed item count [%d]", len(response.Items))
-			// But what is in response.Items?
-			for k, v := range response.Items {
-				log.Printf("Contents of error item %s: %T %q", k, v, v)
-			}
 		}
 		// ack/requeue in a goroutine and let the sender move on
 		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}){
+			// If saving any items in the bulk save failed, 
+			// response.Items will be populated. However, successful
+			// saves may be in there as well. Go through the items
+			// if there are any and populate this map of bools to
+			// indicate which items in response.Items are actual
+			// failures. This is used below.
 			errReqs := make(map[string]bool)
 			if len(items) > 0 {
 				for _, m := range items {
@@ -162,8 +175,11 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 					}
 				}
 			}
-			// This will be easier once we know what response.Items
-			// looks like. For now, ack everything
+			// Go through our map of status channels. If the event
+			// is present in the errReqs map of bools, it needs to
+			// be requeued. Otherwise it saved successfully. In
+			// either case, send the status into the channel for
+			// the caller to acknowledge or requeue as needed.
 			for k, v := range q {
 				stat := new(BulkSaveStatus)
 				stat.Id = k
@@ -176,7 +192,11 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 			}
 		}(queued, response.Items)
 	} else {
-		return fmt.Errorf("something went terribly wrong bulk loading: %s", jsonErr.Error())
+		// Something went *extremely* wrong trying to submit these items
+		// to elasticsearch. Still, we ought to resubmit them.
+		b.numErrors += 1
+		go resubmitAll(queued)
+		errSend = fmt.Errorf("something went terribly wrong bulk loading: %s", jsonErr.Error())
 	}
 	if errSend != nil {
 		return errSend
@@ -184,12 +204,23 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 	return nil
 }
 
+func resubmitAll(q map[string]chan *BulkSaveStatus) {
+	for k, v := range q {
+		stat := new(BulkSaveStatus)
+		stat.Id = k
+		stat.Requeue = true
+		v <- stat
+	}
+}
+
+// Add the event's status channel to the map of status to save
 func (b *bulkSender) saveQueued(id string, status chan *BulkSaveStatus) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.queued[id] = status
 }
 
+// Stop the bulk indexer when we're shutting down
 func StopBulkIndexer() {
 	log.Println("closing bulk indexer...")
 	bulk.Stop()

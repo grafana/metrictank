@@ -97,6 +97,8 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	m.DisableAutoResponse()
 
 	done := make(chan error, 1)
+
+	// This notifies this function whether or not saving the event worked
 	status := make(chan *eventdef.BulkSaveStatus)
 	go func() {
 		pre := time.Now()
@@ -112,6 +114,8 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	}()
 
 	if err := <-done; err != nil {
+		// If saving the event failed, requeue with the default backoff
+		// and try again.
 		m.Requeue(-1)
 		msgsHandleFail.Inc(1)
 		return err
