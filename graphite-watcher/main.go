@@ -178,17 +178,13 @@ func main() {
 	tick := time.NewTicker(time.Millisecond * time.Duration(100))
 	wg := &sync.WaitGroup{}
 	for ts := range tick.C {
-		var t stat
 		targetsLock.Lock()
 		if len(targetKeys) > 0 {
 			key := targetKeys[rand.Intn(len(targets))]
-			t = targets[key]
+			wg.Add(1)
+			go test(wg, ts.Unix(), targets[key])
 		}
 		targetsLock.Unlock()
-		if len(targetKeys) > 0 {
-			wg.Add(1)
-			go test(wg, ts.Unix(), t)
-		}
 	}
 	wg.Wait()
 }
