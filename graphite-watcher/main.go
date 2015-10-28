@@ -82,14 +82,14 @@ func main() {
 	// which seems to be true (see nsqadmin)
 	updateTargets := func() {
 		getEsTick := time.NewTicker(time.Second * time.Duration(10))
-		for ts := range getEsTick.C {
-			tsUnix := ts.Unix()
+		for range getEsTick.C {
 			res, err := http.Get("http://" + os.Args[1] + "/metric/_search?q=*:*&size=10000000")
 			perror(err)
 			defer res.Body.Close()
 			body, err := ioutil.ReadAll(res.Body)
 			perror(err)
 			var data EsResult
+			tsUnix := time.Now().Unix()
 			err = json.Unmarshal(body, &data)
 			perror(err)
 			amount := len(data.Hits.Hits)
