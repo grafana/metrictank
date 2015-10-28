@@ -143,11 +143,11 @@ func main() {
 				}
 				_, err = p[0].Float64()
 				if err != nil && ts > met.firstSeen {
-					nullPoints.Inc(1)
 					if ts < oldestNull {
 						oldestNull = ts
 					}
 					if ts < curTs-30 {
+						nullPoints.Inc(1)
 						// will show up in lag metric too
 						fmt.Println("ERROR: ", met.def.Name, " at", curTs, "seeing a null for ts", p[1])
 						// should this be a metric we track?
