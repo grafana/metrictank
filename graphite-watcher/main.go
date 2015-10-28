@@ -147,7 +147,11 @@ func main() {
 					if ts < curTs-30 {
 						// will show up in lag metric too
 						fmt.Println("ERROR: ", met.def.Name, " at", curTs, "seeing a null for ts", p[1])
+						// should this be a metric we track?
 					}
+				} else {
+					// we saw a valid point, so reset oldestNull.
+					oldestNull = int64(math.MaxInt64)
 				}
 				lastTs = ts
 			}
