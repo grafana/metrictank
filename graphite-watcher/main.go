@@ -76,7 +76,7 @@ func main() {
 	metrics.Register("null_points", nullPoints)
 
 	// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
-	// at a time X where X < Y.  Hence, we confidently say that if we see a metric at Y, we can
+	// at a time X where X < Y.  Hence, we can confidently say that if we see a metric at Y, we can
 	// demand data to show up for that metric at >=Y
 	// for our data check to be useful we need metrics to show up in ES soon after being in the pipeline,
 	// which seems to be true (see nsqadmin)
@@ -148,9 +148,7 @@ func main() {
 					}
 					if ts < curTs-30 {
 						nullPoints.Inc(1)
-						// will show up in lag metric too
 						fmt.Println("ERROR: ", met.def.Name, " at", curTs, "seeing a null for ts", p[1])
-						// should this be a metric we track?
 					}
 				} else {
 					// we saw a valid point, so reset oldestNull.
@@ -169,7 +167,7 @@ func main() {
 			if oldestNull > curTs {
 				oldestNull = curTs
 			}
-			// lag is from first null, even if there were non-nulls after it
+			// lag is from first null after a range of data until now
 			//fmt.Printf("%60s - lag %d\n", name, curTs-oldestNull)
 			lag.Update(curTs - oldestNull)
 		}
