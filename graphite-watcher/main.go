@@ -72,6 +72,8 @@ func main() {
 	metrics.Register("lag", lag)
 	numMetrics := metrics.NewGauge()
 	metrics.Register("num_metrics", numMetrics)
+	nullPoints := metrics.NewCounter()
+	metrics.Register("null_points", nullPoints)
 
 	// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
 	// at a time X where X < Y.  Hence, we confidently say that if we see a metric at Y, we can
@@ -141,6 +143,7 @@ func main() {
 				}
 				_, err = p[0].Float64()
 				if err != nil && ts > met.firstSeen {
+					nullPoints.Inc(1)
 					if ts < oldestNull {
 						oldestNull = ts
 					}
