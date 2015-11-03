@@ -36,6 +36,7 @@ var (
 	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	metricTTL   = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
 	cassandraPort = flag.Int("cassandra-port", 9042, "cassandra port")
 	listenAddr    = flag.String("listen", ":6060", "http listener address.")

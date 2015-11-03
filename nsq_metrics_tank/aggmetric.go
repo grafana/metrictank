@@ -149,7 +149,7 @@ func (a *AggMetric) Persist(c *Chunk) {
 		log.Println("saving maybe  ", c)
 		data := c.Series.Bytes()
 		chunkSizeAtSave.Value(int64(len(data)))
-		err := InsertMetric(a.key, c.t0, data)
+		err := InsertMetric(a.key, c.t0, data, *metricTTL)
 		a.Lock()
 		defer a.Unlock()
 		if err == nil {
