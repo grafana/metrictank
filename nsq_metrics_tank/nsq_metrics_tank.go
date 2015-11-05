@@ -225,6 +225,10 @@ func main() {
 		select {
 		case <-consumer.StopChan:
 			consumer.Stop()
+			err := metrics.Persist()
+			if err != nil {
+				log.Printf("Error: failed to persist aggmetrics. %v", err)
+			}
 			cSession.Close()
 			return
 		case <-sigChan:

@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"github.com/dgryski/go-tsz"
 	"log"
 	"sync"
 	"time"
-
-	"github.com/dgryski/go-tsz"
 )
 
 var serverStart uint32
@@ -25,25 +26,74 @@ func init() {
 // AggMetric is concurrency-safe
 type AggMetric struct {
 	sync.Mutex
-	key         string
-	firstTs     uint32 // first timestamp from which we have seen data. (either a point ts during our first chunk, or the t0 of a chunk if we've had to drop old chunks)
-	lastTs      uint32 // last timestamp seen
-	firstT0     uint32 // first t0 seen, even if no longer in range
-	lastT0      uint32 // last t0 seen
-	numChunks   uint32 // size of the circular buffer
-	chunkSpan   uint32 // span of individual chunks in seconds
-	chunks      []*Chunk
+	Key         string
+	FirstTs     uint32 // first timestamp from which we have seen data. (either a point ts during our first chunk, or the t0 of a chunk if we've had to drop old chunks)
+	LastTs      uint32 // last timestamp seen
+	FirstT0     uint32 // first t0 seen, even if no longer in range
+	LastT0      uint32 // last t0 seen
+	NumChunks   uint32 // size of the circular buffer
+	ChunkSpan   uint32 // span of individual chunks in seconds
+	Chunks      []*Chunk
 	aggregators []*Aggregator
+}
+
+type aggMetricOnDisk struct {
+	Key       string
+	FirstTs   uint32 // first timestamp from which we have seen data. (either a point ts during our first chunk, or the t0 of a chunk if we've had to drop old chunks)
+	LastTs    uint32 // last timestamp seen
+	FirstT0   uint32 // first t0 seen, even if no longer in range
+	LastT0    uint32 // last t0 seen
+	NumChunks uint32 // size of the circular buffer
+	ChunkSpan uint32 // span of individual chunks in seconds
+	Chunks    []*Chunk
+}
+
+func (a AggMetric) GobEncode() ([]byte, error) {
+	log.Println("marshaling AggMetric to Binary")
+	aOnDisk := aggMetricOnDisk{
+		Key:       a.Key,
+		FirstTs:   a.FirstTs,
+		LastTs:    a.LastTs,
+		FirstT0:   a.FirstT0,
+		NumChunks: a.NumChunks,
+		ChunkSpan: a.ChunkSpan,
+		Chunks:    a.Chunks,
+	}
+	var b bytes.Buffer
+	enc := gob.NewEncoder(&b)
+	err := enc.Encode(aOnDisk)
+
+	return b.Bytes(), err
+}
+
+func (a *AggMetric) GobDecode(data []byte) error {
+	log.Println("unmarshaling AggMetric to Binary")
+	r := bytes.NewReader(data)
+	dec := gob.NewDecoder(r)
+	aOnDisk := &aggMetricOnDisk{}
+	err := dec.Decode(aOnDisk)
+	if err != nil {
+		return err
+	}
+	a.Key = aOnDisk.Key
+	a.FirstTs = aOnDisk.FirstTs
+	a.LastTs = aOnDisk.LastTs
+	a.FirstT0 = aOnDisk.FirstT0
+	a.LastT0 = aOnDisk.LastT0
+	a.NumChunks = aOnDisk.NumChunks
+	a.ChunkSpan = aOnDisk.ChunkSpan
+	a.Chunks = aOnDisk.Chunks
+	return nil
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
 func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
-		key:       key,
-		chunkSpan: chunkSpan,
-		numChunks: numChunks,
-		chunks:    make([]*Chunk, numChunks),
+		Key:       key,
+		ChunkSpan: chunkSpan,
+		NumChunks: numChunks,
+		Chunks:    make([]*Chunk, numChunks),
 	}
 	for _, as := range aggsetting {
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
@@ -56,9 +106,9 @@ func (a *AggMetric) stats() {
 	for range time.Tick(statsPeriod) {
 		sum := 0
 		a.Lock()
-		for _, chunk := range a.chunks {
+		for _, chunk := range a.Chunks {
 			if chunk != nil {
-				sum += int(chunk.numPoints)
+				sum += int(chunk.NumPoints)
 			}
 		}
 		a.Unlock()
@@ -68,7 +118,7 @@ func (a *AggMetric) stats() {
 
 // this function must only be called while holding the lock
 func (a *AggMetric) indexFor(t0 uint32) uint32 {
-	return ((t0 - a.firstT0) / a.chunkSpan) % a.numChunks
+	return ((t0 - a.FirstT0) / a.ChunkSpan) % a.NumChunks
 }
 
 // using user input, which has to be verified, and could be any input
@@ -89,20 +139,20 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	}
 	a.Lock()
 	defer a.Unlock()
-	firstT0 := from - (from % a.chunkSpan)
-	lastT0 := (to - 1) - ((to - 1) % a.chunkSpan)
+	firstT0 := from - (from % a.ChunkSpan)
+	lastT0 := (to - 1) - ((to - 1) % a.ChunkSpan)
 	// we cannot satisfy data older than our retention
 	// note lastT0 will be > 0 because this AggMetric can only exist by adding at least 1 point
 	// we could go under 0 in contrived, testing scenarios that use very low timestamps
-	tmp := maxInt(int(a.lastT0)-int((a.numChunks-1)*a.chunkSpan), 0)
+	tmp := maxInt(int(a.LastT0)-int((a.NumChunks-1)*a.ChunkSpan), 0)
 	oldestT0WeMayHave := uint32(tmp)
 
 	// don't request data older than what we have (common shortly after server restart) or possibly could have
-	firstT0 = max(max(firstT0, oldestT0WeMayHave), a.firstT0)
+	firstT0 = max(max(firstT0, oldestT0WeMayHave), a.FirstT0)
 
-	lastT0 = min(lastT0, a.lastT0)
+	lastT0 = min(lastT0, a.LastT0)
 
-	oldest := min(max(oldestT0WeMayHave, serverStart), a.firstTs)
+	oldest := min(max(oldestT0WeMayHave, serverStart), a.FirstTs)
 
 	return oldest, a.get(firstT0, lastT0)
 }
@@ -113,19 +163,19 @@ func (a *AggMetric) get(firstT0, lastT0 uint32) []*tsz.Iter {
 	last := a.indexFor(lastT0)
 	var data []*Chunk
 	if last >= first {
-		data = a.chunks[first : last+1]
+		data = a.Chunks[first : last+1]
 	} else {
-		numAtSliceEnd := (a.numChunks - first)
+		numAtSliceEnd := (a.NumChunks - first)
 		numAtSliceBegin := last + 1
 		num := numAtSliceEnd + numAtSliceBegin
 		data = make([]*Chunk, 0, num)
 		// add the values at the end of chunks slice first (they are first in time)
-		for i := first; i < a.numChunks; i++ {
-			data = append(data, a.chunks[i])
+		for i := first; i < a.NumChunks; i++ {
+			data = append(data, a.Chunks[i])
 		}
 		// then the values later in time, which are at the beginning of the slice
 		for i := uint32(0); i <= last; i++ {
-			data = append(data, a.chunks[i])
+			data = append(data, a.Chunks[i])
 		}
 	}
 	iters := make([]*tsz.Iter, 0, len(data))
@@ -149,11 +199,11 @@ func (a *AggMetric) Persist(c *Chunk) {
 		log.Println("saving maybe  ", c)
 		data := c.Series.Bytes()
 		chunkSizeAtSave.Value(int64(len(data)))
-		err := InsertMetric(a.key, c.t0, data, *metricTTL)
+		err := InsertMetric(a.Key, c.T0, data, *metricTTL)
 		a.Lock()
 		defer a.Unlock()
 		if err == nil {
-			c.saved = true
+			c.Saved = true
 			log.Println("save ok      ", c)
 			chunkSaveOk.Inc(1)
 		} else {
@@ -168,69 +218,69 @@ func (a *AggMetric) Persist(c *Chunk) {
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
-	if ts <= a.lastTs {
-		log.Printf("ERROR: ts %d <= last seen ts %d. can only append newer data", ts, a.lastTs)
+	if ts <= a.LastTs {
+		log.Printf("ERROR: ts %d <= last seen ts %d. can only append newer data", ts, a.LastTs)
 		return
 	}
-	t0 := ts - (ts % a.chunkSpan)
+	t0 := ts - (ts % a.ChunkSpan)
 	//log.Println("t0=", TS(t0), "adding", TS(ts), val)
 
-	if a.lastTs == 0 {
+	if a.LastTs == 0 {
 		// we're adding first point ever..
-		a.firstT0, a.lastT0 = t0, t0
-		a.firstTs, a.lastTs = ts, ts
+		a.FirstT0, a.LastT0 = t0, t0
+		a.FirstTs, a.LastTs = ts, ts
 		chunkCreate.Inc(1)
-		a.chunks[0] = NewChunk(t0).Push(ts, val)
-		log.Println("created ", a.chunks[0])
+		a.Chunks[0] = NewChunk(t0).Push(ts, val)
+		log.Println("created ", a.Chunks[0])
 		a.addAggregators(ts, val)
 		return
 	}
 
-	if t0 == a.lastT0 {
+	if t0 == a.LastT0 {
 		// last prior data was in same chunk as new point
-		a.chunks[a.indexFor(t0)].Push(ts, val)
+		a.Chunks[a.indexFor(t0)].Push(ts, val)
 	} else {
 		// the point needs a newer chunk than points we've seen before
-		prev := a.indexFor(a.lastT0)
-		a.chunks[prev].Finish()
-		a.Persist(a.chunks[prev])
+		prev := a.indexFor(a.LastT0)
+		a.Chunks[prev].Finish()
+		a.Persist(a.Chunks[prev])
 
 		// TODO: create empty series in between, if there's a gap. -> actually no, we may just as well keep the old data
 		// but we have to make sure we don't accidentally return the old data out of order
 
 		now := a.indexFor(t0)
-		if a.chunks[now] != nil {
+		if a.Chunks[now] != nil {
 			chunkClear.Inc(1)
-			log.Println("clearing ", a.chunks[now])
+			log.Println("clearing ", a.Chunks[now])
 		}
 		chunkCreate.Inc(1)
-		a.chunks[now] = NewChunk(t0).Push(ts, val)
-		log.Println("created ", a.chunks[now])
+		a.Chunks[now] = NewChunk(t0).Push(ts, val)
+		log.Println("created ", a.Chunks[now])
 
 		// update firstTs to oldest t0
 		var found *Chunk
 		if now > prev {
 			for i := prev; i <= now && found == nil; i++ {
-				if a.chunks[i] != nil {
-					found = a.chunks[i]
+				if a.Chunks[i] != nil {
+					found = a.Chunks[i]
 				}
 			}
 		} else {
-			for i := prev; i < uint32(len(a.chunks)) && found == nil; i++ {
-				if a.chunks[i] != nil {
-					found = a.chunks[i]
+			for i := prev; i < uint32(len(a.Chunks)) && found == nil; i++ {
+				if a.Chunks[i] != nil {
+					found = a.Chunks[i]
 				}
 			}
 			for i := uint32(0); i <= now && found == nil; i++ {
-				if a.chunks[i] != nil {
-					found = a.chunks[i]
+				if a.Chunks[i] != nil {
+					found = a.Chunks[i]
 				}
 			}
 		}
-		a.firstTs = found.t0
+		a.FirstTs = found.T0
 
-		a.lastT0 = t0
+		a.LastT0 = t0
 	}
-	a.lastTs = ts
+	a.LastTs = ts
 	a.addAggregators(ts, val)
 }
