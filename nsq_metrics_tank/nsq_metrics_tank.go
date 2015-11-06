@@ -26,10 +26,10 @@ import (
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
-	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into kairosdb")
+	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into cassandra")
 
 	// TODO split up for consumer and cassandra sender
-	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages and writing into kairosdb. also number of nsq consumers for both high and low prio topic")
+	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages and writing into cassandra. also number of nsq consumers for both high and low prio topic")
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 	channel     = flag.String("channel", "tank", "NSQ channel")
 	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
@@ -220,11 +220,9 @@ func main() {
 		log.Println(http.ListenAndServe(*listenAddr, nil))
 	}()
 
-	// TODO lots of cassandra write errors cause we still write after closing the session
 	for {
 		select {
 		case <-consumer.StopChan:
-			consumer.Stop()
 			err := metrics.Persist()
 			if err != nil {
 				log.Printf("Error: failed to persist aggmetrics. %v", err)
@@ -233,7 +231,6 @@ func main() {
 			return
 		case <-sigChan:
 			consumer.Stop()
-			cSession.Close()
 		}
 	}
 }
