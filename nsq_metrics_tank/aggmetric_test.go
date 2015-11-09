@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/grafana/grafana/pkg/metric/helper"
 	"testing"
 )
 
@@ -63,6 +64,8 @@ func (c *Checker) Verify(from, to, first, last uint32) {
 }
 
 func TestAggMetric(t *testing.T) {
+	stats, _ := helper.New(false, "", "standard", "nsq_metrics_tank", "")
+	initMetrics(stats)
 	c := NewChecker(t, NewAggMetric("foo", 100, 5))
 
 	// basic case, single range

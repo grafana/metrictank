@@ -32,14 +32,14 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 		aggNumChunks: aggNumChunks,
 	}
 	// open data file
-	dataFile, err := os.Open("aggmetrics.gob")
+	dataFile, err := os.Open(*dumpFile)
 
 	if err == nil {
 		log.Printf("loading aggmetrics from file.")
 		dataDecoder := gob.NewDecoder(dataFile)
 		err = dataDecoder.Decode(&ms)
 		if err != nil {
-			log.Printf("failed to load aggmetrics from file. %v", err)
+			log.Printf("failed to load aggmetrics from file. %s", err)
 		}
 		dataFile.Close()
 	} else {
@@ -86,17 +86,19 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 func (ms *AggMetrics) Persist() error {
 	// create a file\
 	log.Println("persisting aggmetrics to disk.")
-	dataFile, err := os.Create("aggmetrics.gob")
-
+	dataFile, err := os.Create(*dumpFile)
+	defer dataFile.Close()
 	if err != nil {
 		return err
 	}
 
 	dataEncoder := gob.NewEncoder(dataFile)
-	dataEncoder.Encode(*ms)
-
-	dataFile.Close()
-	log.Println("persisted aggmetrics to disk.")
+	err = dataEncoder.Encode(*ms)
+	if err != nil {
+		log.Printf("Error. failed to encode metrics. %s", err)
+	} else {
+		log.Println("persisted aggmetrics to disk.")
+	}
 	return nil
 }
 
