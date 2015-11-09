@@ -3,7 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/dgryski/go-tsz"
+	//"github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 	"log"
 	"sync"
 	"time"

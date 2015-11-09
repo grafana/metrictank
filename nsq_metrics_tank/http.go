@@ -3,7 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dgryski/go-tsz"
+	//github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 	//	"log"
 	"net/http"
 	_ "net/http/pprof"

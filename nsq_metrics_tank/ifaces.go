@@ -1,6 +1,7 @@
 package main
 
-import "github.com/dgryski/go-tsz"
+//import "github.com/dgryski/go-tsz"
+import "github.com/raintank/go-tsz"
 
 type Metrics interface {
 	Get(key string) (Metric, bool)

@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
+	//"github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 )
 
 // write aggregated data to cassandra.
