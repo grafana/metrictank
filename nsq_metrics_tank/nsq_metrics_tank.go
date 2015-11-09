@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -16,6 +15,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/grafana/grafana/pkg/log"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"github.com/nsqio/go-nsq"
@@ -45,6 +45,8 @@ var (
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
 	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
+
+	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
 	cassandraAddrs   = app.StringArray{}
 	consumerOpts     = app.StringArray{}
@@ -93,21 +95,22 @@ var msgsHandleFail met.Count
 
 func main() {
 	flag.Parse()
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
 		fmt.Println("nsq_metrics_tank")
 		return
 	}
 	if *instance == "" {
-		log.Fatal("instance can't be empty")
+		log.Fatal(0, "instance can't be empty")
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to lookup hostname. %s", err)
 	}
 	stats, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to initialize statsd. %s", err)
 	}
 
 	if *channel == "" {
@@ -116,14 +119,14 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal("--topic is required")
+		log.Fatal(0, "--topic is required")
 	}
 
 	if len(nsqdTCPAddrs) == 0 && len(lookupdHTTPAddrs) == 0 {
-		log.Fatal("--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if len(nsqdTCPAddrs) > 0 && len(lookupdHTTPAddrs) > 0 {
-		log.Fatal("use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 	// set default cassandra address if none is set.
 	if len(cassandraAddrs) == 0 {
@@ -137,20 +140,20 @@ func main() {
 	cfg.UserAgent = "nsq_metrics_tank"
 	err = app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to parse nsq consumer options. %s", err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "Failed to create NSQ consumer. %s", err)
 	}
 
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "nsq_metrics_tank"
 	err = app.ParseOpts(pCfg, producerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to parse nsq producer options. %s", err)
 	}
 
 	initMetrics(stats)
@@ -158,7 +161,7 @@ func main() {
 	err = InitCassandra()
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to initialize cassandra. %s", err)
 	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
@@ -167,13 +170,13 @@ func main() {
 
 	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to connect to NSQDs. %s", err)
 	}
-	log.Println("INFO : connected to nsqd")
+	log.Info("connected to nsqd")
 
 	err = consumer.ConnectToNSQLookupds(lookupdHTTPAddrs)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, "failed to connect to NSQLookupds. %s", err)
 	}
 
 	go func() {
@@ -197,8 +200,8 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/get", Get)
-		log.Println("INFO starting listener for metrics and http/debug on ", *listenAddr)
-		log.Println(http.ListenAndServe(*listenAddr, nil))
+		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
+		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {
@@ -206,9 +209,10 @@ func main() {
 		case <-consumer.StopChan:
 			err := metrics.Persist()
 			if err != nil {
-				log.Printf("Error: failed to persist aggmetrics. %v", err)
+				log.Error(0, "failed to persist aggmetrics. %s", err)
 			}
 			cSession.Close()
+			log.Close()
 			return
 		case <-sigChan:
 			consumer.Stop()

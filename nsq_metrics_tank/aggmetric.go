@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	//"github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
-	"log"
 	"sync"
 	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	//"github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 )
 
 var serverStart uint32
@@ -205,7 +206,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 func (a *AggMetric) Persist(c *Chunk) {
 	go func() {
-		log.Println("saving maybe  ", c)
+		log.Debug("starting to save %v", c)
 		data := c.Series.Bytes()
 		chunkSizeAtSave.Value(int64(len(data)))
 		err := InsertMetric(a.Key, c.T0, data, *metricTTL)
@@ -213,10 +214,10 @@ func (a *AggMetric) Persist(c *Chunk) {
 		defer a.Unlock()
 		if err == nil {
 			c.Saved = true
-			log.Println("save ok      ", c)
+			log.Debug("save complete. %v", c)
 			chunkSaveOk.Inc(1)
 		} else {
-			log.Println("ERROR no save", c, err)
+			log.Error(1, "failed to save metric to cassandra. %v, %s", c, err)
 			chunkSaveFail.Inc(1)
 			// TODO
 		}
@@ -234,18 +235,18 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	if currentChunk == nil {
 		chunkCreate.Inc(1)
 		if len(a.Chunks) < int(a.NumChunks) {
-			log.Printf("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
+			log.Debug("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
 			a.Chunks = append(a.Chunks, NewChunk(t0))
 		} else {
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
 		}
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Printf("ERROR: %s", err)
+			log.Error(1, "failed to add metric to chunk. %s", err)
 			return
 		}
 
-		log.Println("created ", a.Chunks[0])
+		log.Debug("created new chunk. %v", a.Chunks[0])
 		a.addAggregators(ts, val)
 		return
 	}
@@ -253,7 +254,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	if t0 == currentChunk.T0 {
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Printf("ERROR: %s", err)
+			log.Error(0, "failed to add metric to chunk. %s", err)
 			return
 		}
 	} else {
@@ -267,18 +268,18 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 		chunkCreate.Inc(1)
 		if len(a.Chunks) < int(a.NumChunks) {
-			log.Printf("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
+			log.Debug("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
 			a.Chunks = append(a.Chunks, NewChunk(t0))
 		} else {
 			chunkClear.Inc(1)
-			log.Printf("numChunks: %d  currentPos: %d", len(a.Chunks), a.CurrentChunkPos)
-			log.Println("clearing ", a.Chunks[a.CurrentChunkPos])
+			log.Debug("numChunks: %d  currentPos: %d", len(a.Chunks), a.CurrentChunkPos)
+			log.Debug("clearing chunk from circular buffer. %v", a.Chunks[a.CurrentChunkPos])
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
 		}
-		log.Println("created ", a.Chunks[a.CurrentChunkPos])
+		log.Debug("created new chunk. %v", a.Chunks[a.CurrentChunkPos])
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Printf("ERROR: %s", err)
+			log.Error(0, "failed to push metric to chunk. %s", err)
 			return
 		}
 	}

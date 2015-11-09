@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	//github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
-	//	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	//github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 )
 
 type Point struct {
@@ -74,7 +75,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 		}
 		if oldest > fromUnix {
 			reqSpanBoth.Value(int64(toUnix - fromUnix))
-			//log.Println("data load from cassandra:", TS(fromUnix), "-", TS(oldest), " from mem:", TS(oldest), "- ", TS(toUnix))
+			log.Debug("data load from cassandra: %s - %s from mem: %s - %s", TS(fromUnix), TS(oldest), TS(oldest), TS(toUnix))
 			storeIters, err := searchCassandra(key, fromUnix, oldest)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -86,7 +87,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 			iters = append(iters, storeIters...)
 		} else {
 			reqSpanMem.Value(int64(toUnix - fromUnix))
-			//log.Println("data load from mem:", TS(fromUnix), "-", TS(toUnix), "oldest (", oldest, ")")
+			log.Debug("data load from mem: %s-%s, oldest (%d)", TS(fromUnix), TS(toUnix), oldest)
 		}
 		iters = append(iters, memIters...)
 		//	for _, i := range memIters {

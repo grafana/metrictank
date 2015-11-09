@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	gometrics "github.com/rcrowley/go-metrics"
-	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	gometrics "github.com/rcrowley/go-metrics"
 )
 
 var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
@@ -35,15 +36,16 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 	dataFile, err := os.Open(*dumpFile)
 
 	if err == nil {
-		log.Printf("loading aggmetrics from file.")
+		log.Info("loading aggMetrics from file.")
 		dataDecoder := gob.NewDecoder(dataFile)
 		err = dataDecoder.Decode(&ms)
 		if err != nil {
-			log.Printf("failed to load aggmetrics from file. %s", err)
+			log.Error(1, "failed to load aggMetrics from file. %s", err)
 		}
 		dataFile.Close()
+		log.Info("aggMetrics loaded from file.")
 	} else {
-		log.Printf("starting with fresh aggmetrics.")
+		log.Info("starting with fresh aggmetrics.")
 	}
 
 	go ms.stats()
@@ -85,7 +87,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 
 func (ms *AggMetrics) Persist() error {
 	// create a file\
-	log.Println("persisting aggmetrics to disk.")
+	log.Info("persisting aggmetrics to disk.")
 	dataFile, err := os.Create(*dumpFile)
 	defer dataFile.Close()
 	if err != nil {
@@ -95,9 +97,9 @@ func (ms *AggMetrics) Persist() error {
 	dataEncoder := gob.NewEncoder(dataFile)
 	err = dataEncoder.Encode(*ms)
 	if err != nil {
-		log.Printf("Error. failed to encode metrics. %s", err)
+		log.Error(0, "failed to encode aggMetrics to binary format. %s", err)
 	} else {
-		log.Println("persisted aggmetrics to disk.")
+		log.Info("successfully persisted aggMetrics to disk.")
 	}
 	return nil
 }
@@ -107,7 +109,6 @@ type aggMetricsOnDisk struct {
 }
 
 func (a AggMetrics) GobEncode() ([]byte, error) {
-	log.Println("marshaling AggMetrics to Binary")
 	aOnDisk := aggMetricsOnDisk{
 		Metrics: a.Metrics,
 	}
@@ -119,7 +120,6 @@ func (a AggMetrics) GobEncode() ([]byte, error) {
 }
 
 func (a *AggMetrics) GobDecode(data []byte) error {
-	log.Println("unmarshaling AggMetrics to Binary")
 	r := bytes.NewReader(data)
 	dec := gob.NewDecoder(r)
 	aOnDisk := &aggMetricsOnDisk{}
