@@ -69,10 +69,10 @@ func (ms *AggMetrics) stats() {
 
 // periodically scan chunks and close any that have not recieved data in a while
 func (ms *AggMetrics) GC() {
-	ticker := time.Tick(time.Duration(int(ms.chunkSpan)) * time.Second)
+	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
 	for now := range ticker {
 		log.Info("checking for stale chunks that need persisting.")
-		minTs := uint32(now.Unix()) - (ms.chunkSpan * ms.numChunks)
+		minTs := uint32(now.Unix()) - uint32(*gcInterval)
 		ms.Lock()
 		for key, a := range ms.Metrics {
 			if stale := a.GC(minTs); stale {

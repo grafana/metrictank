@@ -46,7 +46,8 @@ var (
 
 	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
 
-	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	logLevel   = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	gcInterval = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
 
 	cassandraAddrs   = app.StringArray{}
 	consumerOpts     = app.StringArray{}
