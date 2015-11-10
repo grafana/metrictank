@@ -254,7 +254,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	if t0 == currentChunk.T0 {
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(0, "failed to add metric to chunk. %s", err)
+			log.Error(1, "failed to add metric to chunk. %s", err)
 			return
 		}
 	} else {
@@ -279,9 +279,32 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		log.Debug("created new chunk. %v", a.Chunks[a.CurrentChunkPos])
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(0, "failed to push metric to chunk. %s", err)
+			log.Error(1, "failed to push metric to chunk. %s", err)
 			return
 		}
 	}
 	a.addAggregators(ts, val)
+}
+
+func (a *AggMetric) GC(minTs uint32) bool {
+	a.Lock()
+	defer a.Unlock()
+	currentChunk := a.getChunk(a.CurrentChunkPos)
+	if currentChunk == nil {
+		return false
+	}
+
+	if currentChunk.T0 < minTs {
+		if currentChunk.Saved {
+			// already saved. lets check if we should just delete the metric from memory.
+			if currentChunk.T0 < (minTs - (a.ChunkSpan * a.NumChunks)) {
+				return true
+			}
+		}
+		// chunk has not been written to in a while. Lets persist it.
+		log.Info("Found stale Chunk, persisting it to Cassandra.")
+		currentChunk.Finish()
+		a.Persist(currentChunk)
+	}
+	return false
 }
