@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	gometrics "github.com/rcrowley/go-metrics"
-	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	gometrics "github.com/rcrowley/go-metrics"
 )
 
 var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
@@ -32,21 +33,23 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 		aggNumChunks: aggNumChunks,
 	}
 	// open data file
-	dataFile, err := os.Open("aggmetrics.gob")
+	dataFile, err := os.Open(*dumpFile)
 
 	if err == nil {
-		log.Printf("loading aggmetrics from file.")
+		log.Info("loading aggMetrics from file.")
 		dataDecoder := gob.NewDecoder(dataFile)
 		err = dataDecoder.Decode(&ms)
 		if err != nil {
-			log.Printf("failed to load aggmetrics from file. %v", err)
+			log.Error(1, "failed to load aggMetrics from file. %s", err)
 		}
 		dataFile.Close()
+		log.Info("aggMetrics loaded from file.")
 	} else {
-		log.Printf("starting with fresh aggmetrics.")
+		log.Info("starting with fresh aggmetrics.")
 	}
 
 	go ms.stats()
+	go ms.GC()
 	return &ms
 }
 
@@ -61,6 +64,23 @@ func (ms *AggMetrics) stats() {
 		l := len(ms.Metrics)
 		ms.Unlock()
 		metricsActive.Update(int64(l))
+	}
+}
+
+// periodically scan chunks and close any that have not recieved data in a while
+func (ms *AggMetrics) GC() {
+	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
+	for now := range ticker {
+		log.Info("checking for stale chunks that need persisting.")
+		minTs := uint32(now.Unix()) - uint32(*gcInterval)
+		ms.Lock()
+		for key, a := range ms.Metrics {
+			if stale := a.GC(minTs); stale {
+				log.Info("metric %s is stale. Purging data from memory.", key)
+				delete(ms.Metrics, key)
+			}
+		}
+		ms.Unlock()
 	}
 }
 
@@ -85,18 +105,20 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 
 func (ms *AggMetrics) Persist() error {
 	// create a file\
-	log.Println("persisting aggmetrics to disk.")
-	dataFile, err := os.Create("aggmetrics.gob")
-
+	log.Info("persisting aggmetrics to disk.")
+	dataFile, err := os.Create(*dumpFile)
+	defer dataFile.Close()
 	if err != nil {
 		return err
 	}
 
 	dataEncoder := gob.NewEncoder(dataFile)
-	dataEncoder.Encode(*ms)
-
-	dataFile.Close()
-	log.Println("persisted aggmetrics to disk.")
+	err = dataEncoder.Encode(*ms)
+	if err != nil {
+		log.Error(0, "failed to encode aggMetrics to binary format. %s", err)
+	} else {
+		log.Info("successfully persisted aggMetrics to disk.")
+	}
 	return nil
 }
 
@@ -105,7 +127,6 @@ type aggMetricsOnDisk struct {
 }
 
 func (a AggMetrics) GobEncode() ([]byte, error) {
-	log.Println("marshaling AggMetrics to Binary")
 	aOnDisk := aggMetricsOnDisk{
 		Metrics: a.Metrics,
 	}
@@ -117,7 +138,6 @@ func (a AggMetrics) GobEncode() ([]byte, error) {
 }
 
 func (a *AggMetrics) GobDecode(data []byte) error {
-	log.Println("unmarshaling AggMetrics to Binary")
 	r := bytes.NewReader(data)
 	dec := gob.NewDecoder(r)
 	aOnDisk := &aggMetricsOnDisk{}

@@ -1,7 +1,9 @@
 package main
 
-import "time"
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func TS(ts interface{}) string {
 	switch t := ts.(type) {

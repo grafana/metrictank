@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
+	"github.com/grafana/grafana/pkg/log"
+	//"github.com/dgryski/go-tsz"
+	"github.com/raintank/go-tsz"
 )
 
 // write aggregated data to cassandra.
@@ -90,8 +91,9 @@ func (o asc) Less(i, j int) bool { return o[i].mark < o[j].mark }
 // Basic search of cassandra.
 // start inclusive, end exclusive
 func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
+	iters := make([]*tsz.Iter, 0)
 	if start > end {
-		panic(fmt.Sprintf("searchCassandra start %d > end %d", start, end))
+		return iters, fmt.Errorf("start must be before end.")
 	}
 
 	results := make(chan outcome)
@@ -137,15 +139,19 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 		}
 	}
 	outcomes := make([]outcome, 0)
-	iters := make([]*tsz.Iter, 0)
+
+	// wait for all queries to complete then close the results channel so that the following
+	// for loop ends.
 	go func() {
 		wg.Wait()
 		cassandraGetDuration.Value(time.Now().Sub(pre))
 		close(results)
 	}()
+
 	for o := range results {
 		outcomes = append(outcomes, o)
 	}
+	// we have all of the results, but they could have arrived in any order.
 	sort.Sort(asc(outcomes))
 
 	var b []byte
@@ -156,17 +162,18 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 			chunkSizeAtLoad.Value(int64(len(b)))
 			iter, err := tsz.NewIterator(b)
 			if err != nil {
-				log.Fatal(err)
+				log.Error(1, "failed to unpack cassandra payload. %s", err)
+				return iters, err
 			}
 			iters = append(iters, iter)
 		}
 		cassandraChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
-			log.Println("ERROR:", err)
+			log.Error(0, "cassandra query error. %s", err)
 		}
 	}
 	cassandraRowsPerResponse.Value(int64(len(outcomes)))
-	//log.Println(len(outcomes), "outcomes, cassandra results", len(iters))
+	log.Debug("%d outcomes, cassandra results %d", len(outcomes), len(iters))
 	return iters, nil
 }
