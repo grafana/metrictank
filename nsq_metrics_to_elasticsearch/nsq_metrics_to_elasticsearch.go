@@ -36,7 +36,7 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
-	confFile = flag.String("c", "/etc/raintank/nsq_metrics_to_elasticsearch.ini", "configuration file (default /etc/raintank/nsq_metrics_to_elasticsearch.ini")
+	confFile = flag.String("config", "/etc/raintank/nsq_metrics_to_elasticsearch.ini", "configuration file (default /etc/raintank/nsq_metrics_to_elasticsearch.ini")
 
 	consumerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
@@ -112,12 +112,15 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 func main() {
 	flag.Parse()
 	// hmm
-	conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+	// Only try and parse the conf file if it exists
+	if _, err := os.Stat(*confFile); err == nil {
+		conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+		conf.ParseAll()
 	}
-	conf.ParseAll()
 
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_elasticsearch")
