@@ -4,6 +4,7 @@ machine:
 test:
   override:
     - go test -v -race ./schema
+    - go test -v -race ./metric_tank
   post:
     - pkg/package.sh
 dependencies:

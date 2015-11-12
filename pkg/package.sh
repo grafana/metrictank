@@ -29,7 +29,7 @@ mkdir -p ${BUILD}/etc/raintank
   #--deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
   #-C ${BUILD} -p ${PACKAGE_NAME} .
 
-for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch nsq_metrics_tank; do
+for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch metric_tank; do
 	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
 	NSQ_PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
 	mkdir -p ${NSQ_BUILD}/usr/sbin
