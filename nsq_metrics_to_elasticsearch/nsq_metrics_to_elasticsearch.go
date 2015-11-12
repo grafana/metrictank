@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rakyll/globalconf"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"github.com/nsqio/go-nsq"
@@ -35,6 +36,7 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
+	confFile = flag.String("c", "/etc/raintank/nsq_metrics_to_elasticsearch.ini", "configuration file (default /etc/raintank/nsq_metrics_to_elasticsearch.ini")
 
 	consumerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
@@ -54,6 +56,7 @@ func init() {
 	flag.Var(&consumerOpts, "consumer-opt", "option to passthrough to nsq.Consumer (may be given multiple times, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
 	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
+
 }
 
 type ESHandler struct {
@@ -108,6 +111,13 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 func main() {
 	flag.Parse()
+	// hmm
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+	conf.ParseAll()
 
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_elasticsearch")
