@@ -49,25 +49,15 @@ var (
 
 	logLevel   = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	gcInterval = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
-	confFile = flag.String("config", "/etc/raintank/nsq_metrics_tank.ini", "configuration file (default /etc/raintank/nsq_metrics_tank.ini")
+	confFile   = flag.String("config", "/etc/raintank/nsq_metrics_tank.ini", "configuration file (default /etc/raintank/nsq_metrics_tank.ini")
 
-	cassandraAddrs   = app.StringArray{}
-	consumerOpts     = app.StringArray{}
-	producerOpts     = app.StringArray{}
-	nsqdTCPAddrs     = app.StringArray{}
-	lookupdHTTPAddrs = app.StringArray{}
+	cassandraAddrs   = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
+	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
+	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
 	metrics *AggMetrics
 )
-
-func init() {
-	flag.Var(&consumerOpts, "consumer-opt", "option to passthrough to nsq.Consumer (may be given multiple times, http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	flag.Var(&producerOpts, "producer-opt", "option to passthrough to nsq.Producer (may be given multiple times, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
-
-	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
-	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
-	flag.Var(&cassandraAddrs, "cassandra-addrs", "cassandra host (may be given multiple times)")
-}
 
 var reqSpanMem met.Meter
 var reqSpanBoth met.Meter
@@ -101,7 +91,7 @@ func main() {
 
 	// Only try and parse the conf file if it exists
 	if _, err := os.Stat(*confFile); err == nil {
-		conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
+		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
 			log.Fatal(0, "error with configuration file: %s", err)
 			os.Exit(1)
@@ -136,15 +126,15 @@ func main() {
 		log.Fatal(0, "--topic is required")
 	}
 
-	if len(nsqdTCPAddrs) == 0 && len(lookupdHTTPAddrs) == 0 {
+	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
 		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
-	if len(nsqdTCPAddrs) > 0 && len(lookupdHTTPAddrs) > 0 {
+	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
 		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 	// set default cassandra address if none is set.
-	if len(cassandraAddrs) == 0 {
-		cassandraAddrs = append(cassandraAddrs, "localhost")
+	if *cassandraAddrs == "" {
+		*cassandraAddrs = "localhost"
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -152,7 +142,7 @@ func main() {
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_metrics_tank"
-	err = app.ParseOpts(cfg, consumerOpts)
+	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
 		log.Fatal(0, "failed to parse nsq consumer options. %s", err)
 	}
@@ -161,13 +151,6 @@ func main() {
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
 		log.Fatal(0, "Failed to create NSQ consumer. %s", err)
-	}
-
-	pCfg := nsq.NewConfig()
-	pCfg.UserAgent = "nsq_metrics_tank"
-	err = app.ParseOpts(pCfg, producerOpts)
-	if err != nil {
-		log.Fatal(0, "failed to parse nsq producer options. %s", err)
 	}
 
 	initMetrics(stats)
@@ -182,13 +165,13 @@ func main() {
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
-	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
+	err = consumer.ConnectToNSQDs(strings.Split(*nsqdTCPAddrs, ","))
 	if err != nil {
 		log.Fatal(0, "failed to connect to NSQDs. %s", err)
 	}
 	log.Info("connected to nsqd")
 
-	err = consumer.ConnectToNSQLookupds(lookupdHTTPAddrs)
+	err = consumer.ConnectToNSQLookupds(strings.Split(*lookupdHTTPAddrs, ","))
 	if err != nil {
 		log.Fatal(0, "failed to connect to NSQLookupds. %s", err)
 	}

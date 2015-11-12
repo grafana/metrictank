@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,7 +39,7 @@ object to interact with the whole Cassandra cluster.
 var cSession *gocql.Session
 
 func InitCassandra() error {
-	cluster := gocql.NewCluster(cassandraAddrs...)
+	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cluster.Consistency = gocql.One
 	var err error
 	tmpSession, err := cluster.CreateSession()
