@@ -56,7 +56,6 @@ func init() {
 	flag.Var(&consumerOpts, "consumer-opt", "option to passthrough to nsq.Consumer (may be given multiple times, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
 	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
-
 }
 
 type ESHandler struct {
@@ -111,7 +110,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 func main() {
 	flag.Parse()
-	// hmm
+
 	// Only try and parse the conf file if it exists
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })

@@ -25,6 +25,7 @@ import (
 
 	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/rakyll/globalconf"
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
+	confFile = flag.String("config", "/etc/raintank/nsq_probe_events_to_elasticsearch.ini", "configuration file (default /etc/raintank/nsq_probe_events_to_elasticsearch.ini")
 
 	consumerOpts     = app.StringArray{}
 	nsqdTCPAddrs     = app.StringArray{}
@@ -116,6 +118,16 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 func main() {
 	flag.Parse()
+
+	// Only try and parse the conf file if it exists
+	if _, err := os.Stat(*confFile); err == nil {
+		conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
+		if err != nil {
+			log.Fatal(err)
+			os.Exit(1)
+		}
+		conf.ParseAll()
+	}
 
 	if *showVersion {
 		fmt.Println("nsq_probe_events_to_elasticsearch")

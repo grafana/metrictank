@@ -21,6 +21,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/rakyll/globalconf"
 	gometrics "github.com/rcrowley/go-metrics"
 )
 
@@ -48,6 +49,7 @@ var (
 
 	logLevel   = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	gcInterval = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
+	confFile = flag.String("config", "/etc/raintank/nsq_metrics_tank.ini", "configuration file (default /etc/raintank/nsq_metrics_tank.ini")
 
 	cassandraAddrs   = app.StringArray{}
 	consumerOpts     = app.StringArray{}
@@ -96,6 +98,17 @@ var msgsHandleFail met.Count
 
 func main() {
 	flag.Parse()
+
+	// Only try and parse the conf file if it exists
+	if _, err := os.Stat(*confFile); err == nil {
+		conf, err := globalconf.NewWithOptions(&globalconf.Options{ Filename: *confFile })
+		if err != nil {
+			log.Fatal(0, "error with configuration file: %s", err)
+			os.Exit(1)
+		}
+		conf.ParseAll()
+	}
+
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
