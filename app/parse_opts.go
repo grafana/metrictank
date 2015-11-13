@@ -7,10 +7,10 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
-func ParseOpts(cfg *nsq.Config, opts StringArray) error {
+func ParseOpts(cfg *nsq.Config, opts string) error {
 	var err error
-	for _, opt := range opts {
-		parts := strings.Split(opt, ",")
+	for _, opt := range strings.Split(opts, ",") {
+		parts := strings.Split(opt, "=")
 		key := parts[0]
 		switch len(parts) {
 		case 1:

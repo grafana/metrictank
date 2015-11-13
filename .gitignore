@@ -2,6 +2,7 @@
 .notouch
 raintank-metric
 raintank-metric_*
+metric_tank/metric_tank
 nsq_metrics_tank/nsq_metrics_tank
 nsq_metrics_to_stdout/nsq_metrics_to_stdout
 nsq_metrics_to_elasticsearch/nsq_metrics_to_elasticsearch
