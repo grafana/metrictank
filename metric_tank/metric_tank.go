@@ -165,13 +165,21 @@ func main() {
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
-	err = consumer.ConnectToNSQDs(strings.Split(*nsqdTCPAddrs, ","))
+	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
+	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
+		nsqdAdds = []string{}
+	}
+	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
 		log.Fatal(0, "failed to connect to NSQDs. %s", err)
 	}
 	log.Info("connected to nsqd")
 
-	err = consumer.ConnectToNSQLookupds(strings.Split(*lookupdHTTPAddrs, ","))
+	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
+	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
+		lookupdAdds = []string{}
+	}
+	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
 		log.Fatal(0, "failed to connect to NSQLookupds. %s", err)
 	}
