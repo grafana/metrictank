@@ -208,10 +208,13 @@ func main() {
 			if err != nil {
 				log.Error(0, "failed to persist aggmetrics. %s", err)
 			}
+			log.Info("closing cassandra session.")
 			cSession.Close()
+			log.Info("terminating.")
 			log.Close()
 			return
 		case <-sigChan:
+			log.Info("Shutting down")
 			consumer.Stop()
 		}
 	}

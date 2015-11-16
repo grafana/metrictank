@@ -27,7 +27,7 @@ func init() {
 // in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
 // AggMetric is concurrency-safe
 type AggMetric struct {
-	sync.Mutex
+	sync.RWMutex
 	Key             string
 	CurrentChunkPos uint32 // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // size of the circular buffer
@@ -94,13 +94,13 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 func (a *AggMetric) stats() {
 	for range time.Tick(statsPeriod) {
 		sum := 0
-		a.Lock()
+		a.RLock()
 		for _, chunk := range a.Chunks {
 			if chunk != nil {
 				sum += int(chunk.NumPoints)
 			}
 		}
-		a.Unlock()
+		a.RUnlock()
 		points.Update(int64(sum))
 	}
 }
@@ -117,8 +117,8 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
-	a.Lock()
-	defer a.Unlock()
+	a.RLock()
+	defer a.RUnlock()
 	firstT0 := from - (from % a.ChunkSpan)
 	lastT0 := (to - 1) - ((to - 1) % a.ChunkSpan)
 
@@ -207,13 +207,15 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 func (a *AggMetric) Persist(c *Chunk) {
 	go func() {
 		log.Debug("starting to save %v", c)
+		a.RLock()
 		data := c.Series.Bytes()
+		a.RUnlock()
 		chunkSizeAtSave.Value(int64(len(data)))
 		err := InsertMetric(a.Key, c.T0, data, *metricTTL)
-		a.Lock()
-		defer a.Unlock()
 		if err == nil {
+			a.Lock()
 			c.Saved = true
+			a.Unlock()
 			log.Debug("save complete. %v", c)
 			chunkSaveOk.Inc(1)
 		} else {
@@ -252,9 +254,15 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	}
 
 	if t0 == currentChunk.T0 {
+
+		if currentChunk.Saved {
+			//TODO(awoods): allow the chunk to be re-opened.
+			log.Error(3, "cant write to chunk that has already been saved.", nil)
+			return
+		}
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(1, "failed to add metric to chunk. %s", err)
+			log.Error(3, "failed to add metric to chunk. %s", err)
 			return
 		}
 	} else {

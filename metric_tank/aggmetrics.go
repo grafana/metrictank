@@ -14,7 +14,7 @@ import (
 var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
 
 type AggMetrics struct {
-	sync.Mutex
+	sync.RWMutex
 	Metrics      map[string]*AggMetric
 	chunkSpan    uint32
 	numChunks    uint32
@@ -36,11 +36,11 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 	dataFile, err := os.Open(*dumpFile)
 
 	if err == nil {
-		log.Info("loading aggMetrics from file.")
+		log.Info("loading aggMetrics from file " + *dumpFile)
 		dataDecoder := gob.NewDecoder(dataFile)
 		err = dataDecoder.Decode(&ms)
 		if err != nil {
-			log.Error(1, "failed to load aggMetrics from file. %s", err)
+			log.Error(3, "failed to load aggMetrics from file. %s", err)
 		}
 		dataFile.Close()
 		log.Info("aggMetrics loaded from file.")
@@ -60,9 +60,9 @@ func (ms *AggMetrics) stats() {
 	metricsActive := gometrics.NewGauge()
 	gometrics.Register("metrics_active", metricsActive)
 	for range time.Tick(time.Duration(1) * time.Second) {
-		ms.Lock()
+		ms.RLock()
 		l := len(ms.Metrics)
-		ms.Unlock()
+		ms.RUnlock()
 		metricsActive.Update(int64(l))
 	}
 }
@@ -73,21 +73,33 @@ func (ms *AggMetrics) GC() {
 	for now := range ticker {
 		log.Info("checking for stale chunks that need persisting.")
 		minTs := uint32(now.Unix()) - uint32(*gcInterval)
-		ms.Lock()
-		for key, a := range ms.Metrics {
+
+		// as this is the only goroutine that can delete from ms.Metrics
+		// we only need to lock long enough to get the list of actives metrics.
+		// it doesnt matter if new metrics are added while we iterate this list.
+		ms.RLock()
+		keys := make([]string, 0, len(ms.Metrics))
+		for k := range ms.Metrics {
+			keys = append(keys, k)
+		}
+		ms.RUnlock()
+		for _, key := range keys {
+			ms.RLock()
+			a := ms.Metrics[key]
+			ms.RUnlock()
 			if stale := a.GC(minTs); stale {
 				log.Info("metric %s is stale. Purging data from memory.", key)
 				delete(ms.Metrics, key)
 			}
 		}
-		ms.Unlock()
+
 	}
 }
 
 func (ms *AggMetrics) Get(key string) (Metric, bool) {
-	ms.Lock()
+	ms.RLock()
 	m, ok := ms.Metrics[key]
-	ms.Unlock()
+	ms.RUnlock()
 	return m, ok
 }
 
@@ -113,9 +125,11 @@ func (ms *AggMetrics) Persist() error {
 	}
 
 	dataEncoder := gob.NewEncoder(dataFile)
+	ms.RLock()
 	err = dataEncoder.Encode(*ms)
+	ms.RUnlock()
 	if err != nil {
-		log.Error(0, "failed to encode aggMetrics to binary format. %s", err)
+		log.Error(3, "failed to encode aggMetrics to binary format. %s", err)
 	} else {
 		log.Info("successfully persisted aggMetrics to disk.")
 	}
