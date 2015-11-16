@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"net"
 	"net/http"
 	_ "net/http/pprof"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/rakyll/globalconf"
-	gometrics "github.com/rcrowley/go-metrics"
 )
 
 var (
@@ -85,6 +83,9 @@ var cassandraGetDuration met.Timer
 var inItems met.Meter
 var msgsHandleOK met.Count
 var msgsHandleFail met.Count
+var alloc met.Gauge
+var totalAlloc met.Gauge
+var sysBytes met.Gauge
 
 func main() {
 	flag.Parse()
@@ -112,7 +113,7 @@ func main() {
 	if err != nil {
 		log.Fatal(0, "failed to lookup hostname. %s", err)
 	}
-	stats, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_tank", strings.Replace(hostname, ".", "_", -1))
+	stats, err := helper.New(true, *statsdAddr, *statsdType, "metric_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
 		log.Fatal(0, "failed to initialize statsd. %s", err)
 	}
@@ -185,23 +186,14 @@ func main() {
 	}
 
 	go func() {
-		alloc := gometrics.NewGauge()
-		totalAlloc := gometrics.NewGauge()
-		sys := gometrics.NewGauge()
-		gometrics.Register("bytes_alloc_not_freed", alloc)
-		gometrics.Register("bytes_alloc_incl_freed", totalAlloc)
-		gometrics.Register("bytes_sys", sys)
 		m := &runtime.MemStats{}
 		for range time.Tick(time.Duration(1) * time.Second) {
 			runtime.ReadMemStats(m)
-			alloc.Update(int64(m.Alloc))
-			totalAlloc.Update(int64(m.TotalAlloc))
-			sys.Update(int64(m.Sys))
+			alloc.Value(int64(m.Alloc))
+			totalAlloc.Value(int64(m.TotalAlloc))
+			sysBytes.Value(int64(m.Sys))
 		}
 	}()
-
-	addr, _ := net.ResolveTCPAddr("tcp", "influxdb:2003")
-	go gometrics.Graphite(gometrics.DefaultRegistry, 10e9, fmt.Sprintf("metrics.nsq_metrics_tank.%s.", *instance), addr)
 
 	go func() {
 		http.HandleFunc("/get", Get)
@@ -248,4 +240,7 @@ func initMetrics(stats met.Backend) {
 	inItems = stats.NewMeter("in.items", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")
 	msgsHandleFail = stats.NewCount("handle.fail")
+	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
+	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
+	sysBytes = stats.NewGauge("bytes_sys", 0)
 }
