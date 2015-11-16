@@ -44,6 +44,17 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 		}
 		dataFile.Close()
 		log.Info("aggMetrics loaded from file.")
+		if ms.numChunks != numChunks {
+			if ms.numChunks > numChunks {
+				log.Fatal(3, "numChunks can not be decreased.")
+			}
+			log.Info("numChunks has changed. Updating memory structures.")
+			for _, m := range ms.Metrics {
+				m.NumChunks = numChunks
+			}
+			ms.numChunks = numChunks
+			log.Info("memory structures updated.")
+		}
 	} else {
 		log.Info("starting with fresh aggmetrics.")
 	}
@@ -137,12 +148,14 @@ func (ms *AggMetrics) Persist() error {
 }
 
 type aggMetricsOnDisk struct {
-	Metrics map[string]*AggMetric
+	Metrics   map[string]*AggMetric
+	NumChunks uint32
 }
 
 func (a AggMetrics) GobEncode() ([]byte, error) {
 	aOnDisk := aggMetricsOnDisk{
-		Metrics: a.Metrics,
+		Metrics:   a.Metrics,
+		NumChunks: a.numChunks,
 	}
 	var b bytes.Buffer
 	enc := gob.NewEncoder(&b)
@@ -160,5 +173,6 @@ func (a *AggMetrics) GobDecode(data []byte) error {
 		return err
 	}
 	a.Metrics = aOnDisk.Metrics
+	a.numChunks = aOnDisk.NumChunks
 	return nil
 }

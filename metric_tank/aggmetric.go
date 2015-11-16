@@ -29,7 +29,7 @@ func init() {
 type AggMetric struct {
 	sync.RWMutex
 	Key             string
-	CurrentChunkPos uint32 // element in []Chunks that is active. All others are either finished or nil.
+	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*Chunk
@@ -38,10 +38,34 @@ type AggMetric struct {
 
 type aggMetricOnDisk struct {
 	Key             string
-	CurrentChunkPos uint32
+	CurrentChunkPos int
 	NumChunks       uint32
 	ChunkSpan       uint32
 	Chunks          []*Chunk
+}
+
+// re-order the chunks with the oldest at start of the list and newest at the end.
+// this is to support increaseing the chunkspan in future at startup.
+func (a *aggMetricOnDisk) orderedChunks() []*Chunk {
+	orderdChunks := make([]*Chunk, len(a.Chunks))
+	if uint32(len(a.Chunks)) < a.NumChunks {
+		// the circular buffer is not yet full.
+		orderdChunks = a.Chunks
+	} else {
+		// start by writting the oldest chunk first, then each chunk in turn.
+		pos := a.CurrentChunkPos - 1
+		if pos < 0 {
+			pos += len(a.Chunks)
+		}
+		for i := 0; i < len(a.Chunks); i++ {
+			orderdChunks[i] = a.Chunks[pos]
+			pos++
+			if pos >= len(a.Chunks) {
+				pos = 0
+			}
+		}
+	}
+	return orderdChunks
 }
 
 func (a AggMetric) GobEncode() ([]byte, error) {
@@ -68,10 +92,12 @@ func (a *AggMetric) GobDecode(data []byte) error {
 		return err
 	}
 	a.Key = aOnDisk.Key
-	a.CurrentChunkPos = aOnDisk.CurrentChunkPos
+
 	a.NumChunks = aOnDisk.NumChunks
 	a.ChunkSpan = aOnDisk.ChunkSpan
-	a.Chunks = aOnDisk.Chunks
+	a.Chunks = aOnDisk.orderedChunks()
+	//the current chunk is the last chunk.
+	a.CurrentChunkPos = len(a.Chunks) - 1
 	return nil
 }
 
@@ -105,8 +131,8 @@ func (a *AggMetric) stats() {
 	}
 }
 
-func (a *AggMetric) getChunk(pos uint32) *Chunk {
-	if int(pos) >= len(a.Chunks) {
+func (a *AggMetric) getChunk(pos int) *Chunk {
+	if pos >= len(a.Chunks) {
 		return nil
 	}
 	return a.Chunks[pos]
@@ -114,6 +140,7 @@ func (a *AggMetric) getChunk(pos uint32) *Chunk {
 
 // Get all data between the requested time rages. From is inclusive, to is exclusive. from <= x < to
 func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
+	log.Debug("GET: %s from: %d to:%d", a.Key, from, to)
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
@@ -128,10 +155,12 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 
 	if newestChunk == nil {
 		// we dont have any data yet.
+		log.Debug("no data for requested range.")
 		return 0, make([]*tsz.Iter, 0)
 	}
 	if firstT0 > newestChunk.T0 {
 		// we have no data in the requested range.
+		log.Debug("no data for requested range.")
 		return 0, make([]*tsz.Iter, 0)
 	}
 
@@ -143,24 +172,18 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	// -----------------------------
 	// | n-2 | n-1 | n | n-4 | n-3 |  CurrentChunkPos = 3
 	// -----------------------------
-	oldestPos := (a.CurrentChunkPos - a.NumChunks) + a.NumChunks + 1
-	if oldestPos >= a.NumChunks {
-		oldestPos -= a.NumChunks
+	oldestPos := a.CurrentChunkPos + 1
+	if oldestPos >= len(a.Chunks) {
+		oldestPos = 0
 	}
-	//old chunks may not yet have been initialized.
-	for a.getChunk(oldestPos) == nil {
-		oldestPos++
-		if oldestPos >= a.NumChunks {
-			oldestPos = 0
-		}
-	}
+
 	oldestChunk := a.getChunk(oldestPos)
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
 	// chunk, then we just use the oldest chunk.
 	for oldestChunk != nil && firstT0 > oldestChunk.T0 {
 		oldestPos++
-		if oldestPos >= a.NumChunks {
+		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 		oldestChunk = a.getChunk(oldestPos)
@@ -173,7 +196,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	for lastT0 < newestChunk.T0 {
 		newestPos--
 		if newestPos < 0 {
-			newestPos += (a.NumChunks - 1)
+			newestPos += int(a.NumChunks)
 		}
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
@@ -187,7 +210,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	for oldestPos != newestPos {
 		iters = append(iters, a.getChunk(oldestPos).Iter())
 		oldestPos++
-		if oldestPos >= a.NumChunks {
+		if oldestPos >= int(a.NumChunks) {
 			oldestPos = 0
 		}
 	}
@@ -270,7 +293,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.Persist(currentChunk)
 
 		a.CurrentChunkPos++
-		if a.CurrentChunkPos >= a.NumChunks {
+		if a.CurrentChunkPos >= int(a.NumChunks) {
 			a.CurrentChunkPos = 0
 		}
 
