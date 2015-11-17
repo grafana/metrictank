@@ -280,7 +280,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
-			log.Error(3, "cant write to chunk that has already been saved.", nil)
+			log.Error(3, "cant write to chunk that has already been saved. %s T0:%d", a.Key, currentChunk.T0)
 			return
 		}
 		// last prior data was in same chunk as new point
@@ -333,7 +333,7 @@ func (a *AggMetric) GC(minTs uint32) bool {
 			}
 		}
 		// chunk has not been written to in a while. Lets persist it.
-		log.Info("Found stale Chunk, persisting it to Cassandra.")
+		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
 		currentChunk.Finish()
 		a.Persist(currentChunk)
 	}
