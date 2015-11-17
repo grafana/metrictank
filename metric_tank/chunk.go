@@ -28,7 +28,7 @@ func (c *Chunk) String() string {
 }
 func (c *Chunk) Push(t uint32, v float64) error {
 	if t <= c.LastTs {
-		return fmt.Errorf("Can't push points that are older then points already added. t:%d lastTs: %d", t.c.LastTs)
+		return fmt.Errorf("Can't push points that are older then points already added. t:%d lastTs: %d", t, c.LastTs)
 	}
 	c.Series.Push(t, v)
 	c.NumPoints += 1
