@@ -20,6 +20,7 @@ chdir /
 #limit rtprio <softlimit> <hardlimit>
 #limit sigpending <softlimit> <hardlimit>
 #limit stack <softlimit> <hardlimit>
+kill timeout 60
 setuid root
 setgid root
 console log # log stdout/stderr to /var/log/upstart/
