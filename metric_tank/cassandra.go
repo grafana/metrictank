@@ -37,8 +37,10 @@ It's safe for concurrent use by multiple goroutines and a typical usage scenario
 object to interact with the whole Cassandra cluster.
 */
 var cSession *gocql.Session
+var writeSem chan bool
 
 func InitCassandra() error {
+	writeSem = make(chan bool, *cassandraWriteConcurrency)
 	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cluster.Consistency = gocql.One
 	var err error
@@ -67,6 +69,13 @@ func InitCassandra() error {
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
 func InsertMetric(key string, t0 uint32, data []byte, ttl int) error {
+	// increment our semaphore. if there are already <cassandraWriteConcurrency>
+	// writes running, this will block.
+	writeSem <- true
+	defer func() {
+		// write is complete, so decrement our semaphore.
+		<-writeSem
+	}()
 	// for unit tests
 	if cSession == nil {
 		return nil

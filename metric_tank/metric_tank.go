@@ -27,29 +27,32 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into cassandra")
 
-	// TODO split up for consumer and cassandra sender
-	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages and writing into cassandra. also number of nsq consumers for both high and low prio topic")
+	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages")
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 	channel     = flag.String("channel", "tank", "NSQ channel")
 	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
 	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
-	metricTTL   = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
-	cassandraPort = flag.Int("cassandra-port", 9042, "cassandra port")
-	listenAddr    = flag.String("listen", ":6060", "http listener address.")
+	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
+	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
+	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
+	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
+
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
 	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
 
-	logLevel   = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	gcInterval = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
-	confFile   = flag.String("config", "/etc/raintank/nsq_metrics_tank.ini", "configuration file (default /etc/raintank/nsq_metrics_tank.ini")
 
-	cassandraAddrs   = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
+	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+
+	confFile = flag.String("config", "/etc/raintank/nsq_metrics_tank.ini", "configuration file (default /etc/raintank/nsq_metrics_tank.ini")
+
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
