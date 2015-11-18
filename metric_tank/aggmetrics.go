@@ -49,9 +49,18 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uin
 				log.Fatal(3, "numChunks can not be decreased.")
 			}
 			log.Info("numChunks has changed. Updating memory structures.")
+			sem := make(chan bool, *concurrency)
 			for _, m := range ms.Metrics {
-				m.NumChunks = numChunks
+				sem <- true
+				go func() {
+					m.GrowNumChunks(numChunks)
+					<-sem
+				}()
 			}
+			for i := 0; i < cap(sem); i++ {
+				sem <- true
+			}
+
 			ms.numChunks = numChunks
 			log.Info("memory structures updated.")
 		}

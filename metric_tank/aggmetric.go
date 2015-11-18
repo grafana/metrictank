@@ -45,27 +45,32 @@ type aggMetricOnDisk struct {
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
-// this is to support increaseing the chunkspan in future at startup.
-func (a *aggMetricOnDisk) orderedChunks() []*Chunk {
+// this is to support increasing the chunkspan at startup.
+func (a *AggMetric) GrowNumChunks(numChunks uint32) {
+	a.Lock()
+	defer a.Unlock()
 	orderdChunks := make([]*Chunk, len(a.Chunks))
 	if uint32(len(a.Chunks)) < a.NumChunks {
 		// the circular buffer is not yet full.
-		orderdChunks = a.Chunks
-	} else {
-		// start by writting the oldest chunk first, then each chunk in turn.
-		pos := a.CurrentChunkPos - 1
-		if pos < 0 {
-			pos += len(a.Chunks)
-		}
-		for i := 0; i < len(a.Chunks); i++ {
-			orderdChunks[i] = a.Chunks[pos]
-			pos++
-			if pos >= len(a.Chunks) {
-				pos = 0
-			}
+		return
+	}
+
+	// start by writting the oldest chunk first, then each chunk in turn.
+	pos := a.CurrentChunkPos - 1
+	if pos < 0 {
+		pos += len(a.Chunks)
+	}
+	for i := 0; i < len(a.Chunks); i++ {
+		orderdChunks[i] = a.Chunks[pos]
+		pos++
+		if pos >= len(a.Chunks) {
+			pos = 0
 		}
 	}
-	return orderdChunks
+	a.Chunks = orderdChunks
+	a.CurrentChunkPos = len(a.Chunks) - 1
+	a.NumChunks = numChunks
+	return
 }
 
 func (a AggMetric) GobEncode() ([]byte, error) {
@@ -95,9 +100,9 @@ func (a *AggMetric) GobDecode(data []byte) error {
 
 	a.NumChunks = aOnDisk.NumChunks
 	a.ChunkSpan = aOnDisk.ChunkSpan
-	a.Chunks = aOnDisk.orderedChunks()
+	a.Chunks = aOnDisk.Chunks
 	//the current chunk is the last chunk.
-	a.CurrentChunkPos = len(a.Chunks) - 1
+	a.CurrentChunkPos = aOnDisk.CurrentChunkPos
 	return nil
 }
 
