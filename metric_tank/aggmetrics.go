@@ -83,7 +83,9 @@ func (ms *AggMetrics) GC() {
 	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
 	for now := range ticker {
 		log.Info("checking for stale chunks that need persisting.")
-		minTs := uint32(now.Unix()) - uint32(*gcInterval)
+		now := uint32(now.Unix())
+		chunkMinTs := now - (now % ms.chunkSpan) - uint32(*chunkMaxStale)
+		metricMinTs := now - (now % ms.chunkSpan) - uint32(*metricMaxStale)
 
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.
@@ -98,7 +100,7 @@ func (ms *AggMetrics) GC() {
 			ms.RLock()
 			a := ms.Metrics[key]
 			ms.RUnlock()
-			if stale := a.GC(minTs); stale {
+			if stale := a.GC(chunkMinTs, metricMinTs); stale {
 				log.Info("metric %s is stale. Purging data from memory.", key)
 				delete(ms.Metrics, key)
 			}

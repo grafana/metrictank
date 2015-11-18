@@ -317,7 +317,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	a.addAggregators(ts, val)
 }
 
-func (a *AggMetric) GC(minTs uint32) bool {
+func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
 	currentChunk := a.getChunk(a.CurrentChunkPos)
@@ -325,10 +325,10 @@ func (a *AggMetric) GC(minTs uint32) bool {
 		return false
 	}
 
-	if currentChunk.T0 < minTs {
+	if currentChunk.T0 < chunkMinTs {
 		if currentChunk.Saved {
 			// already saved. lets check if we should just delete the metric from memory.
-			if currentChunk.T0 < (minTs - (a.ChunkSpan * a.NumChunks)) {
+			if currentChunk.T0 < metricMinTs {
 				return true
 			}
 		}
