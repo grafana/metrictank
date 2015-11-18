@@ -161,12 +161,12 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	if newestChunk == nil {
 		// we dont have any data yet.
 		log.Debug("no data for requested range.")
-		return 0, make([]*tsz.Iter, 0)
+		return to, make([]*tsz.Iter, 0)
 	}
 	if firstT0 > newestChunk.T0 {
 		// we have no data in the requested range.
 		log.Debug("no data for requested range.")
-		return 0, make([]*tsz.Iter, 0)
+		return to, make([]*tsz.Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -206,7 +206,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			// the requested time range ends before we collected data.
-			return 0, make([]*tsz.Iter, 0)
+			return to, make([]*tsz.Iter, 0)
 		}
 	}
 
