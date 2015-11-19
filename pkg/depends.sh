@@ -29,8 +29,6 @@ git clone https://github.com/raintank/grafana.git
 ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/github.com/grafana/grafana
 # Only until this is done being in a different branch
 cd ${GOPATH}/src/github.com/raintank/grafana
-go run build.go setup
-godep restore
 
 # link our code to our gopath.
 ln -s $CHECKOUT $GOPATH/src/github.com/raintank/raintank-metric
