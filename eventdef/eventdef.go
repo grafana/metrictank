@@ -18,11 +18,11 @@ package eventdef
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/codeskyblue/go-uuid"
-	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
 )
