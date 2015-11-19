@@ -32,6 +32,9 @@ cd ${GOPATH}/src/github.com/raintank/grafana
 go run build.go setup
 godep restore
 
+# link our code to our gopath.
+ln -s $CHECKOUT $GOPATH/src/github.com/raintank/raintank-metric
+
 # it, erm, seems to not be finding all of the dependencies right now
 go get github.com/nsqio/go-nsq
 go get github.com/tinylib/msgp/msgp
