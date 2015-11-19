@@ -99,7 +99,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	done := make(chan error, 1)
 
 	// This notifies this function whether or not saving the event worked
-	status := make(chan *eventdef.BulkSaveStatus)
+	status := make(chan *eventdef.BulkSaveStatus, 1)
 	go func() {
 		pre := time.Now()
 		if err := eventdef.Save(event, status); err != nil {
