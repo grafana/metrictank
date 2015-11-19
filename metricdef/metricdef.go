@@ -46,6 +46,7 @@ func EnsureIndex(m *schema.MetricData) error {
 
 var es *elastigo.Conn
 var Indexer *elastigo.BulkIndexer
+var IndexName = "metric"
 
 func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
@@ -59,20 +60,94 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
-	if exists, err := es.ExistsIndex("metric", "metric_index", nil); err != nil && err.Error() != "record not found" {
+	if exists, err := es.ExistsIndex(IndexName, "", nil); err != nil && err.Error() != "record not found" {
 		return err
 	} else {
 		if !exists {
-			_, err = es.CreateIndex("metric")
+			//lets apply the mapping.
+			metricMapping := `{
+				"mappings": {
+		            "_default_": {
+		                "dynamic_templates": [
+		                    {
+		                        "strings": {
+		                            "mapping": {
+		                                "index": "not_analyzed",
+		                                "type": "string"
+		                            },
+		                            "match_mapping_type": "string"
+		                        }
+		                    }
+		                ],
+		                "_all": {
+		                    "enabled": false
+		                },
+		                "properties": {}
+		            },
+		            "metric_index": {
+		                "dynamic_templates": [
+		                    {
+		                        "strings": {
+		                            "mapping": {
+		                                "index": "not_analyzed",
+		                                "type": "string"
+		                            },
+		                            "match_mapping_type": "string"
+		                        }
+		                    }
+		                ],
+		                "_all": {
+		                    "enabled": false
+		                },
+		                "_timestamp": {
+		                    "enabled": false
+		                },
+		                "properties": {
+		                    "id": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "interval": {
+		                        "type": "long"
+		                    },
+		                    "lastUpdate": {
+		                        "type": "long"
+		                    },
+		                    "metric": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "name": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "node_count": {
+		                        "type": "long"
+		                    },
+		                    "org_id": {
+		                        "type": "long"
+		                    },
+		                    "tags": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "target_type": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "unit": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    }
+		                }
+					}
+				}
+			}`
+
+			_, err = es.DoCommand("PUT", fmt.Sprintf("/%s", IndexName), nil, metricMapping)
 			if err != nil {
 				return err
 			}
-		}
-		esopts := elastigo.MappingOptions{}
-
-		err = es.PutMapping("metric", "metric_index", schema.MetricDefinition{}, esopts)
-		if err != nil {
-			return err
 		}
 	}
 
