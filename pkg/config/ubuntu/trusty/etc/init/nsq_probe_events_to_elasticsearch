@@ -25,4 +25,4 @@ setgid root
 console log # log stdout/stderr to /var/log/upstart/
 
 
-exec /usr/sbin/nsq_probe_events_to_elasticsearch "-channel=elasticsearch" "-topic=probe_events" "-nsqd-tcp-address=localhost:4150"
+exec /usr/sbin/nsq_probe_events_to_elasticsearch "-config=/etc/raintank/nsq_probe_events_to_elasticsearch.ini"

@@ -29,15 +29,17 @@ mkdir -p ${BUILD}/etc/raintank
   #--deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
   #-C ${BUILD} -p ${PACKAGE_NAME} .
 
-for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch; do
+for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch metric_tank; do
 	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
 	NSQ_PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
 	mkdir -p ${NSQ_BUILD}/usr/sbin
 	mkdir -p ${NSQ_BUILD}/etc/init
-	cp ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf ${NSQ_BUILD}/etc/init
+	mkdir -p ${NSQ_BUILD}/etc/raintank
+	#cp ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf ${NSQ_BUILD}/etc/init
+	cp ${DIR}/config/ubuntu/trusty/etc/raintank/${VAR}.ini ${NSQ_BUILD}/etc/raintank
 	cp ${DIR}/artifacts/$VAR ${NSQ_BUILD}/usr/sbin
 	fpm -s dir -t deb \
 	  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric $VAR worker" \
-	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf \
+	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR} \
 	  -C ${NSQ_BUILD} -p ${NSQ_PACKAGE_NAME} .
 done

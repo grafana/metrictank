@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/grafana/grafana/pkg/log"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"github.com/nsqio/go-nsq"
@@ -21,6 +21,7 @@ import (
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/msg"
+	"github.com/rakyll/globalconf"
 )
 
 var (
@@ -35,10 +36,13 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address (default: localhost:8125)")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog (default: standard)")
+	confFile   = flag.String("config", "/etc/raintank/nsq_metrics_to_elasticsearch.ini", "configuration file (default /etc/raintank/nsq_metrics_to_elasticsearch.ini")
 
-	consumerOpts     = app.StringArray{}
-	nsqdTCPAddrs     = app.StringArray{}
-	lookupdHTTPAddrs = app.StringArray{}
+	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
+	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+
+	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
 	metricsToEsOK     met.Count
 	metricsToEsFail   met.Count
@@ -49,12 +53,6 @@ var (
 	msgsHandleOK      met.Count
 	msgsHandleFail    met.Count
 )
-
-func init() {
-	flag.Var(&consumerOpts, "consumer-opt", "option to passthrough to nsq.Consumer (may be given multiple times, http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	flag.Var(&nsqdTCPAddrs, "nsqd-tcp-address", "nsqd TCP address (may be given multiple times)")
-	flag.Var(&lookupdHTTPAddrs, "lookupd-http-address", "lookupd HTTP address (may be given multiple times)")
-}
 
 type ESHandler struct {
 }
@@ -69,14 +67,14 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 	ms, err := msg.MetricDataFromMsg(m.Body)
 	if err != nil {
-		log.Println("ERROR:", err, "skipping message")
+		log.Error(3, "failed to get metric from message, skipping. %s", err)
 		return nil
 	}
 	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
 
 	err = ms.DecodeMetricData()
 	if err != nil {
-		log.Println("ERROR:", err, "skipping message")
+		log.Error(3, "failed to decode message body, skipping. %s", err)
 		return nil
 	}
 	metricsPerMessage.Value(int64(len(ms.Metrics)))
@@ -86,7 +84,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		pre := time.Now()
 		for i, m := range ms.Metrics {
 			if err := metricdef.EnsureIndex(m); err != nil {
-				fmt.Printf("ERROR: couldn't process %s: %s\n", m.Id, err)
+				log.Error(3, "couldn't process %s: %s", m.Id(), err)
 				metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
 				done <- err
 				return
@@ -109,34 +107,47 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 func main() {
 	flag.Parse()
 
+	// Only try and parse the conf file if it exists
+	if _, err := os.Stat(*confFile); err == nil {
+		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
+		if err != nil {
+			log.Fatal(3, "Could not parse config file. %s", err)
+			os.Exit(1)
+		}
+		conf.ParseAll()
+	}
+
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_elasticsearch")
 		return
 	}
 
+	//initialize logger.
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
+	log.Debug("debug log.")
 	if *channel == "" {
 		rand.Seed(time.Now().UnixNano())
 		*channel = fmt.Sprintf("tail%06d#ephemeral", rand.Int()%999999)
 	}
 
 	if *topic == "" {
-		log.Fatal("--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
-	if len(nsqdTCPAddrs) == 0 && len(lookupdHTTPAddrs) == 0 {
-		log.Fatal("--nsqd-tcp-address or --lookupd-http-address required")
+	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
-	if len(nsqdTCPAddrs) > 0 && len(lookupdHTTPAddrs) > 0 {
-		log.Fatal("use --nsqd-tcp-address or --lookupd-http-address not both")
+	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "could not resolve hostname. %s", err)
 	}
 	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_to_elasticsearch", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -153,57 +164,65 @@ func main() {
 
 	err = metricdef.InitElasticsearch(*esAddr, "", "")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
 	err = metricdef.InitRedis(*redisAddr, "", "")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to initialize redis. %s", err)
 	}
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "nsq_metrics_to_elasticsearch"
-	err = app.ParseOpts(cfg, consumerOpts)
+	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to parse consumer opts. %s", err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", metrics)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to create nsq consumer. %s", err)
 	}
 
 	handler, err := NewESHandler()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to create handler. %s", err)
 	}
 
 	consumer.AddConcurrentHandlers(handler, 80)
 
-	err = consumer.ConnectToNSQDs(nsqdTCPAddrs)
-	if err != nil {
-		log.Fatal(err)
+	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
+	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
+		nsqdAdds = []string{}
 	}
-	log.Println("connected to nsqd")
-
-	err = consumer.ConnectToNSQLookupds(lookupdHTTPAddrs)
+	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, "failed to connect to nsqd. %s", err)
+	}
+	log.Info("connected to nsqd")
+
+	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
+	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
+		lookupdAdds = []string{}
+	}
+	err = consumer.ConnectToNSQLookupds(lookupdAdds)
+	if err != nil {
+		log.Fatal(4, "failed to connect to nsqlookupd. %s", err)
 	}
 	go func() {
-		log.Println("INFO starting listener for http/debug on :6060")
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("INFO starting listener for http/debug on :6060")
+		log.Info("%s", http.ListenAndServe(":6060", nil))
 	}()
 
 	for {
 		select {
 		case <-consumer.StopChan:
+			//flush elastic BulkAPi buffer
+			metricdef.Indexer.Stop()
 			return
 		case <-sigChan:
 			consumer.Stop()
 			<-consumer.StopChan
-			//flush elastic BulkAPi buffer
-			metricdef.Indexer.Stop()
 		}
 	}
 }

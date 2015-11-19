@@ -1,0 +1,189 @@
+package main
+
+import (
+	"bytes"
+	"encoding/gob"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	gometrics "github.com/rcrowley/go-metrics"
+)
+
+var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
+
+type AggMetrics struct {
+	sync.RWMutex
+	Metrics      map[string]*AggMetric
+	chunkSpan    uint32
+	numChunks    uint32
+	aggSpan      uint32
+	aggChunkSpan uint32
+	aggNumChunks uint32
+}
+
+func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uint32) *AggMetrics {
+	ms := AggMetrics{
+		Metrics:      make(map[string]*AggMetric),
+		chunkSpan:    chunkSpan,
+		numChunks:    numChunks,
+		aggSpan:      aggSpan,
+		aggChunkSpan: aggChunkSpan,
+		aggNumChunks: aggNumChunks,
+	}
+	// open data file
+	dataFile, err := os.Open(*dumpFile)
+
+	if err == nil {
+		log.Info("loading aggMetrics from file " + *dumpFile)
+		dataDecoder := gob.NewDecoder(dataFile)
+		err = dataDecoder.Decode(&ms)
+		if err != nil {
+			log.Error(3, "failed to load aggMetrics from file. %s", err)
+		}
+		dataFile.Close()
+		log.Info("aggMetrics loaded from file.")
+		if ms.numChunks != numChunks {
+			if ms.numChunks > numChunks {
+				log.Fatal(3, "numChunks can not be decreased.")
+			}
+			log.Info("numChunks has changed. Updating memory structures.")
+			sem := make(chan bool, *concurrency)
+			for _, m := range ms.Metrics {
+				sem <- true
+				go func() {
+					m.GrowNumChunks(numChunks)
+					<-sem
+				}()
+			}
+			for i := 0; i < cap(sem); i++ {
+				sem <- true
+			}
+
+			ms.numChunks = numChunks
+			log.Info("memory structures updated.")
+		}
+	} else {
+		log.Info("starting with fresh aggmetrics.")
+	}
+
+	go ms.stats()
+	go ms.GC()
+	return &ms
+}
+
+func (ms *AggMetrics) stats() {
+	gometrics.Register("points_per_metric", points)
+	points.Update(0)
+
+	metricsActive := gometrics.NewGauge()
+	gometrics.Register("metrics_active", metricsActive)
+	for range time.Tick(time.Duration(1) * time.Second) {
+		ms.RLock()
+		l := len(ms.Metrics)
+		ms.RUnlock()
+		metricsActive.Update(int64(l))
+	}
+}
+
+// periodically scan chunks and close any that have not recieved data in a while
+func (ms *AggMetrics) GC() {
+	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
+	for now := range ticker {
+		log.Info("checking for stale chunks that need persisting.")
+		now := uint32(now.Unix())
+		chunkMinTs := now - (now % ms.chunkSpan) - uint32(*chunkMaxStale)
+		metricMinTs := now - (now % ms.chunkSpan) - uint32(*metricMaxStale)
+
+		// as this is the only goroutine that can delete from ms.Metrics
+		// we only need to lock long enough to get the list of actives metrics.
+		// it doesnt matter if new metrics are added while we iterate this list.
+		ms.RLock()
+		keys := make([]string, 0, len(ms.Metrics))
+		for k := range ms.Metrics {
+			keys = append(keys, k)
+		}
+		ms.RUnlock()
+		for _, key := range keys {
+			ms.RLock()
+			a := ms.Metrics[key]
+			ms.RUnlock()
+			if stale := a.GC(chunkMinTs, metricMinTs); stale {
+				log.Info("metric %s is stale. Purging data from memory.", key)
+				delete(ms.Metrics, key)
+			}
+		}
+
+	}
+}
+
+func (ms *AggMetrics) Get(key string) (Metric, bool) {
+	ms.RLock()
+	m, ok := ms.Metrics[key]
+	ms.RUnlock()
+	return m, ok
+}
+
+func (ms *AggMetrics) GetOrCreate(key string) Metric {
+	ms.Lock()
+	m, ok := ms.Metrics[key]
+	if !ok {
+		//m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, aggSetting{ms.aggSpan, ms.aggChunkSpan, ms.aggNumChunks})
+		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks)
+		ms.Metrics[key] = m
+	}
+	ms.Unlock()
+	return m
+}
+
+func (ms *AggMetrics) Persist() error {
+	// create a file\
+	log.Info("persisting aggmetrics to disk.")
+	dataFile, err := os.Create(*dumpFile)
+	defer dataFile.Close()
+	if err != nil {
+		return err
+	}
+
+	dataEncoder := gob.NewEncoder(dataFile)
+	ms.RLock()
+	err = dataEncoder.Encode(*ms)
+	ms.RUnlock()
+	if err != nil {
+		log.Error(3, "failed to encode aggMetrics to binary format. %s", err)
+	} else {
+		log.Info("successfully persisted aggMetrics to disk.")
+	}
+	return nil
+}
+
+type aggMetricsOnDisk struct {
+	Metrics   map[string]*AggMetric
+	NumChunks uint32
+}
+
+func (a AggMetrics) GobEncode() ([]byte, error) {
+	aOnDisk := aggMetricsOnDisk{
+		Metrics:   a.Metrics,
+		NumChunks: a.numChunks,
+	}
+	var b bytes.Buffer
+	enc := gob.NewEncoder(&b)
+	err := enc.Encode(aOnDisk)
+
+	return b.Bytes(), err
+}
+
+func (a *AggMetrics) GobDecode(data []byte) error {
+	r := bytes.NewReader(data)
+	dec := gob.NewDecoder(r)
+	aOnDisk := &aggMetricsOnDisk{}
+	err := dec.Decode(aOnDisk)
+	if err != nil {
+		return err
+	}
+	a.Metrics = aOnDisk.Metrics
+	a.numChunks = aOnDisk.NumChunks
+	return nil
+}
