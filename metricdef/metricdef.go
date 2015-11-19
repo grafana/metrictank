@@ -19,10 +19,11 @@ package metricdef
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
 	"strings"
 	"time"
 
+	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
 	"gopkg.in/redis.v2"
@@ -46,6 +47,7 @@ func EnsureIndex(m *schema.MetricData) error {
 
 var es *elastigo.Conn
 var Indexer *elastigo.BulkIndexer
+var IndexName = "metric"
 
 func InitElasticsearch(addr, user, pass string) error {
 	es = elastigo.NewConn()
@@ -59,20 +61,95 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Username = user
 		es.Password = pass
 	}
-	if exists, err := es.ExistsIndex("metric", "metric_index", nil); err != nil && err.Error() != "record not found" {
+	if exists, err := es.ExistsIndex(IndexName, "", nil); err != nil && err.Error() != "record not found" {
 		return err
 	} else {
 		if !exists {
-			_, err = es.CreateIndex("metric")
+			log.Info("initializing %s Index with mapping", IndexName)
+			//lets apply the mapping.
+			metricMapping := `{
+				"mappings": {
+		            "_default_": {
+		                "dynamic_templates": [
+		                    {
+		                        "strings": {
+		                            "mapping": {
+		                                "index": "not_analyzed",
+		                                "type": "string"
+		                            },
+		                            "match_mapping_type": "string"
+		                        }
+		                    }
+		                ],
+		                "_all": {
+		                    "enabled": false
+		                },
+		                "properties": {}
+		            },
+		            "metric_index": {
+		                "dynamic_templates": [
+		                    {
+		                        "strings": {
+		                            "mapping": {
+		                                "index": "not_analyzed",
+		                                "type": "string"
+		                            },
+		                            "match_mapping_type": "string"
+		                        }
+		                    }
+		                ],
+		                "_all": {
+		                    "enabled": false
+		                },
+		                "_timestamp": {
+		                    "enabled": false
+		                },
+		                "properties": {
+		                    "id": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "interval": {
+		                        "type": "long"
+		                    },
+		                    "lastUpdate": {
+		                        "type": "long"
+		                    },
+		                    "metric": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "name": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "node_count": {
+		                        "type": "long"
+		                    },
+		                    "org_id": {
+		                        "type": "long"
+		                    },
+		                    "tags": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "target_type": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    },
+		                    "unit": {
+		                        "type": "string",
+		                        "index": "not_analyzed"
+		                    }
+		                }
+					}
+				}
+			}`
+
+			_, err = es.DoCommand("PUT", fmt.Sprintf("/%s", IndexName), nil, metricMapping)
 			if err != nil {
 				return err
 			}
-		}
-		esopts := elastigo.MappingOptions{}
-
-		err = es.PutMapping("metric", "metric_index", schema.MetricDefinition{}, esopts)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -114,19 +191,19 @@ func Save(m *schema.MetricDefinition) error {
 }
 
 func indexMetric(m *schema.MetricDefinition) error {
-	log.Printf("indexing %s in redis\n", m.Id)
+	log.Debug("indexing %s in redis", m.Id)
 	metricStr, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 	if rerr := rs.SetEx(m.Id, time.Duration(300)*time.Second, string(metricStr)).Err(); err != nil {
-		fmt.Printf("redis err: %s", rerr.Error())
+		log.Error(3, "redis err. %s", rerr)
 	}
 
-	log.Printf("indexing %s in elasticsearch\n", m.Id)
+	log.Debug("indexing %s in elasticsearch", m.Id)
 	err = Indexer.Index("metric", "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
-		log.Printf("failed to send payload to BulkApi indexer.")
+		log.Error(3, "failed to send payload to BulkApi indexer. %s", err)
 		return err
 	}
 
@@ -136,7 +213,7 @@ func indexMetric(m *schema.MetricDefinition) error {
 func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
-		log.Printf("Error: the redis client bombed: %s", err.Error())
+		log.Error(3, "The redis client bombed: %s", err)
 		return nil, err
 	} else if err == nil {
 		//fmt.Printf("json for %s found in redis\n", id)
@@ -147,16 +224,20 @@ func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 		return def, nil
 	}
 
-	log.Printf("checking elasticsearch for %s\n", id)
+	log.Debug("%s not in redis. checking elasticsearch.", id)
 	res, err := es.Get("metric", "metric_index", id, nil)
 	if err != nil {
-		log.Printf("elasticsearch query failed. %s\n", err.Error())
+		if err == elastigo.RecordNotFound {
+			log.Debug("%s not in ES. %s", id, err)
+		} else {
+			log.Error(3, "elasticsearch query failed. %s", err)
+		}
 		return nil, err
 	}
 	//fmt.Printf("elasticsearch query returned %q\n", res.Source)
 	//fmt.Printf("placing %s into redis\n", id)
 	if rerr := rs.SetEx(id, time.Duration(300)*time.Second, string(*res.Source)).Err(); err != nil {
-		log.Printf("redis err: %s", rerr.Error())
+		log.Error(3, "redis err. %s", rerr)
 	}
 
 	def, err := schema.MetricDefinitionFromJSON(*res.Source)

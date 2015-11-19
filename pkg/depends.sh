@@ -28,19 +28,7 @@ git clone https://github.com/raintank/grafana.git
 #ls ${GOPATH}/src/github.com/grafana
 ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/github.com/grafana/grafana
 # Only until this is done being in a different branch
-cd ${GOPATH}/src/github.com/raintank/grafana
-go run build.go setup
-godep restore
+#cd ${GOPATH}/src/github.com/raintank/grafana
 
-# it, erm, seems to not be finding all of the dependencies right now
-go get github.com/nsqio/go-nsq
-go get github.com/tinylib/msgp/msgp
-go get github.com/ctdk/goas/v2/logger
-go get github.com/jessevdk/go-flags
-go get github.com/BurntSushi/toml
-go get github.com/mattbaird/elastigo/lib
-go get gopkg.in/redis.v2
-go get github.com/bitly/go-hostpool
-go get github.com/marpaia/graphite-golang
-go get github.com/codeskyblue/go-uuid
-go get github.com/rakyll/globalconf
+# link our code to our gopath.
+ln -s $CHECKOUT $GOPATH/src/github.com/raintank/raintank-metric
