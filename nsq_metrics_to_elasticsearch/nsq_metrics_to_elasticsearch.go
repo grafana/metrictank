@@ -84,7 +84,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		pre := time.Now()
 		for i, m := range ms.Metrics {
 			if err := metricdef.EnsureIndex(m); err != nil {
-				log.Error(3, "couldn't process %s: %s", m.Id, err)
+				log.Error(3, "couldn't process %s: %s", m.Id(), err)
 				metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
 				done <- err
 				return
