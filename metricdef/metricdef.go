@@ -19,10 +19,11 @@ package metricdef
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
 	"strings"
 	"time"
 
+	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
 	"gopkg.in/redis.v2"
@@ -64,6 +65,7 @@ func InitElasticsearch(addr, user, pass string) error {
 		return err
 	} else {
 		if !exists {
+			log.Info("initializing %s Index with mapping", IndexName)
 			//lets apply the mapping.
 			metricMapping := `{
 				"mappings": {
@@ -189,19 +191,19 @@ func Save(m *schema.MetricDefinition) error {
 }
 
 func indexMetric(m *schema.MetricDefinition) error {
-	log.Printf("indexing %s in redis\n", m.Id)
+	log.Debug("indexing %s in redis", m.Id)
 	metricStr, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 	if rerr := rs.SetEx(m.Id, time.Duration(300)*time.Second, string(metricStr)).Err(); err != nil {
-		fmt.Printf("redis err: %s", rerr.Error())
+		log.Error(3, "redis err. %s", rerr)
 	}
 
-	log.Printf("indexing %s in elasticsearch\n", m.Id)
+	log.Debug("indexing %s in elasticsearch", m.Id)
 	err = Indexer.Index("metric", "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
-		log.Printf("failed to send payload to BulkApi indexer.")
+		log.Error(3, "failed to send payload to BulkApi indexer. %s", err)
 		return err
 	}
 
@@ -211,7 +213,7 @@ func indexMetric(m *schema.MetricDefinition) error {
 func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
-		log.Printf("Error: the redis client bombed: %s", err.Error())
+		log.Error(3, "The redis client bombed: %s", err)
 		return nil, err
 	} else if err == nil {
 		//fmt.Printf("json for %s found in redis\n", id)
@@ -222,16 +224,20 @@ func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 		return def, nil
 	}
 
-	log.Printf("checking elasticsearch for %s\n", id)
+	log.Debug("%s not in redis. checking elasticsearch.", id)
 	res, err := es.Get("metric", "metric_index", id, nil)
 	if err != nil {
-		log.Printf("elasticsearch query failed. %s\n", err.Error())
+		if err == elastigo.RecordNotFound {
+			log.Debug("%s not in ES. %s", id, err)
+		} else {
+			log.Error(3, "elasticsearch query failed. %s", err)
+		}
 		return nil, err
 	}
 	//fmt.Printf("elasticsearch query returned %q\n", res.Source)
 	//fmt.Printf("placing %s into redis\n", id)
 	if rerr := rs.SetEx(id, time.Duration(300)*time.Second, string(*res.Source)).Err(); err != nil {
-		log.Printf("redis err: %s", rerr.Error())
+		log.Error(3, "redis err. %s", rerr)
 	}
 
 	def, err := schema.MetricDefinitionFromJSON(*res.Source)
