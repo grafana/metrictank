@@ -142,6 +142,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	return m
 }
 
+// Persist saves the AggMetrics to disk.
 func (ms *AggMetrics) Persist() error {
 	// create a file\
 	log.Info("persisting aggmetrics to disk.")

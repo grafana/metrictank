@@ -69,8 +69,8 @@ func InitCassandra() error {
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
 func InsertMetric(key string, t0 uint32, data []byte, ttl int) error {
-	// increment our semaphore. if there are already <cassandraWriteConcurrency>
-	// writes running, this will block.
+	// increment our semaphore.
+	// blocks if <cassandraWriteConcurrency> writers are already running
 	writeSem <- true
 	defer func() {
 		// write is complete, so decrement our semaphore.
