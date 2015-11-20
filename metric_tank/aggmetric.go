@@ -144,6 +144,7 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 }
 
 // Get all data between the requested time rages. From is inclusive, to is exclusive. from <= x < to
+// more data then what's requested may be included
 func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	log.Debug("GET: %s from: %d to:%d", a.Key, from, to)
 	if from >= to {
