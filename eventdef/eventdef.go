@@ -66,6 +66,46 @@ func InitElasticsearch(addr, user, pass string) error {
 		es.Password = pass
 	}
 
+	// ensure that our index templates exist
+	tmpl := `{
+		"template" : "events-*",
+		"mappings" : {
+			"_default_" : {
+				"_all" : {
+					"enabled" : false
+				},
+				"dynamic_templates": [
+					{
+						"strings": {
+							"mapping": {
+								"index": "not_analyzed",
+								"type": "string"
+							},
+							"match_mapping_type": "string",
+							"umatch": "message"
+						}
+					},
+					{
+						"message": {
+							"mapping": {
+								"type": "string",
+								"norms": {
+									"enabled": false
+								},
+								"index_options": "docs"
+							},
+							"match": "message"
+						}
+					}
+				]
+			}
+		}
+	}`
+	_, err = es.DoCommand("PUT", fmt.Sprintf("/_template/events"), nil, tmpl)
+	if err != nil {
+		return err
+	}
+
 	// Create the custom bulk sender, its map of queued event setatuses, and
 	// add the elasticsearhc connection
 	bSender = new(bulkSender)
