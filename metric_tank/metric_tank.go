@@ -108,7 +108,7 @@ func main() {
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
-		fmt.Println("nsq_metrics_tank")
+		fmt.Println("metrics_tank")
 		return
 	}
 	if *instance == "" {
@@ -147,7 +147,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_metrics_tank"
+	cfg.UserAgent = "metrics_tank"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
 		log.Fatal(0, "failed to parse nsq consumer options. %s", err)
