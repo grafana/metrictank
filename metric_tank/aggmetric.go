@@ -248,25 +248,23 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 }
 
 func (a *AggMetric) Persist(c *Chunk) {
-	go func() {
-		log.Debug("starting to save %v", c)
-		a.RLock()
-		data := c.Series.Bytes()
-		a.RUnlock()
-		chunkSizeAtSave.Value(int64(len(data)))
-		err := InsertMetric(a.Key, c.T0, data, *metricTTL)
-		if err == nil {
-			a.Lock()
-			c.Saved = true
-			a.Unlock()
-			log.Debug("save complete. %v", c)
-			chunkSaveOk.Inc(1)
-		} else {
-			log.Error(1, "failed to save metric to cassandra. %v, %s", c, err)
-			chunkSaveFail.Inc(1)
-			// TODO
-		}
-	}()
+	log.Debug("starting to save %v", c)
+	a.RLock()
+	data := c.Series.Bytes()
+	a.RUnlock()
+	chunkSizeAtSave.Value(int64(len(data)))
+	err := InsertMetric(a.Key, c.T0, data, *metricTTL)
+	if err == nil {
+		a.Lock()
+		c.Saved = true
+		a.Unlock()
+		log.Debug("save complete. %v", c)
+		chunkSaveOk.Inc(1)
+	} else {
+		log.Error(1, "failed to save metric to cassandra. %v, %s", c, err)
+		chunkSaveFail.Inc(1)
+		// TODO
+	}
 }
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
@@ -310,7 +308,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 	} else {
 		currentChunk.Finish()
-		a.Persist(currentChunk)
+		go a.Persist(currentChunk)
 
 		a.CurrentChunkPos++
 		if a.CurrentChunkPos >= int(a.NumChunks) {
@@ -355,7 +353,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		// chunk has not been written to in a while. Lets persist it.
 		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
 		currentChunk.Finish()
-		a.Persist(currentChunk)
+		go a.Persist(currentChunk)
 	}
 	return false
 }
