@@ -91,7 +91,8 @@ func (ms *AggMetrics) stats() {
 	}
 }
 
-// periodically scan chunks and close any that have not recieved data in a while
+// periodically scan chunks and close any that have not received data in a while
+// TODO instrument occurences and duration of GC
 func (ms *AggMetrics) GC() {
 	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
 	for now := range ticker {
