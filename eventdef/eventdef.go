@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/codeskyblue/go-uuid"
 	elastigo "github.com/mattbaird/elastigo/lib"
@@ -38,16 +38,16 @@ const retry = 60
 const flushBulk = 60
 
 type bulkSender struct {
-	m sync.RWMutex
-	conn *elastigo.Conn
-	queued map[string]chan *BulkSaveStatus
+	m           sync.RWMutex
+	conn        *elastigo.Conn
+	queued      map[string]chan *BulkSaveStatus
 	bulkIndexer *elastigo.BulkIndexer
-	numErrors uint64
+	numErrors   uint64
 }
 
 type BulkSaveStatus struct {
-	Id string
-	Ok bool
+	Id      string
+	Ok      bool
 	Requeue bool
 }
 
@@ -102,9 +102,9 @@ func Save(e *schema.ProbeEvent, status chan *BulkSaveStatus) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
-	
+
 	// Craft the elasticsearch index name from the event's timestamp
-	t := time.Unix(e.Timestamp / 1000, 0)
+	t := time.Unix(e.Timestamp/1000, 0)
 	y, m, d := t.Date()
 	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
 
@@ -158,8 +158,8 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 			errSend = fmt.Errorf("Bulk Insertion Error. Failed item count [%d]", len(response.Items))
 		}
 		// ack/requeue in a goroutine and let the sender move on
-		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}){
-			// If saving any items in the bulk save failed, 
+		go func(q map[string]chan *BulkSaveStatus, items []map[string]interface{}) {
+			// If saving any items in the bulk save failed,
 			// response.Items will be populated. However, successful
 			// saves may be in there as well. Go through the items
 			// if there are any and populate this map of bools to
@@ -227,7 +227,7 @@ func StopBulkIndexer() {
 }
 
 func setErrorTicker() {
-	// log elasticsearch errors 
+	// log elasticsearch errors
 	go func() {
 		for e := range bulk.ErrorChannel {
 			log.Printf("elasticsearch bulk error: %s", e.Err.Error())

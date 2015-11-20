@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nsqio/go-nsq"
 	met "github.com/grafana/grafana/pkg/metric"
+	"github.com/nsqio/go-nsq"
 )
 
 type Consumer struct {

@@ -17,16 +17,16 @@
 package eventdef
 
 import (
-	"github.com/raintank/raintank-metric/schema"
 	"fmt"
-	"log"
-	"testing"
-	"time"
+	"github.com/raintank/raintank-metric/schema"
 	"io"
+	"log"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
-	"net"
+	"testing"
+	"time"
 )
 
 var cmd *exec.Cmd
@@ -49,7 +49,7 @@ func init() {
 	os.Mkdir(fmt.Sprintf("%s/log", dataDir), os.FileMode(0700))
 	esEnv := os.Getenv("ES_COMMAND")
 	if esEnv == "" {
-		esargs = []string{ "elasticsearch", "--config=test_conf/elasticsearch.yml" }
+		esargs = []string{"elasticsearch", "--config=test_conf/elasticsearch.yml"}
 	} else {
 		esargs = strings.Split(esEnv, " ")
 	}
@@ -97,12 +97,12 @@ func init() {
 	}()
 
 	select {
-		case <-fin:
-			// indexing returned
-		case <-time.After(30 * time.Second):
-			log.Println("Starting elasticsearch timed out")
+	case <-fin:
+		// indexing returned
+	case <-time.After(30 * time.Second):
+		log.Println("Starting elasticsearch timed out")
 	}
-	
+
 	addr := "localhost:19200"
 	err := InitElasticsearch(addr, "", "")
 	if err != nil {
@@ -153,7 +153,7 @@ func TestMultipleSave(t *testing.T) {
 	var failure int
 
 	fin := make(chan int, 1)
-	go func(){
+	go func() {
 		for _, s := range done {
 			estat := <-s
 			if estat.Requeue {
@@ -165,17 +165,17 @@ func TestMultipleSave(t *testing.T) {
 		fin <- 1
 	}()
 	select {
-		case <-fin:
-			// indexing returned
-		case <-time.After(10 * time.Second):
-			t.Errorf("Saving timed out")
+	case <-fin:
+		// indexing returned
+	case <-time.After(10 * time.Second):
+		t.Errorf("Saving timed out")
 	}
 	if success < numEvents {
 		t.Errorf("Did not save all events successfully: %d succeeded, %d failed", success, failure)
 	}
 }
 
-func TestResubmitAll(t *testing.T){
+func TestResubmitAll(t *testing.T) {
 	// shut down elasticsearch here
 	perr := cmd.Process.Signal(os.Interrupt)
 	if perr != nil {
@@ -196,12 +196,12 @@ func TestResubmitAll(t *testing.T){
 	}()
 
 	select {
-		case <-fin:
-			// indexing returned
-		case <-time.After(30 * time.Second):
-			log.Println("Stopping elasticsearch timed out")
+	case <-fin:
+		// indexing returned
+	case <-time.After(30 * time.Second):
+		log.Println("Stopping elasticsearch timed out")
 	}
-	
+
 	numEvents := 100
 	done := make([]chan *BulkSaveStatus, numEvents)
 	for i := 0; i < numEvents; i++ {
@@ -216,7 +216,7 @@ func TestResubmitAll(t *testing.T){
 	var success int
 	var failure int
 
-	go func(){
+	go func() {
 		for _, s := range done {
 			estat := <-s
 			if estat.Requeue {
@@ -228,10 +228,10 @@ func TestResubmitAll(t *testing.T){
 		fin <- struct{}{}
 	}()
 	select {
-		case <-fin:
-			// indexing returned
-		case <-time.After(10 * time.Second):
-			t.Errorf("Saving timed out")
+	case <-fin:
+		// indexing returned
+	case <-time.After(10 * time.Second):
+		t.Errorf("Saving timed out")
 	}
 	if failure < numEvents {
 		t.Errorf("Did not save all events successfully: %d succeeded, %d failed", success, failure)

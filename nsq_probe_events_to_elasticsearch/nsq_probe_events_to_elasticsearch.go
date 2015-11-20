@@ -73,7 +73,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 	if m.Body[0] == '\x00' {
 		format = "msgFormatJson"
 	}
-	
+
 	var id int64
 	buf := bytes.NewReader(m.Body[1:9])
 	binary.Read(buf, binary.BigEndian, &id)
@@ -116,7 +116,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		msgsHandleFail.Inc(1)
 		return err
 	}
-	estat := <- status
+	estat := <-status
 	if estat.Requeue {
 		m.Requeue(-1)
 		msgsHandleFail.Inc(1)
