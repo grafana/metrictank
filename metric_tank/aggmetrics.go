@@ -15,22 +15,26 @@ var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
 
 type AggMetrics struct {
 	sync.RWMutex
-	Metrics      map[string]*AggMetric
-	chunkSpan    uint32
-	numChunks    uint32
-	aggSpan      uint32
-	aggChunkSpan uint32
-	aggNumChunks uint32
+	Metrics        map[string]*AggMetric
+	chunkSpan      uint32
+	numChunks      uint32
+	aggSpan        uint32
+	aggChunkSpan   uint32
+	aggNumChunks   uint32
+	chunkMaxStale  uint32
+	metricMaxStale uint32
 }
 
-func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks uint32) *AggMetrics {
+func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks, chunkMaxStale, metricMaxStale uint32) *AggMetrics {
 	ms := AggMetrics{
-		Metrics:      make(map[string]*AggMetric),
-		chunkSpan:    chunkSpan,
-		numChunks:    numChunks,
-		aggSpan:      aggSpan,
-		aggChunkSpan: aggChunkSpan,
-		aggNumChunks: aggNumChunks,
+		Metrics:        make(map[string]*AggMetric),
+		chunkSpan:      chunkSpan,
+		numChunks:      numChunks,
+		aggSpan:        aggSpan,
+		aggChunkSpan:   aggChunkSpan,
+		aggNumChunks:   aggNumChunks,
+		chunkMaxStale:  chunkMaxStale,
+		metricMaxStale: metricMaxStale,
 	}
 	// open data file
 	dataFile, err := os.Open(*dumpFile)
@@ -93,8 +97,8 @@ func (ms *AggMetrics) GC() {
 	for now := range ticker {
 		log.Info("checking for stale chunks that need persisting.")
 		now := uint32(now.Unix())
-		chunkMinTs := now - (now % ms.chunkSpan) - uint32(*chunkMaxStale)
-		metricMinTs := now - (now % ms.chunkSpan) - uint32(*metricMaxStale)
+		chunkMinTs := now - (now % ms.chunkSpan) - uint32(ms.chunkMaxStale)
+		metricMinTs := now - (now % ms.chunkSpan) - uint32(ms.metricMaxStale)
 
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.

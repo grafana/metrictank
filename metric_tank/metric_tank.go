@@ -48,8 +48,8 @@ var (
 	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
 
 	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
-	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "maximum number of seconds before a stale chunk is persisted to Cassandra.")
-	metricMaxStale = flag.Int("metric-max-stale", 21600, "maximum number of seconds before a stale metric is purged from memory.")
+	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
+	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
 
 	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
@@ -167,7 +167,7 @@ func main() {
 		log.Fatal(0, "failed to initialize cassandra. %s", err)
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), uint32(*chunkMaxStale), uint32(*metricMaxStale), 1)
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
