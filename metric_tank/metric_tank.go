@@ -53,7 +53,7 @@ var (
 
 	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
-	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file (default /etc/raintank/metric_tank.ini")
+	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
