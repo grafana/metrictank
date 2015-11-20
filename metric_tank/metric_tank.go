@@ -125,7 +125,7 @@ func main() {
 
 	if *channel == "" {
 		rand.Seed(time.Now().UnixNano())
-		*channel = fmt.Sprintf("tail%06d#ephemeral", rand.Int()%999999)
+		*channel = fmt.Sprintf("metric_tank%06d#ephemeral", rand.Int()%999999)
 	}
 
 	if *topic == "" {
