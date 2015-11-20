@@ -183,15 +183,29 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	}
 
 	oldestChunk := a.getChunk(oldestPos)
+	if oldestChunk == nil {
+		log.Error(3, "unexpected nil chunk.")
+		return to, make([]*tsz.Iter, 0)
+	}
+
+	if lastT0 < oldestChunk.T0 {
+		// the requested time range ends before any data we have.
+		log.Debug("no data for requested range")
+		return to, make([]*tsz.Iter, 0)
+	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
 	// chunk, then we just use the oldest chunk.
-	for oldestChunk != nil && firstT0 > oldestChunk.T0 {
+	for firstT0 > oldestChunk.T0 {
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 		oldestChunk = a.getChunk(oldestPos)
+		if oldestChunk == nil {
+			log.Error(3, "unexpected nil chunk.")
+			return to, make([]*tsz.Iter, 0)
+		}
 	}
 
 	firstT0 = oldestChunk.T0
@@ -201,11 +215,11 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	for lastT0 < newestChunk.T0 {
 		newestPos--
 		if newestPos < 0 {
-			newestPos += int(a.NumChunks)
+			newestPos += len(a.Chunks)
 		}
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
-			// the requested time range ends before we collected data.
+			log.Error(3, "unexpected nil chunk.")
 			return to, make([]*tsz.Iter, 0)
 		}
 	}
