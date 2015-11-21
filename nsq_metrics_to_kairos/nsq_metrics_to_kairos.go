@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	stdlog "log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -15,6 +15,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/bitly/go-hostpool"
+	"github.com/grafana/grafana/pkg/log"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"github.com/nsqio/go-nsq"
@@ -43,6 +44,7 @@ var (
 	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 )
 
 var metricsToKairosOK met.Count
@@ -68,11 +70,13 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			log.Fatal(err)
+			stdlog.Fatal(err)
 			os.Exit(1)
 		}
 		conf.ParseAll()
 	}
+
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_kairos")
@@ -80,11 +84,11 @@ func main() {
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_to_kairos", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	if *channel == "" {
@@ -93,7 +97,7 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal("--topic is required")
+		log.Fatal(0, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
@@ -110,18 +114,18 @@ func main() {
 	cfg.UserAgent = "nsq_metrics_to_kairos"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", metrics)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	consumerLowPrio, err := insq.NewConsumer(*topicLowPrio, *channel, cfg, "low_prio.%s", metrics)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	pCfg := nsq.NewConfig()
@@ -152,14 +156,14 @@ func main() {
 	for _, addr := range strings.Split(*nsqdTCPAddrs, ",") {
 		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
-			log.Fatalf("failed creating producer %s", err)
+			log.Fatalf(0, "failed creating producer %s", err.Error())
 		}
 		producers[addr] = producer
 	}
 
 	gateway, err := NewKairosGateway("http://"+*kairosAddr, *dryRun, *concurrency)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	handler := NewKairosHandler(gateway, hostPool, producers)
@@ -174,9 +178,9 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
-	log.Println("INFO : connected to nsqd")
+	log.Info("connected to nsqd")
 
 	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
 	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
@@ -184,23 +188,23 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	err = consumerLowPrio.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
-	log.Println("INFO : connected to nsqd")
+	log.Info("connected to nsqd")
 
 	err = consumerLowPrio.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	go func() {
-		log.Println("INFO starting listener for http/debug on :6060")
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("starting listener for http/debug on :6060")
+		log.Info("%s", http.ListenAndServe(":6060", nil))
 	}()
 
 	for {

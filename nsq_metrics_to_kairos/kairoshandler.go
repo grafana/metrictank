@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
 	"time"
 
 	"github.com/bitly/go-hostpool"
+	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 )
 
@@ -31,7 +31,7 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 	var id int64
 	binary.Read(buf, binary.BigEndian, &id)
 	if err != nil {
-		log.Printf("WARN : publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+		log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
 		hostPoolResponse.Mark(err)
 	}
 	return err
@@ -40,7 +40,7 @@ func (k *KairosHandler) trySubmit(body []byte) error {
 func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 	created := time.Unix(0, m.Timestamp)
 	if time.Now().Add(-time.Duration(4) * time.Minute).After(created) {
-		log.Printf("DEBUG: requeuing msg %s. timestamp: %s. attempts: %d\n ", m.ID, time.Unix(0, m.Timestamp), m.Attempts)
+		log.Debug("requeuing msg %s. timestamp: %s. attempts: %d\n ", m.ID, time.Unix(0, m.Timestamp), m.Attempts)
 		attempts := 3 // try 3 different hosts before giving up and requeuing
 		var err error
 		for attempt := 1; attempt <= attempts; attempt++ {
@@ -51,7 +51,7 @@ func (k *KairosHandler) HandleMessage(m *nsq.Message) error {
 			}
 		}
 		msgsToLowPrioFail.Inc(1)
-		log.Printf("WARN : failed to publish out of date message %s as low-prio. reprocessing later\n", m.ID)
+		log.Warn("failed to publish out of date message %s as low-prio. reprocessing later\n", m.ID)
 		return err
 	}
 	err := k.gateway.ProcessHighPrio(m)
