@@ -49,12 +49,15 @@ type aggMetricOnDisk struct {
 func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 	a.Lock()
 	defer a.Unlock()
-	orderdChunks := make([]*Chunk, len(a.Chunks))
+	a.NumChunks = numChunks
+
 	if uint32(len(a.Chunks)) < a.NumChunks {
-		// the circular buffer is not yet full.
+		// the circular buffer has never reached the original max size,
+		// so it must still be ordered.
 		return
 	}
 
+	orderdChunks := make([]*Chunk, len(a.Chunks))
 	// start by writting the oldest chunk first, then each chunk in turn.
 	pos := a.CurrentChunkPos - 1
 	if pos < 0 {
@@ -69,7 +72,6 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 	}
 	a.Chunks = orderdChunks
 	a.CurrentChunkPos = len(a.Chunks) - 1
-	a.NumChunks = numChunks
 	return
 }
 
