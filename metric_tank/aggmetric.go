@@ -215,8 +215,6 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		}
 	}
 
-	firstT0 = oldestChunk.T0
-
 	// find the newest Chunk that "to" falls in.  If "to" extends to after the newest data
 	// then just return the newest chunk.
 	for lastT0 < newestChunk.T0 {
@@ -243,7 +241,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	// add the last chunk
 	iters = append(iters, a.getChunk(oldestPos).Iter())
 
-	return firstT0, iters
+	return oldestChunk.T0, iters
 }
 
 // this function must only be called while holding the lock
