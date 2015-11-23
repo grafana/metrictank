@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	stdlog "log"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
@@ -86,14 +85,14 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 	event := new(schema.ProbeEvent)
 	if err := json.Unmarshal(m.Body[9:], &event); err != nil {
-		log.Error(0, "ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
+		log.Error(3, "ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
 	done := make(chan error, 1)
 	go func() {
 		pre := time.Now()
 		if err := eventdef.Save(event); err != nil {
-			log.Error(0, "ERROR: couldn't process %s: %s\n", event.Id, err)
+			log.Error(3, "ERROR: couldn't process %s: %s\n", event.Id, err)
 			eventsToEsFail.Inc(1)
 			done <- err
 			return
@@ -120,8 +119,7 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			stdlog.Fatal(err)
-			os.Exit(1)
+			log.Fatal(4, err.Error())
 		}
 		conf.ParseAll()
 	}
@@ -139,24 +137,24 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal(0, "--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_probe_events_to_elasticsearch", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -174,19 +172,19 @@ func main() {
 	cfg.UserAgent = "nsq_probe_events_to_elasticsearch"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", metrics)
 
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	handler, err := NewESHandler()
 	if err != nil {
-		log.Fatal(0,err.Error())
+		log.Fatal(4,err.Error())
 	}
 
 	consumer.AddConcurrentHandlers(handler, 80)
@@ -197,7 +195,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(0,err.Error())
+		log.Fatal(4,err.Error())
 	}
 	log.Info("connected to nsqd")
 
@@ -207,7 +205,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	go func() {
 		log.Info("INFO starting listener for http/debug on %s", *listenAddr)

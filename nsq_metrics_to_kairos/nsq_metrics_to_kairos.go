@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	stdlog "log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -71,8 +70,7 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			stdlog.Fatal(err)
-			os.Exit(1)
+			log.Fatal(4, err.Error())
 		}
 		conf.ParseAll()
 	}
@@ -85,11 +83,11 @@ func main() {
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_metrics_to_kairos", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	if *channel == "" {
@@ -98,14 +96,14 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal(0, "--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -115,25 +113,25 @@ func main() {
 	cfg.UserAgent = "nsq_metrics_to_kairos"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "high_prio.%s", metrics)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	consumerLowPrio, err := insq.NewConsumer(*topicLowPrio, *channel, cfg, "low_prio.%s", metrics)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "nsq_metrics_to_kairos"
 	err = app.ParseOpts(pCfg, *producerOpts)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	metricsToKairosOK = metrics.NewCount("metrics_to_kairos.ok")
@@ -157,14 +155,14 @@ func main() {
 	for _, addr := range strings.Split(*nsqdTCPAddrs, ",") {
 		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
-			log.Fatal(0, "failed creating producer %s", err.Error())
+			log.Fatal(4, "failed creating producer %s", err.Error())
 		}
 		producers[addr] = producer
 	}
 
 	gateway, err := NewKairosGateway("http://"+*kairosAddr, *dryRun, *concurrency)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	handler := NewKairosHandler(gateway, hostPool, producers)
@@ -179,7 +177,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	log.Info("connected to nsqd")
 
@@ -189,18 +187,18 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	err = consumerLowPrio.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	log.Info("connected to nsqd")
 
 	err = consumerLowPrio.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	go func() {

@@ -99,7 +99,7 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			log.Fatal(0, "error with configuration file: %s", err)
+			log.Fatal(4, "error with configuration file: %s", err)
 			os.Exit(1)
 		}
 		conf.ParseAll()
@@ -164,7 +164,7 @@ func main() {
 	err = InitCassandra()
 
 	if err != nil {
-		log.Fatal(0, "failed to initialize cassandra. %s", err)
+		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
@@ -177,7 +177,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(0, "failed to connect to NSQDs. %s", err)
+		log.Fatal(4, "failed to connect to NSQDs. %s", err)
 	}
 	log.Info("connected to nsqd")
 
@@ -187,7 +187,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(0, "failed to connect to NSQLookupds. %s", err)
+		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
 
 	go func() {
@@ -211,7 +211,7 @@ func main() {
 		case <-consumer.StopChan:
 			err := metrics.Persist()
 			if err != nil {
-				log.Error(0, "failed to persist aggmetrics. %s", err)
+				log.Error(3, "failed to persist aggmetrics. %s", err)
 			}
 			log.Info("closing cassandra session.")
 			cSession.Close()

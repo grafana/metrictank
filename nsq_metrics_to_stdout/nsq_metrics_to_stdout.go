@@ -44,13 +44,13 @@ func NewStdoutHandler() (*StdoutHandler, error) {
 func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
 	ms, err := msg.MetricDataFromMsg(m.Body)
 	if err != nil {
-		log.Error(0, "%s: skipping message", err.Error())
+		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
 	err = ms.DecodeMetricData()
 	if err != nil {
-		log.Error(0, "%s: skipping message", err.Error())
+		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
@@ -76,14 +76,14 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal(0, "--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -93,18 +93,18 @@ func main() {
 	cfg.UserAgent = "nsq_metrics_to_stdout"
 	err := app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := nsq.NewConsumer(*topic, *channel, cfg)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	handler, err := NewStdoutHandler()
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 
 	consumer.AddHandler(handler)
@@ -115,7 +115,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	log.Info("connected to nsqd")
 
@@ -125,7 +125,7 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(0, err.Error())
+		log.Fatal(4, err.Error())
 	}
 	go func() {
 		log.Info("starting listener for http/debug on %s", *listenAddr)

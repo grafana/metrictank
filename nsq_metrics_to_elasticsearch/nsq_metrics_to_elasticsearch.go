@@ -113,7 +113,6 @@ func main() {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
 			log.Fatal(3, "Could not parse config file. %s", err)
-			os.Exit(1)
 		}
 		conf.ParseAll()
 	}
