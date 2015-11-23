@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -162,12 +163,12 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	if newestChunk == nil {
 		// we dont have any data yet.
 		log.Debug("no data for requested range.")
-		return to, make([]*tsz.Iter, 0)
+		return math.MaxUint32, make([]*tsz.Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
 		// we have no data in the requested range.
 		log.Debug("no data for requested range.")
-		return to, make([]*tsz.Iter, 0)
+		return math.MaxUint32, make([]*tsz.Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -189,13 +190,13 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return to, make([]*tsz.Iter, 0)
+		return math.MaxUint32, make([]*tsz.Iter, 0)
 	}
 
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		log.Debug("no data for requested range")
-		return to, make([]*tsz.Iter, 0)
+		return oldestChunk.T0, make([]*tsz.Iter, 0)
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
