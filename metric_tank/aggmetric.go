@@ -281,12 +281,9 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	currentChunk := a.getChunk(a.CurrentChunkPos)
 	if currentChunk == nil {
 		chunkCreate.Inc(1)
-		if len(a.Chunks) < int(a.NumChunks) {
-			log.Debug("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
-			a.Chunks = append(a.Chunks, NewChunk(t0))
-		} else {
-			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
-		}
+		// no data has been added to this metric at all.
+		log.Debug("adding new chunk to cirular Buffer. now 1 chunks")
+		a.Chunks = append(a.Chunks, NewChunk(t0))
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 			log.Error(1, "failed to add metric to chunk. %s", err)
