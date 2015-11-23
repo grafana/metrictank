@@ -30,7 +30,7 @@ type AggMetric struct {
 	sync.RWMutex
 	Key             string
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
-	NumChunks       uint32 // size of the circular buffer
+	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*Chunk
 	aggregators     []*Aggregator
@@ -145,8 +145,9 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
-// Get all data between the requested time rages. From is inclusive, to is exclusive. from <= x < to
+// Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
+// also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
 func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	log.Debug("GET: %s from: %d to:%d", a.Key, from, to)
 	if from >= to {
@@ -175,10 +176,13 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	// get the oldest chunk we have.
 	// eg if we have 5 chunks, N is the current chunk and n-4 is the oldest chunk.
 	// -----------------------------
+	// | n-4 | n-3 | n-2 | n-1 | n |  CurrentChunkPos = 4
+	// -----------------------------
+	// -----------------------------
 	// | n | n-4 | n-3 | n-2 | n-1 |  CurrentChunkPos = 0
 	// -----------------------------
 	// -----------------------------
-	// | n-2 | n-1 | n | n-4 | n-3 |  CurrentChunkPos = 3
+	// | n-2 | n-1 | n | n-4 | n-3 |  CurrentChunkPos = 2
 	// -----------------------------
 	oldestPos := a.CurrentChunkPos + 1
 	if oldestPos >= len(a.Chunks) {
