@@ -43,6 +43,7 @@ var (
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
 	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
 
 	metricsToEsOK     met.Count
 	metricsToEsFail   met.Count
@@ -210,8 +211,8 @@ func main() {
 		log.Fatal(4, "failed to connect to nsqlookupd. %s", err)
 	}
 	go func() {
-		log.Info("INFO starting listener for http/debug on :6060")
-		log.Info("%s", http.ListenAndServe(":6060", nil))
+		log.Info("INFO starting listener for http/debug on %s", *listenAddr)
+		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {

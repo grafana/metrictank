@@ -85,7 +85,7 @@ func (kg *KairosGateway) process(job Job) error {
 
 	err := job.Msg.DecodeMetricData()
 	if err != nil {
-		log.Info(err, "skipping message")
+		log.Info("%s: skipping message", err.Error())
 		return nil
 	}
 

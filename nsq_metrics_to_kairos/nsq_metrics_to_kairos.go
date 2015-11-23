@@ -45,6 +45,7 @@ var (
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
 )
 
 var metricsToKairosOK met.Count
@@ -132,7 +133,7 @@ func main() {
 	pCfg.UserAgent = "nsq_metrics_to_kairos"
 	err = app.ParseOpts(pCfg, *producerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(0, err.Error())
 	}
 
 	metricsToKairosOK = metrics.NewCount("metrics_to_kairos.ok")
@@ -156,7 +157,7 @@ func main() {
 	for _, addr := range strings.Split(*nsqdTCPAddrs, ",") {
 		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
-			log.Fatalf(0, "failed creating producer %s", err.Error())
+			log.Fatal(0, "failed creating producer %s", err.Error())
 		}
 		producers[addr] = producer
 	}
@@ -203,8 +204,8 @@ func main() {
 	}
 
 	go func() {
-		log.Info("starting listener for http/debug on :6060")
-		log.Info("%s", http.ListenAndServe(":6060", nil))
+		log.Info("starting listener for http/debug on %s", *listenAddr)
+		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {
