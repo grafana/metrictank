@@ -306,7 +306,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(3, "failed to add metric to chunk. %s", err)
+			log.Error(3, "failed to add metric to chunk for %s. %s", a.Key, err)
 			return
 		}
 	} else {
