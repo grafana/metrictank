@@ -115,7 +115,7 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 		Key:       key,
 		ChunkSpan: chunkSpan,
 		NumChunks: numChunks,
-		Chunks:    make([]*Chunk, 0),
+		Chunks:    make([]*Chunk, 0, numChunks),
 	}
 	for _, as := range aggsetting {
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
@@ -232,7 +232,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]*tsz.Iter, 0)
+	iters := make([]*tsz.Iter, 0, a.NumChunks)
 	for oldestPos != newestPos {
 		iters = append(iters, a.getChunk(oldestPos).Iter())
 		oldestPos++
