@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"sync"
 	"time"
 
@@ -285,9 +286,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		log.Debug("adding new chunk to cirular Buffer. now 1 chunks")
 		a.Chunks = append(a.Chunks, NewChunk(t0))
 
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(1, "failed to add metric to chunk. %s", err)
-			return
+		if err := a.Chunks[0].Push(ts, val); err != nil {
+			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
 		}
 
 		log.Debug("created new chunk. %v", a.Chunks[0])
@@ -329,8 +329,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		log.Debug("created new chunk. %v", a.Chunks[a.CurrentChunkPos])
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(1, "failed to push metric to chunk. %s", err)
-			return
+			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 		}
 	}
 	a.addAggregators(ts, val)
