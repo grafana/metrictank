@@ -136,7 +136,7 @@ func (a *AggMetric) stats() {
 			}
 		}
 		a.RUnlock()
-		points.Update(int64(sum))
+		pointsPerMetric.Value(int64(sum))
 	}
 }
 

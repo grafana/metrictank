@@ -8,10 +8,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
-	gometrics "github.com/rcrowley/go-metrics"
 )
-
-var points = gometrics.NewHistogram(gometrics.NewExpDecaySample(1028, 0.015))
 
 type AggMetrics struct {
 	sync.RWMutex
@@ -78,16 +75,13 @@ func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks, ch
 }
 
 func (ms *AggMetrics) stats() {
-	gometrics.Register("points_per_metric", points)
-	points.Update(0)
+	pointsPerMetric.Value(0)
 
-	metricsActive := gometrics.NewGauge()
-	gometrics.Register("metrics_active", metricsActive)
 	for range time.Tick(time.Duration(1) * time.Second) {
 		ms.RLock()
 		l := len(ms.Metrics)
 		ms.RUnlock()
-		metricsActive.Update(int64(l))
+		metricsActive.Value(int64(l))
 	}
 }
 
