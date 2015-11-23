@@ -156,10 +156,6 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	}
 	a.RLock()
 	defer a.RUnlock()
-	firstT0 := from - (from % a.ChunkSpan)
-	lastT0 := (to - 1) - ((to - 1) % a.ChunkSpan)
-
-	newestPos := a.CurrentChunkPos
 
 	newestChunk := a.getChunk(a.CurrentChunkPos)
 
@@ -168,7 +164,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		log.Debug("no data for requested range.")
 		return to, make([]*tsz.Iter, 0)
 	}
-	if firstT0 > newestChunk.T0 {
+	if from >= newestChunk.T0+a.ChunkSpan {
 		// we have no data in the requested range.
 		log.Debug("no data for requested range.")
 		return to, make([]*tsz.Iter, 0)
@@ -196,7 +192,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		return to, make([]*tsz.Iter, 0)
 	}
 
-	if lastT0 < oldestChunk.T0 {
+	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		log.Debug("no data for requested range")
 		return to, make([]*tsz.Iter, 0)
@@ -204,7 +200,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
 	// chunk, then we just use the oldest chunk.
-	for firstT0 > oldestChunk.T0 {
+	for from >= oldestChunk.T0+a.ChunkSpan {
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
@@ -218,7 +214,12 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 
 	// find the newest Chunk that "to" falls in.  If "to" extends to after the newest data
 	// then just return the newest chunk.
-	for lastT0 < newestChunk.T0 {
+	// some examples to clarify this more. assume newestChunk.T0 is at 120, then
+	// for a to of 121 -> data upto (incl) 120 -> stay at this chunk, it has a point we need
+	// for a to of 120 -> data upto (incl) 119 -> use older chunk
+	// for a to of 119 -> data upto (incl) 118 -> use older chunk
+	newestPos := a.CurrentChunkPos
+	for to <= newestChunk.T0 {
 		newestPos--
 		if newestPos < 0 {
 			newestPos += len(a.Chunks)
