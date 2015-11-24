@@ -43,10 +43,12 @@ func NewAggregator(key string, aggSpan, aggChunkSpan, aggNumChunks uint32) *Aggr
 func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := aggBoundary(ts, agg.span)
 
-	if boundary > agg.currentBoundary {
-		if agg.agg.cnt == 0 {
-			// nothing to do. in fact, we can reuse the aggregation
-		} else {
+	if boundary == agg.currentBoundary {
+		agg.agg.Add(ts, val)
+	} else if boundary > agg.currentBoundary {
+		// store current totals as a new point in their series
+		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
+		if agg.agg.cnt != 0 {
 			agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
 			agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
 			agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
@@ -55,7 +57,8 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.agg = NewAggregation()
 		}
 		agg.currentBoundary = boundary
-	} else {
 		agg.agg.Add(ts, val)
+	} else {
+		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
 }
