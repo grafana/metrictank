@@ -3,9 +3,9 @@ package main
 import "fmt"
 
 type aggSetting struct {
-	span      uint32 // in seconds
-	chunkSpan uint32 // duration of chunk of aggregated metric for storage
-	numChunks uint32 // number of chunks to keep in memory // TODO: we probably won't ever query them in memory, so this would become a concern of the persisting code
+	span      uint32 // in seconds, controls how many input points go into an aggregated point.
+	chunkSpan uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
+	numChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
 }
 
 // see description for Aggregator and unit tests

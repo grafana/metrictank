@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -58,6 +59,7 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg-bucket in seconds>:<chunkspan in seconds>:<numchunks> (may be given multiple times as comma-separated list)")
 
 	metrics *AggMetrics
 )
@@ -169,7 +171,32 @@ func main() {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), uint32(*chunkMaxStale), uint32(*metricMaxStale), 1)
+	set := strings.Split(*aggSettings, ",")
+	finalSettings := make([]aggSetting, 0)
+	for _, v := range set {
+		if v == "" {
+			continue
+		}
+		fields := strings.Split(v, ":")
+		if len(fields) != 3 {
+			log.Fatal(0, "bad agg settings")
+		}
+		aggSpan, err := strconv.Atoi(fields[0])
+		if err != nil {
+			log.Fatal(0, "bad agg settings", err)
+		}
+		aggChunkSpan, err := strconv.Atoi(fields[1])
+		if err != nil {
+			log.Fatal(0, "bad agg settings", err)
+		}
+		aggNumChunks, err := strconv.Atoi(fields[2])
+		if err != nil {
+			log.Fatal(0, "bad agg settings", err)
+		}
+		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks)})
+	}
+
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
 	handler := NewHandler(metrics)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 

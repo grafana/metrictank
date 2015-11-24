@@ -15,21 +15,17 @@ type AggMetrics struct {
 	Metrics        map[string]*AggMetric
 	chunkSpan      uint32
 	numChunks      uint32
-	aggSpan        uint32
-	aggChunkSpan   uint32
-	aggNumChunks   uint32
+	aggSettings    []aggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 }
 
-func NewAggMetrics(chunkSpan, numChunks, aggSpan, aggChunkSpan, aggNumChunks, chunkMaxStale, metricMaxStale uint32) *AggMetrics {
+func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		Metrics:        make(map[string]*AggMetric),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
-		aggSpan:        aggSpan,
-		aggChunkSpan:   aggChunkSpan,
-		aggNumChunks:   aggNumChunks,
+		aggSettings:    aggSettings,
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
 	}
@@ -128,8 +124,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		//m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, aggSetting{ms.aggSpan, ms.aggChunkSpan, ms.aggNumChunks})
-		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks)
+		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, ms.aggSettings...)
 		ms.Metrics[key] = m
 	}
 	ms.Unlock()
