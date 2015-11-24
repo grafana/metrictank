@@ -302,6 +302,9 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			log.Error(3, "failed to add metric to chunk for %s. %s", a.Key, err)
 			return
 		}
+	} else if t0 < currentChunk.T0 {
+		log.Error(3, "Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
+		return
 	} else {
 		currentChunk.Finish()
 		go a.Persist(currentChunk)
