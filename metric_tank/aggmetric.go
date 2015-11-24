@@ -13,11 +13,9 @@ import (
 	"github.com/raintank/go-tsz"
 )
 
-var serverStart uint32
 var statsPeriod time.Duration
 
 func init() {
-	serverStart = uint32(time.Now().Unix())
 	statsPeriod = time.Duration(1) * time.Second
 }
 
