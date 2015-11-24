@@ -291,12 +291,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		log.Debug("created new chunk. %v", a.Chunks[0])
-		a.addAggregators(ts, val)
-		return
-	}
-
-	if t0 == currentChunk.T0 {
-
+	} else if t0 == currentChunk.T0 {
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
 			log.Error(3, "cant write to chunk that has already been saved. %s T0:%d", a.Key, currentChunk.T0)
