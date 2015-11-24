@@ -18,7 +18,7 @@ package eventdef
 
 import (
 	"fmt"
-	"log"
+	"github.com/grafana/grafana/pkg/log"
 	"strings"
 	"time"
 
@@ -57,9 +57,9 @@ func Save(e *schema.ProbeEvent) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
-	log.Printf("saving event to elasticsearch.")
+	log.Debug("saving event to elasticsearch.")
 	resp, err := es.Index("events", e.EventType, e.Id, nil, e)
-	log.Printf("elasticsearch response: %v", resp)
+	log.Debug("elasticsearch response: %v", resp)
 	if err != nil {
 		return err
 	}
