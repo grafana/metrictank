@@ -59,6 +59,7 @@ func InitCassandra() error {
 	}
 	tmpSession.Close()
 	cluster.Keyspace = "raintank"
+	cluster.NumConns = *cassandraWriteConcurrency
 	cSession, err = cluster.CreateSession()
 	return err
 }
