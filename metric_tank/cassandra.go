@@ -71,18 +71,20 @@ func InitCassandra() error {
 func InsertMetric(key string, t0 uint32, data []byte, ttl int) error {
 	// increment our semaphore.
 	// blocks if <cassandraWriteConcurrency> writers are already running
+	pre := time.Now()
 	writeSem <- true
 	defer func() {
 		// write is complete, so decrement our semaphore.
 		<-writeSem
 	}()
+	cassandraBlockDuration.Value(time.Now().Sub(pre))
 	// for unit tests
 	if cSession == nil {
 		return nil
 	}
 	query := fmt.Sprintf("INSERT INTO metric (key, ts, data) values(?,?,?) USING TTL %d", ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/month) // "month number" based on unix timestamp (rounded down)
-	pre := time.Now()
+	pre = time.Now()
 	ret := cSession.Query(query, row_key, t0, data).Exec()
 	cassandraPutDuration.Value(time.Now().Sub(pre))
 	return ret

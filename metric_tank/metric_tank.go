@@ -86,6 +86,7 @@ var msgsAge met.Meter // in ms
 // there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
 var reqHandleDuration met.Timer
 var cassandraPutDuration met.Timer
+var cassandraBlockDuration met.Timer
 var cassandraGetDuration met.Timer
 var inItems met.Meter
 var pointsPerMetric met.Meter
@@ -273,6 +274,7 @@ func initMetrics(stats met.Backend) {
 	msgsAge = stats.NewMeter("message_age", 0)
 	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
+	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	pointsPerMetric = stats.NewMeter("points_per_metric", 0)
