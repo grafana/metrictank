@@ -248,15 +248,14 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 // this function must only be called while holding the lock
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
+		log.Debug("pushing value to aggregator")
 		agg.Add(ts, val)
 	}
 }
 
 func (a *AggMetric) Persist(c *Chunk) {
 	log.Debug("starting to save %v", c)
-	a.RLock()
 	data := c.Series.Bytes()
-	a.RUnlock()
 	chunkSizeAtSave.Value(int64(len(data)))
 	err := InsertMetric(a.Key, c.T0, data, *metricTTL)
 	if err == nil {
@@ -283,14 +282,14 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	if currentChunk == nil {
 		chunkCreate.Inc(1)
 		// no data has been added to this metric at all.
-		log.Debug("adding new chunk to cirular Buffer. now 1 chunks")
+		log.Debug("instantiating new circular buffer.")
 		a.Chunks = append(a.Chunks, NewChunk(t0))
 
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
 		}
 
-		log.Debug("created new chunk. %v", a.Chunks[0])
+		log.Debug("created new chunk. %s:  %v", a.Key, a.Chunks[0])
 	} else if t0 == currentChunk.T0 {
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
@@ -324,7 +323,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			log.Debug("clearing chunk from circular buffer. %v", a.Chunks[a.CurrentChunkPos])
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
 		}
-		log.Debug("created new chunk. %v", a.Chunks[a.CurrentChunkPos])
+		log.Debug("created new chunk. %s: %v", a.Key, a.Chunks[a.CurrentChunkPos])
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
