@@ -137,7 +137,7 @@ func TestAggMetric(t *testing.T) {
 // 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
 // total -> 13 MB
 // go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out
-// go tool pprof -inuse_space metrics_tank.test mem.out -> shows 25 MB in use
+// go tool pprof -inuse_space metric_tank.test mem.out -> shows 25 MB in use
 
 // TODO update once we clean old data, then we should look at numChunks
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
