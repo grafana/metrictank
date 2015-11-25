@@ -145,18 +145,23 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
 	chunkSpan := uint32(2 * 3600)
 	numChunks := uint32(5)
-	//aggSpan := uint32(300)
-	//aggChunkSpan := uint32(24 * 3600)
-	//numAggChunks := uint32(1)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
+	aggSettings := []aggSetting{
+		{
+			span:      uint32(300),
+			chunkSpan: uint32(24 * 3600),
+			numChunks: uint32(1),
+		},
+	}
 
 	keys := make([]string, 1000)
 	for i := 0; i < 1000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, []aggSetting{})
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, aggSettings)
+
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
