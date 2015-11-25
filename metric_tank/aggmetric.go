@@ -120,7 +120,14 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 	for _, as := range aggsetting {
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
 	}
-	go m.stats()
+
+	// only collect per aggmetric stats when in debug mode.
+	// running a goroutine for each aggmetric in an environment with many hundreds of thousands of metrics
+	// will result in the CPU just context switching and not much else.
+	if *logLevel < 2 {
+		go m.stats()
+	}
+
 	return &m
 }
 
