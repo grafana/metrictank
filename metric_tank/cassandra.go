@@ -175,7 +175,7 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 			chunkSizeAtLoad.Value(int64(len(b)))
 			iter, err := tsz.NewIterator(b)
 			if err != nil {
-				log.Error(1, "failed to unpack cassandra payload. %s", err)
+				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
 			}
 			iters = append(iters, iter)
@@ -183,7 +183,7 @@ func searchCassandra(key string, start, end uint32) ([]*tsz.Iter, error) {
 		cassandraChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
-			log.Error(0, "cassandra query error. %s", err)
+			log.Error(3, "cassandra query error. %s", err)
 		}
 	}
 	cassandraRowsPerResponse.Value(int64(len(outcomes)))
