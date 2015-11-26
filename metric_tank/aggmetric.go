@@ -152,6 +152,29 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
+func (a *AggMetric) GetAggregated(fn string, aggSpan, from, to uint32) (uint32, []*tsz.Iter) {
+	// no lock needed cause aggregators don't change at runtime
+	for _, a := range a.aggregators {
+		if a.span == aggSpan {
+			switch fn {
+			case "min":
+				return a.minMetric.Get(from, to)
+			case "max":
+				return a.maxMetric.Get(from, to)
+			case "sos":
+				return a.sosMetric.Get(from, to)
+			case "sum":
+				return a.sumMetric.Get(from, to)
+			case "cnt":
+				return a.cntMetric.Get(from, to)
+			default:
+				panic(fmt.Sprintf("GetAggregated called with unknown fn %q", fn))
+			}
+		}
+	}
+	panic(fmt.Sprintf("GetAggregated called with unknown aggSpan %d", aggSpan))
+}
+
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra

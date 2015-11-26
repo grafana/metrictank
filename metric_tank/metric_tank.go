@@ -61,7 +61,8 @@ var (
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg-bucket in seconds>:<chunkspan in seconds>:<numchunks> (may be given multiple times as comma-separated list)")
 
-	metrics *AggMetrics
+	metrics   *AggMetrics
+	metaCache *MetaCache
 )
 
 var reqSpanMem met.Meter
@@ -198,7 +199,8 @@ func main() {
 	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
-	handler := NewHandler(metrics)
+	metaCache = NewMetaCache()
+	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
@@ -231,7 +233,7 @@ func main() {
 	}()
 
 	go func() {
-		http.HandleFunc("/get", Get)
+		http.HandleFunc("/get", get(metaCache, finalSettings))
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()

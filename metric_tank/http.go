@@ -27,14 +27,51 @@ type Series struct {
 	Datapoints []Point
 }
 
+func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		Get(w, req, metaCache, aggSettings)
+	}
+}
+
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request) {
+func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	values := req.URL.Query()
-	keys, ok := values["render"]
+
+	consolidateBy := values.Get("consolidateBy")
+	var consolidator aggregator
+	switch consolidateBy {
+	case "", "last":
+		consolidator = last
+	case "sum":
+		consolidator = sum
+	case "avg", "average":
+		consolidator = avg
+	case "min":
+		consolidator = min
+	case "max":
+		consolidator = max
+	default:
+		http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
+		return
+	}
+
+	maxDataPoints := 800
+	maxDataPointsStr := values.Get("maxDataPoints")
+	var err error
+	if maxDataPointsStr != "" {
+		maxDataPoints, err = strconv.Atoi(maxDataPointsStr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	minDataPoints := maxDataPoints / 10
+
+	keys, ok := values["target"]
 	if !ok {
-		http.Error(w, "missing render arg", http.StatusBadRequest)
+		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
 	}
 	now := time.Now()
@@ -65,43 +102,12 @@ func Get(w http.ResponseWriter, req *http.Request) {
 
 	out := make([]Series, len(keys))
 	for i, key := range keys {
-		iters := make([]*tsz.Iter, 0)
-		var memIters []*tsz.Iter
-		oldest := toUnix
-		if metric, ok := metrics.Get(key); ok {
-			oldest, memIters = metric.Get(fromUnix, toUnix)
-		} else {
-			memIters = make([]*tsz.Iter, 0)
+		points, err := getTarget(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		if oldest > fromUnix {
-			reqSpanBoth.Value(int64(toUnix - fromUnix))
-			log.Debug("data load from cassandra: %s - %s from mem: %s - %s", TS(fromUnix), TS(oldest), TS(oldest), TS(toUnix))
-			storeIters, err := searchCassandra(key, fromUnix, oldest)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			//for _, i := range storeIters {
-			//	fmt.Println("c>", TS(i.T0()))
-			//	}
-			iters = append(iters, storeIters...)
-		} else {
-			reqSpanMem.Value(int64(toUnix - fromUnix))
-			log.Debug("data load from mem: %s-%s, oldest (%d)", TS(fromUnix), TS(toUnix), oldest)
-		}
-		iters = append(iters, memIters...)
-		//	for _, i := range memIters {
-		//fmt.Println("m>", TS(i.T0()))
-		//	}
-		points := make([]Point, 0)
-		for _, iter := range iters {
-			for iter.Next() {
-				ts, val := iter.Values()
-				if ts >= fromUnix && ts < toUnix {
-					points = append(points, Point{val, ts})
-				}
-			}
-		}
+
 		out[i] = Series{
 			Target:     key,
 			Datapoints: points,

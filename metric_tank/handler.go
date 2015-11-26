@@ -8,12 +8,14 @@ import (
 )
 
 type Handler struct {
-	metrics Metrics
+	metrics   Metrics
+	metaCache *MetaCache
 }
 
-func NewHandler(metrics Metrics) *Handler {
+func NewHandler(metrics Metrics, metaCache *MetaCache) *Handler {
 	return &Handler{
-		metrics: metrics,
+		metrics:   metrics,
+		metaCache: metaCache,
 	}
 }
 
@@ -39,6 +41,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 		} else {
 			m := h.metrics.GetOrCreate(metric.Id())
 			m.Add(uint32(metric.Time), metric.Value)
+			metaCache.Add(metric.Metric, metric.Interval)
 		}
 	}
 

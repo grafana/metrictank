@@ -12,4 +12,5 @@ type Metric interface {
 	Add(ts uint32, val float64)
 	// the tsz implementation shouldn't leak through the abstraction, but this keeps it simple for now
 	Get(from, to uint32) (uint32, []*tsz.Iter)
+	GetAggregated(fn string, aggSpan, from, to uint32) (uint32, []*tsz.Iter)
 }
