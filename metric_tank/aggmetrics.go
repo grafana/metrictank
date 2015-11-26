@@ -36,10 +36,19 @@ func (ms *AggMetrics) stats() {
 	pointsPerMetric.Value(0)
 
 	for range time.Tick(time.Duration(1) * time.Second) {
+		pre := time.Now()
 		ms.RLock()
-		l := len(ms.Metrics)
+		metrics := make([]*AggMetric, 0, len(ms.Metrics))
+		for _, met := range ms.Metrics {
+			metrics = append(metrics, met)
+		}
 		ms.RUnlock()
-		metricsActive.Value(int64(l))
+		// these metrics will lag behind a bit, possibly using unlinked metrics, but that's ok
+		metricsActive.Value(int64(len(metrics)))
+		for _, met := range metrics {
+			met.stats()
+		}
+		statsDuration.Value(time.Now().Sub(pre))
 	}
 }
 

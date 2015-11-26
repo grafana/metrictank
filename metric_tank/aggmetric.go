@@ -79,28 +79,22 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSett
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
 	}
 
-	// only collect per aggmetric stats when in debug mode.
-	// running a goroutine for each aggmetric in an environment with many hundreds of thousands of metrics
-	// will result in the CPU just context switching and not much else.
-	if *logLevel < 2 {
-		go m.stats()
-	}
-
 	return &m
 }
 
 func (a *AggMetric) stats() {
-	for range time.Tick(statsPeriod) {
-		sum := 0
-		a.RLock()
-		for _, chunk := range a.Chunks {
-			if chunk != nil {
-				sum += int(chunk.NumPoints)
-			}
+	sum := 0
+	a.RLock()
+	for _, chunk := range a.Chunks {
+		if chunk != nil {
+			sum += int(chunk.NumPoints)
 		}
-		a.RUnlock()
-		pointsPerMetric.Value(int64(sum))
 	}
+	a.RUnlock()
+	if sum == 123456 {
+		fmt.Println(sum)
+	}
+	//pointsPerMetric.Value(int64(sum))
 }
 
 func (a *AggMetric) getChunk(pos int) *Chunk {
