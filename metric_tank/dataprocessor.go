@@ -19,79 +19,33 @@ func getPoints(iters []*tsz.Iter, fromUnix, toUnix uint32) []Point {
 	return points
 }
 
-func getDividedPoints(itersA, itersB []*tsz.Iter, fromUnix, toUnix uint32) []Point {
-	// TODO maybe verify block corruption here. normally the iters should return the exact same amount of points, same timestamps, etc
-	points := make([]Point, 0)
-	for i, iterA := range itersA {
-		iterB := itersB[i]
-		for iterA.Next() && iterB.Next() {
-			ts, a := iterA.Values()
-			if ts >= fromUnix && ts < toUnix {
-				_, b := iterB.Values()
-				points = append(points, Point{a / b, ts})
-			}
-		}
+func divide(pointsA, pointsB []Point) []Point {
+	// TODO assert same length
+	out := make([]Point, len(pointsA)
+	for i, a := range pointsA {
+		b := pointsB[i]
+		out[i] = Point{a/b, ts}
 	}
-	return points
+	return out
 }
 
-func getConsolidatedPoints(iters []*tsz.Iter, fromUnix, toUnix, aggNum uint32, consolidator aggregator) []Point {
+func consolidate(in []Point, aggNum uint32, consolidator aggregator) []Point {
 	consFunc := getAggFunc(consolidator)
 	buf := make([]float64, aggNum)
-	i := 0
 	lastTs := uint32(0)
 	pos := 0
-	points := make([]Point, 0)
-	for _, iter := range iters {
-		for iter.Next() {
-			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
-				pos = i % int(aggNum)
-				buf[pos] = val
-				if pos == int(aggNum-1) {
-					points = append(points, Point{consFunc(buf), ts})
-				}
-				lastTs = ts
-				i++
-			}
+	points := make([]Point, (len(in) / aggNum) + 1)
+	for i, val := range in {
+		pos = i % int(aggNum)
+		buf[pos] = val
+		if pos == int(aggNum-1) {
+			points = append(points, Point{consFunc(buf), ts})
 		}
+		lastTs = ts
 	}
 	if i > 0 && pos < int(aggNum-1) {
 		// we have an incomplete buf of some points that didn't get aggregated yet
 		points = append(points, Point{consFunc(buf[:pos+1]), lastTs})
-	}
-	return points
-}
-
-func getConsolidatedDividedPoints(itersA, itersB []*tsz.Iter, fromUnix, toUnix uint32, consolidatorA, consolidatorB aggregator, aggNum int) []Point {
-	consFuncA := getAggFunc(consolidatorA)
-	consFuncB := getAggFunc(consolidatorB)
-	bufA := make([]float64, aggNum)
-	bufB := make([]float64, aggNum)
-	i := 0
-	lastTs := uint32(0)
-	pos := 0
-	points := make([]Point, 0)
-	for i, iterA := range itersA {
-		iterB := itersB[i]
-		for iterA.Next() && iterB.Next() {
-			ts, a := iterA.Values()
-			if ts >= fromUnix && ts < toUnix {
-				_, b := iterB.Values()
-				pos = i % int(aggNum)
-				bufA[pos] = a
-				bufB[pos] = b
-				if pos == aggNum-1 {
-					points = append(points, Point{consFuncA(bufA) / consFuncB(bufB), ts})
-				}
-				lastTs = ts
-				i++
-			}
-		}
-	}
-	if i > 0 && pos < aggNum-1 {
-		// we have an incomplete buf of some points that didn't get aggregated yet
-		points = append(points, Point{consFuncA(bufA[:pos+1]) / consFuncB(bufB[:pos+1]), lastTs})
 	}
 	return points
 }
@@ -142,7 +96,7 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		if err != nil {
 			return nil, err
 		}
-		points := getPoints(iters, fromUnix, toUnix)
+		return getPoints(iters, fromUnix, toUnix), nil
 	}
 	if consolidate && !readConsolidated {
 		// only runtime consolidation is needed
@@ -151,8 +105,9 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		if err != nil {
 			return nil, err
 		}
+		points := getPoints(iters, fromUnix, toUnix)
 		aggNum := numPoints / maxDataPoints
-		points := getConsolidatedPoints(iters, fromUnix, toUnix, aggNum, consolidator)
+		return consolidate(points, aggNum, consolidator), nil
 	}
 	if !consolidate && readConsolidated {
 		// we have to read from a consolidated archive but don't have to apply runtime consolidation
@@ -167,18 +122,20 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 			if err != nil {
 				return nil, err
 			}
-			points = getDividedPoints(sumiters, cntiters, fromUnix, toUnix)
+			sums := getPoints(sumiters, fromUnix, toUnix)
+			cnts := getPoints(cntiters, fromUnix, toUnix)
+			return divide(sums, cnts), nil
 		} else {
 			iters, err := getSeries(key, consolidator.String(), interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			points := getPoints(iters, fromUnix, toUnix)
+			points := getPoints(iters, fromUnix, toUnix), nil
 		}
 	}
 	if consolidate && readConsolidated {
 		// we'll read from a consolidated archive and need to apply further consolidation on top
-		points := make([]Point, 0)
+		aggNum := numPoints / maxDataPoints
 		if consolidator == avg {
 			sumiters, err := getSeries(key, "sum", interval, fromUnix, toUnix)
 			if err != nil {
@@ -188,15 +145,16 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 			if err != nil {
 				return nil, err
 			}
-			points = getConsolidatedDividedPoints(sumiters, cntiters, fromUnix, toUnix)
+			sums := consolidate(getPoints(sumiters, fromUnix, toUnix), aggNum, "sum")
+			cnts := consolidate(getPoints(cntiters, fromUnix, toUnix), aggNum, "cnt")
+			return divide(sums, cnts), nil
 		} else {
 			consFunc := getAggFunc(consolidator)
 			iters, err := getSeries(key, consFunc, interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			aggNum := numPoints / maxDataPoints
-			points := getConsolidatedPoints(iters, fromUnix, toUnix, aggNum, consolidator)
+			points := consolidate(getPoints(iters, fromUnix, toUnix), aggNum, consolidator)
 		}
 	}
 }
