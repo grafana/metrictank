@@ -6,6 +6,17 @@ import (
 	"sort"
 )
 
+// doRecover is the handler that turns panics into returns from the top level of getTarget.
+func doRecover(errp *error) {
+	e := recover()
+	if e != nil {
+		if _, ok := e.(runtime.Error); ok {
+			panic(e)
+		}
+		*errp = e.(error)
+	}
+	return
+}
 
 func divide(pointsA, pointsB []Point) []Point {
 	// TODO assert same length
@@ -38,7 +49,8 @@ func consolidate(in []Point, aggNum uint32, consolidator aggregator) []Point {
 	return points
 }
 
-func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32, consolidator aggregator, aggSettings []aggSetting) ([]Point, error) {
+func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32, consolidator aggregator, aggSettings []aggSetting) (points []Point, err error) {
+	defer doRecover(&err)
 	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
 
 	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
@@ -80,15 +92,12 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 
 	if !consolidate && !readConsolidated {
 		// no consolidation at all needed
-		return getSeries(key, "", 0, fromUnix, toUnix)
+		return getSeries(key, "", 0, fromUnix, toUnix), nil
 	}
 	if consolidate && !readConsolidated {
 		// only runtime consolidation is needed
 		// every buf can be processed by a func
-		points, err := getSeries(key, "", 0, fromUnix, toUnix)
-		if err != nil {
-			return nil, err
-		}
+		points := getSeries(key, "", 0, fromUnix, toUnix)
 		aggNum := numPoints / maxDataPoints
 		return consolidate(points, aggNum, consolidator), nil
 	}
@@ -97,53 +106,39 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		// just read straight from archives. for avg, do the math
 		points := make([]Point, 0)
 		if consolidator == avg {
-			sums, err := getSeries(key, "sum", interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
-			cnts, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
-			return divide(sums, cnts), nil
+			return divide(
+			getSeries(key, "sum", interval, fromUnix, toUnix),
+			getSeries(key, "cnt", interval, fromUnix, toUnix)
+			), nil
 		} else {
-			iters, err := getSeries(key, consolidator.String(), interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
-			points := getPoints(iters, fromUnix, toUnix), nil
+			return getSeries(key, consolidator.String(), interval, fromUnix, toUnix), nil
 		}
 	}
 	if consolidate && readConsolidated {
 		// we'll read from a consolidated archive and need to apply further consolidation on top
 		aggNum := numPoints / maxDataPoints
 		if consolidator == avg {
-			sums, err := getSeries(key, "sum", interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
-			cnts, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
 			return divide(
-					consolidate(sums, aggNum, "sum"),
-					consolidate(cnts, aggNum, "cnt"),
+					consolidate(
+						getSeries(key, "sum", interval, fromUnix, toUnix),
+						aggNum,
+						"sum"),
+					consolidate(
+						getSeries(key, "cnt", interval, fromUnix, toUnix),
+						aggNum,
+						"cnt"),
 				), nil
 		} else {
 			consFunc := getAggFunc(consolidator)
-			points, err := getSeries(key, consFunc, interval, fromUnix, toUnix)
-			if err != nil {
-				return nil, err
-			}
-			return points := consolidate(points, aggNum, consolidator)
+			points := getSeries(key, consFunc, interval, fromUnix, toUnix)
+			return consolidate(points, aggNum, consolidator), nil
 		}
 	}
 }
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sos/sum/cnt and providing the matching agg span.
-func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) ([]Point, error) {
+func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) []Point {
 	iters := make([]*tsz.Iter, 0)
 	var memIters []*tsz.Iter
 	oldest := toUnix
@@ -164,7 +159,7 @@ func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) (
 		}
 		storeIters, err := searchCassandra(key, fromUnix, oldest)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 		iters = append(iters, storeIters...)
 	} else {
@@ -182,5 +177,5 @@ func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) (
 			}
 		}
 	}
-	return points, nil
+	return points
 }
