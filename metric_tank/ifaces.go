@@ -2,6 +2,7 @@ package main
 
 //import "github.com/dgryski/go-tsz"
 import "github.com/raintank/go-tsz"
+import "github.com/raintank/raintank-metric/metric_tank/consolidation"
 
 type Metrics interface {
 	Get(key string) (Metric, bool)
@@ -12,5 +13,5 @@ type Metric interface {
 	Add(ts uint32, val float64)
 	// the tsz implementation shouldn't leak through the abstraction, but this keeps it simple for now
 	Get(from, to uint32) (uint32, []*tsz.Iter)
-	GetAggregated(fn string, aggSpan, from, to uint32) (uint32, []*tsz.Iter)
+	GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []*tsz.Iter)
 }

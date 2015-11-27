@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	//"github.com/dgryski/go-tsz"
 	"github.com/raintank/go-tsz"
+	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 )
 
 var statsPeriod time.Duration
@@ -152,24 +153,27 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(fn string, aggSpan, from, to uint32) (uint32, []*tsz.Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []*tsz.Iter) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
-			switch fn {
-			case "min":
-				return a.minMetric.Get(from, to)
-			case "max":
-				return a.maxMetric.Get(from, to)
-			case "sos":
-				return a.sosMetric.Get(from, to)
-			case "sum":
-				return a.sumMetric.Get(from, to)
-			case "cnt":
+			switch consolidator {
+			case consolidation.None:
+				panic("cannot get an archive for no consolidation")
+			case consolidation.Avg:
+				panic("avg consolidator has no matching Archive(). you need sum and cnt")
+			case consolidation.Cnt:
 				return a.cntMetric.Get(from, to)
-			default:
-				panic(fmt.Sprintf("GetAggregated called with unknown fn %q", fn))
+			case consolidation.Last:
+			case consolidation.Min:
+				return a.minMetric.Get(from, to)
+			case consolidation.Max:
+				return a.maxMetric.Get(from, to)
+			case consolidation.Sum:
+				return a.sumMetric.Get(from, to)
 			}
+			panic("unknown consolidator to String()")
+			// note: no way to access sosMetric yet
 		}
 	}
 	panic(fmt.Sprintf("GetAggregated called with unknown aggSpan %d", aggSpan))

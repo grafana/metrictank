@@ -3,14 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
-
-	"github.com/grafana/grafana/pkg/log"
-	//github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
 )
 
 type Point struct {
@@ -40,32 +37,33 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	values := req.URL.Query()
 
 	consolidateBy := values.Get("consolidateBy")
-	var consolidator aggregator
+	var consolidator consolidation.Consolidator
 	switch consolidateBy {
-	case "", "last":
-		consolidator = last
-	case "sum":
-		consolidator = sum
 	case "avg", "average":
-		consolidator = avg
+		consolidator = consolidation.Avg
+	case "", "last":
+		consolidator = consolidation.Last
 	case "min":
-		consolidator = min
+		consolidator = consolidation.Min
 	case "max":
-		consolidator = max
+		consolidator = consolidation.Max
+	case "sum":
+		consolidator = consolidation.Sum
 	default:
 		http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
 		return
 	}
 
-	maxDataPoints := 800
+	maxDataPoints := uint32(800)
 	maxDataPointsStr := values.Get("maxDataPoints")
 	var err error
 	if maxDataPointsStr != "" {
-		maxDataPoints, err = strconv.Atoi(maxDataPointsStr)
+		tmp, err := strconv.Atoi(maxDataPointsStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		maxDataPoints = uint32(tmp)
 	}
 	minDataPoints := maxDataPoints / 10
 

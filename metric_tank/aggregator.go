@@ -32,6 +32,7 @@ type Aggregator struct {
 	sosMetric       *AggMetric
 	sumMetric       *AggMetric
 	cntMetric       *AggMetric
+	lstMetric       *AggMetric
 }
 
 func NewAggregator(key string, aggSpan, aggChunkSpan, aggNumChunks uint32) *Aggregator {
@@ -44,6 +45,7 @@ func NewAggregator(key string, aggSpan, aggChunkSpan, aggNumChunks uint32) *Aggr
 		sosMetric: NewAggMetric(fmt.Sprintf("%s_sos_%d", key, aggSpan), aggChunkSpan, aggNumChunks),
 		sumMetric: NewAggMetric(fmt.Sprintf("%s_sum_%d", key, aggSpan), aggChunkSpan, aggNumChunks),
 		cntMetric: NewAggMetric(fmt.Sprintf("%s_cnt_%d", key, aggSpan), aggChunkSpan, aggNumChunks),
+		lstMetric: NewAggMetric(fmt.Sprintf("%s_lst_%d", key, aggSpan), aggChunkSpan, aggNumChunks),
 	}
 }
 
@@ -61,6 +63,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
 			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
 			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
+			agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
 			agg.agg = NewAggregation()
 		}
 		agg.currentBoundary = boundary

@@ -10,6 +10,7 @@ type Aggregation struct {
 	sos float64
 	sum float64
 	cnt float64
+	lst float64
 }
 
 func NewAggregation() *Aggregation {
@@ -24,4 +25,5 @@ func (a *Aggregation) Add(ts uint32, val float64) {
 	a.sos += math.Pow(val, 2)
 	a.sum += val
 	a.cnt += 1
+	a.lst = val
 }
