@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"net/http"
 	_ "net/http/pprof"
@@ -79,7 +80,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		fromUnix = uint32(fromUnixInt)
@@ -88,7 +89,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	if to != "" {
 		toUnixInt, err := strconv.Atoi(to)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		toUnix = uint32(toUnixInt)
@@ -102,6 +103,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	for i, key := range keys {
 		points, err := getTarget(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator, aggSettings)
 		if err != nil {
+			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -113,6 +115,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	}
 	js, err := json.Marshal(out)
 	if err != nil {
+		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
