@@ -32,7 +32,7 @@ type Series struct {
 func Get(w http.ResponseWriter, req *http.Request) {
 	pre := time.Now()
 	values := req.URL.Query()
-	keys, ok := values["render"]
+	keys, ok := values["target"]
 	if !ok {
 		http.Error(w, "missing render arg", http.StatusBadRequest)
 		return
