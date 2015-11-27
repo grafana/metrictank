@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/go-tsz"
@@ -16,7 +17,13 @@ func doRecover(errp *error) {
 		if _, ok := e.(runtime.Error); ok {
 			panic(e)
 		}
-		*errp = e.(error)
+		if err, ok := e.(error); ok {
+			*errp = err
+		} else if errStr, ok := e.(string); ok {
+			*errp = errors.New(errStr)
+		} else {
+			*errp = fmt.Errorf("%v", e)
+		}
 	}
 	return
 }
