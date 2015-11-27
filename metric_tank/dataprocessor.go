@@ -20,31 +20,31 @@ func doRecover(errp *error) {
 
 func divide(pointsA, pointsB []Point) []Point {
 	// TODO assert same length
-	out := make([]Point, len(pointsA)
+	out := make([]Point, len(pointsA))
 	for i, a := range pointsA {
 		b := pointsB[i]
-		out[i] = Point{a/b, ts}
+		out[i] = Point{a / b, ts}
 	}
 	return out
 }
 
-func consolidate(in []Point, aggNum uint32, consolidator aggregator) []Point {
+func consolidate(in []Point, num int, consolidator aggregator) []Point {
 	consFunc := getAggFunc(consolidator)
-	buf := make([]float64, aggNum)
+	buf := make([]float64, num)
 	lastTs := uint32(0)
-	pos := 0
-	points := make([]Point, (len(in) / aggNum) + 1)
-	for i, val := range in {
-		pos = i % int(aggNum)
-		buf[pos] = val
-		if pos == int(aggNum-1) {
+	bufpos := 0
+	points := make([]Point, (len(in)/num)+1)
+	for inpos, val := range in {
+		bufpos = inpos % num
+		buf[bufpos] = val
+		if bufpos == num-1 {
 			points = append(points, Point{consFunc(buf), ts})
 		}
 		lastTs = ts
 	}
-	if i > 0 && pos < int(aggNum-1) {
+	if inpos > 0 && bufpos < num-1 {
 		// we have an incomplete buf of some points that didn't get aggregated yet
-		points = append(points, Point{consFunc(buf[:pos+1]), lastTs})
+		points = append(points, Point{consFunc(buf[:bufpos+1]), lastTs})
 	}
 	return points
 }
@@ -87,51 +87,47 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	// i.e. whether your data got consolidated or not, it should be pretty equivalent.
 	// for that reason, stdev should not be done as a consolidation. but sos is still useful for when we explicitly (and always, not optionally) want the stdev.
 
-	consolidate := (numPoints > maxDataPoints) // do we need to compress any points at runtime?
-	readConsolidated := (archive != -1)        // do we need to read from a downsampled series?
+	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
+	runtimeConsolidation := (numPoints > maxDataPoints) // do we need to compress any points at runtime?
 
-	if !consolidate && !readConsolidated {
-		// no consolidation at all needed
+	if !readConsolidated && !runtimeConsolidation {
 		return getSeries(key, "", 0, fromUnix, toUnix), nil
 	}
-	if consolidate && !readConsolidated {
-		// only runtime consolidation is needed
-		// every buf can be processed by a func
-		points := getSeries(key, "", 0, fromUnix, toUnix)
-		aggNum := numPoints / maxDataPoints
-		return consolidate(points, aggNum, consolidator), nil
+	if !readConsolidated && runtimeConsolidation {
+		return consolidate(
+			getSeries(key, "", 0, fromUnix, toUnix),
+			int(numPoints/maxDataPoints),
+			consolidator), nil
 	}
-	if !consolidate && readConsolidated {
-		// we have to read from a consolidated archive but don't have to apply runtime consolidation
-		// just read straight from archives. for avg, do the math
+	if readConsolidated && !runtimeConsolidation {
 		points := make([]Point, 0)
 		if consolidator == avg {
 			return divide(
-			getSeries(key, "sum", interval, fromUnix, toUnix),
-			getSeries(key, "cnt", interval, fromUnix, toUnix)
+				getSeries(key, "sum", interval, fromUnix, toUnix),
+				getSeries(key, "cnt", interval, fromUnix, toUnix),
 			), nil
 		} else {
 			return getSeries(key, consolidator.String(), interval, fromUnix, toUnix), nil
 		}
 	}
-	if consolidate && readConsolidated {
-		// we'll read from a consolidated archive and need to apply further consolidation on top
-		aggNum := numPoints / maxDataPoints
+	if readConsolidated && runtimeConsolidation {
+		aggNum := int(numPoints / maxDataPoints)
 		if consolidator == avg {
 			return divide(
-					consolidate(
-						getSeries(key, "sum", interval, fromUnix, toUnix),
-						aggNum,
-						"sum"),
-					consolidate(
-						getSeries(key, "cnt", interval, fromUnix, toUnix),
-						aggNum,
-						"cnt"),
-				), nil
+				consolidate(
+					getSeries(key, "sum", interval, fromUnix, toUnix),
+					aggNum,
+					"sum"),
+				consolidate(
+					getSeries(key, "cnt", interval, fromUnix, toUnix),
+					aggNum,
+					"cnt"),
+			), nil
 		} else {
 			consFunc := getAggFunc(consolidator)
-			points := getSeries(key, consFunc, interval, fromUnix, toUnix)
-			return consolidate(points, aggNum, consolidator), nil
+			return consolidate(
+				getSeries(key, consFunc, interval, fromUnix, toUnix),
+				aggNum, consolidator), nil
 		}
 	}
 }
