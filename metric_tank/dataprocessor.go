@@ -65,12 +65,16 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	// and we assume we can use that interval through history.
 	// TODO: no support for interval changes, metrics not seen yet, missing datablocks, ...
 	interval := uint32(metaCache.Get(key))
+
+	// we don't have the data yet, let's assume the interval is 10 seconds
+	if interval == 0 {
+		interval = 10
+	}
 	numPoints := (toUnix - fromUnix) / interval
 
 	aggs := aggSettingsSpanDesc(aggSettings)
 	sort.Sort(aggs)
 	for i, aggSetting := range aggs {
-		fmt.Println("key", key, aggSetting.span)
 		numPointsHere := (toUnix - fromUnix) / aggSetting.span
 		if numPointsHere >= minDataPoints {
 			archive = i
