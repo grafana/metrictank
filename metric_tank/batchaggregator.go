@@ -5,19 +5,35 @@ import (
 	"math"
 )
 
+//go:generate stringer -type=aggFunc
+
 type aggregator int
 
 const (
-	avg aggregator = iota
+	none aggregator = iota
+	avg
 	last
 	min
 	max
 	sum
 )
 
+func (foo aggregator) String() string {
+	switch aggregator {
+	case last:
+		return "last"
+	case min:
+		return "min"
+	case max:
+		return "max"
+	case sum:
+		return "sum"
+	}
+	panic("unknown aggregator to String()")
+}
+
 type aggFunc func(in []float64) float64
 
-// TODO not sure yet if any of these funcs will be used
 func Avg(in []float64) float64 {
 	if len(in) == 0 {
 		panic("avg() called in aggregator with 0 terms")
@@ -64,4 +80,21 @@ func Sum(in []float64) float64 {
 		sum += term
 	}
 	return sum
+}
+
+func getAggFunc(aggregator aggregator) aggFunc {
+	var consFunc aggFunc
+	switch aggregator {
+	case avg:
+		consFunc = Avg
+	case last:
+		consFunc = Last
+	case min:
+		consFunc = Min
+	case max:
+		consFunc = Max
+	case sum:
+		consFunc = Sum
+	}
+	return consFunc
 }

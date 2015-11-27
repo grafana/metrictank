@@ -102,7 +102,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 
 	out := make([]Series, len(keys))
 	for i, key := range keys {
-		points, err := getTarget(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		points, err := getTarget(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator, aggSettings)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
