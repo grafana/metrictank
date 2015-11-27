@@ -6,18 +6,6 @@ import (
 	"sort"
 )
 
-func getPoints(iters []*tsz.Iter, fromUnix, toUnix uint32) []Point {
-	points := make([]Point, 0)
-	for _, iter := range iters {
-		for iter.Next() {
-			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
-				points = append(points, Point{val, ts})
-			}
-		}
-	}
-	return points
-}
 
 func divide(pointsA, pointsB []Point) []Point {
 	// TODO assert same length
@@ -92,20 +80,15 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 
 	if !consolidate && !readConsolidated {
 		// no consolidation at all needed
-		iters, err := getSeries(key, "", 0, fromUnix, toUnix)
-		if err != nil {
-			return nil, err
-		}
-		return getPoints(iters, fromUnix, toUnix), nil
+		return getSeries(key, "", 0, fromUnix, toUnix)
 	}
 	if consolidate && !readConsolidated {
 		// only runtime consolidation is needed
 		// every buf can be processed by a func
-		iters, err := getSeries(key, "", 0, fromUnix, toUnix)
+		points, err := getSeries(key, "", 0, fromUnix, toUnix)
 		if err != nil {
 			return nil, err
 		}
-		points := getPoints(iters, fromUnix, toUnix)
 		aggNum := numPoints / maxDataPoints
 		return consolidate(points, aggNum, consolidator), nil
 	}
@@ -114,16 +97,14 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		// just read straight from archives. for avg, do the math
 		points := make([]Point, 0)
 		if consolidator == avg {
-			sumiters, err := getSeries(key, "sum", interval, fromUnix, toUnix)
+			sums, err := getSeries(key, "sum", interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			cntiters, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
+			cnts, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			sums := getPoints(sumiters, fromUnix, toUnix)
-			cnts := getPoints(cntiters, fromUnix, toUnix)
 			return divide(sums, cnts), nil
 		} else {
 			iters, err := getSeries(key, consolidator.String(), interval, fromUnix, toUnix)
@@ -137,31 +118,32 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		// we'll read from a consolidated archive and need to apply further consolidation on top
 		aggNum := numPoints / maxDataPoints
 		if consolidator == avg {
-			sumiters, err := getSeries(key, "sum", interval, fromUnix, toUnix)
+			sums, err := getSeries(key, "sum", interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			cntiters, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
+			cnts, err := getSeries(key, "cnt", interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			sums := consolidate(getPoints(sumiters, fromUnix, toUnix), aggNum, "sum")
-			cnts := consolidate(getPoints(cntiters, fromUnix, toUnix), aggNum, "cnt")
-			return divide(sums, cnts), nil
+			return divide(
+					consolidate(sums, aggNum, "sum"),
+					consolidate(cnts, aggNum, "cnt"),
+				), nil
 		} else {
 			consFunc := getAggFunc(consolidator)
-			iters, err := getSeries(key, consFunc, interval, fromUnix, toUnix)
+			points, err := getSeries(key, consFunc, interval, fromUnix, toUnix)
 			if err != nil {
 				return nil, err
 			}
-			points := consolidate(getPoints(iters, fromUnix, toUnix), aggNum, consolidator)
+			return points := consolidate(points, aggNum, consolidator)
 		}
 	}
 }
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sos/sum/cnt and providing the matching agg span.
-func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) ([]*tsz.Iter, error) {
+func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) ([]Point, error) {
 	iters := make([]*tsz.Iter, 0)
 	var memIters []*tsz.Iter
 	oldest := toUnix
@@ -190,5 +172,15 @@ func getSeries(key, consolidator aggregator, aggSpan, fromUnix, toUnix uint32) (
 		log.Debug("data load from mem: %s-%s, oldest (%d)", TS(fromUnix), TS(toUnix), oldest)
 	}
 	iters = append(iters, memIters...)
-	return iters, nil
+
+	points := make([]Point, 0)
+	for _, iter := range iters {
+		for iter.Next() {
+			ts, val := iter.Values()
+			if ts >= fromUnix && ts < toUnix {
+				points = append(points, Point{val, ts})
+			}
+		}
+	}
+	return points, nil
 }
