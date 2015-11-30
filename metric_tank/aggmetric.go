@@ -165,6 +165,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			case consolidation.Cnt:
 				return a.cntMetric.Get(from, to)
 			case consolidation.Last:
+				return a.lstMetric.Get(from, to)
 			case consolidation.Min:
 				return a.minMetric.Get(from, to)
 			case consolidation.Max:
