@@ -57,9 +57,25 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 	return points
 }
 
+type planOption struct {
+	agg      string
+	interval string
+	points   uint32
+	comment  string
+}
+
+type plan []planOption
+
+func (a plan) Len() int           { return len(a) }
+func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
+
 func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32, consolidator consolidation.Consolidator, aggSettings []aggSetting) (points []Point, err error) {
 	defer doRecover(&err)
 	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
+
+	p := make([]planOption, len(aggSettings)+1)
+	guess := false
 
 	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 	// and we assume we can use that interval through history.
@@ -68,21 +84,32 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 
 	// we don't have the data yet, let's assume the interval is 10 seconds
 	if interval == 0 {
+		guess = true
 		interval = 10
 	}
 	numPoints := (toUnix - fromUnix) / interval
 
+	if guess {
+		p[0] = planOption{"raw", "10 (guess)", numPoints, ""}
+	} else {
+		p[0] = planOption{"raw", fmt.Sprintf("%d", interval), numPoints, ""}
+	}
+
 	aggs := aggSettingsSpanDesc(aggSettings)
 	sort.Sort(aggs)
+	finished := false
 	for i, aggSetting := range aggs {
 		numPointsHere := (toUnix - fromUnix) / aggSetting.span
-		if numPointsHere >= minDataPoints {
+		p[i+1] = planOption{fmt.Sprintf("agg %d", i), fmt.Sprintf("%d", aggSetting.span), numPointsHere, ""}
+		if numPointsHere >= minDataPoints && !finished {
 			archive = i
 			interval = aggSetting.span
 			numPoints = numPointsHere
-			break
+			finished = true
 		}
 	}
+
+	p[archive+1].comment = "<-- chosen"
 
 	// note, it should always be safe to dynamically switch on/off consolidation based on how well our data stacks up against the request
 	// i.e. whether your data got consolidated or not, it should be pretty equivalent.
@@ -90,6 +117,15 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 
 	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
 	runtimeConsolidation := (numPoints > maxDataPoints) // do we need to compress any points at runtime?
+
+	fmt.Printf("%s %d-%d (%d) %d <= num <= %d. %s\n", key, fromUnix, toUnix, toUnix-fromUnix, minDataPoints, maxDataPoints, consolidator)
+	fmt.Println("type   interval   points")
+	sortedPlan := plan(p)
+	sort.Sort(sortedPlan)
+	for _, opt := range p {
+		fmt.Printf("%-6s %-10s %-6d %s\n", opt.agg, opt.interval, opt.points, opt.comment)
+	}
+	fmt.Printf("runtimeConsolidation: %t\n\n", runtimeConsolidation)
 
 	if !readConsolidated && !runtimeConsolidation {
 		return getSeries(key, consolidation.None, 0, fromUnix, toUnix), nil
