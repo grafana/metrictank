@@ -59,7 +59,7 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg-bucket in seconds>:<chunkspan in seconds>:<numchunks> (may be given multiple times as comma-separated list)")
+	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
 
 	metrics   *AggMetrics
 	metaCache *MetaCache
