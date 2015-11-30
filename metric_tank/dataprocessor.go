@@ -78,7 +78,7 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		numPointsHere := (toUnix - fromUnix) / aggSetting.span
 		if numPointsHere >= minDataPoints {
 			archive = i
-			interval = aggSetting.chunkSpan
+			interval = aggSetting.span
 			numPoints = numPointsHere
 			break
 		}
