@@ -173,7 +173,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			case consolidation.Sum:
 				return a.sumMetric.Get(from, to)
 			}
-			panic("unknown consolidator to String()")
+			panic(fmt.Sprintf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator))
 			// note: no way to access sosMetric yet
 		}
 	}

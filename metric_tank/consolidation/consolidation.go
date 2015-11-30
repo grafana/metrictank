@@ -1,6 +1,7 @@
 package consolidation
 
 import (
+	"fmt"
 	"github.com/raintank/raintank-metric/metric_tank/batch"
 )
 
@@ -17,6 +18,27 @@ const (
 	Max
 	Sum
 )
+
+// String provides human friendly names
+func (c Consolidator) String() string {
+	switch c {
+	case None:
+		return "NoneConsolidator"
+	case Avg:
+		return "AverageConsolidator"
+	case Cnt:
+		return "CountConsolidator"
+	case Last:
+		return "LastConsolidator"
+	case Min:
+		return "MinimumConsolidator"
+	case Max:
+		return "MaximumConsolidator"
+	case Sum:
+		return "SumConsolidator"
+	}
+	panic(fmt.Sprintf("Consolidator.String(): unknown consolidator %v", c))
+}
 
 // provide the name of a stored archive
 // see aggregator.go for which archives are available
@@ -37,7 +59,7 @@ func (c Consolidator) Archive() string {
 	case Sum:
 		return "sum"
 	}
-	panic("unknown consolidator to String()")
+	panic(fmt.Sprintf("Consolidator.Archive(): unknown consolidator %q", c))
 }
 
 // map the consolidation to the respective aggregation function, if applicable.
