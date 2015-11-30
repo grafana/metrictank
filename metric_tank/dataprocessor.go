@@ -58,8 +58,9 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 }
 
 type planOption struct {
-	agg      string
-	interval string
+	archive  string
+	interval uint32
+	intestim bool
 	points   uint32
 	comment  string
 }
@@ -90,9 +91,9 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	numPoints := (toUnix - fromUnix) / interval
 
 	if guess {
-		p[0] = planOption{"raw", "10 (guess)", numPoints, ""}
+		p[0] = planOption{"raw", 10, true, numPoints, ""}
 	} else {
-		p[0] = planOption{"raw", fmt.Sprintf("%d", interval), numPoints, ""}
+		p[0] = planOption{"raw", interval, false, numPoints, ""}
 	}
 
 	aggs := aggSettingsSpanDesc(aggSettings)
@@ -100,7 +101,7 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	finished := false
 	for i, aggSetting := range aggs {
 		numPointsHere := (toUnix - fromUnix) / aggSetting.span
-		p[i+1] = planOption{fmt.Sprintf("agg %d", i), fmt.Sprintf("%d", aggSetting.span), numPointsHere, ""}
+		p[i+1] = planOption{fmt.Sprintf("agg %d", i), aggSetting.span, false, numPointsHere, ""}
 		if numPointsHere >= minDataPoints && !finished {
 			archive = i
 			interval = aggSetting.span
@@ -123,7 +124,11 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	sortedPlan := plan(p)
 	sort.Sort(sortedPlan)
 	for _, opt := range p {
-		fmt.Printf("%-6s %-10s %-6d %s\n", opt.agg, opt.interval, opt.points, opt.comment)
+		iStr := fmt.Sprintf("%d", opt.interval)
+		if opt.intestim {
+			iStr = fmt.Sprintf("%d (guess)", opt.interval)
+		}
+		fmt.Printf("%-6s %-10s %-6d %s\n", opt.archive, iStr, opt.points, opt.comment)
 	}
 	fmt.Printf("runtimeConsolidation: %t\n\n", runtimeConsolidation)
 
