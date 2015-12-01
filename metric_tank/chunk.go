@@ -23,7 +23,7 @@ func NewChunk(t0 uint32) *Chunk {
 }
 
 func (c *Chunk) String() string {
-	return fmt.Sprintf("<chunk t0 at %s, %d points>", TS(c.T0), c.NumPoints)
+	return fmt.Sprintf("<chunk T0=%d, LastTS=%d, NumPoints=%d, Saved=%t>", c.T0, c.LastTs, c.NumPoints, c.Saved)
 
 }
 func (c *Chunk) Push(t uint32, v float64) error {

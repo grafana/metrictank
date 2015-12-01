@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
-	//"github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 )
 
@@ -153,7 +151,7 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []*tsz.Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []Iter) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -183,8 +181,8 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
-	log.Debug("GET: %s from: %d to:%d", a.Key, from, to)
+func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
+	log.Debug("AggMetric.Get():    %s %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
@@ -196,12 +194,12 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	if newestChunk == nil {
 		// we dont have any data yet.
 		log.Debug("no data for requested range.")
-		return math.MaxInt32, make([]*tsz.Iter, 0)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
 		// we have no data in the requested range.
 		log.Debug("no data for requested range.")
-		return math.MaxInt32, make([]*tsz.Iter, 0)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -223,13 +221,13 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return math.MaxInt32, make([]*tsz.Iter, 0)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		log.Debug("no data for requested range")
-		return oldestChunk.T0, make([]*tsz.Iter, 0)
+		return oldestChunk.T0, make([]Iter, 0)
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -242,7 +240,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]*tsz.Iter, 0)
+			return to, make([]Iter, 0)
 		}
 	}
 
@@ -261,21 +259,23 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]*tsz.Iter, 0)
+			return to, make([]Iter, 0)
 		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]*tsz.Iter, 0, a.NumChunks)
+	iters := make([]Iter, 0, a.NumChunks)
 	for oldestPos != newestPos {
-		iters = append(iters, a.getChunk(oldestPos).Iter())
+		chunk := a.getChunk(oldestPos)
+		iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
 		oldestPos++
 		if oldestPos >= int(a.NumChunks) {
 			oldestPos = 0
 		}
 	}
 	// add the last chunk
-	iters = append(iters, a.getChunk(oldestPos).Iter())
+	chunk := a.getChunk(oldestPos)
+	iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
 
 	return oldestChunk.T0, iters
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
-	"github.com/raintank/go-tsz"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"runtime"
 	"sort"
@@ -119,8 +118,8 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
 	runtimeConsolidation := (numPoints > maxDataPoints) // do we need to compress any points at runtime?
 
-	fmt.Printf("%s %d-%d (%d) %d <= num <= %d. %s\n", key, fromUnix, toUnix, toUnix-fromUnix, minDataPoints, maxDataPoints, consolidator)
-	fmt.Println("type   interval   points")
+	log.Debug("getTarget()         %s %d - %d (%s - %s) span:%ds. %d <= points <= %d. %s", key, fromUnix, toUnix, TS(fromUnix), TS(toUnix), toUnix-fromUnix-1, minDataPoints, maxDataPoints, consolidator)
+	log.Debug("type   interval   points")
 	sortedPlan := plan(p)
 	sort.Sort(sortedPlan)
 	for _, opt := range p {
@@ -128,9 +127,9 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 		if opt.intestim {
 			iStr = fmt.Sprintf("%d (guess)", opt.interval)
 		}
-		fmt.Printf("%-6s %-10s %-6d %s\n", opt.archive, iStr, opt.points, opt.comment)
+		log.Debug("%-6s %-10s %-6d %s", opt.archive, iStr, opt.points, opt.comment)
 	}
-	fmt.Printf("runtimeConsolidation: %t\n\n", runtimeConsolidation)
+	log.Debug("runtimeConsolidation: %t", runtimeConsolidation)
 
 	if !readConsolidated && !runtimeConsolidation {
 		return getSeries(key, consolidation.None, 0, fromUnix, toUnix), nil
@@ -170,27 +169,35 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	}
 }
 
+func logLoad(typ, key string, from, to uint32) {
+	log.Debug("load from %-9s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+}
+
+func aggMetricKey(key, archive string, aggSpan uint32) string {
+	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
+}
+
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sos/sum/cnt and providing the matching agg span.
 func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []Point {
-	iters := make([]*tsz.Iter, 0)
-	var memIters []*tsz.Iter
+	iters := make([]Iter, 0)
+	memIters := make([]Iter, 0)
 	oldest := toUnix
 	if metric, ok := metrics.Get(key); ok {
 		if consolidator != consolidation.None {
+			logLoad("memory", aggMetricKey(key, consolidator.Archive(), aggSpan), fromUnix, toUnix)
 			oldest, memIters = metric.GetAggregated(consolidator, aggSpan, fromUnix, toUnix)
 		} else {
+			logLoad("memory", key, fromUnix, toUnix)
 			oldest, memIters = metric.Get(fromUnix, toUnix)
 		}
-	} else {
-		memIters = make([]*tsz.Iter, 0)
 	}
 	if oldest > fromUnix {
 		reqSpanBoth.Value(int64(toUnix - fromUnix))
-		log.Debug("data load from cassandra: %s - %s from mem: %s - %s", TS(fromUnix), TS(oldest), TS(oldest), TS(toUnix))
 		if consolidator != consolidation.None {
-			key = fmt.Sprintf("%s_%s_%s", key, consolidator.Archive(), aggSpan)
+			key = aggMetricKey(key, consolidator.Archive(), aggSpan)
 		}
+		logLoad("cassandra", key, fromUnix, oldest)
 		storeIters, err := searchCassandra(key, fromUnix, oldest)
 		if err != nil {
 			panic(err)
@@ -198,18 +205,22 @@ func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fro
 		iters = append(iters, storeIters...)
 	} else {
 		reqSpanMem.Value(int64(toUnix - fromUnix))
-		log.Debug("data load from mem: %s-%s, oldest (%d)", TS(fromUnix), TS(toUnix), oldest)
 	}
 	iters = append(iters, memIters...)
 
 	points := make([]Point, 0)
 	for _, iter := range iters {
+		total := 0
+		good := 0
 		for iter.Next() {
+			total += 1
 			ts, val := iter.Values()
 			if ts >= fromUnix && ts < toUnix {
+				good += 1
 				points = append(points, Point{val, ts})
 			}
 		}
+		log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
 	}
 	return points
 }
