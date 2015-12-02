@@ -70,7 +70,7 @@ func (a plan) Len() int           { return len(a) }
 func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
 
-func getTarget(req Req, aggSettings []aggSetting) (points []Point, err error) {
+func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points []Point, err error) {
 	defer doRecover(&err)
 	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
 

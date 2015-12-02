@@ -104,7 +104,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		log.Debug("===================================")
 		req := NewReq(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
 		log.Debug("HTTP Get()          %s", req)
-		points, err := getTarget(req, aggSettings)
+		points, err := getTarget(req, aggSettings, metaCache)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
