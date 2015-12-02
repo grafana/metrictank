@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/grafana/pkg/log"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"testing"
 )
@@ -69,7 +68,6 @@ func (c *Checker) Verify(from, to, first, last uint32) {
 }
 
 func TestAggMetric(t *testing.T) {
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, 1))
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
 
