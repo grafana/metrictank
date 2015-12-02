@@ -38,11 +38,18 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	values := req.URL.Query()
 
 	consolidateBy := values.Get("consolidateBy")
+	if consolidateBy == "" {
+		meta := metaCache.Get(key)
+		consolidateBy = "avg"
+		if meta.TargetType == "counter" {
+			consolidateBy = "last"
+		}
+	}
 	var consolidator consolidation.Consolidator
 	switch consolidateBy {
 	case "avg", "average":
 		consolidator = consolidation.Avg
-	case "", "last":
+	case "last":
 		consolidator = consolidation.Last
 	case "min":
 		consolidator = consolidation.Min

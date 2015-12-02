@@ -41,7 +41,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 		} else {
 			m := h.metrics.GetOrCreate(metric.Id())
 			m.Add(uint32(metric.Time), metric.Value)
-			metaCache.Add(metric.Id(), metric.Interval)
+			metaCache.Add(metric.Id(), metric.Interval, metric.TargetType)
 		}
 	}
 

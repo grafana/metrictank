@@ -80,7 +80,8 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 	// and we assume we can use that interval through history.
 	// TODO: no support for interval changes, metrics not seen yet, missing datablocks, ...
-	interval := uint32(metaCache.Get(req.key))
+	meta := metaCache.Get(req.key)
+	interval := uint32(meta.interval)
 
 	// we don't have the data yet, let's assume the interval is 10 seconds
 	if interval == 0 {
