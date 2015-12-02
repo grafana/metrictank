@@ -146,6 +146,9 @@ func (a *AggMetric) stats() {
 }
 
 func (a *AggMetric) getChunk(pos int) *Chunk {
+	if pos < 0 {
+		return nil
+	}
 	if pos >= len(a.Chunks) {
 		return nil
 	}
@@ -260,22 +263,95 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
-func (a *AggMetric) Persist(c *Chunk) {
-	log.Debug("starting to save %v", c)
-	data := c.Series.Bytes()
-	chunkSizeAtSave.Value(int64(len(data)))
-	err := InsertMetric(a.Key, c.T0, data, *metricTTL)
-	if err == nil {
-		a.Lock()
+func (a *AggMetric) Persist(pos int) <-chan bool {
+	c := a.Chunks[pos]
+	c.Finish()
+	if *dryRun {
 		c.Saved = true
-		a.Unlock()
-		log.Debug("save complete. %v", c)
-		chunkSaveOk.Inc(1)
-	} else {
-		log.Error(1, "failed to save metric to cassandra. %v, %s", c, err)
-		chunkSaveFail.Inc(1)
-		// TODO
+		return nil
 	}
+
+	// save any older chunks that have not been saved yet.
+
+	// get the previous chunk. returns -1 if there are no older chunks
+	prevPos := a.chunkBefore(pos)
+	if prevPos >= 0 {
+		prev := a.getChunk(prevPos)
+		if prev != nil && !prev.Saved {
+			log.Debug("%s chunk:%d waiting on old chunk %d", a.Key, c.T0, prev.T0)
+			// the previous chunk has not been saved, so lets save it.
+			result := false
+			count := 1
+			for !result {
+				// by recursively calling persist, we ensure all unsaved
+				// chunks get saved.
+				d := a.Persist(prevPos)
+				// we block on this to ensure chunks are getting written.
+				// If this is happening alot (ie due to cassandra being down)
+				// this block will cascade back to the message handler and we
+				// will stop consume new messages (which is desired)
+				result = <-d
+				if !result {
+					// presiting failed. Lets wait and try again.
+					// our wait time is extended based on how many
+					// times we have retried.
+					log.Debug("Failed to save chunk. retrying in %dms", count*200)
+					time.Sleep(time.Duration(count*200) * time.Millisecond)
+				}
+				count++
+			}
+			log.Debug("chunk %s:%d saved.", a.Key, prev.T0)
+		}
+	}
+	log.Debug("%s:%d all older chunks saved. Saving currentChunk", a.Key, c.T0)
+
+	done := make(chan bool, 1)
+
+	go func() {
+		log.Debug("starting to save %s:%d %v", a.Key, c.T0, c)
+		data := c.Series.Bytes()
+		chunkSizeAtSave.Value(int64(len(data)))
+		err := InsertMetric(a.Key, c.T0, data, *metricTTL)
+		if err == nil {
+			done <- true
+			a.Lock()
+			c.Saved = true
+			a.Unlock()
+			log.Debug("save complete. %s:%d %v", a.Key, c.T0, c)
+			chunkSaveOk.Inc(1)
+		} else {
+			log.Error(3, "failed to save metric to cassandra. %v, %s", c, err)
+			chunkSaveFail.Inc(1)
+			// TODO
+			done <- false
+		}
+	}()
+	return done
+}
+
+func (a *AggMetric) chunkBefore(pos int) int {
+	pos--
+	l := len(a.Chunks)
+	if pos < 0 {
+		pos += l
+		if pos == a.CurrentChunkPos {
+			return -1
+		}
+	}
+
+	return pos
+}
+
+func (a *AggMetric) chunkAfter(pos int) int {
+	if pos == a.CurrentChunkPos {
+		return -1
+	}
+	l := len(a.Chunks)
+	pos++
+	if pos == l {
+		return 0
+	}
+	return pos
 }
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
@@ -312,8 +388,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		log.Error(3, "Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
 		return
 	} else {
-		currentChunk.Finish()
-		go a.Persist(currentChunk)
+		// persist the chunk. If all older chunks have been successfully persisted, then this call is non-blocking (we ignore channel returned).
+		// If there are older chunks that have not been persisted then this call will block until they are successfully persisted. Blocking here
+		// will put pressure on the message handler and we will stop accepting messages (which is desired)
+		a.Persist(a.CurrentChunkPos)
 
 		a.CurrentChunkPos++
 		if a.CurrentChunkPos >= int(a.NumChunks) {
@@ -356,8 +434,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		}
 		// chunk has not been written to in a while. Lets persist it.
 		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
-		currentChunk.Finish()
-		go a.Persist(currentChunk)
+		a.Persist(a.CurrentChunkPos)
 	}
 	return false
 }
