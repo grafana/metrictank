@@ -70,7 +70,7 @@ func (a plan) Len() int           { return len(a) }
 func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
 
-func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32, consolidator consolidation.Consolidator, aggSettings []aggSetting) (points []Point, err error) {
+func getTarget(req Req, aggSettings []aggSetting) (points []Point, err error) {
 	defer doRecover(&err)
 	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
 
@@ -80,14 +80,14 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 	// and we assume we can use that interval through history.
 	// TODO: no support for interval changes, metrics not seen yet, missing datablocks, ...
-	interval := uint32(metaCache.Get(key))
+	interval := uint32(metaCache.Get(req.key))
 
 	// we don't have the data yet, let's assume the interval is 10 seconds
 	if interval == 0 {
 		guess = true
 		interval = 10
 	}
-	numPoints := (toUnix - fromUnix) / interval
+	numPoints := (req.to - req.from) / interval
 
 	if guess {
 		p[0] = planOption{"raw", 10, true, numPoints, ""}
@@ -99,9 +99,9 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	sort.Sort(aggs)
 	finished := false
 	for i, aggSetting := range aggs {
-		numPointsHere := (toUnix - fromUnix) / aggSetting.span
+		numPointsHere := (req.to - req.from) / aggSetting.span
 		p[i+1] = planOption{fmt.Sprintf("agg %d", i), aggSetting.span, false, numPointsHere, ""}
-		if numPointsHere >= minDataPoints && !finished {
+		if numPointsHere >= req.minPoints && !finished {
 			archive = i
 			interval = aggSetting.span
 			numPoints = numPointsHere
@@ -116,9 +116,9 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	// for that reason, stdev should not be done as a consolidation. but sos is still useful for when we explicitly (and always, not optionally) want the stdev.
 
 	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
-	runtimeConsolidation := (numPoints > maxDataPoints) // do we need to compress any points at runtime?
+	runtimeConsolidation := (numPoints > req.maxPoints) // do we need to compress any points at runtime?
 
-	log.Debug("getTarget()         %s %d - %d (%s - %s) span:%ds. %d <= points <= %d. %s", key, fromUnix, toUnix, TS(fromUnix), TS(toUnix), toUnix-fromUnix-1, minDataPoints, maxDataPoints, consolidator)
+	log.Debug("getTarget()         %s", req)
 	log.Debug("type   interval   points")
 	sortedPlan := plan(p)
 	sort.Sort(sortedPlan)
@@ -132,39 +132,39 @@ func getTarget(key string, fromUnix, toUnix, minDataPoints, maxDataPoints uint32
 	log.Debug("runtimeConsolidation: %t", runtimeConsolidation)
 
 	if !readConsolidated && !runtimeConsolidation {
-		return getSeries(key, consolidation.None, 0, fromUnix, toUnix), nil
+		return getSeries(req.key, consolidation.None, 0, req.from, req.to), nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
-			getSeries(key, consolidation.None, 0, fromUnix, toUnix),
-			int(numPoints/maxDataPoints),
-			consolidator), nil
+			getSeries(req.key, consolidation.None, 0, req.from, req.to),
+			int(numPoints/req.maxPoints),
+			req.consolidator), nil
 	} else if readConsolidated && !runtimeConsolidation {
-		if consolidator == consolidation.Avg {
+		if req.consolidator == consolidation.Avg {
 			return divide(
-				getSeries(key, consolidation.Sum, interval, fromUnix, toUnix),
-				getSeries(key, consolidation.Sum, interval, fromUnix, toUnix),
+				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
 			), nil
 		} else {
-			return getSeries(key, consolidator, interval, fromUnix, toUnix), nil
+			return getSeries(req.key, req.consolidator, interval, req.from, req.to), nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
-		aggNum := int(numPoints / maxDataPoints)
-		if consolidator == consolidation.Avg {
+		aggNum := int(numPoints / req.maxPoints)
+		if req.consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
-					getSeries(key, consolidation.Sum, interval, fromUnix, toUnix),
+					getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
 					aggNum,
 					consolidation.Sum),
 				consolidate(
-					getSeries(key, consolidation.Cnt, interval, fromUnix, toUnix),
+					getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
 					aggNum,
 					consolidation.Cnt),
 			), nil
 		} else {
 			return consolidate(
-				getSeries(key, consolidator, interval, fromUnix, toUnix),
-				aggNum, consolidator), nil
+				getSeries(req.key, req.consolidator, interval, req.from, req.to),
+				aggNum, req.consolidator), nil
 		}
 	}
 }

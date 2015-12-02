@@ -102,8 +102,9 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	out := make([]Series, len(keys))
 	for i, key := range keys {
 		log.Debug("===================================")
-		log.Debug("HTTP Get()          %s %d - %d (%s - %s) span:%ds. %d <= points <= %d, %s", key, fromUnix, toUnix, TS(fromUnix), TS(toUnix), toUnix-fromUnix-1, minDataPoints, maxDataPoints, consolidator)
-		points, err := getTarget(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator, aggSettings)
+		req := NewReq(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		log.Debug("HTTP Get()          %s", req)
+		points, err := getTarget(req, aggSettings)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
