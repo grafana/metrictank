@@ -61,7 +61,7 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 // returns how many points should be aggregated together so that you end up with as many points as possible,
 // but never more than maxPoints
 func aggEvery(numPoints, maxPoints uint32) int {
-	return int(numPoints / maxPoints)
+	return int((numPoints + maxPoints - 1) / maxPoints)
 }
 
 type planOption struct {
