@@ -169,7 +169,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 }
 
 func logLoad(typ, key string, from, to uint32) {
-	log.Debug("load from %-9s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+	log.Debug("load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
 }
 
 func aggMetricKey(key, archive string, aggSpan uint32) string {
@@ -196,7 +196,7 @@ func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fro
 		if consolidator != consolidation.None {
 			key = aggMetricKey(key, consolidator.Archive(), aggSpan)
 		}
-		logLoad("cassandra", key, fromUnix, oldest)
+		logLoad("cassan", key, fromUnix, oldest)
 		storeIters, err := searchCassandra(key, fromUnix, oldest)
 		if err != nil {
 			panic(err)
