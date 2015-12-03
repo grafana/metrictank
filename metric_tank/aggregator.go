@@ -67,8 +67,8 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
 			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
 			agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
-			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f , created new aggregation and added new point", agg.span, agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
-			agg.agg = NewAggregation()
+			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f , created new aggregation and added new point", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
+			agg.agg.Reset()
 		} else {
 			msg = "added point to existing aggregation"
 		}

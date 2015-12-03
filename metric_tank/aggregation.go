@@ -28,3 +28,12 @@ func (a *Aggregation) Add(val float64) {
 	a.cnt += 1
 	a.lst = val
 }
+
+func (a *Aggregation) Reset() {
+	a.min = math.MaxFloat64
+	a.max = -math.MaxFloat64
+	a.sos = 0
+	a.sum = 0
+	a.cnt = 0
+	// no need to set a.lst, for a to be valid (cnt > 1), a.lst will always be set properly
+}
