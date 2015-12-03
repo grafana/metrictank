@@ -16,6 +16,7 @@ type Aggregation struct {
 func NewAggregation() *Aggregation {
 	return &Aggregation{
 		min: math.MaxFloat64,
+		max: -math.MaxFloat64,
 	}
 }
 
