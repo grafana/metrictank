@@ -145,7 +145,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
-				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+				getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
 			), nil
 		} else {
 			return getSeries(req.key, req.consolidator, interval, req.from, req.to), nil
