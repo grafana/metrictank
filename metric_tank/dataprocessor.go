@@ -43,7 +43,11 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 	aggFunc := consolidation.GetAggFunc(consolidator)
 	buf := make([]float64, num)
 	bufpos := -1
-	points := make([]Point, (len(in)/num)+1)
+	outLen := len(in) / num
+	if len(in)%num != 0 {
+		outLen += 1
+	}
+	points := make([]Point, 0, outLen)
 	for inpos, p := range in {
 		bufpos = inpos % num
 		buf[bufpos] = p.Val
