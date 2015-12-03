@@ -1,6 +1,7 @@
 package main
 
 import "fmt"
+import "github.com/grafana/grafana/pkg/log"
 
 type aggSetting struct {
 	span      uint32 // in seconds, controls how many input points go into an aggregated point.
@@ -54,7 +55,9 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(ts, val)
+		log.Debug("aggregator %d Add(): adding to existing block", agg.span)
 	} else if boundary > agg.currentBoundary {
+		var msg string
 		// store current totals as a new point in their series
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
 		if agg.agg.cnt != 0 {
@@ -64,10 +67,14 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
 			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
 			agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
+			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f , created new aggregation and added new point", agg.span, agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 			agg.agg = NewAggregation()
+		} else {
+			msg = "added point to existing aggregation"
 		}
 		agg.currentBoundary = boundary
 		agg.agg.Add(ts, val)
+		log.Debug("aggregator %d Add(): %s", agg.span, msg)
 	} else {
 		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
