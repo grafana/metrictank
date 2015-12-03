@@ -289,7 +289,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 }
 
 func (a *AggMetric) Persist(c *Chunk) {
-	log.Debug("AggMetric %s Perist(): starting to save %v", a.Key, c)
+	log.Debug("AggMetric %s Persist(): starting to save %v", a.Key, c)
 	data := c.Series.Bytes()
 	chunkSizeAtSave.Value(int64(len(data)))
 	err := InsertMetric(a.Key, c.T0, data, *metricTTL)
@@ -300,7 +300,7 @@ func (a *AggMetric) Persist(c *Chunk) {
 		log.Debug("AggMetric %s Persist(): save complete. %v", a.Key, c)
 		chunkSaveOk.Inc(1)
 	} else {
-		log.Error(1, "failed to save metric to cassandra. %v, %s", c, err)
+		log.Error(1, "AggMetric %s Persist(): failed to save %v to cassandra. %v, %s", a.Key, c, err)
 		chunkSaveFail.Inc(1)
 		// TODO
 	}
