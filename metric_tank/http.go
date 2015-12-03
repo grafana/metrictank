@@ -42,29 +42,6 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	values := req.URL.Query()
 
 	consolidateBy := values.Get("consolidateBy")
-	if consolidateBy == "" {
-		meta := metaCache.Get(key)
-		consolidateBy = "avg"
-		if meta.TargetType == "counter" {
-			consolidateBy = "last"
-		}
-	}
-	var consolidator consolidation.Consolidator
-	switch consolidateBy {
-	case "avg", "average":
-		consolidator = consolidation.Avg
-	case "last":
-		consolidator = consolidation.Last
-	case "min":
-		consolidator = consolidation.Min
-	case "max":
-		consolidator = consolidation.Max
-	case "sum":
-		consolidator = consolidation.Sum
-	default:
-		http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
-		return
-	}
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := values.Get("maxDataPoints")
@@ -112,6 +89,29 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 
 	out := make([]Series, len(keys))
 	for i, key := range keys {
+		if consolidateBy == "" {
+			meta := metaCache.Get(key)
+			consolidateBy = "avg"
+			if meta.targetType == "counter" {
+				consolidateBy = "last"
+			}
+		}
+		var consolidator consolidation.Consolidator
+		switch consolidateBy {
+		case "avg", "average":
+			consolidator = consolidation.Avg
+		case "last":
+			consolidator = consolidation.Last
+		case "min":
+			consolidator = consolidation.Min
+		case "max":
+			consolidator = consolidation.Max
+		case "sum":
+			consolidator = consolidation.Sum
+		default:
+			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
+			return
+		}
 		log.Debug("===================================")
 		req := NewReq(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
 		log.Debug("HTTP Get()          %s", req)
