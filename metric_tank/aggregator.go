@@ -54,7 +54,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := aggBoundary(ts, agg.span)
 
 	if boundary == agg.currentBoundary {
-		agg.agg.Add(ts, val)
+		agg.agg.Add(val)
 		log.Debug("aggregator %d Add(): adding to existing block", agg.span)
 	} else if boundary > agg.currentBoundary {
 		var msg string
@@ -73,7 +73,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			msg = "added point to existing aggregation"
 		}
 		agg.currentBoundary = boundary
-		agg.agg.Add(ts, val)
+		agg.agg.Add(val)
 		log.Debug("aggregator %d Add(): %s", agg.span, msg)
 	} else {
 		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")

@@ -20,7 +20,7 @@ func NewAggregation() *Aggregation {
 	}
 }
 
-func (a *Aggregation) Add(ts uint32, val float64) {
+func (a *Aggregation) Add(val float64) {
 	a.min = math.Min(val, a.min)
 	a.max = math.Max(val, a.max)
 	a.sos += math.Pow(val, 2)
