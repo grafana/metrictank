@@ -58,6 +58,12 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 	return points
 }
 
+// returns how many points should be aggregated together so that you end up with as many points as possible,
+// but never more than maxPoints
+func aggEvery(numPoints, maxPoints uint32) int {
+	return int(numPoints / maxPoints)
+}
+
 type planOption struct {
 	archive  string
 	interval uint32
@@ -135,7 +141,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			getSeries(req.key, consolidation.None, 0, req.from, req.to),
-			int(numPoints/req.maxPoints),
+			aggEvery(numPoints, req.maxPoints),
 			req.consolidator), nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.consolidator == consolidation.Avg {
@@ -148,7 +154,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
-		aggNum := int(numPoints / req.maxPoints)
+		aggNum := aggEvery(numPoints, req.maxPoints)
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
