@@ -28,7 +28,9 @@ func doRecover(errp *error) {
 }
 
 func divide(pointsA, pointsB []Point) []Point {
-	// TODO assert same length
+	if len(pointsA) != len(pointsB) {
+		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
+	}
 	out := make([]Point, len(pointsA))
 	for i, a := range pointsA {
 		b := pointsB[i]
