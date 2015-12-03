@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -17,6 +18,9 @@ type Point struct {
 }
 
 func (p *Point) MarshalJSON() ([]byte, error) {
+	if math.IsNaN(p.Val) {
+		return []byte(fmt.Sprintf("[null, %d]", p.Ts)), nil
+	}
 	return []byte(fmt.Sprintf("[%f, %d]", p.Val, p.Ts)), nil
 }
 
