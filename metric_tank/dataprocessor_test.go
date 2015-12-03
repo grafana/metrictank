@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"testing"
 )
@@ -32,14 +31,12 @@ func TestDataProcessor(t *testing.T) {
 	}
 	for i, c := range cases {
 		out := consolidate(c.in, c.num, c.consol)
-		spew.Dump(out)
-		continue
 		if len(out) != len(c.out) {
 			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.out, out)
 
 		} else {
 			for j, p := range out {
-				if p.Val != c.out[i].Val || p.Ts != c.out[i].Ts {
+				if p.Val != c.out[j].Val || p.Ts != c.out[j].Ts {
 					t.Fatalf("output for testcase %d mismatch at point %d: expected: %v, got: %v", i, j, c.out[j], out[j])
 				}
 			}
