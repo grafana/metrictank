@@ -92,11 +92,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 	}
 	numPoints := (req.to - req.from) / interval
 
-	if guess {
-		p[0] = planOption{"raw", 10, true, numPoints, ""}
-	} else {
-		p[0] = planOption{"raw", interval, false, numPoints, ""}
-	}
+	p[0] = planOption{"raw", interval, guess, numPoints, ""}
 
 	aggs := aggSettingsSpanDesc(aggSettings)
 	sort.Sort(aggs)
