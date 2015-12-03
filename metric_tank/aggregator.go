@@ -55,7 +55,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(val)
-		log.Debug("aggregator %d Add(): adding to existing block", agg.span)
+		log.Debug("aggregator %d Add(): adding to aggregation block", agg.span)
 	} else if boundary > agg.currentBoundary {
 		var msg string
 		// store current totals as a new point in their series
@@ -67,10 +67,10 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
 			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
 			agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
-			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f , created new aggregation and added new point", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
+			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block and added new point", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 			agg.agg.Reset()
 		} else {
-			msg = "added point to existing aggregation"
+			msg = "added point to still-unused aggregation block"
 		}
 		agg.currentBoundary = boundary
 		agg.agg.Add(val)
