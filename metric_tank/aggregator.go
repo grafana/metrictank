@@ -49,26 +49,34 @@ func NewAggregator(key string, aggSpan, aggChunkSpan, aggNumChunks uint32) *Aggr
 		lstMetric: NewAggMetric(fmt.Sprintf("%s_lst_%d", key, aggSpan), aggChunkSpan, aggNumChunks),
 	}
 }
+func (agg *Aggregator) flush() string {
+	agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
+	agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
+	agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
+	agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
+	agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
+	agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
+	msg := fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
+	agg.agg.Reset()
+	return msg
+}
 
 func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := aggBoundary(ts, agg.span)
 
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(val)
-		log.Debug("aggregator %d Add(): adding to aggregation block", agg.span)
+		if ts == boundary {
+			log.Debug("aggregator %d Add(): added to aggregation block, %s because this was the last point for the block", agg.span, agg.flush())
+		} else {
+			log.Debug("aggregator %d Add(): added to aggregation block", agg.span)
+		}
 	} else if boundary > agg.currentBoundary {
 		var msg string
 		// store current totals as a new point in their series
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
 		if agg.agg.cnt != 0 {
-			agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
-			agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
-			agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
-			agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
-			agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
-			agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
-			msg = fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block and added new point", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
-			agg.agg.Reset()
+			msg = agg.flush() + "and added new point"
 		} else {
 			msg = "added point to still-unused aggregation block"
 		}
