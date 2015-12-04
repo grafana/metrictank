@@ -32,7 +32,7 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, a
 	// open data file
 	dataFile, err := os.Open(*dumpFile)
 
-	if err == nil {
+	if false && err == nil {
 		log.Info("loading aggMetrics from file " + *dumpFile)
 		dataDecoder := gob.NewDecoder(dataFile)
 		err = dataDecoder.Decode(&ms)
@@ -133,6 +133,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 
 // Persist saves the AggMetrics to disk.
 func (ms *AggMetrics) Persist() error {
+	return nil
 	// create a file\
 	log.Info("persisting aggmetrics to disk.")
 	dataFile, err := os.Create(*dumpFile)
