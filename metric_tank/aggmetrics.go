@@ -1,9 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
-	"os"
 	"sync"
 	"time"
 
@@ -28,41 +25,6 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, a
 		aggSettings:    aggSettings,
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
-	}
-	// open data file
-	dataFile, err := os.Open(*dumpFile)
-
-	if false && err == nil {
-		log.Info("loading aggMetrics from file " + *dumpFile)
-		dataDecoder := gob.NewDecoder(dataFile)
-		err = dataDecoder.Decode(&ms)
-		if err != nil {
-			log.Error(3, "failed to load aggMetrics from file. %s", err)
-		}
-		dataFile.Close()
-		log.Info("aggMetrics loaded from file.")
-		if ms.numChunks != numChunks {
-			if ms.numChunks > numChunks {
-				log.Fatal(3, "numChunks can not be decreased.")
-			}
-			log.Info("numChunks has changed. Updating memory structures.")
-			sem := make(chan bool, *concurrency)
-			for _, m := range ms.Metrics {
-				sem <- true
-				go func() {
-					m.GrowNumChunks(numChunks)
-					<-sem
-				}()
-			}
-			for i := 0; i < cap(sem); i++ {
-				sem <- true
-			}
-
-			ms.numChunks = numChunks
-			log.Info("memory structures updated.")
-		}
-	} else {
-		log.Info("starting with fresh aggmetrics.")
 	}
 
 	go ms.stats()
@@ -129,57 +91,4 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	}
 	ms.Unlock()
 	return m
-}
-
-// Persist saves the AggMetrics to disk.
-func (ms *AggMetrics) Persist() error {
-	return nil
-	// create a file\
-	log.Info("persisting aggmetrics to disk.")
-	dataFile, err := os.Create(*dumpFile)
-	defer dataFile.Close()
-	if err != nil {
-		return err
-	}
-
-	dataEncoder := gob.NewEncoder(dataFile)
-	ms.RLock()
-	err = dataEncoder.Encode(*ms)
-	ms.RUnlock()
-	if err != nil {
-		log.Error(3, "failed to encode aggMetrics to binary format. %s", err)
-	} else {
-		log.Info("successfully persisted aggMetrics to disk.")
-	}
-	return nil
-}
-
-type aggMetricsOnDisk struct {
-	Metrics   map[string]*AggMetric
-	NumChunks uint32
-}
-
-func (a AggMetrics) GobEncode() ([]byte, error) {
-	aOnDisk := aggMetricsOnDisk{
-		Metrics:   a.Metrics,
-		NumChunks: a.numChunks,
-	}
-	var b bytes.Buffer
-	enc := gob.NewEncoder(&b)
-	err := enc.Encode(aOnDisk)
-
-	return b.Bytes(), err
-}
-
-func (a *AggMetrics) GobDecode(data []byte) error {
-	r := bytes.NewReader(data)
-	dec := gob.NewDecoder(r)
-	aOnDisk := &aggMetricsOnDisk{}
-	err := dec.Decode(aOnDisk)
-	if err != nil {
-		return err
-	}
-	a.Metrics = aOnDisk.Metrics
-	a.numChunks = aOnDisk.NumChunks
-	return nil
 }

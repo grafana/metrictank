@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"math"
 	"sync"
@@ -35,14 +34,6 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 }
 
-type aggMetricOnDisk struct {
-	Key             string
-	CurrentChunkPos int
-	NumChunks       uint32
-	ChunkSpan       uint32
-	Chunks          []*Chunk
-}
-
 // re-order the chunks with the oldest at start of the list and newest at the end.
 // this is to support increasing the chunkspan at startup.
 func (a *AggMetric) GrowNumChunks(numChunks uint32) {
@@ -72,39 +63,6 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 	a.Chunks = orderdChunks
 	a.CurrentChunkPos = len(a.Chunks) - 1
 	return
-}
-
-func (a AggMetric) GobEncode() ([]byte, error) {
-	aOnDisk := aggMetricOnDisk{
-		Key:             a.Key,
-		CurrentChunkPos: a.CurrentChunkPos,
-		NumChunks:       a.NumChunks,
-		ChunkSpan:       a.ChunkSpan,
-		Chunks:          a.Chunks,
-	}
-	var b bytes.Buffer
-	enc := gob.NewEncoder(&b)
-	err := enc.Encode(aOnDisk)
-
-	return b.Bytes(), err
-}
-
-func (a *AggMetric) GobDecode(data []byte) error {
-	r := bytes.NewReader(data)
-	dec := gob.NewDecoder(r)
-	aOnDisk := &aggMetricOnDisk{}
-	err := dec.Decode(aOnDisk)
-	if err != nil {
-		return err
-	}
-	a.Key = aOnDisk.Key
-
-	a.NumChunks = aOnDisk.NumChunks
-	a.ChunkSpan = aOnDisk.ChunkSpan
-	a.Chunks = aOnDisk.Chunks
-	//the current chunk is the last chunk.
-	a.CurrentChunkPos = aOnDisk.CurrentChunkPos
-	return nil
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long

@@ -46,8 +46,6 @@ var (
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
-	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
-
 	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
 	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
@@ -241,10 +239,6 @@ func main() {
 	for {
 		select {
 		case <-consumer.StopChan:
-			err := metrics.Persist()
-			if err != nil {
-				log.Error(3, "failed to persist aggmetrics. %s", err)
-			}
 			log.Info("closing cassandra session.")
 			cSession.Close()
 			log.Info("terminating.")
