@@ -177,12 +177,12 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 			chunkSizeAtLoad.Value(int64(len(b)))
 			if len(b) < 2 {
 				err := errors.New("unpossibly small chunk in cassandra")
-				log.Error(3, err)
+				log.Error(3, err.Error())
 				return iters, err
 			}
 			if Format(b[0]) != FormatStandardGoTsz {
 				err := errors.New("unrecognized chunk format in cassandra")
-				log.Error(3, err)
+				log.Error(3, err.Error())
 				return iters, err
 			}
 			iter, err := tsz.NewIterator(b[1:])
