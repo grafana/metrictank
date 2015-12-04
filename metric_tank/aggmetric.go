@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
@@ -250,7 +251,18 @@ func (a *AggMetric) Persist(c *Chunk) {
 	log.Debug("AggMetric %s Persist(): starting to save %v", a.Key, c)
 	data := c.Series.Bytes()
 	chunkSizeAtSave.Value(int64(len(data)))
-	err := InsertMetric(a.Key, c.T0, data, *metricTTL)
+
+	version := FormatStandardGoTsz
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, uint8(version))
+	if err != nil {
+		// TODO
+	}
+	_, err = buf.Write(data)
+	if err != nil {
+		// TODO
+	}
+	err = InsertChunk(a.Key, c.T0, buf.Bytes(), *metricTTL)
 	if err == nil {
 		a.Lock()
 		c.Saved = true

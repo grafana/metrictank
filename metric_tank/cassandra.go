@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -64,12 +65,12 @@ func InitCassandra() error {
 	return err
 }
 
-// Insert metric into Cassandra.
+// Insert Chunks into Cassandra.
 //
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func InsertMetric(key string, t0 uint32, data []byte, ttl int) error {
+func InsertChunk(key string, t0 uint32, data []byte, ttl int) error {
 	// increment our semaphore.
 	// blocks if <cassandraWriteConcurrency> writers are already running
 	pre := time.Now()
@@ -174,7 +175,17 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 		for outcome.i.Scan(&ts, &b) {
 			chunks += 1
 			chunkSizeAtLoad.Value(int64(len(b)))
-			iter, err := tsz.NewIterator(b)
+			if len(b) < 2 {
+				err := errors.New("unpossibly small chunk in cassandra")
+				log.Error(3, err)
+				return iters, err
+			}
+			if Format(b[0]) != FormatStandardGoTsz {
+				err := errors.New("unrecognized chunk format in cassandra")
+				log.Error(3, err)
+				return iters, err
+			}
+			iter, err := tsz.NewIterator(b[1:])
 			if err != nil {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
