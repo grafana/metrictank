@@ -57,20 +57,7 @@ func TestOddConsolidationAlignments(t *testing.T) {
 			3,
 			[]Point{
 				{2, 1449178151},
-				{4, 1449178161},
-			},
-		},
-		{
-			[]Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
-			},
-			consolidation.Avg,
-			5,
-			[]Point{
-				{float64(10) / float64(4), 1449178161},
+				{4, 1449178181}, // see comment below
 			},
 		},
 		{
