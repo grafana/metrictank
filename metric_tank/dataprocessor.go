@@ -57,7 +57,18 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 	}
 	if bufpos != -1 && bufpos < num-1 {
 		// we have an incomplete buf of some points that didn't get aggregated yet
-		points = append(points, Point{aggFunc(buf[:bufpos+1]), in[len(in)-1].Ts})
+		// we must also aggregate it and add it, and the timestamp of this point must be what it would have been
+		// if the buf would have been complete, i.e. points in the consolidation output should be evenly spaced.
+		// obviously we can only figure out the interval if we have at least 2 points
+		var lastTs uint32
+		if len(in) == 1 {
+			lastTs = in[0].Ts
+		} else {
+			interval := in[len(in)-1].Ts - in[len(in)-2].Ts
+			// len 10, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
+			lastTs = in[len(in)-1].Ts + uint32(num-len(in)%num)*interval
+		}
+		points = append(points, Point{aggFunc(buf[:bufpos+1]), lastTs})
 	}
 	return points
 }
