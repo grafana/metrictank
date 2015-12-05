@@ -217,8 +217,11 @@ func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fro
 		if consolidator != consolidation.None {
 			key = aggMetricKey(key, consolidator.Archive(), aggSpan)
 		}
-		logLoad("cassan", key, fromUnix, oldest)
-		storeIters, err := searchCassandra(key, fromUnix, oldest)
+		// if oldest < to -> search until oldest, we already have the rest from mem
+		// if to < oldest -> no need to search until oldest, only search until to
+		until := min(oldest, to)
+		logLoad("cassan", key, fromUnix, until)
+		storeIters, err := searchCassandra(key, fromUnix, until)
 		if err != nil {
 			panic(err)
 		}
