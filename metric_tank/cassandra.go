@@ -116,38 +116,33 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	query := func(month uint32, q string, p ...interface{}) {
 		wg.Add(1)
 		go func() {
+			//		if len(p) == 3 {
+			//		log.Println("querying cassandra for", q, p[0], TS(p[1]), TS(p[2]))
+			//		} else if len(p) == 2 {
+			//		log.Println("querying cassandra for", q, p[0], TS(p[1]))
+			//		} else {
+			//		log.Println("querying cassandra for", q, p)
+			//		}
 			results <- outcome{month, cSession.Query(q, p...).Iter()}
 			wg.Done()
 		}()
 	}
 
-	// unfortunately in the database we only have the t0's of all chunks.
-	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't query for start <= t0 because than we will miss some data,
-	// we effectively need all chunks with a t0 >= start, as well as the last chunk with a t0 <= start which btw, could also be in the previous row.
-	// and also we can't assume we know the chunkSpan so we can't just calculate the t0 >= start - <some-predefined-number> because chunkSpans may change over time.
-	// but it seems cumbersome+slow to first query something like `where ts <= start order by ts desc limit 1` to check if that yielded a chunk, and if not, go to
-	// the previous row. and by the way, it doesn't even seem possible to execute such query in cassandra anyway.
-	// i wish we could just add another property to each ts-data combo to mark the "last-ts" contained within the chunk. that would make things a lot easier.
-	// but since i'm told that's impossible and given all of the above we can just assume that a chunkspan will never be more than 12h (TODO: might want to make this configurable)
-	// and just query 12 hours back and filter out the data.  this comes with a bunch of io overhead but what you gonna do...
-
-	conservative_start := start - 12*60*60
-	start_month := conservative_start - (conservative_start % month_sec) // starting row has to be at, or before, requested start.
-	end_month := (end - 1) - ((end - 1) % month_sec)                     // ending row has to include the last point right before the end
+	start_month := start - (start % month_sec)       // starting row has to be at, or before, requested start
+	end_month := (end - 1) - ((end - 1) % month_sec) // ending row has to be include the last point we might need
 
 	pre := time.Now()
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key := fmt.Sprintf("%s_%d", key, start_month/month_sec)
-		query(start_month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC", row_key, conservative_start, end)
+		query(start_month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for month := start_month; month <= end_month; month += month_sec {
 			row_key := fmt.Sprintf("%s_%d", key, month/month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, conservative_start)
+				query(month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
 				query(month, "SELECT ts, data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
@@ -173,30 +168,21 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	// we have all of the results, but they could have arrived in any order.
 	sort.Sort(asc(outcomes))
 
-	// remember, we only want data from last chunk that has a t0 <= start and onwards
-	// as explained above we probably have one or more chunks in the beginning that aren't needed at all
-	firstIter := 0
-	numIter := -1
-
 	var b []byte
 	var ts int
 	for _, outcome := range outcomes {
 		chunks := int64(0)
 		for outcome.i.Scan(&ts, &b) {
-			numIter += 1
-			if uint32(ts) <= start {
-				firstIter = numIter
-			}
 			chunks += 1
 			chunkSizeAtLoad.Value(int64(len(b)))
 			if len(b) < 2 {
 				err := errors.New("unpossibly small chunk in cassandra")
-				log.Error(3, err.Error())
+				log.Error(3, err)
 				return iters, err
 			}
 			if Format(b[0]) != FormatStandardGoTsz {
 				err := errors.New("unrecognized chunk format in cassandra")
-				log.Error(3, err.Error())
+				log.Error(3, err)
 				return iters, err
 			}
 			iter, err := tsz.NewIterator(b[1:])
@@ -212,8 +198,7 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 			log.Error(3, "cassandra query error. %s", err)
 		}
 	}
-
 	cassandraRowsPerResponse.Value(int64(len(outcomes)))
 	log.Debug("searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
-	return iters[firstIter:], nil
+	return iters, nil
 }
