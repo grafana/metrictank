@@ -219,7 +219,7 @@ func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fro
 		}
 		// if oldest < to -> search until oldest, we already have the rest from mem
 		// if to < oldest -> no need to search until oldest, only search until to
-		until := min(oldest, to)
+		until := min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
 		storeIters, err := searchCassandra(key, fromUnix, until)
 		if err != nil {
