@@ -93,14 +93,15 @@ func InsertChunk(key string, t0 uint32, data []byte, ttl int) error {
 }
 
 type outcome struct {
-	month uint32
-	i     *gocql.Iter
+	month   uint32
+	sortKey uint32
+	i       *gocql.Iter
 }
 type asc []outcome
 
 func (o asc) Len() int           { return len(o) }
 func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
-func (o asc) Less(i, j int) bool { return o[i].month < o[j].month }
+func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
@@ -113,17 +114,10 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	results := make(chan outcome)
 	wg := &sync.WaitGroup{}
 
-	query := func(month uint32, q string, p ...interface{}) {
+	query := func(month, sortKey uint32, q string, p ...interface{}) {
 		wg.Add(1)
 		go func() {
-			//		if len(p) == 3 {
-			//		log.Println("querying cassandra for", q, p[0], TS(p[1]), TS(p[2]))
-			//		} else if len(p) == 2 {
-			//		log.Println("querying cassandra for", q, p[0], TS(p[1]))
-			//		} else {
-			//		log.Println("querying cassandra for", q, p)
-			//		}
-			results <- outcome{month, cSession.Query(q, p...).Iter()}
+			results <- outcome{month, sortKey, cSession.Query(q, p...).Iter()}
 			wg.Done()
 		}()
 	}
@@ -132,23 +126,35 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	end_month := (end - 1) - ((end - 1) % month_sec) // ending row has to be include the last point we might need
 
 	pre := time.Now()
+
+	// unfortunately in the database we only have the t0's of all chunks.
+	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than will miss some data at the beginning
+	// we can't assume we know the chunkSpan so we can't just calculate the t0 >= start - <some-predefined-number> because chunkSpans may change over time.
+	// we effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
+	// since we make sure that you can only use chunkSpans so that month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
+	// as the one that has start_month.
+
+	row_key := fmt.Sprintf("%s_%d", key, start_month/month_sec)
+	query(start_month, start_month, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
+
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
-		row_key := fmt.Sprintf("%s_%d", key, start_month/month_sec)
-		query(start_month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
+		row_key = fmt.Sprintf("%s_%d", key, start_month/month_sec)
+		query(start_month, start_month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for month := start_month; month <= end_month; month += month_sec {
-			row_key := fmt.Sprintf("%s_%d", key, month/month_sec)
+			row_key = fmt.Sprintf("%s_%d", key, month/month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start)
+				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? ORDER BY ts ASC", row_key, start)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, "SELECT ts, data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
+				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
 			} else {
 				// we want all columns
-				query(month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
+				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
 			}
 		}
 	}

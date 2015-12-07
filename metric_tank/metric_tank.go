@@ -189,11 +189,17 @@ func main() {
 		if err != nil {
 			log.Fatal(0, "bad agg settings", err)
 		}
+		if (month_sec % aggChunkSpan) != 0 {
+			panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		}
 		aggNumChunks, err := strconv.Atoi(fields[2])
 		if err != nil {
 			log.Fatal(0, "bad agg settings", err)
 		}
 		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks)})
+	}
+	if (month_sec % *chunkSpan) != 0 {
+		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
