@@ -2,7 +2,7 @@
 # http interface
 
 * to query for series data
-* `http://localhost:6063/get?render=<id>` (render variable can be given multiple times for several series)
+* `http://localhost:6063/get?target=<target>` (target variable can be given multiple times for several series)
 * optionally, specify `from` and `to` unix timestamps.
   * from is inclusive, to is exclusive.
   * so from=x, to=y returns data that can include x and y-1 but not y.
