@@ -36,6 +36,8 @@ var (
 	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 
+	maxUnwrittenChunks = flag.Int("max-unwritten-chunks", 1, "number of chunks per metric waiting to be written to cassandra.")
+
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
