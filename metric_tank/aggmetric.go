@@ -285,7 +285,7 @@ WAIT:
 			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
 			break WAIT
 		case <-timer.C:
-			log.Debug("%s:%d blocked writting to writeQueue.", a.Key, chunk.T0)
+			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
 		}
 	}
 	timer.Stop()
@@ -316,7 +316,7 @@ WAIT:
 							chunkSaveOk.Inc(1)
 						} else {
 							if (attempts % 20) == 0 {
-								log.Error(3, "failed to save metric to cassandra after %d attempts. %v, %s", attempts+1, c, err)
+								log.Warn("failed to save metric to cassandra after %d attempts. %v, %s", attempts+1, c, err)
 							}
 							chunkSaveFail.Inc(1)
 							sleepTime := 100 * attempts
