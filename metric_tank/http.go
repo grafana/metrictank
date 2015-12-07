@@ -90,7 +90,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	out := make([]Series, len(targets))
 	for i, target := range targets {
 		var consolidateBy string
-		var id string
+		id := target
 		// yes, i am aware of the arguably grossness of the below.
 		// however, it is solid based on the documented allowed input format.
 		// once we need to support several functions, we can implement
