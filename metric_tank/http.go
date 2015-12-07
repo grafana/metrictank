@@ -3,14 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"time"
-
-	"github.com/grafana/grafana/pkg/log"
-	//github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
 )
 
 type Point struct {
@@ -19,6 +18,9 @@ type Point struct {
 }
 
 func (p *Point) MarshalJSON() ([]byte, error) {
+	if math.IsNaN(p.Val) {
+		return []byte(fmt.Sprintf("[null, %d]", p.Ts)), nil
+	}
 	return []byte(fmt.Sprintf("[%f, %d]", p.Val, p.Ts)), nil
 }
 
@@ -27,14 +29,36 @@ type Series struct {
 	Datapoints []Point
 }
 
+func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		Get(w, req, metaCache, aggSettings)
+	}
+}
+
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request) {
+func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	values := req.URL.Query()
+
+	consolidateBy := values.Get("consolidateBy")
+
+	maxDataPoints := uint32(800)
+	maxDataPointsStr := values.Get("maxDataPoints")
+	var err error
+	if maxDataPointsStr != "" {
+		tmp, err := strconv.Atoi(maxDataPointsStr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		maxDataPoints = uint32(tmp)
+	}
+	minDataPoints := maxDataPoints / 10
+
 	keys, ok := values["target"]
 	if !ok {
-		http.Error(w, "missing render arg", http.StatusBadRequest)
+		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
 	}
 	now := time.Now()
@@ -44,7 +68,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		fromUnix = uint32(fromUnixInt)
@@ -53,7 +77,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 	if to != "" {
 		toUnixInt, err := strconv.Atoi(to)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		toUnix = uint32(toUnixInt)
@@ -65,43 +89,39 @@ func Get(w http.ResponseWriter, req *http.Request) {
 
 	out := make([]Series, len(keys))
 	for i, key := range keys {
-		iters := make([]*tsz.Iter, 0)
-		var memIters []*tsz.Iter
-		oldest := toUnix
-		if metric, ok := metrics.Get(key); ok {
-			oldest, memIters = metric.Get(fromUnix, toUnix)
-		} else {
-			memIters = make([]*tsz.Iter, 0)
-		}
-		if oldest > fromUnix {
-			reqSpanBoth.Value(int64(toUnix - fromUnix))
-			log.Debug("data load from cassandra: %s - %s from mem: %s - %s", TS(fromUnix), TS(oldest), TS(oldest), TS(toUnix))
-			storeIters, err := searchCassandra(key, fromUnix, oldest)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			//for _, i := range storeIters {
-			//	fmt.Println("c>", TS(i.T0()))
-			//	}
-			iters = append(iters, storeIters...)
-		} else {
-			reqSpanMem.Value(int64(toUnix - fromUnix))
-			log.Debug("data load from mem: %s-%s, oldest (%d)", TS(fromUnix), TS(toUnix), oldest)
-		}
-		iters = append(iters, memIters...)
-		//	for _, i := range memIters {
-		//fmt.Println("m>", TS(i.T0()))
-		//	}
-		points := make([]Point, 0)
-		for _, iter := range iters {
-			for iter.Next() {
-				ts, val := iter.Values()
-				if ts >= fromUnix && ts < toUnix {
-					points = append(points, Point{val, ts})
-				}
+		if consolidateBy == "" {
+			meta := metaCache.Get(key)
+			consolidateBy = "avg"
+			if meta.targetType == "counter" {
+				consolidateBy = "last"
 			}
 		}
+		var consolidator consolidation.Consolidator
+		switch consolidateBy {
+		case "avg", "average":
+			consolidator = consolidation.Avg
+		case "last":
+			consolidator = consolidation.Last
+		case "min":
+			consolidator = consolidation.Min
+		case "max":
+			consolidator = consolidation.Max
+		case "sum":
+			consolidator = consolidation.Sum
+		default:
+			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
+			return
+		}
+		log.Debug("===================================")
+		req := NewReq(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		log.Debug("HTTP Get()          %s", req)
+		points, err := getTarget(req, aggSettings, metaCache)
+		if err != nil {
+			log.Error(0, err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		out[i] = Series{
 			Target:     key,
 			Datapoints: points,
@@ -109,6 +129,7 @@ func Get(w http.ResponseWriter, req *http.Request) {
 	}
 	js, err := json.Marshal(out)
 	if err != nil {
+		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

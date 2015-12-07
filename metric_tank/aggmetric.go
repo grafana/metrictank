@@ -2,15 +2,14 @@ package main
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
-	//"github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
+	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 )
 
 var statsPeriod time.Duration
@@ -36,14 +35,6 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	writeQueue      chan *Chunk
 	activeWrite     bool
-}
-
-type aggMetricOnDisk struct {
-	Key             string
-	CurrentChunkPos int
-	NumChunks       uint32
-	ChunkSpan       uint32
-	Chunks          []*Chunk
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
@@ -75,40 +66,6 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 	a.Chunks = orderdChunks
 	a.CurrentChunkPos = len(a.Chunks) - 1
 	return
-}
-
-func (a AggMetric) GobEncode() ([]byte, error) {
-	aOnDisk := aggMetricOnDisk{
-		Key:             a.Key,
-		CurrentChunkPos: a.CurrentChunkPos,
-		NumChunks:       a.NumChunks,
-		ChunkSpan:       a.ChunkSpan,
-		Chunks:          a.Chunks,
-	}
-	var b bytes.Buffer
-	enc := gob.NewEncoder(&b)
-	err := enc.Encode(aOnDisk)
-
-	return b.Bytes(), err
-}
-
-func (a *AggMetric) GobDecode(data []byte) error {
-	r := bytes.NewReader(data)
-	dec := gob.NewDecoder(r)
-	aOnDisk := &aggMetricOnDisk{}
-	err := dec.Decode(aOnDisk)
-	if err != nil {
-		return err
-	}
-	a.Key = aOnDisk.Key
-
-	a.NumChunks = aOnDisk.NumChunks
-	a.ChunkSpan = aOnDisk.ChunkSpan
-	a.Chunks = aOnDisk.Chunks
-	//the current chunk is the last chunk.
-	a.CurrentChunkPos = aOnDisk.CurrentChunkPos
-	a.writeQueue = make(chan *Chunk, *maxUnwrittenChunks)
-	return nil
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -159,11 +116,38 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []Iter) {
+	// no lock needed cause aggregators don't change at runtime
+	for _, a := range a.aggregators {
+		if a.span == aggSpan {
+			switch consolidator {
+			case consolidation.None:
+				panic("cannot get an archive for no consolidation")
+			case consolidation.Avg:
+				panic("avg consolidator has no matching Archive(). you need sum and cnt")
+			case consolidation.Cnt:
+				return a.cntMetric.Get(from, to)
+			case consolidation.Last:
+				return a.lstMetric.Get(from, to)
+			case consolidation.Min:
+				return a.minMetric.Get(from, to)
+			case consolidation.Max:
+				return a.maxMetric.Get(from, to)
+			case consolidation.Sum:
+				return a.sumMetric.Get(from, to)
+			}
+			panic(fmt.Sprintf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator))
+			// note: no way to access sosMetric yet
+		}
+	}
+	panic(fmt.Sprintf("GetAggregated called with unknown aggSpan %d", aggSpan))
+}
+
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
-	log.Debug("GET: %s from: %d to:%d", a.Key, from, to)
+func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
+	log.Debug("AggMetric %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
@@ -174,13 +158,13 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 
 	if newestChunk == nil {
 		// we dont have any data yet.
-		log.Debug("no data for requested range.")
-		return math.MaxUint32, make([]*tsz.Iter, 0)
+		log.Debug("AggMetric %s Get(): no data for requested range.", a.Key)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
 		// we have no data in the requested range.
-		log.Debug("no data for requested range.")
-		return math.MaxUint32, make([]*tsz.Iter, 0)
+		log.Debug("AggMetric %s Get(): no data for requested range.", a.Key)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -202,13 +186,13 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return math.MaxUint32, make([]*tsz.Iter, 0)
+		return math.MaxInt32, make([]Iter, 0)
 	}
 
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
-		log.Debug("no data for requested range")
-		return oldestChunk.T0, make([]*tsz.Iter, 0)
+		log.Debug("AggMetric %s Get(): no data for requested range", a.Key)
+		return oldestChunk.T0, make([]Iter, 0)
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -221,7 +205,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]*tsz.Iter, 0)
+			return to, make([]Iter, 0)
 		}
 	}
 
@@ -240,21 +224,23 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]*tsz.Iter, 0)
+			return to, make([]Iter, 0)
 		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]*tsz.Iter, 0, a.NumChunks)
+	iters := make([]Iter, 0, a.NumChunks)
 	for oldestPos != newestPos {
-		iters = append(iters, a.getChunk(oldestPos).Iter())
+		chunk := a.getChunk(oldestPos)
+		iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
 		oldestPos++
 		if oldestPos >= int(a.NumChunks) {
 			oldestPos = 0
 		}
 	}
 	// add the last chunk
-	iters = append(iters, a.getChunk(oldestPos).Iter())
+	chunk := a.getChunk(oldestPos)
+	iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
 
 	return oldestChunk.T0, iters
 }
@@ -262,7 +248,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []*tsz.Iter) {
 // this function must only be called while holding the lock
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
-		log.Debug("pushing value to aggregator")
+		log.Debug("AggMetric %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
 		agg.Add(ts, val)
 	}
 }
@@ -301,10 +287,20 @@ WAIT:
 					log.Debug("starting to save %s:%d %v", a.Key, c.T0, c)
 					data := c.Series.Bytes()
 					chunkSizeAtSave.Value(int64(len(data)))
+					version := FormatStandardGoTsz
+					buf := new(bytes.Buffer)
+					err := binary.Write(buf, binary.LittleEndian, uint8(version))
+					if err != nil {
+						// TODO
+					}
+					_, err = buf.Write(data)
+					if err != nil {
+						// TODO
+					}
 					success := false
 					attempts := 0
 					for !success {
-						err := InsertMetric(a.Key, c.T0, data, *metricTTL)
+						err := InsertChunk(a.Key, c.T0, buf.Bytes(), *metricTTL)
 						if err == nil {
 							success = true
 							go func() {
@@ -381,14 +377,13 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	if currentChunk == nil {
 		chunkCreate.Inc(1)
 		// no data has been added to this metric at all.
-		log.Debug("instantiating new circular buffer.")
 		a.Chunks = append(a.Chunks, NewChunk(t0))
 
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
 		}
 
-		log.Debug("created new chunk. %s:  %v", a.Key, a.Chunks[0])
+		log.Debug("AggMetric %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
 	} else if t0 == currentChunk.T0 {
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
@@ -400,6 +395,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			log.Error(3, "failed to add metric to chunk for %s. %s", a.Key, err)
 			return
 		}
+		log.Debug("AggMetric %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
 		log.Error(3, "Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
 		return
@@ -413,20 +409,20 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		chunkCreate.Inc(1)
+		var msg string
 		if len(a.Chunks) < int(a.NumChunks) {
-			log.Debug("adding new chunk to cirular Buffer. now %d chunks", a.CurrentChunkPos+1)
+			msg = fmt.Sprintf("added new chunk to buffer. now %d chunks", a.CurrentChunkPos+1)
 			a.Chunks = append(a.Chunks, NewChunk(t0))
 		} else {
 			chunkClear.Inc(1)
-			log.Debug("numChunks: %d  currentPos: %d", len(a.Chunks), a.CurrentChunkPos)
-			log.Debug("clearing chunk from circular buffer. %v", a.Chunks[a.CurrentChunkPos])
+			msg = fmt.Sprintf("cleared chunk at %d of %d and replaced with new", a.CurrentChunkPos, len(a.Chunks))
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
 		}
-		log.Debug("created new chunk. %s: %v", a.Key, a.Chunks[a.CurrentChunkPos])
 
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 		}
+		log.Debug("AggMetric %s Add(): %s and added the new point: %s", a.Key, msg, a.Chunks[a.CurrentChunkPos])
 	}
 	a.addAggregators(ts, val)
 }

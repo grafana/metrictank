@@ -48,8 +48,6 @@ var (
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
-	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
-
 	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
 	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
@@ -61,9 +59,10 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg-bucket in seconds>:<chunkspan in seconds>:<numchunks> (may be given multiple times as comma-separated list)")
+	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
 
-	metrics *AggMetrics
+	metrics   *AggMetrics
+	metaCache *MetaCache
 )
 
 var reqSpanMem met.Meter
@@ -192,15 +191,22 @@ func main() {
 		if err != nil {
 			log.Fatal(0, "bad agg settings", err)
 		}
+		if (month_sec % aggChunkSpan) != 0 {
+			panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		}
 		aggNumChunks, err := strconv.Atoi(fields[2])
 		if err != nil {
 			log.Fatal(0, "bad agg settings", err)
 		}
 		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks)})
 	}
+	if (month_sec % *chunkSpan) != 0 {
+		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
-	handler := NewHandler(metrics)
+	metaCache = NewMetaCache()
+	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
@@ -233,7 +239,7 @@ func main() {
 	}()
 
 	go func() {
-		http.HandleFunc("/get", Get)
+		http.HandleFunc("/get", get(metaCache, finalSettings))
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
@@ -241,10 +247,6 @@ func main() {
 	for {
 		select {
 		case <-consumer.StopChan:
-			err := metrics.Persist()
-			if err != nil {
-				log.Error(3, "failed to persist aggmetrics. %s", err)
-			}
 			log.Info("closing cassandra session.")
 			cSession.Close()
 			log.Info("terminating.")
