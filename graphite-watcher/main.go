@@ -32,14 +32,18 @@ var numMetrics = metrics.NewGauge()
 var nullPoints = metrics.NewCounter()
 
 func main() {
-	if len(os.Args) != 4 {
-		log.Fatal("usage: graphite-watcher <elasticsearch-addr> <metrics-addr> <graphite-addr>")
+	if len(os.Args) != 4 && len(os.Args) != 5 {
+		log.Fatal("usage: graphite-watcher <elasticsearch-addr> <metrics-addr> <graphite-addr> [debug]")
 	}
 	addr, _ := net.ResolveTCPAddr("tcp", os.Args[2])
 	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "graphite-watcher.", addr)
 	metrics.Register("lag", lag)
 	metrics.Register("num_metrics", numMetrics)
 	metrics.Register("null_points", nullPoints)
+	debug := false
+	if len(os.Args) == 5 && os.Args[4] == "debug" {
+		debug = true
+	}
 
 	// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
 	// at a time X where X < Y.  Hence, we can confidently say that if we see a metric at Y, we can
@@ -70,7 +74,7 @@ func main() {
 		if len(targetKeys) > 0 {
 			key := targetKeys[rand.Intn(len(targets))]
 			wg.Add(1)
-			go test(wg, ts.Unix(), targets[key], os.Args[3])
+			go test(wg, ts.Unix(), targets[key], os.Args[3], debug)
 		}
 		targetsLock.Unlock()
 	}
