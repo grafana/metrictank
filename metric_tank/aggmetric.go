@@ -253,6 +253,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
+// write a chunk to peristant storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
 	chunk := a.Chunks[pos]
 	chunk.Finish()
@@ -290,7 +291,10 @@ WAIT:
 	if !a.activeWrite {
 		log.Debug("starting persist goroutine.")
 		a.activeWrite = true
-		// asynchronously write data to cassandra.
+		// asynchronously write data to cassandra. Because we hold the lock
+		// when starting this goroutine, we are assured that only 1 goroutine
+		// is ever running and there will always be at least 1 chunk in the
+		// writeQueue.
 		go func() {
 			for {
 				select {
