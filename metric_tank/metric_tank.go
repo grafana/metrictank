@@ -28,13 +28,14 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into cassandra")
 
-	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages")
-	topic       = flag.String("topic", "metrics", "NSQ topic")
-	channel     = flag.String("channel", "tank", "NSQ channel")
-	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
-	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
-	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
+	topic              = flag.String("topic", "metrics", "NSQ topic")
+	topicNotifyPersist = flag.String("topic-notify-persist", "metricPersist", "NSQ topic")
+	channel            = flag.String("channel", "tank", "NSQ channel")
+	instance           = flag.String("instance", "default", "instance, to separate instances in metrics")
+	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
+	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
@@ -54,6 +55,7 @@ var (
 
 	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
+	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
@@ -116,15 +118,15 @@ func main() {
 		return
 	}
 	if *instance == "" {
-		log.Fatal(0, "instance can't be empty")
+		log.Fatal(4, "instance can't be empty")
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(0, "failed to lookup hostname. %s", err)
+		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
 	stats, err := helper.New(true, *statsdAddr, *statsdType, "metric_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(0, "failed to initialize statsd. %s", err)
+		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
 
 	if *channel == "" {
@@ -133,14 +135,14 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal(0, "--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 	// set default cassandra address if none is set.
 	if *cassandraAddrs == "" {
@@ -154,22 +156,16 @@ func main() {
 	cfg.UserAgent = "metrics_tank"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(0, "failed to parse nsq consumer options. %s", err)
+		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
-		log.Fatal(0, "Failed to create NSQ consumer. %s", err)
+		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
 	initMetrics(stats)
-
-	err = InitCassandra()
-
-	if err != nil {
-		log.Fatal(4, "failed to initialize cassandra. %s", err)
-	}
 
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]aggSetting, 0)
@@ -179,15 +175,15 @@ func main() {
 		}
 		fields := strings.Split(v, ":")
 		if len(fields) != 3 {
-			log.Fatal(0, "bad agg settings")
+			log.Fatal(4, "bad agg settings")
 		}
 		aggSpan, err := strconv.Atoi(fields[0])
 		if err != nil {
-			log.Fatal(0, "bad agg settings", err)
+			log.Fatal(4, "bad agg settings", err)
 		}
 		aggChunkSpan, err := strconv.Atoi(fields[1])
 		if err != nil {
-			log.Fatal(0, "bad agg settings", err)
+			log.Fatal(4, "bad agg settings", err)
 		}
 		if (month_sec % aggChunkSpan) != 0 {
 			panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
@@ -215,7 +211,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQDs. %s", err)
 	}
-	log.Info("connected to nsqd")
+	log.Info("consumer connected to nsqd")
 
 	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
 	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
@@ -226,6 +222,13 @@ func main() {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
 
+	InitCoordinator(metrics, stats)
+
+	err = InitCassandra()
+
+	if err != nil {
+		log.Fatal(4, "failed to initialize cassandra. %s", err)
+	}
 	go func() {
 		m := &runtime.MemStats{}
 		for range time.Tick(time.Duration(1) * time.Second) {

@@ -268,6 +268,12 @@ func (a *AggMetric) Persist(c *Chunk) {
 		c.Saved = true
 		a.Unlock()
 		log.Debug("AggMetric %s Persist(): save complete. %v", a.Key, c)
+		msg := &PersistMessage{
+			Instance: *instance,
+			Key:      a.Key,
+			T0:       c.T0,
+		}
+		go msg.Send()
 		chunkSaveOk.Inc(1)
 	} else {
 		log.Error(1, "AggMetric %s Persist(): failed to save %v to cassandra. %v, %s", a.Key, c, err)
