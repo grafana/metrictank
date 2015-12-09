@@ -9,6 +9,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -40,8 +41,7 @@ func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
 func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	values := req.URL.Query()
-
-	consolidateBy := values.Get("consolidateBy")
+	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := values.Get("maxDataPoints")
@@ -56,7 +56,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	}
 	minDataPoints := maxDataPoints / 10
 
-	keys, ok := values["target"]
+	targets, ok := values["target"]
 	if !ok {
 		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
@@ -87,10 +87,25 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		return
 	}
 
-	out := make([]Series, len(keys))
-	for i, key := range keys {
+	out := make([]Series, len(targets))
+	for i, target := range targets {
+		var consolidateBy string
+		id := target
+		// yes, i am aware of the arguably grossness of the below.
+		// however, it is solid based on the documented allowed input format.
+		// once we need to support several functions, we can implement
+		// a proper expression parser
+		if strings.HasPrefix(target, "consolidateBy(") {
+			if target[len(target)-2:len(target)] != "')" || !strings.Contains(target, ",'") || strings.Count(target, "'") != 2 || strings.Count(target, ",") != 1 {
+				http.Error(w, "target parse error", http.StatusBadRequest)
+				return
+			}
+			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
+			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
+		}
+
 		if consolidateBy == "" {
-			meta := metaCache.Get(key)
+			meta := metaCache.Get(id)
 			consolidateBy = "avg"
 			if meta.targetType == "counter" {
 				consolidateBy = "last"
@@ -113,7 +128,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			return
 		}
 		log.Debug("===================================")
-		req := NewReq(key, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
 		log.Debug("HTTP Get()          %s", req)
 		points, err := getTarget(req, aggSettings, metaCache)
 		if err != nil {
@@ -123,7 +138,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		}
 
 		out[i] = Series{
-			Target:     key,
+			Target:     target,
 			Datapoints: points,
 		}
 	}
