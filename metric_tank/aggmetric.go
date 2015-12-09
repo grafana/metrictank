@@ -70,16 +70,16 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSetting) *AggMetric {
+func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
 		Key:        key,
 		ChunkSpan:  chunkSpan,
 		NumChunks:  numChunks,
 		Chunks:     make([]*Chunk, 0, numChunks),
-		writeQueue: make(chan *Chunk, *maxUnwrittenChunks),
+		writeQueue: make(chan *Chunk, maxDirtyChunks),
 	}
 	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
+		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, maxDirtyChunks))
 	}
 
 	// only collect per aggmetric stats when in debug mode.
@@ -261,21 +261,32 @@ func (a *AggMetric) persist(pos int) {
 		return
 	}
 
-	// this will block when the write queue fills up.
 	log.Debug("sending chunk to write queue")
-	timer := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
+	// Processing will remain in this for loop until the chunk can be
+	// added to the writeQueue. If the writeQueue is already full, then
+	// the calling function will block waiting for persist() complete.
+	// This is intended to put backpressure on our message handlers so
+	// that they stop consuming messages, leaving them to buffer at
+	// the message bus.
 WAIT:
 	for {
 		select {
 		case a.writeQueue <- chunk:
 			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
 			break WAIT
-		case <-timer.C:
+		case <-ticker.C:
 			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
 		}
 	}
-	timer.Stop()
+	ticker.Stop()
 
+	// If there is already a goroutine running that is consuming from our
+	// writeQueue, then we dont need to do anything further.  Otherwise,
+	// we need to start a new goroutine to consume from the writeQueue.
+	// Because we still hold the lock when we check activeWrite, there is
+	// no risk that any existing goroutine is going to exit without first
+	// processing the chunk we just added to the queue.
 	if !a.activeWrite {
 		log.Debug("starting persist goroutine.")
 		a.activeWrite = true
@@ -312,7 +323,7 @@ WAIT:
 							chunkSaveOk.Inc(1)
 						} else {
 							if (attempts % 20) == 0 {
-								log.Warn("failed to save metric to cassandra after %d attempts. %v, %s", attempts+1, c, err)
+								log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, c, err)
 							}
 							chunkSaveFail.Inc(1)
 							sleepTime := 100 * attempts
@@ -326,6 +337,12 @@ WAIT:
 				default:
 					log.Debug("waiting for lock: %s", a.Key)
 					a.Lock()
+					// this will typically be 0. Though there is a possibility for a chunk to be added
+					// to the writeQueue before the lock is obtained.
+					// If a call to aggMetric.Add() is running it will already be holding the lock. We
+					// will then block trying to acquire the lock until after aggMetric.Add() completes.
+					// If aggMetric.Add() calls persist() another chunk will be added to the writeQueue
+					//  increasing its length to 1.
 					if len(a.writeQueue) == 0 {
 						log.Debug("no items in writeQueue, terminating write goroutine for %s.", a.Key)
 						a.activeWrite = false
@@ -339,31 +356,6 @@ WAIT:
 		}()
 	}
 	return
-}
-
-func (a *AggMetric) chunkBefore(pos int) int {
-	pos--
-	l := len(a.Chunks)
-	if pos < 0 {
-		pos += l
-		if pos == a.CurrentChunkPos {
-			return -1
-		}
-	}
-
-	return pos
-}
-
-func (a *AggMetric) chunkAfter(pos int) int {
-	if pos == a.CurrentChunkPos {
-		return -1
-	}
-	l := len(a.Chunks)
-	pos++
-	if pos == l {
-		return 0
-	}
-	return pos
 }
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!

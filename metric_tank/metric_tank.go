@@ -204,7 +204,7 @@ func main() {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*maxUnwrittenChunks), uint32(*metricMaxStale), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
