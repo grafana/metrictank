@@ -345,10 +345,10 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
-	if currentChunk.T0 < chunkMinTs {
+	if currentChunk.LastWrite < chunkMinTs {
 		if currentChunk.Saved {
 			// already saved. lets check if we should just delete the metric from memory.
-			if currentChunk.T0 < metricMinTs {
+			if currentChunk.LastWrite < metricMinTs {
 				return true
 			}
 		}

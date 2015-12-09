@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	//"github.com/dgryski/go-tsz"
 	"github.com/raintank/go-tsz"
@@ -14,10 +15,13 @@ type Chunk struct {
 	LastTs    uint32 // last TS seen, not computed or anything
 	NumPoints uint32
 	Saved     bool
+	LastWrite uint32
 }
 
 func NewChunk(t0 uint32) *Chunk {
-	return &Chunk{tsz.New(t0), t0, 0, 0, false}
+	// we must set LastWrite here as well to make sure a new Chunk doesn't get immediately
+	// garbage collected right after creating it, before we can push to it
+	return &Chunk{tsz.New(t0), t0, 0, 0, false, uint32(time.Now().Unix())}
 }
 
 func (c *Chunk) String() string {
@@ -31,5 +35,6 @@ func (c *Chunk) Push(t uint32, v float64) error {
 	c.Series.Push(t, v)
 	c.NumPoints += 1
 	c.LastTs = t
+	c.LastWrite = uint32(time.Now().Unix())
 	return nil
 }
