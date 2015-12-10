@@ -65,6 +65,7 @@ func (c *Checker) Verify(from, to, first, last uint32) {
 
 func TestAggMetric(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	clusterStatus = NewClusterStatus("default", false)
 	initMetrics(stats)
 
 	c := NewChecker(t, NewAggMetric("foo", 100, 5, []aggSetting{}...))

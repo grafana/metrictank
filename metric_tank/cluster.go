@@ -30,7 +30,7 @@ type ClusterStatus struct {
 	LastChange time.Time
 }
 
-func newClusterStatus(instance string, initialState bool) *ClusterStatus {
+func NewClusterStatus(instance string, initialState bool) *ClusterStatus {
 	return &ClusterStatus{
 		Instance:   instance,
 		Primary:    initialState,
@@ -114,7 +114,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 }
 
 func InitCluster(instance string, initialState bool, metrics Metrics, stats met.Backend) {
-	clusterStatus = newClusterStatus(instance, initialState)
+	clusterStatus = NewClusterStatus(instance, initialState)
 
 	// init producers
 	pCfg := nsq.NewConfig()
