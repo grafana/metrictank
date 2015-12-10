@@ -3,18 +3,59 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/bitly/go-hostpool"
 	"github.com/grafana/grafana/pkg/log"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 )
 
 var (
-	hostPool  hostpool.HostPool
-	producers map[string]*nsq.Producer
+	hostPool      hostpool.HostPool
+	producers     map[string]*nsq.Producer
+	clusterStatus *ClusterStatus
 )
+
+type ClusterStatus struct {
+	sync.Mutex
+	Instance   string
+	Primary    bool
+	LastChange time.Time
+}
+
+func newClusterStatus(instance string, initialState bool) *ClusterStatus {
+	return &ClusterStatus{
+		Instance:   instance,
+		Primary:    initialState,
+		LastChange: time.Now(),
+	}
+}
+
+func (c *ClusterStatus) Marshal() ([]byte, error) {
+	c.Lock()
+	defer c.Unlock()
+	return json.Marshal(c)
+}
+
+func (c *ClusterStatus) Set(newState bool) {
+	c.Lock()
+	defer c.Unlock()
+	c.Primary = newState
+	c.LastChange = time.Now()
+}
+
+func (c *ClusterStatus) IsPrimary() bool {
+	c.Lock()
+	defer c.Unlock()
+	return c.Primary
+}
 
 type PersistMessage struct {
 	Instance string `json:"instance"`
@@ -59,29 +100,30 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 		return nil
 	}
 	if ms.Instance == *instance {
-		log.Debug("skipping message we generated.")
+		log.Debug("skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
 		return nil
 	}
 
 	// get metric
 	if agg, ok := metrics.Get(ms.Key); ok {
 		// get chunk
-
-		chunk.Save()
+		agg.(*AggMetric).SaveChunkByT0(ms.T0)
 	}
 
 	return nil
 }
 
-func InitCoordinator(metrics metrics, stats met.Backend) {
+func InitCluster(instance string, initialState bool, metrics Metrics, stats met.Backend) {
+	clusterStatus = newClusterStatus(instance, initialState)
+
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
-	err = app.ParseOpts(pCfg, *producerOpts)
+	err := app.ParseOpts(pCfg, *producerOpts)
 	if err != nil {
 		log.Fatal(4, "failed to parse nsq producer options. %s", err)
 	}
-	hostPool := hostpool.NewEpsilonGreedy(strings.Split(*nsqdTCPAddrs, ","), 0, &hostpool.LinearEpsilonValueCalculator{})
+	hostPool = hostpool.NewEpsilonGreedy(strings.Split(*nsqdTCPAddrs, ","), 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
 
 	for _, addr := range strings.Split(*nsqdTCPAddrs, ",") {
@@ -94,14 +136,14 @@ func InitCoordinator(metrics metrics, stats met.Backend) {
 
 	// init consumers
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "metrics_tank_coordinator"
+	cfg.UserAgent = "metrics_tank_cluster"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
 		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := insq.NewConsumer(*topicNotifyPersist, fmt.Sprintf("metric_tank#%06d#ephemeral", rand.Int()%999999), cfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(*topicNotifyPersist, fmt.Sprintf("metric_tank_%06d#ephemeral", rand.Int()%999999), cfg, "metric_persist.%s", stats)
 	if err != nil {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
@@ -126,6 +168,46 @@ func InitCoordinator(metrics metrics, stats met.Backend) {
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
+}
 
-	return nil
+// Handlers for HTTP interface.
+// Handle requests for /cluster. POST to set primary flag, GET to get current state.
+func clusterStatusHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method == "GET" {
+		getClusterStatus(w, req)
+		return
+	}
+	if req.Method == "POST" {
+		setClusterStatus(w, req)
+		return
+	}
+	http.Error(w, "not found.", http.StatusNotFound)
+}
+
+func setClusterStatus(w http.ResponseWriter, req *http.Request) {
+	status := make(map[string]bool)
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&status)
+	if err != nil {
+		http.Error(w, "could not marshal status to json", http.StatusBadRequest)
+		return
+	}
+	if primary, ok := status["primary"]; ok {
+		clusterStatus.Set(primary)
+		log.Info("primary status is now %t", primary)
+		w.Write([]byte("OK"))
+		return
+	}
+	http.Error(w, "primary field missing from payload.", http.StatusBadRequest)
+	return
+}
+
+func getClusterStatus(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	resp, err := clusterStatus.Marshal()
+	if err != nil {
+		http.Error(w, "could not marshal status to json", http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
 }

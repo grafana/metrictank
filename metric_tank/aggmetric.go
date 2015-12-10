@@ -103,6 +103,96 @@ func (a *AggMetric) stats() {
 	}
 }
 
+func (a *AggMetric) SaveChunkByT0(ts uint32) {
+	a.RLock()
+	defer a.RUnlock()
+	chunk := a.getChunkByT0(ts)
+	if chunk != nil {
+		log.Debug("saving chunk %s:%d", a.Key, chunk.T0)
+		chunk.Saved = true
+	}
+}
+
+func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
+	// we have no chunks.
+	if len(a.Chunks) == 0 {
+		return nil
+	}
+
+	currentT0 := a.Chunks[a.CurrentChunkPos].T0
+
+	if ts == currentT0 {
+		//found our chunk.
+		return a.Chunks[a.CurrentChunkPos]
+	}
+
+	// requested Chunk is not in our dataset.
+	if ts > currentT0 {
+		return nil
+	}
+
+	// calculate the number of chunks ago our requested T0 is
+	// assuming that chunks are sequential.
+	chunksAgo := int((currentT0 - ts) % a.ChunkSpan)
+
+	numChunks := len(a.Chunks)
+	oldestPos := a.CurrentChunkPos + 1
+	if oldestPos >= numChunks {
+		oldestPos = 0
+	}
+
+	var guess int
+
+	if chunksAgo >= (numChunks - 1) {
+		// set guess to the oldest chunk.
+		guess = oldestPos
+	} else {
+		guess = a.CurrentChunkPos - chunksAgo
+		if guess < 0 {
+			guess += numChunks
+		}
+	}
+
+	// we now have a good guess at which chunk position our requested TO is in.
+	c := a.Chunks[guess]
+
+	if c.T0 == ts {
+		// found our chunk.
+		return c
+	}
+
+	if ts > c.T0 {
+		// we need to check newer chunks
+		for c.T0 < currentT0 {
+			guess += 1
+			if guess >= numChunks {
+				guess = 0
+			}
+			c = a.Chunks[guess]
+			if c.T0 == ts {
+				//found our chunk
+				return c
+			}
+		}
+	} else {
+		// we need to check older chunks
+		oldestT0 := a.Chunks[oldestPos].T0
+		for c.T0 >= oldestT0 {
+			guess -= 1
+			if guess < 0 {
+				guess += numChunks
+			}
+			c = a.Chunks[guess]
+			if c.T0 == ts {
+				//found or chunk.
+				return c
+			}
+		}
+	}
+	// chunk not found.
+	return nil
+}
+
 func (a *AggMetric) getChunk(pos int) *Chunk {
 	if pos >= len(a.Chunks) {
 		return nil
@@ -249,6 +339,10 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 func (a *AggMetric) Persist(c *Chunk) {
 	log.Debug("AggMetric %s Persist(): starting to save %v", a.Key, c)
+	if !clusterStatus.IsPrimary() {
+		log.Debug("node is not primary, not saving chunk.")
+		return
+	}
 	data := c.Series.Bytes()
 	chunkSizeAtSave.Value(int64(len(data)))
 

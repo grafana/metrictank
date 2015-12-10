@@ -30,7 +30,7 @@ var (
 
 	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
 	topic              = flag.String("topic", "metrics", "NSQ topic")
-	topicNotifyPersist = flag.String("topic-notify-persist", "metricPersist", "NSQ topic")
+	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic")
 	channel            = flag.String("channel", "tank", "NSQ channel")
 	instance           = flag.String("instance", "default", "instance, to separate instances in metrics")
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
@@ -222,7 +222,7 @@ func main() {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
 
-	InitCoordinator(metrics, stats)
+	InitCluster(*instance, !*dryRun, metrics, stats)
 
 	err = InitCassandra()
 
@@ -241,6 +241,7 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/get", get(metaCache, finalSettings))
+		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
