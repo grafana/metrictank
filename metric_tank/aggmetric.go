@@ -33,6 +33,8 @@ type AggMetric struct {
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*Chunk
 	aggregators     []*Aggregator
+	writeQueue      chan *Chunk
+	activeWrite     bool
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
@@ -68,15 +70,16 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(key string, chunkSpan, numChunks uint32, aggsetting ...aggSetting) *AggMetric {
+func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
-		Key:       key,
-		ChunkSpan: chunkSpan,
-		NumChunks: numChunks,
-		Chunks:    make([]*Chunk, 0, numChunks),
+		Key:        key,
+		ChunkSpan:  chunkSpan,
+		NumChunks:  numChunks,
+		Chunks:     make([]*Chunk, 0, numChunks),
+		writeQueue: make(chan *Chunk, maxDirtyChunks),
 	}
 	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks))
+		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, maxDirtyChunks))
 	}
 
 	// only collect per aggmetric stats when in debug mode.
@@ -104,6 +107,9 @@ func (a *AggMetric) stats() {
 }
 
 func (a *AggMetric) getChunk(pos int) *Chunk {
+	if pos < 0 {
+		return nil
+	}
 	if pos >= len(a.Chunks) {
 		return nil
 	}
@@ -247,33 +253,113 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
-func (a *AggMetric) Persist(c *Chunk) {
-	log.Debug("AggMetric %s Persist(): starting to save %v", a.Key, c)
-	data := c.Series.Bytes()
-	chunkSizeAtSave.Value(int64(len(data)))
+// write a chunk to peristant storage. This should only be called while holding a.Lock()
+func (a *AggMetric) persist(pos int) {
+	chunk := a.Chunks[pos]
+	chunk.Finish()
+	if *dryRun {
+		chunk.Saved = true
+		return
+	}
 
-	version := FormatStandardGoTsz
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, uint8(version))
-	if err != nil {
-		// TODO
+	log.Debug("sending chunk to write queue")
+	ticker := time.NewTicker(2 * time.Second)
+	// Processing will remain in this for loop until the chunk can be
+	// added to the writeQueue. If the writeQueue is already full, then
+	// the calling function will block waiting for persist() complete.
+	// This is intended to put backpressure on our message handlers so
+	// that they stop consuming messages, leaving them to buffer at
+	// the message bus.
+WAIT:
+	for {
+		select {
+		case a.writeQueue <- chunk:
+			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
+			break WAIT
+		case <-ticker.C:
+			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
+		}
 	}
-	_, err = buf.Write(data)
-	if err != nil {
-		// TODO
+	ticker.Stop()
+
+	// If there is already a goroutine running that is consuming from our
+	// writeQueue, then we dont need to do anything further.  Otherwise,
+	// we need to start a new goroutine to consume from the writeQueue.
+	// Because we still hold the lock when we check activeWrite, there is
+	// no risk that any existing goroutine is going to exit without first
+	// processing the chunk we just added to the queue.
+	if !a.activeWrite {
+		log.Debug("starting persist goroutine.")
+		a.activeWrite = true
+		// asynchronously write data to cassandra. Because we hold the lock
+		// when starting this goroutine, we are assured that only 1 goroutine
+		// is ever running and there will always be at least 1 chunk in the
+		// writeQueue.
+		go func() {
+			for {
+				select {
+				case c := <-a.writeQueue:
+					log.Debug("starting to save %s:%d %v", a.Key, c.T0, c)
+					data := c.Series.Bytes()
+					chunkSizeAtSave.Value(int64(len(data)))
+					version := FormatStandardGoTsz
+					buf := new(bytes.Buffer)
+					err := binary.Write(buf, binary.LittleEndian, uint8(version))
+					if err != nil {
+						// TODO
+					}
+					_, err = buf.Write(data)
+					if err != nil {
+						// TODO
+					}
+					success := false
+					attempts := 0
+					for !success {
+						err := InsertChunk(a.Key, c.T0, buf.Bytes(), *metricTTL)
+						if err == nil {
+							success = true
+							go func() {
+								a.Lock()
+								c.Saved = true
+								a.Unlock()
+							}()
+							log.Debug("save complete. %s:%d %v", a.Key, c.T0, c)
+							chunkSaveOk.Inc(1)
+						} else {
+							if (attempts % 20) == 0 {
+								log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, c, err)
+							}
+							chunkSaveFail.Inc(1)
+							sleepTime := 100 * attempts
+							if sleepTime > 2000 {
+								sleepTime = 2000
+							}
+							time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+							attempts++
+						}
+					}
+				default:
+					log.Debug("waiting for lock: %s", a.Key)
+					a.Lock()
+					// this will typically be 0. Though there is a possibility for a chunk to be added
+					// to the writeQueue before the lock is obtained.
+					// If a call to aggMetric.Add() is running it will already be holding the lock. We
+					// will then block trying to acquire the lock until after aggMetric.Add() completes.
+					// If aggMetric.Add() calls persist() another chunk will be added to the writeQueue
+					//  increasing its length to 1.
+					if len(a.writeQueue) == 0 {
+						log.Debug("no items in writeQueue, terminating write goroutine for %s.", a.Key)
+						a.activeWrite = false
+						a.Unlock()
+						return
+					}
+					log.Debug("still pending writes in queue for %s", a.Key)
+					a.Unlock()
+				}
+			}
+		}()
 	}
-	err = InsertChunk(a.Key, c.T0, buf.Bytes(), *metricTTL)
-	if err == nil {
-		a.Lock()
-		c.Saved = true
-		a.Unlock()
-		log.Debug("AggMetric %s Persist(): save complete. %v", a.Key, c)
-		chunkSaveOk.Inc(1)
-	} else {
-		log.Error(1, "AggMetric %s Persist(): failed to save %v to cassandra. %v, %s", a.Key, c, err)
-		chunkSaveFail.Inc(1)
-		// TODO
-	}
+	return
 }
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
@@ -310,8 +396,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		log.Error(3, "Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
 		return
 	} else {
-		currentChunk.Finish()
-		go a.Persist(currentChunk)
+		// persist the chunk. If the writeQueue is full, then this will block.
+		a.persist(a.CurrentChunkPos)
 
 		a.CurrentChunkPos++
 		if a.CurrentChunkPos >= int(a.NumChunks) {
@@ -354,8 +440,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		}
 		// chunk has not been written to in a while. Lets persist it.
 		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
-		currentChunk.Finish()
-		go a.Persist(currentChunk)
+		a.persist(a.CurrentChunkPos)
 	}
 	return false
 }

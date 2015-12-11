@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func init() {
+	*dryRun = true
+}
+
 type point struct {
 	ts  uint32
 	val float64
@@ -67,7 +71,7 @@ func TestAggMetric(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
 
-	c := NewChecker(t, NewAggMetric("foo", 100, 5, []aggSetting{}...))
+	c := NewChecker(t, NewAggMetric("foo", 100, 5, 1, []aggSetting{}...))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -149,6 +153,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
+	maxDirtyChunks := uint32(1)
 	aggSettings := []aggSetting{
 		{
 			span:      uint32(300),
@@ -162,7 +167,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, aggSettings)
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, maxDirtyChunks, aggSettings)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
