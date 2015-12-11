@@ -37,6 +37,8 @@ var (
 	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 
+	maxUnwrittenChunks = flag.Int("max-unwritten-chunks", 1, "number of chunks per metric waiting to be written to cassandra.")
+
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
@@ -198,7 +200,7 @@ func main() {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), finalSettings)
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*maxUnwrittenChunks), uint32(*metricMaxStale), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
