@@ -34,23 +34,8 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, a
 		metricMaxStale: metricMaxStale,
 	}
 
-	go ms.stats()
 	go ms.GC()
 	return &ms
-}
-
-func (ms *AggMetrics) stats() {
-	currentPoints := 0
-
-	ticker := time.Tick(time.Duration(1) * time.Second)
-	for {
-		select {
-		case <-ticker:
-			points.Value(int64(currentPoints))
-		case update := <-totalPoints:
-			currentPoints += update
-		}
-	}
 }
 
 // periodically scan chunks and close any that have not received data in a while

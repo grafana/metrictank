@@ -286,4 +286,19 @@ func initMetrics(stats met.Backend) {
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
 	metricsActive = stats.NewGauge("metrics_active", 0)
+
+	// run a collector for some global stats
+	go func() {
+		currentPoints := 0
+
+		ticker := time.Tick(time.Duration(1) * time.Second)
+		for {
+			select {
+			case <-ticker:
+				points.Value(int64(currentPoints))
+			case update := <-totalPoints:
+				currentPoints += update
+			}
+		}
+	}()
 }
