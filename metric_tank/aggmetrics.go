@@ -17,6 +17,13 @@ type AggMetrics struct {
 	metricMaxStale uint32
 }
 
+var totalPoints chan int
+
+func init() {
+	// measurements can lag a bit, that's ok
+	totalPoints = make(chan int, 10)
+}
+
 func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		Metrics:        make(map[string]*AggMetric),
@@ -33,22 +40,16 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, a
 }
 
 func (ms *AggMetrics) stats() {
-	pointsPerMetric.Value(0)
+	currentPoints := 0
 
-	for range time.Tick(time.Duration(1) * time.Second) {
-		pre := time.Now()
-		ms.RLock()
-		metrics := make([]*AggMetric, 0, len(ms.Metrics))
-		for _, met := range ms.Metrics {
-			metrics = append(metrics, met)
+	ticker := time.Tick(time.Duration(1) * time.Second)
+	for {
+		select {
+		case <-ticker:
+			points.Value(int64(currentPoints))
+		case update := <-totalPoints:
+			currentPoints += update
 		}
-		ms.RUnlock()
-		// these metrics will lag behind a bit, possibly using unlinked metrics, but that's ok
-		metricsActive.Value(int64(len(metrics)))
-		for _, met := range metrics {
-			met.stats()
-		}
-		statsDuration.Value(time.Now().Sub(pre))
 	}
 }
 
