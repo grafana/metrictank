@@ -106,16 +106,18 @@ func (a *AggMetric) stats() {
 	}
 }
 
-func (a *AggMetric) SaveChunkByT0(ts uint32) {
+// Sync the saved state of a chunk by its T0.
+func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	a.RLock()
 	defer a.RUnlock()
 	chunk := a.getChunkByT0(ts)
 	if chunk != nil {
-		log.Debug("saving chunk %s:%d", a.Key, chunk.T0)
+		log.Debug("marking chunk %s:%d as saved.", a.Key, chunk.T0)
 		chunk.Saved = true
 	}
 }
 
+/* Get a chunk by its T0.  It is expected that the caller has acquired of the a.Lock()*/
 func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 	// we have no chunks.
 	if len(a.Chunks) == 0 {
@@ -134,9 +136,9 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 		return nil
 	}
 
-	// calculate the number of chunks ago our requested T0 is
+	// calculate the number of chunks ago our requested T0 is,
 	// assuming that chunks are sequential.
-	chunksAgo := int((currentT0 - ts) % a.ChunkSpan)
+	chunksAgo := int((currentT0 - ts) / a.ChunkSpan)
 
 	numChunks := len(a.Chunks)
 	oldestPos := a.CurrentChunkPos + 1
@@ -349,10 +351,6 @@ func (a *AggMetric) persist(pos int) {
 	chunk.Finish()
 	if !clusterStatus.IsPrimary() {
 		log.Debug("node is not primary, not saving chunk.")
-		return
-	}
-	if *dryRun {
-		chunk.Saved = true
 		return
 	}
 

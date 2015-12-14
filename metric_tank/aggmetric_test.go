@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-func init() {
-	*dryRun = true
-}
-
 type point struct {
 	ts  uint32
 	val float64

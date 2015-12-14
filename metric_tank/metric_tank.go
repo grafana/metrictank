@@ -26,13 +26,13 @@ import (
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
-	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into cassandra")
+	primaryNode = flag.Bool("primary-node", true, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
 
 	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
 	topic              = flag.String("topic", "metrics", "NSQ topic")
 	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic")
 	channel            = flag.String("channel", "tank", "NSQ channel")
-	instance           = flag.String("instance", "default", "instance, to separate instances in metrics")
+	instance           = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
@@ -158,19 +158,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	cfg := nsq.NewConfig()
-	cfg.UserAgent = "metrics_tank"
-	err = app.ParseOpts(cfg, *consumerOpts)
-	if err != nil {
-		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
-	}
-	cfg.MaxInFlight = *maxInFlight
-
-	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
-	if err != nil {
-		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
-	}
-
 	initMetrics(stats)
 
 	set := strings.Split(*aggSettings, ",")
@@ -204,6 +191,24 @@ func main() {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
+	err = InitCassandra()
+	if err != nil {
+		log.Fatal(4, "failed to initialize cassandra. %s", err)
+	}
+
+	cfg := nsq.NewConfig()
+	cfg.UserAgent = "metrics_tank"
+	err = app.ParseOpts(cfg, *consumerOpts)
+	if err != nil {
+		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
+	}
+	cfg.MaxInFlight = *maxInFlight
+
+	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
+	if err != nil {
+		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
+	}
+
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*maxUnwrittenChunks), uint32(*metricMaxStale), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
@@ -228,13 +233,8 @@ func main() {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
 
-	InitCluster(*instance, !*dryRun, metrics, stats)
+	InitCluster(*instance, *primaryNode, metrics, stats)
 
-	err = InitCassandra()
-
-	if err != nil {
-		log.Fatal(4, "failed to initialize cassandra. %s", err)
-	}
 	go func() {
 		m := &runtime.MemStats{}
 		for range time.Tick(time.Duration(1) * time.Second) {
