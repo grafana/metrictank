@@ -36,6 +36,7 @@ var (
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
 
 	maxUnwrittenChunks = flag.Int("max-unwritten-chunks", 1, "number of chunks per metric waiting to be written to cassandra.")
 
@@ -65,6 +66,8 @@ var (
 
 	metrics   *AggMetrics
 	metaCache *MetaCache
+
+	startupTime time.Time
 )
 
 var reqSpanMem met.Meter
@@ -101,6 +104,7 @@ var sysBytes met.Gauge
 var metricsActive met.Gauge
 
 func main() {
+	startupTime = time.Now()
 	flag.Parse()
 
 	// Only try and parse the conf file if it exists
@@ -242,6 +246,7 @@ func main() {
 	}()
 
 	go func() {
+		http.HandleFunc("/", appStatus)
 		http.HandleFunc("/get", get(metaCache, finalSettings))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
