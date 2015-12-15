@@ -32,16 +32,16 @@ var numMetrics = metrics.NewGauge()
 var nullPoints = metrics.NewCounter()
 
 func main() {
-	if len(os.Args) != 4 && len(os.Args) != 5 {
-		log.Fatal("usage: graphite-watcher <elasticsearch-addr> <metrics-addr> <graphite-addr> [debug]")
+	if len(os.Args) != 5 && len(os.Args) != 6 {
+		log.Fatal("usage: graphite-watcher <environment-for-metrics> <elasticsearch-addr> <metrics-addr> <graphite-addr> [debug]")
 	}
-	addr, _ := net.ResolveTCPAddr("tcp", os.Args[2])
-	go metrics.Graphite(metrics.DefaultRegistry, 10e9, "graphite-watcher.", addr)
+	addr, _ := net.ResolveTCPAddr("tcp", os.Args[3])
+	go metrics.Graphite(metrics.DefaultRegistry, 10e9, fmt.Sprintf("graphite-watcher.%s", os.Args[1]), addr)
 	metrics.Register("lag", lag)
 	metrics.Register("num_metrics", numMetrics)
 	metrics.Register("null_points", nullPoints)
 	debug := false
-	if len(os.Args) == 5 && os.Args[4] == "debug" {
+	if len(os.Args) == 6 && os.Args[5] == "debug" {
 		debug = true
 	}
 
@@ -53,7 +53,7 @@ func main() {
 	go func() {
 		getEsTick := time.NewTicker(time.Second * time.Duration(10))
 		for range getEsTick.C {
-			metrics := getMetrics(os.Args[1])
+			metrics := getMetrics(os.Args[2])
 			numMetrics.Update(int64(len(metrics)))
 			tsUnix := time.Now().Unix()
 			for _, met := range metrics {
@@ -74,7 +74,7 @@ func main() {
 		if len(targetKeys) > 0 {
 			key := targetKeys[rand.Intn(len(targets))]
 			wg.Add(1)
-			go test(wg, ts.Unix(), targets[key], os.Args[3], debug)
+			go test(wg, ts.Unix(), targets[key], os.Args[4], debug)
 		}
 		targetsLock.Unlock()
 	}
