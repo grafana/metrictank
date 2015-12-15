@@ -29,6 +29,7 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	writeQueue      chan *Chunk
 	activeWrite     bool
+	firstChunkT0    uint32
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
@@ -254,6 +255,21 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		return math.MaxInt32, make([]Iter, 0)
 	}
 
+	// The first chunk is likely only a partial chunk. If we are not the primary node
+	// we should not serve data from this chunk, and should instead get the chunk from cassandra.
+	// if we are the primary node, then there is likely no data in Cassandra anyway.
+	if !clusterStatus.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
+		oldestPos++
+		if oldestPos >= len(a.Chunks) {
+			oldestPos = 0
+		}
+		oldestChunk = a.getChunk(oldestPos)
+		if oldestChunk == nil {
+			log.Error(3, "unexpected nil chunk.")
+			return math.MaxInt32, make([]Iter, 0)
+		}
+	}
+
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		log.Debug("AggMetric %s Get(): no data for requested range", a.Key)
@@ -445,6 +461,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		chunkCreate.Inc(1)
 		// no data has been added to this metric at all.
 		a.Chunks = append(a.Chunks, NewChunk(t0))
+
+		// The first chunk is typically going to be a partial chunk
+		// so we keep a record of it.
+		a.firstChunkT0 = t0
 
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
