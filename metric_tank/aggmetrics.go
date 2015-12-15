@@ -15,6 +15,7 @@ type AggMetrics struct {
 	aggSettings    []aggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
+	maxDirtyChunks uint32
 }
 
 var totalPoints chan int
@@ -24,7 +25,7 @@ func init() {
 	totalPoints = make(chan int, 10)
 }
 
-func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, aggSettings []aggSetting) *AggMetrics {
+func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, maxDirtyChunks uint32, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		Metrics:        make(map[string]*AggMetric),
 		chunkSpan:      chunkSpan,
@@ -32,6 +33,7 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, a
 		aggSettings:    aggSettings,
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
+		maxDirtyChunks: maxDirtyChunks,
 	}
 
 	go ms.GC()
@@ -81,7 +83,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, ms.aggSettings...)
+		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, ms.maxDirtyChunks, ms.aggSettings...)
 		ms.Metrics[key] = m
 	}
 	ms.Unlock()
