@@ -26,7 +26,7 @@ import (
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
-	primaryNode = flag.Bool("primary-node", true, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
+	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
 
 	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
 	topic              = flag.String("topic", "metrics", "NSQ topic")

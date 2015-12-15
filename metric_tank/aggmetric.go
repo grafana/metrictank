@@ -343,20 +343,46 @@ func (a *AggMetric) persist(pos int) {
 		return
 	}
 
-	log.Debug("sending chunk to write queue")
+	// create an array of chunks that need to be sent to the writeQueue.
+	pending := make([]*Chunk, 0)
+
+	// if we recently became the primary, there may be older chunks
+	// that the old primary did not save.  We should check for those
+	// and save them.
+	previousPos := pos - 1
+	if previousPos < 0 {
+		previousPos += len(a.Chunks)
+	}
+	previousChunk := a.Chunks[previousPos]
+	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
+		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
+		pending = append(pending, previousChunk)
+		previousPos--
+		if previousPos < 0 {
+			previousPos += len(a.Chunks)
+		}
+		previousChunk = a.Chunks[previousPos]
+	}
+
+	// add the current chunk to the list of chunks to send to the writeQueue
+	pending = append(pending, chunk)
+
+	log.Debug("sending %d chunks to write queue", len(pending))
+
 	ticker := time.NewTicker(2 * time.Second)
-	// Processing will remain in this for loop until the chunk can be
+	pendingChunk := 0
+	// Processing will remain in this for loop until the chunks can be
 	// added to the writeQueue. If the writeQueue is already full, then
-	// the calling function will block waiting for persist() complete.
+	// the calling function will block waiting for persist() to complete.
 	// This is intended to put backpressure on our message handlers so
 	// that they stop consuming messages, leaving them to buffer at
 	// the message bus.
-WAIT:
-	for {
+	for pendingChunk < len(pending) {
 		select {
-		case a.writeQueue <- chunk:
+		case a.writeQueue <- pending[pendingChunk]:
+			pending[pendingChunk].Saving = true
+			pendingChunk++
 			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
-			break WAIT
 		case <-ticker.C:
 			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
 		}
