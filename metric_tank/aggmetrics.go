@@ -18,6 +18,13 @@ type AggMetrics struct {
 	maxDirtyChunks uint32
 }
 
+var totalPoints chan int
+
+func init() {
+	// measurements can lag a bit, that's ok
+	totalPoints = make(chan int, 10)
+}
+
 func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, maxDirtyChunks uint32, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		Metrics:        make(map[string]*AggMetric),
@@ -29,20 +36,8 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, m
 		maxDirtyChunks: maxDirtyChunks,
 	}
 
-	go ms.stats()
 	go ms.GC()
 	return &ms
-}
-
-func (ms *AggMetrics) stats() {
-	pointsPerMetric.Value(0)
-
-	for range time.Tick(time.Duration(1) * time.Second) {
-		ms.RLock()
-		l := len(ms.Metrics)
-		ms.RUnlock()
-		metricsActive.Value(int64(l))
-	}
 }
 
 // periodically scan chunks and close any that have not received data in a while

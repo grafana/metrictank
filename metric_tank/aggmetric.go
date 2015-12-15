@@ -12,12 +12,6 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 )
 
-var statsPeriod time.Duration
-
-func init() {
-	statsPeriod = time.Duration(1) * time.Second
-}
-
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
 // it uses a circular buffer of chunks
 // each chunk starts at their respective t0
@@ -82,28 +76,7 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32
 		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, maxDirtyChunks))
 	}
 
-	// only collect per aggmetric stats when in debug mode.
-	// running a goroutine for each aggmetric in an environment with many hundreds of thousands of metrics
-	// will result in the CPU just context switching and not much else.
-	if *logLevel < 2 {
-		go m.stats()
-	}
-
 	return &m
-}
-
-func (a *AggMetric) stats() {
-	for range time.Tick(statsPeriod) {
-		sum := 0
-		a.RLock()
-		for _, chunk := range a.Chunks {
-			if chunk != nil {
-				sum += int(chunk.NumPoints)
-			}
-		}
-		a.RUnlock()
-		pointsPerMetric.Value(int64(sum))
-	}
 }
 
 // Sync the saved state of a chunk by its T0.
@@ -117,7 +90,7 @@ func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	}
 }
 
-/* Get a chunk by its T0.  It is expected that the caller has acquired of the a.Lock()*/
+/* Get a chunk by its T0.  It is expected that the caller has acquired a.Lock()*/
 func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 	// we have no chunks.
 	if len(a.Chunks) == 0 {
@@ -509,6 +482,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			a.Chunks = append(a.Chunks, NewChunk(t0))
 		} else {
 			chunkClear.Inc(1)
+			totalPoints <- -1 * int(a.Chunks[a.CurrentChunkPos].NumPoints)
 			msg = fmt.Sprintf("cleared chunk at %d of %d and replaced with new", a.CurrentChunkPos, len(a.Chunks))
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
 		}

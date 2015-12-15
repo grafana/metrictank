@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-func writeErrors(curTs int64, met stat, series graphite.Response, debug bool, errs *[]string) {
+func writeErrors(curTs int64, met stat, series *graphite.Response, debug bool, errs *[]string) {
 	if len(*errs) != 0 && debug {
 		f, err := os.Create(fmt.Sprintf("errors-%v-%d", met.def.Name, curTs))
 		if err != nil {
@@ -20,22 +20,22 @@ func writeErrors(curTs int64, met stat, series graphite.Response, debug bool, er
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		for _, e := range *errs {
-			_, err = w.WriteString(e + "\n")
+			_, err = w.WriteString(fmt.Sprintf("ERROR %s\n", e))
 			if err != nil {
 				panic(err)
 			}
 		}
 		w.WriteString("graphite response:\n")
-		for _, serie := range series {
+		for _, serie := range *series {
 			w.WriteString(serie.Target)
 			for _, p := range serie.Datapoints {
-				w.WriteString(fmt.Sprintf("%s:%s\n", p[0], p[1]))
+				w.WriteString(fmt.Sprintf("%s:%s\n", p[1], p[0]))
 			}
 		}
 		w.Flush()
 	}
 	for _, e := range *errs {
-		fmt.Println(e)
+		fmt.Println(fmt.Sprintf("ERROR %d %s", curTs, e))
 	}
 }
 
@@ -43,9 +43,9 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 	defer wg.Done()
 	var series graphite.Response
 	errs := make([]string, 0)
-	defer writeErrors(curTs, met, series, debug, &errs)
+	defer writeErrors(curTs, met, &series, debug, &errs)
 	e := func(str string, pieces ...interface{}) {
-		errs = append(errs, "ERROR: "+fmt.Sprintf(str, pieces...))
+		errs = append(errs, fmt.Sprintf(str, pieces...))
 	}
 
 	g := graphite.HostHeader{Host: "http://" + host + "/render", Header: http.Header{}}
@@ -54,32 +54,32 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 	q := graphite.Request{Targets: []string{met.def.Name}}
 	series, err := g.Query(&q)
 	if err != nil {
-		e("querying graphite: %q", err)
+		e("querying graphite: %v", err)
 		return
 	}
 	for _, serie := range series {
 		if met.def.Name != serie.Target {
-			e("name %q != target name%q", met.def.Name, serie.Target)
+			e("%v : bad target name %v", met.def.Name, serie.Target)
 		}
 
 		lastTs := int64(0)
 		oldestNull := int64(math.MaxInt64)
 		if len(serie.Datapoints) == 0 {
-			e("series for %q contains no points!", met.def.Name)
+			e("%v : series contains no points!", met.def.Name)
 		}
 		for _, p := range serie.Datapoints {
 			ts, err := p[1].Int64()
 			if err != nil {
-				e("could not parse timestamp %q", p)
+				e("%v : could not parse timestamp %q", met.def.Name, p)
 			}
 			if ts <= lastTs {
-				e("timestamp %v must be bigger than last %v", ts, lastTs)
+				e("%v timestamp %v must be bigger than last %v", met.def.Name, ts, lastTs)
 			}
 			if lastTs == 0 && (ts < curTs-24*3600-60 || ts > curTs-24*3600+60) {
-				e("first point %q should have been about 24h ago, i.e. around %d", p, curTs-24*3600)
+				e("%v first point %q should have been about 24h ago, i.e. around %d", met.def.Name, p, curTs-24*3600)
 			}
 			if lastTs != 0 && ts != lastTs+int64(met.def.Interval) {
-				e("point %v is not interval %v apart from previous point", p, met.def.Interval)
+				e("%v point %v is not interval %v apart from previous point", met.def.Name, p, met.def.Interval)
 			}
 			_, err = p[0].Float64()
 			if err != nil && ts > met.firstSeen {
@@ -88,7 +88,7 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 				}
 				if ts < curTs-30 {
 					nullPoints.Inc(1)
-					e("%v at %d : seeing a null for ts %v", met.def.Name, curTs, p[1])
+					e("%v : seeing a null for ts %v", met.def.Name, p[1])
 				}
 			} else {
 				// we saw a valid point, so reset oldestNull.
@@ -97,7 +97,7 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 			lastTs = ts
 		}
 		if lastTs < curTs-int64(met.def.Interval) || lastTs > curTs+int64(met.def.Interval) {
-			e("last point at %d is out of range. should have been around %d (now) +- %d", lastTs, curTs, met.def.Interval)
+			e("%v : last point at %d is out of range. should have been around %d (now) +- %d", met.def.Name, lastTs, curTs, met.def.Interval)
 		}
 		// if there was no null, we treat the point after the last one we had as null
 		if oldestNull == math.MaxInt64 {
