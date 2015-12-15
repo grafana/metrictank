@@ -90,7 +90,7 @@ var cassandraPutDuration met.Timer
 var cassandraBlockDuration met.Timer
 var cassandraGetDuration met.Timer
 var inItems met.Meter
-var pointsPerMetric met.Meter
+var points met.Gauge
 var msgsHandleOK met.Count
 var msgsHandleFail met.Count
 var alloc met.Gauge
@@ -281,11 +281,26 @@ func initMetrics(stats met.Backend) {
 	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
-	pointsPerMetric = stats.NewMeter("points_per_metric", 0)
+	points = stats.NewGauge("total_points", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")
 	msgsHandleFail = stats.NewCount("handle.fail")
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
 	metricsActive = stats.NewGauge("metrics_active", 0)
+
+	// run a collector for some global stats
+	go func() {
+		currentPoints := 0
+
+		ticker := time.Tick(time.Duration(1) * time.Second)
+		for {
+			select {
+			case <-ticker:
+				points.Value(int64(currentPoints))
+			case update := <-totalPoints:
+				currentPoints += update
+			}
+		}
+	}()
 }
