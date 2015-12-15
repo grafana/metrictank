@@ -116,7 +116,6 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 
 	// get metric
 	if agg, ok := metrics.Get(ms.Key); ok {
-		// Sync the save state of our chunk for the specific T0 referenced in the msg.
 		agg.(*AggMetric).SyncChunkSaveState(ms.T0)
 	}
 
