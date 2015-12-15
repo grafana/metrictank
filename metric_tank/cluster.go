@@ -71,18 +71,22 @@ func (msg *PersistMessage) Send() {
 	if err != nil {
 		log.Fatal(4, "failed to marshal persistMessage to json.")
 	}
-	// This will always return a host. If all hosts are currently marked as dead,
-	// then all hosts will be reset to alive and we will try them all again. This
-	// will result in this loop repeating forever until we successfully publish our msg.
-	hostPoolResponse := hostPool.Get()
-	p := producers[hostPoolResponse.Host()]
-	err = p.Publish(*topicNotifyPersist, body)
-	// Hosts that are marked as dead will be retried after 30seconds.  If we published
-	// successfully, then sending a nil error will mark the host as alive again.
-	hostPoolResponse.Mark(err)
-	if err != nil {
-		log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
-		msg.Send()
+	sent := false
+	for !sent {
+		// This will always return a host. If all hosts are currently marked as dead,
+		// then all hosts will be reset to alive and we will try them all again. This
+		// will result in this loop repeating forever until we successfully publish our msg.
+		hostPoolResponse := hostPool.Get()
+		p := producers[hostPoolResponse.Host()]
+		err = p.Publish(*topicNotifyPersist, body)
+		// Hosts that are marked as dead will be retried after 30seconds.  If we published
+		// successfully, then sending a nil error will mark the host as alive again.
+		hostPoolResponse.Mark(err)
+		if err != nil {
+			log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+		} else {
+			sent = true
+		}
 	}
 
 	return
