@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/Dieterbe/go-metrics"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
