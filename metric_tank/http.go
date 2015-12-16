@@ -153,3 +153,20 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
 }
+
+// report ApplicationStatus for use by loadBalancer healthChecks.
+// We only want requests to be sent to this node if it is the primary
+// node or if it has been online for at *warmUpPeriod
+func appStatus(w http.ResponseWriter, req *http.Request) {
+	if clusterStatus.IsPrimary() {
+		w.Write([]byte("OK"))
+		return
+	}
+	if time.Since(startupTime) < (time.Duration(*warmUpPeriod) * time.Second) {
+		http.Error(w, "Service not ready", http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Write([]byte("OK"))
+	return
+}

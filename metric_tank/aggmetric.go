@@ -29,6 +29,7 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	writeQueue      chan *Chunk
 	activeWrite     bool
+	firstChunkT0    uint32
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
@@ -77,6 +78,98 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32
 	}
 
 	return &m
+}
+
+// Sync the saved state of a chunk by its T0.
+func (a *AggMetric) SyncChunkSaveState(ts uint32) {
+	a.RLock()
+	defer a.RUnlock()
+	chunk := a.getChunkByT0(ts)
+	if chunk != nil {
+		log.Debug("marking chunk %s:%d as saved.", a.Key, chunk.T0)
+		chunk.Saved = true
+	}
+}
+
+/* Get a chunk by its T0.  It is expected that the caller has acquired a.Lock()*/
+func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
+	// we have no chunks.
+	if len(a.Chunks) == 0 {
+		return nil
+	}
+
+	currentT0 := a.Chunks[a.CurrentChunkPos].T0
+
+	if ts == currentT0 {
+		//found our chunk.
+		return a.Chunks[a.CurrentChunkPos]
+	}
+
+	// requested Chunk is not in our dataset.
+	if ts > currentT0 {
+		return nil
+	}
+
+	// calculate the number of chunks ago our requested T0 is,
+	// assuming that chunks are sequential.
+	chunksAgo := int((currentT0 - ts) / a.ChunkSpan)
+
+	numChunks := len(a.Chunks)
+	oldestPos := a.CurrentChunkPos + 1
+	if oldestPos >= numChunks {
+		oldestPos = 0
+	}
+
+	var guess int
+
+	if chunksAgo >= (numChunks - 1) {
+		// set guess to the oldest chunk.
+		guess = oldestPos
+	} else {
+		guess = a.CurrentChunkPos - chunksAgo
+		if guess < 0 {
+			guess += numChunks
+		}
+	}
+
+	// we now have a good guess at which chunk position our requested TO is in.
+	c := a.Chunks[guess]
+
+	if c.T0 == ts {
+		// found our chunk.
+		return c
+	}
+
+	if ts > c.T0 {
+		// we need to check newer chunks
+		for c.T0 < currentT0 {
+			guess += 1
+			if guess >= numChunks {
+				guess = 0
+			}
+			c = a.Chunks[guess]
+			if c.T0 == ts {
+				//found our chunk
+				return c
+			}
+		}
+	} else {
+		// we need to check older chunks
+		oldestT0 := a.Chunks[oldestPos].T0
+		for c.T0 >= oldestT0 {
+			guess -= 1
+			if guess < 0 {
+				guess += numChunks
+			}
+			c = a.Chunks[guess]
+			if c.T0 == ts {
+				//found or chunk.
+				return c
+			}
+		}
+	}
+	// chunk not found.
+	return nil
 }
 
 func (a *AggMetric) getChunk(pos int) *Chunk {
@@ -162,6 +255,21 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		return math.MaxInt32, make([]Iter, 0)
 	}
 
+	// The first chunk is likely only a partial chunk. If we are not the primary node
+	// we should not serve data from this chunk, and should instead get the chunk from cassandra.
+	// if we are the primary node, then there is likely no data in Cassandra anyway.
+	if !clusterStatus.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
+		oldestPos++
+		if oldestPos >= len(a.Chunks) {
+			oldestPos = 0
+		}
+		oldestChunk = a.getChunk(oldestPos)
+		if oldestChunk == nil {
+			log.Error(3, "unexpected nil chunk.")
+			return math.MaxInt32, make([]Iter, 0)
+		}
+	}
+
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		log.Debug("AggMetric %s Get(): no data for requested range", a.Key)
@@ -230,25 +338,53 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 func (a *AggMetric) persist(pos int) {
 	chunk := a.Chunks[pos]
 	chunk.Finish()
-	if *dryRun {
-		chunk.Saved = true
+	if !clusterStatus.IsPrimary() {
+		log.Debug("node is not primary, not saving chunk.")
 		return
 	}
 
-	log.Debug("sending chunk to write queue")
+	// create an array of chunks that need to be sent to the writeQueue.
+	pending := make([]*Chunk, 1)
+	// add the current chunk to the list of chunks to send to the writeQueue
+	pending[0] = chunk
+
+	// if we recently became the primary, there may be older chunks
+	// that the old primary did not save.  We should check for those
+	// and save them.
+	previousPos := pos - 1
+	if previousPos < 0 {
+		previousPos += len(a.Chunks)
+	}
+	previousChunk := a.Chunks[previousPos]
+	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
+		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
+		pending = append(pending, previousChunk)
+		previousPos--
+		if previousPos < 0 {
+			previousPos += len(a.Chunks)
+		}
+		previousChunk = a.Chunks[previousPos]
+	}
+
+	log.Debug("sending %d chunks to write queue", len(pending))
+
 	ticker := time.NewTicker(2 * time.Second)
-	// Processing will remain in this for loop until the chunk can be
+	pendingChunk := len(pending) - 1
+
+	// Processing will remain in this for loop until the chunks can be
 	// added to the writeQueue. If the writeQueue is already full, then
-	// the calling function will block waiting for persist() complete.
+	// the calling function will block waiting for persist() to complete.
 	// This is intended to put backpressure on our message handlers so
 	// that they stop consuming messages, leaving them to buffer at
-	// the message bus.
-WAIT:
-	for {
+	// the message bus. The "pending" array of chunks are proccessed
+	// last-to-first ensuring that older data is added to the writeQueue
+	// before newer data.
+	for pendingChunk >= 0 {
 		select {
-		case a.writeQueue <- chunk:
+		case a.writeQueue <- pending[pendingChunk]:
+			pending[pendingChunk].Saving = true
+			pendingChunk--
 			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
-			break WAIT
 		case <-ticker.C:
 			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
 		}
@@ -295,6 +431,12 @@ WAIT:
 								a.Lock()
 								c.Saved = true
 								a.Unlock()
+								msg := &PersistMessage{
+									Instance: *instance,
+									Key:      a.Key,
+									T0:       c.T0,
+								}
+								msg.Send()
 							}()
 							log.Debug("save complete. %s:%d %v", a.Key, c.T0, c)
 							chunkSaveOk.Inc(1)
@@ -347,6 +489,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		chunkCreate.Inc(1)
 		// no data has been added to this metric at all.
 		a.Chunks = append(a.Chunks, NewChunk(t0))
+
+		// The first chunk is typically going to be a partial chunk
+		// so we keep a record of it.
+		a.firstChunkT0 = t0
 
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))

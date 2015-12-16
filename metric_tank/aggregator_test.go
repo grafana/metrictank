@@ -36,7 +36,9 @@ func TestAggBoundary(t *testing.T) {
 
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
+	clusterStatus = NewClusterStatus("default", false)
 	compare := func(key string, metric Metric, expected []Point) {
+		clusterStatus.Set(true)
 		_, iters := metric.Get(0, 1000)
 		got := make([]Point, 0, len(expected))
 		for _, iter := range iters {
@@ -56,6 +58,7 @@ func TestAggregator(t *testing.T) {
 				}
 			}
 		}
+		clusterStatus.Set(false)
 	}
 	agg := NewAggregator("test", 60, 120, 10, 10)
 	agg.Add(100, 123.4)
