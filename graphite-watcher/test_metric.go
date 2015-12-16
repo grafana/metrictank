@@ -13,7 +13,7 @@ import (
 
 func writeErrors(curTs int64, met stat, series *graphite.Response, debug bool, errs *[]string) {
 	if len(*errs) != 0 && debug {
-		f, err := os.Create(fmt.Sprintf("errors-%v-%d", met.def.Name, curTs))
+		f, err := os.Create(fmt.Sprintf("errors/%v-%d", met.def.Name, curTs))
 		if err != nil {
 			panic(err)
 		}

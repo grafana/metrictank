@@ -9,6 +9,7 @@ nsq_metrics_to_elasticsearch/nsq_metrics_to_elasticsearch
 nsq_probe_events_to_elasticsearch/nsq_probe_events_to_elasticsearch
 nsq_metrics_to_kairos/nsq_metrics_to_kairos
 graphite-watcher/graphite-watcher
+graphite-watcher/errors/*
 inspect-es/inspect-es
 *.deb
 *.rpm
