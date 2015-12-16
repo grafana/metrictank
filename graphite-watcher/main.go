@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/Dieterbe/go-metrics"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
@@ -37,7 +36,7 @@ func main() {
 		log.Fatal("usage: graphite-watcher <environment-for-metrics> <elasticsearch-addr> <metrics-addr> <graphite-addr> [debug]")
 	}
 	addr, _ := net.ResolveTCPAddr("tcp", os.Args[3])
-	go metrics.Graphite(metrics.DefaultRegistry, 10e9, fmt.Sprintf("graphite-watcher.%s", os.Args[1]), addr)
+	go metrics.Graphite(metrics.DefaultRegistry, 1e9, "graphite-watcher."+os.Args[1]+".", addr)
 	metrics.Register("lag", lag)
 	metrics.Register("num_metrics", numMetrics)
 	metrics.Register("null_points", nullPoints)
@@ -52,7 +51,7 @@ func main() {
 	// for our data check to be useful we need metrics to show up in ES soon after being in the pipeline,
 	// which seems to be true (see nsqadmin)
 	go func() {
-		getEsTick := time.NewTicker(time.Second * time.Duration(10))
+		getEsTick := time.NewTicker(time.Second * time.Duration(1))
 		for range getEsTick.C {
 			metrics := getMetrics(os.Args[2])
 			numMetrics.Update(int64(len(metrics)))
