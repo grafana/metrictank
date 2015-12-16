@@ -344,7 +344,9 @@ func (a *AggMetric) persist(pos int) {
 	}
 
 	// create an array of chunks that need to be sent to the writeQueue.
-	pending := make([]*Chunk, 0)
+	pending := make([]*Chunk, 1)
+	// add the current chunk to the list of chunks to send to the writeQueue
+	pending[0] = chunk
 
 	// if we recently became the primary, there may be older chunks
 	// that the old primary did not save.  We should check for those
@@ -364,24 +366,24 @@ func (a *AggMetric) persist(pos int) {
 		previousChunk = a.Chunks[previousPos]
 	}
 
-	// add the current chunk to the list of chunks to send to the writeQueue
-	pending = append(pending, chunk)
-
 	log.Debug("sending %d chunks to write queue", len(pending))
 
 	ticker := time.NewTicker(2 * time.Second)
-	pendingChunk := 0
+	pendingChunk := len(pending) - 1
+
 	// Processing will remain in this for loop until the chunks can be
 	// added to the writeQueue. If the writeQueue is already full, then
 	// the calling function will block waiting for persist() to complete.
 	// This is intended to put backpressure on our message handlers so
 	// that they stop consuming messages, leaving them to buffer at
-	// the message bus.
-	for pendingChunk < len(pending) {
+	// the message bus. The "pending" array of chunks are proccessed
+	// last-to-first ensuring that older data is added to the writeQueue
+	// before newer data.
+	for pendingChunk >= 0 {
 		select {
 		case a.writeQueue <- pending[pendingChunk]:
 			pending[pendingChunk].Saving = true
-			pendingChunk++
+			pendingChunk--
 			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
 		case <-ticker.C:
 			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
