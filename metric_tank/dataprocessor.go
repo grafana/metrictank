@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metricdef"
 	"runtime"
 	"sort"
+	"time"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -102,14 +104,22 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 
 	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 	// and we assume we can use that interval through history.
-	// TODO: no support for interval changes, metrics not seen yet, missing datablocks, ...
+	// TODO: no support for interval changes, missing datablocks, ...
 	meta := metaCache.Get(req.key)
-	interval := uint32(meta.interval)
+	var interval uint32
 
-	// we don't have the data yet, let's assume the interval is 10 seconds
-	if interval == 0 {
-		guess = true
-		interval = 10
+	if meta.interval == 0 {
+		metricMetaCacheMiss.Inc(1)
+		pre := time.Now()
+		def, err := metricdef.GetMetricDefinition(req.key)
+		if err != nil {
+			return nil, err
+		}
+		metricMetaGetDuration.Value(time.Now().Sub(pre))
+		interval = uint32(def.Interval)
+	} else {
+		interval = uint32(meta.interval)
+		metricMetaCacheHit.Inc(1)
 	}
 	numPoints := (req.to - req.from) / interval
 
