@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"math"
 	"testing"
 )
 
@@ -220,4 +221,97 @@ func TestAggEvery(t *testing.T) {
 			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.every, every)
 		}
 	}
+}
+
+type fixc struct {
+	in       []Point
+	from     uint32
+	to       uint32
+	interval uint32
+	out      []Point
+}
+
+func TestFix(t *testing.T) {
+	cases := []fixc{
+		{
+			// the most standard simple case
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			10,
+			31,
+			10,
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+		},
+		{
+			// almost... need Nan in front
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			1,
+			31,
+			10,
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+		},
+		{
+			// need Nan in front
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			0,
+			31,
+			10,
+			[]Point{{math.NaN(), 0}, {1, 10}, {2, 20}, {3, 30}},
+		},
+		{
+			// almost..need Nan in back
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			10,
+			40,
+			10,
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+		},
+		{
+			// need Nan in back
+			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			10,
+			41,
+			10,
+			[]Point{{1, 10}, {2, 20}, {3, 30}, {math.NaN(), 40}},
+		},
+		{
+			// need Nan in middle
+			[]Point{{1, 10}, {3, 30}},
+			10,
+			31,
+			10,
+			[]Point{{1, 10}, {math.NaN(), 20}, {3, 30}},
+		},
+		{
+			// need Nan everywhere
+			[]Point{{2, 20}, {4, 40}, {7, 70}},
+			0,
+			90,
+			10,
+			[]Point{{math.NaN(), 0}, {math.NaN(), 10}, {2, 20}, {math.NaN(), 30}, {4, 40}, {math.NaN(), 50}, {math.NaN(), 60}, {7, 70}, {math.NaN(), 80}},
+		},
+		{
+			// too much data. note that there are multiple satisfactory solutions here. this is just one of them.
+			[]Point{{10, 10}, {14, 14}, {20, 20}, {26, 26}, {35, 35}},
+			10,
+			41,
+			10,
+			[]Point{{10, 10}, {14, 20}, {26, 30}, {35, 40}},
+		},
+	}
+	for i, c := range cases {
+		got := fix(c.in, c.from, c.to, c.interval)
+
+		if len(c.out) != len(got) {
+			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.out, got)
+		}
+		for j, pgot := range got {
+			pexp := c.out[j]
+			gotNan := math.IsNaN(pgot.Val)
+			expNan := math.IsNaN(pexp.Val)
+			if gotNan != expNan || (!gotNan && pgot.Val != pexp.Val) || pgot.Ts != pexp.Ts {
+				t.Fatalf("output for testcase %d at point %d mismatch: expected: %v, got: %v", i, j, c.out, got)
+			}
+		}
+	}
+
 }

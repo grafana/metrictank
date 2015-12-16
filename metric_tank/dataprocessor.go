@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metricdef"
+	"math"
 	"runtime"
 	"sort"
 	"time"
@@ -27,6 +28,58 @@ func doRecover(errp *error) {
 		}
 	}
 	return
+}
+
+// fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
+// graphite does this quantization before storing, we may want to do that as well at some point
+// note: values are quantized to the right because we can't lie about the future:
+// e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
+// values to earlier in time.
+func fix(in []Point, from, to, interval uint32) []Point {
+	out := make([]Point, 0, len(in))
+
+	// first point should be the first point at or after from that divides by interval
+	start := from
+	remain := from % interval
+	if remain != 0 {
+		start = from + interval - remain
+	}
+
+	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
+	lastPoint := (to - 1) - ((to - 1) % interval)
+
+	for t, i := start, 0; t <= lastPoint; t += interval {
+
+		// input is out of values. add a null
+		if i >= len(in) {
+			out = append(out, Point{math.NaN(), t})
+			continue
+		}
+
+		p := in[i]
+		if p.Ts == t {
+			// point has perfect ts, use it and move on to next point
+			out = append(out, p)
+			i++
+		} else if p.Ts > t {
+			// point is too recent, append a null and reconsider same point for next slot
+			out = append(out, Point{math.NaN(), t})
+		} else if p.Ts > t-interval && p.Ts < t {
+			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
+			out = append(out, Point{p.Val, t})
+			i++
+		} else if p.Ts <= t-interval {
+			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again.
+			for p.Ts <= t-interval {
+				i++
+				p = in[i]
+			}
+			t -= interval
+		}
+
+	}
+
+	return out
 }
 
 func divide(pointsA, pointsB []Point) []Point {
@@ -162,20 +215,45 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 	log.Debug("runtimeConsolidation: %t", runtimeConsolidation)
 
 	if !readConsolidated && !runtimeConsolidation {
-		return getSeries(req.key, consolidation.None, 0, req.from, req.to), nil
+		return fix(
+			getSeries(req.key, consolidation.None, 0, req.from, req.to),
+			req.from,
+			req.to,
+			interval,
+		), nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
-			getSeries(req.key, consolidation.None, 0, req.from, req.to),
+			fix(
+				getSeries(req.key, consolidation.None, 0, req.from, req.to),
+				req.from,
+				req.to,
+				interval,
+			),
 			aggEvery(numPoints, req.maxPoints),
 			req.consolidator), nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.consolidator == consolidation.Avg {
 			return divide(
-				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
-				getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+				fix(
+					getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+					req.from,
+					req.to,
+					interval,
+				),
+				fix(
+					getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+					req.from,
+					req.to,
+					interval,
+				),
 			), nil
 		} else {
-			return getSeries(req.key, req.consolidator, interval, req.from, req.to), nil
+			return fix(
+				getSeries(req.key, req.consolidator, interval, req.from, req.to),
+				req.from,
+				req.to,
+				interval,
+			), nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
@@ -183,17 +261,32 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
-					getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+					fix(
+						getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+						req.from,
+						req.to,
+						interval,
+					),
 					aggNum,
 					consolidation.Sum),
 				consolidate(
-					getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+					fix(
+						getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+						req.from,
+						req.to,
+						interval,
+					),
 					aggNum,
 					consolidation.Cnt),
 			), nil
 		} else {
 			return consolidate(
-				getSeries(req.key, req.consolidator, interval, req.from, req.to),
+				fix(
+					getSeries(req.key, req.consolidator, interval, req.from, req.to),
+					req.from,
+					req.to,
+					interval,
+				),
 				aggNum, req.consolidator), nil
 		}
 	}
