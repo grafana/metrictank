@@ -196,8 +196,8 @@ func main() {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*maxUnwrittenChunks), uint32(*metricMaxStale), finalSettings)
-	InitCluster(*instance, *primaryNode, metrics, stats)
+	// set our cluster state before we start consuming messages.
+	clusterStatus = NewClusterStatus(*instance, *primaryNode)
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "metrics_tank"
@@ -212,6 +212,7 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*maxUnwrittenChunks), uint32(*metricMaxStale), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
@@ -234,6 +235,8 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
+
+	InitCluster(metrics, stats)
 
 	go func() {
 		m := &runtime.MemStats{}

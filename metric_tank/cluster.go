@@ -121,9 +121,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 	return nil
 }
 
-func InitCluster(instance string, initialState bool, metrics Metrics, stats met.Backend) {
-	clusterStatus = NewClusterStatus(instance, initialState)
-
+func InitCluster(metrics Metrics, stats met.Backend) {
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
