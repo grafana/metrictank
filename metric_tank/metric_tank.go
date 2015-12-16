@@ -31,7 +31,7 @@ var (
 	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
 	topic              = flag.String("topic", "metrics", "NSQ topic")
 	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic")
-	channel            = flag.String("channel", "tank", "NSQ channel")
+	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
 	instance           = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
 	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")

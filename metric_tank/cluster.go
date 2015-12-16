@@ -152,7 +152,7 @@ func InitCluster(instance string, initialState bool, metrics Metrics, stats met.
 	}
 	cfg.MaxInFlight = *maxInFlight
 
-	consumer, err := insq.NewConsumer(*topicNotifyPersist, fmt.Sprintf("metric_tank_%s", instance), cfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(*topicNotifyPersist, *channel, cfg, "metric_persist.%s", stats)
 	if err != nil {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
