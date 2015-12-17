@@ -231,6 +231,14 @@ type fixc struct {
 	out      []Point
 }
 
+func nullPoints(from, to, interval uint32) []Point {
+	out := make([]Point, 0)
+	for i := from; i < to; i += interval {
+		out = append(out, Point{math.NaN(), i})
+	}
+	return out
+}
+
 func TestFix(t *testing.T) {
 	cases := []fixc{
 		{
@@ -297,7 +305,24 @@ func TestFix(t *testing.T) {
 			10,
 			[]Point{{10, 10}, {14, 20}, {26, 30}, {35, 40}},
 		},
+		{
+			// no data at all. saw this one for real
+			[]Point{},
+			1450242982,
+			1450329382,
+			600,
+			nullPoints(1450243200, 1450329382, 600),
+		},
+		{
+			// don't trip over last.
+			[]Point{{1, 10}, {2, 20}, {2, 19}},
+			10,
+			31,
+			10,
+			[]Point{{1, 10}, {2, 20}, {math.NaN(), 30}},
+		},
 	}
+
 	for i, c := range cases {
 		got := fix(c.in, c.from, c.to, c.interval)
 
