@@ -69,10 +69,15 @@ func fix(in []Point, from, to, interval uint32) []Point {
 			out = append(out, Point{p.Val, t})
 			i++
 		} else if p.Ts <= t-interval {
-			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again.
-			for p.Ts <= t-interval {
+			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
+			// if those considerations are any of the above ones.
+			// if the last point would end up in this branch again, discard it as well.
+			for p.Ts <= t-interval && i < len(in)-1 {
 				i++
 				p = in[i]
+			}
+			if p.Ts <= t-interval {
+				i++
 			}
 			t -= interval
 		}
