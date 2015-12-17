@@ -148,7 +148,7 @@ func (a plan) Len() int           { return len(a) }
 func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
 
-func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points []Point, err error) {
+func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points []Point, interval uint32, err error) {
 	defer doRecover(&err)
 	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
 
@@ -159,14 +159,13 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 	// and we assume we can use that interval through history.
 	// TODO: no support for interval changes, missing datablocks, ...
 	meta := metaCache.Get(req.key)
-	var interval uint32
 
 	if meta.interval == 0 {
 		metricMetaCacheMiss.Inc(1)
 		pre := time.Now()
 		def, err := metricdef.GetMetricDefinition(req.key)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		metricMetaGetDuration.Value(time.Now().Sub(pre))
 		interval = uint32(def.Interval)
@@ -212,7 +211,17 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 		}
 		log.Debug("%-6s %-10s %-6d %s", opt.archive, iStr, opt.points, opt.comment)
 	}
-	log.Debug("runtimeConsolidation: %t", runtimeConsolidation)
+	var aggNum int
+	// interval is the interval the data should be at (whether pulling from RAM or storage, whether aggregated or raw) and so what we use for fix()
+	// outInterval is the interval of the output, i.e. after runtime consolidation, if any.
+	outInterval := interval
+	if runtimeConsolidation {
+		aggNum = aggEvery(numPoints, req.maxPoints)
+		outInterval = interval * uint32(aggNum)
+		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", aggNum, outInterval)
+	} else {
+		log.Debug("runtimeConsolidation: false")
+	}
 
 	if !readConsolidated && !runtimeConsolidation {
 		return fix(
@@ -220,7 +229,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 			req.from,
 			req.to,
 			interval,
-		), nil
+		), outInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
@@ -229,8 +238,8 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 				req.to,
 				interval,
 			),
-			aggEvery(numPoints, req.maxPoints),
-			req.consolidator), nil
+			aggNum,
+			req.consolidator), outInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.consolidator == consolidation.Avg {
 			return divide(
@@ -246,18 +255,17 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 					req.to,
 					interval,
 				),
-			), nil
+			), outInterval, nil
 		} else {
 			return fix(
 				getSeries(req.key, req.consolidator, interval, req.from, req.to),
 				req.from,
 				req.to,
 				interval,
-			), nil
+			), outInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
-		aggNum := aggEvery(numPoints, req.maxPoints)
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
@@ -278,7 +286,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 					),
 					aggNum,
 					consolidation.Cnt),
-			), nil
+			), outInterval, nil
 		} else {
 			return consolidate(
 				fix(
@@ -287,7 +295,7 @@ func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points 
 					req.to,
 					interval,
 				),
-				aggNum, req.consolidator), nil
+				aggNum, req.consolidator), outInterval, nil
 		}
 	}
 }

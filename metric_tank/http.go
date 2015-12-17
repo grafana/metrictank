@@ -28,6 +28,7 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 type Series struct {
 	Target     string
 	Datapoints []Point
+	Interval   uint32
 }
 
 func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
@@ -130,7 +131,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		log.Debug("===================================")
 		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
 		log.Debug("HTTP Get()          %s", req)
-		points, err := getTarget(req, aggSettings, metaCache)
+		points, interval, err := getTarget(req, aggSettings, metaCache)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -140,6 +141,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		out[i] = Series{
 			Target:     target,
 			Datapoints: points,
+			Interval:   interval,
 		}
 	}
 	js, err := json.Marshal(out)
