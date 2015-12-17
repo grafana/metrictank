@@ -261,16 +261,6 @@ func main() {
 	InitCluster(metrics, stats)
 
 	go func() {
-		m := &runtime.MemStats{}
-		for range time.Tick(time.Duration(1) * time.Second) {
-			runtime.ReadMemStats(m)
-			alloc.Value(int64(m.Alloc))
-			totalAlloc.Value(int64(m.TotalAlloc))
-			sysBytes.Value(int64(m.Sys))
-		}
-	}()
-
-	go func() {
 		http.HandleFunc("/", appStatus)
 		http.HandleFunc("/get", get(metaCache, finalSettings))
 		http.HandleFunc("/cluster", clusterStatusHandler)
@@ -329,12 +319,17 @@ func initMetrics(stats met.Backend) {
 	// run a collector for some global stats
 	go func() {
 		currentPoints := 0
+		m := &runtime.MemStats{}
 
 		ticker := time.Tick(time.Duration(1) * time.Second)
 		for {
 			select {
 			case <-ticker:
 				points.Value(int64(currentPoints))
+				runtime.ReadMemStats(m)
+				alloc.Value(int64(m.Alloc))
+				totalAlloc.Value(int64(m.TotalAlloc))
+				sysBytes.Value(int64(m.Sys))
 			case update := <-totalPoints:
 				currentPoints += update
 			}
