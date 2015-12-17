@@ -36,6 +36,7 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, m
 		maxDirtyChunks: maxDirtyChunks,
 	}
 
+	go ms.stats()
 	go ms.GC()
 	return &ms
 }
@@ -69,6 +70,14 @@ func (ms *AggMetrics) GC() {
 			}
 		}
 
+	}
+}
+
+func (ms *AggMetrics) stats() {
+	for range time.Tick(time.Duration(1) * time.Second) {
+		ms.RLock()
+		metricsActive.Value(int64(len(ms.Metrics)))
+		ms.RUnlock()
 	}
 }
 
