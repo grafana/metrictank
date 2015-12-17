@@ -255,7 +255,7 @@ func main() {
 		if err != nil {
 			log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 		}
-		log.Info("consumer connected to nsqlookud")
+		log.Info("consumer connected to nsqlookupd")
 	}()
 
 	InitCluster(metrics, stats)
