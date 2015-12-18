@@ -22,7 +22,7 @@ var totalPoints chan int
 
 func init() {
 	// measurements can lag a bit, that's ok
-	totalPoints = make(chan int, 10)
+	totalPoints = make(chan int, 1000)
 }
 
 func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, maxDirtyChunks uint32, aggSettings []aggSetting) *AggMetrics {
