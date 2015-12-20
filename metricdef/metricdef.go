@@ -210,6 +210,8 @@ func indexMetric(m *schema.MetricDefinition) error {
 	return nil
 }
 
+// TODO: differentiate between record not found and error, so we can bubble up
+// the right thing towards the user.
 func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {

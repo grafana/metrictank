@@ -88,8 +88,8 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		return
 	}
 
-	out := make([]Series, len(targets))
-	for i, target := range targets {
+	reqs := make([]Req, len(targets))
+	for _, target := range targets {
 		var consolidateBy string
 		id := target
 		// yes, i am aware of the arguably grossness of the below.
@@ -128,10 +128,20 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
 			return
 		}
-		log.Debug("===================================")
 		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		reqs = append(reqs, req)
+	}
+	reqs, err = alignRequests(reqs, aggSettings, metaCache)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]Series, len(reqs))
+	for i, req := range reqs {
+		log.Debug("===================================")
 		log.Debug("HTTP Get()          %s", req)
-		points, interval, err := getTarget(req, aggSettings, metaCache)
+		points, interval, err := getTarget(req)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -139,7 +149,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		}
 
 		out[i] = Series{
-			Target:     target,
+			Target:     targets[i],
 			Datapoints: points,
 			Interval:   interval,
 		}

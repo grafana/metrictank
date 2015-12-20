@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
-	"github.com/raintank/raintank-metric/metricdef"
 	"math"
 	"runtime"
 	"sort"
-	"time"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -140,9 +138,9 @@ func aggEvery(numPoints, maxPoints uint32) int {
 }
 
 type planOption struct {
-	archive  string
+	title    string
+	archive  int
 	interval uint32
-	intestim bool
 	points   uint32
 	comment  string
 }
@@ -153,75 +151,58 @@ func (a plan) Len() int           { return len(a) }
 func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
 
-func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points []Point, interval uint32, err error) {
-	defer doRecover(&err)
-	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
+// updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
+// luckily, all metrics still use the same aggSettings, making this a bit simpler
+// for all requests, sets archive, numPoints, interval (and rawInterval as a side effect)
+func alignRequests(reqs []Req, aggSettings []aggSetting, metaCache *MetaCache) ([]Req, error) {
 
-	p := make([]planOption, len(aggSettings)+1)
-	guess := false
+	// first find the highest raw interval amongst the metrics
+	// this is effectively the lowest interval that can be returned by all of the requested metrics
+	// some may need to do runtime consolidation for that to happen though
+	// eg for
+	// 10 raw, 600, 7200, 21600
+	// 30 raw, 600, 7200, 21600
+	// 60 raw, 600, 7200, 21600
+	// would return 60
+	// an optimization to avoid intervals that for many of the metrics would have to be runtime consolidated
+	// can be added later.
 
-	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
-	// and we assume we can use that interval through history.
-	// TODO: no support for interval changes, missing datablocks, ...
-	meta := metaCache.Get(req.key)
-
-	if meta.interval == 0 {
-		metricMetaCacheMiss.Inc(1)
-		pre := time.Now()
-		def, err := metricdef.GetMetricDefinition(req.key)
+	highestInterval := uint32(0)
+	for _, req := range reqs {
+		err := metaCache.UpdateReq(&req)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
-		metricMetaGetDuration.Value(time.Now().Sub(pre))
-		interval = uint32(def.Interval)
-	} else {
-		interval = uint32(meta.interval)
-		metricMetaCacheHit.Inc(1)
+		if req.rawInterval > highestInterval {
+			highestInterval = req.rawInterval
+		}
 	}
-	numPoints := (req.to - req.from) / interval
 
-	p[0] = planOption{"raw", interval, guess, numPoints, ""}
-
+	// now let's find how to best satisfy the request.
+	// let each req figure it out for themselves.
 	aggs := aggSettingsSpanDesc(aggSettings)
 	sort.Sort(aggs)
-	finished := false
-	for i, aggSetting := range aggs {
-		numPointsHere := (req.to - req.from) / aggSetting.span
-		p[i+1] = planOption{fmt.Sprintf("agg %d", i), aggSetting.span, false, numPointsHere, ""}
-		if numPointsHere >= req.minPoints && !finished {
-			archive = i
-			interval = aggSetting.span
-			numPoints = numPointsHere
-			finished = true
-		}
+	for _, req := range reqs {
+		req.optimize(highestInterval, aggs)
 	}
+	return reqs, nil
+}
 
-	p[archive+1].comment = "<-- chosen"
+func getTarget(req Req) (points []Point, interval uint32, err error) {
+	defer doRecover(&err)
 
-	// note, it should always be safe to dynamically switch on/off consolidation based on how well our data stacks up against the request
-	// i.e. whether your data got consolidated or not, it should be pretty equivalent.
-	// for that reason, stdev should not be done as a consolidation. but sos is still useful for when we explicitly (and always, not optionally) want the stdev.
-
-	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
-	runtimeConsolidation := (numPoints > req.maxPoints) // do we need to compress any points at runtime?
+	readConsolidated := (req.archive != -1)                 // do we need to read from a downsampled series?
+	runtimeConsolidation := (req.numPoints > req.maxPoints) // do we need to compress any points at runtime?
 
 	log.Debug("getTarget()         %s", req)
 	log.Debug("type   interval   points")
-	sortedPlan := plan(p)
-	sort.Sort(sortedPlan)
-	for _, opt := range p {
-		iStr := fmt.Sprintf("%d", opt.interval)
-		if opt.intestim {
-			iStr = fmt.Sprintf("%d (guess)", opt.interval)
-		}
-		log.Debug("%-6s %-10s %-6d %s", opt.archive, iStr, opt.points, opt.comment)
-	}
 	var aggNum int
 	// interval is the interval the data should be at (whether pulling from RAM or storage, whether aggregated or raw) and so what we use for fix()
 	// outInterval is the interval of the output, i.e. after runtime consolidation, if any.
+	interval = req.interval
 	outInterval := interval
 	if runtimeConsolidation {
-		aggNum = aggEvery(numPoints, req.maxPoints)
+		aggNum = aggEvery(req.numPoints, req.maxPoints)
 		outInterval = interval * uint32(aggNum)
 		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", aggNum, outInterval)
 	} else {
