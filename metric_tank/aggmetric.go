@@ -82,8 +82,8 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32
 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32) {
-	a.RLock()
-	defer a.RUnlock()
+	a.Lock()
+	defer a.Unlock()
 	chunk := a.getChunkByT0(ts)
 	if chunk != nil {
 		log.Debug("marking chunk %s:%d as saved.", a.Key, chunk.T0)
