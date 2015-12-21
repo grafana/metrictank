@@ -110,6 +110,11 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 		return nil
 	}
 
+	// requested Chunk is not in our dataset.
+	if len(a.Chunks) == 1 {
+		return nil
+	}
+
 	// calculate the number of chunks ago our requested T0 is,
 	// assuming that chunks are sequential.
 	chunksAgo := int((currentT0 - ts) / a.ChunkSpan)
