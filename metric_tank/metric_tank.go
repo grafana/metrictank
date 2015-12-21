@@ -108,6 +108,9 @@ var alloc met.Gauge
 var totalAlloc met.Gauge
 var sysBytes met.Gauge
 var metricsActive met.Gauge
+var metricsToEsOK met.Count
+var metricsToEsFail met.Count
+var esPutDuration met.Timer
 
 func main() {
 	startupTime = time.Now()
@@ -273,6 +276,7 @@ func main() {
 		case <-consumer.StopChan:
 			log.Info("closing cassandra session.")
 			cSession.Close()
+			metricdef.Indexer.Stop()
 			log.Info("terminating.")
 			log.Close()
 			return
@@ -315,6 +319,9 @@ func initMetrics(stats met.Backend) {
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
 	metricsActive = stats.NewGauge("metrics_active", 0)
+	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
+	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	esPutDuration = stats.NewTimer("es_put_duration", 0)
 
 	// run a collector for some global stats
 	go func() {
