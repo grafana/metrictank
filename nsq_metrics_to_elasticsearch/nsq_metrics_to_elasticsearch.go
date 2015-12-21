@@ -46,6 +46,7 @@ var (
 	listenAddr = flag.String("listen", ":6060", "http listener address.")
 
 	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
+	redisDB   = flag.Int("redis-db", 0, "Redis DB number.")
 
 	metricsToEsOK     met.Count
 	metricsToEsFail   met.Count
@@ -168,7 +169,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
-	err = metricdef.InitRedis(*redisAddr, "", "")
+	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
 	if err != nil {
 		log.Fatal(4, "failed to initialize redis. %s", err)
 	}

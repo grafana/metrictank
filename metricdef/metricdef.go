@@ -170,14 +170,14 @@ func InitElasticsearch(addr, user, pass, indexName string) error {
 
 var rs *redis.Client
 
-func InitRedis(addr, db, pass string) error {
+func InitRedis(addr string, db int, pass string) error {
 	opts := &redis.Options{}
 	opts.Network = "tcp"
 	opts.Addr = addr
 	if pass != "" {
 		opts.Password = pass
 	}
-	opts.DB = 0
+	opts.DB = int64(db)
 	rs = redis.NewClient(opts)
 
 	return nil
