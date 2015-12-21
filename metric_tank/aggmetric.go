@@ -366,6 +366,12 @@ func (a *AggMetric) persist(pos int) {
 		previousChunk = a.Chunks[previousPos]
 	}
 
+	if len(pending) > cap(a.writeQueue) {
+		// this can lead to a deadlock. so lets just write what we
+		// can and handle the rest next time.
+		pending = pending[len(pending)-cap(a.writeQueue):]
+	}
+
 	log.Debug("sending %d chunks to write queue", len(pending))
 
 	ticker := time.NewTicker(2 * time.Second)
