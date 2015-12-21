@@ -131,7 +131,12 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
 		reqs = append(reqs, req)
 	}
-	reqs, err = alignRequests(reqs, aggSettings, metaCache)
+	err = findMetricsForRequests(reqs, metaCache)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	reqs, err = alignRequests(reqs, metrics.MinSpan(), aggSettings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

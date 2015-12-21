@@ -97,7 +97,8 @@ func divide(pointsA, pointsB []Point) []Point {
 	return out
 }
 
-func consolidate(in []Point, num int, consolidator consolidation.Consolidator) []Point {
+func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolidator) []Point {
+	num := int(aggNum)
 	aggFunc := consolidation.GetAggFunc(consolidator)
 	buf := make([]float64, num)
 	bufpos := -1
@@ -137,25 +138,118 @@ func aggEvery(numPoints, maxPoints uint32) int {
 	return int((numPoints + maxPoints - 1) / maxPoints)
 }
 
-type planOption struct {
+type band struct {
 	title    string
 	archive  int
 	interval uint32
-	points   uint32
+	ramSpan  uint32 // what's the span we have in memory
 	comment  string
+	cost     uint32 // computed when solving for best requests
 }
 
-type plan []planOption
+func (b band) String() string {
+	return fmt.Sprintf("<band %d: %s> int:%d, ram:%d, cost: %d, comment: %s", b.archive, b.title, b.interval, b.ramSpan, b.cost, b.comment)
+}
 
-func (a plan) Len() int           { return len(a) }
-func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
+// returns cost, aggNum and whether possible at all
+// by comparing the band with the requested output interval of the req.
+func (b *band) costFor(r Req) (uint32, uint32, bool) {
+	b.cost = 0
+	timespan := r.to - r.from
+
+	// settings assuming no runtime consolidation
+	finalPoints := timespan / b.interval
+	aggNum := uint32(1)
+
+	// this band can't be used at all.
+	if b.interval > r.outInterval {
+		fmt.Println("cost ", b, r.DebugString(), "IMP too >int")
+		return 0, 0, false
+	} else if b.interval < r.outInterval {
+		// this band can't be aggregated to match the requested interval
+		if r.outInterval%b.interval != 0 {
+			fmt.Println("cost ", b, r.DebugString(), "IMPOS, int%")
+			return 0, 0, false
+		}
+		aggNum := r.outInterval / b.interval
+		// add the cost for each point that should be runtime-consolidated away
+		finalPoints = finalPoints / aggNum
+		b.cost += ((aggNum - 1) * finalPoints) * 10
+	}
+	if finalPoints > r.maxPoints || finalPoints < r.minPoints {
+		b.cost = 0
+		fmt.Println("cost ", b, r.DebugString(), "IMP #points")
+		return 0, 0, false
+	}
+
+	// add cost for data that should be fetched from storage
+	// TODO this doesn't take into account from-to, it assumes to=now.
+	if b.ramSpan < timespan {
+		b.cost += (timespan - b.ramSpan) / b.interval * 500
+	}
+	// add cost for just having a lot of points in output
+	b.cost += finalPoints
+	fmt.Println("cost ", b, r.DebugString())
+
+	return b.cost, aggNum, true
+}
+
+type bands []band
+
+func (a bands) Len() int           { return len(a) }
+func (a bands) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a bands) Less(i, j int) bool { return a[i].interval < a[j].interval }
+
+type solution struct {
+	reqs  []Req
+	bands []int // for each req, point to the best band
+	cost  uint32
+}
+
+func NewSolution() *solution {
+	return &solution{
+		make([]Req, 0),
+		make([]int, 0),
+		0,
+	}
+}
+
+func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
+	for i := range reqs {
+		err := metaCache.UpdateReq(&reqs[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // for all requests, sets archive, numPoints, interval (and rawInterval as a side effect)
-func alignRequests(reqs []Req, aggSettings []aggSetting, metaCache *MetaCache) ([]Req, error) {
+// note: it is assumed that all requests have the same from, to, minDataPoints and maxdatapoints!
+func alignRequests(reqs []Req, ramSpan uint32, aggSettings []aggSetting) ([]Req, error) {
+	fmt.Println("ALIGN START")
 
+	// model all the bands for each requested metric
+	// the 0th band is always the raw series, with highest res (lowest interval)
+	aggs := aggSettingsSpanAsc(aggSettings)
+	sort.Sort(aggs)
+	allbands := make([][]band, len(reqs))
+	for i, req := range reqs {
+		allbands[i] = make([]band, len(aggs)+1)
+
+		// model the first band, the raw storage
+		allbands[i][0] = band{"raw ", -1, req.rawInterval, ramSpan, "", 0}
+
+		// now model the bands we get from the aggregations
+		for j, agg := range aggs {
+			ramSpan := agg.chunkSpan * (agg.numChunks - 1)
+			allbands[i][j+1] = band{fmt.Sprintf("agg %d", j), j, agg.span, ramSpan, "", 0}
+		}
+	}
+
+	// now we know for each metric all the available bands.
 	// first find the highest raw interval amongst the metrics
 	// this is effectively the lowest interval that can be returned by all of the requested metrics
 	// some may need to do runtime consolidation for that to happen though
@@ -166,47 +260,114 @@ func alignRequests(reqs []Req, aggSettings []aggSetting, metaCache *MetaCache) (
 	// would return 60
 	// an optimization to avoid intervals that for many of the metrics would have to be runtime consolidated
 	// can be added later.
-
-	highestInterval := uint32(0)
-	for _, req := range reqs {
-		err := metaCache.UpdateReq(&req)
-		if err != nil {
-			return nil, err
-		}
-		if req.rawInterval > highestInterval {
-			highestInterval = req.rawInterval
+	highestLowestInterval := uint32(0)
+	for _, bands := range allbands {
+		if bands[0].interval > highestLowestInterval {
+			highestLowestInterval = bands[0].interval
 		}
 	}
 
-	// now let's find how to best satisfy the request.
-	// let each req figure it out for themselves.
-	aggs := aggSettingsSpanDesc(aggSettings)
-	sort.Sort(aggs)
-	for _, req := range reqs {
-		req.optimize(highestInterval, aggs)
+	// now let's find the best interval based on what all the metrics can return.
+	// solutions are scored based on 3 factors, in order of importance:
+	// 1) the more we can fulfill by using data in RAM as opposed to external storage, the better
+	// 2) least amount of runtime consolidation possible.
+	// 3) least amount of points needed, but still satisfying minDataPoints
+
+	// note that for some metrics, highestLowestInterval may not occur in any of the bands natively. not raw, not in the aggregations.
+	// so the possible output intervals are all sensible intervals between
+	// highestLowestInterval (which either matches, or is larger than the raw band) and
+	// the maximum interval possible given minDataPoints.
+	low := highestLowestInterval
+	interval := (reqs[0].to - reqs[0].from)
+	high := interval / reqs[0].minPoints
+	if interval%reqs[0].minPoints != 0 {
+		high += 1
 	}
-	return reqs, nil
+	outputIntervals := make([]uint32, 0)
+	for i := low; i <= high; i += 10 {
+		outputIntervals = append(outputIntervals, i)
+	}
+
+	// there's a solution for each input interval (hopefully)
+	// each solution is a set of requests to satisfy all targets for said interval, along with associated cost to satisfy all those requests
+	solutions := make([]solution, 0, len(outputIntervals))
+INTERVALS:
+	for _, interval := range outputIntervals {
+		s := NewSolution()
+		fmt.Println("working on solution for interval", interval)
+		for j, req := range reqs {
+			// for this given req and interval, find the band with the lowest cost.
+			req.outInterval = interval
+			lowestCost := uint32(math.MaxUint32)
+			bestBand := -1
+			bestAggNum := uint32(0)
+			for k, band := range allbands[j] {
+				cost, aggNum, possible := band.costFor(req)
+				if possible && cost < lowestCost {
+					lowestCost = cost
+					bestBand = k
+					bestAggNum = aggNum
+				}
+			}
+			// this metric has no bands to satisfy this interval at all
+			// so this interval has no solution
+			if bestBand == -1 {
+				continue INTERVALS
+			} else {
+				band := allbands[j][bestBand]
+				s.cost += band.cost
+				req.archive = band.archive
+				req.archInterval = band.interval
+				req.aggNum = bestAggNum
+				s.reqs = append(s.reqs, req)
+				s.bands = append(s.bands, bestBand)
+			}
+		}
+		// we're still here, so we've built a complete solution that can satisfy each request for a given total cost.
+		solutions = append(solutions, *s)
+	}
+	if len(solutions) == 0 {
+		return nil, errors.New("minDataPoints/maxDataPoints cannot be honored with the series requested")
+	}
+	lowestCost := uint32(math.MaxUint32)
+	bestSolution := -1
+	for i, solution := range solutions {
+		if solution.cost < lowestCost {
+			fmt.Println("yeay solution", i, "only has cost", solution.cost)
+			lowestCost = solution.cost
+			bestSolution = i
+		}
+	}
+	solution := solutions[bestSolution]
+
+	for i, req := range solution.reqs {
+		allbands[i][solution.bands[i]].comment = "<-- chosen"
+
+		// note, it should always be safe to dynamically switch on/off consolidation based on how well our data stacks up against the request
+		// i.e. whether your data got consolidated or not, it should be pretty equivalent.
+		// for that reason, stdev should not be done as a consolidation. but sos is still useful for when we explicitly (and always, not optionally) want the stdev.
+
+		for _, band := range allbands[i] {
+			log.Debug("%-6s %-6d %-6d %s", band.title, band.interval, (req.to-req.from)/band.interval, band.comment)
+		}
+	}
+	return solution.reqs, nil
+
 }
 
 func getTarget(req Req) (points []Point, interval uint32, err error) {
 	defer doRecover(&err)
 
-	readConsolidated := (req.archive != -1)                 // do we need to read from a downsampled series?
-	runtimeConsolidation := (req.numPoints > req.maxPoints) // do we need to compress any points at runtime?
+	readConsolidated := req.archive != -1  // do we need to read from a downsampled series?
+	runtimeConsolidation := req.aggNum > 1 // do we need to compress any points at runtime?
 
 	log.Debug("getTarget()         %s", req)
 	log.Debug("type   interval   points")
-	var aggNum int
-	// interval is the interval the data should be at (whether pulling from RAM or storage, whether aggregated or raw) and so what we use for fix()
-	// outInterval is the interval of the output, i.e. after runtime consolidation, if any.
-	interval = req.interval
-	outInterval := interval
+
 	if runtimeConsolidation {
-		aggNum = aggEvery(req.numPoints, req.maxPoints)
-		outInterval = interval * uint32(aggNum)
-		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", aggNum, outInterval)
+		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", req.aggNum, req.outInterval)
 	} else {
-		log.Debug("runtimeConsolidation: false")
+		log.Debug("runtimeConsolidation: false. output interval: %d", req.outInterval)
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
@@ -214,41 +375,41 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 			getSeries(req.key, consolidation.None, 0, req.from, req.to),
 			req.from,
 			req.to,
-			interval,
-		), outInterval, nil
+			req.archInterval,
+		), req.outInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
 				getSeries(req.key, consolidation.None, 0, req.from, req.to),
 				req.from,
 				req.to,
-				interval,
+				req.archInterval,
 			),
-			aggNum,
-			req.consolidator), outInterval, nil
+			req.aggNum,
+			req.consolidator), req.outInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				fix(
-					getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+					getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
-					interval,
+					req.archInterval,
 				),
 				fix(
-					getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+					getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
-					interval,
+					req.archInterval,
 				),
-			), outInterval, nil
+			), req.outInterval, nil
 		} else {
 			return fix(
-				getSeries(req.key, req.consolidator, interval, req.from, req.to),
+				getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
 				req.from,
 				req.to,
-				interval,
-			), outInterval, nil
+				req.archInterval,
+			), req.outInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
@@ -256,32 +417,32 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 			return divide(
 				consolidate(
 					fix(
-						getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
+						getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
 						req.from,
 						req.to,
-						interval,
+						req.archInterval,
 					),
-					aggNum,
+					req.aggNum,
 					consolidation.Sum),
 				consolidate(
 					fix(
-						getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
+						getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
 						req.from,
 						req.to,
-						interval,
+						req.archInterval,
 					),
-					aggNum,
+					req.aggNum,
 					consolidation.Cnt),
-			), outInterval, nil
+			), req.outInterval, nil
 		} else {
 			return consolidate(
 				fix(
-					getSeries(req.key, req.consolidator, interval, req.from, req.to),
+					getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
-					interval,
+					req.archInterval,
 				),
-				aggNum, req.consolidator), outInterval, nil
+				req.aggNum, req.consolidator), req.outInterval, nil
 		}
 	}
 }

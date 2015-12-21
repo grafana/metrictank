@@ -9,7 +9,7 @@ import (
 type testCase struct {
 	in     []Point
 	consol consolidation.Consolidator
-	num    int
+	num    uint32
 	out    []Point
 }
 
@@ -339,4 +339,95 @@ func TestFix(t *testing.T) {
 		}
 	}
 
+}
+
+type alignCase struct {
+	reqs        []Req
+	ramSpan     uint32
+	aggSettings []aggSetting
+	outReqs     []Req
+	outErr      error
+}
+
+func reqRaw(key string, from, to, minPoints, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32) Req {
+	req := NewReq(key, from, to, minPoints, maxPoints, consolidator)
+	req.rawInterval = rawInterval
+	return req
+}
+func reqOut(key string, from, to, minPoints, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32, archive int, archInterval, outInterval, aggNum uint32) Req {
+	req := NewReq(key, from, to, minPoints, maxPoints, consolidator)
+	req.rawInterval = rawInterval
+	req.archive = archive
+	req.archInterval = archInterval
+	req.outInterval = outInterval
+	req.aggNum = aggNum
+	return req
+}
+
+func TestAlignRequests(t *testing.T) {
+	input := []alignCase{
+		/*	{
+			// request would be satisfied by each band like so:
+			// remember we don't count 1 chunk because it can be almost-empty
+			// -1 raw: 2400/10=240 points in RAM, (3600-2400)/10=120 in cassandra, 360 in total
+			// 0 agg 1: 1*600/60= 10 points in RAM, (3600-600)=3000/60=50 in cassandra, 60 in total
+			// 1 agg 2: 3600/120=30 points in total
+			// only raw has enough points
+			[]Req{
+				reqRaw("a", 0, 3600, 100, 800, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600, 100, 800, consolidation.Avg, 10),
+				reqRaw("c", 0, 3600, 100, 800, consolidation.Avg, 10),
+			},
+			2400,
+			[]aggSetting{
+				{60, 600, 2},
+				{120, 600, 1},
+			},
+			[]Req{
+				reqOut("a", 0, 3600, 100, 800, consolidation.Avg, 10, -1, 10, 10, 1),
+				reqOut("b", 0, 3600, 100, 800, consolidation.Avg, 10, -1, 10, 10, 1),
+				reqOut("c", 0, 3600, 100, 800, consolidation.Avg, 10, -1, 10, 10, 1),
+			},
+			nil,
+		}, */
+		// same but with much lower minDataPoints so now the archives both fit, and the 2nd one can do it with least points and least points from cassandra
+		{
+			[]Req{
+				reqRaw("a", 0, 3600, 20, 800, consolidation.Avg, 10),
+				//		reqRaw("b", 0, 3600, 20, 800, consolidation.Avg, 10),
+				//		reqRaw("c", 0, 3600, 20, 800, consolidation.Avg, 10),
+			},
+			2400,
+			[]aggSetting{
+				{60, 600, 2},
+				{120, 600, 1},
+			},
+			[]Req{
+				reqOut("a", 0, 3600, 20, 800, consolidation.Avg, 10, 1, 120, 120, 1),
+				//		reqOut("b", 0, 3600, 20, 800, consolidation.Avg, 10, 1, 120, 120, 1),
+				//		reqOut("c", 0, 3600, 20, 800, consolidation.Avg, 10, 1, 120, 120, 1),
+			},
+			nil,
+		},
+		// do one where we need to consolidate
+		// do one where lowest common is interesting like so
+		// 10 raw, 600, 7200, 21600
+		// 30 raw, 600, 7200, 21600
+		// 60 raw, 600, 7200, 21600
+	}
+	for i, ac := range input {
+		out, err := alignRequests(ac.reqs, ac.ramSpan, ac.aggSettings)
+		if err != ac.outErr {
+			t.Fatalf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
+		}
+		if len(out) != len(ac.outReqs) {
+			t.Fatalf("different amount of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
+		} else {
+			for r, exp := range ac.outReqs {
+				if exp != out[r] {
+					t.Fatalf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
+				}
+			}
+		}
+	}
 }
