@@ -49,7 +49,8 @@ var es *elastigo.Conn
 var Indexer *elastigo.BulkIndexer
 var IndexName = "metric"
 
-func InitElasticsearch(addr, user, pass string) error {
+func InitElasticsearch(addr, user, pass, indexName string) error {
+	IndexName = indexName
 	es = elastigo.NewConn()
 	parts := strings.Split(addr, ":")
 	if len(parts) != 2 {
