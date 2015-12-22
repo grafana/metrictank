@@ -148,10 +148,10 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 			row_key = fmt.Sprintf("%s_%d", key, month/month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? ORDER BY ts ASC", row_key, start)
+				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
+				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
 			} else {
 				// we want all columns
 				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
