@@ -148,10 +148,10 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 			row_key = fmt.Sprintf("%s_%d", key, month/month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? ORDER BY ts ASC", row_key, start)
+				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts < ? ORDER BY ts ASC", row_key, end)
+				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
 			} else {
 				// we want all columns
 				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
@@ -186,12 +186,16 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 				log.Error(3, err.Error())
 				return iters, err
 			}
+			startByte := 1
 			if Format(b[0]) != FormatStandardGoTsz {
-				err := errors.New("unrecognized chunk format in cassandra")
-				log.Error(3, err.Error())
-				return iters, err
+				// Production currently has a few weeks of data that does not have
+				// a format byte.  In 1 month (20th Jan 2016), this can be removed.
+				//err := errors.New("unrecognized chunk format in cassandra")
+				//log.Error(3, err.Error())
+				//return iters, err
+				startByte = 0
 			}
-			iter, err := tsz.NewIterator(b[1:])
+			iter, err := tsz.NewIterator(b[startByte:])
 			if err != nil {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err

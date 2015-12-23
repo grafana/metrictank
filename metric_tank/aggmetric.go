@@ -82,8 +82,8 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32
 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32) {
-	a.RLock()
-	defer a.RUnlock()
+	a.Lock()
+	defer a.Unlock()
 	chunk := a.getChunkByT0(ts)
 	if chunk != nil {
 		log.Debug("marking chunk %s:%d as saved.", a.Key, chunk.T0)
@@ -107,6 +107,11 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 
 	// requested Chunk is not in our dataset.
 	if ts > currentT0 {
+		return nil
+	}
+
+	// requested Chunk is not in our dataset.
+	if len(a.Chunks) == 1 {
 		return nil
 	}
 
@@ -364,6 +369,12 @@ func (a *AggMetric) persist(pos int) {
 			previousPos += len(a.Chunks)
 		}
 		previousChunk = a.Chunks[previousPos]
+	}
+
+	if len(pending) > cap(a.writeQueue) {
+		// this can lead to a deadlock. so lets just write what we
+		// can and handle the rest next time.
+		pending = pending[len(pending)-cap(a.writeQueue):]
 	}
 
 	log.Debug("sending %d chunks to write queue", len(pending))

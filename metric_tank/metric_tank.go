@@ -48,7 +48,9 @@ var (
 
 	listenAddr = flag.String("listen", ":6060", "http listener address.")
 	redisAddr  = flag.String("redis-addr", "localhost:6379", "redis address")
+	redisDB    = flag.Int("redis-db", 0, "Redis DB number.")
 	esAddr     = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
+	indexName  = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
@@ -164,12 +166,12 @@ func main() {
 		*cassandraAddrs = "localhost"
 	}
 
-	err = metricdef.InitRedis(*redisAddr, "", "")
+	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
 	if err != nil {
 		log.Fatal(4, "failed to initialize redis. %s", err)
 	}
 
-	err = metricdef.InitElasticsearch(*esAddr, "", "")
+	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}

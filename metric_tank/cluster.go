@@ -154,7 +154,7 @@ func InitCluster(metrics Metrics, stats met.Backend) {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 	handler := NewMetricPersistHandler(metrics)
-	consumer.AddHandler(handler)
+	consumer.AddConcurrentHandlers(handler, 2)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
 	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
