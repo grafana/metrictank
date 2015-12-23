@@ -56,8 +56,9 @@ var warmUpDuration = 1800
 var warmUpPercent = 1
 var startTime time.Time
 
-func InitElasticsearch(addr, user, pass, indexName string) error {
+func InitElasticsearch(addr, user, pass, indexName string, warmupPct int) error {
 	IndexName = indexName
+	warmUpPercent = warmupPct
 	startTime = time.Now()
 	rand.Seed(startTime.Unix())
 
@@ -241,7 +242,7 @@ func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 		}
 		return def, nil
 	}
-	if time.Since(startTime) < (time.Duration(warmUpDuration) * time.Second) {
+	if time.Since(startTime) < (time.Duration(warmUpDuration)*time.Second) && warmUpPercent != 100 {
 		// we are in our warmup period.
 		return nil, fmt.Errorf("record not found")
 	}
