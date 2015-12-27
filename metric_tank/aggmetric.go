@@ -161,7 +161,7 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 	} else {
 		// we need to check older chunks
 		oldestT0 := a.Chunks[oldestPos].T0
-		for c.T0 >= oldestT0 {
+		for c.T0 >= oldestT0 && c.TO < currentT0 {
 			guess -= 1
 			if guess < 0 {
 				guess += numChunks
