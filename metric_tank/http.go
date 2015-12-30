@@ -89,7 +89,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	}
 
 	reqs := make([]Req, len(targets))
-	for _, target := range targets {
+	for i, target := range targets {
 		var consolidateBy string
 		id := target
 		// yes, i am aware of the arguably grossness of the below.
@@ -129,7 +129,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			return
 		}
 		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
-		reqs = append(reqs, req)
+		reqs[i] = req
 	}
 	err = findMetricsForRequests(reqs, metaCache)
 	if err != nil {
