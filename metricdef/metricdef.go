@@ -56,8 +56,9 @@ var warmUpDuration = 1800
 var warmUpPercent = 1
 var startTime time.Time
 
-func InitElasticsearch(addr, user, pass, indexName string) error {
+func InitElasticsearch(addr, user, pass, indexName string, warmupPct int) error {
 	IndexName = indexName
+	warmUpPercent = warmupPct
 	startTime = time.Now()
 	rand.Seed(startTime.Unix())
 
@@ -226,7 +227,12 @@ func indexMetric(m *schema.MetricDefinition) error {
 	return nil
 }
 
+// TODO: differentiate between record not found and error, so we can bubble up
+// the right thing towards the user.
 func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
+	if id == "" {
+		panic("key cant be empty string.")
+	}
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
 		log.Error(3, "The redis client bombed: %s", err)
@@ -239,7 +245,7 @@ func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 		}
 		return def, nil
 	}
-	if time.Since(startTime) < (time.Duration(warmUpDuration) * time.Second) {
+	if time.Since(startTime) < (time.Duration(warmUpDuration)*time.Second) && warmUpPercent != 100 {
 		// we are in our warmup period.
 		return nil, fmt.Errorf("record not found")
 	}

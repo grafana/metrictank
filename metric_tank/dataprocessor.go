@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"math"
 	"runtime"
-	"sort"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -27,6 +27,63 @@ func doRecover(errp *error) {
 	return
 }
 
+// fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
+// graphite does this quantization before storing, we may want to do that as well at some point
+// note: values are quantized to the right because we can't lie about the future:
+// e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
+// values to earlier in time.
+func fix(in []Point, from, to, interval uint32) []Point {
+	out := make([]Point, 0, len(in))
+
+	// first point should be the first point at or after from that divides by interval
+	start := from
+	remain := from % interval
+	if remain != 0 {
+		start = from + interval - remain
+	}
+
+	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
+	lastPoint := (to - 1) - ((to - 1) % interval)
+
+	for t, i := start, 0; t <= lastPoint; t += interval {
+
+		// input is out of values. add a null
+		if i >= len(in) {
+			out = append(out, Point{math.NaN(), t})
+			continue
+		}
+
+		p := in[i]
+		if p.Ts == t {
+			// point has perfect ts, use it and move on to next point
+			out = append(out, p)
+			i++
+		} else if p.Ts > t {
+			// point is too recent, append a null and reconsider same point for next slot
+			out = append(out, Point{math.NaN(), t})
+		} else if p.Ts > t-interval && p.Ts < t {
+			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
+			out = append(out, Point{p.Val, t})
+			i++
+		} else if p.Ts <= t-interval {
+			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
+			// if those considerations are any of the above ones.
+			// if the last point would end up in this branch again, discard it as well.
+			for p.Ts <= t-interval && i < len(in)-1 {
+				i++
+				p = in[i]
+			}
+			if p.Ts <= t-interval {
+				i++
+			}
+			t -= interval
+		}
+
+	}
+
+	return out
+}
+
 func divide(pointsA, pointsB []Point) []Point {
 	if len(pointsA) != len(pointsB) {
 		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
@@ -39,7 +96,8 @@ func divide(pointsA, pointsB []Point) []Point {
 	return out
 }
 
-func consolidate(in []Point, num int, consolidator consolidation.Consolidator) []Point {
+func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolidator) []Point {
+	num := int(aggNum)
 	aggFunc := consolidation.GetAggFunc(consolidator)
 	buf := make([]float64, num)
 	bufpos := -1
@@ -54,6 +112,7 @@ func consolidate(in []Point, num int, consolidator consolidation.Consolidator) [
 		if bufpos == num-1 {
 			points = append(points, Point{aggFunc(buf), p.Ts})
 		}
+
 	}
 	if bufpos != -1 && bufpos < num-1 {
 		// we have an incomplete buf of some points that didn't get aggregated yet
@@ -79,112 +138,94 @@ func aggEvery(numPoints, maxPoints uint32) int {
 	return int((numPoints + maxPoints - 1) / maxPoints)
 }
 
-type planOption struct {
-	archive  string
-	interval uint32
-	intestim bool
-	points   uint32
-	comment  string
-}
-
-type plan []planOption
-
-func (a plan) Len() int           { return len(a) }
-func (a plan) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a plan) Less(i, j int) bool { return a[i].points > a[j].points }
-
-func getTarget(req Req, aggSettings []aggSetting, metaCache *MetaCache) (points []Point, err error) {
+func getTarget(req Req) (points []Point, interval uint32, err error) {
 	defer doRecover(&err)
-	archive := -1 // -1 means original data, 0 last agg level, 1 2nd last, etc.
 
-	p := make([]planOption, len(aggSettings)+1)
-	guess := false
-
-	// note: the metacache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
-	// and we assume we can use that interval through history.
-	// TODO: no support for interval changes, metrics not seen yet, missing datablocks, ...
-	meta := metaCache.Get(req.key)
-	interval := uint32(meta.interval)
-
-	// we don't have the data yet, let's assume the interval is 10 seconds
-	if interval == 0 {
-		guess = true
-		interval = 10
-	}
-	numPoints := (req.to - req.from) / interval
-
-	p[0] = planOption{"raw", interval, guess, numPoints, ""}
-
-	aggs := aggSettingsSpanDesc(aggSettings)
-	sort.Sort(aggs)
-	finished := false
-	for i, aggSetting := range aggs {
-		numPointsHere := (req.to - req.from) / aggSetting.span
-		p[i+1] = planOption{fmt.Sprintf("agg %d", i), aggSetting.span, false, numPointsHere, ""}
-		if numPointsHere >= req.minPoints && !finished {
-			archive = i
-			interval = aggSetting.span
-			numPoints = numPointsHere
-			finished = true
-		}
-	}
-
-	p[archive+1].comment = "<-- chosen"
-
-	// note, it should always be safe to dynamically switch on/off consolidation based on how well our data stacks up against the request
-	// i.e. whether your data got consolidated or not, it should be pretty equivalent.
-	// for that reason, stdev should not be done as a consolidation. but sos is still useful for when we explicitly (and always, not optionally) want the stdev.
-
-	readConsolidated := (archive != -1)                 // do we need to read from a downsampled series?
-	runtimeConsolidation := (numPoints > req.maxPoints) // do we need to compress any points at runtime?
+	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
+	runtimeConsolidation := req.aggNum > 1 // do we need to compress any points at runtime?
 
 	log.Debug("getTarget()         %s", req)
 	log.Debug("type   interval   points")
-	sortedPlan := plan(p)
-	sort.Sort(sortedPlan)
-	for _, opt := range p {
-		iStr := fmt.Sprintf("%d", opt.interval)
-		if opt.intestim {
-			iStr = fmt.Sprintf("%d (guess)", opt.interval)
-		}
-		log.Debug("%-6s %-10s %-6d %s", opt.archive, iStr, opt.points, opt.comment)
+
+	if runtimeConsolidation {
+		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", req.aggNum, req.outInterval)
+	} else {
+		log.Debug("runtimeConsolidation: false. output interval: %d", req.outInterval)
 	}
-	log.Debug("runtimeConsolidation: %t", runtimeConsolidation)
 
 	if !readConsolidated && !runtimeConsolidation {
-		return getSeries(req.key, consolidation.None, 0, req.from, req.to), nil
+		return fix(
+			getSeries(req.key, consolidation.None, 0, req.from, req.to),
+			req.from,
+			req.to,
+			req.archInterval,
+		), req.outInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
-			getSeries(req.key, consolidation.None, 0, req.from, req.to),
-			aggEvery(numPoints, req.maxPoints),
-			req.consolidator), nil
+			fix(
+				getSeries(req.key, consolidation.None, 0, req.from, req.to),
+				req.from,
+				req.to,
+				req.archInterval,
+			),
+			req.aggNum,
+			req.consolidator), req.outInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.consolidator == consolidation.Avg {
 			return divide(
-				getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
-				getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
-			), nil
+				fix(
+					getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
+					req.from,
+					req.to,
+					req.archInterval,
+				),
+				fix(
+					getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
+					req.from,
+					req.to,
+					req.archInterval,
+				),
+			), req.outInterval, nil
 		} else {
-			return getSeries(req.key, req.consolidator, interval, req.from, req.to), nil
+			return fix(
+				getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
+				req.from,
+				req.to,
+				req.archInterval,
+			), req.outInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
-		aggNum := aggEvery(numPoints, req.maxPoints)
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
-					getSeries(req.key, consolidation.Sum, interval, req.from, req.to),
-					aggNum,
+					fix(
+						getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
+						req.from,
+						req.to,
+						req.archInterval,
+					),
+					req.aggNum,
 					consolidation.Sum),
 				consolidate(
-					getSeries(req.key, consolidation.Cnt, interval, req.from, req.to),
-					aggNum,
-					consolidation.Cnt),
-			), nil
+					fix(
+						getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
+						req.from,
+						req.to,
+						req.archInterval,
+					),
+					req.aggNum,
+					consolidation.Sum),
+			), req.outInterval, nil
 		} else {
 			return consolidate(
-				getSeries(req.key, req.consolidator, interval, req.from, req.to),
-				aggNum, req.consolidator), nil
+				fix(
+					getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
+					req.from,
+					req.to,
+					req.archInterval,
+				),
+				req.aggNum, req.consolidator), req.outInterval, nil
 		}
 	}
 }

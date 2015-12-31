@@ -21,6 +21,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/rakyll/globalconf"
 )
 
@@ -45,7 +46,12 @@ var (
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
-	listenAddr = flag.String("listen", ":6060", "http listener address.")
+	listenAddr      = flag.String("listen", ":6060", "http listener address.")
+	redisAddr       = flag.String("redis-addr", "localhost:6379", "redis address")
+	redisDB         = flag.Int("redis-db", 0, "Redis DB number.")
+	esAddr          = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
+	indexName       = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
+	esWarmupPercent = flag.Int("elastic-warmup-pct", 1, "how much % of metrics to index into ES during the warmup period")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
@@ -80,6 +86,8 @@ var chunkCreate met.Count
 var chunkClear met.Count
 var chunkSaveOk met.Count
 var chunkSaveFail met.Count
+var metricMetaCacheHit met.Count
+var metricMetaCacheMiss met.Count
 var metricsReceived met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
@@ -94,6 +102,7 @@ var reqHandleDuration met.Timer
 var cassandraPutDuration met.Timer
 var cassandraBlockDuration met.Timer
 var cassandraGetDuration met.Timer
+var metricMetaGetDuration met.Timer
 var inItems met.Meter
 var points met.Gauge
 var msgsHandleOK met.Count
@@ -102,6 +111,9 @@ var alloc met.Gauge
 var totalAlloc met.Gauge
 var sysBytes met.Gauge
 var metricsActive met.Gauge
+var metricsToEsOK met.Count
+var metricsToEsFail met.Count
+var esPutDuration met.Timer
 
 func main() {
 	startupTime = time.Now()
@@ -153,6 +165,16 @@ func main() {
 	// set default cassandra address if none is set.
 	if *cassandraAddrs == "" {
 		*cassandraAddrs = "localhost"
+	}
+
+	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
+	if err != nil {
+		log.Fatal(4, "failed to initialize redis. %s", err)
+	}
+
+	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName, *esWarmupPercent)
+	if err != nil {
+		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -239,20 +261,10 @@ func main() {
 		if err != nil {
 			log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 		}
-		log.Info("consumer connected to nsqlookud")
+		log.Info("consumer connected to nsqlookupd")
 	}()
 
 	InitCluster(metrics, stats)
-
-	go func() {
-		m := &runtime.MemStats{}
-		for range time.Tick(time.Duration(1) * time.Second) {
-			runtime.ReadMemStats(m)
-			alloc.Value(int64(m.Alloc))
-			totalAlloc.Value(int64(m.TotalAlloc))
-			sysBytes.Value(int64(m.Sys))
-		}
-	}()
 
 	go func() {
 		http.HandleFunc("/", appStatus)
@@ -267,6 +279,7 @@ func main() {
 		case <-consumer.StopChan:
 			log.Info("closing cassandra session.")
 			cSession.Close()
+			metricdef.Indexer.Stop()
 			log.Info("terminating.")
 			log.Close()
 			return
@@ -286,6 +299,8 @@ func initMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
+	metricMetaCacheHit = stats.NewCount("metricmeta_cache.hit")
+	metricMetaCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
@@ -298,6 +313,7 @@ func initMetrics(stats met.Backend) {
 	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
 	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
+	metricMetaGetDuration = stats.NewTimer("metricmeta_cache_lookup_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")
@@ -306,16 +322,24 @@ func initMetrics(stats met.Backend) {
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
 	metricsActive = stats.NewGauge("metrics_active", 0)
+	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
+	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	esPutDuration = stats.NewTimer("es_put_duration", 0)
 
 	// run a collector for some global stats
 	go func() {
 		currentPoints := 0
+		m := &runtime.MemStats{}
 
 		ticker := time.Tick(time.Duration(1) * time.Second)
 		for {
 			select {
 			case <-ticker:
 				points.Value(int64(currentPoints))
+				runtime.ReadMemStats(m)
+				alloc.Value(int64(m.Alloc))
+				totalAlloc.Value(int64(m.TotalAlloc))
+				sysBytes.Value(int64(m.Sys))
 			case update := <-totalPoints:
 				currentPoints += update
 			}

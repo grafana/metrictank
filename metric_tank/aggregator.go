@@ -9,11 +9,11 @@ type aggSetting struct {
 	numChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
 }
 
-type aggSettingsSpanDesc []aggSetting
+type aggSettingsSpanAsc []aggSetting
 
-func (a aggSettingsSpanDesc) Len() int           { return len(a) }
-func (a aggSettingsSpanDesc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a aggSettingsSpanDesc) Less(i, j int) bool { return a[i].span > a[j].span }
+func (a aggSettingsSpanAsc) Len() int           { return len(a) }
+func (a aggSettingsSpanAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a aggSettingsSpanAsc) Less(i, j int) bool { return a[i].span < a[j].span }
 
 // see description for Aggregator and unit tests
 func aggBoundary(ts uint32, span uint32) uint32 {

@@ -36,6 +36,7 @@ func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, m
 		maxDirtyChunks: maxDirtyChunks,
 	}
 
+	go ms.stats()
 	go ms.GC()
 	return &ms
 }
@@ -65,10 +66,20 @@ func (ms *AggMetrics) GC() {
 			ms.RUnlock()
 			if stale := a.GC(chunkMinTs, metricMinTs); stale {
 				log.Info("metric %s is stale. Purging data from memory.", key)
+				ms.Lock()
 				delete(ms.Metrics, key)
+				ms.Unlock()
 			}
 		}
 
+	}
+}
+
+func (ms *AggMetrics) stats() {
+	for range time.Tick(time.Duration(1) * time.Second) {
+		ms.RLock()
+		metricsActive.Value(int64(len(ms.Metrics)))
+		ms.RUnlock()
 	}
 }
 
@@ -88,4 +99,11 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	}
 	ms.Unlock()
 	return m
+}
+
+// returns the minimum span of data we'll always have in RAM (assuming data has been loaded)
+func (ms *AggMetrics) MinSpan() uint32 {
+	ms.RLock()
+	defer ms.RUnlock()
+	return ms.chunkSpan * (ms.numChunks - 1)
 }

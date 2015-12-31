@@ -28,6 +28,7 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 type Series struct {
 	Target     string
 	Datapoints []Point
+	Interval   uint32
 }
 
 func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
@@ -87,7 +88,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		return
 	}
 
-	out := make([]Series, len(targets))
+	reqs := make([]Req, len(targets))
 	for i, target := range targets {
 		var consolidateBy string
 		id := target
@@ -127,10 +128,25 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
 			return
 		}
-		log.Debug("===================================")
 		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		reqs[i] = req
+	}
+	err = findMetricsForRequests(reqs, metaCache)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	reqs, err = alignRequests(reqs, metrics.MinSpan(), aggSettings)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]Series, len(reqs))
+	for i, req := range reqs {
+		log.Debug("===================================")
 		log.Debug("HTTP Get()          %s", req)
-		points, err := getTarget(req, aggSettings, metaCache)
+		points, interval, err := getTarget(req)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -138,8 +154,9 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		}
 
 		out[i] = Series{
-			Target:     target,
+			Target:     targets[i],
 			Datapoints: points,
+			Interval:   interval,
 		}
 	}
 	js, err := json.Marshal(out)

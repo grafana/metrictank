@@ -57,6 +57,7 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 		e("querying graphite: %v", err)
 		return
 	}
+	interval := 600 // we request 24h worth of data. returned data will be consolidated.
 	for _, serie := range series {
 		if met.def.Name != serie.Target {
 			e("%v : bad target name %v", met.def.Name, serie.Target)
@@ -78,8 +79,8 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 			if lastTs == 0 && (ts < curTs-24*3600-60 || ts > curTs-24*3600+60) {
 				e("%v first point %q should have been about 24h ago, i.e. around %d", met.def.Name, p, curTs-24*3600)
 			}
-			if lastTs != 0 && ts != lastTs+int64(met.def.Interval) {
-				e("%v point %v is not interval %v apart from previous point", met.def.Name, p, met.def.Interval)
+			if lastTs != 0 && ts != lastTs+int64(interval) {
+				e("%v point %v is not interval %v apart from previous point", met.def.Name, p, interval)
 			}
 			_, err = p[0].Float64()
 			if err != nil && ts > met.firstSeen {
@@ -96,12 +97,12 @@ func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
 			}
 			lastTs = ts
 		}
-		if lastTs < curTs-int64(met.def.Interval) || lastTs > curTs+int64(met.def.Interval) {
-			e("%v : last point at %d is out of range. should have been around %d (now) +- %d", met.def.Name, lastTs, curTs, met.def.Interval)
+		if lastTs < curTs-int64(interval) || lastTs > curTs+int64(interval) {
+			e("%v : last point at %d is out of range. should have been around %d (now) +- %d", met.def.Name, lastTs, curTs, interval)
 		}
 		// if there was no null, we treat the point after the last one we had as null
 		if oldestNull == math.MaxInt64 {
-			oldestNull = lastTs + int64(met.def.Interval)
+			oldestNull = lastTs + int64(interval)
 		}
 		// lag cannot be < 0
 		if oldestNull > curTs {
