@@ -112,6 +112,7 @@ func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolida
 		if bufpos == num-1 {
 			points = append(points, Point{aggFunc(buf), p.Ts})
 		}
+
 	}
 	if bufpos != -1 && bufpos < num-1 {
 		// we have an incomplete buf of some points that didn't get aggregated yet
@@ -214,7 +215,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 						req.archInterval,
 					),
 					req.aggNum,
-					consolidation.Cnt),
+					consolidation.Sum),
 			), req.outInterval, nil
 		} else {
 			return consolidate(
