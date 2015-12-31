@@ -45,7 +45,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
 
 	maxDataPoints := uint32(800)
-	minDataPoints := uint32(0)
+	minDataPoints := uint32(1)
 	maxDataPointsStr := values.Get("maxDataPoints")
 	var err error
 	if maxDataPointsStr != "" {
