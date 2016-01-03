@@ -390,25 +390,6 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
-		// same but with much lower minDataPoints so now the archives both fit, and the 2nd one can do it with least points and least points from cassandra
-		{
-			[]Req{
-				reqRaw("a", 0, 3600, 20, 800, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600, 20, 800, consolidation.Avg, 10),
-				reqRaw("c", 0, 3600, 20, 800, consolidation.Avg, 10),
-			},
-			2400,
-			[]aggSetting{
-				{60, 600, 2},
-				{120, 600, 1},
-			},
-			[]Req{
-				reqOut("a", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-				reqOut("b", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-				reqOut("c", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-			},
-			nil,
-		},
 		{ // now we request 0-2400, with max datapoints 100. raw can satisfy this from RAM, using some runtime consolidation,
 			// but that's much better than going to cassandra and using any of the other archives
 			[]Req{
@@ -451,7 +432,6 @@ func TestAlignRequests(t *testing.T) {
 		},
 		// same thing as above, but now we set max points to 39, which means at step of 60 is just not going to work
 		// the next best thing (the only one actually) that works is the 1st aggregation at 120 points, for all of em.
-		// but since all data is RAM and we can avoid a cassandra lookup, it'll do it through runtime consolidation
 		{
 			[]Req{
 				reqRaw("a", 0, 2400, 20, 39, consolidation.Avg, 10),
@@ -464,9 +444,9 @@ func TestAlignRequests(t *testing.T) {
 				{600, 600, 2},
 			},
 			[]Req{
-				reqOut("a", 0, 2400, 20, 39, consolidation.Avg, 10, 0, 10, 120, 12),
-				reqOut("b", 0, 2400, 20, 39, consolidation.Avg, 30, 0, 30, 120, 4),
-				reqOut("c", 0, 2400, 20, 39, consolidation.Avg, 60, 0, 60, 120, 2),
+				reqOut("a", 0, 2400, 20, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("b", 0, 2400, 20, 39, consolidation.Avg, 30, 1, 120, 120, 1),
+				reqOut("c", 0, 2400, 20, 39, consolidation.Avg, 60, 1, 120, 120, 1),
 			},
 			nil,
 		},
