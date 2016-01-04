@@ -388,8 +388,11 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
-		{ // now we request 0-2400, with max datapoints 100. raw can satisfy this from RAM, using some runtime consolidation,
-			// but that's much better than going to cassandra and using any of the other archives
+		{ // now we request 0-2400, with max datapoints 100.
+			// raw would provide 240pts, so runtime consolidation would be needed.
+			// 60s rollups would provide 40pts which is a good candidate.
+			// however 40pts is 2.5x smaller then the target 100pts and 240pts is
+			// only 2.4x larger then the target 100pts, so it is selected.
 			[]Req{
 				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
 				reqRaw("b", 0, 2400, 100, consolidation.Avg, 10),
@@ -406,8 +409,29 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
+		// same thing as above, but now we set max points to 39. So now the 240pts
+		// provided by raw is 6.15x our target of 39pts. But our the 20pts provided
+		// by our 120s rollups is only 1.95x smaller then our target 39pts so it is
+		// selected.
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("c", 0, 2400, 39, consolidation.Avg, 10),
+			},
+			[]aggSetting{
+				{120, 600, 2},
+				{600, 600, 2},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("b", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("c", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+			},
+			nil,
+		},
 		// now something a bit different. 3 different raw intervals, but same aggregation settings.
-		// raw is here best again cause it can all be served from ram. but all series need to be at a step of 60
+		// raw is here best again but all series need to be at a step of 60
 		// so runtime consolidation is needed, we'll get 40 points for each metric
 		{
 			[]Req{
@@ -426,22 +450,64 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
-		// same thing as above, but now we set max points to 39, which means at step of 60 is just not going to work
-		// the next best thing (the only one actually) that works is the 1st aggregation at 120 points, for all of em.
+
+		// Similar to above with 3 different raw intervals, but these raw intervals
+		// require a little more calculation to get the minimum interval they all fit into.
+		// because the minimum interval that they all fit into (300) is greater then the
+		// 120second rollup data, the rollups is a better choice.
 		{
 			[]Req{
-				reqRaw("a", 0, 2400, 39, consolidation.Avg, 10),
-				reqRaw("b", 0, 2400, 39, consolidation.Avg, 30),
-				reqRaw("c", 0, 2400, 39, consolidation.Avg, 60),
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
 				{120, 600, 2},
 				{600, 600, 2},
 			},
 			[]Req{
-				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
-				reqOut("b", 0, 2400, 39, consolidation.Avg, 30, 1, 120, 120, 1),
-				reqOut("c", 0, 2400, 39, consolidation.Avg, 60, 1, 120, 120, 1),
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 1, 120, 120, 1),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 1, 120, 120, 1),
+			},
+			nil,
+		},
+		// again with 3 different raw intervals that have a large common interval.
+		// With this test, our common raw interval matches our first rollup. Runtime consolidation is expensive
+		// so we preference the rollup data.
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{300, 600, 2},
+				{600, 600, 2},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 300, 300, 1),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 1, 300, 300, 1),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 1, 300, 300, 1),
+			},
+			nil,
+		},
+		// again with 3 different raw intervals that have a large common interval.
+		// With this test, our common raw interval is less then our first rollup so is selected.
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{600, 600, 2},
+				{1200, 1200, 2},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 300, 30),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 0, 50, 300, 6),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 0, 60, 300, 5),
 			},
 			nil,
 		},
