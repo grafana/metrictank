@@ -24,19 +24,6 @@ func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 
-// provides exact execution details for each request, as well as a cost of executing everything
-type solution struct {
-	reqs []Req
-	cost uint32
-}
-
-func NewSolution() *solution {
-	return &solution{
-		make([]Req, 0),
-		0,
-	}
-}
-
 func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
 	for i := range reqs {
 		err := metaCache.UpdateReq(&reqs[i])
@@ -50,8 +37,8 @@ func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // for all requests, sets archive, numPoints, interval (and rawInterval as a side effect)
-// note: it is assumed that all requests have the same from, to, minDataPoints and maxdatapoints!
-func alignRequests(reqs []Req, ramSpan uint32, aggSettings []aggSetting) ([]Req, error) {
+// note: it is assumed that all requests have the same from, to and maxdatapoints!
+func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
