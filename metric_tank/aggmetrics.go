@@ -100,10 +100,3 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Unlock()
 	return m
 }
-
-// returns the minimum span of data we'll always have in RAM (assuming data has been loaded)
-func (ms *AggMetrics) MinSpan() uint32 {
-	ms.RLock()
-	defer ms.RUnlock()
-	return ms.chunkSpan * (ms.numChunks - 1)
-}
