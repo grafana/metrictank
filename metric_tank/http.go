@@ -45,7 +45,6 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
 
 	maxDataPoints := uint32(800)
-	minDataPoints := uint32(1)
 	maxDataPointsStr := values.Get("maxDataPoints")
 	var err error
 	if maxDataPointsStr != "" {
@@ -55,7 +54,6 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			return
 		}
 		maxDataPoints = uint32(tmp)
-		minDataPoints = maxDataPoints / 10
 	}
 
 	targets, ok := values["target"]
@@ -129,7 +127,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
 			return
 		}
-		req := NewReq(id, fromUnix, toUnix, minDataPoints, maxDataPoints, consolidator)
+		req := NewReq(id, fromUnix, toUnix, maxDataPoints, consolidator)
 		reqs[i] = req
 	}
 	err = findMetricsForRequests(reqs, metaCache)
@@ -137,7 +135,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	reqs, err = alignRequests(reqs, metrics.MinSpan(), aggSettings)
+	reqs, err = alignRequests(reqs, aggSettings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

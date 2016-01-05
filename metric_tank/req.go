@@ -10,7 +10,6 @@ type Req struct {
 	key          string
 	from         uint32
 	to           uint32
-	minPoints    uint32
 	maxPoints    uint32
 	consolidator consolidation.Consolidator
 
@@ -22,12 +21,11 @@ type Req struct {
 	aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key string, from, to, minPoints, maxPoints uint32, consolidator consolidation.Consolidator) Req {
+func NewReq(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator) Req {
 	return Req{
 		key,
 		from,
 		to,
-		minPoints,
 		maxPoints,
 		consolidator,
 		-1, // this is supposed to be updated still!
@@ -39,10 +37,10 @@ func NewReq(key string, from, to, minPoints, maxPoints uint32, consolidator cons
 }
 
 func (r Req) String() string {
-	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. %d <= points <= %d. %s", r.key, r.from, r.to, TS(r.from), TS(r.to), r.to-r.from-1, r.minPoints, r.maxPoints, r.consolidator)
+	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s", r.key, r.from, r.to, TS(r.from), TS(r.to), r.to-r.from-1, r.maxPoints, r.consolidator)
 }
 
 func (r Req) DebugString() string {
-	return fmt.Sprintf("%s %d - %d . %d <= points <= %d. %s - archive %d, rawInt %d, archInt %d, outInt %d, aggNum %d",
-		r.key, r.from, r.to, r.minPoints, r.maxPoints, r.consolidator, r.archive, r.rawInterval, r.archInterval, r.outInterval, r.aggNum)
+	return fmt.Sprintf("%s %d - %d . points <= %d. %s - archive %d, rawInt %d, archInt %d, outInt %d, aggNum %d",
+		r.key, r.from, r.to, r.maxPoints, r.consolidator, r.archive, r.rawInterval, r.archInterval, r.outInterval, r.aggNum)
 }

@@ -343,19 +343,18 @@ func TestFix(t *testing.T) {
 
 type alignCase struct {
 	reqs        []Req
-	ramSpan     uint32
 	aggSettings []aggSetting
 	outReqs     []Req
 	outErr      error
 }
 
-func reqRaw(key string, from, to, minPoints, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32) Req {
-	req := NewReq(key, from, to, minPoints, maxPoints, consolidator)
+func reqRaw(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32) Req {
+	req := NewReq(key, from, to, maxPoints, consolidator)
 	req.rawInterval = rawInterval
 	return req
 }
-func reqOut(key string, from, to, minPoints, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32, archive int, archInterval, outInterval, aggNum uint32) Req {
-	req := NewReq(key, from, to, minPoints, maxPoints, consolidator)
+func reqOut(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32, archive int, archInterval, outInterval, aggNum uint32) Req {
+	req := NewReq(key, from, to, maxPoints, consolidator)
 	req.rawInterval = rawInterval
 	req.archive = archive
 	req.archInterval = archInterval
@@ -374,99 +373,141 @@ func TestAlignRequests(t *testing.T) {
 			// 1 agg 2: 3600/120=30 points in total, none in RAM
 			// only raw has enough points
 			[]Req{
-				reqRaw("a", 0, 3600, 100, 800, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600, 100, 800, consolidation.Avg, 10),
-				reqRaw("c", 0, 3600, 100, 800, consolidation.Avg, 10),
+				reqRaw("a", 0, 3600, 800, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600, 800, consolidation.Avg, 10),
+				reqRaw("c", 0, 3600, 800, consolidation.Avg, 10),
 			},
-			2400,
 			[]aggSetting{
 				{60, 600, 2},
 				{120, 600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600, 100, 800, consolidation.Avg, 10, 0, 10, 10, 1),
-				reqOut("b", 0, 3600, 100, 800, consolidation.Avg, 10, 0, 10, 10, 1),
-				reqOut("c", 0, 3600, 100, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+				reqOut("a", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+				reqOut("b", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+				reqOut("c", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
 			},
 			nil,
 		},
-		// same but with much lower minDataPoints so now the archives both fit, and the 2nd one can do it with least points and least points from cassandra
+		{ // now we request 0-2400, with max datapoints 100.
+			// raw would provide 240pts, so runtime consolidation would be needed.
+			// 60s rollups would provide 40pts which is a good candidate.
+			// however 40pts is 2.5x smaller then the target 100pts and 240pts is
+			// only 2.4x larger then the target 100pts, so it is selected.
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 10),
+			},
+			[]aggSetting{
+				{60, 600, 2},
+				{120, 600, 1},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 30, 3),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 30, 3),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 30, 3),
+			},
+			nil,
+		},
+		// same thing as above, but now we set max points to 39. So now the 240pts
+		// provided by raw is 6.15x our target of 39pts. But our the 20pts provided
+		// by our 120s rollups is only 1.95x smaller then our target 39pts so it is
+		// selected.
 		{
 			[]Req{
-				reqRaw("a", 0, 3600, 20, 800, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600, 20, 800, consolidation.Avg, 10),
-				reqRaw("c", 0, 3600, 20, 800, consolidation.Avg, 10),
+				reqRaw("a", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("c", 0, 2400, 39, consolidation.Avg, 10),
 			},
-			2400,
 			[]aggSetting{
-				{60, 600, 2},
-				{120, 600, 1},
+				{120, 600, 2},
+				{600, 600, 2},
 			},
 			[]Req{
-				reqOut("a", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-				reqOut("b", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-				reqOut("c", 0, 3600, 20, 800, consolidation.Avg, 10, 2, 120, 120, 1),
-			},
-			nil,
-		},
-		{ // now we request 0-2400, with max datapoints 100. raw can satisfy this from RAM, using some runtime consolidation,
-			// but that's much better than going to cassandra and using any of the other archives
-			[]Req{
-				reqRaw("a", 0, 2400, 20, 100, consolidation.Avg, 10),
-				reqRaw("b", 0, 2400, 20, 100, consolidation.Avg, 10),
-				reqRaw("c", 0, 2400, 20, 100, consolidation.Avg, 10),
-			},
-			2400,
-			[]aggSetting{
-				{60, 600, 2},
-				{120, 600, 1},
-			},
-			[]Req{
-				reqOut("a", 0, 2400, 20, 100, consolidation.Avg, 10, 0, 10, 30, 3),
-				reqOut("b", 0, 2400, 20, 100, consolidation.Avg, 10, 0, 10, 30, 3),
-				reqOut("c", 0, 2400, 20, 100, consolidation.Avg, 10, 0, 10, 30, 3),
+				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("b", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("c", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
 			},
 			nil,
 		},
 		// now something a bit different. 3 different raw intervals, but same aggregation settings.
-		// raw is here best again cause it can all be served from ram. but all series need to be at a step of 60
+		// raw is here best again but all series need to be at a step of 60
 		// so runtime consolidation is needed, we'll get 40 points for each metric
 		{
 			[]Req{
-				reqRaw("a", 0, 2400, 20, 100, consolidation.Avg, 10),
-				reqRaw("b", 0, 2400, 20, 100, consolidation.Avg, 30),
-				reqRaw("c", 0, 2400, 20, 100, consolidation.Avg, 60),
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 30),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
-			2400,
 			[]aggSetting{
 				{120, 600, 2},
 				{600, 600, 2},
 			},
 			[]Req{
-				reqOut("a", 0, 2400, 20, 100, consolidation.Avg, 10, 0, 10, 60, 6),
-				reqOut("b", 0, 2400, 20, 100, consolidation.Avg, 30, 0, 30, 60, 2),
-				reqOut("c", 0, 2400, 20, 100, consolidation.Avg, 60, 0, 60, 60, 1),
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 60, 6),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 30, 0, 30, 60, 2),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 0, 60, 60, 1),
 			},
 			nil,
 		},
-		// same thing as above, but now we set max points to 39, which means at step of 60 is just not going to work
-		// the next best thing (the only one actually) that works is the 1st aggregation at 120 points, for all of em.
-		// but since all data is RAM and we can avoid a cassandra lookup, it'll do it through runtime consolidation
+
+		// Similar to above with 3 different raw intervals, but these raw intervals
+		// require a little more calculation to get the minimum interval they all fit into.
+		// because the minimum interval that they all fit into (300) is greater then the
+		// 120second rollup data, the rollups is a better choice.
 		{
 			[]Req{
-				reqRaw("a", 0, 2400, 20, 39, consolidation.Avg, 10),
-				reqRaw("b", 0, 2400, 20, 39, consolidation.Avg, 30),
-				reqRaw("c", 0, 2400, 20, 39, consolidation.Avg, 60),
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
-			2400,
 			[]aggSetting{
 				{120, 600, 2},
 				{600, 600, 2},
 			},
 			[]Req{
-				reqOut("a", 0, 2400, 20, 39, consolidation.Avg, 10, 0, 10, 120, 12),
-				reqOut("b", 0, 2400, 20, 39, consolidation.Avg, 30, 0, 30, 120, 4),
-				reqOut("c", 0, 2400, 20, 39, consolidation.Avg, 60, 0, 60, 120, 2),
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 120, 120, 1),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 1, 120, 120, 1),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 1, 120, 120, 1),
+			},
+			nil,
+		},
+		// again with 3 different raw intervals that have a large common interval.
+		// With this test, our common raw interval matches our first rollup. Runtime consolidation is expensive
+		// so we preference the rollup data.
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{300, 600, 2},
+				{600, 600, 2},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 300, 300, 1),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 1, 300, 300, 1),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 1, 300, 300, 1),
+			},
+			nil,
+		},
+		// again with 3 different raw intervals that have a large common interval.
+		// With this test, our common raw interval is less then our first rollup so is selected.
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{600, 600, 2},
+				{1200, 1200, 2},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 300, 30),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 0, 50, 300, 6),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 0, 60, 300, 5),
 			},
 			nil,
 		},
@@ -474,20 +515,19 @@ func TestAlignRequests(t *testing.T) {
 		// this should come out of RAM
 		{
 			[]Req{
-				reqRaw("a", 0, 3600*3, 100, 1000, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600*3, 100, 1000, consolidation.Avg, 30),
-				reqRaw("c", 0, 3600*3, 100, 1000, consolidation.Avg, 60),
+				reqRaw("a", 0, 3600*3, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*3, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*3, 1000, consolidation.Avg, 60),
 			},
-			600 * 36, // retain in ram 36 chunks of 10min, i.e. 6h worth of data
 			[]aggSetting{
 				{600, 21600, 1}, // aggregations stored in 6h chunks
 				{7200, 21600, 1},
 				{21600, 21600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600*3, 100, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
-				reqOut("b", 0, 3600*3, 100, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
-				reqOut("c", 0, 3600*3, 100, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
+				reqOut("a", 0, 3600*3, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
+				reqOut("b", 0, 3600*3, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
+				reqOut("c", 0, 3600*3, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
 			},
 			nil,
 		},
@@ -495,20 +535,19 @@ func TestAlignRequests(t *testing.T) {
 		// this should come out of RAM
 		{
 			[]Req{
-				reqRaw("a", 0, 3600*6, 100, 1000, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600*6, 100, 1000, consolidation.Avg, 30),
-				reqRaw("c", 0, 3600*6, 100, 1000, consolidation.Avg, 60),
+				reqRaw("a", 0, 3600*6, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*6, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*6, 1000, consolidation.Avg, 60),
 			},
-			600 * 36, // retain in ram 36 chunks of 10min, i.e. 6h worth of data
 			[]aggSetting{
 				{600, 21600, 1}, // aggregations stored in 6h chunks
 				{7200, 21600, 1},
 				{21600, 21600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600*6, 100, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
-				reqOut("b", 0, 3600*6, 100, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
-				reqOut("c", 0, 3600*6, 100, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
+				reqOut("a", 0, 3600*6, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
+				reqOut("b", 0, 3600*6, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
+				reqOut("c", 0, 3600*6, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
 			},
 			nil,
 		},
@@ -516,20 +555,19 @@ func TestAlignRequests(t *testing.T) {
 		// this should come out of raw archive, mostly out of ram
 		{
 			[]Req{
-				reqRaw("a", 0, 3600*9, 100, 1000, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600*9, 100, 1000, consolidation.Avg, 30),
-				reqRaw("c", 0, 3600*9, 100, 1000, consolidation.Avg, 60),
+				reqRaw("a", 0, 3600*9, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*9, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*9, 1000, consolidation.Avg, 60),
 			},
-			600 * 36, // retain in ram 36 chunks of 10min, i.e. 6h worth of data
 			[]aggSetting{
 				{600, 21600, 1}, // aggregations stored in 6h chunks
 				{7200, 21600, 1},
 				{21600, 21600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600*9, 100, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
-				reqOut("b", 0, 3600*9, 100, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
-				reqOut("c", 0, 3600*9, 100, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
+				reqOut("a", 0, 3600*9, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
+				reqOut("b", 0, 3600*9, 1000, consolidation.Avg, 30, 0, 30, 60, 2),
+				reqOut("c", 0, 3600*9, 1000, consolidation.Avg, 60, 0, 60, 60, 1),
 			},
 			nil,
 		},
@@ -539,20 +577,19 @@ func TestAlignRequests(t *testing.T) {
 		// first agg at 600s step can return 144 points without runtime consolidation, needing 24h of data from c* at 600s, which is the better deal
 		{
 			[]Req{
-				reqRaw("a", 0, 3600*24, 100, 1000, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600*24, 100, 1000, consolidation.Avg, 30),
-				reqRaw("c", 0, 3600*24, 100, 1000, consolidation.Avg, 60),
+				reqRaw("a", 0, 3600*24, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24, 1000, consolidation.Avg, 60),
 			},
-			600 * 36, // retain in ram 36 chunks of 10min, i.e. 6h worth of data
 			[]aggSetting{
 				{600, 21600, 1}, // aggregations stored in 6h chunks
 				{7200, 21600, 1},
 				{21600, 21600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600*24, 100, 1000, consolidation.Avg, 10, 1, 600, 600, 1),
-				reqOut("b", 0, 3600*24, 100, 1000, consolidation.Avg, 30, 1, 600, 600, 1),
-				reqOut("c", 0, 3600*24, 100, 1000, consolidation.Avg, 60, 1, 600, 600, 1),
+				reqOut("a", 0, 3600*24, 1000, consolidation.Avg, 10, 1, 600, 600, 1),
+				reqOut("b", 0, 3600*24, 1000, consolidation.Avg, 30, 1, 600, 600, 1),
+				reqOut("c", 0, 3600*24, 1000, consolidation.Avg, 60, 1, 600, 600, 1),
 			},
 			nil,
 		},
@@ -562,26 +599,25 @@ func TestAlignRequests(t *testing.T) {
 		// 2nd archive can do it in 3600*24*7 / 7200 = 84 points, but that's not enough to satisfy mindatapoints, so we should use first archive + runtime consol
 		{
 			[]Req{
-				reqRaw("a", 0, 3600*24*7, 100, 1000, consolidation.Avg, 10),
-				reqRaw("b", 0, 3600*24*7, 100, 1000, consolidation.Avg, 30),
-				reqRaw("c", 0, 3600*24*7, 100, 1000, consolidation.Avg, 60),
+				reqRaw("a", 0, 3600*24*7, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*7, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 			},
-			600 * 36, // retain in ram 36 chunks of 10min, i.e. 6h worth of data
 			[]aggSetting{
 				{600, 21600, 1}, // aggregations stored in 6h chunks
 				{7200, 21600, 1},
 				{21600, 21600, 1},
 			},
 			[]Req{
-				reqOut("a", 0, 3600*24*7, 100, 1000, consolidation.Avg, 10, 1, 600, 1200, 2),
-				reqOut("b", 0, 3600*24*7, 100, 1000, consolidation.Avg, 30, 1, 600, 1200, 2),
-				reqOut("c", 0, 3600*24*7, 100, 1000, consolidation.Avg, 60, 1, 600, 1200, 2),
+				reqOut("a", 0, 3600*24*7, 1000, consolidation.Avg, 10, 1, 600, 1200, 2),
+				reqOut("b", 0, 3600*24*7, 1000, consolidation.Avg, 30, 1, 600, 1200, 2),
+				reqOut("c", 0, 3600*24*7, 1000, consolidation.Avg, 60, 1, 600, 1200, 2),
 			},
 			nil,
 		},
 	}
 	for i, ac := range input {
-		out, err := alignRequests(ac.reqs, ac.ramSpan, ac.aggSettings)
+		out, err := alignRequests(ac.reqs, ac.aggSettings)
 		if err != ac.outErr {
 			t.Fatalf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
 		}
@@ -602,9 +638,9 @@ var result []Req
 func BenchmarkAlignRequests(b *testing.B) {
 	var res []Req
 	reqs := []Req{
-		reqRaw("a", 0, 3600*24*7, 100, 1000, consolidation.Avg, 10),
-		reqRaw("b", 0, 3600*24*7, 100, 1000, consolidation.Avg, 30),
-		reqRaw("c", 0, 3600*24*7, 100, 1000, consolidation.Avg, 60),
+		reqRaw("a", 0, 3600*24*7, 1000, consolidation.Avg, 10),
+		reqRaw("b", 0, 3600*24*7, 1000, consolidation.Avg, 30),
+		reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 	}
 	aggSettings := []aggSetting{
 		{600, 21600, 1},
@@ -613,7 +649,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		res, _ = alignRequests(reqs, 21600, aggSettings)
+		res, _ = alignRequests(reqs, aggSettings)
 	}
 	result = res
 }
