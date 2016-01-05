@@ -150,6 +150,7 @@ func TestAggMetric(t *testing.T) {
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
+	clusterStatus = NewClusterStatus("default", false)
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
 	chunkSpan := uint32(2 * 3600)
@@ -175,6 +176,134 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
+			m := metrics.GetOrCreate(keys[metricI])
+			m.Add(t, float64(t))
+		}
+	}
+}
+
+func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
+	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	initMetrics(stats)
+
+	chunkSpan := uint32(600)
+	numChunks := uint32(5)
+	chunkMaxStale := uint32(3600)
+	metricMaxStale := uint32(21600)
+
+	*topicNotifyPersist = ""
+	*cassandraWriteConcurrency = b.N
+	clusterStatus = NewClusterStatus("default", true)
+	CassandraWriteQueue = make(chan *ChunkWriteRequest, 1000)
+	for i := 0; i < b.N; i++ {
+		go processWriteQueue()
+	}
+
+	ttl := uint32(84600)
+	aggSettings := []aggSetting{
+		{
+			span:      uint32(300),
+			chunkSpan: uint32(24 * 3600),
+			numChunks: uint32(2),
+		},
+	}
+
+	keys := make([]string, 1000)
+	for i := 0; i < 1000; i++ {
+		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	}
+
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+
+	maxT := uint32(1200)
+	for t := uint32(1); t < maxT; t += 10 {
+		for metricI := 0; metricI < 1000; metricI++ {
+			m := metrics.GetOrCreate(keys[metricI])
+			m.Add(t, float64(t))
+		}
+	}
+}
+
+func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
+	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	initMetrics(stats)
+
+	chunkSpan := uint32(600)
+	numChunks := uint32(5)
+	chunkMaxStale := uint32(3600)
+	metricMaxStale := uint32(21600)
+
+	*topicNotifyPersist = ""
+	*cassandraWriteConcurrency = b.N
+
+	clusterStatus = NewClusterStatus("default", true)
+	CassandraWriteQueue = make(chan *ChunkWriteRequest, 10000)
+	for i := 0; i < b.N; i++ {
+		go processWriteQueue()
+	}
+
+	ttl := uint32(84600)
+	aggSettings := []aggSetting{
+		{
+			span:      uint32(300),
+			chunkSpan: uint32(24 * 3600),
+			numChunks: uint32(2),
+		},
+	}
+
+	keys := make([]string, 10000)
+	for i := 0; i < 10000; i++ {
+		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	}
+
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+
+	maxT := uint32(1200)
+	for t := uint32(1); t < maxT; t += 10 {
+		for metricI := 0; metricI < 10000; metricI++ {
+			m := metrics.GetOrCreate(keys[metricI])
+			m.Add(t, float64(t))
+		}
+	}
+}
+
+func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
+	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	initMetrics(stats)
+
+	chunkSpan := uint32(600)
+	numChunks := uint32(5)
+	chunkMaxStale := uint32(3600)
+	metricMaxStale := uint32(21600)
+
+	*topicNotifyPersist = ""
+	*cassandraWriteConcurrency = b.N
+
+	clusterStatus = NewClusterStatus("default", true)
+	CassandraWriteQueue = make(chan *ChunkWriteRequest, 100000)
+	for i := 0; i < b.N; i++ {
+		go processWriteQueue()
+	}
+
+	ttl := uint32(84600)
+	aggSettings := []aggSetting{
+		{
+			span:      uint32(300),
+			chunkSpan: uint32(24 * 3600),
+			numChunks: uint32(2),
+		},
+	}
+
+	keys := make([]string, 100000)
+	for i := 0; i < 100000; i++ {
+		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	}
+
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+
+	maxT := uint32(1200)
+	for t := uint32(1); t < maxT; t += 10 {
+		for metricI := 0; metricI < 100000; metricI++ {
 			m := metrics.GetOrCreate(keys[metricI])
 			m.Add(t, float64(t))
 		}
