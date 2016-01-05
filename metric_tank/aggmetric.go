@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
@@ -27,9 +25,8 @@ type AggMetric struct {
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*Chunk
 	aggregators     []*Aggregator
-	writeQueue      chan *Chunk
-	activeWrite     bool
 	firstChunkT0    uint32
+	ttl             uint32
 }
 
 // re-order the chunks with the oldest at start of the list and newest at the end.
@@ -65,16 +62,17 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(key string, chunkSpan, numChunks uint32, maxDirtyChunks uint32, aggsetting ...aggSetting) *AggMetric {
+func NewAggMetric(key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
-		Key:        key,
-		ChunkSpan:  chunkSpan,
-		NumChunks:  numChunks,
-		Chunks:     make([]*Chunk, 0, numChunks),
-		writeQueue: make(chan *Chunk, maxDirtyChunks),
+		Key:       key,
+		ChunkSpan: chunkSpan,
+		NumChunks: numChunks,
+		Chunks:    make([]*Chunk, 0, numChunks),
+		ttl:       ttl,
 	}
 	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, maxDirtyChunks))
+		//TODO(awoods): use per aggsetting TTL
+		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, ttl))
 	}
 
 	return &m
@@ -349,9 +347,14 @@ func (a *AggMetric) persist(pos int) {
 	}
 
 	// create an array of chunks that need to be sent to the writeQueue.
-	pending := make([]*Chunk, 1)
+	pending := make([]*ChunkWriteRequest, 1)
 	// add the current chunk to the list of chunks to send to the writeQueue
-	pending[0] = chunk
+	pending[0] = &ChunkWriteRequest{
+		key:       a.Key,
+		chunk:     chunk,
+		ttl:       a.ttl,
+		timestamp: time.Now(),
+	}
 
 	// if we recently became the primary, there may be older chunks
 	// that the old primary did not save.  We should check for those
@@ -363,18 +366,17 @@ func (a *AggMetric) persist(pos int) {
 	previousChunk := a.Chunks[previousPos]
 	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
 		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
-		pending = append(pending, previousChunk)
+		pending = append(pending, &ChunkWriteRequest{
+			key:       a.Key,
+			chunk:     previousChunk,
+			ttl:       a.ttl,
+			timestamp: time.Now(),
+		})
 		previousPos--
 		if previousPos < 0 {
 			previousPos += len(a.Chunks)
 		}
 		previousChunk = a.Chunks[previousPos]
-	}
-
-	if len(pending) > cap(a.writeQueue) {
-		// this can lead to a deadlock. so lets just write what we
-		// can and handle the rest next time.
-		pending = pending[len(pending)-cap(a.writeQueue):]
 	}
 
 	log.Debug("sending %d chunks to write queue", len(pending))
@@ -392,99 +394,15 @@ func (a *AggMetric) persist(pos int) {
 	// before newer data.
 	for pendingChunk >= 0 {
 		select {
-		case a.writeQueue <- pending[pendingChunk]:
-			pending[pendingChunk].Saving = true
+		case CassandraWriteQueue <- pending[pendingChunk]:
+			pending[pendingChunk].chunk.Saving = true
 			pendingChunk--
-			log.Debug("chunk in write queue: length: %d", len(a.writeQueue))
+			log.Debug("chunk in write queue: length: %d", len(CassandraWriteQueue))
 		case <-ticker.C:
 			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
 		}
 	}
 	ticker.Stop()
-
-	// If there is already a goroutine running that is consuming from our
-	// writeQueue, then we dont need to do anything further.  Otherwise,
-	// we need to start a new goroutine to consume from the writeQueue.
-	// Because we still hold the lock when we check activeWrite, there is
-	// no risk that any existing goroutine is going to exit without first
-	// processing the chunk we just added to the queue.
-	if !a.activeWrite {
-		log.Debug("starting persist goroutine.")
-		a.activeWrite = true
-		// asynchronously write data to cassandra. Because we hold the lock
-		// when starting this goroutine, we are assured that only 1 goroutine
-		// is ever running and there will always be at least 1 chunk in the
-		// writeQueue.
-		go func() {
-			for {
-				select {
-				case c := <-a.writeQueue:
-					log.Debug("starting to save %s:%d %v", a.Key, c.T0, c)
-					data := c.Series.Bytes()
-					chunkSizeAtSave.Value(int64(len(data)))
-					version := FormatStandardGoTsz
-					buf := new(bytes.Buffer)
-					err := binary.Write(buf, binary.LittleEndian, uint8(version))
-					if err != nil {
-						// TODO
-					}
-					_, err = buf.Write(data)
-					if err != nil {
-						// TODO
-					}
-					success := false
-					attempts := 0
-					for !success {
-						err := InsertChunk(a.Key, c.T0, buf.Bytes(), *metricTTL)
-						if err == nil {
-							success = true
-							go func() {
-								a.Lock()
-								c.Saved = true
-								a.Unlock()
-								msg := &PersistMessage{
-									Instance: *instance,
-									Key:      a.Key,
-									T0:       c.T0,
-								}
-								msg.Send()
-							}()
-							log.Debug("save complete. %s:%d %v", a.Key, c.T0, c)
-							chunkSaveOk.Inc(1)
-						} else {
-							if (attempts % 20) == 0 {
-								log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, c, err)
-							}
-							chunkSaveFail.Inc(1)
-							sleepTime := 100 * attempts
-							if sleepTime > 2000 {
-								sleepTime = 2000
-							}
-							time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-							attempts++
-						}
-					}
-				default:
-					log.Debug("waiting for lock: %s", a.Key)
-					a.Lock()
-					// this will typically be 0. Though there is a possibility for a chunk to be added
-					// to the writeQueue before the lock is obtained.
-					// If a call to aggMetric.Add() is running it will already be holding the lock. We
-					// will then block trying to acquire the lock until after aggMetric.Add() completes.
-					// If aggMetric.Add() calls persist() another chunk will be added to the writeQueue
-					//  increasing its length to 1.
-					if len(a.writeQueue) == 0 {
-						log.Debug("no items in writeQueue, terminating write goroutine for %s.", a.Key)
-						a.activeWrite = false
-						a.Unlock()
-						return
-					}
-					log.Debug("still pending writes in queue for %s", a.Key)
-					a.Unlock()
-				}
-			}
-		}()
-	}
 	return
 }
 
