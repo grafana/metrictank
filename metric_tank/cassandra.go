@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -38,10 +40,16 @@ It's safe for concurrent use by multiple goroutines and a typical usage scenario
 object to interact with the whole Cassandra cluster.
 */
 var cSession *gocql.Session
-var writeSem chan bool
+var CassandraWriteQueue chan *ChunkWriteRequest
+
+type ChunkWriteRequest struct {
+	key       string
+	chunk     *Chunk
+	ttl       uint32
+	timestamp time.Time
+}
 
 func InitCassandra() error {
-	writeSem = make(chan bool, *cassandraWriteConcurrency)
 	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cluster.Consistency = gocql.One
 	var err error
@@ -62,7 +70,67 @@ func InitCassandra() error {
 	cluster.Keyspace = "raintank"
 	cluster.NumConns = *cassandraWriteConcurrency
 	cSession, err = cluster.CreateSession()
+
+	CassandraWriteQueue = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+	for i := 0; i < *cassandraWriteConcurrency; i++ {
+		go processWriteQueue()
+	}
+
 	return err
+}
+
+/* process writeQueue.
+ */
+func processWriteQueue() {
+	for {
+		select {
+		case c := <-CassandraWriteQueue:
+			log.Debug("starting to save %s:%d %v", c.key, c.chunk.T0, c.chunk)
+			//log how long the chunk waited in the queue before we attempted to save to cassandra
+			cassandraBlockDuration.Value(time.Now().Sub(c.timestamp))
+
+			data := c.chunk.Series.Bytes()
+			chunkSizeAtSave.Value(int64(len(data)))
+			version := FormatStandardGoTsz
+			buf := new(bytes.Buffer)
+			err := binary.Write(buf, binary.LittleEndian, uint8(version))
+			if err != nil {
+				// TODO
+			}
+			_, err = buf.Write(data)
+			if err != nil {
+				// TODO
+			}
+			success := false
+			attempts := 0
+			for !success {
+				err := InsertChunk(c.key, c.chunk.T0, buf.Bytes(), int(c.ttl))
+				if err == nil {
+					success = true
+					c.chunk.Saved = true
+					msg := &PersistMessage{
+						Instance: *instance,
+						Key:      c.key,
+						T0:       c.chunk.T0,
+					}
+					msg.Send()
+					log.Debug("save complete. %s:%d %v", c.key, c.chunk.T0, c.chunk)
+					chunkSaveOk.Inc(1)
+				} else {
+					if (attempts % 20) == 0 {
+						log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, c.chunk, err)
+					}
+					chunkSaveFail.Inc(1)
+					sleepTime := 100 * attempts
+					if sleepTime > 2000 {
+						sleepTime = 2000
+					}
+					time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+					attempts++
+				}
+			}
+		}
+	}
 }
 
 // Insert Chunks into Cassandra.
@@ -71,22 +139,13 @@ func InitCassandra() error {
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
 func InsertChunk(key string, t0 uint32, data []byte, ttl int) error {
-	// increment our semaphore.
-	// blocks if <cassandraWriteConcurrency> writers are already running
-	pre := time.Now()
-	writeSem <- true
-	defer func() {
-		// write is complete, so decrement our semaphore.
-		<-writeSem
-	}()
-	cassandraBlockDuration.Value(time.Now().Sub(pre))
 	// for unit tests
 	if cSession == nil {
 		return nil
 	}
 	query := fmt.Sprintf("INSERT INTO metric (key, ts, data) values(?,?,?) USING TTL %d", ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/month_sec) // "month number" based on unix timestamp (rounded down)
-	pre = time.Now()
+	pre := time.Now()
 	ret := cSession.Query(query, row_key, t0, data).Exec()
 	cassandraPutDuration.Value(time.Now().Sub(pre))
 	return ret

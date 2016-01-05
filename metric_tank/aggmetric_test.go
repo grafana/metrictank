@@ -156,7 +156,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
-	maxDirtyChunks := uint32(1)
+	ttl := uint32(84600)
 	aggSettings := []aggSetting{
 		{
 			span:      uint32(300),
@@ -170,7 +170,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, maxDirtyChunks, aggSettings)
+	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {

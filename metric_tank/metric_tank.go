@@ -39,9 +39,8 @@ var (
 	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
 
-	maxUnwrittenChunks = flag.Int("max-unwritten-chunks", 1, "number of chunks per metric waiting to be written to cassandra.")
-
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
+	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size. should be large engough to hold all at least the total number of series expected.")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
@@ -234,7 +233,7 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*maxUnwrittenChunks), finalSettings)
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
