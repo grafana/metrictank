@@ -108,12 +108,7 @@ func processWriteQueue() {
 				if err == nil {
 					success = true
 					c.chunk.Saved = true
-					msg := &PersistMessage{
-						Instance: *instance,
-						Key:      c.key,
-						T0:       c.chunk.T0,
-					}
-					msg.Send()
+					SendPersistMessage(c.key, c.chunk.T0)
 					log.Debug("save complete. %s:%d %v", c.key, c.chunk.T0, c.chunk)
 					chunkSaveOk.Inc(1)
 				} else {

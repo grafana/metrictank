@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -17,10 +19,14 @@ import (
 )
 
 var (
-	hostPool      hostpool.HostPool
-	producers     map[string]*nsq.Producer
-	clusterStatus *ClusterStatus
+	hostPool            hostpool.HostPool
+	producers           map[string]*nsq.Producer
+	clusterStatus       *ClusterStatus
+	persistMessageBatch *PersistMessageBatch
 )
+
+//PersistMessage format version
+const PersistMessageBatchV1 = 1
 
 type ClusterStatus struct {
 	sync.Mutex
@@ -62,29 +68,72 @@ type PersistMessage struct {
 	T0       uint32 `json:"t0"`
 }
 
-func (msg *PersistMessage) Send() {
-	if *topicNotifyPersist == "" {
-		return
-	}
-	body, err := json.Marshal(&msg)
-	if err != nil {
-		log.Fatal(4, "failed to marshal persistMessage to json.")
-	}
-	sent := false
-	for !sent {
-		// This will always return a host. If all hosts are currently marked as dead,
-		// then all hosts will be reset to alive and we will try them all again. This
-		// will result in this loop repeating forever until we successfully publish our msg.
-		hostPoolResponse := hostPool.Get()
-		p := producers[hostPoolResponse.Host()]
-		err = p.Publish(*topicNotifyPersist, body)
-		// Hosts that are marked as dead will be retried after 30seconds.  If we published
-		// successfully, then sending a nil error will mark the host as alive again.
-		hostPoolResponse.Mark(err)
+type PersistMessageBatch struct {
+	sync.Mutex
+	Instance    string        `json:"instance"`
+	SavedChunks []*savedChunk `json:"saved_chunks"`
+}
+
+type savedChunk struct {
+	Key string `json:"key"`
+	T0  uint32 `json:"t0"`
+}
+
+func (p *PersistMessageBatch) AddChunk(key string, t0 uint32) {
+	p.Lock()
+	defer p.Unlock()
+	p.SavedChunks = append(p.SavedChunks, &savedChunk{Key: key, T0: t0})
+}
+
+func SendPersistMessage(key string, t0 uint32) {
+	persistMessageBatch.AddChunk(key, t0)
+}
+
+func (p *PersistMessageBatch) flush() {
+	ticker := time.NewTicker(time.Second)
+	for range ticker.C {
+		// get current savedChunks and clear our buffer.
+		p.Lock()
+		c := make([]*savedChunk, len(p.SavedChunks))
+		copy(c, p.SavedChunks)
+		p.SavedChunks = nil
+		msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: c}
+		p.Unlock()
+
+		if len(c) == 0 {
+			continue
+		}
+
+		if *topicNotifyPersist == "" {
+			continue
+		}
+
+		log.Debug("sending %d batch metricPersist messages", len(c))
+
+		data, err := json.Marshal(&msg)
 		if err != nil {
-			log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
-		} else {
-			sent = true
+			log.Fatal(4, "failed to marshal persistMessage to json.")
+		}
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.LittleEndian, uint8(PersistMessageBatchV1))
+		buf.Write(data)
+
+		sent := false
+		for !sent {
+			// This will always return a host. If all hosts are currently marked as dead,
+			// then all hosts will be reset to alive and we will try them all again. This
+			// will result in this loop repeating forever until we successfully publish our msg.
+			hostPoolResponse := hostPool.Get()
+			p := producers[hostPoolResponse.Host()]
+			err = p.Publish(*topicNotifyPersist, buf.Bytes())
+			// Hosts that are marked as dead will be retried after 30seconds.  If we published
+			// successfully, then sending a nil error will mark the host as alive again.
+			hostPoolResponse.Mark(err)
+			if err != nil {
+				log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+			} else {
+				sent = true
+			}
 		}
 	}
 
@@ -102,26 +151,47 @@ func NewMetricPersistHandler(metrics Metrics) *MetricPersistHandler {
 }
 
 func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
-	ms := PersistMessage{}
-	err := json.Unmarshal(m.Body, &ms)
-	if err != nil {
-		log.Error(3, "skipping message. %s", err)
-		return nil
-	}
-	if ms.Instance == *instance {
-		log.Debug("skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
-		return nil
-	}
+	version := uint8(m.Body[0])
+	if version == uint8(PersistMessageBatchV1) {
+		// new batch format.
+		batch := PersistMessageBatch{}
+		err := json.Unmarshal(m.Body[1:], &batch)
+		if err != nil {
+			log.Error(3, "failed to unmarsh batch message. skipping.", err)
+			return nil
+		}
+		if batch.Instance == *instance {
+			log.Debug("skipping batch message we generated.")
+			return nil
+		}
+		for _, c := range batch.SavedChunks {
+			if agg, ok := metrics.Get(c.Key); ok {
+				agg.(*AggMetric).SyncChunkSaveState(c.T0)
+			}
+		}
+	} else {
+		// assume the old format.
+		ms := PersistMessage{}
+		err := json.Unmarshal(m.Body, &ms)
+		if err != nil {
+			log.Error(3, "skipping message. %s", err)
+			return nil
+		}
+		if ms.Instance == *instance {
+			log.Debug("skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
+			return nil
+		}
 
-	// get metric
-	if agg, ok := metrics.Get(ms.Key); ok {
-		agg.(*AggMetric).SyncChunkSaveState(ms.T0)
+		// get metric
+		if agg, ok := metrics.Get(ms.Key); ok {
+			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
+		}
 	}
-
 	return nil
 }
 
 func InitCluster(metrics Metrics, stats met.Backend) {
+	persistMessageBatch = &PersistMessageBatch{Instance: *instance, SavedChunks: make([]*savedChunk, 0)}
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
@@ -174,6 +244,7 @@ func InitCluster(metrics Metrics, stats met.Backend) {
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
+	go persistMessageBatch.flush()
 }
 
 // Handlers for HTTP interface.
