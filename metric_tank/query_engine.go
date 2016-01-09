@@ -57,16 +57,17 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	}
 	tsRange := (reqs[0].to - reqs[0].from)
 
+	// note: not all series necessarily have the same raw settings, will be fixed further down
 	options[0] = archive{"raw", minInterval, tsRange / minInterval, ""}
 	// now model the archives we get from the aggregations
 	for j, agg := range aggs {
 		options[j+1] = archive{fmt.Sprintf("agg %d", j), agg.span, tsRange / agg.span, ""}
 	}
 
-	// find the first option with a pointCount < maxDataPoints
+	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
 	selected := len(options) - 1
 	for i, opt := range options {
-		if opt.pointCount < reqs[0].maxPoints {
+		if opt.pointCount <= reqs[0].maxPoints {
 			selected = i
 			break
 		}
@@ -112,14 +113,8 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		sort.Ints(keys)
 		chosenInterval = uint32(keys[0])
 		for i := 1; i < len(keys); i++ {
-			var a, b uint32
-			if uint32(keys[i]) > chosenInterval {
-				a = uint32(keys[i])
-				b = chosenInterval
-			} else {
-				a = chosenInterval
-				b = uint32(keys[i])
-			}
+			a := max(uint32(keys[i]), chosenInterval)
+			b := min(uint32(keys[i]), chosenInterval)
 			r := a % b
 			if r != 0 {
 				for j := uint32(2); j <= b; j++ {
@@ -130,7 +125,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 				}
 			} else {
 
-				chosenInterval = uint32(a)
+				chosenInterval = a
 			}
 			options[0].pointCount = tsRange / chosenInterval
 			options[0].interval = chosenInterval
@@ -169,7 +164,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 				// Handle RAW interval
 				req.archInterval = req.rawInterval
 
-				// each request can have a different rawInterval. So the aggNum is vairable.
+				// each request can have a different rawInterval. So the aggNum is variable.
 				if chosenInterval != req.rawInterval {
 					aggNum = aggNum * (chosenInterval / req.rawInterval)
 				}
