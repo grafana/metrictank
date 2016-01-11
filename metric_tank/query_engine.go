@@ -36,7 +36,6 @@ func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
 
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
-// for all requests, sets archive, numPoints, interval (and rawInterval as a side effect)
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
@@ -142,7 +141,8 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
 	}
 
-	/* we now just need to update the archiveInterval, outInterval and aggNum of each req.
+	/* we now just need to update the following properties for each req:
+	   archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
 	   archInterval uint32 // the interval corresponding to the archive we'll fetch
 	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
 	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
