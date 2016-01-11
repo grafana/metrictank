@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
@@ -17,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/grafana/grafana/pkg/log"
 	met "github.com/grafana/grafana/pkg/metric"
 	"github.com/grafana/grafana/pkg/metric/helper"
 	"github.com/nsqio/go-nsq"
@@ -44,6 +44,8 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	logLevel         = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr       = flag.String("listen", ":6060", "http listener address.")
 
 	eventsToEsOK   met.Count
 	eventsToEsFail met.Count
@@ -68,7 +70,7 @@ func NewESHandler() (*ESHandler, error) {
 }
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
-	log.Printf("received message.")
+	log.Debug("received message.")
 	format := "unknown"
 	if m.Body[0] == '\x00' {
 		format = "msgFormatJson"
@@ -84,7 +86,7 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 	event := new(schema.ProbeEvent)
 	if err := json.Unmarshal(m.Body[9:], &event); err != nil {
-		log.Printf("ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
+		log.Error(3, "ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
 		return nil
 	}
 
@@ -96,16 +98,14 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 
 	// This notifies this function whether or not saving the event worked
 	status := make(chan *eventdef.BulkSaveStatus, 1)
+	pre := time.Now()
 	go func() {
-		pre := time.Now()
 		if err := eventdef.Save(event, status); err != nil {
-			fmt.Printf("ERROR: couldn't process %s: %s\n", event.Id, err)
+			log.Error(3, "couldn't process %s: %s", event.Id, err)
 			eventsToEsFail.Inc(1)
 			done <- err
 			return
 		}
-		esPutDuration.Value(time.Now().Sub(pre))
-		eventsToEsOK.Inc(1)
 		done <- nil
 	}()
 
@@ -117,13 +117,16 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		return err
 	}
 	estat := <-status
+	esPutDuration.Value(time.Now().Sub(pre))
 	if estat.Requeue {
 		m.Requeue(-1)
 		msgsHandleFail.Inc(1)
+		eventsToEsFail.Inc(1)
 		err := fmt.Errorf("event %s failed to save, requeueing", estat.Id)
-		log.Println(err)
+		log.Error(3, "%s", err)
 		return err
 	}
+	eventsToEsOK.Inc(1)
 
 	m.Finish()
 	msgsHandleOK.Inc(1)
@@ -138,11 +141,12 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
+			log.Fatal(4, err.Error())
 		}
 		conf.ParseAll()
 	}
+
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
 		fmt.Println("nsq_probe_events_to_elasticsearch")
@@ -155,22 +159,23 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal("--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
+
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 	metrics, err := helper.New(true, *statsdAddr, *statsdType, "nsq_probe_events_to_elasticsearch", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -188,19 +193,19 @@ func main() {
 	cfg.UserAgent = "nsq_probe_events_to_elasticsearch"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", metrics)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 
 	handler, err := NewESHandler()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 
 	consumer.AddConcurrentHandlers(handler, 80)
@@ -211,9 +216,9 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
-	log.Println("connected to nsqd")
+	log.Info("connected to nsqd")
 
 	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
 	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
@@ -221,11 +226,14 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 	go func() {
-		log.Println("INFO starting listener for http/debug on :6060")
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("INFO starting listener for http/debug on %s", *listenAddr)
+		httperr := http.ListenAndServe(*listenAddr, nil)
+		if httperr != nil {
+			log.Info(httperr.Error())
+		}
 	}()
 
 	for {

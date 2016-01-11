@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,46 +21,58 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/rakyll/globalconf"
 )
 
 var (
 	showVersion = flag.Bool("version", false, "print version string")
-	dryRun      = flag.Bool("dry", false, "dry run (disable actually storing into cassandra")
+	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
 
-	concurrency = flag.Int("concurrency", 10, "number of workers parsing messages")
-	topic       = flag.String("topic", "metrics", "NSQ topic")
-	channel     = flag.String("channel", "tank", "NSQ channel")
-	instance    = flag.String("instance", "default", "instance, to separate instances in metrics")
-	maxInFlight = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	chunkSpan   = flag.Int("chunkspan", 120, "chunk span in seconds")
-	numChunks   = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
+	topic              = flag.String("topic", "metrics", "NSQ topic")
+	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic")
+	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
+	instance           = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
+	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
+	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
 
-	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 50, "max number of concurrent writes to cassandra.")
+	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
+	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size. should be large engough to hold all at least the total number of series expected.")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
-	listenAddr = flag.String("listen", ":6060", "http listener address.")
+	listenAddr      = flag.String("listen", ":6060", "http listener address.")
+	redisAddr       = flag.String("redis-addr", "localhost:6379", "redis address")
+	redisDB         = flag.Int("redis-db", 0, "Redis DB number.")
+	esAddr          = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
+	indexName       = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
+	esWarmupPercent = flag.Int("elastic-warmup-pct", 1, "how much % of metrics to index into ES during the warmup period")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
-	dumpFile = flag.String("dump-file", "/tmp/nmt.gob", "path of file to dump of all metrics written at shutdown and read at startup")
-
 	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
-	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "maximum number of seconds before a stale chunk is persisted to Cassandra.")
-	metricMaxStale = flag.Int("metric-max-stale", 21600, "maximum number of seconds before a stale metric is purged from memory.")
+	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
+	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
 
 	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
-	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file (default /etc/raintank/metric_tank.ini")
+	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
+	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
 
-	metrics *AggMetrics
+	metrics   *AggMetrics
+	metaCache *MetaCache
+
+	startupTime time.Time
 )
 
 var reqSpanMem met.Meter
@@ -72,6 +85,8 @@ var chunkCreate met.Count
 var chunkClear met.Count
 var chunkSaveOk met.Count
 var chunkSaveFail met.Count
+var metricMetaCacheHit met.Count
+var metricMetaCacheMiss met.Count
 var metricsReceived met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
@@ -84,22 +99,30 @@ var msgsAge met.Meter // in ms
 // there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
 var reqHandleDuration met.Timer
 var cassandraPutDuration met.Timer
+var cassandraBlockDuration met.Timer
 var cassandraGetDuration met.Timer
+var metricMetaGetDuration met.Timer
 var inItems met.Meter
+var points met.Gauge
 var msgsHandleOK met.Count
 var msgsHandleFail met.Count
 var alloc met.Gauge
 var totalAlloc met.Gauge
 var sysBytes met.Gauge
+var metricsActive met.Gauge
+var metricsToEsOK met.Count
+var metricsToEsFail met.Count
+var esPutDuration met.Timer
 
 func main() {
+	startupTime = time.Now()
 	flag.Parse()
 
 	// Only try and parse the conf file if it exists
 	if _, err := os.Stat(*confFile); err == nil {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
-			log.Fatal(0, "error with configuration file: %s", err)
+			log.Fatal(4, "error with configuration file: %s", err)
 			os.Exit(1)
 		}
 		conf.ParseAll()
@@ -108,100 +131,144 @@ func main() {
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
-		fmt.Println("nsq_metrics_tank")
+		fmt.Println("metrics_tank")
 		return
 	}
 	if *instance == "" {
-		log.Fatal(0, "instance can't be empty")
+		log.Fatal(4, "instance can't be empty")
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal(0, "failed to lookup hostname. %s", err)
+		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
 	stats, err := helper.New(true, *statsdAddr, *statsdType, "metric_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
-		log.Fatal(0, "failed to initialize statsd. %s", err)
+		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
 
 	if *channel == "" {
 		rand.Seed(time.Now().UnixNano())
-		*channel = fmt.Sprintf("tail%06d#ephemeral", rand.Int()%999999)
+		*channel = fmt.Sprintf("metric_tank%06d#ephemeral", rand.Int()%999999)
 	}
 
 	if *topic == "" {
-		log.Fatal(0, "--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 	// set default cassandra address if none is set.
 	if *cassandraAddrs == "" {
 		*cassandraAddrs = "localhost"
 	}
 
+	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
+	if err != nil {
+		log.Fatal(4, "failed to initialize redis. %s", err)
+	}
+
+	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName, *esWarmupPercent)
+	if err != nil {
+		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
+	}
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	initMetrics(stats)
+
+	set := strings.Split(*aggSettings, ",")
+	finalSettings := make([]aggSetting, 0)
+	for _, v := range set {
+		if v == "" {
+			continue
+		}
+		fields := strings.Split(v, ":")
+		if len(fields) != 3 {
+			log.Fatal(4, "bad agg settings")
+		}
+		aggSpan, err := strconv.Atoi(fields[0])
+		if err != nil {
+			log.Fatal(4, "bad agg settings", err)
+		}
+		aggChunkSpan, err := strconv.Atoi(fields[1])
+		if err != nil {
+			log.Fatal(4, "bad agg settings", err)
+		}
+		if (month_sec % aggChunkSpan) != 0 {
+			panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		}
+		aggNumChunks, err := strconv.Atoi(fields[2])
+		if err != nil {
+			log.Fatal(0, "bad agg settings", err)
+		}
+		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks)})
+	}
+	if (month_sec % *chunkSpan) != 0 {
+		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+	}
+
+	err = InitCassandra()
+	if err != nil {
+		log.Fatal(4, "failed to initialize cassandra. %s", err)
+	}
+
+	// set our cluster state before we start consuming messages.
+	clusterStatus = NewClusterStatus(*instance, *primaryNode)
+
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "nsq_metrics_tank"
+	cfg.UserAgent = "metrics_tank"
 	err = app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(0, "failed to parse nsq consumer options. %s", err)
+		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
-		log.Fatal(0, "Failed to create NSQ consumer. %s", err)
+		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
-	initMetrics(stats)
-
-	err = InitCassandra()
-
-	if err != nil {
-		log.Fatal(0, "failed to initialize cassandra. %s", err)
-	}
-
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(300), uint32(3600*2), 1)
-	handler := NewHandler(metrics)
+	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
+	metaCache = NewMetaCache()
+	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
 	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
 		nsqdAdds = []string{}
 	}
-	err = consumer.ConnectToNSQDs(nsqdAdds)
-	if err != nil {
-		log.Fatal(0, "failed to connect to NSQDs. %s", err)
-	}
-	log.Info("connected to nsqd")
 
 	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
 	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
 		lookupdAdds = []string{}
 	}
-	err = consumer.ConnectToNSQLookupds(lookupdAdds)
-	if err != nil {
-		log.Fatal(0, "failed to connect to NSQLookupds. %s", err)
-	}
 
 	go func() {
-		m := &runtime.MemStats{}
-		for range time.Tick(time.Duration(1) * time.Second) {
-			runtime.ReadMemStats(m)
-			alloc.Value(int64(m.Alloc))
-			totalAlloc.Value(int64(m.TotalAlloc))
-			sysBytes.Value(int64(m.Sys))
+		time.Sleep(100 * time.Millisecond)
+		err = consumer.ConnectToNSQDs(nsqdAdds)
+		if err != nil {
+			log.Fatal(4, "failed to connect to NSQDs. %s", err)
 		}
+		log.Info("consumer connected to nsqd")
+
+		err = consumer.ConnectToNSQLookupds(lookupdAdds)
+		if err != nil {
+			log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
+		}
+		log.Info("consumer connected to nsqlookupd")
 	}()
 
+	InitCluster(metrics, stats)
+
 	go func() {
-		http.HandleFunc("/get", Get)
+		http.HandleFunc("/", appStatus)
+		http.HandleFunc("/get", get(metaCache, finalSettings))
+		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
@@ -209,12 +276,9 @@ func main() {
 	for {
 		select {
 		case <-consumer.StopChan:
-			err := metrics.Persist()
-			if err != nil {
-				log.Error(0, "failed to persist aggmetrics. %s", err)
-			}
 			log.Info("closing cassandra session.")
 			cSession.Close()
+			metricdef.Indexer.Stop()
 			log.Info("terminating.")
 			log.Close()
 			return
@@ -234,6 +298,8 @@ func initMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
+	metricMetaCacheHit = stats.NewCount("metricmeta_cache.hit")
+	metricMetaCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
@@ -244,11 +310,38 @@ func initMetrics(stats met.Backend) {
 	msgsAge = stats.NewMeter("message_age", 0)
 	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
+	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
+	metricMetaGetDuration = stats.NewTimer("metricmeta_cache_lookup_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
+	points = stats.NewGauge("total_points", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")
 	msgsHandleFail = stats.NewCount("handle.fail")
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
+	metricsActive = stats.NewGauge("metrics_active", 0)
+	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
+	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	esPutDuration = stats.NewTimer("es_put_duration", 0)
+
+	// run a collector for some global stats
+	go func() {
+		currentPoints := 0
+		m := &runtime.MemStats{}
+
+		ticker := time.Tick(time.Duration(1) * time.Second)
+		for {
+			select {
+			case <-ticker:
+				points.Value(int64(currentPoints))
+				runtime.ReadMemStats(m)
+				alloc.Value(int64(m.Alloc))
+				totalAlloc.Value(int64(m.TotalAlloc))
+				sysBytes.Value(int64(m.Sys))
+			case update := <-totalPoints:
+				currentPoints += update
+			}
+		}
+	}()
 }

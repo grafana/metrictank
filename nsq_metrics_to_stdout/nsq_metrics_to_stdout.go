@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/msg"
@@ -29,6 +29,8 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
 )
 
 type StdoutHandler struct {
@@ -42,13 +44,13 @@ func NewStdoutHandler() (*StdoutHandler, error) {
 func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
 	ms, err := msg.MetricDataFromMsg(m.Body)
 	if err != nil {
-		log.Println("ERROR:", err, "skipping message")
+		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
 	err = ms.DecodeMetricData()
 	if err != nil {
-		log.Println("ERROR:", err, "skipping message")
+		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
@@ -61,6 +63,8 @@ func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
 func main() {
 	flag.Parse()
 
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
+
 	if *showVersion {
 		fmt.Println("nsq_metrics_to_stdout")
 		return
@@ -72,14 +76,14 @@ func main() {
 	}
 
 	if *topic == "" {
-		log.Fatal("--topic is required")
+		log.Fatal(4, "--topic is required")
 	}
 
 	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(0, "--nsqd-tcp-address or --lookupd-http-address required")
+		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(0, "use --nsqd-tcp-address or --lookupd-http-address not both")
+		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -89,18 +93,18 @@ func main() {
 	cfg.UserAgent = "nsq_metrics_to_stdout"
 	err := app.ParseOpts(cfg, *consumerOpts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 	cfg.MaxInFlight = *maxInFlight
 
 	consumer, err := nsq.NewConsumer(*topic, *channel, cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 
 	handler, err := NewStdoutHandler()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 
 	consumer.AddHandler(handler)
@@ -111,9 +115,9 @@ func main() {
 	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
-	log.Println("connected to nsqd")
+	log.Info("connected to nsqd")
 
 	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
 	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
@@ -121,11 +125,11 @@ func main() {
 	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(4, err.Error())
 	}
 	go func() {
-		log.Println("INFO starting listener for http/debug on :6060")
-		log.Println(http.ListenAndServe(":6060", nil))
+		log.Info("starting listener for http/debug on %s", *listenAddr)
+		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {

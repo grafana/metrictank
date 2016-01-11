@@ -42,7 +42,11 @@ var (
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
-	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	logLevel   = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
+
+	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
+	redisDB   = flag.Int("redis-db", 0, "Redis DB number.")
 
 	metricsToEsOK     met.Count
 	metricsToEsFail   met.Count
@@ -112,7 +116,6 @@ func main() {
 		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
 		if err != nil {
 			log.Fatal(3, "Could not parse config file. %s", err)
-			os.Exit(1)
 		}
 		conf.ParseAll()
 	}
@@ -162,11 +165,11 @@ func main() {
 	msgsHandleOK = metrics.NewCount("handle.ok")
 	msgsHandleFail = metrics.NewCount("handle.fail")
 
-	err = metricdef.InitElasticsearch(*esAddr, "", "")
+	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
-	err = metricdef.InitRedis(*redisAddr, "", "")
+	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
 	if err != nil {
 		log.Fatal(4, "failed to initialize redis. %s", err)
 	}
@@ -210,8 +213,8 @@ func main() {
 		log.Fatal(4, "failed to connect to nsqlookupd. %s", err)
 	}
 	go func() {
-		log.Info("INFO starting listener for http/debug on :6060")
-		log.Info("%s", http.ListenAndServe(":6060", nil))
+		log.Info("INFO starting listener for http/debug on %s", *listenAddr)
+		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
 	for {

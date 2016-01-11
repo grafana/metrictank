@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"time"
 
 	"github.com/nsqio/go-nsq"
+	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metricstore"
 )
 
@@ -81,11 +81,11 @@ func (kg *KairosGateway) ProcessLowPrio(msg *nsq.Message) error {
 func (kg *KairosGateway) process(job Job) error {
 	msg := job.msg
 	messagesSize.Value(int64(len(job.Msg.Msg)))
-	log.Printf("DEBUG: processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.Msg.Id, time.Unix(0, msg.Timestamp), job.Msg.Format, msg.Attempts)
+	log.Debug("processing metrics %s %d. timestamp: %s. format: %s. attempts: %d\n", job.qualifier, job.Msg.Id, time.Unix(0, msg.Timestamp), job.Msg.Format, msg.Attempts)
 
 	err := job.Msg.DecodeMetricData()
 	if err != nil {
-		log.Println(err, "skipping message")
+		log.Info("%s: skipping message", err.Error())
 		return nil
 	}
 
@@ -95,12 +95,12 @@ func (kg *KairosGateway) process(job Job) error {
 		err = kg.kairos.SendMetricPointers(job.Msg.Metrics)
 		if err != nil {
 			metricsToKairosFail.Inc(int64(len(job.Msg.Metrics)))
-			log.Printf("WARNING: can't send to kairosdb: %s. retrying later", err)
+			log.Warn("can't send to kairosdb: %s. retrying later", err)
 		} else {
 			metricsToKairosOK.Inc(int64(len(job.Msg.Metrics)))
 			kairosPutDuration.Value(time.Now().Sub(pre))
 		}
 	}
-	log.Printf("DEBUG: finished metrics %s %d - %d metrics sent\n", job.qualifier, job.Msg.Id, len(job.Msg.Metrics))
+	log.Debug("finished metrics %s %d - %d metrics sent\n", job.qualifier, job.Msg.Id, len(job.Msg.Metrics))
 	return err
 }

@@ -3,24 +3,37 @@ package main
 import "math"
 
 // Aggregation is a container for all summary statistics / aggregated data for 1 metric, in 1 time frame
+// if the cnt is 0, the numbers don't necessarily make sense.
 type Aggregation struct {
 	min float64
 	max float64
 	sos float64
 	sum float64
 	cnt float64
+	lst float64
 }
 
 func NewAggregation() *Aggregation {
 	return &Aggregation{
 		min: math.MaxFloat64,
+		max: -math.MaxFloat64,
 	}
 }
 
-func (a *Aggregation) Add(ts uint32, val float64) {
+func (a *Aggregation) Add(val float64) {
 	a.min = math.Min(val, a.min)
 	a.max = math.Max(val, a.max)
 	a.sos += math.Pow(val, 2)
 	a.sum += val
 	a.cnt += 1
+	a.lst = val
+}
+
+func (a *Aggregation) Reset() {
+	a.min = math.MaxFloat64
+	a.max = -math.MaxFloat64
+	a.sos = 0
+	a.sum = 0
+	a.cnt = 0
+	// no need to set a.lst, for a to be valid (cnt > 1), a.lst will always be set properly
 }

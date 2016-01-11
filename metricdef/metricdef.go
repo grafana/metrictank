@@ -19,7 +19,7 @@ package metricdef
 import (
 	"encoding/json"
 	"fmt"
-
+	"math/rand"
 	"strings"
 	"time"
 
@@ -49,7 +49,19 @@ var es *elastigo.Conn
 var Indexer *elastigo.BulkIndexer
 var IndexName = "metric"
 
-func InitElasticsearch(addr, user, pass string) error {
+// for the first 30minutes after startup, only
+// write to ES 1% of the time. This allows us to
+// slowly warmup a new or stale index.
+var warmUpDuration = 1800
+var warmUpPercent = 1
+var startTime time.Time
+
+func InitElasticsearch(addr, user, pass, indexName string, warmupPct int) error {
+	IndexName = indexName
+	warmUpPercent = warmupPct
+	startTime = time.Now()
+	rand.Seed(startTime.Unix())
+
 	es = elastigo.NewConn()
 	parts := strings.Split(addr, ":")
 	if len(parts) != 2 {
@@ -169,14 +181,14 @@ func InitElasticsearch(addr, user, pass string) error {
 
 var rs *redis.Client
 
-func InitRedis(addr, db, pass string) error {
+func InitRedis(addr string, db int, pass string) error {
 	opts := &redis.Options{}
 	opts.Network = "tcp"
 	opts.Addr = addr
 	if pass != "" {
 		opts.Password = pass
 	}
-	opts.DB = 0
+	opts.DB = int64(db)
 	rs = redis.NewClient(opts)
 
 	return nil
@@ -196,12 +208,17 @@ func indexMetric(m *schema.MetricDefinition) error {
 	if err != nil {
 		return err
 	}
-	if rerr := rs.SetEx(m.Id, time.Duration(300)*time.Second, string(metricStr)).Err(); err != nil {
+	if rerr := rs.SetEx(m.Id, time.Duration(1800)*time.Second, string(metricStr)).Err(); err != nil {
 		log.Error(3, "redis err. %s", rerr)
 	}
-
+	if time.Since(startTime) < (time.Duration(warmUpDuration) * time.Second) {
+		// we are in our warmup period.
+		if rand.Intn(100) > warmUpPercent {
+			return nil
+		}
+	}
 	log.Debug("indexing %s in elasticsearch", m.Id)
-	err = Indexer.Index("metric", "metric_index", m.Id, "", "", nil, m)
+	err = Indexer.Index(IndexName, "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
 		log.Error(3, "failed to send payload to BulkApi indexer. %s", err)
 		return err
@@ -210,7 +227,12 @@ func indexMetric(m *schema.MetricDefinition) error {
 	return nil
 }
 
+// TODO: differentiate between record not found and error, so we can bubble up
+// the right thing towards the user.
 func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
+	if id == "" {
+		panic("key cant be empty string.")
+	}
 	// TODO: fetch from redis before checking elasticsearch
 	if v, err := rs.Get(id).Result(); err != nil && err != redis.Nil {
 		log.Error(3, "The redis client bombed: %s", err)
@@ -223,9 +245,12 @@ func GetMetricDefinition(id string) (*schema.MetricDefinition, error) {
 		}
 		return def, nil
 	}
-
+	if time.Since(startTime) < (time.Duration(warmUpDuration)*time.Second) && warmUpPercent != 100 {
+		// we are in our warmup period.
+		return nil, fmt.Errorf("record not found")
+	}
 	log.Debug("%s not in redis. checking elasticsearch.", id)
-	res, err := es.Get("metric", "metric_index", id, nil)
+	res, err := es.Get(IndexName, "metric_index", id, nil)
 	if err != nil {
 		if err == elastigo.RecordNotFound {
 			log.Debug("%s not in ES. %s", id, err)

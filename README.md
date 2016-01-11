@@ -1,3 +1,5 @@
+[![Circle CI](https://circleci.com/gh/raintank/raintank-metric.svg?style=shield)](https://circleci.com/gh/raintank/raintank-metric)
+
 this repo contains some common libraries, schema and message definitions, as well as the following apps who all pull data from NSQ:
 
 * nmt : nsq_metrics_tank (`tank` branch)

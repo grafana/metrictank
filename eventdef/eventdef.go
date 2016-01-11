@@ -20,12 +20,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/codeskyblue/go-uuid"
+	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
 )
@@ -151,10 +151,11 @@ func Save(e *schema.ProbeEvent, status chan *BulkSaveStatus) error {
 	// Add the event's status channel to the map of event statuses
 	bSender.saveQueued(e.Id, status)
 
-	log.Printf("saving event to elasticsearch.")
+	log.Debug("saving event to elasticsearch.")
 	// Add the event to the bulk indexer's queue
 	err := bulk.Index(idxName, e.EventType, e.Id, "", "", &t, e)
-	log.Printf("event queued to bulk indexer")
+	log.Debug("event queued to bulk indexer")
+
 	if err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func (b *bulkSender) bulkSend(buf *bytes.Buffer) error {
 	// to the bulk sender
 	queued := b.queued
 	b.queued = make(map[string]chan *BulkSaveStatus)
-
+	log.Debug("sending batch of %d events to Elastic", len(queued))
 	body, err := b.conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", b.bulkIndexer.Refresh), nil, buf)
 
 	// If something goes wrong at this stage, everything needs to be
@@ -262,7 +263,7 @@ func (b *bulkSender) saveQueued(id string, status chan *BulkSaveStatus) {
 
 // Stop the bulk indexer when we're shutting down
 func StopBulkIndexer() {
-	log.Println("closing bulk indexer...")
+	log.Info("closing bulk indexer...")
 	bulk.Stop()
 }
 
@@ -270,7 +271,7 @@ func setErrorTicker() {
 	// log elasticsearch errors
 	go func() {
 		for e := range bulk.ErrorChannel {
-			log.Printf("elasticsearch bulk error: %s", e.Err.Error())
+			log.Warn("elasticsearch bulk error: %s", e.Err.Error())
 		}
 	}()
 }
