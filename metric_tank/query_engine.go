@@ -152,28 +152,22 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		req.archive = selected
 		req.archInterval = options[selected].interval
 		req.outInterval = chosenInterval
-		aggNum := uint32(1)
+		req.aggNum = 1
 		if runTimeConsolidate {
-			ptCount := options[selected].pointCount
+			req.aggNum = aggEvery(options[selected].pointCount, req.maxPoints)
 
-			aggNum = ptCount / req.maxPoints
-			if ptCount%req.maxPoints != 0 {
-				aggNum++
-			}
 			if selected == 0 {
 				// Handle RAW interval
 				req.archInterval = req.rawInterval
 
 				// each request can have a different rawInterval. So the aggNum is variable.
 				if chosenInterval != req.rawInterval {
-					aggNum = aggNum * (chosenInterval / req.rawInterval)
+					req.aggNum *= chosenInterval / req.rawInterval
 				}
 			}
 
-			req.outInterval = req.archInterval * aggNum
+			req.outInterval = req.archInterval * req.aggNum
 		}
-
-		req.aggNum = aggNum
 	}
 	return reqs, nil
 }
