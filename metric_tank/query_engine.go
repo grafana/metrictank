@@ -105,30 +105,13 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
 		runTimeConsolidate = true
-		var keys []int
+		var keys []uint32
 		for k := range rawIntervals {
-			keys = append(keys, int(k))
+			keys = append(keys, k)
 		}
-		sort.Ints(keys)
-		chosenInterval = uint32(keys[0])
-		for i := 1; i < len(keys); i++ {
-			a := max(uint32(keys[i]), chosenInterval)
-			b := min(uint32(keys[i]), chosenInterval)
-			r := a % b
-			if r != 0 {
-				for j := uint32(2); j <= b; j++ {
-					if (j*a)%b == 0 {
-						chosenInterval = j * a
-						break
-					}
-				}
-			} else {
-
-				chosenInterval = a
-			}
-			options[0].pointCount = tsRange / chosenInterval
-			options[0].interval = chosenInterval
-		}
+		chosenInterval = lcm(keys)
+		options[0].interval = chosenInterval
+		options[0].pointCount = tsRange / chosenInterval
 		//make sure that the calculated interval is not greater then the interval of the first rollup.
 		if len(options) > 1 && chosenInterval >= options[1].interval {
 			selected = 1
