@@ -225,7 +225,7 @@ func main() {
 
 	writeQueue = NewInProgressMessageQueue()
 
-	err = eventdef.InitElasticsearch(*esAddr, "", "", writeQueue.status)
+	err = eventdef.InitElasticsearch(*esAddr, "", "", writeQueue.status, *maxInFlight)
 	if err != nil {
 		log.Fatal(4, err.Error())
 	}

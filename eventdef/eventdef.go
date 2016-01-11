@@ -44,7 +44,7 @@ type BulkSaveStatus struct {
 	Ok bool
 }
 
-func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus) error {
+func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxDocs int) error {
 	writeStatus = w
 	es = elastigo.NewConn()
 	host, port, err := net.SplitHostPort(addr)
@@ -103,7 +103,7 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus) error {
 	// how it handles errors)
 	bulk = es.NewBulkIndexerErrors(maxCons, retry)
 	bulk.Sender = bulkSend
-
+	bulk.BulkMaxDocs = bulkMaxDocs
 	// start the indexer
 	bulk.Start()
 
