@@ -160,7 +160,7 @@ func (q *InProgressMessageQueue) loop() {
 func NewInProgressMessageQueue() *InProgressMessageQueue {
 	q := &InProgressMessageQueue{
 		inProgress: make(map[string]*inProgressMessage),
-		status:     make(chan *eventdef.BulkSaveStatus, 10),
+		status:     make(chan *eventdef.BulkSaveStatus, *maxInFlight),
 	}
 	for i := 0; i < *concurrency; i++ {
 		go q.loop()
