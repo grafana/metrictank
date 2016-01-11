@@ -129,7 +129,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 			options[0].pointCount = tsRange / chosenInterval
 			options[0].interval = chosenInterval
 		}
-		//make sure that the calculated interval is not greater then the interval of the fist rollup.
+		//make sure that the calculated interval is not greater then the interval of the first rollup.
 		if len(options) > 1 && chosenInterval >= options[1].interval {
 			selected = 1
 			chosenInterval = options[1].interval
