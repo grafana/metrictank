@@ -48,12 +48,12 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	options := make([]archive, len(aggs)+1)
 
 	minInterval := uint32(0)
-	rawIntervals := make(map[uint32]bool)
+	rawIntervals := make(map[uint32]struct{})
 	for _, req := range reqs {
 		if minInterval == 0 || minInterval > req.rawInterval {
 			minInterval = req.rawInterval
 		}
-		rawIntervals[req.rawInterval] = true
+		rawIntervals[req.rawInterval] = struct{}{}
 	}
 	tsRange := (reqs[0].to - reqs[0].from)
 
