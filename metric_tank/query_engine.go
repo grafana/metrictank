@@ -36,7 +36,6 @@ func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
 
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
-// for all requests, sets archive, numPoints, interval (and rawInterval as a side effect)
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
@@ -48,25 +47,26 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	options := make([]archive, len(aggs)+1)
 
 	minInterval := uint32(0)
-	rawIntervals := make(map[uint32]bool)
+	rawIntervals := make(map[uint32]struct{})
 	for _, req := range reqs {
 		if minInterval == 0 || minInterval > req.rawInterval {
 			minInterval = req.rawInterval
 		}
-		rawIntervals[req.rawInterval] = true
+		rawIntervals[req.rawInterval] = struct{}{}
 	}
 	tsRange := (reqs[0].to - reqs[0].from)
 
+	// note: not all series necessarily have the same raw settings, will be fixed further down
 	options[0] = archive{"raw", minInterval, tsRange / minInterval, ""}
 	// now model the archives we get from the aggregations
 	for j, agg := range aggs {
 		options[j+1] = archive{fmt.Sprintf("agg %d", j), agg.span, tsRange / agg.span, ""}
 	}
 
-	// find the first option with a pointCount < maxDataPoints
+	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
 	selected := len(options) - 1
 	for i, opt := range options {
-		if opt.pointCount < reqs[0].maxPoints {
+		if opt.pointCount <= reqs[0].maxPoints {
 			selected = i
 			break
 		}
@@ -105,37 +105,14 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
 		runTimeConsolidate = true
-		var keys []int
+		var keys []uint32
 		for k := range rawIntervals {
-			keys = append(keys, int(k))
+			keys = append(keys, k)
 		}
-		sort.Ints(keys)
-		chosenInterval = uint32(keys[0])
-		for i := 1; i < len(keys); i++ {
-			var a, b uint32
-			if uint32(keys[i]) > chosenInterval {
-				a = uint32(keys[i])
-				b = chosenInterval
-			} else {
-				a = chosenInterval
-				b = uint32(keys[i])
-			}
-			r := a % b
-			if r != 0 {
-				for j := uint32(2); j <= b; j++ {
-					if (j*a)%b == 0 {
-						chosenInterval = j * a
-						break
-					}
-				}
-			} else {
-
-				chosenInterval = uint32(a)
-			}
-			options[0].pointCount = tsRange / chosenInterval
-			options[0].interval = chosenInterval
-		}
-		//make sure that the calculated interval is not greater then the interval of the fist rollup.
+		chosenInterval = lcm(keys)
+		options[0].interval = chosenInterval
+		options[0].pointCount = tsRange / chosenInterval
+		//make sure that the calculated interval is not greater then the interval of the first rollup.
 		if len(options) > 1 && chosenInterval >= options[1].interval {
 			selected = 1
 			chosenInterval = options[1].interval
@@ -147,7 +124,8 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
 	}
 
-	/* we now just need to update the archiveInterval, outInterval and aggNum of each req.
+	/* we now just need to update the following properties for each req:
+	   archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
 	   archInterval uint32 // the interval corresponding to the archive we'll fetch
 	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
 	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
@@ -157,28 +135,19 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		req.archive = selected
 		req.archInterval = options[selected].interval
 		req.outInterval = chosenInterval
-		aggNum := uint32(1)
+		req.aggNum = 1
 		if runTimeConsolidate {
-			ptCount := options[selected].pointCount
+			req.aggNum = aggEvery(options[selected].pointCount, req.maxPoints)
 
-			aggNum = ptCount / req.maxPoints
-			if ptCount%req.maxPoints != 0 {
-				aggNum++
-			}
-			if selected == 0 {
-				// Handle RAW interval
+			// options[0].{interval,pointCount} didn't necessarily reflect the actual raw archive for this request,
+			// so adjust where needed.
+			if selected == 0 && chosenInterval != req.rawInterval {
 				req.archInterval = req.rawInterval
-
-				// each request can have a different rawInterval. So the aggNum is vairable.
-				if chosenInterval != req.rawInterval {
-					aggNum = aggNum * (chosenInterval / req.rawInterval)
-				}
+				req.aggNum *= chosenInterval / req.rawInterval
 			}
 
-			req.outInterval = req.archInterval * aggNum
+			req.outInterval = req.archInterval * req.aggNum
 		}
-
-		req.aggNum = aggNum
 	}
 	return reqs, nil
 }

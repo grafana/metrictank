@@ -196,7 +196,7 @@ func TestConsolidationFunctions(t *testing.T) {
 type c struct {
 	numPoints     uint32
 	maxDataPoints uint32
-	every         int
+	every         uint32
 }
 
 func TestAggEvery(t *testing.T) {
