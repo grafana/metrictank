@@ -137,12 +137,16 @@ func (q *InProgressMessageQueue) loop() {
 			q.Lock()
 			if m, ok := q.inProgress[s.Id]; ok {
 				if s.Ok {
-					m.message.Finish()
+					if m.message != nil {
+						m.message.Finish()
+					}
 					eventsToEsOK.Inc(1)
 					msgsHandleOK.Inc(1)
 					log.Debug("event %s commited to ES", s.Id)
 				} else {
-					m.message.Requeue(-1)
+					if m.message != nil {
+						m.message.Requeue(-1)
+					}
 					eventsToEsFail.Inc(1)
 					msgsHandleFail.Inc(1)
 					log.Error(3, "event %s failed to save, requeueing", s.Id)
