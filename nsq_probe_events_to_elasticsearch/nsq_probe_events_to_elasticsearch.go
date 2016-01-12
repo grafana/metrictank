@@ -219,13 +219,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	messagesSize = metrics.NewMeter("message_size", 0)
-	msgsAge = metrics.NewMeter("message_age", 0)
-	eventsToEsOK = metrics.NewCount("events_to_es.ok")
-	eventsToEsFail = metrics.NewCount("events_to_es.fail")
-	esPutDuration = metrics.NewTimer("es_put_duration", 0)
-	msgsHandleOK = metrics.NewCount("handle.ok")
-	msgsHandleFail = metrics.NewCount("handle.fail")
+	initMetrics(metrics)
 
 	writeQueue = NewInProgressMessageQueue()
 
@@ -291,4 +285,14 @@ func main() {
 			eventdef.StopBulkIndexer()
 		}
 	}
+}
+
+func initMetrics(metrics met.Backend) {
+	messagesSize = metrics.NewMeter("message_size", 0)
+	msgsAge = metrics.NewMeter("message_age", 0)
+	eventsToEsOK = metrics.NewCount("events_to_es.ok")
+	eventsToEsFail = metrics.NewCount("events_to_es.fail")
+	esPutDuration = metrics.NewTimer("es_put_duration", 0)
+	msgsHandleOK = metrics.NewCount("handle.ok")
+	msgsHandleFail = metrics.NewCount("handle.fail")
 }
