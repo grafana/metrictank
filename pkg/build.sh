@@ -7,8 +7,9 @@ cd ${DIR}
 : ${GOPATH:="${HOME}/.go_workspace"}
 export PATH=$GOPATH/bin:$PATH
 
+go get github.com/bmizerany/assert
 
-for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch metric_tank; do
+for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
 	cd ${DIR}/../${VAR}
 	go get ./...
 	cd $DIR
