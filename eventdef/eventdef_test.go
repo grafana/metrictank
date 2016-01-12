@@ -17,252 +17,206 @@
 package eventdef
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/raintank/raintank-metric/schema"
-	"io"
 	"log"
-	"net"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bmizerany/assert"
+	"github.com/codeskyblue/go-uuid"
+	"github.com/raintank/raintank-metric/schema"
 )
 
-var cmd *exec.Cmd
-var esargs []string
-var dataDir string
-var stdout io.ReadCloser
-var stderr io.ReadCloser
-
-func init() {
-	// if you change this, you need to change it in the config file too
-	// This directory *will* be wiped out when the tests finish.
-	dataDir = os.Getenv("ES_DATADIR")
-	if dataDir == "" {
-		dataDir = "/tmp/es_testing"
-	}
-	derr := os.Mkdir(dataDir, os.FileMode(0700))
-	if derr != nil {
-		panic(derr)
-	}
-	os.Mkdir(fmt.Sprintf("%s/log", dataDir), os.FileMode(0700))
-	esEnv := os.Getenv("ES_COMMAND")
-	if esEnv == "" {
-		esargs = []string{"elasticsearch", "--config=test_conf/elasticsearch.yml"}
-	} else {
-		esargs = strings.Split(esEnv, " ")
-	}
-	verbose := os.Getenv("ES_TEST_VERBOSE")
-	var cerr error
-	cmd = exec.Command(esargs[0], esargs[1:]...)
-	stderr, _ = cmd.StderrPipe()
-	stdout, _ = cmd.StdoutPipe()
-	if verbose != "" {
-		go func() {
-			for {
-				w := make([]byte, 1024)
-				_, rerr := stdout.Read(w)
-				log.Printf("STDOUT: %s\n", string(w))
-				if rerr != nil {
-					break
-				}
-			}
-		}()
-		go func() {
-			for {
-				w := make([]byte, 1024)
-				_, rerr := stderr.Read(w)
-				log.Printf("STDERR: %s\n", string(w))
-				if rerr != nil {
-					break
-				}
-			}
-		}()
-	}
-	cerr = cmd.Start()
-	if cerr != nil {
-		panic(cerr)
-	}
-	// wait for elasticsearch to start
-	fin := make(chan struct{})
-	go func() {
-		for {
-			_, conerr := net.Dial("tcp", "localhost:19200")
-			if conerr == nil {
-				fin <- struct{}{}
-				break
-			}
-		}
-	}()
-
-	select {
-	case <-fin:
-		// indexing returned
-	case <-time.After(30 * time.Second):
-		log.Println("Starting elasticsearch timed out")
-	}
-
-	addr := "localhost:19200"
-	err := InitElasticsearch(addr, "", "")
-	if err != nil {
-		panic(err)
-	}
-}
-
-func makeEvent() *schema.ProbeEvent {
+func makeEvent(timestamp time.Time) *schema.ProbeEvent {
 	e := new(schema.ProbeEvent)
+	e.Id = uuid.NewUUID().String()
 	e.EventType = "monitor_state"
 	e.OrgId = 1
 	e.Severity = "ERROR"
 	e.Source = "network_collector"
 	e.Message = "100% packet loss"
-	e.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
+	e.Timestamp = timestamp.UnixNano() / int64(time.Millisecond)
 
 	return e
 }
 
-// let's try pulling in an event and saving it, eh?
+func parseRequestPayload(buf *bytes.Buffer) map[string][]*schema.ProbeEvent {
+	/*
+		{"index":{"_index":"events-2016-01-12","_type":"monitor_state","_id":"f6698a1d-b8ef-11e5-b991-74d4353d029e","_timestamp":"1452577647000"}}
+		{"id":"f6698a1d-b8ef-11e5-b991-74d4353d029e","event_type":"monitor_state","org_id":1,"severity":"ERROR","source":"network_collector","timestamp":1452577647547,"message":"100% packet loss","tags":null}
+	*/
+	resp := make(map[string][]*schema.ProbeEvent)
+	lines := strings.Split(buf.String(), "\n")
+	for i := 0; i < len(lines); i += 2 {
+		if lines[i] == "" {
+			continue
+		}
+		idx := make(map[string]map[string]string)
+		err := json.Unmarshal([]byte(lines[i]), &idx)
+		if err != nil {
+			log.Fatalf("failed to marshal payload line. %s", err)
+		}
+		index := idx["index"]["_index"]
+		event := new(schema.ProbeEvent)
+		err = json.Unmarshal([]byte(lines[i+1]), event)
+		if err != nil {
+			log.Fatalf("failed to marshal payload line.%s", err)
+		}
+		if _, ok := resp[index]; !ok {
+			resp[index] = make([]*schema.ProbeEvent, 0)
+		}
+		resp[index] = append(resp[index], event)
 
-func TestSave(t *testing.T) {
-	e := makeEvent()
-	status := make(chan *BulkSaveStatus)
-	err := Save(e, status)
+	}
+	return resp
+}
+
+func TestPayloadSentOneEvent(t *testing.T) {
+	eTime := time.Now()
+	e := makeEvent(eTime)
+	sender := func(buf *bytes.Buffer) error {
+		//log.Printf("sending bytes. %s", buf)
+		data := parseRequestPayload(buf)
+		assert.T(t, len(data) == 1, fmt.Sprintf("Should have been only one indexName, found  %d", len(data)))
+		y, m, d := eTime.Date()
+		idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
+		events, indexFound := data[idxName]
+		assert.T(t, indexFound, fmt.Sprintf("index %s not found in request payload.", idxName))
+		assert.T(t, len(events) == 1, fmt.Sprintf("payload should have 1 event. %d found", len(events)))
+		assert.T(t, events[0].Id == e.Id, fmt.Sprintf("expected event id %s, got %s instead", e.Id, events[0].Id))
+		return nil
+	}
+	initBulkIndexer(sender, 10)
+	err := Save(e)
 	if err != nil {
 		t.Errorf("error right off the bat with saving: %s", err.Error())
 	}
-	estat := <-status
-	if estat.Requeue {
-		t.Errorf("event status came back with 'requeue'")
-	}
+
+	bulk.Stop()
 }
 
-func TestMultipleSave(t *testing.T) {
-	numEvents := 100
-	done := make([]chan *BulkSaveStatus, numEvents)
-	for i := 0; i < numEvents; i++ {
-		e := makeEvent()
-		status := make(chan *BulkSaveStatus, 1)
-		err := Save(e, status)
+func TestPayloadSentMultipleEvents(t *testing.T) {
+	eTime := time.Now()
+	events := make([]*schema.ProbeEvent, 5)
+	for i := 0; i < 5; i++ {
+		events[i] = makeEvent(eTime)
+	}
+
+	sender := func(buf *bytes.Buffer) error {
+		//log.Printf("sending bytes. %s", buf)
+		data := parseRequestPayload(buf)
+		assert.T(t, len(data) == 1, fmt.Sprintf("Should have been only one indexName, found  %d", len(data)))
+		y, m, d := eTime.Date()
+		idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
+		sentEvents, indexFound := data[idxName]
+		assert.T(t, indexFound, fmt.Sprintf("index %s not found in request payload.", idxName))
+
+		assert.T(t, len(sentEvents) == 5, fmt.Sprintf("payload should have 1 event. %d found", len(sentEvents)))
+		for i, e := range events {
+			assert.T(t, sentEvents[i].Id == e.Id, fmt.Sprintf("expected event id %s, got %s instead", e.Id, sentEvents[i].Id))
+		}
+
+		return nil
+	}
+
+	initBulkIndexer(sender, 10)
+	for _, e := range events {
+		err := Save(e)
 		if err != nil {
-			t.Errorf("error right off the bat for event %d with saving: %s", i, err.Error())
+			t.Errorf("error right off the bat with saving: %s", err.Error())
 		}
-		done[i] = status
 	}
-	var success int
-	var failure int
 
-	fin := make(chan int, 1)
-	go func() {
-		for _, s := range done {
-			estat := <-s
-			if estat.Requeue {
-				failure++
-			} else {
-				success++
-			}
-		}
-		fin <- 1
-	}()
-	select {
-	case <-fin:
-		// indexing returned
-	case <-time.After(10 * time.Second):
-		t.Errorf("Saving timed out")
-	}
-	if success < numEvents {
-		t.Errorf("Did not save all events successfully: %d succeeded, %d failed", success, failure)
-	}
+	bulk.Stop()
 }
 
-func TestResubmitAll(t *testing.T) {
-	// shut down elasticsearch here
-	perr := cmd.Process.Signal(os.Interrupt)
-	if perr != nil {
-		panic(perr)
-	}
-	cmd.Wait()
+func TestResponseChannelOk(t *testing.T) {
+	writeStatus = make(chan *BulkSaveStatus, 1)
 
-	// be very sure elasticsearch stops
-	fin := make(chan struct{}, 1)
-	go func() {
-		for {
-			_, conerr := net.Dial("tcp", "localhost:19200")
-			if conerr != nil {
-				fin <- struct{}{}
-				break
-			}
-		}
-	}()
+	esResponse := []byte(`{
+    "took": 1,
+    "errors": false,
+    "items": [
+        {
+            "index": {
+                "_index": "events-2016-01-12",
+                "_type": "monitor_state",
+                "_id": "1",
+                "_version": 2,
+                "status": 200
+            }
+        }
+    ]
+}`)
+	processEsResponse(esResponse)
 
-	select {
-	case <-fin:
-		// indexing returned
-	case <-time.After(30 * time.Second):
-		log.Println("Stopping elasticsearch timed out")
-	}
-
-	numEvents := 100
-	done := make([]chan *BulkSaveStatus, numEvents)
-	for i := 0; i < numEvents; i++ {
-		e := makeEvent()
-		status := make(chan *BulkSaveStatus, 1)
-		err := Save(e, status)
-		if err != nil {
-			t.Errorf("error right off the bat for event %d with saving: %s", i, err.Error())
-		}
-		done[i] = status
-	}
-	var success int
-	var failure int
-
-	go func() {
-		for _, s := range done {
-			estat := <-s
-			if estat.Requeue {
-				failure++
-			} else {
-				success++
-			}
-		}
-		fin <- struct{}{}
-	}()
-	select {
-	case <-fin:
-		// indexing returned
-	case <-time.After(10 * time.Second):
-		t.Errorf("Saving timed out")
-	}
-	if failure < numEvents {
-		t.Errorf("Did not save all events successfully: %d succeeded, %d failed", success, failure)
-	}
+	status := <-writeStatus
+	assert.T(t, status.Id == "1", fmt.Sprintf("expected status for event %s, got %s.", "1", status.Id))
+	assert.T(t, status.Ok, fmt.Sprintf("expected status.Ok to be true."))
 }
 
-// check to see if the elasticsearch index has the right name, and clean up
-func TestElasticSearchIndexes(t *testing.T) {
-	esIndexPath := fmt.Sprintf("%s/elasticsearch_gotest/nodes/0/indices", dataDir)
-	y, m, d := time.Now().Date()
-	idxName := fmt.Sprintf("events-%d-%02d-%02d", y, m, d)
-	dir, err := os.Open(esIndexPath)
-	if err != nil {
-		log.Printf("error opening %s: %s", esIndexPath, err.Error())
-	}
-	files, ferr := dir.Readdir(-1)
-	if ferr != nil {
-		log.Printf("error reading directory %s: %s", esIndexPath, ferr.Error())
-	}
-	var found bool
-	for _, f := range files {
-		if f.Name() == idxName {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("Expected to find index %s, but did not. Did find: %q", idxName, files)
-	}
-	err = os.RemoveAll(dataDir)
-	if err != nil {
-		log.Printf("Error removing %s: %s", esIndexPath, err.Error())
-	}
+func TestResponseChannelFailed(t *testing.T) {
+	writeStatus = make(chan *BulkSaveStatus, 1)
+
+	esResponse := []byte(`{
+    "took": 1,
+    "errors": true,
+    "items": [
+        {
+            "index": {
+                "_index": "events-2016-01-12",
+                "_type": "monitor_state",
+                "_id": "1",
+                "status": 409,
+                "error": "DocumentAlreadyExistsException[[events-2016-01-12][1] [monitor_state][f6698a1d-b8ef-11e5-b991-74d4353d029e]: document already exists]"
+            }
+        }
+    ]
+}`)
+	processEsResponse(esResponse)
+
+	status := <-writeStatus
+	assert.T(t, status.Id == "1", fmt.Sprintf("expected status for event %s, got %s.", "1", status.Id))
+	assert.T(t, !status.Ok, fmt.Sprintf("expected status.Ok to be false."))
+}
+
+func TestResponseChannelOkAndFailed(t *testing.T) {
+	writeStatus = make(chan *BulkSaveStatus, 1)
+
+	esResponse := []byte(`{
+    "took": 1,
+    "errors": true,
+    "items": [
+        {
+            "index": {
+                "_index": "events-2016-01-12",
+                "_type": "monitor_state",
+                "_id": "1",
+                "status": 409,
+                "error": "DocumentAlreadyExistsException[[events-2016-01-12][1] [monitor_state][f6698a1d-b8ef-11e5-b991-74d4353d029e]: document already exists]"
+            }
+        },
+        {
+            "index": {
+                "_index": "events-2016-01-12",
+                "_type": "monitor_state",
+                "_id": "2",
+                "_version": 2,
+                "status": 200
+            }
+        }
+    ]
+}`)
+	go processEsResponse(esResponse)
+
+	status := <-writeStatus
+	assert.T(t, status.Id == "1", fmt.Sprintf("expected status for event %s, got %s.", "1", status.Id))
+	assert.T(t, !status.Ok, fmt.Sprintf("expected status.Ok to be false."))
+
+	status = <-writeStatus
+	assert.T(t, status.Id == "2", fmt.Sprintf("expected status for event %s, got %s.", "2", status.Id))
+	assert.T(t, status.Ok, fmt.Sprintf("expected status.Ok to be true."))
 }

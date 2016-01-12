@@ -5,6 +5,7 @@ test:
   override:
     - go test -v -race ./schema
     - go test -v -race ./metric_tank
+    - go test -v -race ./eventdef
   post:
     - pkg/package.sh
 dependencies:

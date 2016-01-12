@@ -97,7 +97,12 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxD
 	if err != nil {
 		return err
 	}
+	initBulkIndexer(bulkSend, bulkMaxDocs)
+	setErrorTicker()
+	return nil
+}
 
+func initBulkIndexer(bulkSend func(*bytes.Buffer) error, bulkMaxDocs int) {
 	// Now create the actual bulk indexer and assign the custom bulkSend
 	// function to it as its sending function (so we have more control over
 	// how it handles errors)
@@ -106,10 +111,6 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxD
 	bulk.BulkMaxDocs = bulkMaxDocs
 	// start the indexer
 	bulk.Start()
-
-	setErrorTicker()
-
-	return nil
 }
 
 func Save(e *schema.ProbeEvent) error {
@@ -152,7 +153,6 @@ type responseStruct struct {
 }
 
 func bulkSend(buf *bytes.Buffer) error {
-	response := responseStruct{}
 
 	log.Debug("sending batch of events to Elastic")
 	body, err := es.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", bulk.Refresh), nil, buf)
@@ -162,6 +162,12 @@ func bulkSend(buf *bytes.Buffer) error {
 		log.Error(3, "failed to send batch of events to ES.", err)
 		return err
 	}
+
+	return processEsResponse(body)
+}
+
+func processEsResponse(body []byte) error {
+	response := responseStruct{}
 
 	// check for response errors, bulk insert will give 200 OK but then include errors in response
 	jsonErr := json.Unmarshal(body, &response)
@@ -191,9 +197,8 @@ func bulkSend(buf *bytes.Buffer) error {
 		// Something went *extremely* wrong trying to submit these items
 		// to elasticsearch. return an error and bulkIndexer will retry.
 		log.Error(3, "something went terribly wrong bulk loading: %s", jsonErr)
-		return err
+		return jsonErr
 	}
-
 	return nil
 }
 
