@@ -30,14 +30,13 @@ import (
 )
 
 func EnsureIndex(m *schema.MetricData) error {
-	id := m.Id()
-	def, err := GetMetricDefinition(id)
+	def, err := GetMetricDefinition(m.GetId())
 	if err != nil && err.Error() != "record not found" {
 		return err
 	}
 	//if the definition does not exist, or is older then 10minutes. update it.
 	if def == nil || def.LastUpdate < (time.Now().Unix()-600) {
-		mdef := schema.MetricDefinitionFromMetricData(id, m)
+		mdef := schema.MetricDefinitionFromMetricData(m)
 		if err := Save(mdef); err != nil {
 			return err
 		}
