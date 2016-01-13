@@ -7,7 +7,7 @@ import (
 
 	"github.com/bmizerany/assert"
 	"github.com/codeskyblue/go-uuid"
-	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/eventdef"
 	"github.com/raintank/raintank-metric/schema"
 )

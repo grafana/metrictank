@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/met/helper"
 	"testing"
 )
 
