@@ -41,7 +41,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 		pre := time.Now()
 		for i, m := range ms.Metrics {
 			if err := metricdef.EnsureIndex(m); err != nil {
-				log.Error(3, "couldn't index to ES %s: %s", m.Id(), err)
+				log.Error(3, "couldn't index to ES %s: %s", m.GetId(), err)
 				metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
 				return
 			}
@@ -52,11 +52,11 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 
 	for _, metric := range ms.Metrics {
 		if metric.Time == 0 {
-			log.Warn("invalid metric. metric.Time is 0. %s", metric.Id())
+			log.Warn("invalid metric. metric.Time is 0. %s", metric.GetId())
 		} else {
-			m := h.metrics.GetOrCreate(metric.Id())
+			m := h.metrics.GetOrCreate(metric.GetId())
 			m.Add(uint32(metric.Time), metric.Value)
-			metaCache.Add(metric.Id(), metric.Interval, metric.TargetType)
+			metaCache.Add(metric.GetId(), metric.Interval, metric.TargetType)
 		}
 	}
 
