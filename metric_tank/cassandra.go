@@ -71,20 +71,32 @@ func InitCassandra() error {
 	cluster.NumConns = *cassandraWriteConcurrency
 	cSession, err = cluster.CreateSession()
 
-	CassandraWriteQueue = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+	CassandraWriteQueue = make(chan *ChunkWriteRequest)
+	workerQueues := make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency)
 	for i := 0; i < *cassandraWriteConcurrency; i++ {
-		go processWriteQueue()
+		workerQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+		go processWriteQueue(workerQueues[i])
 	}
+	go func() {
+		var sum int
+		for cwr := range CassandraWriteQueue {
+			sum = 0
+			for _, char := range cwr.key {
+				sum += int(char)
+			}
+			workerQueues[sum%*cassandraWriteConcurrency] <- cwr
+		}
+	}()
 
 	return err
 }
 
 /* process writeQueue.
  */
-func processWriteQueue() {
+func processWriteQueue(queue chan *ChunkWriteRequest) {
 	for {
 		select {
-		case c := <-CassandraWriteQueue:
+		case c := <-queue:
 			log.Debug("starting to save %s:%d %v", c.key, c.chunk.T0, c.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassandraBlockDuration.Value(time.Now().Sub(c.timestamp))
