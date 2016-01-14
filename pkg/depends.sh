@@ -17,14 +17,32 @@ export PATH=$GOPATH/bin:$PATH
 mkdir -p artifacts
 bundle install
 
+MYGOPATH=""
+# find a writeable GOPATH
+echo "searching for writeable GOPATH"
+for p in ${GOPATH//:/ }; do 
+	echo "checking if $p is writeable"
+	if [ -w $p ]; then
+		echo "using $p"
+		MYGOPATH=$p
+		break
+	fi
+done	
+
+if [ -z ${MYGOPATH} ]; then
+	echo "no writable GOPATH found."
+	exit 1
+fi
+
+mkdir -p $MYGOPATH/src/github.com/raintank
+rm -rf $MYGOPATH/src/github.com/raintank/raintank-metric
 
 # link our checked out code to our gopath.
-rm -rf $GOPATH/src/github.com/raintank/raintank-metric
-ln -s $(dirname $(readlink -e $CHECKOUT)) $GOPATH/src/github.com/raintank/raintank-metric
-
+ABS_CHECKOUT=$(readlink -e $CHECKOUT)
+ln -s $ABS_CHECKOUT ${MYGOPATH}/src/github.com/raintank/raintank-metric
 
 for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
-	cd $GOPATH/src/github.com/raintank/raintank-metric
+	cd ${MYGOPATH}/src/github.com/raintank/raintank-metric
 	go get -t -d ./...
 	cd ${DIR}
 done
