@@ -24,7 +24,7 @@ ln -s $(dirname $(readlink -e $CHECKOUT)) $GOPATH/src/github.com/raintank/rainta
 
 
 for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
-	$GOPATH/src/github.com/raintank/raintank-metric
+	cd $GOPATH/src/github.com/raintank/raintank-metric
 	go get -t -d ./...
 	cd ${DIR}
 done
