@@ -1,11 +1,24 @@
 package main
 
 import (
+	"errors"
+	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"sync"
 	"time"
 )
+
+// design notes:
+// MT pulls in all definitions when it starts up.
+// those "old" ones + whatever it sees as inputs from the metrics queue
+// is enough for it to always know the complete current state
+// nothing should update ES "behind its back", so we never need to pull
+// from ES other then at startup.
+// but other MT instances may update ES while we are down, so ES is a good
+// place to pull from, until the performance is demonstrably too slow.
+// there are some vectors here for race conditions but we can work those out
+// later, perhaps when tacking the multiple-intervals work
 
 type DefCache struct {
 	sync.RWMutex
@@ -16,22 +29,43 @@ func NewDefCache() *DefCache {
 	return &DefCache{
 		defs: make(map[string]*schema.MetricDefinition),
 	}
-	// TODO: initialize state from local disk or cassandra
-	// TODO: periodically sync state to local disk
+	// TODO: initialize state from ES, something like searchDSL.Scroll(
 }
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
 	id := metric.GetId()
 	dc.Lock()
-	_, ok := dc.defs[id]
+	mdef, ok := dc.defs[id]
 	dc.Unlock()
-	if !ok {
-		mdef := schema.MetricDefinitionFromMetricData(metric)
+	if ok {
+		if mdef.LastUpdate < time.Now().Unix()-600 {
+			dc.addToES(mdef)
+		}
+	} else {
+		mdef = schema.MetricDefinitionFromMetricData(metric)
 		dc.Lock()
-		dc.defs[id] = mdef
+		add := false
+		_, ok := dc.defs[id]
+		if !ok {
+			dc.defs[id] = mdef
+			add = true
+		}
 		dc.Unlock()
+		if add {
+			dc.addToES(mdef)
+		}
 	}
+}
 
+func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
+	pre := time.Now()
+	err := metricdef.IndexMetric(mdef)
+	if err != nil {
+		log.Error(3, "couldn't index to ES %s: %s", mdef.Id, err)
+		//metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
+		//metricsToEsOK.Inc(int64(len(ms.Metrics)))
+		esPutDuration.Value(time.Now().Sub(pre))
+	}
 }
 
 func (dc *DefCache) Get(key string) (*schema.MetricDefinition, bool) {
@@ -49,13 +83,7 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 
 	if !ok {
 		metricDefCacheMiss.Inc(1)
-		pre := time.Now()
-		def, err := metricdef.GetMetricDefinition(req.key)
-		if err != nil {
-			return err
-		}
-		metricMetaGetDuration.Value(time.Now().Sub(pre))
-		req.rawInterval = uint32(def.Interval)
+		return errors.New("not found")
 	} else {
 		req.rawInterval = uint32(def.Interval)
 		metricDefCacheHit.Inc(1)
@@ -63,8 +91,5 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 	return nil
 }
 
-// TODO: re-introduce the following things:
-//		log.Error(3, "couldn't index to ES %s: %s", m.GetId(), err)
-//		metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
-//metricsToEsOK.Inc(int64(len(ms.Metrics)))
-//esPutDuration.Value(time.Now().Sub(pre))
+// now deprecated:
+// metricMetaGetDuration.Value(time.Now().Sub(pre))

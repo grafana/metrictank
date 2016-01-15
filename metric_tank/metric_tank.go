@@ -16,9 +16,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
@@ -46,8 +46,6 @@ var (
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
 	listenAddr      = flag.String("listen", ":6060", "http listener address.")
-	redisAddr       = flag.String("redis-addr", "localhost:6379", "redis address")
-	redisDB         = flag.Int("redis-db", 0, "Redis DB number.")
 	esAddr          = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
 	indexName       = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 	esWarmupPercent = flag.Int("elastic-warmup-pct", 1, "how much % of metrics to index into ES during the warmup period")
@@ -69,7 +67,7 @@ var (
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
 
-	metrics   *AggMetrics
+	metrics  *AggMetrics
 	defCache *DefCache
 
 	startupTime time.Time
@@ -164,11 +162,6 @@ func main() {
 	// set default cassandra address if none is set.
 	if *cassandraAddrs == "" {
 		*cassandraAddrs = "localhost"
-	}
-
-	err = metricdef.InitRedis(*redisAddr, *redisDB, "")
-	if err != nil {
-		log.Fatal(4, "failed to initialize redis. %s", err)
 	}
 
 	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName, *esWarmupPercent)
