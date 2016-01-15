@@ -70,7 +70,7 @@ var (
 	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
 
 	metrics   *AggMetrics
-	metaCache *MetaCache
+	defCache *DefCache
 
 	startupTime time.Time
 )
@@ -85,8 +85,8 @@ var chunkCreate met.Count
 var chunkClear met.Count
 var chunkSaveOk met.Count
 var chunkSaveFail met.Count
-var metricMetaCacheHit met.Count
-var metricMetaCacheMiss met.Count
+var metricDefCacheHit met.Count
+var metricDefCacheMiss met.Count
 var metricsReceived met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
@@ -234,8 +234,8 @@ func main() {
 	}
 
 	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
-	metaCache = NewMetaCache()
-	handler := NewHandler(metrics, metaCache)
+	defCache = NewDefCache()
+	handler := NewHandler(metrics, defCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
@@ -267,7 +267,7 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(metaCache, finalSettings))
+		http.HandleFunc("/get", get(defCache, finalSettings))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
@@ -298,8 +298,8 @@ func initMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
-	metricMetaCacheHit = stats.NewCount("metricmeta_cache.hit")
-	metricMetaCacheMiss = stats.NewCount("metricmeta_cache.miss")
+	metricDefCacheHit = stats.NewCount("metricmeta_cache.hit")
+	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
