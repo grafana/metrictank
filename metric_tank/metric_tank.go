@@ -16,9 +16,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
@@ -40,7 +40,7 @@ var (
 	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
 
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
-	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size. should be large engough to hold all at least the total number of series expected.")
+	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
@@ -212,7 +212,7 @@ func main() {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
-	err = InitCassandra()
+	store, err := NewCassandraStore()
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -233,7 +233,7 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
-	metrics = NewAggMetrics(uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
+	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
 	metaCache = NewMetaCache()
 	handler := NewHandler(metrics, metaCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
@@ -267,7 +267,7 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(metaCache, finalSettings))
+		http.HandleFunc("/get", get(store, metaCache, finalSettings))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
@@ -276,8 +276,8 @@ func main() {
 	for {
 		select {
 		case <-consumer.StopChan:
-			log.Info("closing cassandra session.")
-			cSession.Close()
+			log.Info("closing store")
+			store.Stop()
 			metricdef.Indexer.Stop()
 			log.Info("terminating.")
 			log.Close()
