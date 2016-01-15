@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/Dieterbe/go-metrics"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
@@ -31,52 +33,85 @@ var lag = metrics.NewHistogram(metrics.NewExpDecaySample(1028, 0.015))
 var numMetrics = metrics.NewGauge()
 var nullPoints = metrics.NewCounter()
 
-func main() {
-	if len(os.Args) != 5 && len(os.Args) != 6 {
-		log.Fatal("usage: graphite-watcher <environment-for-metrics> <elasticsearch-addr> <metrics-addr> <graphite-addr> [debug]")
-	}
-	addr, _ := net.ResolveTCPAddr("tcp", os.Args[3])
-	go metrics.Graphite(metrics.DefaultRegistry, 1e9, "graphite-watcher."+os.Args[1]+".", addr)
-	metrics.Register("lag", lag)
-	metrics.Register("num_metrics", numMetrics)
-	metrics.Register("null_points", nullPoints)
-	debug := false
-	if len(os.Args) == 6 && os.Args[5] == "debug" {
-		debug = true
-	}
+var env string
+var esAddr string
+var carbonAddr string
+var graphAddr string
+var debug bool
 
-	// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
-	// at a time X where X < Y.  Hence, we can confidently say that if we see a metric at Y, we can
-	// demand data to show up for that metric at >=Y
-	// for our data check to be useful we need metrics to show up in ES soon after being in the pipeline,
-	// which seems to be true (see nsqadmin)
-	go func() {
-		getEsTick := time.NewTicker(time.Second * time.Duration(1))
-		for range getEsTick.C {
-			metrics := getMetrics(os.Args[2])
-			numMetrics.Update(int64(len(metrics)))
-			tsUnix := time.Now().Unix()
-			for _, met := range metrics {
-				targetsLock.Lock()
-				if _, ok := targets[met.Name]; !ok {
-					targetKeys = append(targetKeys, met.Name)
-					targets[met.Name] = stat{met, tsUnix}
-				}
-				targetsLock.Unlock()
-			}
-		}
-	}()
+func init() {
+	flag.StringVar(&env, "env", "", "environment for metrics")
+	flag.StringVar(&esAddr, "es", "", "elasticsearch address")
+	flag.StringVar(&carbonAddr, "carbon", "", "address to send metrics to")
+	flag.StringVar(&graphAddr, "graphite", "", "graphite address")
+	flag.BoolVar(&debug, "debug", false, "debug mode")
+}
 
-	tick := time.NewTicker(time.Millisecond * time.Duration(100))
-	wg := &sync.WaitGroup{}
-	for ts := range tick.C {
+// for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
+// at a time X where X < Y.  Hence, we can confidently say that if we see a metric at Y, we can
+// demand data to show up for that metric at >=Y
+// for our data check to be useful we need metrics to show up in ES soon after being in the pipeline,
+// which seems to be true (see nsqadmin)
+func updateMetrics(metrics []schema.MetricDefinition, seenAt int64) {
+	numMetrics.Update(int64(len(metrics)))
+	for _, met := range metrics {
 		targetsLock.Lock()
-		if len(targetKeys) > 0 {
-			key := targetKeys[rand.Intn(len(targets))]
-			wg.Add(1)
-			go test(wg, ts.Unix(), targets[key], os.Args[4], debug)
+		if _, ok := targets[met.Name]; !ok {
+			targetKeys = append(targetKeys, met.Name)
+			targets[met.Name] = stat{met, seenAt}
 		}
 		targetsLock.Unlock()
 	}
-	wg.Wait()
+}
+
+func main() {
+	flag.Parse()
+	if env == "" {
+		fmt.Fprintln(os.Stderr, "env must be set")
+		os.Exit(2)
+	}
+	addr, _ := net.ResolveTCPAddr("tcp", carbonAddr)
+	go metrics.Graphite(metrics.DefaultRegistry, 1e9, "graphite-watcher."+env+".", addr)
+	metrics.Register("lag", lag)
+	metrics.Register("num_metrics", numMetrics)
+	metrics.Register("null_points", nullPoints)
+
+	args := flag.Args()
+	if len(args) == 1 && args[0] == "one" {
+		metrics := getMetrics(esAddr)
+		for len(metrics) == 0 {
+			fmt.Println("waiting to see metrics in ES...")
+			time.Sleep(4 * time.Second)
+			metrics = getMetrics(esAddr)
+		}
+		updateMetrics(metrics, time.Now().Unix())
+		targetsLock.Lock()
+		key := targetKeys[rand.Intn(len(targets))]
+		targetsLock.Unlock()
+		test(time.Now().Unix(), targets[key], graphAddr, debug)
+	} else {
+
+		go func() {
+			getEsTick := time.NewTicker(time.Second * time.Duration(1))
+			for range getEsTick.C {
+				updateMetrics(getMetrics(esAddr), time.Now().Unix())
+			}
+		}()
+
+		tick := time.NewTicker(time.Millisecond * time.Duration(100))
+		wg := &sync.WaitGroup{}
+		for ts := range tick.C {
+			targetsLock.Lock()
+			if len(targetKeys) > 0 {
+				key := targetKeys[rand.Intn(len(targets))]
+				wg.Add(1)
+				go func() {
+					test(ts.Unix(), targets[key], graphAddr, debug)
+					wg.Done()
+				}()
+			}
+			targetsLock.Unlock()
+		}
+		wg.Wait()
+	}
 }

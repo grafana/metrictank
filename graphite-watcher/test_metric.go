@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"sync"
 )
 
 func writeErrors(curTs int64, met stat, series *graphite.Response, debug bool, errs *[]string) {
@@ -39,8 +38,7 @@ func writeErrors(curTs int64, met stat, series *graphite.Response, debug bool, e
 	}
 }
 
-func test(wg *sync.WaitGroup, curTs int64, met stat, host string, debug bool) {
-	defer wg.Done()
+func test(curTs int64, met stat, host string, debug bool) {
 	var series graphite.Response
 	errs := make([]string, 0)
 	defer writeErrors(curTs, met, &series, debug, &errs)
