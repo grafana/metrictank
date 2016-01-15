@@ -8,10 +8,11 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"sync"
 	"time"
-	//"strings"
 )
 
 func perror(err error) {
@@ -37,6 +38,7 @@ var env string
 var esAddr string
 var carbonAddr string
 var graphAddr string
+var listenAddr string
 var debug bool
 
 func init() {
@@ -44,6 +46,7 @@ func init() {
 	flag.StringVar(&esAddr, "es", "", "elasticsearch address")
 	flag.StringVar(&carbonAddr, "carbon", "", "address to send metrics to")
 	flag.StringVar(&graphAddr, "graphite", "", "graphite address")
+	flag.StringVar(&listenAddr, "listen", ":6060", "http listener address.")
 	flag.BoolVar(&debug, "debug", false, "debug mode")
 }
 
@@ -72,6 +75,10 @@ func main() {
 	}
 	addr, _ := net.ResolveTCPAddr("tcp", carbonAddr)
 	go metrics.Graphite(metrics.DefaultRegistry, 1e9, "graphite-watcher."+env+".", addr)
+	go func() {
+		log.Println("starting listener on", listenAddr)
+		log.Printf("%s\n", http.ListenAndServe(listenAddr, nil))
+	}()
 	metrics.Register("lag", lag)
 	metrics.Register("num_metrics", numMetrics)
 	metrics.Register("null_points", nullPoints)
