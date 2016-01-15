@@ -31,15 +31,15 @@ type Series struct {
 	Interval   uint32
 }
 
-func get(metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
+func get(store Store, metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, metaCache, aggSettings)
+		Get(w, req, store, metaCache, aggSettings)
 	}
 }
 
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSettings []aggSetting) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, metaCache *MetaCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	values := req.URL.Query()
 	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
@@ -145,7 +145,7 @@ func Get(w http.ResponseWriter, req *http.Request, metaCache *MetaCache, aggSett
 	for i, req := range reqs {
 		log.Debug("===================================")
 		log.Debug("HTTP Get()          %s", req)
-		points, interval, err := getTarget(req)
+		points, interval, err := getTarget(store, req)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)

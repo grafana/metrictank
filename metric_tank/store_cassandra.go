@@ -39,69 +39,68 @@ Session is the interface used by users to interact with the database.
 It's safe for concurrent use by multiple goroutines and a typical usage scenario is to have one global session
 object to interact with the whole Cassandra cluster.
 */
-var cSession *gocql.Session
-var CassandraWriteQueue chan *ChunkWriteRequest
 
-type ChunkWriteRequest struct {
-	key       string
-	chunk     *Chunk
-	ttl       uint32
-	timestamp time.Time
+type cassandraStore struct {
+	session      *gocql.Session
+	workerQueues []chan *ChunkWriteRequest
 }
 
-func InitCassandra() error {
+func NewCassandraStore() (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cluster.Consistency = gocql.One
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// ensure the keyspace and table exist.
 	err = tmpSession.Query(keyspace_schema).Exec()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = tmpSession.Query(table_schema).Exec()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	tmpSession.Close()
 	cluster.Keyspace = "raintank"
 	cluster.NumConns = *cassandraWriteConcurrency
-	cSession, err = cluster.CreateSession()
-
-	CassandraWriteQueue = make(chan *ChunkWriteRequest)
-	workerQueues := make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency)
-	for i := 0; i < *cassandraWriteConcurrency; i++ {
-		workerQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
-		go processWriteQueue(workerQueues[i])
+	session, err := cluster.CreateSession()
+	if err != nil {
+		return nil, err
 	}
-	go func() {
-		var sum int
-		for cwr := range CassandraWriteQueue {
-			sum = 0
-			for _, char := range cwr.key {
-				sum += int(char)
-			}
-			workerQueues[sum%*cassandraWriteConcurrency] <- cwr
-		}
-	}()
+	c := &cassandraStore{
+		session:      session,
+		workerQueues: make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency),
+	}
 
-	return err
+	for i := 0; i < *cassandraWriteConcurrency; i++ {
+		c.workerQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+		go c.processWriteQueue(c.workerQueues[i])
+	}
+
+	return c, err
+}
+
+func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
+	sum := 0
+	for _, char := range cwr.key {
+		sum += int(char)
+	}
+	c.workerQueues[sum%*cassandraWriteConcurrency] <- cwr
 }
 
 /* process writeQueue.
  */
-func processWriteQueue(queue chan *ChunkWriteRequest) {
+func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest) {
 	for {
 		select {
-		case c := <-queue:
-			log.Debug("starting to save %s:%d %v", c.key, c.chunk.T0, c.chunk)
+		case cwr := <-queue:
+			log.Debug("starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
-			cassandraBlockDuration.Value(time.Now().Sub(c.timestamp))
+			cassandraBlockDuration.Value(time.Now().Sub(cwr.timestamp))
 
-			data := c.chunk.Series.Bytes()
+			data := cwr.chunk.Series.Bytes()
 			chunkSizeAtSave.Value(int64(len(data)))
 			version := FormatStandardGoTsz
 			buf := new(bytes.Buffer)
@@ -116,16 +115,16 @@ func processWriteQueue(queue chan *ChunkWriteRequest) {
 			success := false
 			attempts := 0
 			for !success {
-				err := InsertChunk(c.key, c.chunk.T0, buf.Bytes(), int(c.ttl))
+				err := c.insertChunk(cwr.key, cwr.chunk.T0, buf.Bytes(), int(cwr.ttl))
 				if err == nil {
 					success = true
-					c.chunk.Saved = true
-					SendPersistMessage(c.key, c.chunk.T0)
-					log.Debug("save complete. %s:%d %v", c.key, c.chunk.T0, c.chunk)
+					cwr.chunk.Saved = true
+					SendPersistMessage(cwr.key, cwr.chunk.T0)
+					log.Debug("save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc(1)
 				} else {
 					if (attempts % 20) == 0 {
-						log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, c.chunk, err)
+						log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
 					}
 					chunkSaveFail.Inc(1)
 					sleepTime := 100 * attempts
@@ -145,15 +144,15 @@ func processWriteQueue(queue chan *ChunkWriteRequest) {
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func InsertChunk(key string, t0 uint32, data []byte, ttl int) error {
+func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int) error {
 	// for unit tests
-	if cSession == nil {
+	if c.session == nil {
 		return nil
 	}
 	query := fmt.Sprintf("INSERT INTO metric (key, ts, data) values(?,?,?) USING TTL %d", ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
-	ret := cSession.Query(query, row_key, t0, data).Exec()
+	ret := c.session.Query(query, row_key, t0, data).Exec()
 	cassandraPutDuration.Value(time.Now().Sub(pre))
 	return ret
 }
@@ -171,7 +170,7 @@ func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func searchCassandra(key string, start, end uint32) ([]Iter, error) {
+func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	iters := make([]Iter, 0)
 	if start > end {
 		return iters, fmt.Errorf("start must be before end.")
@@ -183,7 +182,7 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
 		wg.Add(1)
 		go func() {
-			results <- outcome{month, sortKey, cSession.Query(q, p...).Iter()}
+			results <- outcome{month, sortKey, c.session.Query(q, p...).Iter()}
 			wg.Done()
 		}()
 	}
@@ -277,4 +276,8 @@ func searchCassandra(key string, start, end uint32) ([]Iter, error) {
 	cassandraRowsPerResponse.Value(int64(len(outcomes)))
 	log.Debug("searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil
+}
+
+func (c *cassandraStore) Stop() {
+	c.session.Close()
 }
