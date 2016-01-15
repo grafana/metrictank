@@ -85,6 +85,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 1 && args[0] == "one" {
+		log.Println("mode: oneshot")
 		metrics := getMetrics(esAddr)
 		for len(metrics) == 0 {
 			fmt.Println("waiting to see metrics in ES...")
@@ -97,7 +98,7 @@ func main() {
 		targetsLock.Unlock()
 		test(time.Now().Unix(), targets[key], graphAddr, debug)
 	} else {
-
+		log.Println("mode: continuous")
 		go func() {
 			getEsTick := time.NewTicker(time.Second * time.Duration(1))
 			for range getEsTick.C {
