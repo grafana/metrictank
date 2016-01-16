@@ -47,11 +47,20 @@ func init() {
 }
 
 // returns a chunk for testing of 100Bytes
-func getChunk(id int) []byte {
+// size should be a multiple of 100
+func getChunk(id, size int) []byte {
 	b := bytes.NewBuffer([]byte(fmt.Sprintf("%20d", id)))
-	_, err := b.Write([]byte("11111111112222222222333333333344444444445555555555666666666677777777778888888888"))
+	len80 := []byte("11111111112222222222333333333344444444445555555555666666666677777777778888888888")
+	len100 := []byte("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000")
+	_, err := b.Write(len80)
 	if err != nil {
 		panic(err)
+	}
+	for i := 0; i < size/100-1; i++ {
+		_, err := b.Write(len100)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return b.Bytes()
 }
@@ -66,26 +75,56 @@ func randKey(n int) []byte {
 	}
 	return b
 }
+func printB(bytes int64) string {
+	if bytes < 4096 {
+		return fmt.Sprintf("%d B", bytes)
+	} else if bytes < 4096*1024 {
+		return fmt.Sprintf("%d KiB", bytes/1024)
+	} else if bytes < 4096*1024*10024 {
+		return fmt.Sprintf("%d MiB", bytes/1024/1024)
+	} else {
+		return fmt.Sprintf("%d GiB", bytes/1024/1024/1024)
+	}
+}
 
-func BenchmarkBoltWrite1kRandMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysRand[0:1000], b)
+func BenchmarkBoltWrite1kRandMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysRand[0:1000], 100, b)
 }
-func BenchmarkBoltWrite100kRandMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysRand[0:100000], b)
+func BenchmarkBoltWrite100kRandMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysRand[0:100000], 100, b)
 }
-func BenchmarkBoltWrite1kSortMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysSort[0:1000], b)
+func BenchmarkBoltWrite1kSortMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysSort[0:1000], 100, b)
 }
-func BenchmarkBoltWrite100kSortMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysSort[0:100000], b)
+func BenchmarkBoltWrite100kSortMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysSort[0:100000], 100, b)
 }
-func BenchmarkBoltWrite1kRevSortMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysRevSort[0:1000], b)
+func BenchmarkBoltWrite1kRevSortMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysRevSort[0:1000], 100, b)
 }
-func BenchmarkBoltWrite100kRevSortMetrics(b *testing.B) {
-	benchmarkBoltWrite(keysRevSort[0:100000], b)
+func BenchmarkBoltWrite100kRevSortMetrics100(b *testing.B) {
+	benchmarkBoltWrite(keysRevSort[0:100000], 100, b)
 }
-func benchmarkBoltWrite(keys [][]byte, b *testing.B) {
+
+func BenchmarkBoltWrite1kRandMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysRand[0:1000], 500, b)
+}
+func BenchmarkBoltWrite100kRandMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysRand[0:100000], 500, b)
+}
+func BenchmarkBoltWrite1kSortMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysSort[0:1000], 500, b)
+}
+func BenchmarkBoltWrite100kSortMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysSort[0:100000], 500, b)
+}
+func BenchmarkBoltWrite1kRevSortMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysRevSort[0:1000], 500, b)
+}
+func BenchmarkBoltWrite100kRevSortMetrics500(b *testing.B) {
+	benchmarkBoltWrite(keysRevSort[0:100000], 500, b)
+}
+func benchmarkBoltWrite(keys [][]byte, chunkSize int, b *testing.B) {
 	fname := fmt.Sprintf("test-%d.db", len(keys))
 	db, err := bolt.Open(fname, 0600, nil)
 	if err != nil {
@@ -111,7 +150,7 @@ func benchmarkBoltWrite(keys [][]byte, b *testing.B) {
 			//fmt.Print(chunk)
 			for metric := 0; metric < len(keys); metric++ {
 				b := tx.Bucket(keys[metric])
-				err := b.Put([]byte(string(chunk)), getChunk(chunk))
+				err := b.Put([]byte(string(chunk)), getChunk(chunk, chunkSize))
 				if err != nil {
 					return err
 				}
@@ -120,28 +159,17 @@ func benchmarkBoltWrite(keys [][]byte, b *testing.B) {
 				//	}
 			}
 			//fmt.Println()
-			b.SetBytes(int64(len(keys)) * 100)
+			b.SetBytes(int64(len(keys) * chunkSize))
 		}
 		return nil
 	})
 	b.StopTimer()
-	printB := func(bytes int64) string {
-		if bytes < 4096 {
-			return fmt.Sprintf("%d B", bytes)
-		} else if bytes < 4096*1024 {
-			return fmt.Sprintf("%d KiB", bytes/1024)
-		} else if bytes < 4096*1024*10024 {
-			return fmt.Sprintf("%d MiB", bytes/1024/1024)
-		} else {
-			return fmt.Sprintf("%d GiB", bytes/1024/1024/1024)
-		}
-	}
-	totalB := int64(len(keys) * 100 * b.N)
-	st, err := os.Stat(fname)
-	if err != nil {
-		panic(err)
-	}
-	b.Logf("wrote %s -- filesize %s", printB(totalB), printB(st.Size()))
+	//	totalB := int64(len(keys) * chunkSize * b.N)
+	//	st, err := os.Stat(fname)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	b.Logf("wrote %s -- filesize %s", printB(totalB), printB(st.Size()))
 	os.Remove(fname)
 	/*	for chunk := 0; chunk < b.N; chunk++ {
 			for metric := 0; metric < m; metric++ {
