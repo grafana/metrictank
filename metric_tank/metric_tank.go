@@ -99,7 +99,6 @@ var reqHandleDuration met.Timer
 var cassandraPutDuration met.Timer
 var cassandraBlockDuration met.Timer
 var cassandraGetDuration met.Timer
-var metricMetaGetDuration met.Timer
 var inItems met.Meter
 var points met.Gauge
 var msgsHandleOK met.Count
@@ -305,7 +304,6 @@ func initMetrics(stats met.Backend) {
 	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
 	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
 	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
-	metricMetaGetDuration = stats.NewTimer("metricmeta_cache_lookup_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")

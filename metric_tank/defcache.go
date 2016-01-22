@@ -132,6 +132,3 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 	}
 	return nil
 }
-
-// now deprecated:
-// metricMetaGetDuration.Value(time.Now().Sub(pre))
