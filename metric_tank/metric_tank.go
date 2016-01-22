@@ -109,7 +109,7 @@ var sysBytes met.Gauge
 var metricsActive met.Gauge
 var metricsToEsOK met.Count
 var metricsToEsFail met.Count
-var esPutDuration met.Timer
+var esPutDuration met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 
 func main() {
 	startupTime = time.Now()
