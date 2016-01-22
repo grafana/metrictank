@@ -94,11 +94,19 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	pre := time.Now()
 	err := metricdef.IndexMetric(mdef)
+	mdef.LastUpdate = pre.Unix()
 	if err != nil {
 		log.Error(3, "couldn't index to ES %s: %s", mdef.Id, err)
 		//metricsToEsFail.Inc(int64(len(ms.Metrics) - i))
 		//metricsToEsOK.Inc(int64(len(ms.Metrics)))
 		esPutDuration.Value(time.Now().Sub(pre))
+	} else {
+		// TODO: only updating if err == nil may cause hammering ES
+		// when err != nil. remove this comment once we know this is ok
+		// or we have some sort of ratelimiting
+		dc.Lock()
+		dc.defs[mdef.Id] = mdef
+		dc.Unlock()
 	}
 }
 
