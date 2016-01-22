@@ -161,6 +161,37 @@ func InitElasticsearch(addr, user, pass, indexName string, warmupPct int) error 
 	return nil
 }
 
+// if scroll_id specified, will resume that scroll session.
+// returns scroll_id if there's any more metrics to be fetched.
+func GetMetrics(scroll_id string) ([]*schema.MetricDefinition, string, error) {
+	// future optimiz: clear scroll when finished, tweak length of items, order by _doc
+	// see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-scroll.html
+	defs := make([]*schema.MetricDefinition, 0)
+	var err error
+	var out elastigo.SearchResult
+	if scroll_id == "" {
+		out, err = es.Search(IndexName, "metric_index", map[string]interface{}{"scroll": "1m"}, nil)
+	} else {
+		out, err = es.Scroll(map[string]interface{}{"scroll": "1m"}, scroll_id)
+	}
+	if err != nil {
+		return defs, "", err
+	}
+	for _, h := range out.Hits.Hits {
+		mdef, err := schema.MetricDefinitionFromJSON(*h.Source)
+		if err != nil {
+			return defs, "", err
+		}
+		defs = append(defs, mdef)
+	}
+	scroll_id = ""
+	if out.Hits.Len() > 0 {
+		scroll_id = out.ScrollId
+	}
+
+	return defs, scroll_id, nil
+}
+
 func IndexMetric(m *schema.MetricDefinition) error {
 	if err := m.Validate(); err != nil {
 		return err

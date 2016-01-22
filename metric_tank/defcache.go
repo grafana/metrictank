@@ -26,10 +26,44 @@ type DefCache struct {
 }
 
 func NewDefCache() *DefCache {
-	return &DefCache{
+	d := &DefCache{
 		defs: make(map[string]*schema.MetricDefinition),
 	}
-	// TODO: initialize state from ES, something like searchDSL.Scroll(
+	go d.Backfill()
+	return d
+}
+
+// backfill definitions from ES
+// in theory, there is a race between defs from ES and from nsq
+// in practice, it doesn't matter: you're only supposed to query MT
+// after a while, after which the defs surely have stabilized.
+func (dc *DefCache) Backfill() {
+	total := 0
+	add := func(met []*schema.MetricDefinition) {
+		if len(met) > 0 {
+			total += len(met)
+			dc.Lock()
+			for _, def := range met {
+				dc.defs[def.Id] = def
+			}
+			dc.Unlock()
+		}
+	}
+	met, scroll_id, err := metricdef.GetMetrics("")
+	if err != nil {
+		log.Error(3, "Could not backfill from ES: %s", err)
+		return
+	}
+	add(met)
+	for scroll_id != "" {
+		met, scroll_id, err = metricdef.GetMetrics(scroll_id)
+		if err != nil {
+			log.Error(3, "Could not backfill from ES: %s", err)
+			return
+		}
+		add(met)
+	}
+	log.Debug("backfilled %d metric definitions", total)
 }
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
