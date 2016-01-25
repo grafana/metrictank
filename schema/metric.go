@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 )
 
 //go:generate msgp
@@ -98,7 +97,7 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		Metric:     d.Metric,
 		TargetType: d.TargetType,
 		Interval:   d.Interval,
-		LastUpdate: time.Now().Unix(),
+		LastUpdate: d.Time,
 		Unit:       d.Unit,
 		Tags:       d.Tags,
 		Nodes:      nodesMap,

@@ -72,7 +72,10 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 	mdef, ok := dc.defs[id]
 	dc.Unlock()
 	if ok {
-		if mdef.LastUpdate < time.Now().Unix()-600 {
+		//If the time diff between this datapoint and the lastUpdate
+		// time of the metricDef is grater then 6hours, update the metricDef.
+		if mdef.LastUpdate < metric.Time-21600 {
+			mdef.LastUpdate = metric.Time
 			dc.addToES(mdef)
 		}
 	} else {
@@ -94,7 +97,6 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	pre := time.Now()
 	err := metricdef.IndexMetric(mdef)
-	mdef.LastUpdate = pre.Unix()
 	if err != nil {
 		log.Error(3, "couldn't index to ES %s: %s", mdef.Id, err)
 		metricsToEsFail.Inc(1)
