@@ -80,31 +80,21 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 		}
 	} else {
 		mdef = schema.MetricDefinitionFromMetricData(metric)
-		dc.Lock()
-		add := false
-		_, ok := dc.defs[id]
-		if !ok {
-			dc.defs[id] = mdef
-			add = true
-		}
-		dc.Unlock()
-		if add {
-			dc.addToES(mdef)
-		}
+		dc.addToES(mdef)
 	}
 }
 
 func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	pre := time.Now()
 	err := metricdef.IndexMetric(mdef)
+	// NOTE: indexing to ES is done asyncrounously using the bulkAPI.
+	// so an error here is just an error adding the document to the
+	// bulkAPI buffer.
 	if err != nil {
 		log.Error(3, "couldn't index to ES %s: %s", mdef.Id, err)
 		metricsToEsFail.Inc(1)
 	} else {
 		metricsToEsOK.Inc(1)
-		// TODO: only updating if err == nil may cause hammering ES
-		// when err != nil. remove this comment once we know this is ok
-		// or we have some sort of ratelimiting
 		dc.Lock()
 		dc.defs[mdef.Id] = mdef
 		dc.Unlock()
