@@ -170,7 +170,7 @@ func GetMetrics(scroll_id string) ([]*schema.MetricDefinition, string, error) {
 	var err error
 	var out elastigo.SearchResult
 	if scroll_id == "" {
-		out, err = es.Search(IndexName, "metric_index", map[string]interface{}{"scroll": "1m"}, nil)
+		out, err = es.Search(IndexName, "metric_index", map[string]interface{}{"scroll": "1m", "size": 1000}, nil)
 	} else {
 		out, err = es.Scroll(map[string]interface{}{"scroll": "1m"}, scroll_id)
 	}
