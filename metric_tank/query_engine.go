@@ -24,9 +24,9 @@ func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 
-func findMetricsForRequests(reqs []Req, metaCache *MetaCache) error {
+func findMetricsForRequests(reqs []Req, defCache *DefCache) error {
 	for i := range reqs {
-		err := metaCache.UpdateReq(&reqs[i])
+		err := defCache.UpdateReq(&reqs[i])
 		if err != nil {
 			return err
 		}

@@ -31,15 +31,15 @@ type Series struct {
 	Interval   uint32
 }
 
-func get(store Store, metaCache *MetaCache, aggSettings []aggSetting) http.HandlerFunc {
+func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, metaCache, aggSettings)
+		Get(w, req, store, defCache, aggSettings)
 	}
 }
 
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request, store Store, metaCache *MetaCache, aggSettings []aggSetting) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	values := req.URL.Query()
 	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
@@ -105,9 +105,9 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, metaCache *MetaC
 		}
 
 		if consolidateBy == "" {
-			meta := metaCache.Get(id)
+			def, ok := defCache.Get(id)
 			consolidateBy = "avg"
-			if meta.targetType == "counter" {
+			if ok && def.TargetType == "counter" {
 				consolidateBy = "last"
 			}
 		}
@@ -130,7 +130,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, metaCache *MetaC
 		req := NewReq(id, fromUnix, toUnix, maxDataPoints, consolidator)
 		reqs[i] = req
 	}
-	err = findMetricsForRequests(reqs, metaCache)
+	err = findMetricsForRequests(reqs, defCache)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
