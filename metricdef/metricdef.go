@@ -31,16 +31,10 @@ var es *elastigo.Conn
 var Indexer *elastigo.BulkIndexer
 var IndexName = "metric"
 
-// for the first 30minutes after startup, only
-// write to ES 1% of the time. This allows us to
-// slowly warmup a new or stale index.
-var warmUpDuration = 1800
-var warmUpPercent = 1
 var startTime time.Time
 
-func InitElasticsearch(addr, user, pass, indexName string, warmupPct int) error {
+func InitElasticsearch(addr, user, pass, indexName string) error {
 	IndexName = indexName
-	warmUpPercent = warmupPct
 	startTime = time.Now()
 	rand.Seed(startTime.Unix())
 
@@ -197,12 +191,6 @@ func IndexMetric(m *schema.MetricDefinition) error {
 		return err
 	}
 
-	if time.Since(startTime) < (time.Duration(warmUpDuration) * time.Second) {
-		// we are in our warmup period.
-		if rand.Intn(100) > warmUpPercent {
-			return nil
-		}
-	}
 	log.Debug("indexing %s in elasticsearch", m.Id)
 	err := Indexer.Index(IndexName, "metric_index", m.Id, "", "", nil, m)
 	if err != nil {

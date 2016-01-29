@@ -45,10 +45,9 @@ var (
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
-	listenAddr      = flag.String("listen", ":6060", "http listener address.")
-	esAddr          = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
-	indexName       = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
-	esWarmupPercent = flag.Int("elastic-warmup-pct", 1, "how much % of metrics to index into ES during the warmup period")
+	listenAddr = flag.String("listen", ":6060", "http listener address.")
+	esAddr     = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
+	indexName  = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
@@ -163,7 +162,7 @@ func main() {
 		*cassandraAddrs = "localhost"
 	}
 
-	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName, *esWarmupPercent)
+	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
