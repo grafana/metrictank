@@ -29,7 +29,7 @@ func NewDefCache() *DefCache {
 	d := &DefCache{
 		defs: make(map[string]*schema.MetricDefinition),
 	}
-	go d.Backfill()
+	d.Backfill()
 	return d
 }
 
