@@ -219,14 +219,15 @@ func main() {
 	}
 	cfg.MaxInFlight = *maxInFlight
 
+	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
+	defCache = NewDefCache()
+	handler := NewHandler(metrics, defCache)
+	log.Info("DefCache initialized. starting data consumption")
+
 	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
 	if err != nil {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
-
-	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
-	defCache = NewDefCache()
-	handler := NewHandler(metrics, defCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
