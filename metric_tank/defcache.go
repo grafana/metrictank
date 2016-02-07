@@ -22,12 +22,14 @@ import (
 
 type DefCache struct {
 	sync.RWMutex
-	defs map[string]*schema.MetricDefinition
+	defs      map[string]*schema.MetricDefinition
+	defsStore metricdef.Defs
 }
 
-func NewDefCache() *DefCache {
+func NewDefCache(defsStore metricdef.Defs) *DefCache {
 	d := &DefCache{
-		defs: make(map[string]*schema.MetricDefinition),
+		defs:      make(map[string]*schema.MetricDefinition),
+		defsStore: defsStore,
 	}
 	d.Backfill()
 	return d
@@ -49,14 +51,14 @@ func (dc *DefCache) Backfill() {
 			dc.Unlock()
 		}
 	}
-	met, scroll_id, err := metricdef.GetMetrics("")
+	met, scroll_id, err := dc.defsStore.GetMetrics("")
 	if err != nil {
 		log.Error(3, "Could not backfill from ES: %s", err)
 		return
 	}
 	add(met)
 	for scroll_id != "" {
-		met, scroll_id, err = metricdef.GetMetrics(scroll_id)
+		met, scroll_id, err = dc.defsStore.GetMetrics(scroll_id)
 		if err != nil {
 			log.Error(3, "Could not backfill from ES: %s", err)
 			return
@@ -86,7 +88,7 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 
 func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	pre := time.Now()
-	err := metricdef.IndexMetric(mdef)
+	err := dc.defsStore.IndexMetric(mdef)
 	// NOTE: indexing to ES is done asyncrounously using the bulkAPI.
 	// so an error here is just an error adding the document to the
 	// bulkAPI buffer.
