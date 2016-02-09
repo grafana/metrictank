@@ -448,21 +448,22 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		chunkCreate.Inc(1)
-		var msg string
 		if len(a.Chunks) < int(a.NumChunks) {
-			msg = fmt.Sprintf("added new chunk to buffer. now %d chunks", a.CurrentChunkPos+1)
 			a.Chunks = append(a.Chunks, NewChunk(t0))
+			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
+			}
+			log.Debug("AggMetric %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
 		} else {
 			chunkClear.Inc(1)
 			totalPoints <- -1 * int(a.Chunks[a.CurrentChunkPos].NumPoints)
-			msg = fmt.Sprintf("cleared chunk at %d of %d and replaced with new", a.CurrentChunkPos, len(a.Chunks))
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
+			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
+			}
+			log.Debug("AggMetric %s Add(): cleared chunk at %d of %d and replaced with new. and added the new point: %s", a.Key, a.CurrentChunkPos, len(a.Chunks), a.Chunks[a.CurrentChunkPos])
 		}
 
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
-		}
-		log.Debug("AggMetric %s Add(): %s and added the new point: %s", a.Key, msg, a.Chunks[a.CurrentChunkPos])
 	}
 	a.addAggregators(ts, val)
 }
