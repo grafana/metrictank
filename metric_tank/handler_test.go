@@ -19,34 +19,38 @@ func BenchmarkHandler_HandleMessage1000(b *testing.B) {
 	defCache := NewDefCache(metricdef.NewDefsMock())
 	handler := NewHandler(aggmetrics, defCache)
 
-	metric := &schema.MetricData{
-		Id:         "some.id.of.a.metric",
-		OrgId:      500,
-		Name:       "some.id",
-		Metric:     "metric",
-		Interval:   60,
-		Value:      1234.567,
-		Unit:       "ms",
-		Time:       1234567890,
-		TargetType: "gauge",
-		Tags:       []string{"some_tag", "ok"},
+	metrics := make([]*schema.MetricData, 10)
+	for i := 0; i < len(metrics); i++ {
+		metrics[i] = &schema.MetricData{
+			Id:         "some.id.of.a.metric",
+			OrgId:      500,
+			Name:       "some.id",
+			Metric:     "metric",
+			Interval:   60,
+			Value:      1234.567,
+			Unit:       "ms",
+			Time:       1234567890 + int64(i),
+			TargetType: "gauge",
+			Tags:       []string{"some_tag", "ok"},
+		}
 	}
-
-	metrics := make([]*schema.MetricData, 0)
-	for i := 0; i < 10; i++ {
-		metrics = append(metrics, metric)
+	msgs := make([]*nsq.Message, 1000)
+	for i := 0; i < len(msgs); i++ {
+		id := nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
+		for j := 0; j < len(metrics); j++ {
+			metrics[j].Time += 10
+		}
+		data, err := msg.CreateMsg(metrics, 1, msg.FormatMetricDataArrayMsgp)
+		if err != nil {
+			panic(err)
+		}
+		msgs[i] = nsq.NewMessage(id, data)
 	}
-	id := nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
-	data, err := msg.CreateMsg(metrics, 1, msg.FormatMetricDataArrayMsgp)
-	if err != nil {
-		panic(err)
-	}
-	nsqmsg := nsq.NewMessage(id, data)
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		for i := 0; i < 1000; i++ {
-			err := handler.HandleMessage(nsqmsg)
+		for i := 0; i < len(msgs); i++ {
+			err := handler.HandleMessage(msgs[i])
 			if err != nil {
 				panic(err)
 			}
