@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func BenchmarkHandler_HandleMessage1000(b *testing.B) {
+func BenchmarkHandler_HandleMessage(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	clusterStatus = NewClusterStatus("default", false)
 	initMetrics(stats)
@@ -29,12 +29,13 @@ func BenchmarkHandler_HandleMessage1000(b *testing.B) {
 			Interval:   60,
 			Value:      1234.567,
 			Unit:       "ms",
-			Time:       1234567890 + int64(i),
+			Time:       int64(i - len(metrics) + 1),
 			TargetType: "gauge",
 			Tags:       []string{"some_tag", "ok"},
 		}
 	}
-	msgs := make([]*nsq.Message, 1000)
+	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
+	msgs := make([]*nsq.Message, b.N)
 	for i := 0; i < len(msgs); i++ {
 		id := nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
 		for j := 0; j < len(metrics); j++ {
@@ -48,12 +49,10 @@ func BenchmarkHandler_HandleMessage1000(b *testing.B) {
 	}
 
 	b.StartTimer()
-	for n := 0; n < b.N; n++ {
-		for i := 0; i < len(msgs); i++ {
-			err := handler.HandleMessage(msgs[i])
-			if err != nil {
-				panic(err)
-			}
+	for i := 0; i < b.N; i++ {
+		err := handler.HandleMessage(msgs[i])
+		if err != nil {
+			panic(err)
 		}
 	}
 }
