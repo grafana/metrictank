@@ -74,7 +74,8 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxD
 								"type": "string"
 							},
 							"match_mapping_type": "string",
-							"umatch": "message"
+							"umatch": "message",
+							"path_unmatch": "tags.*"
 						}
 					},
 					{
@@ -87,6 +88,18 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxD
 								"index_options": "docs"
 							},
 							"match": "message"
+						}
+					},
+					{
+						"tag_values": {
+							"mapping": {
+								"type": "string",
+								"norms": {
+									"enabled": false
+								},
+								"index_options": "docs"
+							},
+							"path_match": "tags.*"
 						}
 					}
 				]
