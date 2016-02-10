@@ -1,9 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -17,15 +14,15 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/raintank-metric/msg"
 
 	"github.com/codeskyblue/go-uuid"
 	"github.com/raintank/raintank-metric/eventdef"
-	"github.com/raintank/raintank-metric/schema"
 	"github.com/rakyll/globalconf"
 )
 
@@ -69,39 +66,31 @@ func NewESHandler() (*ESHandler, error) {
 }
 
 func (k *ESHandler) HandleMessage(m *nsq.Message) error {
-	log.Debug("received message.")
-	format := "unknown"
-	if m.Body[0] == '\x00' {
-		format = "msgFormatJson"
-	}
-
-	var id int64
-	buf := bytes.NewReader(m.Body[1:9])
-	binary.Read(buf, binary.BigEndian, &id)
-	produced := time.Unix(0, id)
-
-	msgsAge.Value(time.Now().Sub(produced).Nanoseconds() / 1000)
-	messagesSize.Value(int64(len(m.Body)))
-
-	event := new(schema.ProbeEvent)
-	if err := json.Unmarshal(m.Body[9:], &event); err != nil {
-		log.Error(3, "ERROR: failure to unmarshal message body via format %s: %s. skipping message", format, err)
+	ms, err := msg.ProbeEventFromMsg(m.Body)
+	if err != nil {
+		log.Error(3, "skipping message. %s", err)
 		return nil
 	}
-
+	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
+	messagesSize.Value(int64(len(m.Body)))
+	err = ms.DecodeProbeEvent()
+	if err != nil {
+		log.Error(3, "skipping message. %s", err)
+		return nil
+	}
 	// Since these messages are being batched, we'll need to hold onto this
 	// and ack or requeue it on our own
 	m.DisableAutoResponse()
-	if event.Id == "" {
+	if ms.Event.Id == "" {
 		// per http://blog.mikemccandless.com/2014/05/choosing-fast-unique-identifier-uuid.html,
 		// using V1 UUIDs is much faster than v4 like we were using
 		u := uuid.NewUUID()
-		event.Id = u.String()
+		ms.Event.Id = u.String()
 	}
-	writeQueue.EnQueue(event.Id, m)
+	writeQueue.EnQueue(ms.Event.Id, m)
 
-	if err := eventdef.Save(event); err != nil {
-		log.Error(3, "couldn't process %s: %s", event.Id, err)
+	if err := eventdef.Save(ms.Event); err != nil {
+		log.Error(3, "couldn't process %s: %s", ms.Event.Id, err)
 		msgsHandleFail.Inc(1)
 		m.Requeue(-1)
 		return err
