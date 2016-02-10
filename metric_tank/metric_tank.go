@@ -162,7 +162,7 @@ func main() {
 		*cassandraAddrs = "localhost"
 	}
 
-	err = metricdef.InitElasticsearch(*esAddr, "", "", *indexName)
+	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}
@@ -225,7 +225,7 @@ func main() {
 	}
 
 	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
-	defCache = NewDefCache()
+	defCache = NewDefCache(defs)
 	handler := NewHandler(metrics, defCache)
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
@@ -269,7 +269,7 @@ func main() {
 		case <-consumer.StopChan:
 			log.Info("closing store")
 			store.Stop()
-			metricdef.Indexer.Stop()
+			defs.Stop()
 			log.Info("terminating.")
 			log.Close()
 			return
