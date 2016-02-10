@@ -48,7 +48,7 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 		msgs[i] = nsq.NewMessage(id, data)
 	}
 
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		err := handler.HandleMessage(msgs[i])
 		if err != nil {
