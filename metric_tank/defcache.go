@@ -126,7 +126,3 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 	}
 	return nil
 }
-
-func (dc *DefCache) Clear() {
-	dc.defsStore.Clear()
-}

@@ -9,5 +9,4 @@ type Defs interface {
 	GetMetricDefinition(id string) (*schema.MetricDefinition, bool, error)
 	IndexMetric(m *schema.MetricDefinition) error
 	Stop()
-	Clear() // only for unit testing
 }
