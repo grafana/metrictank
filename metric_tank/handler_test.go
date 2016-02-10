@@ -49,6 +49,8 @@ func BenchmarkHandler_HandleMessage1000(b *testing.B) {
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
+		aggmetrics.Clear()
+		defCache.Clear()
 		for i := 0; i < len(msgs); i++ {
 			err := handler.HandleMessage(msgs[i])
 			if err != nil {

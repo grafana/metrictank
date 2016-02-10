@@ -102,3 +102,9 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Unlock()
 	return m
 }
+
+func (ms *AggMetrics) Clear() {
+	ms.Lock()
+	ms.Metrics = make(map[string]*AggMetric)
+	ms.Unlock()
+}

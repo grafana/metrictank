@@ -223,3 +223,7 @@ func (d *DefsEs) GetMetricDefinition(id string) (*schema.MetricDefinition, bool,
 func (d *DefsEs) Stop() {
 	d.BulkIndexer.Stop()
 }
+
+// Clear is a no-op. should only be used in testing
+func (d *DefsEs) Clear() {
+}

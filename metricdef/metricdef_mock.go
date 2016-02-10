@@ -56,3 +56,7 @@ func (d *DefsMock) GetMetricDefinition(id string) (*schema.MetricDefinition, boo
 
 func (d *DefsMock) Stop() {
 }
+
+func (d *DefsMock) Clear() {
+	d.defs = make(map[string]*schema.MetricDefinition)
+}
