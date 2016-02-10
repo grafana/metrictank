@@ -14,7 +14,7 @@ chdir /
 #limit memlock <softlimit> <hardlimit>
 #limit msgqueue <softlimit> <hardlimit>
 #limit nice <softlimit> <hardlimit>
-#limit nofile <softlimit> <hardlimit>
+limit nofile 102400 102400
 #limit nproc <softlimit> <hardlimit>
 #limit rss <softlimit> <hardlimit>
 #limit rtprio <softlimit> <hardlimit>
