@@ -11,6 +11,9 @@ import (
 	"github.com/raintank/raintank-metric/schema"
 )
 
+var errMsgTooSmall = errors.New("msg too small")
+var errMsgUnknownFormat = errors.New("unknown format")
+
 type MetricData struct {
 	Id       int64
 	Metrics  []*schema.MetricData
@@ -19,29 +22,37 @@ type MetricData struct {
 	Msg      []byte
 }
 
-// parses format and id (cheap), but doesn't decode metrics (expensive) just yet.
-func MetricDataFromMsg(msg []byte) (MetricData, error) {
-	m := MetricData{
-		Metrics: make([]*schema.MetricData, 0),
-		Msg:     msg,
+func NewMetricData(cap int) *MetricData {
+	return &MetricData{
+		Metrics: make([]*schema.MetricData, 0, cap),
 	}
-
-	if len(msg) < 9 {
-		return m, errors.New("msg too small")
-	}
-
-	buf := bytes.NewReader(msg[1:9])
-	binary.Read(buf, binary.BigEndian, &m.Id)
-	m.Produced = time.Unix(0, m.Id)
-
-	format := Format(msg[0])
-	if format != FormatMetricDataArrayJson && format != FormatMetricDataArrayMsgp {
-		return m, errors.New("unknown format")
-	}
-	m.Format = format
-	return m, nil
 }
 
+// parses format and id (cheap), but doesn't decode metrics (expensive) just yet.
+// deprecated: this function allocates.
+func MetricDataFromMsg(msg []byte) (*MetricData, error) {
+	m := NewMetricData(0)
+	return m, m.InitializeFromMsg(m.Msg)
+}
+
+// resets a MetricData, sets format and id (cheap), but doesn't decode metrics (expensive) just yet.
+func (m *MetricData) InitializeFromMsg(msg []byte) error {
+	if len(msg) < 9 {
+		return errMsgTooSmall
+	}
+	m.Msg = msg
+	buf := bytes.NewReader(m.Msg[1:9])
+	binary.Read(buf, binary.BigEndian, &m.Id)
+	m.Metrics = m.Metrics[:0]
+	m.Produced = time.Unix(0, m.Id)
+
+	m.Format = Format(m.Msg[0])
+	if m.Format != FormatMetricDataArrayJson && m.Format != FormatMetricDataArrayMsgp {
+		return errMsgUnknownFormat
+	}
+	return nil
+
+}
 func (m *MetricData) DecodeMetricData(buf []byte) ([]byte, error) {
 	var err error
 	switch m.Format {
