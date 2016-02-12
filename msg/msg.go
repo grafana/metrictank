@@ -42,22 +42,52 @@ func MetricDataFromMsg(msg []byte) (MetricData, error) {
 	return m, nil
 }
 
-func (m *MetricData) DecodeMetricData() error {
+func (m *MetricData) DecodeMetricData(buf []byte) ([]byte, error) {
 	var err error
 	switch m.Format {
 	case FormatMetricDataArrayJson:
 		err = json.Unmarshal(m.Msg[9:], &m.Metrics)
 	case FormatMetricDataArrayMsgp:
 		var out schema.MetricDataArray
-		_, err = out.UnmarshalMsg(m.Msg[9:])
+		//ehh := buf[:len(m.Msg)-9]
+		//fmt.Println("lenaa", len(ehh))
+		//fmt.Println("capaa", cap(ehh))
+		//lenaa 1341
+		//capaa 10000
+
+		// copy copies $(whichever has the largest len) bytes
+		copy(buf[:len(m.Msg)-9], m.Msg[9:]) // if provided buf is large enough, we don't need to allocate.
+		//copy(buf, m.Msg[9:]) // if provided buf is large enough, we don't need to allocate.
+		//fmt.Println("message size", len(m.Msg)) // 1350
+		//fmt.Println("message size without prefix", len(m.Msg[9:])) // 1341
+		//fmt.Println("bytes copied", ret) // 1341
+		//fmt.Println("buf len", len(buf))
+		//fmt.Println("buf cap", cap(buf))
+		//buf len 0
+		//buf cap 10000
+
+		//_, err := out.UnmarshalMsg(buf[len(m.Msg)-9:]) // slice bounds out of range
+		//_, err := out.UnmarshalMsg(buf) 		// panic: msgp: too few bytes left to read object
+		//_, err := out.UnmarshalMsg(buf[:0])		// panic: msgp: too few bytes left to read object
+		//_, err := out.UnmarshalMsg(buf[:10000]) // works but still high alloc
+		_, err := out.UnmarshalMsg(buf[:cap(buf)]) // "
+
+		if err != nil {
+			panic(err)
+		}
+		//fmt.Println("returned slice", len(r)) // remainder of input slice
+		//message size without prefix 1381
+		//bytes copied 1381
+		//returned slice 8619
+
 		m.Metrics = []*schema.MetricData(out)
 	default:
-		return fmt.Errorf("unrecognized format %d", m.Msg[0])
+		return buf, fmt.Errorf("unrecognized format %d", m.Msg[0])
 	}
 	if err != nil {
-		return fmt.Errorf("ERROR: failure to unmarshal message body via format %q: %s", m.Format, err)
+		return buf, fmt.Errorf("ERROR: failure to unmarshal message body via format %q: %s", m.Format, err)
 	}
-	return nil
+	return buf, nil
 }
 
 func CreateMsg(metrics []*schema.MetricData, id int64, version Format) ([]byte, error) {
