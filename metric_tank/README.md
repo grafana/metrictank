@@ -2,11 +2,11 @@
 # http interface
 
 ## data querying
-* `http://localhost:6063/get?target=<target>` (target variable can be given multiple times for several series)
-  accepted format for `<target>`:
-  * simply the raw id of a metric. like `1.2345foobar`
-  * `consolidateBy(<id>,'<function>')`. single quotes only. accepted functions are avg, average, last, min, max, sum.
-     example: `consolidateBy(1.2345foobar,'average')`.
+* `http://localhost:6063/get` either POST or GET, with the following parameters:
+  * `<target>` (can be specified multiple times to request several series). Supported formats:
+    * simply the raw id of a metric. like `1.2345foobar`
+    * `consolidateBy(<id>,'<function>')`. single quotes only. accepted functions are avg, average, last, min, max, sum.
+       example: `consolidateBy(1.2345foobar,'average')`.
 
 * optionally, specify `from` and `to` unix timestamps.
   * from is inclusive, to is exclusive.
