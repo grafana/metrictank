@@ -75,9 +75,9 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 	dc.Unlock()
 	if ok {
 		//If the time diff between this datapoint and the lastUpdate
-		// time of the metricDef is grater then 6hours, update the metricDef.
+		// time of the metricDef is greater than 6hours, update the metricDef.
 		if mdef.LastUpdate < metric.Time-21600 {
-			mdef.LastUpdate = metric.Time
+			mdef = schema.MetricDefinitionFromMetricData(metric)
 			dc.addToES(mdef)
 		}
 	} else {
