@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/raintank/raintank-metric/schema"
@@ -20,6 +21,10 @@ type MetricData struct {
 	Produced time.Time
 	Format   Format
 	Msg      []byte
+}
+
+var mdPool = sync.Pool{
+	New: func() interface{} { return make(schema.MetricDataArray, 5) }, // default size probably too small, but after some automatic reallocations should be well-tuned for real load
 }
 
 func NewMetricData(cap int) *MetricData {
@@ -59,7 +64,7 @@ func (m *MetricData) DecodeMetricData(buf []byte) ([]byte, error) {
 	case FormatMetricDataArrayJson:
 		err = json.Unmarshal(m.Msg[9:], &m.Metrics)
 	case FormatMetricDataArrayMsgp:
-		var out schema.MetricDataArray
+		out := mdPool.Get().(schema.MetricDataArray)
 		//ehh := buf[:len(m.Msg)-9]
 		//fmt.Println("lenaa", len(ehh))
 		//fmt.Println("capaa", cap(ehh))
@@ -92,6 +97,7 @@ func (m *MetricData) DecodeMetricData(buf []byte) ([]byte, error) {
 		//returned slice 8619
 
 		m.Metrics = []*schema.MetricData(out)
+		mdPool.Put(out)
 	default:
 		return buf, fmt.Errorf("unrecognized format %d", m.Msg[0])
 	}
