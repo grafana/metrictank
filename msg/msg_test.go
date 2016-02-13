@@ -5,8 +5,13 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/schema"
 	"runtime"
+	"sync"
 	"testing"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} { return make([]byte, 0) },
+} // for CreateMsg
 
 func Benchmark_CreateMessage(b *testing.B) {
 	metrics := make([]*schema.MetricData, 10)
@@ -32,11 +37,13 @@ func Benchmark_CreateMessage(b *testing.B) {
 		for j := 0; j < len(metrics); j++ {
 			metrics[j].Time += 10
 		}
-		data, err := CreateMsg(metrics, 1, FormatMetricDataArrayMsgp)
+		tmp := bufPool.Get().([]byte)
+		data, err := CreateMsg(tmp, metrics, 1, FormatMetricDataArrayMsgp)
 		if err != nil {
 			panic(err)
 		}
 		m = nsq.NewMessage(id, data)
+		bufPool.Put(data[:0])
 	}
 	// prevents the go compiler from optimizing msgs away. presumably..
 	if m.ID != id {

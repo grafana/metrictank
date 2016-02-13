@@ -60,8 +60,10 @@ func (m *MetricData) DecodeMetricData() error {
 	return nil
 }
 
-func CreateMsg(metrics []*schema.MetricData, id int64, version Format) ([]byte, error) {
-	buf := new(bytes.Buffer)
+// make sure tmp has desired capacity but len zero
+func CreateMsg(tmp []byte, metrics []*schema.MetricData, id int64, version Format) ([]byte, error) {
+	buf := bytes.NewBuffer(tmp)
+
 	err := binary.Write(buf, binary.LittleEndian, uint8(version))
 	if err != nil {
 		return nil, fmt.Errorf("binary.Write failed: %s", err.Error())
