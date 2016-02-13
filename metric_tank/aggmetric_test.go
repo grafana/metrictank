@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/grafana/pkg/metric/helper"
+	"github.com/raintank/met/helper"
 	"testing"
 )
+
+var dnstore = NewDevnullStore()
 
 type point struct {
 	ts  uint32
@@ -71,7 +73,7 @@ func TestAggMetric(t *testing.T) {
 	clusterStatus = NewClusterStatus("default", false)
 	initMetrics(stats)
 
-	c := NewChecker(t, NewAggMetric("foo", 100, 5, 1, []aggSetting{}...))
+	c := NewChecker(t, NewAggMetric(dnstore, "foo", 100, 5, 1, []aggSetting{}...))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -171,7 +173,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
@@ -192,12 +194,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	metricMaxStale := uint32(21600)
 
 	*topicNotifyPersist = ""
-	*cassandraWriteConcurrency = b.N
 	clusterStatus = NewClusterStatus("default", true)
-	CassandraWriteQueue = make(chan *ChunkWriteRequest, 1000)
-	for i := 0; i < b.N; i++ {
-		go processWriteQueue()
-	}
 
 	ttl := uint32(84600)
 	aggSettings := []aggSetting{
@@ -213,7 +210,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -234,13 +231,8 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	metricMaxStale := uint32(21600)
 
 	*topicNotifyPersist = ""
-	*cassandraWriteConcurrency = b.N
 
 	clusterStatus = NewClusterStatus("default", true)
-	CassandraWriteQueue = make(chan *ChunkWriteRequest, 10000)
-	for i := 0; i < b.N; i++ {
-		go processWriteQueue()
-	}
 
 	ttl := uint32(84600)
 	aggSettings := []aggSetting{
@@ -256,7 +248,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -277,13 +269,8 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	metricMaxStale := uint32(21600)
 
 	*topicNotifyPersist = ""
-	*cassandraWriteConcurrency = b.N
 
 	clusterStatus = NewClusterStatus("default", true)
-	CassandraWriteQueue = make(chan *ChunkWriteRequest, 100000)
-	for i := 0; i < b.N; i++ {
-		go processWriteQueue()
-	}
 
 	ttl := uint32(84600)
 	aggSettings := []aggSetting{
@@ -299,7 +286,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
+	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {

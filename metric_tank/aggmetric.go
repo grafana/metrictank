@@ -18,6 +18,7 @@ import (
 // in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
 // AggMetric is concurrency-safe
 type AggMetric struct {
+	store Store
 	sync.RWMutex
 	Key             string
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
@@ -62,8 +63,9 @@ func (a *AggMetric) GrowNumChunks(numChunks uint32) {
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...aggSetting) *AggMetric {
+func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
+		store:     store,
 		Key:       key,
 		ChunkSpan: chunkSpan,
 		NumChunks: numChunks,
@@ -72,7 +74,7 @@ func NewAggMetric(key string, chunkSpan, numChunks uint32, ttl uint32, aggsettin
 	}
 	for _, as := range aggsetting {
 		//TODO(awoods): use per aggsetting TTL
-		m.aggregators = append(m.aggregators, NewAggregator(key, as.span, as.chunkSpan, as.numChunks, ttl))
+		m.aggregators = append(m.aggregators, NewAggregator(store, key, as.span, as.chunkSpan, as.numChunks, ttl))
 	}
 
 	return &m
@@ -381,28 +383,21 @@ func (a *AggMetric) persist(pos int) {
 
 	log.Debug("sending %d chunks to write queue", len(pending))
 
-	ticker := time.NewTicker(2 * time.Second)
 	pendingChunk := len(pending) - 1
 
-	// Processing will remain in this for loop until the chunks can be
-	// added to the writeQueue. If the writeQueue is already full, then
+	// if the store blocks,
 	// the calling function will block waiting for persist() to complete.
 	// This is intended to put backpressure on our message handlers so
 	// that they stop consuming messages, leaving them to buffer at
 	// the message bus. The "pending" array of chunks are proccessed
-	// last-to-first ensuring that older data is added to the writeQueue
+	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		select {
-		case CassandraWriteQueue <- pending[pendingChunk]:
-			pending[pendingChunk].chunk.Saving = true
-			pendingChunk--
-			log.Debug("chunk in write queue: length: %d", len(CassandraWriteQueue))
-		case <-ticker.C:
-			log.Warn("%s:%d blocked pushing to writeQueue.", a.Key, chunk.T0)
-		}
+		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk/len(pending), a.Key, chunk.T0)
+		a.store.Add(pending[pendingChunk])
+		pending[pendingChunk].chunk.Saving = true
+		pendingChunk--
 	}
-	ticker.Stop()
 	return
 }
 
@@ -453,21 +448,22 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		chunkCreate.Inc(1)
-		var msg string
 		if len(a.Chunks) < int(a.NumChunks) {
-			msg = fmt.Sprintf("added new chunk to buffer. now %d chunks", a.CurrentChunkPos+1)
 			a.Chunks = append(a.Chunks, NewChunk(t0))
+			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
+			}
+			log.Debug("AggMetric %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
 		} else {
 			chunkClear.Inc(1)
 			totalPoints <- -1 * int(a.Chunks[a.CurrentChunkPos].NumPoints)
-			msg = fmt.Sprintf("cleared chunk at %d of %d and replaced with new", a.CurrentChunkPos, len(a.Chunks))
 			a.Chunks[a.CurrentChunkPos] = NewChunk(t0)
+			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
+			}
+			log.Debug("AggMetric %s Add(): cleared chunk at %d of %d and replaced with new. and added the new point: %s", a.Key, a.CurrentChunkPos, len(a.Chunks), a.Chunks[a.CurrentChunkPos])
 		}
 
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
-		}
-		log.Debug("AggMetric %s Add(): %s and added the new point: %s", a.Key, msg, a.Chunks[a.CurrentChunkPos])
 	}
 	a.addAggregators(ts, val)
 }

@@ -8,6 +8,7 @@ import (
 )
 
 type AggMetrics struct {
+	store Store
 	sync.RWMutex
 	Metrics        map[string]*AggMetric
 	chunkSpan      uint32
@@ -25,8 +26,9 @@ func init() {
 	totalPoints = make(chan int, 1000)
 }
 
-func NewAggMetrics(chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, aggSettings []aggSetting) *AggMetrics {
+func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
+		store:          store,
 		Metrics:        make(map[string]*AggMetric),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
@@ -94,7 +96,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
+		m = NewAggMetric(ms.store, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
 		ms.Metrics[key] = m
 	}
 	ms.Unlock()

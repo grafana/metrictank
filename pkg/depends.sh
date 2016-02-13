@@ -17,18 +17,32 @@ export PATH=$GOPATH/bin:$PATH
 mkdir -p artifacts
 bundle install
 
-mkdir -p ${GOPATH}/src/github.com/grafana/grafana
-mv ${GOPATH}/src/github.com/grafana/grafana ${GOPATH}/src/github.com/grafana/grafana-bak
-mkdir -p ${GOPATH}/src/github.com/raintank
-cd ${GOPATH}/src/github.com/raintank
-git clone https://github.com/raintank/grafana.git
-#echo "raintank"
-#ls ${GOPATH}/src/github.com/raintank
-#echo "grafana"
-#ls ${GOPATH}/src/github.com/grafana
-ln -s ${GOPATH}/src/github.com/raintank/grafana ${GOPATH}/src/github.com/grafana/grafana
-# Only until this is done being in a different branch
-#cd ${GOPATH}/src/github.com/raintank/grafana
+MYGOPATH=""
+# find a writeable GOPATH
+echo "searching for writeable GOPATH"
+for p in ${GOPATH//:/ }; do 
+	echo "checking if $p is writeable"
+	if [ -w $p ]; then
+		echo "using $p"
+		MYGOPATH=$p
+		break
+	fi
+done	
 
-# link our code to our gopath.
-ln -s $CHECKOUT $GOPATH/src/github.com/raintank/raintank-metric
+if [ -z ${MYGOPATH} ]; then
+	echo "no writable GOPATH found."
+	exit 1
+fi
+
+mkdir -p $MYGOPATH/src/github.com/raintank
+rm -rf $MYGOPATH/src/github.com/raintank/raintank-metric
+
+# link our checked out code to our gopath.
+ABS_CHECKOUT=$(readlink -e $CHECKOUT)
+ln -s $ABS_CHECKOUT ${MYGOPATH}/src/github.com/raintank/raintank-metric
+
+for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
+	cd ${MYGOPATH}/src/github.com/raintank/raintank-metric
+	go get -t -d ./...
+	cd ${DIR}
+done

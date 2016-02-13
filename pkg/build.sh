@@ -7,12 +7,7 @@ cd ${DIR}
 : ${GOPATH:="${HOME}/.go_workspace"}
 export PATH=$GOPATH/bin:$PATH
 
-
-for VAR in nsq_metrics_to_elasticsearch	nsq_metrics_to_kairos nsq_probe_events_to_elasticsearch metric_tank; do
-	cd ${DIR}/../${VAR}
-	go get ./...
-	cd $DIR
-	#go get -u -f github.com/raintank/raintank-metric/$VAR
+for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
 	go install github.com/raintank/raintank-metric/$VAR
 	cp $(which $VAR) ${DIR}/artifacts
 done

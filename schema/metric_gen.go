@@ -24,6 +24,11 @@ func (z *MetricData) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
+		case "Id":
+			z.Id, err = dc.ReadString()
+			if err != nil {
+				return
+			}
 		case "OrgId":
 			z.OrgId, err = dc.ReadInt()
 			if err != nil {
@@ -93,9 +98,18 @@ func (z *MetricData) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *MetricData) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 9
+	// map header, size 10
+	// write "Id"
+	err = en.Append(0x8a, 0xa2, 0x49, 0x64)
+	if err != nil {
+		return err
+	}
+	err = en.WriteString(z.Id)
+	if err != nil {
+		return
+	}
 	// write "OrgId"
-	err = en.Append(0x89, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
+	err = en.Append(0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
 	if err != nil {
 		return err
 	}
@@ -187,9 +201,12 @@ func (z *MetricData) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *MetricData) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 9
+	// map header, size 10
+	// string "Id"
+	o = append(o, 0x8a, 0xa2, 0x49, 0x64)
+	o = msgp.AppendString(o, z.Id)
 	// string "OrgId"
-	o = append(o, 0x89, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
+	o = append(o, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
 	o = msgp.AppendInt(o, z.OrgId)
 	// string "Name"
 	o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
@@ -237,6 +254,11 @@ func (z *MetricData) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
+		case "Id":
+			z.Id, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
 		case "OrgId":
 			z.OrgId, bts, err = msgp.ReadIntBytes(bts)
 			if err != nil {
@@ -306,7 +328,7 @@ func (z *MetricData) UnmarshalMsg(bts []byte) (o []byte, err error) {
 }
 
 func (z *MetricData) Msgsize() (s int) {
-	s = 1 + 6 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Name) + 7 + msgp.StringPrefixSize + len(z.Metric) + 9 + msgp.IntSize + 6 + msgp.Float64Size + 5 + msgp.StringPrefixSize + len(z.Unit) + 5 + msgp.Int64Size + 11 + msgp.StringPrefixSize + len(z.TargetType) + 5 + msgp.ArrayHeaderSize
+	s = 1 + 3 + msgp.StringPrefixSize + len(z.Id) + 6 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Name) + 7 + msgp.StringPrefixSize + len(z.Metric) + 9 + msgp.IntSize + 6 + msgp.Float64Size + 5 + msgp.StringPrefixSize + len(z.Unit) + 5 + msgp.Int64Size + 11 + msgp.StringPrefixSize + len(z.TargetType) + 5 + msgp.ArrayHeaderSize
 	for xvk := range z.Tags {
 		s += msgp.StringPrefixSize + len(z.Tags[xvk])
 	}

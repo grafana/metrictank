@@ -134,11 +134,11 @@ func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolida
 
 // returns how many points should be aggregated together so that you end up with as many points as possible,
 // but never more than maxPoints
-func aggEvery(numPoints, maxPoints uint32) int {
-	return int((numPoints + maxPoints - 1) / maxPoints)
+func aggEvery(numPoints, maxPoints uint32) uint32 {
+	return (numPoints + maxPoints - 1) / maxPoints
 }
 
-func getTarget(req Req) (points []Point, interval uint32, err error) {
+func getTarget(store Store, req Req) (points []Point, interval uint32, err error) {
 	defer doRecover(&err)
 
 	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
@@ -155,7 +155,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 
 	if !readConsolidated && !runtimeConsolidation {
 		return fix(
-			getSeries(req.key, consolidation.None, 0, req.from, req.to),
+			getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
 			req.from,
 			req.to,
 			req.archInterval,
@@ -163,7 +163,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
-				getSeries(req.key, consolidation.None, 0, req.from, req.to),
+				getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
 				req.from,
 				req.to,
 				req.archInterval,
@@ -174,13 +174,13 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 		if req.consolidator == consolidation.Avg {
 			return divide(
 				fix(
-					getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
+					getSeries(store, req.key, consolidation.Sum, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
 					req.archInterval,
 				),
 				fix(
-					getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
+					getSeries(store, req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
 					req.archInterval,
@@ -188,7 +188,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 			), req.outInterval, nil
 		} else {
 			return fix(
-				getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
+				getSeries(store, req.key, req.consolidator, req.archInterval, req.from, req.to),
 				req.from,
 				req.to,
 				req.archInterval,
@@ -200,7 +200,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 			return divide(
 				consolidate(
 					fix(
-						getSeries(req.key, consolidation.Sum, req.archInterval, req.from, req.to),
+						getSeries(store, req.key, consolidation.Sum, req.archInterval, req.from, req.to),
 						req.from,
 						req.to,
 						req.archInterval,
@@ -209,7 +209,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 					consolidation.Sum),
 				consolidate(
 					fix(
-						getSeries(req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
+						getSeries(store, req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
 						req.from,
 						req.to,
 						req.archInterval,
@@ -220,7 +220,7 @@ func getTarget(req Req) (points []Point, interval uint32, err error) {
 		} else {
 			return consolidate(
 				fix(
-					getSeries(req.key, req.consolidator, req.archInterval, req.from, req.to),
+					getSeries(store, req.key, req.consolidator, req.archInterval, req.from, req.to),
 					req.from,
 					req.to,
 					req.archInterval,
@@ -240,7 +240,7 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sos/sum/cnt and providing the matching agg span.
-func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []Point {
+func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []Point {
 	iters := make([]Iter, 0)
 	memIters := make([]Iter, 0)
 	oldest := toUnix
@@ -262,7 +262,7 @@ func getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fro
 		// if to < oldest -> no need to search until oldest, only search until to
 		until := min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
-		storeIters, err := searchCassandra(key, fromUnix, until)
+		storeIters, err := store.Search(key, fromUnix, until)
 		if err != nil {
 			panic(err)
 		}

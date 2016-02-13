@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nsqio/go-nsq"
-	met "github.com/grafana/grafana/pkg/metric"
+	"github.com/raintank/met"
 )
 
 type Consumer struct {

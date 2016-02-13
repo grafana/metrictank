@@ -12,7 +12,7 @@ import (
 
 	"github.com/bitly/go-hostpool"
 	"github.com/grafana/grafana/pkg/log"
-	met "github.com/grafana/grafana/pkg/metric"
+	"github.com/raintank/met"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"

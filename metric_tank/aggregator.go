@@ -36,17 +36,17 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(key string, aggSpan, aggChunkSpan, aggNumChunks uint32, ttl uint32) *Aggregator {
+func NewAggregator(store Store, key string, aggSpan, aggChunkSpan, aggNumChunks uint32, ttl uint32) *Aggregator {
 	return &Aggregator{
 		key:       key,
 		span:      aggSpan,
 		agg:       NewAggregation(),
-		minMetric: NewAggMetric(fmt.Sprintf("%s_min_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		maxMetric: NewAggMetric(fmt.Sprintf("%s_max_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		sosMetric: NewAggMetric(fmt.Sprintf("%s_sos_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		sumMetric: NewAggMetric(fmt.Sprintf("%s_sum_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		cntMetric: NewAggMetric(fmt.Sprintf("%s_cnt_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		lstMetric: NewAggMetric(fmt.Sprintf("%s_lst_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		minMetric: NewAggMetric(store, fmt.Sprintf("%s_min_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		maxMetric: NewAggMetric(store, fmt.Sprintf("%s_max_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		sosMetric: NewAggMetric(store, fmt.Sprintf("%s_sos_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		sumMetric: NewAggMetric(store, fmt.Sprintf("%s_sum_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		cntMetric: NewAggMetric(store, fmt.Sprintf("%s_cnt_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
+		lstMetric: NewAggMetric(store, fmt.Sprintf("%s_lst_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
 	}
 }
 func (agg *Aggregator) flush() string {

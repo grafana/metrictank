@@ -5,6 +5,8 @@ test:
   override:
     - go test -v -race ./schema
     - go test -v -race ./metric_tank
+    - go test -v -race ./eventdef
+    - go test -v -race ./nsq_probe_events_to_elasticsearch
   post:
     - pkg/package.sh
 dependencies:
