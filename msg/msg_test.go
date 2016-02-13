@@ -24,10 +24,9 @@ func Benchmark_CreateMessage(b *testing.B) {
 			Tags:       []string{"some_tag", "ok"},
 		}
 	}
-	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
-	msgs := make([]*nsq.Message, b.N)
 	b.ResetTimer()
 	var id nsq.MessageID
+	var m *nsq.Message
 	for i := 0; i < b.N; i++ {
 		id = nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
 		for j := 0; j < len(metrics); j++ {
@@ -37,10 +36,10 @@ func Benchmark_CreateMessage(b *testing.B) {
 		if err != nil {
 			panic(err)
 		}
-		msgs[i] = nsq.NewMessage(id, data)
+		m = nsq.NewMessage(id, data)
 	}
 	// prevents the go compiler from optimizing msgs away. presumably..
-	if msgs[len(msgs)-1].ID != id {
+	if m.ID != id {
 		panic("bad id")
 	}
 	b.StopTimer()
