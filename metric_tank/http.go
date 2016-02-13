@@ -41,11 +41,11 @@ func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.Handler
 // we just serve what we know
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting) {
 	pre := time.Now()
-	values := req.URL.Query()
-	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", values.Get("target"), values.Get("maxDataPoints")))
+	req.ParseForm()
+	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", req.Form.Get("target"), req.Form.Get("maxDataPoints")))
 
 	maxDataPoints := uint32(800)
-	maxDataPointsStr := values.Get("maxDataPoints")
+	maxDataPointsStr := req.Form.Get("maxDataPoints")
 	var err error
 	if maxDataPointsStr != "" {
 		tmp, err := strconv.Atoi(maxDataPointsStr)
@@ -56,7 +56,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		maxDataPoints = uint32(tmp)
 	}
 
-	targets, ok := values["target"]
+	targets, ok := req.Form["target"]
 	if !ok {
 		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
@@ -64,7 +64,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	now := time.Now()
 	fromUnix := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	toUnix := uint32(now.Add(time.Duration(1) * time.Second).Unix())
-	from := values.Get("from")
+	from := req.Form.Get("from")
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
 		if err != nil {
@@ -73,7 +73,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 		fromUnix = uint32(fromUnixInt)
 	}
-	to := values.Get("to")
+	to := req.Form.Get("to")
 	if to != "" {
 		toUnixInt, err := strconv.Atoi(to)
 		if err != nil {
