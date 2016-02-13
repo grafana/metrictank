@@ -28,8 +28,8 @@ note:
 
 # aggregations
 
-the aggregated metrics are not accessible through http ui, and that's probably fine, cause we'll only query for old aggregated data anyway, in cassandra
-making it accessible would be extra work and resources for no good reason
+MT can save various bands of aggregated data, using multiple consolidation functions per series. this works seamlessly with consolidateBy, unlike graphite.
+
 TODO: you can currently write fake metrics with same key as aggregated metrics, which would conflict, we should probably blacklist such patterns
 
 `
