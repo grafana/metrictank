@@ -1,7 +1,7 @@
 
 # http interface
 
-* to query for series data
+## data querying
 * `http://localhost:6063/get?target=<target>` (target variable can be given multiple times for several series)
   accepted format for `<target>`:
   * simply the raw id of a metric. like `1.2345foobar`
@@ -19,9 +19,17 @@ note:
 * it just serves up the data that it has, in timestamp ascending order. it does no effort to try to fill in gaps.
 * no support for wildcards, patterns, "magic" time specs like "-10min" etc.
 
+## other useful endpoints exemplified through curl commands:
+
+`curl http://localhost:6063/` app status (OK if either primary or secondary that has been warmed up). good for loadbalancers.
+`curl http://localhost:6063/cluster` cluster status
+`curl -X POST -d primary=false http://localhost:6063/cluster` set primary true/false
+
+
 # aggregations
 
 the aggregated metrics are not accessible through http ui, and that's probably fine, cause we'll only query for old aggregated data anyway, in cassandra
 making it accessible would be extra work and resources for no good reason
 TODO: you can currently write fake metrics with same key as aggregated metrics, which would conflict, we should probably blacklist such patterns
 
+`
