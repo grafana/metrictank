@@ -28,24 +28,14 @@ type MetricData struct {
 // returns a id (hash key) in the format OrgId.md5Sum
 // the md5sum is a hash of the the concatination of the
 // series name + each tag key:value pair, sorted alphabetically.
-func (m *MetricData) GetId() string {
-	id := m.Id
-	if id == "" {
-		var buffer bytes.Buffer
-		buffer.WriteString(m.Name)
-		sort.Strings(m.Tags)
-		for _, k := range m.Tags {
-			buffer.WriteString(fmt.Sprintf(";%s", k))
-		}
-		id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
-	}
-	return id
-}
-
 func (m *MetricData) SetId() {
-	if m.Id == "" {
-		m.Id = m.GetId()
+	var buffer bytes.Buffer
+	buffer.WriteString(m.Name)
+	sort.Strings(m.Tags)
+	for _, k := range m.Tags {
+		buffer.WriteString(fmt.Sprintf(";%s", k))
 	}
+	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
 }
 
 // can be used by some encoders, such as msgp
@@ -91,7 +81,7 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		nodesMap[key] = n
 	}
 	return &MetricDefinition{
-		Id:         d.GetId(),
+		Id:         d.Id,
 		Name:       d.Name,
 		OrgId:      d.OrgId,
 		Metric:     d.Metric,

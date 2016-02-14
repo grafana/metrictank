@@ -69,9 +69,8 @@ func (dc *DefCache) Backfill() {
 }
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
-	id := metric.GetId()
 	dc.Lock()
-	mdef, ok := dc.defs[id]
+	mdef, ok := dc.defs[metric.Id]
 	dc.Unlock()
 	if ok {
 		//If the time diff between this datapoint and the lastUpdate
