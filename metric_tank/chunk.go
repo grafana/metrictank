@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	//"github.com/dgryski/go-tsz"
-	"github.com/raintank/go-tsz"
+	"github.com/dgryski/go-tsz"
 )
 
 // Chunk is a chunk of data. not concurrency safe.

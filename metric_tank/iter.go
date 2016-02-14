@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/raintank/go-tsz"
+	"github.com/dgryski/go-tsz"
 )
 
 type Iter struct {
