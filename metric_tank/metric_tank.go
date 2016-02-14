@@ -230,6 +230,7 @@ func main() {
 	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
 	defCache = NewDefCache(defs)
 	handler := NewHandler(metrics, defCache)
+	log.Info("DefCache initialized. starting data consumption")
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
