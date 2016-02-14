@@ -64,7 +64,7 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks> (may be given multiple times as comma-separated list)")
+	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds> (may be given multiple times as comma-separated list)")
 
 	metrics  *AggMetrics
 	defCache *DefCache
@@ -182,7 +182,7 @@ func main() {
 			continue
 		}
 		fields := strings.Split(v, ":")
-		if len(fields) != 3 {
+		if len(fields) != 4 {
 			log.Fatal(4, "bad agg settings")
 		}
 		aggSpan, err := strconv.Atoi(fields[0])
@@ -200,7 +200,11 @@ func main() {
 		if err != nil {
 			log.Fatal(0, "bad agg settings", err)
 		}
-		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks)})
+		aggTTL, err := strconv.Atoi(fields[3])
+		if err != nil {
+			log.Fatal(0, "bad agg settings", err)
+		}
+		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks), uint32(aggTTL)})
 	}
 	if (month_sec % *chunkSpan) != 0 {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")

@@ -37,6 +37,7 @@ func findMetricsForRequests(reqs []Req, defCache *DefCache) error {
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
+// this function ignores the TTL values. it is assumed that you've set sensible TTL's
 func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
 	// model all the archives for each requested metric

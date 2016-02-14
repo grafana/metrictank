@@ -73,8 +73,7 @@ func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint
 		ttl:       ttl,
 	}
 	for _, as := range aggsetting {
-		//TODO(awoods): use per aggsetting TTL
-		m.aggregators = append(m.aggregators, NewAggregator(store, key, as.span, as.chunkSpan, as.numChunks, ttl))
+		m.aggregators = append(m.aggregators, NewAggregator(store, key, as.span, as.chunkSpan, as.numChunks, as.ttl))
 	}
 
 	return &m
