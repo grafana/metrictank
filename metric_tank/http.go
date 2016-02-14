@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
@@ -10,25 +9,50 @@ import (
 	_ "net/http/pprof"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} { return make([]byte, 0) },
+}
 
 type Point struct {
 	Val float64
 	Ts  uint32
 }
 
-func (p *Point) MarshalJSON() ([]byte, error) {
-	if math.IsNaN(p.Val) {
-		return []byte(fmt.Sprintf("[null, %d]", p.Ts)), nil
-	}
-	return []byte(fmt.Sprintf("[%f, %d]", p.Val, p.Ts)), nil
-}
-
 type Series struct {
 	Target     string
 	Datapoints []Point
 	Interval   uint32
+}
+
+func graphiteJSON(b []byte, series []Series) ([]byte, error) {
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"Target":"`...)
+		b = append(b, s.Target...)
+		b = append(b, `","Datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
+		}
+		b = b[:len(b)-1] // cut last comma
+		b = append(b, `],"Interval":`...)
+		b = strconv.AppendInt(b, int64(s.Interval), 10)
+		b = append(b, `},`...)
+	}
+	b = b[:len(b)-1] // cut last comma
+	b = append(b, ']')
+	return b, nil
 }
 
 func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.HandlerFunc {
@@ -158,12 +182,14 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			Interval:   interval,
 		}
 	}
-	js, err := json.Marshal(out)
+	js := bufPool.Get().([]byte)
+	js, err = graphiteJSON(js, out)
 	if err != nil {
 		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	bufPool.Put(js[:0])
 
 	w.Header().Set("Content-Type", "application/json")
 	reqHandleDuration.Value(time.Now().Sub(pre))
