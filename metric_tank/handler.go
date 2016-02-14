@@ -37,11 +37,14 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 	metricsReceived.Inc(int64(len(ms.Metrics)))
 
 	for _, metric := range ms.Metrics {
+		if metric.Id == "" {
+			panic("empty metric.Id")
+		}
 		if metric.Time == 0 {
-			log.Warn("invalid metric. metric.Time is 0. %s", metric.GetId())
+			log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
 		} else {
 			h.defCache.Add(metric)
-			m := h.metrics.GetOrCreate(metric.GetId())
+			m := h.metrics.GetOrCreate(metric.Id)
 			m.Add(uint32(metric.Time), metric.Value)
 		}
 	}
