@@ -24,26 +24,31 @@ type Series struct {
 	Interval   uint32
 }
 
-func (s *Series) MarshalJSON() ([]byte, error) {
+func graphiteJSON(series []Series) ([]byte, error) {
 	var b []byte
-	b = append(b, `{"Target":"`...)
-	b = append(b, s.Target...)
-	b = append(b, `","Datapoints":[`...)
-	for _, p := range s.Datapoints {
-		b = append(b, '[')
-		if math.IsNaN(p.Val) {
-			b = append(b, `null,`...)
-		} else {
-			b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
-			b = append(b, ',')
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"Target":"`...)
+		b = append(b, s.Target...)
+		b = append(b, `","Datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
 		}
-		b = strconv.AppendUint(b, uint64(p.Ts), 10)
-		b = append(b, `],`...)
+		b = b[:len(b)-1] // cut last comma
+		b = append(b, `],"Interval":`...)
+		b = strconv.AppendInt(b, int64(s.Interval), 10)
+		b = append(b, `},`...)
 	}
 	b = b[:len(b)-1] // cut last comma
-	b = append(b, `],"Interval":`...)
-	b = strconv.AppendInt(b, int64(s.Interval), 10)
-	b = append(b, '}')
+	b = append(b, ']')
 	return b, nil
 }
 

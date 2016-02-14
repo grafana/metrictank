@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -29,7 +28,7 @@ func TestJsonMarshal(t *testing.T) {
 			Interval: 10,
 		},
 	}
-	js, err := json.Marshal(data)
+	js, err := graphiteJSON(data)
 	if err != nil {
 		panic(err)
 	}
@@ -46,15 +45,17 @@ func BenchmarkSeriesJson(b *testing.B) {
 	for i := 0; i < 1000; i++ {
 		pA[i] = Point{float64(10000 * i), uint32(baseTs + 10*i)}
 	}
-	data := Series{
-		Target:     "some.metric.with.a-whole-bunch-of.integers",
-		Datapoints: pA,
-		Interval:   10,
+	data := []Series{
+		Series{
+			Target:     "some.metric.with.a-whole-bunch-of.integers",
+			Datapoints: pA,
+			Interval:   10,
+		},
 	}
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		js, err := json.Marshal(data)
+		js, err := graphiteJSON(data)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}
@@ -84,7 +85,7 @@ func BenchmarkHttpRespJson(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		js, err := json.Marshal(data)
+		js, err := graphiteJSON(data)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}
