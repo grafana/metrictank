@@ -378,8 +378,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600, 800, consolidation.Avg, 10),
 			},
 			[]aggSetting{
-				{60, 600, 2},
-				{120, 600, 1},
+				{60, 600, 2, 0},
+				{120, 600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
@@ -399,8 +399,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 10),
 			},
 			[]aggSetting{
-				{60, 600, 2},
-				{120, 600, 1},
+				{60, 600, 2, 0},
+				{120, 600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 30, 3),
@@ -420,8 +420,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 39, consolidation.Avg, 10),
 			},
 			[]aggSetting{
-				{120, 600, 2},
-				{600, 600, 2},
+				{120, 600, 2, 0},
+				{600, 600, 2, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
@@ -440,8 +440,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{120, 600, 2},
-				{600, 600, 2},
+				{120, 600, 2, 0},
+				{600, 600, 2, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -462,8 +462,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{120, 600, 2},
-				{600, 600, 2},
+				{120, 600, 2, 0},
+				{600, 600, 2, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 120, 120, 1),
@@ -482,8 +482,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{300, 600, 2},
-				{600, 600, 2},
+				{300, 600, 2, 0},
+				{600, 600, 2, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 300, 300, 1),
@@ -501,8 +501,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 600, 2},
-				{1200, 1200, 2},
+				{600, 600, 2, 0},
+				{1200, 1200, 2, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 300, 30),
@@ -520,9 +520,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*3, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1}, // aggregations stored in 6h chunks
-				{7200, 21600, 1},
-				{21600, 21600, 1},
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*3, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -540,9 +540,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*6, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1}, // aggregations stored in 6h chunks
-				{7200, 21600, 1},
-				{21600, 21600, 1},
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*6, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -560,9 +560,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*9, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1}, // aggregations stored in 6h chunks
-				{7200, 21600, 1},
-				{21600, 21600, 1},
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*9, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -582,9 +582,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1}, // aggregations stored in 6h chunks
-				{7200, 21600, 1},
-				{21600, 21600, 1},
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*24, 1000, consolidation.Avg, 10, 1, 600, 600, 1),
@@ -604,9 +604,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1}, // aggregations stored in 6h chunks
-				{7200, 21600, 1},
-				{21600, 21600, 1},
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*24*7, 1000, consolidation.Avg, 10, 1, 600, 1200, 2),
@@ -643,9 +643,9 @@ func BenchmarkAlignRequests(b *testing.B) {
 		reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 	}
 	aggSettings := []aggSetting{
-		{600, 21600, 1},
-		{7200, 21600, 1},
-		{21600, 21600, 1},
+		{600, 21600, 1, 0},
+		{7200, 21600, 1, 0},
+		{21600, 21600, 1, 0},
 	}
 
 	for n := 0; n < b.N; n++ {
