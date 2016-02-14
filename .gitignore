@@ -1,5 +1,7 @@
 .*.sw?
 .notouch
+msg/msg.test
+metric_tank/metric_tank.test
 raintank-metric
 raintank-metric_*
 metric_tank/metric_tank
