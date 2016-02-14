@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
@@ -10,8 +9,13 @@ import (
 	_ "net/http/pprof"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var bufPool = sync.Pool{
+	New: func() interface{} { return make([]byte, 0) },
+}
 
 type Point struct {
 	Val float64
@@ -24,8 +28,7 @@ type Series struct {
 	Interval   uint32
 }
 
-func graphiteJSON(series []Series) ([]byte, error) {
-	var b []byte
+func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 	b = append(b, '[')
 	for _, s := range series {
 		b = append(b, `{"Target":"`...)
@@ -179,12 +182,14 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			Interval:   interval,
 		}
 	}
-	js, err := json.Marshal(out)
+	js := bufPool.Get().([]byte)
+	js, err = graphiteJSON(js, out)
 	if err != nil {
 		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	bufPool.Put(js[:0])
 
 	w.Header().Set("Content-Type", "application/json")
 	reqHandleDuration.Value(time.Now().Sub(pre))
