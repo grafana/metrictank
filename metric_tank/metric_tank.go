@@ -110,6 +110,8 @@ var metricsToEsOK met.Count
 var metricsToEsFail met.Count
 var esPutDuration met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 var clusterPrimary met.Gauge
+var gcNum met.Gauge
+var gcDur met.Gauge
 
 func main() {
 	startupTime = time.Now()
@@ -316,21 +318,25 @@ func initMetrics(stats met.Backend) {
 	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
 	esPutDuration = stats.NewTimer("es_put_duration", 0)
 	clusterPrimary = stats.NewGauge("cluster.primary", 0)
+	gcNum = stats.NewGauge("gc.num", 0)
+	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
 
 	// run a collector for some global stats
 	go func() {
 		currentPoints := 0
-		m := &runtime.MemStats{}
+		var m runtime.MemStats
 
 		ticker := time.Tick(time.Duration(1) * time.Second)
 		for {
 			select {
 			case <-ticker:
 				points.Value(int64(currentPoints))
-				runtime.ReadMemStats(m)
+				runtime.ReadMemStats(&m)
 				alloc.Value(int64(m.Alloc))
 				totalAlloc.Value(int64(m.TotalAlloc))
 				sysBytes.Value(int64(m.Sys))
+				gcNum.Value(int64(m.NumGC))
+				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
 				var px int64
 				if clusterStatus.IsPrimary() {
 					px = 1
