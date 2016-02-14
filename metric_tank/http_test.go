@@ -33,7 +33,7 @@ func TestJsonMarshal(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	exp := `[{"Target":"a","Datapoints":[[123.000000,60],[10000.000000,120],[0.000000,180],[1.000000,240]],"Interval":60},{"Target":"foo(bar)","Datapoints":[[123.456000,10],[123.700000,20],[124.100000,30],[125.000000,40],[126.000000,50]],"Interval":10}]`
+	exp := `[{"Target":"a","Datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]],"Interval":60},{"Target":"foo(bar)","Datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]],"Interval":10}]`
 	got := string(js)
 	if exp != got {
 		t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", exp, got)
