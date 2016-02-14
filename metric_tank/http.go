@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
@@ -26,26 +25,26 @@ type Series struct {
 }
 
 func (s *Series) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteString(`{"Target":"`)
-	buf.WriteString(s.Target)
-	buf.WriteString(`","Datapoints":[`)
+	var b []byte
+	b = append(b, `{"Target":"`...)
+	b = append(b, s.Target...)
+	b = append(b, `","Datapoints":[`...)
 	for _, p := range s.Datapoints {
-		buf.WriteString(`[`)
+		b = append(b, '[')
 		if math.IsNaN(p.Val) {
-			buf.WriteString(`null,`)
+			b = append(b, `null,`...)
 		} else {
-			buf.WriteString(strconv.FormatFloat(p.Val, 'f', 3, 64))
-			buf.WriteString(`,`)
+			b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+			b = append(b, ',')
 		}
-		buf.WriteString(strconv.FormatUint(uint64(p.Ts), 10))
-		buf.WriteString(`],`)
+		b = strconv.AppendUint(b, uint64(p.Ts), 10)
+		b = append(b, `],`...)
 	}
-	buf.Truncate(buf.Len() - 1) // cut last comma
-	buf.WriteString(`],"Interval":`)
-	buf.WriteString(strconv.FormatInt(int64(s.Interval), 10))
-	buf.WriteString(`}`)
-	return buf.Bytes(), nil
+	b = b[:len(b)-1] // cut last comma
+	b = append(b, `],"Interval":`...)
+	b = strconv.AppendInt(b, int64(s.Interval), 10)
+	b = append(b, '}')
+	return b, nil
 }
 
 func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.HandlerFunc {
