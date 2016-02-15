@@ -47,7 +47,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
 	options := make([]archive, len(aggs)+1)
 
-	minInterval := uint32(0)
+	minInterval := uint32(0) // will contain the smallest rawInterval from all requested series
 	rawIntervals := make(map[uint32]struct{})
 	for _, req := range reqs {
 		if minInterval == 0 || minInterval > req.rawInterval {
@@ -65,7 +65,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	}
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
-	selected := len(options) - 1
+	selected := len(options) - 1 // and fall back to lowest-res option if they all have too many
 	for i, opt := range options {
 		if opt.pointCount <= reqs[0].maxPoints {
 			selected = i
@@ -76,16 +76,18 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	/*
 	   do a quick calculation of the ratio between pointCount and maxDatapoints of
 	   the selected option, and the option before that.  eg. with a time range of 1hour,
-	   our pointCounts for each option are:
-	   10s   | 360
-	   600s  | 6
-	   7200s | 0
+	   our options are:
+	   i | span  | pointCount
+	   ======================
+	   0 | 10s   | 360
+	   1 | 600s  | 6
+	   2 | 7200s | 0
 
 	   if maxPoints is 100, then selected will be 1, our 600s rollups.
 	   We then calculate the ratio between maxPoints and our
 	   selected pointCount "6" and the previous option "360".
-	   belowMaxDataPointsRatio  =  16  #(100/6)
-	   aboveMaxDataPointsRatio  =  3   #(360/100)
+	   belowMaxDataPointsRatio = 100/6   = 16.67
+	   aboveMaxDataPointsRatio = 360/100 = 3.6
 
 	   As the maxDataPoint requested is much closer to 360 then it is to 6,
 	   we will use 360 and do runtime consolidation.
