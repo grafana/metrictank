@@ -22,17 +22,6 @@ func Cnt(in []float64) float64 {
 	return float64(len(usable))
 }
 
-func Last(in []float64) float64 {
-	if len(in) == 0 {
-		panic("last() called in aggregator with 0 terms")
-	}
-	usable := Usable(in)
-	if len(usable) == 0 {
-		return math.NaN()
-	}
-	return usable[len(usable)-1]
-}
-
 func Min(in []float64) float64 {
 	if len(in) == 0 {
 		panic("min() called in aggregator with 0 terms")

@@ -139,8 +139,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		switch consolidateBy {
 		case "avg", "average":
 			consolidator = consolidation.Avg
-		case "last":
-			consolidator = consolidation.Last
 		case "min":
 			consolidator = consolidation.Min
 		case "max":
