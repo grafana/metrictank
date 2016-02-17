@@ -239,7 +239,7 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 }
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
-// it can query for data within aggregated archives, by using fn min/max/sos/sum/cnt and providing the matching agg span.
+// it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
 func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []Point {
 	iters := make([]Iter, 0)
 	memIters := make([]Iter, 0)

@@ -13,7 +13,6 @@ const (
 	None Consolidator = iota
 	Avg
 	Cnt // not available through http api
-	Last
 	Min
 	Max
 	Sum
@@ -28,8 +27,6 @@ func (c Consolidator) String() string {
 		return "AverageConsolidator"
 	case Cnt:
 		return "CountConsolidator"
-	case Last:
-		return "LastConsolidator"
 	case Min:
 		return "MinimumConsolidator"
 	case Max:
@@ -50,8 +47,6 @@ func (c Consolidator) Archive() string {
 		panic("avg consolidator has no matching Archive(). you need sum and cnt")
 	case Cnt:
 		return "cnt"
-	case Last:
-		return "lst"
 	case Min:
 		return "min"
 	case Max:
@@ -70,8 +65,6 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 		consFunc = batch.Avg
 	case Cnt:
 		consFunc = batch.Cnt
-	case Last:
-		consFunc = batch.Last
 	case Min:
 		consFunc = batch.Min
 	case Max:

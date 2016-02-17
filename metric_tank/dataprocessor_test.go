@@ -140,20 +140,6 @@ func TestConsolidationFunctions(t *testing.T) {
 				{3, 1449178151},
 				{4, 1449178161},
 			},
-			consolidation.Last,
-			2,
-			[]Point{
-				{2, 1449178141},
-				{4, 1449178161},
-			},
-		},
-		{
-			[]Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
-			},
 			consolidation.Min,
 			2,
 			[]Point{

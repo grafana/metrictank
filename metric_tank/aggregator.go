@@ -31,10 +31,8 @@ type Aggregator struct {
 	agg             *Aggregation
 	minMetric       *AggMetric
 	maxMetric       *AggMetric
-	sosMetric       *AggMetric
 	sumMetric       *AggMetric
 	cntMetric       *AggMetric
-	lstMetric       *AggMetric
 }
 
 func NewAggregator(store Store, key string, aggSpan, aggChunkSpan, aggNumChunks uint32, ttl uint32) *Aggregator {
@@ -44,19 +42,15 @@ func NewAggregator(store Store, key string, aggSpan, aggChunkSpan, aggNumChunks 
 		agg:       NewAggregation(),
 		minMetric: NewAggMetric(store, fmt.Sprintf("%s_min_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
 		maxMetric: NewAggMetric(store, fmt.Sprintf("%s_max_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		sosMetric: NewAggMetric(store, fmt.Sprintf("%s_sos_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
 		sumMetric: NewAggMetric(store, fmt.Sprintf("%s_sum_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
 		cntMetric: NewAggMetric(store, fmt.Sprintf("%s_cnt_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
-		lstMetric: NewAggMetric(store, fmt.Sprintf("%s_lst_%d", key, aggSpan), aggChunkSpan, aggNumChunks, ttl),
 	}
 }
 func (agg *Aggregator) flush() string {
 	agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
 	agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
-	agg.sosMetric.Add(agg.currentBoundary, agg.agg.sos)
 	agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
 	agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
-	agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
 	msg := fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 	agg.agg.Reset()
 	return msg

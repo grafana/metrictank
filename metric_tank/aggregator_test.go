@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"testing"
 )
 
@@ -113,14 +112,6 @@ func TestAggregator(t *testing.T) {
 	compare("simple-cnt-skip-a-block", agg.cntMetric, []Point{
 		{2, 120},
 		{3, 240},
-	})
-	compare("simple-lst-skip-a-block", agg.lstMetric, []Point{
-		{5, 120},
-		{978894.445, 240},
-	})
-	compare("simple-sos-skip-a-block", agg.sosMetric, []Point{
-		{math.Pow(float64(123.4), 2) + math.Pow(float64(5), 2), 120},
-		{math.Pow(float64(2451.123), 2) + math.Pow(float64(1451.123), 2) + math.Pow(float64(978894.445), 2), 240},
 	})
 	compare("simple-sum-skip-a-block", agg.sumMetric, []Point{
 		{128.4, 120},
