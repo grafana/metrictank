@@ -38,7 +38,7 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 
 	for _, metric := range ms.Metrics {
 		if metric.Id == "" {
-			panic("empty metric.Id")
+			log.Fatal(3, "empty metric.Id - fix your datastream")
 		}
 		if metric.Time == 0 {
 			log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
