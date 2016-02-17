@@ -427,12 +427,14 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Error(3, "failed to add metric to chunk for %s. %s", a.Key, err)
+			log.Debug("failed to add metric to chunk for %s. %s", a.Key, err)
+			metricsTooOld.Inc(1)
 			return
 		}
 		log.Debug("AggMetric %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
-		log.Error(3, "Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
+		log.Debug("Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
+		metricsTooOld.Inc(1)
 		return
 	} else {
 		// persist the chunk. If the writeQueue is full, then this will block.

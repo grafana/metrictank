@@ -87,6 +87,7 @@ var metricDefCacheMiss met.Count
 var metricsReceived met.Count
 var metricsToCassandraOK met.Count
 var metricsToCassandraFail met.Count
+var metricsTooOld met.Count
 var cassandraRowsPerResponse met.Meter
 var cassandraChunksPerRow met.Meter
 var messagesSize met.Meter
@@ -320,6 +321,7 @@ func initMetrics(stats met.Backend) {
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsToCassandraOK = stats.NewCount("metrics_to_cassandra.ok")
 	metricsToCassandraFail = stats.NewCount("metrics_to_cassandra.fail")
+	metricsTooOld = stats.NewCount("metrics_too_old")
 	cassandraRowsPerResponse = stats.NewMeter("cassandra_rows_per_response", 0)
 	cassandraChunksPerRow = stats.NewMeter("cassandra_chunks_per_row", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
