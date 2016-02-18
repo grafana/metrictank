@@ -86,17 +86,19 @@ var metricDefCacheHit met.Count
 var metricDefCacheMiss met.Count
 var metricsReceived met.Count
 var metricsTooOld met.Count
-var cassandraRowsPerResponse met.Meter
-var cassandraChunksPerRow met.Meter
+var cassRowsPerResponse met.Meter
+var cassChunksPerRow met.Meter
+var cassWriteQueueSize met.Gauge
+var cassWriters met.Gauge
+var cassPutDuration met.Timer
+var cassBlockDuration met.Timer
+var cassGetDuration met.Timer
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
 var msgsAge met.Meter // in ms
 // just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
 // there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
 var reqHandleDuration met.Timer
-var cassandraPutDuration met.Timer
-var cassandraBlockDuration met.Timer
-var cassandraGetDuration met.Timer
 var inItems met.Meter
 var points met.Gauge
 var msgsHandleOK met.Count
@@ -226,7 +228,7 @@ func main() {
 		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
-	store, err := NewCassandraStore()
+	store, err := NewCassandraStore(stats)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -318,15 +320,17 @@ func initMetrics(stats met.Backend) {
 	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
-	cassandraRowsPerResponse = stats.NewMeter("cassandra_rows_per_response", 0)
-	cassandraChunksPerRow = stats.NewMeter("cassandra_chunks_per_row", 0)
+	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
+	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
+	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
+	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
+	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
+	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
+	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
 	msgsAge = stats.NewMeter("message_age", 0)
 	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
-	cassandraGetDuration = stats.NewTimer("cassandra_get_duration", 0)
-	cassandraBlockDuration = stats.NewTimer("cassandra_block_duration", 0)
-	cassandraPutDuration = stats.NewTimer("cassandra_put_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	msgsHandleOK = stats.NewCount("handle.ok")
@@ -365,6 +369,8 @@ func initMetrics(stats met.Backend) {
 					px = 0
 				}
 				clusterPrimary.Value(px)
+				cassWriters.Value(int64(*cassandraWriteConcurrency))
+				cassWriteQueueSize.Value(int64(*cassandraWriteQueueSize))
 			case update := <-totalPoints:
 				currentPoints += update
 			}

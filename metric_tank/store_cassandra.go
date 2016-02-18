@@ -13,6 +13,7 @@ import (
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/met"
 )
 
 // write aggregated data to cassandra.
@@ -40,11 +41,12 @@ object to interact with the whole Cassandra cluster.
 */
 
 type cassandraStore struct {
-	session      *gocql.Session
-	workerQueues []chan *ChunkWriteRequest
+	session          *gocql.Session
+	workerQueues     []chan *ChunkWriteRequest
+	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore() (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cluster.Consistency = gocql.One
 	var err error
@@ -69,13 +71,15 @@ func NewCassandraStore() (*cassandraStore, error) {
 		return nil, err
 	}
 	c := &cassandraStore{
-		session:      session,
-		workerQueues: make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency),
+		session:          session,
+		workerQueues:     make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency),
+		writeQueueMeters: make([]met.Meter, *cassandraWriteConcurrency),
 	}
 
 	for i := 0; i < *cassandraWriteConcurrency; i++ {
 		c.workerQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
-		go c.processWriteQueue(c.workerQueues[i])
+		c.writeQueueMeters[i] = stats.NewMeter(fmt.Sprintf("cassandra.write_queue.%d.items", i+1), 0)
+		go c.processWriteQueue(c.workerQueues[i], c.writeQueueMeters[i])
 	}
 
 	return c, err
@@ -86,18 +90,23 @@ func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 	for _, char := range cwr.key {
 		sum += int(char)
 	}
-	c.workerQueues[sum%*cassandraWriteConcurrency] <- cwr
+	which := sum % *cassandraWriteConcurrency
+	c.writeQueueMeters[which].Value(int64(len(c.workerQueues[which])))
+	c.workerQueues[which] <- cwr
+	c.writeQueueMeters[which].Value(int64(len(c.workerQueues[which])))
 }
 
 /* process writeQueue.
  */
-func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest) {
+func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter met.Meter) {
 	for {
+		meter.Value(int64(len(queue)))
 		select {
 		case cwr := <-queue:
+			meter.Value(int64(len(queue)))
 			log.Debug("starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
-			cassandraBlockDuration.Value(time.Now().Sub(cwr.timestamp))
+			cassBlockDuration.Value(time.Now().Sub(cwr.timestamp))
 
 			data := cwr.chunk.Series.Bytes()
 			chunkSizeAtSave.Value(int64(len(data)))
@@ -152,7 +161,7 @@ func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int
 	row_key := fmt.Sprintf("%s_%d", key, t0/month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ret := c.session.Query(query, row_key, t0, data).Exec()
-	cassandraPutDuration.Value(time.Now().Sub(pre))
+	cassPutDuration.Value(time.Now().Sub(pre))
 	return ret
 }
 
@@ -228,7 +237,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	// for loop ends.
 	go func() {
 		wg.Wait()
-		cassandraGetDuration.Value(time.Now().Sub(pre))
+		cassGetDuration.Value(time.Now().Sub(pre))
 		close(results)
 	}()
 
@@ -266,13 +275,13 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 			}
 			iters = append(iters, NewIter(iter, "cassandra month=%d t0=%d", outcome.month, ts))
 		}
-		cassandraChunksPerRow.Value(chunks)
+		cassChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
 		}
 	}
-	cassandraRowsPerResponse.Value(int64(len(outcomes)))
+	cassRowsPerResponse.Value(int64(len(outcomes)))
 	log.Debug("searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil
 }
