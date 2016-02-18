@@ -85,6 +85,11 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
 	}
+	if len(targets)*int(maxDataPoints) > 100*1000 {
+		http.Error(w, "too much data requested", http.StatusBadRequest)
+		return
+	}
+
 	now := time.Now()
 	fromUnix := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	toUnix := uint32(now.Add(time.Duration(1) * time.Second).Unix())
@@ -108,6 +113,10 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	}
 	if fromUnix >= toUnix {
 		http.Error(w, "to must be higher than from", http.StatusBadRequest)
+		return
+	}
+	if len(targets)*int(toUnix-fromUnix) > 2*365*24*3600 {
+		http.Error(w, "too much data requested", http.StatusBadRequest)
 		return
 	}
 
