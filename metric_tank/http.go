@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"math"
@@ -66,7 +65,8 @@ func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.Handler
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting) {
 	pre := time.Now()
 	req.ParseForm()
-	log.Debug(fmt.Sprintf("http.Get(): INCOMING REQ. targets: %q, maxDataPoints: %q", req.Form.Get("target"), req.Form.Get("maxDataPoints")))
+	log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
+		req.Method, req.Form.Get("from"), req.Form.Get("to"), req.Form["target"], req.Form.Get("maxDataPoints"))
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := req.Form.Get("maxDataPoints")
