@@ -35,6 +35,7 @@ var (
 	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
 	instance           = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+	blockProfileRate   = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
 	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
@@ -162,6 +163,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
+	runtime.SetBlockProfileRate(*blockProfileRate)
 
 	if *channel == "" {
 		rand.Seed(time.Now().UnixNano())
