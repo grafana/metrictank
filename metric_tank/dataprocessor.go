@@ -6,7 +6,9 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"math"
+	"math/rand"
 	"runtime"
+	"time"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -254,6 +256,9 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 		}
 	}
 	if oldest > fromUnix {
+		if rand.Uint32()%50 == 0 {
+			log.Info("cassandra needed for %s %d - %d span=%ds now=%d oldest=%d", key, fromUnix, toUnix, toUnix-fromUnix-1, time.Now().Unix(), oldest)
+		}
 		reqSpanBoth.Value(int64(toUnix - fromUnix))
 		if consolidator != consolidation.None {
 			key = aggMetricKey(key, consolidator.Archive(), aggSpan)
