@@ -229,9 +229,19 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		return math.MaxInt32, make([]Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
-		// we have no data in the requested range.
+		// request falls entirely ahead of the data we have
+		// this can happen in a few cases:
+		// * queries for the most recent data, but our ingestion has fallen behind.
+		//   we don't want such a degradation to cause a storm of cassandra queries
+		//   we should just return an oldest value that is <= from so we don't hit cassandra
+		//   but it doesn't have to be the real oldest value, so do whatever is cheap.
+		// * data got once written by another node, but has been re-sending (perhaps fixed)
+		//   to this node, but not yet up to the point it was previously sent. so we're
+		//   only aware of older data and not the newer data in cassandra. this is unlikely
+		//   and it's better to not serve this scenario well in favor of the above case.
+		//   seems like a fair tradeoff anyway that you have to refill all the way first.
 		log.Debug("AggMetric %s Get(): no data for requested range.", a.Key)
-		return math.MaxInt32, make([]Iter, 0)
+		return from, make([]Iter, 0)
 	}
 
 	// get the oldest chunk we have.
