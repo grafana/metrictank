@@ -347,6 +347,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 // write a chunk to peristant storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
+	pre := time.Now()
 	chunk := a.Chunks[pos]
 	chunk.Finish()
 	if !clusterStatus.IsPrimary() {
@@ -404,6 +405,7 @@ func (a *AggMetric) persist(pos int) {
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
 	}
+	persistDuration.Value(time.Now().Sub(pre))
 	return
 }
 

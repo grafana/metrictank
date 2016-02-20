@@ -94,6 +94,7 @@ var cassWriters met.Gauge
 var cassPutDuration met.Timer
 var cassBlockDuration met.Timer
 var cassGetDuration met.Timer
+var persistDuration met.Timer
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
 var msgsAge met.Meter // in ms
@@ -329,6 +330,7 @@ func initMetrics(stats met.Backend) {
 	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
 	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
 	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
+	persistDuration = stats.NewTimer("persist_duration", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
 	msgsAge = stats.NewMeter("message_age", 0)
