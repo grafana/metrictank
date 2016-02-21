@@ -53,7 +53,7 @@ var (
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
-	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
+	gcInterval     = flag.Int("gc-interval", 600, "Interval in seconds to run garbage collection job.  You probably want to run this at least as often as your smallest chunkSpan, and track whether it can keep up")
 	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
 
