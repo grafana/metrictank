@@ -68,6 +68,7 @@ func (ms *AggMetrics) GC() {
 		}
 		ms.RUnlock()
 		for _, key := range keys {
+			gcMetric.Inc(1)
 			ms.RLock()
 			a := ms.Metrics[key]
 			ms.RUnlock()

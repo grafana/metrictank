@@ -118,8 +118,9 @@ var (
 	metricsToEsFail   met.Count
 	esPutDuration     met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 	clusterPrimary    met.Gauge
-	gcNum             met.Gauge
-	gcDur             met.Gauge
+	gcNum             met.Gauge // go GC
+	gcDur             met.Gauge // go GC
+	gcMetric          met.Count // metrics GC
 )
 
 func init() {
@@ -339,6 +340,7 @@ func initMetrics(stats met.Backend) {
 	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
+	gcMetric = stats.NewCount("gc_metric")
 	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
 	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
