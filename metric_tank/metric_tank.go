@@ -87,6 +87,7 @@ var metricDefCacheHit met.Count
 var metricDefCacheMiss met.Count
 var metricsReceived met.Count
 var metricsTooOld met.Count
+var gcMetric met.Count
 var cassRowsPerResponse met.Meter
 var cassChunksPerRow met.Meter
 var cassWriteQueueSize met.Gauge
@@ -323,6 +324,7 @@ func initMetrics(stats met.Backend) {
 	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
+	gcMetric = stats.NewCount("gc_metric")
 	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
 	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
