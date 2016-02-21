@@ -395,7 +395,7 @@ func (a *AggMetric) persist(pos int) {
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk/len(pending), a.Key, maxT0)
+		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, maxT0)
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
