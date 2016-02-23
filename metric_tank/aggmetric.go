@@ -347,47 +347,42 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
-// write a chunk to peristant storage. This should only be called while holding a.Lock()
+// write chunks to persistent storage. This should only be called while holding a.Lock()
+// pos is the pos of the most recent chunk that is safe to be persisted (no longer being written to)
+// typically the one just before the current one.
 func (a *AggMetric) persist(pos int) {
-	pre := time.Now()
-	chunk := a.Chunks[pos]
-	chunk.Finish()
 	if !clusterStatus.IsPrimary() {
 		log.Debug("node is not primary, not saving chunk.")
 		return
 	}
+	pre := time.Now()
 
 	// create an array of chunks that need to be sent to the writeQueue.
-	pending := make([]*ChunkWriteRequest, 1)
-	// add the current chunk to the list of chunks to send to the writeQueue
-	pending[0] = &ChunkWriteRequest{
-		key:       a.Key,
-		chunk:     chunk,
-		ttl:       a.ttl,
-		timestamp: time.Now(),
-	}
+	pending := make([]*ChunkWriteRequest, 0)
 
-	// if we recently became the primary, there may be older chunks
-	// that the old primary did not save.  We should check for those
-	// and save them.
-	previousPos := pos - 1
-	if previousPos < 0 {
-		previousPos += len(a.Chunks)
-	}
-	previousChunk := a.Chunks[previousPos]
-	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
-		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
+	// see if we need to save the given chunk or any of the chunks before it
+	// (older chunks may not have been saved yet due to discrepancies between GC
+	// rate and rate of a metric filling up (perhaps its backfilled at a fast rate)
+	// or due to an older primary crashing and having failed to save a bunch of chunks
+	maxT0 := a.Chunks[pos].T0
+	startPos := pos
+	for chunk := a.Chunks[pos]; chunk.T0 <= maxT0 && !chunk.Saved && !chunk.Saving; {
+		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, chunk.T0)
+		chunk.Finish()
 		pending = append(pending, &ChunkWriteRequest{
 			key:       a.Key,
-			chunk:     previousChunk,
+			chunk:     chunk,
 			ttl:       a.ttl,
 			timestamp: time.Now(),
 		})
-		previousPos--
-		if previousPos < 0 {
-			previousPos += len(a.Chunks)
+		pos--
+		if pos < 0 {
+			pos += len(a.Chunks)
 		}
-		previousChunk = a.Chunks[previousPos]
+		if pos == startPos {
+			// cycle is complete
+			break
+		}
 	}
 
 	log.Debug("sending %d chunks to write queue", len(pending))
@@ -402,7 +397,7 @@ func (a *AggMetric) persist(pos int) {
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk/len(pending), a.Key, chunk.T0)
+		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, maxT0)
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
@@ -451,9 +446,6 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		metricsTooOld.Inc(1)
 		return
 	} else {
-		// persist the chunk. If the writeQueue is full, then this will block.
-		a.persist(a.CurrentChunkPos)
-
 		a.CurrentChunkPos++
 		if a.CurrentChunkPos >= int(a.NumChunks) {
 			a.CurrentChunkPos = 0
@@ -494,10 +486,20 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			if currentChunk.LastWrite < metricMinTs {
 				return true
 			}
+		} else {
+			// chunk has not been written to in a while. Lets persist it.
+			log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
+			a.persist(a.CurrentChunkPos)
 		}
-		// chunk has not been written to in a while. Lets persist it.
-		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
-		a.persist(a.CurrentChunkPos)
+	} else {
+		// current chunk is still recent enough, but let's see if we have to persist any older chunks
+		pos := a.CurrentChunkPos - 1
+		if pos == -1 {
+			pos += len(a.Chunks)
+		}
+		if a.Chunks[pos] != nil {
+			a.persist(pos)
+		}
 	}
 	return false
 }

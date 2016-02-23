@@ -55,7 +55,7 @@ var (
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
-	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
+	gcInterval     = flag.Int("gc-interval", 600, "Interval in seconds to run garbage collection job.  You probably want to run this at least as often as your smallest chunkSpan, and track whether it can keep up")
 	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
 
@@ -93,6 +93,7 @@ var metricDefCacheHit met.Count
 var metricDefCacheMiss met.Count
 var metricsReceived met.Count
 var metricsTooOld met.Count
+var gcMetric met.Count
 var cassRowsPerResponse met.Meter
 var cassChunksPerRow met.Meter
 var cassWriteQueueSize met.Gauge
@@ -329,6 +330,7 @@ func initMetrics(stats met.Backend) {
 	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
+	gcMetric = stats.NewCount("gc_metric")
 	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
 	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
