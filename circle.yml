@@ -11,7 +11,7 @@ test:
     - pkg/package.sh
 dependencies:
   pre:
-    - if [[ ! -e /usr/local/go-1.6 ]]; then mv /usr/local/go /usr/local/go-1.5.1; wget https://storage.googleapis.com/golang/go1.6.linux-amd64.tar.gz && tar -C /usr/local -zxf go1.6.linux-amd64.tar.gz && mv /usr/local/go /usr/local/go-1.6 && ln -s /usr/local/go-1.6 /usr/local/go; fi
+    - if [[ ! -e /usr/local/go-1.6 ]]; then sudo mv /usr/local/go /usr/local/go-1.5.1; wget https://storage.googleapis.com/golang/go1.6.linux-amd64.tar.gz && sudo tar -C /usr/local -zxf go1.6.linux-amd64.tar.gz && sudo mv /usr/local/go /usr/local/go-1.6 && sudo ln -s /usr/local/go-1.6 /usr/local/go; fi
   override:
     - pkg/depends.sh
     - pkg/build.sh
