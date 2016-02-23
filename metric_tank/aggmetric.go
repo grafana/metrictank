@@ -340,7 +340,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 // this function must only be called while holding the lock
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
-		log.Debug("AggMetric %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
+		if logLevel < 2 {
+			log.Debug("AggMetric %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
+		}
 		agg.Add(ts, val)
 	}
 }

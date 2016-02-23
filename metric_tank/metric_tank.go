@@ -26,6 +26,8 @@ import (
 )
 
 var (
+	logLevel int
+
 	showVersion = flag.Bool("version", false, "print version string")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
 
@@ -57,8 +59,6 @@ var (
 	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
 
-	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-
 	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
 	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
@@ -72,6 +72,10 @@ var (
 
 	startupTime time.Time
 )
+
+func init() {
+	flag.IntVar(&logLevel, "log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+}
 
 var reqSpanMem met.Meter
 var reqSpanBoth met.Meter
@@ -130,9 +134,9 @@ func main() {
 		conf.ParseAll()
 	}
 
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, logLevel))
 	// workaround for https://github.com/grafana/grafana/issues/4055
-	switch *logLevel {
+	switch logLevel {
 	case 0:
 		log.Level(log.TRACE)
 	case 1:
