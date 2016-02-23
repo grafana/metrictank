@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -56,6 +57,7 @@ var (
 	msgsHandleFail met.Count
 
 	writeQueue *InProgressMessageQueue
+	GitHash = "(none)"
 )
 
 type ESHandler struct {
@@ -176,7 +178,7 @@ func main() {
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
 	if *showVersion {
-		fmt.Println("nsq_probe_events_to_elasticsearch")
+		fmt.Printf("nsq_probe_events_to_elasticsearch (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
 
