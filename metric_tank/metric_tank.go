@@ -71,6 +71,8 @@ var (
 	defCache *DefCache
 
 	startupTime time.Time
+
+	GitHash 	 = "(none)"
 )
 
 func init() {
@@ -154,7 +156,7 @@ func main() {
 	}
 
 	if *showVersion {
-		fmt.Println("metrics_tank")
+		fmt.Printf("metrics_tank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
 	if *instance == "" {
