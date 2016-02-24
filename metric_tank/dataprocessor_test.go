@@ -601,18 +601,77 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
+		// let's request 1 year of data
+		// raw 3600*24*365/60 -> 525600
+		// agg1 3600*24*365/600 -> 52560
+		// agg2 3600*24*365/7200 -> 4380
+		// agg3 3600*24*365/21600 -> 1460
+		// clearly agg3 is the best, and we have to runtime consolidate wih aggNum 2
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0},
+				{21600, 21600, 1, 0},
+			},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 10, 3, 21600, 43200, 2),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 3, 21600, 43200, 2),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 60, 3, 21600, 43200, 2),
+			},
+			nil,
+		},
+
+		// now let's request 1 year of data again, but without actually having any aggregation bands (wowa don't do this)
+		// raw 3600*24*365/60 -> 525600
+		// we need an aggNum of 526 to keep this under 1000 points
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 60),
+			},
+			[]aggSetting{},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 10, 0, 10, 31560, 526*6),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 0, 30, 31560, 526*2),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 60, 0, 60, 31560, 526),
+			},
+			nil,
+		},
+		// same thing but if the metrics have the same resolution
+		// raw 3600*24*365/60 -> 525600
+		// we need an aggNum of 526 to keep this under 1000 points
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+			},
+			[]aggSetting{},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 30, 0, 30, 31560, 526*2),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 0, 30, 31560, 526*2),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 30, 0, 30, 31560, 526*2),
+			},
+			nil,
+		},
 	}
 	for i, ac := range input {
 		out, err := alignRequests(ac.reqs, ac.aggSettings)
 		if err != ac.outErr {
-			t.Fatalf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
+			t.Errorf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
 		}
 		if len(out) != len(ac.outReqs) {
-			t.Fatalf("different amount of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
+			t.Errorf("different amount of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
 		} else {
 			for r, exp := range ac.outReqs {
 				if exp != out[r] {
-					t.Fatalf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
+					t.Errorf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
 				}
 			}
 		}
