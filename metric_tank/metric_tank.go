@@ -72,7 +72,7 @@ var (
 
 	startupTime time.Time
 
-	GitHash 	 = "(none)"
+	GitHash = "(none)"
 )
 
 func init() {
