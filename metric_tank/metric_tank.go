@@ -60,7 +60,6 @@ var (
 
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
