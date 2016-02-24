@@ -65,9 +65,13 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	}
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
-	selected := len(options) - 1 // and fall back to lowest-res option if they all have too many
+	// if all options have too many points, fall back to the lowest-res option and apply runtime
+	// consolidation
+	selected := len(options) - 1
+	runTimeConsolidate := true
 	for i, opt := range options {
 		if opt.pointCount <= reqs[0].maxPoints {
+			runTimeConsolidate = false
 			selected = i
 			break
 		}
@@ -92,7 +96,6 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	   As the maxDataPoint requested is much closer to 360 then it is to 6,
 	   we will use 360 and do runtime consolidation.
 	*/
-	runTimeConsolidate := false
 	if selected > 0 {
 		belowMaxDataPointsRatio := float64(reqs[0].maxPoints) / float64(options[selected].pointCount)
 		aboveMaxDataPointsRatio := float64(options[selected-1].pointCount) / float64(reqs[0].maxPoints)
