@@ -39,6 +39,9 @@ var (
 	logLevel    = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	orgs        = flag.Int("orgs", 2000, "how many orgs to simulate")
 	keysPerOrg  = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
+	steps       = flag.Int("steps", 1, "for each advancement of real time, how many advancements of fake data to simulate")
+	interval    = flag.Int("interval", 1, "interval in seconds")
+	offset      = flag.Int("offset", 0, "offset in seconds (how far back in time to start. you can catch up with >1 steps)")
 	statsdAddr  = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType  = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
@@ -81,7 +84,7 @@ func main() {
 	messagesSize = stats.NewMeter("metricpublisher.message_size", 0)
 	metricsPerMessage = stats.NewMeter("metricpublisher.metrics_per_message", 0)
 	publishDuration = stats.NewTimer("metricpublisher.publish_duration", 0)
-	run(*orgs, *keysPerOrg, time.Second)
+	run(*orgs, *keysPerOrg, *steps, *interval, *offset)
 }
 
 func Reslice(in []*schema.MetricData, size int) [][]*schema.MetricData {
@@ -135,34 +138,50 @@ func Publish(metrics []*schema.MetricData) error {
 		if err != nil {
 			log.Fatal(0, "can't publish to nsqd: %s", err)
 		}
-		log.Info("published metrics %d size=%d", id, len(data))
+		//log.Info("published metrics %d size=%d", id, len(data))
 	}
 	return nil
 }
 
-func run(orgs, keysPerOrg int, interval time.Duration) {
-	tick := time.NewTicker(interval)
-	total := orgs * keysPerOrg
+func run(orgs, keysPerOrg, steps, interval, offset int) {
+	var tickDuration time.Duration
+	// if the step is high, it's wasteful to wait a long time (a second or more) and then do big batches
+	// in that case it's better to flush messages smaller messages more continously
+	if steps > 1000 {
+		tickDuration = time.Duration(1000*100*interval/steps) * time.Millisecond
+		steps = 100
+	} else {
+		tickDuration = time.Duration(100) * time.Millisecond
+	}
+
+	tick := time.NewTicker(tickDuration)
+	metricsPerStep := orgs * keysPerOrg
+	total := metricsPerStep * steps
 	metrics := make([]*schema.MetricData, total)
-	for o := 1; o <= orgs; o++ {
-		for k := 1; k <= keysPerOrg; k++ {
-			i := (o-1)*keysPerOrg + k - 1
-			metrics[i] = &schema.MetricData{
-				Name:       fmt.Sprintf("some.id.of.a.metric.%d", k),
-				Metric:     "some.id.of.a.metric",
-				OrgId:      o,
-				Interval:   1,
-				Value:      0,
-				Unit:       "ms",
-				TargetType: "gauge",
-				Tags:       []string{"some_tag", "ok"},
+	for s := 1; s <= steps; s++ {
+		for o := 1; o <= orgs; o++ {
+			for k := 1; k <= keysPerOrg; k++ {
+				i := (s-1)*metricsPerStep + (o-1)*keysPerOrg + k - 1
+				metrics[i] = &schema.MetricData{
+					Name:       fmt.Sprintf("some.id.of.a.metric.%d", k),
+					Metric:     "some.id.of.a.metric",
+					OrgId:      o,
+					Interval:   interval,
+					Value:      0,
+					Unit:       "ms",
+					TargetType: "gauge",
+					Tags:       []string{"some_tag", "ok"},
+				}
+				metrics[i].SetId()
 			}
-			metrics[i].SetId()
 		}
 	}
-	for now := range tick.C {
-		ts := now.Unix()
+	ts := time.Now().Add(-time.Duration(offset-interval) * time.Second).Unix()
+	for range tick.C {
 		for i := range metrics {
+			if i%metricsPerStep == 0 {
+				ts += int64(interval)
+			}
 			metrics[i].Time = ts
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
