@@ -15,7 +15,7 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 	initMetrics(stats)
 
 	store := NewDevnullStore()
-	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, make([]aggSetting, 0))
+	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]aggSetting, 0))
 	defCache := NewDefCache(metricdef.NewDefsMock())
 	handler := NewHandler(aggmetrics, defCache)
 

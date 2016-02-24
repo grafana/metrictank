@@ -17,6 +17,7 @@ type AggMetrics struct {
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	ttl            uint32
+	gcInterval     time.Duration
 }
 
 var totalPoints chan int
@@ -26,7 +27,7 @@ func init() {
 	totalPoints = make(chan int, 1000)
 }
 
-func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, aggSettings []aggSetting) *AggMetrics {
+func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		Metrics:        make(map[string]*AggMetric),
@@ -36,6 +37,7 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
 		ttl:            ttl,
+		gcInterval:     gcInterval,
 	}
 
 	go ms.stats()
@@ -46,7 +48,7 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 // periodically scan chunks and close any that have not received data in a while
 // TODO instrument occurences and duration of GC
 func (ms *AggMetrics) GC() {
-	ticker := time.Tick(time.Duration(*gcInterval) * time.Second)
+	ticker := time.Tick(ms.gcInterval)
 	for now := range ticker {
 		log.Info("checking for stale chunks that need persisting.")
 		now := uint32(now.Unix())
