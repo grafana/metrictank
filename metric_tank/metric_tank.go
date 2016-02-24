@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -56,7 +57,7 @@ var (
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
 
-	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds> (may be given multiple times as comma-separated list)")
+	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool>] (may be given multiple times as comma-separated list)")
 
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
@@ -220,7 +221,7 @@ func main() {
 			continue
 		}
 		fields := strings.Split(v, ":")
-		if len(fields) != 4 {
+		if len(fields) < 4 {
 			log.Fatal(4, "bad agg settings")
 		}
 		aggSpan := mustInSeconds("aggsettings", fields[0])
@@ -230,7 +231,14 @@ func main() {
 		if (month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL})
+		var ready bool
+		if len(fields) == 5 {
+			ready, err = strconv.ParseBool(fields[4])
+			if err != nil {
+				log.Fatal(4, "aggsettigs ready: %s", err)
+			}
+		}
+		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
 	}
 
 	store, err := NewCassandraStore(stats)

@@ -352,20 +352,17 @@ func reqOut(key string, from, to, maxPoints uint32, consolidator consolidation.C
 func TestAlignRequests(t *testing.T) {
 	input := []alignCase{
 		{
-			// request would be satisfied by each archive like so:
-			// remember we don't count 1 chunk because it can be almost-empty
-			// -1 raw: 2400/10=240 points in RAM, (3600-2400)/10=120 in cassandra, 360 in total
-			// 0 agg 1: 1*600/60= 10 points in RAM, (3600-600)=3000/60=50 in cassandra, 60 in total
-			// 1 agg 2: 3600/120=30 points in total, none in RAM
-			// only raw has enough points
+			// raw would be 3600/10=360 points, agg1 3600/60=60. raw is best cause it provides most points
+			// and still under the max points limit.
 			[]Req{
 				reqRaw("a", 0, 3600, 800, consolidation.Avg, 10),
 				reqRaw("b", 0, 3600, 800, consolidation.Avg, 10),
 				reqRaw("c", 0, 3600, 800, consolidation.Avg, 10),
 			},
+			// span, chunkspan, numchunks, ttl, ready
 			[]aggSetting{
-				{60, 600, 2, 0},
-				{120, 600, 1, 0},
+				{60, 600, 2, 0, true},
+				{120, 600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
@@ -374,19 +371,39 @@ func TestAlignRequests(t *testing.T) {
 			},
 			nil,
 		},
-		{ // now we request 0-2400, with max datapoints 100.
-			// raw would provide 240pts, so runtime consolidation would be needed.
-			// 60s rollups would provide 40pts which is a good candidate.
-			// however 40pts is 2.5x smaller then the target 100pts and 240pts is
-			// only 2.4x larger then the target 100pts, so it is selected.
+		{
+			// same as before, but agg1 disabled. just to make sure it still behaves the same.
+			[]Req{
+				reqRaw("a", 0, 3600, 800, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600, 800, consolidation.Avg, 10),
+				reqRaw("c", 0, 3600, 800, consolidation.Avg, 10),
+			},
+			// span, chunkspan, numchunks, ttl, ready
+			[]aggSetting{
+				{60, 600, 2, 0, false},
+				{120, 600, 1, 0, true},
+			},
+			[]Req{
+				reqOut("a", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+				reqOut("b", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+				reqOut("c", 0, 3600, 800, consolidation.Avg, 10, 0, 10, 10, 1),
+			},
+			nil,
+		},
+		{
+			// now we request 0-2400, with max datapoints 100.
+			// raw: 2400/10 -> 240pts -> needs runtime consolidation
+			// agg1: 2400/60 -> 40 pts, good candidate,
+			// though 40pts is 2.5x smaller than the maxPoints target (100 points)
+			// raw's 240 pts is only 2.4x larger then 100pts, so it is selected.
 			[]Req{
 				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
 				reqRaw("b", 0, 2400, 100, consolidation.Avg, 10),
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 10),
 			},
 			[]aggSetting{
-				{60, 600, 2, 0},
-				{120, 600, 1, 0},
+				{60, 600, 2, 0, true},
+				{120, 600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 30, 3),
@@ -396,8 +413,8 @@ func TestAlignRequests(t *testing.T) {
 			nil,
 		},
 		// same thing as above, but now we set max points to 39. So now the 240pts
-		// provided by raw is 6.15x our target of 39pts. But our the 20pts provided
-		// by our 120s rollups is only 1.95x smaller then our target 39pts so it is
+		// raw: 2400/10 -> 240 pts is 6.15x our target of 39pts
+		// agg1 2400/120 -> 20 pts is only 1.95x smaller then our target 39pts so it is
 		// selected.
 		{
 			[]Req{
@@ -406,13 +423,56 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 39, consolidation.Avg, 10),
 			},
 			[]aggSetting{
-				{120, 600, 2, 0},
-				{600, 600, 2, 0},
+				{120, 600, 2, 0, true},
+				{600, 600, 2, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
 				reqOut("b", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
 				reqOut("c", 0, 2400, 39, consolidation.Avg, 10, 1, 120, 120, 1),
+			},
+			nil,
+		},
+		// same as above, except now the 120s band is disabled.
+		// raw: 2400/10 -> 240 pts is 6.15x our target of 39pts
+		// agg1 2400/600 -> 4 pts is about 10x smaller so we prefer raw again
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 39, consolidation.Avg, 10),
+				reqRaw("c", 0, 2400, 39, consolidation.Avg, 10),
+			},
+			[]aggSetting{
+				{120, 600, 2, 0, false},
+				{600, 600, 2, 0, true},
+			},
+			// rawInterval, archive, archInterval, outInterval, aggNum
+			[]Req{
+				reqOut("a", 0, 2400, 39, consolidation.Avg, 10, 0, 10, 70, 7),
+				reqOut("b", 0, 2400, 39, consolidation.Avg, 10, 0, 10, 70, 7),
+				reqOut("c", 0, 2400, 39, consolidation.Avg, 10, 0, 10, 70, 7),
+			},
+			nil,
+		},
+		// same as above, 120s band is still disabled. but we query for a longer range
+		// raw: 24000/10 -> 2400 pts is 61.5x our target of 39pts
+		// agg2 24000/600 -> 40 pts is just too large, but we can make it work with runtime
+		// consolidation
+		{
+			[]Req{
+				reqRaw("a", 0, 24000, 39, consolidation.Avg, 10),
+				reqRaw("b", 0, 24000, 39, consolidation.Avg, 10),
+				reqRaw("c", 0, 24000, 39, consolidation.Avg, 10),
+			},
+			[]aggSetting{
+				{120, 600, 2, 0, false},
+				{600, 600, 2, 0, true},
+			},
+			// rawInterval, archive, archInterval, outInterval, aggNum
+			[]Req{
+				reqOut("a", 0, 24000, 39, consolidation.Avg, 10, 2, 600, 1200, 2),
+				reqOut("b", 0, 24000, 39, consolidation.Avg, 10, 2, 600, 1200, 2),
+				reqOut("c", 0, 24000, 39, consolidation.Avg, 10, 2, 600, 1200, 2),
 			},
 			nil,
 		},
@@ -426,8 +486,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{120, 600, 2, 0},
-				{600, 600, 2, 0},
+				{120, 600, 2, 0, true},
+				{600, 600, 2, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -448,8 +508,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{120, 600, 2, 0},
-				{600, 600, 2, 0},
+				{120, 600, 2, 0, true},
+				{600, 600, 2, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 120, 120, 1),
@@ -468,13 +528,35 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{300, 600, 2, 0},
-				{600, 600, 2, 0},
+				{300, 600, 2, 0, true},
+				{600, 600, 2, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 1, 300, 300, 1),
 				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 1, 300, 300, 1),
 				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 1, 300, 300, 1),
+			},
+			nil,
+		},
+		// same but now the first rollup band is disabled
+		// raw 2400/300 -> 8 points
+		// agg 2 2400/600 -> 4 points
+		// best use raw despite the needed consolidation
+
+		{
+			[]Req{
+				reqRaw("a", 0, 2400, 100, consolidation.Avg, 10),
+				reqRaw("b", 0, 2400, 100, consolidation.Avg, 50),
+				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{300, 600, 2, 0, false},
+				{600, 600, 2, 0, true},
+			},
+			[]Req{
+				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 300, 30),
+				reqOut("b", 0, 2400, 100, consolidation.Avg, 50, 0, 50, 300, 6),
+				reqOut("c", 0, 2400, 100, consolidation.Avg, 60, 0, 60, 300, 5),
 			},
 			nil,
 		},
@@ -487,8 +569,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 600, 2, 0},
-				{1200, 1200, 2, 0},
+				{600, 600, 2, 0, true},
+				{1200, 1200, 2, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 2400, 100, consolidation.Avg, 10, 0, 10, 300, 30),
@@ -498,7 +580,10 @@ func TestAlignRequests(t *testing.T) {
 			nil,
 		},
 		// let's do a realistic one: request 3h worth of data
-		// this should come out of RAM
+		// raw means an alignment at 60s interval so:
+		// raw -> 10800/60 -> 180 points
+		// clearly this fits well within the max points, and it's the highest res,
+		// so it's returned.
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*3, 1000, consolidation.Avg, 10),
@@ -506,9 +591,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*3, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0},
-				{21600, 21600, 1, 0},
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*3, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -518,7 +603,7 @@ func TestAlignRequests(t *testing.T) {
 			nil,
 		},
 		// same but request 6h worth of data
-		// this should come out of RAM
+		// raw 21600/60 -> 360. chosen for same reason
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*6, 1000, consolidation.Avg, 10),
@@ -526,9 +611,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*6, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0},
-				{21600, 21600, 1, 0},
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*6, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -538,7 +623,7 @@ func TestAlignRequests(t *testing.T) {
 			nil,
 		},
 		// same but request 9h worth of data
-		// this should come out of raw archive, mostly out of ram
+		// raw 32400/60 -> 540. chosen for same reason
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*9, 1000, consolidation.Avg, 10),
@@ -546,9 +631,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*9, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0},
-				{21600, 21600, 1, 0},
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*9, 1000, consolidation.Avg, 10, 0, 10, 60, 6),
@@ -558,9 +643,8 @@ func TestAlignRequests(t *testing.T) {
 			nil,
 		},
 		// same but request 24h worth of data
-		// raw archive at 60s step would be 1440 points, which is too many
-		// we can runtime consolidate raw down to 120s step, but require 18h of data from c* at 10/30/60 res
-		// first agg at 600s step can return 144 points without runtime consolidation, needing 24h of data from c* at 600s, which is the better deal
+		// raw 86400/60 -> 1440
+		// agg1 86400/600 -> 144 points -> best choice
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*24, 1000, consolidation.Avg, 10),
@@ -568,9 +652,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0},
-				{21600, 21600, 1, 0},
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*24, 1000, consolidation.Avg, 10, 1, 600, 600, 1),
@@ -581,8 +665,8 @@ func TestAlignRequests(t *testing.T) {
 		},
 		// same but now let's request 2 weeks worth of data.
 		// not using raw is a no brainer.
-		// first archive can return 3600*24*7 / 600 = 1008 points, which is too many, so must also do runtime consolidation and bring it back to 504
-		// 2nd archive can do it in 3600*24*7 / 7200 = 84 points, but that's not enough to satisfy mindatapoints, so we should use first archive + runtime consol
+		// agg1 3600*24*7 / 600 = 1008 points, which is too many, so must also do runtime consolidation and bring it back to 504
+		// agg2 3600*24*7 / 7200 = 84 points -> too far below maxdatapoints, better to do agg1 with runtime consol
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*24*7, 1000, consolidation.Avg, 10),
@@ -590,14 +674,75 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 			},
 			[]aggSetting{
-				{600, 21600, 1, 0}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0},
-				{21600, 21600, 1, 0},
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
 			},
 			[]Req{
 				reqOut("a", 0, 3600*24*7, 1000, consolidation.Avg, 10, 1, 600, 1200, 2),
 				reqOut("b", 0, 3600*24*7, 1000, consolidation.Avg, 30, 1, 600, 1200, 2),
 				reqOut("c", 0, 3600*24*7, 1000, consolidation.Avg, 60, 1, 600, 1200, 2),
+			},
+			nil,
+		},
+		// let's request 1 year of data
+		// raw 3600*24*365/60 -> 525600
+		// agg1 3600*24*365/600 -> 52560
+		// agg2 3600*24*365/7200 -> 4380
+		// agg3 3600*24*365/21600 -> 1460
+		// clearly agg3 is the best, and we have to runtime consolidate wih aggNum 2
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, true},
+			},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 10, 3, 21600, 43200, 2),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 3, 21600, 43200, 2),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 60, 3, 21600, 43200, 2),
+			},
+			nil,
+		},
+		// ditto but disable agg3
+		// so we have to use agg2 with aggNum of 5
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 60),
+			},
+			[]aggSetting{
+				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
+				{7200, 21600, 1, 0, true},
+				{21600, 21600, 1, 0, false},
+			},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 10, 2, 7200, 36000, 5),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 2, 7200, 36000, 5),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 60, 2, 7200, 36000, 5),
+			},
+			nil,
+		},
+		// now let's request 1 year of data again, but without actually having any aggregation bands (wowa don't do this)
+		// raw 3600*24*365/60 -> 525600
+		// we need an aggNum of 526 to keep this under 1000 points
+		{
+			[]Req{
+				reqRaw("a", 0, 3600*24*365, 1000, consolidation.Avg, 10),
+				reqRaw("b", 0, 3600*24*365, 1000, consolidation.Avg, 30),
+				reqRaw("c", 0, 3600*24*365, 1000, consolidation.Avg, 60),
+			},
+			[]aggSetting{},
+			[]Req{
+				reqOut("a", 0, 3600*24*365, 1000, consolidation.Avg, 10, 0, 10, 31560, 526*6),
+				reqOut("b", 0, 3600*24*365, 1000, consolidation.Avg, 30, 0, 30, 31560, 526*2),
+				reqOut("c", 0, 3600*24*365, 1000, consolidation.Avg, 60, 0, 60, 31560, 526),
 			},
 			nil,
 		},
@@ -629,9 +774,9 @@ func BenchmarkAlignRequests(b *testing.B) {
 		reqRaw("c", 0, 3600*24*7, 1000, consolidation.Avg, 60),
 	}
 	aggSettings := []aggSetting{
-		{600, 21600, 1, 0},
-		{7200, 21600, 1, 0},
-		{21600, 21600, 1, 0},
+		{600, 21600, 1, 0, true},
+		{7200, 21600, 1, 0, true},
+		{21600, 21600, 1, 0, true},
 	}
 
 	for n := 0; n < b.N; n++ {

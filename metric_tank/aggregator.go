@@ -7,6 +7,7 @@ type aggSetting struct {
 	chunkSpan uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
 	numChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
 	ttl       uint32 // how many seconds to keep the chunk in cassandra
+	ready     bool   // ready for reads?
 }
 
 type aggSettingsSpanAsc []aggSetting
