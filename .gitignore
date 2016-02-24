@@ -10,6 +10,7 @@ nsq_metrics_to_stdout/nsq_metrics_to_stdout
 nsq_metrics_to_elasticsearch/nsq_metrics_to_elasticsearch
 nsq_probe_events_to_elasticsearch/nsq_probe_events_to_elasticsearch
 nsq_metrics_to_kairos/nsq_metrics_to_kairos
+fake_metrics_to_nsq/fake_metrics_to_nsq
 graphite-watcher/graphite-watcher
 graphite-watcher/errors/*
 inspect-es/inspect-es
