@@ -176,12 +176,14 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	for i, req := range reqs {
 		log.Debug("===================================")
 		log.Debug("HTTP Get()          %s", req)
+		pre := time.Now()
 		points, interval, err := getTarget(store, req)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		getTargetDuration.Value(time.Now().Sub(pre))
 
 		out[i] = Series{
 			Target:     targets[i],

@@ -240,6 +240,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 		cassGetDuration.Value(time.Now().Sub(pre))
 		close(results)
 	}()
+	pre = time.Now()
 
 	for o := range results {
 		outcomes = append(outcomes, o)
@@ -281,6 +282,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 			log.Error(3, "cassandra query error. %s", err)
 		}
 	}
+	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(int64(len(outcomes)))
 	log.Debug("searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil

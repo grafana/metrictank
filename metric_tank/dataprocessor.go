@@ -7,6 +7,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"math"
 	"runtime"
+	"time"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -270,6 +271,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 	} else {
 		reqSpanMem.Value(int64(toUnix - fromUnix))
 	}
+	pre := time.Now()
 	iters = append(iters, memIters...)
 
 	points := make([]Point, 0)
@@ -286,5 +288,6 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 		}
 		log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
 	}
+	itersToPointsDuration.Value(time.Now().Sub(pre))
 	return points
 }

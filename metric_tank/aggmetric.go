@@ -214,6 +214,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
 func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
+	pre := time.Now()
 	log.Debug("AggMetric %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
 	if from >= to {
 		panic("invalid request. to must > from")
@@ -334,6 +335,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	chunk := a.getChunk(oldestPos)
 	iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
 
+	memToIterDuration.Value(time.Now().Sub(pre))
 	return oldestChunk.T0, iters
 }
 
