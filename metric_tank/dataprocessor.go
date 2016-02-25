@@ -156,7 +156,7 @@ func getTargets(store Store, reqs []Req) ([]Series, error) {
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
 				seriesChan <- Series{
-					Target:     req.key,
+					Target:     req.target,
 					Datapoints: points,
 					Interval:   interval,
 				}

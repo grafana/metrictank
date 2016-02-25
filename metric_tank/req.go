@@ -7,7 +7,8 @@ import (
 
 type Req struct {
 	// these fields can be set straight away:
-	key          string
+	key          string // metric key, often same as target
+	target       string // original input string like consolidateBy(key,'sum')
 	from         uint32
 	to           uint32
 	maxPoints    uint32
@@ -21,9 +22,10 @@ type Req struct {
 	aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator) Req {
+func NewReq(key, target string, from, to, maxPoints uint32, consolidator consolidation.Consolidator) Req {
 	return Req{
 		key,
+		target,
 		from,
 		to,
 		maxPoints,

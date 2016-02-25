@@ -158,7 +158,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
 			return
 		}
-		req := NewReq(id, fromUnix, toUnix, maxDataPoints, consolidator)
+		req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
 		reqs[i] = req
 	}
 	err = findMetricsForRequests(reqs, defCache)
