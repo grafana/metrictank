@@ -115,7 +115,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		http.Error(w, "to must be higher than from", http.StatusBadRequest)
 		return
 	}
-	if len(targets)*int(toUnix-fromUnix) > 2*365*24*3600 {
+	if len(targets)*int(toUnix-fromUnix) > 100*2*365*24*3600 {
 		http.Error(w, "too much data requested", http.StatusBadRequest)
 		return
 	}
