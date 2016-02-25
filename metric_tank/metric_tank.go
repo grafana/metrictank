@@ -258,6 +258,8 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
+	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+
 	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
 	pre := time.Now()
 	defCache = NewDefCache(defs)
