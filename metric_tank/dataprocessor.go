@@ -7,6 +7,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"math"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -137,6 +138,48 @@ func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolida
 // but never more than maxPoints
 func aggEvery(numPoints, maxPoints uint32) uint32 {
 	return (numPoints + maxPoints - 1) / maxPoints
+}
+
+// error is the error of the first failing target request
+func getTargets(store Store, reqs []Req) ([]Series, error) {
+	seriesChan := make(chan Series, len(reqs))
+	errorsChan := make(chan error, len(reqs))
+	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
+	wg := sync.WaitGroup{}
+	wg.Add(len(reqs))
+	for _, req := range reqs {
+		go func(wg *sync.WaitGroup, req Req) {
+			pre := time.Now()
+			points, interval, err := getTarget(store, req)
+			if err != nil {
+				errorsChan <- err
+			} else {
+				getTargetDuration.Value(time.Now().Sub(pre))
+				seriesChan <- Series{
+					Target:     req.key,
+					Datapoints: points,
+					Interval:   interval,
+				}
+			}
+			wg.Done()
+		}(&wg, req)
+	}
+	go func() {
+		wg.Wait()
+		close(seriesChan)
+		close(errorsChan)
+	}()
+	out := make([]Series, 0, len(reqs))
+	var err error
+	for series := range seriesChan {
+		out = append(out, series)
+	}
+	for e := range errorsChan {
+		err = e
+		break
+	}
+	return out, err
+
 }
 
 func getTarget(store Store, req Req) (points []Point, interval uint32, err error) {

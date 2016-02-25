@@ -172,25 +172,17 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	out := make([]Series, len(reqs))
-	for i, req := range reqs {
+	for _, req := range reqs {
 		log.Debug("===================================")
 		log.Debug("HTTP Get()          %s", req)
-		pre := time.Now()
-		points, interval, err := getTarget(store, req)
-		if err != nil {
-			log.Error(0, err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		getTargetDuration.Value(time.Now().Sub(pre))
-
-		out[i] = Series{
-			Target:     targets[i],
-			Datapoints: points,
-			Interval:   interval,
-		}
 	}
+	out, err := getTargets(store, reqs)
+	if err != nil {
+		log.Error(0, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	js := bufPool.Get().([]byte)
 	js, err = graphiteJSON(js, out)
 	if err != nil {
