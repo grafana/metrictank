@@ -100,6 +100,11 @@ var cassWriters met.Gauge
 var cassPutDuration met.Timer
 var cassBlockDuration met.Timer
 var cassGetDuration met.Timer
+var memToIterDuration met.Timer
+var getTargetDuration met.Timer
+var itersToPointsDuration met.Timer
+var cassToIterDuration met.Timer
+
 var persistDuration met.Timer
 var messagesSize met.Meter
 var metricsPerMessage met.Meter
@@ -336,6 +341,10 @@ func initMetrics(stats met.Backend) {
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
 	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
+	memToIterDuration = stats.NewTimer("mem.to_iter_duration", 0)
+	getTargetDuration = stats.NewTimer("get_target_duration", 0)
+	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
+	cassToIterDuration = stats.NewTimer("cassandra.to_iter_duration", 0)
 	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
 	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
 	persistDuration = stats.NewTimer("persist_duration", 0)
