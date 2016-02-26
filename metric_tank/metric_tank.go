@@ -211,7 +211,7 @@ func main() {
 	gcInterval := time.Duration(mustInSeconds("gc-interval", *gcIntervalStr)) * time.Second
 	ttl := mustInSeconds("ttl", *ttlStr)
 	if (month_sec % chunkSpan) != 0 {
-		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
 	set := strings.Split(*aggSettings, ",")
