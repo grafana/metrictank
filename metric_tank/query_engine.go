@@ -45,7 +45,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	aggs := aggSettingsSpanAsc(aggSettings)
 	sort.Sort(aggs)
 
-	options := make([]archive, len(aggs)+1)
+	options := make([]archive, 1, len(aggs)+1)
 
 	minInterval := uint32(0) // will contain the smallest rawInterval from all requested series
 	rawIntervals := make(map[uint32]struct{})
@@ -60,8 +60,14 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	// note: not all series necessarily have the same raw settings, will be fixed further down
 	options[0] = archive{"raw", minInterval, tsRange / minInterval, ""}
 	// now model the archives we get from the aggregations
+	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
+	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
+	aggRef := []int{0}
 	for j, agg := range aggs {
-		options[j+1] = archive{fmt.Sprintf("agg %d", j), agg.span, tsRange / agg.span, ""}
+		if agg.ready {
+			options = append(options, archive{fmt.Sprintf("agg %d", j), agg.span, tsRange / agg.span, ""})
+			aggRef = append(aggRef, j+1)
+		}
 	}
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
@@ -79,7 +85,10 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
 	/*
 	   do a quick calculation of the ratio between pointCount and maxDatapoints of
-	   the selected option, and the option before that.  eg. with a time range of 1hour,
+	   the selected option, and the option before that; if the previous option is
+	   a lot closer to max points than we are, we pick that and apply some runtime
+	   consolidation.
+	   eg. with a time range of 1hour,
 	   our options are:
 	   i | span  | pointCount
 	   ======================
@@ -138,7 +147,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	*/
 	for i, _ := range reqs {
 		req := &reqs[i]
-		req.archive = selected
+		req.archive = aggRef[selected]
 		req.archInterval = options[selected].interval
 		req.outInterval = chosenInterval
 		req.aggNum = 1

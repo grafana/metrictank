@@ -26,106 +26,105 @@ import (
 )
 
 var (
-	logLevel int
+	logLevel     int
+	warmupPeriod time.Duration
+	startupTime  time.Time
+	GitHash      = "(none)"
+
+	metrics  *AggMetrics
+	defCache *DefCache
 
 	showVersion = flag.Bool("version", false, "print version string")
-	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
+	listenAddr  = flag.String("listen", ":6060", "http listener address.")
+	confFile    = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
-	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages")
-	topic              = flag.String("topic", "metrics", "NSQ topic")
-	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic")
+	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages from NSQ")
+	topic              = flag.String("topic", "metrics", "NSQ topic for metrics")
+	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic for persist messages")
 	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
-	instance           = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-	blockProfileRate   = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
-	chunkSpan          = flag.Int("chunkspan", 120, "chunk span in seconds")
-	numChunks          = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
-	warmUpPeriod       = flag.Int("warm-up-period", 3600, "number of seconds before secondary nodes start serving requests")
+
+	instance         = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
+	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
+	primaryNode      = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
+
+	chunkSpanStr = flag.String("chunkspan", "2h", "chunk span")
+	numChunksInt = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from cassandra")
+
+	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
+	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
+	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
+	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
+
+	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	cassandraPort             = flag.Int("cassandra-port", 9042, "cassandra port")
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
-	metricTTL                 = flag.Int("ttl", 3024000, "seconds before metrics are removed from cassandra")
 
-	listenAddr = flag.String("listen", ":6060", "http listener address.")
-	esAddr     = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
-	indexName  = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
+	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
+	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
-
-	gcInterval     = flag.Int("gc-interval", 3600, "Interval in seconds to run garbage collection job.")
-	chunkMaxStale  = flag.Int("chunk-max-stale", 3600, "max age in seconds for a chunk before to be considered stale and to be persisted to Cassandra.")
-	metricMaxStale = flag.Int("metric-max-stale", 21600, "max age in seconds for a metric before to be considered stale and to be purged from memory.")
-
-	confFile = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
 	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	aggSettings      = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds> (may be given multiple times as comma-separated list)")
 
-	metrics  *AggMetrics
-	defCache *DefCache
+	reqSpanMem  met.Meter
+	reqSpanBoth met.Meter
 
-	startupTime time.Time
-
-	GitHash = "(none)"
+	// it's pretty expensive/impossible to do chunk sive in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
+	chunkSizeAtSave       met.Meter
+	chunkSizeAtLoad       met.Meter
+	chunkCreate           met.Count
+	chunkClear            met.Count
+	chunkSaveOk           met.Count
+	chunkSaveFail         met.Count
+	metricDefCacheHit     met.Count
+	metricDefCacheMiss    met.Count
+	metricsReceived       met.Count
+	metricsTooOld         met.Count
+	cassRowsPerResponse   met.Meter
+	cassChunksPerRow      met.Meter
+	cassWriteQueueSize    met.Gauge
+	cassWriters           met.Gauge
+	cassPutDuration       met.Timer
+	cassBlockDuration     met.Timer
+	cassGetDuration       met.Timer
+	memToIterDuration     met.Timer
+	getTargetDuration     met.Timer
+	itersToPointsDuration met.Timer
+	cassToIterDuration    met.Timer
+	persistDuration       met.Timer
+	messagesSize          met.Meter
+	metricsPerMessage     met.Meter
+	msgsAge               met.Meter // in ms
+	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
+	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
+	reqHandleDuration met.Timer
+	inItems           met.Meter
+	points            met.Gauge
+	msgsHandleOK      met.Count
+	msgsHandleFail    met.Count
+	alloc             met.Gauge
+	totalAlloc        met.Gauge
+	sysBytes          met.Gauge
+	metricsActive     met.Gauge
+	metricsToEsOK     met.Count
+	metricsToEsFail   met.Count
+	esPutDuration     met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
+	clusterPrimary    met.Gauge
+	gcNum             met.Gauge
+	gcDur             met.Gauge
 )
 
 func init() {
 	flag.IntVar(&logLevel, "log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 }
-
-var reqSpanMem met.Meter
-var reqSpanBoth met.Meter
-
-// it's pretty expensive/impossible to do chunk sive in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
-var chunkSizeAtSave met.Meter
-var chunkSizeAtLoad met.Meter
-var chunkCreate met.Count
-var chunkClear met.Count
-var chunkSaveOk met.Count
-var chunkSaveFail met.Count
-var metricDefCacheHit met.Count
-var metricDefCacheMiss met.Count
-var metricsReceived met.Count
-var metricsTooOld met.Count
-var cassRowsPerResponse met.Meter
-var cassChunksPerRow met.Meter
-var cassWriteQueueSize met.Gauge
-var cassWriters met.Gauge
-var cassPutDuration met.Timer
-var cassBlockDuration met.Timer
-var cassGetDuration met.Timer
-var memToIterDuration met.Timer
-var getTargetDuration met.Timer
-var itersToPointsDuration met.Timer
-var cassToIterDuration met.Timer
-
-var persistDuration met.Timer
-var messagesSize met.Meter
-var metricsPerMessage met.Meter
-var msgsAge met.Meter // in ms
-// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
-// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-var reqHandleDuration met.Timer
-var inItems met.Meter
-var points met.Gauge
-var msgsHandleOK met.Count
-var msgsHandleFail met.Count
-var alloc met.Gauge
-var totalAlloc met.Gauge
-var sysBytes met.Gauge
-var metricsActive met.Gauge
-var metricsToEsOK met.Count
-var metricsToEsFail met.Count
-var esPutDuration met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
-var clusterPrimary met.Gauge
-var gcNum met.Gauge
-var gcDur met.Gauge
 
 func main() {
 	startupTime = time.Now()
@@ -205,7 +204,19 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	sec := mustInSeconds("warm-up-period", *warmUpPeriodStr)
+	warmupPeriod = time.Duration(sec) * time.Second
+
 	initMetrics(stats)
+	chunkSpan := mustInSeconds("chunkspan", *chunkSpanStr)
+	numChunks := uint32(*numChunksInt)
+	chunkMaxStale := mustInSeconds("chunk-max-stale", *chunkMaxStaleStr)
+	metricMaxStale := mustInSeconds("metric-max-stale", *metricMaxStaleStr)
+	gcInterval := time.Duration(mustInSeconds("gc-interval", *gcIntervalStr)) * time.Second
+	ttl := mustInSeconds("ttl", *ttlStr)
+	if (month_sec % chunkSpan) != 0 {
+		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
+	}
 
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]aggSetting, 0)
@@ -214,32 +225,24 @@ func main() {
 			continue
 		}
 		fields := strings.Split(v, ":")
-		if len(fields) != 4 {
+		if len(fields) < 4 {
 			log.Fatal(4, "bad agg settings")
 		}
-		aggSpan, err := strconv.Atoi(fields[0])
-		if err != nil {
-			log.Fatal(4, "bad agg settings", err)
-		}
-		aggChunkSpan, err := strconv.Atoi(fields[1])
-		if err != nil {
-			log.Fatal(4, "bad agg settings", err)
-		}
+		aggSpan := mustInSeconds("aggsettings", fields[0])
+		aggChunkSpan := mustInSeconds("aggsettings", fields[1])
+		aggNumChunks := mustInSeconds("aggsettings", fields[2])
+		aggTTL := mustInSeconds("aggsettings", fields[3])
 		if (month_sec % aggChunkSpan) != 0 {
-			panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		aggNumChunks, err := strconv.Atoi(fields[2])
-		if err != nil {
-			log.Fatal(0, "bad agg settings", err)
+		ready := true
+		if len(fields) == 5 {
+			ready, err = strconv.ParseBool(fields[4])
+			if err != nil {
+				log.Fatal(4, "aggsettigs ready: %s", err)
+			}
 		}
-		aggTTL, err := strconv.Atoi(fields[3])
-		if err != nil {
-			log.Fatal(0, "bad agg settings", err)
-		}
-		finalSettings = append(finalSettings, aggSetting{uint32(aggSpan), uint32(aggChunkSpan), uint32(aggNumChunks), uint32(aggTTL)})
-	}
-	if (month_sec % *chunkSpan) != 0 {
-		panic("aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
 	}
 
 	store, err := NewCassandraStore(stats)
@@ -265,7 +268,7 @@ func main() {
 
 	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
-	metrics = NewAggMetrics(store, uint32(*chunkSpan), uint32(*numChunks), uint32(*chunkMaxStale), uint32(*metricMaxStale), uint32(*metricTTL), finalSettings)
+	metrics = NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 	defCache = NewDefCache(defs)
 	handler := NewHandler(metrics, defCache)

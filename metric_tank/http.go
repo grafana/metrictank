@@ -209,7 +209,7 @@ func appStatus(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("OK"))
 		return
 	}
-	if time.Since(startupTime) < (time.Duration(*warmUpPeriod) * time.Second) {
+	if time.Since(startupTime) < warmupPeriod {
 		http.Error(w, "Service not ready", http.StatusServiceUnavailable)
 		return
 	}
