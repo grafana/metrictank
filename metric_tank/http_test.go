@@ -5,38 +5,66 @@ import (
 )
 
 func TestJsonMarshal(t *testing.T) {
-	data := []Series{
+	cases := []struct {
+		in  []Series
+		out string
+	}{
 		{
-			Target: "a",
-			Datapoints: []Point{
-				{123, 60},
-				{10000, 120},
-				{0, 180},
-				{1, 240},
-			},
-			Interval: 60,
+			in:  []Series{},
+			out: `[]`,
 		},
 		{
-			Target: "foo(bar)",
-			Datapoints: []Point{
-				{123.456, 10},
-				{123.7, 20},
-				{124.10, 30},
-				{125.0, 40},
-				{126.0, 50},
+			in: []Series{
+				{
+					Target: "a",
+					Datapoints: []Point{
+						{123, 60},
+						{10000, 120},
+						{0, 180},
+						{1, 240},
+					},
+					Interval: 60,
+				},
 			},
-			Interval: 10,
+			out: `[{"Target":"a","Datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]],"Interval":60}]`,
+		},
+		{
+			in: []Series{
+				{
+					Target: "a",
+					Datapoints: []Point{
+						{123, 60},
+						{10000, 120},
+						{0, 180},
+						{1, 240},
+					},
+					Interval: 60,
+				},
+				{
+					Target: "foo(bar)",
+					Datapoints: []Point{
+						{123.456, 10},
+						{123.7, 20},
+						{124.10, 30},
+						{125.0, 40},
+						{126.0, 50},
+					},
+					Interval: 10,
+				},
+			},
+			out: `[{"Target":"a","Datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]],"Interval":60},{"Target":"foo(bar)","Datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]],"Interval":10}]`,
 		},
 	}
 	js := bufPool.Get().([]byte)
-	js, err := graphiteJSON(js, data)
-	if err != nil {
-		panic(err)
-	}
-	exp := `[{"Target":"a","Datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]],"Interval":60},{"Target":"foo(bar)","Datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]],"Interval":10}]`
-	got := string(js)
-	if exp != got {
-		t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", exp, got)
+	for _, c := range cases {
+		js, err := graphiteJSON(js[:0], c.in)
+		if err != nil {
+			panic(err)
+		}
+		got := string(js)
+		if c.out != got {
+			t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", c.out, got)
+		}
 	}
 	bufPool.Put(js[:0])
 }
