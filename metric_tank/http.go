@@ -44,12 +44,16 @@ func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 			b = strconv.AppendUint(b, uint64(p.Ts), 10)
 			b = append(b, `],`...)
 		}
-		b = b[:len(b)-1] // cut last comma
+		if len(s.Datapoints) != 0 {
+			b = b[:len(b)-1] // cut last comma
+		}
 		b = append(b, `],"Interval":`...)
 		b = strconv.AppendInt(b, int64(s.Interval), 10)
 		b = append(b, `},`...)
 	}
-	b = b[:len(b)-1] // cut last comma
+	if len(series) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
 	b = append(b, ']')
 	return b, nil
 }
