@@ -352,6 +352,19 @@ func reqOut(key string, from, to, maxPoints uint32, consolidator consolidation.C
 func TestAlignRequests(t *testing.T) {
 	input := []alignCase{
 		{
+			// real example seen with alerting queries
+			[]Req{
+				reqRaw("a", 0, 30, 800, consolidation.Avg, 10),
+				reqRaw("b", 0, 30, 800, consolidation.Avg, 60),
+			},
+			[]aggSetting{},
+			[]Req{
+				reqOut("a", 0, 30, 800, consolidation.Avg, 10, 0, 10, 60, 6),
+				reqOut("b", 0, 30, 800, consolidation.Avg, 60, 0, 60, 60, 1),
+			},
+			nil,
+		},
+		{
 			// raw would be 3600/10=360 points, agg1 3600/60=60. raw is best cause it provides most points
 			// and still under the max points limit.
 			[]Req{
