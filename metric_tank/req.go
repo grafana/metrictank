@@ -38,11 +38,11 @@ func NewReq(key, target string, from, to, maxPoints uint32, consolidator consoli
 	}
 }
 
-func (r Req) String() string {
+func (r Req) DebugString() string {
 	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s", r.key, r.from, r.to, TS(r.from), TS(r.to), r.to-r.from-1, r.maxPoints, r.consolidator)
 }
 
-func (r Req) DebugString() string {
+func (r Req) String() string {
 	return fmt.Sprintf("%s %d - %d . points <= %d. %s - archive %d, rawInt %d, archInt %d, outInt %d, aggNum %d",
 		r.key, r.from, r.to, r.maxPoints, r.consolidator, r.archive, r.rawInterval, r.archInterval, r.outInterval, r.aggNum)
 }

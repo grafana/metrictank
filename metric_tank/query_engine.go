@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/grafana/pkg/log"
+	//	"github.com/grafana/grafana/pkg/log"
+	"github.com/davecgh/go-spew/spew"
 	"sort"
 )
 
@@ -39,6 +40,8 @@ func findMetricsForRequests(reqs []Req, defCache *DefCache) error {
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 // this function ignores the TTL values. it is assumed that you've set sensible TTL's
 func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
+	fmt.Println("requests before")
+	spew.Dump(reqs)
 
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
@@ -125,6 +128,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 			keys = append(keys, k)
 		}
 		chosenInterval = lcm(keys)
+		fmt.Println("time to set options int/pointCount. chosenInt", chosenInterval, "pointCount", tsRange, "/", chosenInterval, "=", tsRange/chosenInterval)
 		options[0].interval = chosenInterval
 		options[0].pointCount = tsRange / chosenInterval
 		//make sure that the calculated interval is not greater then the interval of the first rollup.
@@ -135,8 +139,9 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	}
 
 	options[selected].comment = "<-- chosen"
+	fmt.Println("options:")
 	for _, archive := range options {
-		log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
+		fmt.Printf("%-6s int:%-6d points:%-6d %s\n", archive.title, archive.interval, archive.pointCount, archive.comment)
 	}
 
 	/* we now just need to update the following properties for each req:
@@ -145,6 +150,7 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
 	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 	*/
+	fmt.Println("chosen interval is", chosenInterval)
 	for i, _ := range reqs {
 		req := &reqs[i]
 		req.archive = aggRef[selected]
@@ -152,17 +158,25 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		req.outInterval = chosenInterval
 		req.aggNum = 1
 		if runTimeConsolidate {
+			fmt.Println("aggEvery pointcount, maxpoints:", options[selected].pointCount, req.maxPoints)
 			req.aggNum = aggEvery(options[selected].pointCount, req.maxPoints)
 
 			// options[0].{interval,pointCount} didn't necessarily reflect the actual raw archive for this request,
 			// so adjust where needed.
 			if selected == 0 && chosenInterval != req.rawInterval {
+				fmt.Println("selected is 0 and chosenInterval", chosenInterval, "is != rawInterval", req.rawInterval)
+				fmt.Println("setting archInterval to", req.rawInterval)
+				fmt.Println("settig aggNum to chosenint / rawint: ", chosenInterval, "/", req.rawInterval)
 				req.archInterval = req.rawInterval
+				fmt.Println("aggNum before", req.aggNum)
 				req.aggNum *= chosenInterval / req.rawInterval
+				fmt.Println("aggNum after", req.aggNum)
 			}
 
 			req.outInterval = req.archInterval * req.aggNum
 		}
 	}
+	fmt.Println("requests after")
+	spew.Dump(reqs)
 	return reqs, nil
 }
