@@ -50,8 +50,7 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 func (ms *AggMetrics) GC() {
 	for {
 		unix := time.Duration(time.Now().UnixNano())
-		period := time.Duration(ms.gcInterval) * time.Second
-		diff := period - (unix % period)
+		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
 		log.Info("checking for stale chunks that need persisting.")
 		now := uint32(time.Now().Unix())
