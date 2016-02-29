@@ -137,6 +137,9 @@ func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolida
 // returns how many points should be aggregated together so that you end up with as many points as possible,
 // but never more than maxPoints
 func aggEvery(numPoints, maxPoints uint32) uint32 {
+	if numPoints == 0 {
+		return 1
+	}
 	return (numPoints + maxPoints - 1) / maxPoints
 }
 
