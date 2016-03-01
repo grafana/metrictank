@@ -404,7 +404,7 @@ func (a *AggMetric) persist(pos int) {
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk/len(pending), a.Key, chunk.T0)
+		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
@@ -496,10 +496,11 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			if currentChunk.LastWrite < metricMinTs {
 				return true
 			}
+		} else {
+			// chunk has not been written to in a while. Lets persist it.
+			log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
+			a.persist(a.CurrentChunkPos)
 		}
-		// chunk has not been written to in a while. Lets persist it.
-		log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
-		a.persist(a.CurrentChunkPos)
 	}
 	return false
 }

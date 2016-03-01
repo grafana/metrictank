@@ -48,10 +48,12 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 // periodically scan chunks and close any that have not received data in a while
 // TODO instrument occurences and duration of GC
 func (ms *AggMetrics) GC() {
-	ticker := time.Tick(ms.gcInterval)
-	for now := range ticker {
+	for {
+		unix := time.Duration(time.Now().UnixNano())
+		diff := ms.gcInterval - (unix % ms.gcInterval)
+		time.Sleep(diff + time.Minute)
 		log.Info("checking for stale chunks that need persisting.")
-		now := uint32(now.Unix())
+		now := uint32(time.Now().Unix())
 		chunkMinTs := now - (now % ms.chunkSpan) - uint32(ms.chunkMaxStale)
 		metricMinTs := now - (now % ms.chunkSpan) - uint32(ms.metricMaxStale)
 
@@ -65,6 +67,7 @@ func (ms *AggMetrics) GC() {
 		}
 		ms.RUnlock()
 		for _, key := range keys {
+			gcMetric.Inc(1)
 			ms.RLock()
 			a := ms.Metrics[key]
 			ms.RUnlock()

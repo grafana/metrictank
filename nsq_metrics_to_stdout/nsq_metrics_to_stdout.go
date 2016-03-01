@@ -29,8 +29,8 @@ var (
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	logLevel = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	listenAddr = flag.String("listen", ":6060", "http listener address.")
+	logLevel         = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	listenAddr       = flag.String("listen", ":6060", "http listener address.")
 )
 
 type StdoutHandler struct {
@@ -55,7 +55,7 @@ func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	for _, m := range ms.Metrics {
-		fmt.Println(m.Name, m.Time, m.Value, m.Tags)
+		fmt.Println(m.Id, m.Interval, m.Name, m.Time, m.Value, m.Tags)
 	}
 	return nil
 }
