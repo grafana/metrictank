@@ -46,9 +46,11 @@ type cassandraStore struct {
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend) (*cassandraStore, error) {
-	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
-	cluster.Consistency = gocql.One
+func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, writers int) (*cassandraStore, error) {
+	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
+	cluster.Consistency = gocql.ParseConsistency(consistency)
+	cluster.Timeout = time.Duration(timeout) * time.Millisecond
+	cluster.NumConns = writers
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
@@ -65,7 +67,6 @@ func NewCassandraStore(stats met.Backend) (*cassandraStore, error) {
 	}
 	tmpSession.Close()
 	cluster.Keyspace = "raintank"
-	cluster.NumConns = *cassandraWriteConcurrency
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
