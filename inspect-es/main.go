@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
-	"io/ioutil"
 	"log"
-	"net/http"
 )
 
 type Hit struct {
@@ -39,15 +37,18 @@ func perror(err error) {
 }
 
 func main() {
-	res, err := http.Get("http://localhost:9200/metric/_search?q=*:*&size=10000000")
+	defs, err := metricdef.NewDefsEs("localhost:9200", "", "", "metric")
+	show := func(ds []*schema.MetricDefinition) {
+		for _, d := range ds {
+			fmt.Println(d.OrgId, d.Name)
+		}
+	}
+	met, scroll_id, err := defs.GetMetrics("")
 	perror(err)
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	perror(err)
-	var data EsResult
-	err = json.Unmarshal(body, &data)
-	perror(err)
-	for _, h := range data.Hits.Hits {
-		fmt.Println(h.Source.Name)
+	show(met)
+	for scroll_id != "" {
+		met, scroll_id, err = defs.GetMetrics(scroll_id)
+		perror(err)
+		show(met)
 	}
 }
