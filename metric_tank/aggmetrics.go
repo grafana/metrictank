@@ -46,7 +46,6 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 }
 
 // periodically scan chunks and close any that have not received data in a while
-// TODO instrument occurences and duration of GC
 func (ms *AggMetrics) GC() {
 	for {
 		unix := time.Duration(time.Now().UnixNano())
