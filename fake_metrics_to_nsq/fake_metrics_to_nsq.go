@@ -147,14 +147,14 @@ func run(orgs, keysPerOrg, steps, interval, offset int) {
 	var tickDuration time.Duration
 	// if the step is high, it's wasteful to wait a long time (a second or more) and then do big batches
 	// in that case it's better to flush messages smaller messages more continously
-	if steps > 1000 {
+	if steps >= 1000 {
 		tickDuration = time.Duration(1000*100*interval/steps) * time.Millisecond
 		steps = 100
 	} else {
 		tickDuration = time.Duration(100) * time.Millisecond
 	}
+	fmt.Println("tickDuration", tickDuration, "steps", steps)
 
-	tick := time.NewTicker(tickDuration)
 	metricsPerStep := orgs * keysPerOrg
 	total := metricsPerStep * steps
 	metrics := make([]*schema.MetricData, total)
@@ -177,6 +177,7 @@ func run(orgs, keysPerOrg, steps, interval, offset int) {
 		}
 	}
 	ts := time.Now().Add(-time.Duration(offset-interval) * time.Second).Unix()
+	tick := time.NewTicker(tickDuration)
 	for range tick.C {
 		for i := range metrics {
 			if i%metricsPerStep == 0 {
