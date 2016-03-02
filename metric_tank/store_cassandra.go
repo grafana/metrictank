@@ -99,9 +99,11 @@ func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 /* process writeQueue.
  */
 func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter met.Meter) {
+	tick := time.Tick(time.Duration(1) * time.Second)
 	for {
-		meter.Value(int64(len(queue)))
 		select {
+		case <-tick:
+			meter.Value(int64(len(queue)))
 		case cwr := <-queue:
 			meter.Value(int64(len(queue)))
 			log.Debug("starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
