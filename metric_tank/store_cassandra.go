@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dgryski/go-tsz"
@@ -42,11 +41,12 @@ object to interact with the whole Cassandra cluster.
 
 type cassandraStore struct {
 	session          *gocql.Session
-	workerQueues     []chan *ChunkWriteRequest
+	writeQueues      []chan *ChunkWriteRequest
+	readQueue        chan *ChunkReadRequest
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, writers int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -73,14 +73,19 @@ func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, wr
 	}
 	c := &cassandraStore{
 		session:          session,
-		workerQueues:     make([]chan *ChunkWriteRequest, *cassandraWriteConcurrency),
-		writeQueueMeters: make([]met.Meter, *cassandraWriteConcurrency),
+		writeQueues:      make([]chan *ChunkWriteRequest, writers),
+		readQueue:        make(chan *ChunkReadRequest, *cassandraReadQueueSize),
+		writeQueueMeters: make([]met.Meter, writers),
 	}
 
 	for i := 0; i < *cassandraWriteConcurrency; i++ {
-		c.workerQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+		c.writeQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
 		c.writeQueueMeters[i] = stats.NewMeter(fmt.Sprintf("cassandra.write_queue.%d.items", i+1), 0)
-		go c.processWriteQueue(c.workerQueues[i], c.writeQueueMeters[i])
+		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
+	}
+
+	for i := 0; i < *cassandraReadConcurrency; i++ {
+		go c.processReadQueue()
 	}
 
 	return c, err
@@ -92,9 +97,9 @@ func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 		sum += int(char)
 	}
 	which := sum % *cassandraWriteConcurrency
-	c.writeQueueMeters[which].Value(int64(len(c.workerQueues[which])))
-	c.workerQueues[which] <- cwr
-	c.writeQueueMeters[which].Value(int64(len(c.workerQueues[which])))
+	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
+	c.writeQueues[which] <- cwr
+	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
 }
 
 /* process writeQueue.
@@ -179,6 +184,12 @@ func (o asc) Len() int           { return len(o) }
 func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
 func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
+func (c *cassandraStore) processReadQueue() {
+	for crr := range c.readQueue {
+		crr.out <- outcome{crr.month, crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+	}
+}
+
 // Basic search of cassandra.
 // start inclusive, end exclusive
 func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
@@ -188,14 +199,11 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	}
 
 	results := make(chan outcome)
-	wg := &sync.WaitGroup{}
+	numQueries := 0
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		wg.Add(1)
-		go func() {
-			results <- outcome{month, sortKey, c.session.Query(q, p...).Iter()}
-			wg.Done()
-		}()
+		numQueries += 1
+		c.readQueue <- &ChunkReadRequest{month, sortKey, q, p, results}
 	}
 
 	start_month := start - (start % month_sec)       // starting row has to be at, or before, requested start
@@ -234,20 +242,19 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 			}
 		}
 	}
-	outcomes := make([]outcome, 0)
+	outcomes := make([]outcome, 0, numQueries)
 
-	// wait for all queries to complete then close the results channel so that the following
-	// for loop ends.
-	go func() {
-		wg.Wait()
-		cassGetDuration.Value(time.Now().Sub(pre))
-		close(results)
-	}()
-	pre = time.Now()
-
+	seen := 0
 	for o := range results {
+		seen += 1
 		outcomes = append(outcomes, o)
+		if seen == numQueries {
+			close(results)
+			cassGetDuration.Value(time.Now().Sub(pre))
+			break
+		}
 	}
+	pre = time.Now()
 	// we have all of the results, but they could have arrived in any order.
 	sort.Sort(asc(outcomes))
 
