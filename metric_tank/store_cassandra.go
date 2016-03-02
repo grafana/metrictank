@@ -263,16 +263,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 				log.Error(3, err.Error())
 				return iters, err
 			}
-			startByte := 1
 			if Format(b[0]) != FormatStandardGoTsz {
-				// Production currently has a few weeks of data that does not have
-				// a format byte.  In 1 month (20th Jan 2016), this can be removed.
-				//err := errors.New("unrecognized chunk format in cassandra")
-				//log.Error(3, err.Error())
-				//return iters, err
-				startByte = 0
+				err := errors.New("unrecognized chunk format in cassandra")
+				log.Error(3, err.Error())
+				return iters, err
 			}
-			iter, err := tsz.NewIterator(b[startByte:])
+			iter, err := tsz.NewIterator(b[1:])
 			if err != nil {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
