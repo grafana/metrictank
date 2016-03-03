@@ -62,7 +62,9 @@ var (
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraConsistency      = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cassandraTimeout          = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
+	cassandraReadConcurrency  = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
+	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
@@ -248,7 +250,7 @@ func main() {
 		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
 	}
 
-	store, err := NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraWriteConcurrency)
+	store, err := NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
