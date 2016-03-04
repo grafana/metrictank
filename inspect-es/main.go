@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
@@ -36,8 +37,12 @@ func perror(err error) {
 	}
 }
 
+var esAddr = flag.String("es-addr", "localhost:9200", "elasticsearch address")
+
 func main() {
-	defs, err := metricdef.NewDefsEs("localhost:9200", "", "", "metric")
+	flag.Parse()
+	defs, err := metricdef.NewDefsEs(*esAddr, "", "", "metric")
+	perror(err)
 	show := func(ds []*schema.MetricDefinition) {
 		for _, d := range ds {
 			fmt.Println(d.OrgId, d.Name)
