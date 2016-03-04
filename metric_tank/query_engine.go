@@ -134,9 +134,11 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		}
 	}
 
-	options[selected].comment = "<-- chosen"
-	for _, archive := range options {
-		log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
+	if logLevel < 2 {
+		options[selected].comment = "<-- chosen"
+		for _, archive := range options {
+			log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
+		}
 	}
 
 	/* we now just need to update the following properties for each req:
