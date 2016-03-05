@@ -198,12 +198,10 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 		return iters, fmt.Errorf("start must be before end.")
 	}
 
-	results := make(chan outcome)
-	numQueries := 0
+	crrs := make([]*ChunkReadRequest, 0)
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		numQueries += 1
-		c.readQueue <- &ChunkReadRequest{month, sortKey, q, p, results}
+		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, nil})
 	}
 
 	start_month := start - (start % month_sec)       // starting row has to be at, or before, requested start
@@ -220,6 +218,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	// as the one that has start_month.
 
 	row_key := fmt.Sprintf("%s_%d", key, start_month/month_sec)
+
 	query(start_month, start_month, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
 
 	if start_month == end_month {
@@ -241,6 +240,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
 			}
 		}
+	}
+	numQueries := len(crrs)
+	results := make(chan outcome, numQueries)
+	for i := range crrs {
+		crrs[i].out = results
+		c.readQueue <- crrs[i]
 	}
 	outcomes := make([]outcome, 0, numQueries)
 
