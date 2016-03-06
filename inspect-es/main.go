@@ -52,7 +52,7 @@ func showList(ds []*schema.MetricDefinition) {
 }
 func showVegetaGraphite(ds []*schema.MetricDefinition) {
 	for _, d := range ds {
-		fmt.Printf("GET http://localhost:8888/render?target=%s&from=-30s\nX-Org-Id: %d\n", d.Name, d.OrgId)
+		fmt.Printf("GET http://localhost:8888/render?target=%s&from=-%s\nX-Org-Id: %d\n", d.Name, *from, d.OrgId)
 	}
 }
 func showVegetaMT(ds []*schema.MetricDefinition) {
