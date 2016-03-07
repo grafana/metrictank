@@ -804,21 +804,19 @@ func TestAlignRequests(t *testing.T) {
 	}
 }
 
-func randFloats(num int) []Point {
+func randFloats() []Point {
 	// let's just do the "odd" case, since the non-odd will be sufficiently close
-	num += 1
-	ret := make([]Point, num)
-	for i := 0; i < num; i++ {
+	ret := make([]Point, 1000001)
+	for i := 0; i < len(ret); i++ {
 		ret[i] = Point{rand.Float64(), uint32(i)}
 	}
 	return ret
 }
 
-func randFloatsWithNulls(num int) []Point {
+func randFloatsWithNulls() []Point {
 	// let's just do the "odd" case, since the non-odd will be sufficiently close
-	num += 1
-	ret := make([]Point, num)
-	for i := 0; i < num; i++ {
+	ret := make([]Point, 1000001)
+	for i := 0; i < len(ret); i++ {
 		if i%2 == 0 {
 			ret[i] = Point{math.NaN(), uint32(i)}
 		} else {
@@ -828,114 +826,117 @@ func randFloatsWithNulls(num int) []Point {
 	return ret
 }
 
-// each "operation" (b.N) is an extra input point
-func BenchmarkConsolidateAvgRand1(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1, consolidation.Avg, b)
+// each "operation" is a consolidation of 1M+1 points
+func BenchmarkConsolidateAvgRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRandWithNulls1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRand2(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 2, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRandWithNulls2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 2, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRand25(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 25, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRandWithNulls25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 2, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRand1000(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1000, consolidation.Avg, b)
+func BenchmarkConsolidateAvgRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Avg, b)
 }
-func BenchmarkConsolidateAvgRandWithNulls1000(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1000, consolidation.Avg, b)
-}
-
-func BenchmarkConsolidateMinRand1(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRandWithNulls1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRand2(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 2, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRandWithNulls2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 2, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRand25(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 25, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRandWithNulls25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 25, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRand1000(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1000, consolidation.Min, b)
-}
-func BenchmarkConsolidateMinRandWithNulls1000(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1000, consolidation.Min, b)
+func BenchmarkConsolidateAvgRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Avg, b)
 }
 
-func BenchmarkConsolidateMaxRand1(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1, consolidation.Max, b)
+func BenchmarkConsolidateMinRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRandWithNulls1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1, consolidation.Max, b)
+func BenchmarkConsolidateMinRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRand2(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 2, consolidation.Max, b)
+func BenchmarkConsolidateMinRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRandWithNulls2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 2, consolidation.Max, b)
+func BenchmarkConsolidateMinRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRand25(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 25, consolidation.Max, b)
+func BenchmarkConsolidateMinRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRandWithNulls25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 25, consolidation.Max, b)
+func BenchmarkConsolidateMinRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRand1000(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1000, consolidation.Max, b)
+func BenchmarkConsolidateMinRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Min, b)
 }
-func BenchmarkConsolidateMaxRandWithNulls1000(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1000, consolidation.Max, b)
+func BenchmarkConsolidateMinRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Min, b)
 }
 
-func BenchmarkConsolidateSumRand1(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRandWithNulls1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRand2(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 2, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRandWithNulls2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 2, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRand25(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 25, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRandWithNulls25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 25, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRand1000(b *testing.B) {
-	benchmarkConsolidate(randFloats(b.N), 1000, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Max, b)
 }
-func BenchmarkConsolidateSumRandWithNulls1000(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls(b.N), 1000, consolidation.Sum, b)
+func BenchmarkConsolidateMaxRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Max, b)
+}
+
+func BenchmarkConsolidateSumRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Sum, b)
 }
 
 var dummy []Point
 
-func benchmarkConsolidate(in []Point, aggNum uint32, consolidator consolidation.Consolidator, b *testing.B) {
-	b.ResetTimer()
-
-	ret := consolidate(in, aggNum, consolidator)
-	dummy = ret
+func benchmarkConsolidate(fn func() []Point, aggNum uint32, consolidator consolidation.Consolidator, b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		in := fn()
+		b.StartTimer()
+		ret := consolidate(in, aggNum, consolidator)
+		dummy = ret
+	}
 }
 
 var result []Req
