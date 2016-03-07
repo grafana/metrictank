@@ -12,7 +12,18 @@ func Avg(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("avg() called in aggregator with 0 terms")
 	}
-	return Sum(in) / Cnt(in)
+	valid := float64(0)
+	sum := float64(0)
+	for _, term := range in {
+		if !math.IsNaN(term.Val) {
+			valid += 1
+			sum += term.Val
+		}
+	}
+	if valid == 0 {
+		return math.NaN()
+	}
+	return sum / valid
 }
 
 func Cnt(in []schema.Point) float64 {
