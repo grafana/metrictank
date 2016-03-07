@@ -48,7 +48,7 @@ func Max(in []float64) float64 {
 		return math.NaN()
 	}
 	max := math.Inf(-1)
-	for _, v := range in {
+	for _, v := range usable {
 		if v > max {
 			max = v
 		}
