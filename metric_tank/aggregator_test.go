@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/raintank/raintank-metric/schema"
 	"testing"
 )
 
@@ -36,14 +37,14 @@ func TestAggBoundary(t *testing.T) {
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
 	clusterStatus = NewClusterStatus("default", false)
-	compare := func(key string, metric Metric, expected []Point) {
+	compare := func(key string, metric Metric, expected []schema.Point) {
 		clusterStatus.Set(true)
 		_, iters := metric.Get(0, 1000)
-		got := make([]Point, 0, len(expected))
+		got := make([]schema.Point, 0, len(expected))
 		for _, iter := range iters {
 			for iter.Next() {
 				ts, val := iter.Values()
-				got = append(got, Point{val, ts})
+				got = append(got, schema.Point{val, ts})
 			}
 		}
 		if len(got) != len(expected) {
@@ -62,14 +63,14 @@ func TestAggregator(t *testing.T) {
 	agg := NewAggregator(dnstore, "test", 60, 120, 10, 86400)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
-	expected := []Point{}
+	expected := []schema.Point{}
 	compare("simple-min-unfinished", agg.minMetric, expected)
 
 	agg = NewAggregator(dnstore, "test", 60, 120, 10, 86400)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
-	expected = []Point{
+	expected = []schema.Point{
 		{5, 120},
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
@@ -78,7 +79,7 @@ func TestAggregator(t *testing.T) {
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(120, 4)
-	expected = []Point{
+	expected = []schema.Point{
 		{4, 120},
 	}
 	compare("simple-min-one-block-done-cause-last-point-just-right", agg.minMetric, expected)
@@ -88,7 +89,7 @@ func TestAggregator(t *testing.T) {
 	agg.Add(110, 5)
 	agg.Add(150, 1.123)
 	agg.Add(180, 1)
-	expected = []Point{
+	expected = []schema.Point{
 		{5, 120},
 		{1, 180},
 	}
@@ -101,19 +102,19 @@ func TestAggregator(t *testing.T) {
 	agg.Add(200, 1451.123)
 	agg.Add(220, 978894.445)
 	agg.Add(250, 1)
-	compare("simple-min-skip-a-block", agg.minMetric, []Point{
+	compare("simple-min-skip-a-block", agg.minMetric, []schema.Point{
 		{5, 120},
 		{1451.123, 240},
 	})
-	compare("simple-max-skip-a-block", agg.maxMetric, []Point{
+	compare("simple-max-skip-a-block", agg.maxMetric, []schema.Point{
 		{123.4, 120},
 		{978894.445, 240},
 	})
-	compare("simple-cnt-skip-a-block", agg.cntMetric, []Point{
+	compare("simple-cnt-skip-a-block", agg.cntMetric, []schema.Point{
 		{2, 120},
 		{3, 240},
 	})
-	compare("simple-sum-skip-a-block", agg.sumMetric, []Point{
+	compare("simple-sum-skip-a-block", agg.sumMetric, []schema.Point{
 		{128.4, 120},
 		{2451.123 + 1451.123 + 978894.445, 240},
 	})

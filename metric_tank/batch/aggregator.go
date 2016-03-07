@@ -2,19 +2,20 @@ package batch
 
 // aggregation functions for batches of data
 import (
+	"github.com/raintank/raintank-metric/schema"
 	"math"
 )
 
-type AggFunc func(in []float64) float64
+type AggFunc func(in []schema.Point) float64
 
-func Avg(in []float64) float64 {
+func Avg(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("avg() called in aggregator with 0 terms")
 	}
 	return Sum(in) / Cnt(in)
 }
 
-func Cnt(in []float64) float64 {
+func Cnt(in []schema.Point) float64 {
 	usable := Usable(in)
 	if len(usable) == 0 {
 		return math.NaN()
@@ -22,7 +23,7 @@ func Cnt(in []float64) float64 {
 	return float64(len(usable))
 }
 
-func Min(in []float64) float64 {
+func Min(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("min() called in aggregator with 0 terms")
 	}
@@ -39,7 +40,7 @@ func Min(in []float64) float64 {
 	return min
 }
 
-func Max(in []float64) float64 {
+func Max(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("max() called in aggregator with 0 terms")
 	}
@@ -56,7 +57,7 @@ func Max(in []float64) float64 {
 	return max
 }
 
-func Sum(in []float64) float64 {
+func Sum(in []schema.Point) float64 {
 	usable := Usable(in)
 	if len(usable) == 0 {
 		return math.NaN()
@@ -68,11 +69,11 @@ func Sum(in []float64) float64 {
 	return sum
 }
 
-func Usable(in []float64) []float64 {
+func Usable(in []schema.Point) []float64 {
 	u := make([]float64, 0)
 	for _, v := range in {
-		if !math.IsNaN(v) {
-			u = append(u, v)
+		if !math.IsNaN(v.Val) {
+			u = append(u, v.Val)
 		}
 	}
 	return u

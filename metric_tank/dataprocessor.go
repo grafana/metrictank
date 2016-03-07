@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"runtime"
 	"sync"
@@ -34,8 +35,8 @@ func doRecover(errp *error) {
 // note: values are quantized to the right because we can't lie about the future:
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
-func fix(in []Point, from, to, interval uint32) []Point {
-	out := make([]Point, 0, len(in))
+func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
+	out := make([]schema.Point, 0, len(in))
 
 	// first point should be the first point at or after from that divides by interval
 	start := from
@@ -51,7 +52,7 @@ func fix(in []Point, from, to, interval uint32) []Point {
 
 		// input is out of values. add a null
 		if i >= len(in) {
-			out = append(out, Point{math.NaN(), t})
+			out = append(out, schema.Point{math.NaN(), t})
 			continue
 		}
 
@@ -62,10 +63,10 @@ func fix(in []Point, from, to, interval uint32) []Point {
 			i++
 		} else if p.Ts > t {
 			// point is too recent, append a null and reconsider same point for next slot
-			out = append(out, Point{math.NaN(), t})
+			out = append(out, schema.Point{math.NaN(), t})
 		} else if p.Ts > t-interval && p.Ts < t {
 			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
-			out = append(out, Point{p.Val, t})
+			out = append(out, schema.Point{p.Val, t})
 			i++
 		} else if p.Ts <= t-interval {
 			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
@@ -86,50 +87,56 @@ func fix(in []Point, from, to, interval uint32) []Point {
 	return out
 }
 
-func divide(pointsA, pointsB []Point) []Point {
+func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	if len(pointsA) != len(pointsB) {
 		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
 	}
-	out := make([]Point, len(pointsA))
+	out := make([]schema.Point, len(pointsA))
 	for i, a := range pointsA {
 		b := pointsB[i]
-		out[i] = Point{a.Val / b.Val, a.Ts}
+		out[i] = schema.Point{a.Val / b.Val, a.Ts}
 	}
 	return out
 }
 
-func consolidate(in []Point, aggNum uint32, consolidator consolidation.Consolidator) []Point {
+func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Consolidator) []schema.Point {
 	num := int(aggNum)
 	aggFunc := consolidation.GetAggFunc(consolidator)
-	buf := make([]float64, num)
-	bufpos := -1
 	outLen := len(in) / num
-	if len(in)%num != 0 {
-		outLen += 1
-	}
-	points := make([]Point, 0, outLen)
-	for inpos, p := range in {
-		bufpos = inpos % num
-		buf[bufpos] = p.Val
-		if bufpos == num-1 {
-			points = append(points, Point{aggFunc(buf), p.Ts})
+	var points []schema.Point
+	cleanLen := num * outLen // what the len of input slice would be if it was a perfect fit
+	if len(in) == cleanLen {
+		points = make([]schema.Point, outLen)
+		out_i := 0
+		var next_i int
+		for in_i := 0; in_i < cleanLen; in_i = next_i {
+			next_i = in_i + num
+			points[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out_i += 1
 		}
-
-	}
-	if bufpos != -1 && bufpos < num-1 {
-		// we have an incomplete buf of some points that didn't get aggregated yet
+	} else {
+		outLen += 1
+		points = make([]schema.Point, outLen)
+		out_i := 0
+		var next_i int
+		for in_i := 0; in_i < cleanLen; in_i = next_i {
+			next_i = in_i + num
+			points[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out_i += 1
+		}
+		// we have some leftover points that didn't get aggregated yet
 		// we must also aggregate it and add it, and the timestamp of this point must be what it would have been
-		// if the buf would have been complete, i.e. points in the consolidation output should be evenly spaced.
+		// if the group would have been complete, i.e. points in the consolidation output should be evenly spaced.
 		// obviously we can only figure out the interval if we have at least 2 points
 		var lastTs uint32
 		if len(in) == 1 {
 			lastTs = in[0].Ts
 		} else {
 			interval := in[len(in)-1].Ts - in[len(in)-2].Ts
-			// len 10, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
-			lastTs = in[len(in)-1].Ts + uint32(num-len(in)%num)*interval
+			// len 10, cleanLen 9, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
+			lastTs = in[cleanLen].Ts + (aggNum-1)*interval
 		}
-		points = append(points, Point{aggFunc(buf[:bufpos+1]), lastTs})
+		points[out_i] = schema.Point{aggFunc(in[cleanLen:len(in)]), lastTs}
 	}
 	return points
 }
@@ -185,7 +192,7 @@ func getTargets(store Store, reqs []Req) ([]Series, error) {
 
 }
 
-func getTarget(store Store, req Req) (points []Point, interval uint32, err error) {
+func getTarget(store Store, req Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 
 	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
@@ -287,7 +294,7 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
-func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []Point {
+func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]Iter, 0)
 	memIters := make([]Iter, 0)
 	oldest := toUnix
@@ -320,7 +327,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 	pre := time.Now()
 	iters = append(iters, memIters...)
 
-	points := make([]Point, 0)
+	points := make([]schema.Point, 0)
 	for _, iter := range iters {
 		total := 0
 		good := 0
@@ -329,7 +336,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 			ts, val := iter.Values()
 			if ts >= fromUnix && ts < toUnix {
 				good += 1
-				points = append(points, Point{val, ts})
+				points = append(points, schema.Point{val, ts})
 			}
 		}
 		log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
