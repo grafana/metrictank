@@ -103,25 +103,25 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 	num := int(aggNum)
 	aggFunc := consolidation.GetAggFunc(consolidator)
 	outLen := len(in) / num
-	var points []schema.Point
+	var out []schema.Point
 	cleanLen := num * outLen // what the len of input slice would be if it was a perfect fit
 	if len(in) == cleanLen {
-		points = make([]schema.Point, outLen)
+		out = in[0:outLen]
 		out_i := 0
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
 			next_i = in_i + num
-			points[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
 			out_i += 1
 		}
 	} else {
 		outLen += 1
-		points = make([]schema.Point, outLen)
+		out = in[0:outLen]
 		out_i := 0
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
 			next_i = in_i + num
-			points[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
 			out_i += 1
 		}
 		// we have some leftover points that didn't get aggregated yet
@@ -136,9 +136,9 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 			// len 10, cleanLen 9, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
 			lastTs = in[cleanLen].Ts + (aggNum-1)*interval
 		}
-		points[out_i] = schema.Point{aggFunc(in[cleanLen:len(in)]), lastTs}
+		out[out_i] = schema.Point{aggFunc(in[cleanLen:len(in)]), lastTs}
 	}
-	return points
+	return out
 }
 
 // returns how many points should be aggregated together so that you end up with as many points as possible,
