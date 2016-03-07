@@ -16,26 +16,34 @@ func Avg(in []schema.Point) float64 {
 }
 
 func Cnt(in []schema.Point) float64 {
-	usable := Usable(in)
-	if len(usable) == 0 {
+	valid := float64(0)
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			valid += 1
+		}
+	}
+	if valid == 0 {
 		return math.NaN()
 	}
-	return float64(len(usable))
+	return valid
 }
 
 func Min(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("min() called in aggregator with 0 terms")
 	}
-	usable := Usable(in)
-	if len(usable) == 0 {
-		return math.NaN()
-	}
+	valid := false
 	min := math.Inf(1)
-	for _, v := range usable {
-		if v < min {
-			min = v
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			valid = true
+			if v.Val < min {
+				min = v.Val
+			}
 		}
+	}
+	if !valid {
+		min = math.NaN()
 	}
 	return min
 }
@@ -44,37 +52,33 @@ func Max(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("max() called in aggregator with 0 terms")
 	}
-	usable := Usable(in)
-	if len(usable) == 0 {
-		return math.NaN()
-	}
+	valid := false
 	max := math.Inf(-1)
-	for _, v := range usable {
-		if v > max {
-			max = v
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			valid = true
+			if v.Val > max {
+				max = v.Val
+			}
 		}
+	}
+	if !valid {
+		max = math.NaN()
 	}
 	return max
 }
 
 func Sum(in []schema.Point) float64 {
-	usable := Usable(in)
-	if len(usable) == 0 {
-		return math.NaN()
-	}
+	valid := false
 	sum := float64(0)
-	for _, term := range usable {
-		sum += term
-	}
-	return sum
-}
-
-func Usable(in []schema.Point) []float64 {
-	u := make([]float64, 0)
-	for _, v := range in {
-		if !math.IsNaN(v.Val) {
-			u = append(u, v.Val)
+	for _, term := range in {
+		if !math.IsNaN(term.Val) {
+			valid = true
+			sum += term.Val
 		}
 	}
-	return u
+	if !valid {
+		sum = math.NaN()
+	}
+	return sum
 }
