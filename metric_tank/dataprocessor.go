@@ -36,8 +36,6 @@ func doRecover(errp *error) {
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
 func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
-	out := make([]schema.Point, 0, len(in))
-
 	// first point should be the first point at or after from that divides by interval
 	start := from
 	remain := from % interval
@@ -47,26 +45,29 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
 	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
 	lastPoint := (to - 1) - ((to - 1) % interval)
+	out := make([]schema.Point, (lastPoint-start)/interval+1)
 
-	for t, i := start, 0; t <= lastPoint; t += interval {
+	// i iterates in. o iterates out. t is the ts we're looking to fill.
+	for t, i, o := start, 0, -1; t <= lastPoint; t += interval {
+		o += 1
 
 		// input is out of values. add a null
 		if i >= len(in) {
-			out = append(out, schema.Point{math.NaN(), t})
+			out[o] = schema.Point{math.NaN(), t}
 			continue
 		}
 
 		p := in[i]
 		if p.Ts == t {
 			// point has perfect ts, use it and move on to next point
-			out = append(out, p)
+			out[o] = p
 			i++
 		} else if p.Ts > t {
 			// point is too recent, append a null and reconsider same point for next slot
-			out = append(out, schema.Point{math.NaN(), t})
+			out[o] = schema.Point{math.NaN(), t}
 		} else if p.Ts > t-interval && p.Ts < t {
 			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
-			out = append(out, schema.Point{p.Val, t})
+			out[o] = schema.Point{p.Val, t}
 			i++
 		} else if p.Ts <= t-interval {
 			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
@@ -80,6 +81,7 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 				i++
 			}
 			t -= interval
+			o -= 1
 		}
 
 	}
