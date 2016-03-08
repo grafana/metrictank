@@ -940,6 +940,16 @@ func benchmarkConsolidate(fn func() []schema.Point, aggNum uint32, consolidator 
 	}
 }
 
+func BenchmarkFix1M(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		in := randFloats()
+		b.StartTimer()
+		out := fix(in, 0, 1000001, 1)
+		dummy = out
+	}
+}
+
 var result []Req
 
 func BenchmarkAlignRequests(b *testing.B) {
