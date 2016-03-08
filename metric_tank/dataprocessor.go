@@ -341,7 +341,9 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 				points = append(points, schema.Point{val, ts})
 			}
 		}
-		log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
+		if logLevel < 2 {
+			log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
+		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
 	return points
