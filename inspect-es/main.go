@@ -42,7 +42,7 @@ func perror(err error) {
 var esAddr = flag.String("es-addr", "localhost:9200", "elasticsearch address")
 var esIndex = flag.String("es-index", "metrictank", "elasticsearch index to query")
 var format = flag.String("format", "list", "format: list|vegeta-graphite|vegeta-mt")
-var maxAge = flag.Int("max-age", 3600, "max age (last update diff with now) of metricdefs. use 0 to disable")
+var maxAge = flag.Int("max-age", 23400, "max age (last update diff with now) of metricdefs. defaults to 6.5hr. use 0 to disable")
 var from = flag.String("from", "30min", "from. eg '30min', '5h', '14d', etc")
 var silent = flag.Bool("silent", false, "silent mode (don't print number of metrics loaded to stderr)")
 var fromS uint32
