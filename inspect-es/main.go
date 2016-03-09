@@ -6,6 +6,7 @@ import (
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
+	"os"
 	"time"
 )
 
@@ -43,6 +44,7 @@ var esIndex = flag.String("es-index", "metrictank", "elasticsearch index to quer
 var format = flag.String("format", "list", "format: list|vegeta-graphite|vegeta-mt")
 var maxAge = flag.Int("max-age", 3600, "max age (last update diff with now) of metricdefs")
 var from = flag.String("from", "30min", "from. eg '30min', '5h', '14d', etc")
+var silent = flag.Bool("silent", false, "silent mode (don't print number of metrics loaded to stderr)")
 var fromS uint32
 
 func showList(ds []*schema.MetricDefinition) {
@@ -84,10 +86,15 @@ func main() {
 	perror(err)
 	met, scroll_id, err := defs.GetMetrics("")
 	perror(err)
+	total := len(met)
 	show(met)
 	for scroll_id != "" {
 		met, scroll_id, err = defs.GetMetrics(scroll_id)
 		perror(err)
 		show(met)
+		total += len(met)
+	}
+	if !*silent {
+		fmt.Fprintf(os.Stderr, "listed %d metrics\n", total)
 	}
 }
