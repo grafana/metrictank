@@ -192,7 +192,7 @@ func (d *DefsEs) IndexMetric(m *schema.MetricDefinition) error {
 		return err
 	}
 
-	log.Debug("indexing %s in elasticsearch", m.Id)
+	log.Debug("ES: indexing %s in elasticsearch", m.Id)
 	err := d.BulkIndexer.Index(d.index, "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
 		log.Error(3, "failed to send payload to BulkApi indexer. %s", err)
@@ -209,7 +209,7 @@ func (d *DefsEs) GetMetricDefinition(id string) (*schema.MetricDefinition, bool,
 	res, err := d.Get(d.index, "metric_index", id, nil)
 	if err != nil {
 		if err == elastigo.RecordNotFound {
-			log.Debug("%s not in ES. %s", id, err)
+			log.Debug("ES: %s not in ES. %s", id, err)
 			return nil, false, nil
 		} else {
 			log.Error(3, "elasticsearch query failed. %s", err)

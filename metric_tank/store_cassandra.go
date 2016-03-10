@@ -112,7 +112,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			meter.Value(int64(len(queue)))
 		case cwr := <-queue:
 			meter.Value(int64(len(queue)))
-			log.Debug("starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
+			log.Debug("CS: starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassBlockDuration.Value(time.Now().Sub(cwr.timestamp))
 
@@ -136,11 +136,11 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 					success = true
 					cwr.chunk.Saved = true
 					SendPersistMessage(cwr.key, cwr.chunk.T0)
-					log.Debug("save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
+					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc(1)
 				} else {
 					if (attempts % 20) == 0 {
-						log.Warn("failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
+						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
 					}
 					chunkSaveFail.Inc(1)
 					sleepTime := 100 * attempts
@@ -295,7 +295,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(int64(len(outcomes)))
-	log.Debug("searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
+	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil
 }
 

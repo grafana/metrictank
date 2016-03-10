@@ -137,9 +137,9 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		options[selected].chosen = true
 		for i, archive := range options {
 			if archive.chosen {
-				log.Debug("%-2d %-6d %-6d <-", i, archive.interval, tsRange/archive.interval)
+				log.Debug("QE %-2d %-6d %-6d <-", i, archive.interval, tsRange/archive.interval)
 			} else {
-				log.Debug("%-2d %-6d %-6d", i, archive.interval, tsRange/archive.interval)
+				log.Debug("QE %-2d %-6d %-6d", i, archive.interval, tsRange/archive.interval)
 			}
 		}
 	}

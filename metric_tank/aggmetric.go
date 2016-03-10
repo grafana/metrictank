@@ -85,7 +85,9 @@ func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	defer a.Unlock()
 	chunk := a.getChunkByT0(ts)
 	if chunk != nil {
-		log.Debug("marking chunk %s:%d as saved.", a.Key, chunk.T0)
+		if logLevel < 2 {
+			log.Debug("AM marking chunk %s:%d as saved.", a.Key, chunk.T0)
+		}
 		chunk.Saved = true
 	}
 }
@@ -215,7 +217,9 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
 func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	pre := time.Now()
-	log.Debug("AggMetric %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
+	if logLevel < 2 {
+		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
+	}
 	if from >= to {
 		panic("invalid request. to must > from")
 	}
@@ -226,7 +230,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 
 	if newestChunk == nil {
 		// we dont have any data yet.
-		log.Debug("AggMetric %s Get(): no data for requested range.", a.Key)
+		if logLevel < 2 {
+			log.Debug("AM %s Get(): no data for requested range.", a.Key)
+		}
 		return math.MaxInt32, make([]Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
@@ -241,7 +247,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		//   only aware of older data and not the newer data in cassandra. this is unlikely
 		//   and it's better to not serve this scenario well in favor of the above case.
 		//   seems like a fair tradeoff anyway that you have to refill all the way first.
-		log.Debug("AggMetric %s Get(): no data for requested range.", a.Key)
+		if logLevel < 2 {
+			log.Debug("AM %s Get(): no data for requested range.", a.Key)
+		}
 		return from, make([]Iter, 0)
 	}
 
@@ -284,7 +292,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
-		log.Debug("AggMetric %s Get(): no data for requested range", a.Key)
+		if logLevel < 2 {
+			log.Debug("AM %s Get(): no data for requested range", a.Key)
+		}
 		return oldestChunk.T0, make([]Iter, 0)
 	}
 
@@ -343,7 +353,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
 		if logLevel < 2 {
-			log.Debug("AggMetric %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
+			log.Debug("AM %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
 		}
 		agg.Add(ts, val)
 	}
@@ -355,7 +365,9 @@ func (a *AggMetric) persist(pos int) {
 	chunk := a.Chunks[pos]
 	chunk.Finish()
 	if !clusterStatus.IsPrimary() {
-		log.Debug("node is not primary, not saving chunk.")
+		if logLevel < 2 {
+			log.Debug("AM persist(): node is not primary, not saving chunk.")
+		}
 		return
 	}
 
@@ -378,7 +390,9 @@ func (a *AggMetric) persist(pos int) {
 	}
 	previousChunk := a.Chunks[previousPos]
 	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
-		log.Debug("old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
+		if logLevel < 2 {
+			log.Debug("AM persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
+		}
 		pending = append(pending, &ChunkWriteRequest{
 			key:       a.Key,
 			chunk:     previousChunk,
@@ -392,7 +406,9 @@ func (a *AggMetric) persist(pos int) {
 		previousChunk = a.Chunks[previousPos]
 	}
 
-	log.Debug("sending %d chunks to write queue", len(pending))
+	if logLevel < 2 {
+		log.Debug("AM persist(): sending %d chunks to write queue", len(pending))
+	}
 
 	pendingChunk := len(pending) - 1
 
@@ -404,7 +420,9 @@ func (a *AggMetric) persist(pos int) {
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		log.Debug("adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
+		if logLevel < 2 {
+			log.Debug("AM persist(): adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
+		}
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
@@ -434,7 +452,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
 		}
 
-		log.Debug("AggMetric %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
+		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
 	} else if t0 == currentChunk.T0 {
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
@@ -443,13 +461,13 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 		// last prior data was in same chunk as new point
 		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
-			log.Debug("failed to add metric to chunk for %s. %s", a.Key, err)
+			log.Debug("AM failed to add metric to chunk for %s. %s", a.Key, err)
 			metricsTooOld.Inc(1)
 			return
 		}
-		log.Debug("AggMetric %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
+		log.Debug("AM %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
-		log.Debug("Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
+		log.Debug("AM Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
 		metricsTooOld.Inc(1)
 		return
 	} else {
@@ -467,7 +485,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 			}
-			log.Debug("AggMetric %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
+			log.Debug("AM %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
 		} else {
 			chunkClear.Inc(1)
 			totalPoints <- -1 * int(a.Chunks[a.CurrentChunkPos].NumPoints)
@@ -475,7 +493,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 			}
-			log.Debug("AggMetric %s Add(): cleared chunk at %d of %d and replaced with new. and added the new point: %s", a.Key, a.CurrentChunkPos, len(a.Chunks), a.Chunks[a.CurrentChunkPos])
+			log.Debug("AM %s Add(): cleared chunk at %d of %d and replaced with new. and added the new point: %s", a.Key, a.CurrentChunkPos, len(a.Chunks), a.Chunks[a.CurrentChunkPos])
 		}
 
 	}

@@ -12,8 +12,8 @@ import (
 
 	"github.com/bitly/go-hostpool"
 	"github.com/grafana/grafana/pkg/log"
-	"github.com/raintank/met"
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 )
@@ -108,7 +108,7 @@ func (p *PersistMessageBatch) flush() {
 			continue
 		}
 
-		log.Debug("sending %d batch metricPersist messages", len(c))
+		log.Debug("CLU sending %d batch metricPersist messages", len(c))
 
 		data, err := json.Marshal(&msg)
 		if err != nil {
@@ -161,7 +161,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 			return nil
 		}
 		if batch.Instance == *instance {
-			log.Debug("skipping batch message we generated.")
+			log.Debug("CLU skipping batch message we generated.")
 			return nil
 		}
 		for _, c := range batch.SavedChunks {
@@ -178,7 +178,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 			return nil
 		}
 		if ms.Instance == *instance {
-			log.Debug("skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
+			log.Debug("CLU skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
 			return nil
 		}
 

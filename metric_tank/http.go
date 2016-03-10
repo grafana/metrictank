@@ -161,6 +161,13 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
 		reqs[i] = req
 	}
+
+	if logLevel < 2 {
+		for _, req := range reqs {
+			log.Debug("HTTP Get() %s", req)
+		}
+	}
+
 	err = findMetricsForRequests(reqs, defCache)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -172,10 +179,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	for _, req := range reqs {
-		log.Debug("===================================")
-		log.Debug("HTTP Get()          %s", req)
-	}
 	out, err := getTargets(store, reqs)
 	if err != nil {
 		log.Error(0, err.Error())

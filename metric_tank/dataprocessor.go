@@ -200,13 +200,12 @@ func getTarget(store Store, req Req) (points []schema.Point, interval uint32, er
 	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
 	runtimeConsolidation := req.aggNum > 1 // do we need to compress any points at runtime?
 
-	log.Debug("getTarget()         %s", req)
-	log.Debug("type   interval   points")
-
-	if runtimeConsolidation {
-		log.Debug("runtimeConsolidation: true. agg factor: %d -> output interval: %d", req.aggNum, req.outInterval)
-	} else {
-		log.Debug("runtimeConsolidation: false. output interval: %d", req.outInterval)
+	if logLevel < 2 {
+		if runtimeConsolidation {
+			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.aggNum, req.outInterval)
+		} else {
+			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.outInterval)
+		}
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
@@ -287,7 +286,9 @@ func getTarget(store Store, req Req) (points []schema.Point, interval uint32, er
 }
 
 func logLoad(typ, key string, from, to uint32) {
-	log.Debug("load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+	if logLevel < 2 {
+		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+	}
 }
 
 func aggMetricKey(key, archive string, aggSpan uint32) string {
@@ -342,7 +343,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 			}
 		}
 		if logLevel < 2 {
-			log.Debug("getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
+			log.Debug("DP getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
