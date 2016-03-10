@@ -57,7 +57,7 @@ type MetricDefinition struct {
 }
 
 func (m *MetricDefinition) Validate() error {
-	if m.Name == "" || m.OrgId == 0 || (m.TargetType != "derive" && m.TargetType != "gauge") || m.Interval == 0 || m.Metric == "" || m.Unit == "" {
+	if m.Name == "" || m.OrgId == 0 || m.Interval == 0 {
 		// TODO: this error message ought to be more informative
 		err := fmt.Errorf("metric is not valid!")
 		return err
