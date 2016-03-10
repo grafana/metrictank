@@ -213,6 +213,9 @@ func main() {
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
+	// set our cluster state before we start consuming messages.
+	clusterStatus = NewClusterStatus(*instance, *primaryNode)
+
 	initMetrics(stats)
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
@@ -255,9 +258,6 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
-
-	// set our cluster state before we start consuming messages.
-	clusterStatus = NewClusterStatus(*instance, *primaryNode)
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "metrics_tank"
