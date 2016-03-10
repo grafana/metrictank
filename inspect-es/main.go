@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
@@ -88,7 +89,7 @@ func main() {
 		log.Fatal("invalid format")
 	}
 	var err error
-	fromS, err = inSeconds(*from)
+	fromS, err = dur.ParseUNsec(*from)
 	perror(err)
 	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *esIndex)
 	perror(err)

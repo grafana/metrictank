@@ -1,4 +1,8 @@
-package main
+package dur
+
+// this package works with the following shorthands:
+// Usec : unsigned (positive) number of seconds
+// UNsec: like Usec, but non-zero.
 
 import (
 	"errors"
@@ -11,17 +15,33 @@ var errNegative = errors.New("number cannot be negative")
 var errNonZero = errors.New("number must be nonzero")
 var errUnknownTimeUnit = errors.New("unknown time unit")
 
-func mustInSeconds(desc, s string) uint32 {
-	sec, err := inSeconds(s)
+func MustParseUsec(desc, s string) uint32 {
+	sec, err := ParseUsec(s)
 	if err != nil {
 		panic(fmt.Sprintf("%q: %s", desc, s))
 	}
 	return sec
 }
 
-// inSeconds converts a string expr to a number in seconds
+func MustParseUNsec(desc, s string) uint32 {
+	sec, err := ParseUNsec(s)
+	if err != nil {
+		panic(fmt.Sprintf("%q: %s", desc, s))
+	}
+	return sec
+}
+
+func ParseUNsec(s string) (uint32, error) {
+	i, e := ParseUsec(s)
+	if e == nil && i == 0 {
+		return 0, errNonZero
+	}
+	return i, e
+}
+
+// ParseUsec converts a string expr to an Usec.
 // unit defaults to s if not specified
-func inSeconds(s string) (uint32, error) {
+func ParseUsec(s string) (uint32, error) {
 	if s == "" {
 		return 0, errEmpty
 	}
@@ -69,9 +89,5 @@ func inSeconds(s string) (uint32, error) {
 		}
 		sum += uint32(num * units)
 	}
-	if sum == 0 {
-		return 0, errNonZero
-	}
-
 	return sum, nil
 }

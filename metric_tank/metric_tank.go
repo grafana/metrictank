@@ -20,6 +20,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/app"
+	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/rakyll/globalconf"
@@ -209,16 +210,16 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	sec := mustInSeconds("warm-up-period", *warmUpPeriodStr)
+	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
 	initMetrics(stats)
-	chunkSpan := mustInSeconds("chunkspan", *chunkSpanStr)
+	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
-	chunkMaxStale := mustInSeconds("chunk-max-stale", *chunkMaxStaleStr)
-	metricMaxStale := mustInSeconds("metric-max-stale", *metricMaxStaleStr)
-	gcInterval := time.Duration(mustInSeconds("gc-interval", *gcIntervalStr)) * time.Second
-	ttl := mustInSeconds("ttl", *ttlStr)
+	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
+	metricMaxStale := dur.MustParseUNsec("metric-max-stale", *metricMaxStaleStr)
+	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
+	ttl := dur.MustParseUNsec("ttl", *ttlStr)
 	if (month_sec % chunkSpan) != 0 {
 		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
@@ -233,10 +234,10 @@ func main() {
 		if len(fields) < 4 {
 			log.Fatal(4, "bad agg settings")
 		}
-		aggSpan := mustInSeconds("aggsettings", fields[0])
-		aggChunkSpan := mustInSeconds("aggsettings", fields[1])
-		aggNumChunks := mustInSeconds("aggsettings", fields[2])
-		aggTTL := mustInSeconds("aggsettings", fields[3])
+		aggSpan := dur.MustParseUNsec("aggsettings", fields[0])
+		aggChunkSpan := dur.MustParseUNsec("aggsettings", fields[1])
+		aggNumChunks := dur.MustParseUNsec("aggsettings", fields[2])
+		aggTTL := dur.MustParseUNsec("aggsettings", fields[3])
 		if (month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}

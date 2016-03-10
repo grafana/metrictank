@@ -1,15 +1,15 @@
-package main
+package dur
 
 import "testing"
 
-func TestDuration(t *testing.T) {
+func TestUsec(t *testing.T) {
 	var cases = []struct {
 		in  string
 		out uint32
 		err bool
 	}{
 		{"", 0, true},
-		{"0", 0, true},
+		{"0", 0, false},
 		{"-1", 0, true},
 		{"1", 1, false},
 		{"3600", 3600, false},
@@ -29,7 +29,7 @@ func TestDuration(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		d, err := inSeconds(c.in)
+		d, err := ParseUsec(c.in)
 		if (err != nil) != c.err {
 			t.Fatalf("case %d %q: expected err %t, got err %s", i, c.in, c.err, err)
 		}
