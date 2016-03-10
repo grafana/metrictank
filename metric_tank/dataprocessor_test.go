@@ -2,15 +2,17 @@ package main
 
 import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/schema"
 	"math"
+	"math/rand"
 	"testing"
 )
 
 type testCase struct {
-	in     []Point
+	in     []schema.Point
 	consol consolidation.Consolidator
 	num    uint32
-	out    []Point
+	out    []schema.Point
 }
 
 func validate(cases []testCase, t *testing.T) {
@@ -32,7 +34,7 @@ func validate(cases []testCase, t *testing.T) {
 func TestOddConsolidationAlignments(t *testing.T) {
 	cases := []testCase{
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -40,7 +42,7 @@ func TestOddConsolidationAlignments(t *testing.T) {
 			},
 			consolidation.Avg,
 			1,
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -48,7 +50,7 @@ func TestOddConsolidationAlignments(t *testing.T) {
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -56,47 +58,47 @@ func TestOddConsolidationAlignments(t *testing.T) {
 			},
 			consolidation.Avg,
 			3,
-			[]Point{
+			[]schema.Point{
 				{2, 1449178151},
 				{4, 1449178181}, // see comment below
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
 			},
 			consolidation.Avg,
 			1,
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
 			},
 			consolidation.Avg,
 			2,
-			[]Point{
+			[]schema.Point{
 				{1.5, 1449178141},
 				{3, 1449178161}, // note: we choose the next ts here for even spacing (important for further processing/parsing/handing off), even though that point is missing
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
 			},
 			consolidation.Avg,
 			3,
-			[]Point{
+			[]schema.Point{
 				{2, 1449178151},
 			},
 		},
@@ -106,7 +108,7 @@ func TestOddConsolidationAlignments(t *testing.T) {
 func TestConsolidationFunctions(t *testing.T) {
 	cases := []testCase{
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -114,13 +116,13 @@ func TestConsolidationFunctions(t *testing.T) {
 			},
 			consolidation.Avg,
 			2,
-			[]Point{
+			[]schema.Point{
 				{1.5, 1449178141},
 				{3.5, 1449178161},
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -128,13 +130,13 @@ func TestConsolidationFunctions(t *testing.T) {
 			},
 			consolidation.Cnt,
 			2,
-			[]Point{
+			[]schema.Point{
 				{2, 1449178141},
 				{2, 1449178161},
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -142,13 +144,13 @@ func TestConsolidationFunctions(t *testing.T) {
 			},
 			consolidation.Min,
 			2,
-			[]Point{
+			[]schema.Point{
 				{1, 1449178141},
 				{3, 1449178161},
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -156,13 +158,13 @@ func TestConsolidationFunctions(t *testing.T) {
 			},
 			consolidation.Max,
 			2,
-			[]Point{
+			[]schema.Point{
 				{2, 1449178141},
 				{4, 1449178161},
 			},
 		},
 		{
-			[]Point{
+			[]schema.Point{
 				{1, 1449178131},
 				{2, 1449178141},
 				{3, 1449178151},
@@ -170,7 +172,7 @@ func TestConsolidationFunctions(t *testing.T) {
 			},
 			consolidation.Sum,
 			2,
-			[]Point{
+			[]schema.Point{
 				{3, 1449178141},
 				{7, 1449178161},
 			},
@@ -219,17 +221,17 @@ func TestAggEvery(t *testing.T) {
 }
 
 type fixc struct {
-	in       []Point
+	in       []schema.Point
 	from     uint32
 	to       uint32
 	interval uint32
-	out      []Point
+	out      []schema.Point
 }
 
-func nullPoints(from, to, interval uint32) []Point {
-	out := make([]Point, 0)
+func nullPoints(from, to, interval uint32) []schema.Point {
+	out := make([]schema.Point, 0)
 	for i := from; i < to; i += interval {
-		out = append(out, Point{math.NaN(), i})
+		out = append(out, schema.Point{math.NaN(), i})
 	}
 	return out
 }
@@ -238,71 +240,71 @@ func TestFix(t *testing.T) {
 	cases := []fixc{
 		{
 			// the most standard simple case
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 			10,
 			31,
 			10,
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 		},
 		{
 			// almost... need Nan in front
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 			1,
 			31,
 			10,
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 		},
 		{
 			// need Nan in front
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 			0,
 			31,
 			10,
-			[]Point{{math.NaN(), 0}, {1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{math.NaN(), 0}, {1, 10}, {2, 20}, {3, 30}},
 		},
 		{
 			// almost..need Nan in back
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 			10,
 			40,
 			10,
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 		},
 		{
 			// need Nan in back
-			[]Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
 			10,
 			41,
 			10,
-			[]Point{{1, 10}, {2, 20}, {3, 30}, {math.NaN(), 40}},
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}, {math.NaN(), 40}},
 		},
 		{
 			// need Nan in middle
-			[]Point{{1, 10}, {3, 30}},
+			[]schema.Point{{1, 10}, {3, 30}},
 			10,
 			31,
 			10,
-			[]Point{{1, 10}, {math.NaN(), 20}, {3, 30}},
+			[]schema.Point{{1, 10}, {math.NaN(), 20}, {3, 30}},
 		},
 		{
 			// need Nan everywhere
-			[]Point{{2, 20}, {4, 40}, {7, 70}},
+			[]schema.Point{{2, 20}, {4, 40}, {7, 70}},
 			0,
 			90,
 			10,
-			[]Point{{math.NaN(), 0}, {math.NaN(), 10}, {2, 20}, {math.NaN(), 30}, {4, 40}, {math.NaN(), 50}, {math.NaN(), 60}, {7, 70}, {math.NaN(), 80}},
+			[]schema.Point{{math.NaN(), 0}, {math.NaN(), 10}, {2, 20}, {math.NaN(), 30}, {4, 40}, {math.NaN(), 50}, {math.NaN(), 60}, {7, 70}, {math.NaN(), 80}},
 		},
 		{
 			// too much data. note that there are multiple satisfactory solutions here. this is just one of them.
-			[]Point{{10, 10}, {14, 14}, {20, 20}, {26, 26}, {35, 35}},
+			[]schema.Point{{10, 10}, {14, 14}, {20, 20}, {26, 26}, {35, 35}},
 			10,
 			41,
 			10,
-			[]Point{{10, 10}, {14, 20}, {26, 30}, {35, 40}},
+			[]schema.Point{{10, 10}, {14, 20}, {26, 30}, {35, 40}},
 		},
 		{
 			// no data at all. saw this one for real
-			[]Point{},
+			[]schema.Point{},
 			1450242982,
 			1450329382,
 			600,
@@ -310,11 +312,11 @@ func TestFix(t *testing.T) {
 		},
 		{
 			// don't trip over last.
-			[]Point{{1, 10}, {2, 20}, {2, 19}},
+			[]schema.Point{{1, 10}, {2, 20}, {2, 19}},
 			10,
 			31,
 			10,
-			[]Point{{1, 10}, {2, 20}, {math.NaN(), 30}},
+			[]schema.Point{{1, 10}, {2, 20}, {math.NaN(), 30}},
 		},
 	}
 
@@ -800,6 +802,151 @@ func TestAlignRequests(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func randFloats() []schema.Point {
+	// let's just do the "odd" case, since the non-odd will be sufficiently close
+	ret := make([]schema.Point, 1000001)
+	for i := 0; i < len(ret); i++ {
+		ret[i] = schema.Point{rand.Float64(), uint32(i)}
+	}
+	return ret
+}
+
+func randFloatsWithNulls() []schema.Point {
+	// let's just do the "odd" case, since the non-odd will be sufficiently close
+	ret := make([]schema.Point, 1000001)
+	for i := 0; i < len(ret); i++ {
+		if i%2 == 0 {
+			ret[i] = schema.Point{math.NaN(), uint32(i)}
+		} else {
+			ret[i] = schema.Point{rand.Float64(), uint32(i)}
+		}
+	}
+	return ret
+}
+
+// each "operation" is a consolidation of 1M+1 points
+func BenchmarkConsolidateAvgRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Avg, b)
+}
+func BenchmarkConsolidateAvgRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Avg, b)
+}
+
+func BenchmarkConsolidateMinRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Min, b)
+}
+func BenchmarkConsolidateMinRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Min, b)
+}
+
+func BenchmarkConsolidateMaxRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Max, b)
+}
+func BenchmarkConsolidateMaxRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Max, b)
+}
+
+func BenchmarkConsolidateSumRand1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloats, 1, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_1(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloats, 2, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_2(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloats, 25, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_25(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRand1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloats, 100, consolidation.Sum, b)
+}
+func BenchmarkConsolidateSumRandWithNulls1M_100(b *testing.B) {
+	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Sum, b)
+}
+
+var dummy []schema.Point
+
+func benchmarkConsolidate(fn func() []schema.Point, aggNum uint32, consolidator consolidation.Consolidator, b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		in := fn()
+		b.StartTimer()
+		ret := consolidate(in, aggNum, consolidator)
+		dummy = ret
+	}
+}
+
+func BenchmarkFix1M(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		in := randFloats()
+		b.StartTimer()
+		out := fix(in, 0, 1000001, 1)
+		dummy = out
 	}
 }
 

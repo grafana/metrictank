@@ -8,14 +8,13 @@ import (
 
 // represents a data "archive", i.e. the raw one, or an aggregated series
 type archive struct {
-	title      string
 	interval   uint32
 	pointCount uint32
-	comment    string
+	chosen     bool
 }
 
 func (b archive) String() string {
-	return fmt.Sprintf("<archive %s> int:%d, comment: %s", b.title, b.interval, b.comment)
+	return fmt.Sprintf("<archive int:%d, pointCount: %d, chosen: %t", b.interval, b.pointCount, b.chosen)
 }
 
 type archives []archive
@@ -58,14 +57,14 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	tsRange := (reqs[0].to - reqs[0].from)
 
 	// note: not all series necessarily have the same raw settings, will be fixed further down
-	options[0] = archive{"raw", minInterval, tsRange / minInterval, ""}
+	options[0] = archive{minInterval, tsRange / minInterval, false}
 	// now model the archives we get from the aggregations
 	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
 	aggRef := []int{0}
 	for j, agg := range aggs {
 		if agg.ready {
-			options = append(options, archive{fmt.Sprintf("agg %d", j), agg.span, tsRange / agg.span, ""})
+			options = append(options, archive{agg.span, tsRange / agg.span, false})
 			aggRef = append(aggRef, j+1)
 		}
 	}
@@ -135,9 +134,13 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	}
 
 	if logLevel < 2 {
-		options[selected].comment = "<-- chosen"
-		for _, archive := range options {
-			log.Debug("%-6s %-6d %-6d %s", archive.title, archive.interval, tsRange/archive.interval, archive.comment)
+		options[selected].chosen = true
+		for i, archive := range options {
+			if archive.chosen {
+				log.Debug("%-2d %-6d %-6d <-", i, archive.interval, tsRange/archive.interval)
+			} else {
+				log.Debug("%-2d %-6d %-6d", i, archive.interval, tsRange/archive.interval)
+			}
 		}
 	}
 

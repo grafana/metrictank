@@ -41,7 +41,10 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 	}
 
 	go ms.stats()
-	go ms.GC()
+	// gcInterval = 0 can be useful in tests
+	if gcInterval > 0 {
+		go ms.GC()
+	}
 	return &ms
 }
 

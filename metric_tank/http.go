@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,14 +17,9 @@ var bufPool = sync.Pool{
 	New: func() interface{} { return make([]byte, 0) },
 }
 
-type Point struct {
-	Val float64
-	Ts  uint32
-}
-
 type Series struct {
 	Target     string
-	Datapoints []Point
+	Datapoints []schema.Point
 	Interval   uint32
 }
 

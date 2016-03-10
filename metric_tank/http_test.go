@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/raintank/raintank-metric/schema"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestJsonMarshal(t *testing.T) {
 			in: []Series{
 				{
 					Target:     "a",
-					Datapoints: []Point{},
+					Datapoints: []schema.Point{},
 					Interval:   60,
 				},
 			},
@@ -27,7 +28,7 @@ func TestJsonMarshal(t *testing.T) {
 			in: []Series{
 				{
 					Target: "a",
-					Datapoints: []Point{
+					Datapoints: []schema.Point{
 						{123, 60},
 						{10000, 120},
 						{0, 180},
@@ -42,7 +43,7 @@ func TestJsonMarshal(t *testing.T) {
 			in: []Series{
 				{
 					Target: "a",
-					Datapoints: []Point{
+					Datapoints: []schema.Point{
 						{123, 60},
 						{10000, 120},
 						{0, 180},
@@ -52,7 +53,7 @@ func TestJsonMarshal(t *testing.T) {
 				},
 				{
 					Target: "foo(bar)",
-					Datapoints: []Point{
+					Datapoints: []schema.Point{
 						{123.456, 10},
 						{123.7, 20},
 						{124.10, 30},
@@ -80,10 +81,10 @@ func TestJsonMarshal(t *testing.T) {
 }
 
 func BenchmarkSeriesJson(b *testing.B) {
-	pA := make([]Point, 1000, 1000)
+	pA := make([]schema.Point, 1000, 1000)
 	baseTs := 1500000000
 	for i := 0; i < 1000; i++ {
-		pA[i] = Point{float64(10000 * i), uint32(baseTs + 10*i)}
+		pA[i] = schema.Point{float64(10000 * i), uint32(baseTs + 10*i)}
 	}
 	data := []Series{
 		Series{
@@ -105,12 +106,12 @@ func BenchmarkSeriesJson(b *testing.B) {
 }
 
 func BenchmarkHttpRespJson(b *testing.B) {
-	pA := make([]Point, 1000, 1000)
-	pB := make([]Point, 1000, 1000)
+	pA := make([]schema.Point, 1000, 1000)
+	pB := make([]schema.Point, 1000, 1000)
 	baseTs := 1500000000
 	for i := 0; i < 1000; i++ {
-		pA[i] = Point{float64(10000 * i), uint32(baseTs + 10*i)}
-		pB[i] = Point{12.34 * float64(i), uint32(baseTs + 10*i)}
+		pA[i] = schema.Point{float64(10000 * i), uint32(baseTs + 10*i)}
+		pB[i] = schema.Point{12.34 * float64(i), uint32(baseTs + 10*i)}
 	}
 	data := []Series{
 		{
