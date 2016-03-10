@@ -9,11 +9,11 @@ import (
 
 	"time"
 
-	//"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
 )
@@ -35,15 +35,16 @@ var (
 	topic = flag.String("topic", "metrics", "NSQ topic")
 
 	//producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	nsqdTCPAddr = flag.String("nsqd-tcp-address", "localhost:4150", "nsqd TCP address")
-	logLevel    = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	orgs        = flag.Int("orgs", 2000, "how many orgs to simulate")
-	keysPerOrg  = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
-	steps       = flag.Int("steps", 1, "for each advancement of real time, how many advancements of fake data to simulate")
-	interval    = flag.Int("interval", 1, "interval in seconds")
-	offset      = flag.Int("offset", 0, "offset in seconds (how far back in time to start. you can catch up with >1 steps)")
-	statsdAddr  = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType  = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+	nsqdTCPAddr  = flag.String("nsqd-tcp-address", "localhost:4150", "nsqd TCP address")
+	logLevel     = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	orgs         = flag.Int("orgs", 2000, "how many orgs to simulate")
+	keysPerOrg   = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
+	speedup      = flag.Int("speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
+	metricPeriod = flag.Int("metricPeriod", 1, "period in seconds between metric points")
+	flushPeriod  = flag.Int("flushPeriod", 100, "period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant")
+	offset       = flag.String("offset", "0", "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc")
+	statsdAddr   = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdType   = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
 
 func main() {
@@ -84,7 +85,11 @@ func main() {
 	messagesSize = stats.NewMeter("metricpublisher.message_size", 0)
 	metricsPerMessage = stats.NewMeter("metricpublisher.metrics_per_message", 0)
 	publishDuration = stats.NewTimer("metricpublisher.publish_duration", 0)
-	run(*orgs, *keysPerOrg, *steps, *interval, *offset)
+	if (1000**metricPeriod)%*flushPeriod != 0 {
+		panic("metricPeriod must be cleanly divisible by flushPeriod")
+	}
+	off := int(dur.MustParseUsec("offset", *offset))
+	run(*orgs, *keysPerOrg, *metricPeriod, *flushPeriod, off, *speedup)
 }
 
 func Reslice(in []*schema.MetricData, size int) [][]*schema.MetricData {
@@ -143,30 +148,44 @@ func Publish(metrics []*schema.MetricData) error {
 	return nil
 }
 
-func run(orgs, keysPerOrg, steps, interval, offset int) {
-	var tickDuration time.Duration
-	// if the step is high, it's wasteful to wait a long time (a second or more) and then do big batches
-	// in that case it's better to flush messages smaller messages more continously
-	if steps >= 1000 {
-		tickDuration = time.Duration(1000*100*interval/steps) * time.Millisecond
-		steps = 100
-	} else {
-		tickDuration = time.Duration(100) * time.Millisecond
-	}
-	fmt.Println("tickDuration", tickDuration, "steps", steps)
+func run(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int) {
+	// examples:
+	// flushperiod - metricperiod - speedup -> data to flush each flush
+	// 100           1              1          1/10 -> flush 1 of 10 fractions
+	// 100           1              2          1/5 -> flush 1 of 5 fractions
+	// 1000          1              2          2x -> flush ratio 2
+	// 2000          1              1          2x -> flush ratio 2
+	// 2000          1              2          4x -> flush ratio 4
 
-	metricsPerStep := orgs * keysPerOrg
-	total := metricsPerStep * steps
-	metrics := make([]*schema.MetricData, total)
-	for s := 1; s <= steps; s++ {
+	if flushPeriod*speedup >= 1000*metricPeriod {
+		runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup)
+	} else {
+		runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup)
+	}
+}
+
+// we need to send multiples of the data at every flush
+func runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int) {
+	if flushPeriod*speedup%(1000*metricPeriod) != 0 {
+		panic(fmt.Sprintf("not a good fit. metricPeriod*1000 should fit in flushPeriod*speedup"))
+	}
+	ratio := flushPeriod * speedup / 1000 / metricPeriod
+	uniqueKeys := orgs * keysPerOrg
+	totalKeys := uniqueKeys * ratio
+	tickDur := time.Duration(flushPeriod) * time.Millisecond
+	tick := time.NewTicker(tickDur)
+	fmt.Printf("each %s, sending %d metrics. (sending the %d metrics %d times per flush, each time advancing them by %d s)\n", tickDur, totalKeys, uniqueKeys, ratio, metricPeriod)
+
+	metrics := make([]*schema.MetricData, totalKeys)
+	for r := 1; r <= ratio; r++ {
 		for o := 1; o <= orgs; o++ {
 			for k := 1; k <= keysPerOrg; k++ {
-				i := (s-1)*metricsPerStep + (o-1)*keysPerOrg + k - 1
+				i := (r-1)*orgs*keysPerOrg + (o-1)*keysPerOrg + k - 1
 				metrics[i] = &schema.MetricData{
 					Name:       fmt.Sprintf("some.id.of.a.metric.%d", k),
 					Metric:     "some.id.of.a.metric",
 					OrgId:      o,
-					Interval:   interval,
+					Interval:   metricPeriod,
 					Value:      0,
 					Unit:       "ms",
 					TargetType: "gauge",
@@ -176,16 +195,67 @@ func run(orgs, keysPerOrg, steps, interval, offset int) {
 			}
 		}
 	}
-	ts := time.Now().Add(-time.Duration(offset-interval) * time.Second).Unix()
-	tick := time.NewTicker(tickDuration)
+	mp := int64(metricPeriod)
+	ts := time.Now().Unix() - int64(offset) - mp
+
 	for range tick.C {
-		for i := range metrics {
-			if i%metricsPerStep == 0 {
-				ts += int64(interval)
+		for i := 0; i < len(metrics); i++ {
+			if i%uniqueKeys == 0 {
+				ts += mp
 			}
 			metrics[i].Time = ts
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
 		Publish(metrics)
+	}
+}
+
+// we need to send fractions of the data at every flush
+func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int) {
+	totalKeys := orgs * keysPerOrg
+	fractions := 1000 * metricPeriod / flushPeriod / speedup
+	if totalKeys%fractions != 0 {
+		panic(fmt.Sprintf("not a good fit: (%d orgs * %d keysPerOrg)=%d metrics but 1000*%d metricPeriod / %d flushPeriod / %d speedup = %d fractions)", orgs, keysPerOrg, totalKeys, metricPeriod, flushPeriod, speedup, fractions))
+	}
+	metricsPerFrac := totalKeys / fractions
+	tickDur := time.Duration(flushPeriod) * time.Millisecond
+	tick := time.NewTicker(tickDur)
+	fmt.Printf("each %s, sending %d out of %d metrics. timestamps increment by %d s every %d flushes)\n", tickDur, metricsPerFrac, totalKeys, metricPeriod, fractions)
+
+	metrics := make([]*schema.MetricData, totalKeys)
+	for o := 1; o <= orgs; o++ {
+		for k := 1; k <= keysPerOrg; k++ {
+			i := (o-1)*keysPerOrg + k - 1
+			metrics[i] = &schema.MetricData{
+				Name:       fmt.Sprintf("some.id.of.a.metric.%d", k),
+				Metric:     "some.id.of.a.metric",
+				OrgId:      o,
+				Interval:   metricPeriod,
+				Value:      0,
+				Unit:       "ms",
+				TargetType: "gauge",
+				Tags:       []string{"some_tag", "ok"},
+			}
+			metrics[i].SetId()
+		}
+	}
+
+	mp := int64(metricPeriod)
+	ts := time.Now().Unix() - int64(offset) - mp
+	endIndex, startIndex := 0, 0
+	for range tick.C {
+		startIndex = endIndex
+		if startIndex == len(metrics) {
+			startIndex = 0
+		}
+		endIndex = startIndex + metricsPerFrac
+		if startIndex == 0 {
+			ts += mp
+		}
+		for i := startIndex; i < endIndex; i++ {
+			metrics[i].Time = ts
+			metrics[i].Value = rand.Float64() * float64(i+1)
+		}
+		Publish(metrics[startIndex:endIndex])
 	}
 }
