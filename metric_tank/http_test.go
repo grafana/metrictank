@@ -93,6 +93,7 @@ func BenchmarkSeriesJson(b *testing.B) {
 			Interval:   10,
 		},
 	}
+	b.SetBytes(int64(len(pA) * 12))
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -125,8 +126,9 @@ func BenchmarkHttpRespJson(b *testing.B) {
 			Interval:   10,
 		},
 	}
-
+	b.SetBytes(int64(len(pA) * 2 * 12))
 	b.ResetTimer()
+
 	for n := 0; n < b.N; n++ {
 		js := bufPool.Get().([]byte)
 		js, err := graphiteJSON(js, data)

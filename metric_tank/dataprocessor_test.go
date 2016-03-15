@@ -931,23 +931,29 @@ func BenchmarkConsolidateSumRandWithNulls1M_100(b *testing.B) {
 var dummy []schema.Point
 
 func benchmarkConsolidate(fn func() []schema.Point, aggNum uint32, consolidator consolidation.Consolidator, b *testing.B) {
+	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		in := fn()
+		l = len(in)
 		b.StartTimer()
 		ret := consolidate(in, aggNum, consolidator)
 		dummy = ret
 	}
+	b.SetBytes(int64(l * 12))
 }
 
 func BenchmarkFix1M(b *testing.B) {
+	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		in := randFloats()
+		l = len(in)
 		b.StartTimer()
 		out := fix(in, 0, 1000001, 1)
 		dummy = out
 	}
+	b.SetBytes(int64(l * 12))
 }
 
 var result []Req
