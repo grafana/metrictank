@@ -74,6 +74,8 @@ var (
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
+	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
+
 	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
@@ -217,6 +219,8 @@ func main() {
 	clusterStatus = NewClusterStatus(*instance, *primaryNode)
 
 	initMetrics(stats)
+
+	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
@@ -310,7 +314,7 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, defCache, finalSettings))
+		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))

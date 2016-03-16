@@ -54,19 +54,17 @@ func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 	return b, nil
 }
 
-func get(store Store, defCache *DefCache, aggSettings []aggSetting) http.HandlerFunc {
+func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, defCache, aggSettings)
+		Get(w, req, store, defCache, aggSettings, logMinDur)
 	}
 }
 
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) {
 	pre := time.Now()
 	req.ParseForm()
-	log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
-		req.Method, req.Form.Get("from"), req.Form.Get("to"), req.Form["target"], req.Form.Get("maxDataPoints"))
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := req.Form.Get("maxDataPoints")
@@ -160,6 +158,10 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 		req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
 		reqs[i] = req
+	}
+	if (toUnix - fromUnix) >= logMinDur {
+		log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
+			req.Method, req.Form.Get("from"), req.Form.Get("to"), req.Form["target"], req.Form.Get("maxDataPoints"))
 	}
 
 	if logLevel < 2 {
