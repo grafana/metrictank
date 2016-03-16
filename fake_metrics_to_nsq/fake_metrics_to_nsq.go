@@ -43,6 +43,7 @@ var (
 	metricPeriod = flag.Int("metricPeriod", 1, "period in seconds between metric points")
 	flushPeriod  = flag.Int("flushPeriod", 100, "period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant")
 	offset       = flag.String("offset", "0", "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc")
+	stopAtNow    = flag.Bool("stop-at-now", false, "stop program instead of starting to write data with future timestamps")
 	statsdAddr   = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType   = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
@@ -199,9 +200,14 @@ func runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup 
 	ts := time.Now().Unix() - int64(offset) - mp
 
 	for range tick.C {
+		now := time.Now().Unix()
 		for i := 0; i < len(metrics); i++ {
 			if i%uniqueKeys == 0 {
 				ts += mp
+				if ts > now && *stopAtNow {
+					return
+				}
+
 			}
 			metrics[i].Time = ts
 			metrics[i].Value = rand.Float64() * float64(i+1)
@@ -244,6 +250,7 @@ func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int
 	ts := time.Now().Unix() - int64(offset) - mp
 	endIndex, startIndex := 0, 0
 	for range tick.C {
+		now := time.Now().Unix()
 		startIndex = endIndex
 		if startIndex == len(metrics) {
 			startIndex = 0
@@ -251,6 +258,9 @@ func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int
 		endIndex = startIndex + metricsPerFrac
 		if startIndex == 0 {
 			ts += mp
+			if ts > now && *stopAtNow {
+				return
+			}
 		}
 		for i := startIndex; i < endIndex; i++ {
 			metrics[i].Time = ts

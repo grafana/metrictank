@@ -42,3 +42,13 @@ obviously you need to use fewer metrics to do this.
 ```
 ./fake_metrics_to_nsq -keys-per-org 1 -orgs 1 -statsd-addr statsdaemon:8125 -nsqd-tcp-address nsqd:4150 -offset 1y -speedup 40000
 ```
+
+
+or a workload where you want the last days' worth of data to be filled but you also want a good amount of total metrics,
+this gives a realistic workload for testing GC and such:
+
+```
+./fake_metrics_to_nsq -keys-per-org 100 -orgs 10 -statsd-addr statsdaemon:8125 -nsqd-tcp-address nsqd:4150 -offset 1d -speedup 100 -stop-at-now
+./fake_metrics_to_nsq -keys-per-org 100 -orgs 10 -statsd-addr statsdaemon:8125 -nsqd-tcp-address nsqd:4150
+```
+
