@@ -287,7 +287,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
 			}
-			iters = append(iters, NewIter(iter, "cassandra month=%d t0=%d", outcome.month, ts))
+			iters = append(iters, NewIter(iter, true))
 		}
 		cassChunksPerRow.Value(chunks)
 		err := outcome.i.Close()

@@ -335,7 +335,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	iters := make([]Iter, 0, a.NumChunks)
 	for oldestPos != newestPos {
 		chunk := a.getChunk(oldestPos)
-		iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
+		iters = append(iters, NewIter(chunk.Iter(), false))
 		oldestPos++
 		if oldestPos >= int(a.NumChunks) {
 			oldestPos = 0
@@ -343,7 +343,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	}
 	// add the last chunk
 	chunk := a.getChunk(oldestPos)
-	iters = append(iters, NewIter(chunk.Iter(), "mem %s", chunk))
+	iters = append(iters, NewIter(chunk.Iter(), false))
 
 	memToIterDuration.Value(time.Now().Sub(pre))
 	return oldestChunk.T0, iters

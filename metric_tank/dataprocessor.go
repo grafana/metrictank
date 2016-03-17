@@ -346,7 +346,11 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 			}
 		}
 		if logLevel < 2 {
-			log.Debug("DP getSeries: iter %s  values good/total %d/%d", iter.cmt, good, total)
+			if iter.cass {
+				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
+			} else {
+				log.Debug("DP getSeries: iter mem %d values good/total %d/%d", iter.T0, good, total)
+			}
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
