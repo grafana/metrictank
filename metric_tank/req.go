@@ -8,7 +8,7 @@ import (
 type Req struct {
 	// these fields can be set straight away:
 	key          string // metric key, often same as target
-	target       string // original input string like consolidateBy(key,'sum')
+	target       string // original input string like consolidateBy(key,'sum'). used in output so that graphite doesn't get confused
 	from         uint32
 	to           uint32
 	maxPoints    uint32

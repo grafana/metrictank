@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
@@ -12,6 +14,8 @@ import (
 	"sync"
 	"time"
 )
+
+var errMetricNotFound = errors.New("metric not found")
 
 var bufPool = sync.Pool{
 	New: func() interface{} { return make([]byte, 0) },
@@ -56,13 +60,19 @@ func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 
 func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, defCache, aggSettings, logMinDur)
+		Get(w, req, store, defCache, aggSettings, logMinDur, false)
+	}
+}
+
+func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		Get(w, req, store, defCache, aggSettings, logMinDur, true)
 	}
 }
 
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	req.ParseForm()
 
@@ -94,11 +104,20 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	from := req.Form.Get("from")
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if err == nil {
+			fromUnix = uint32(fromUnixInt)
+		} else {
+			if len(from) == 1 || from[0] != '-' {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			dur, err := dur.ParseUNsec(from[1:])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			fromUnix = uint32(now.Add(-time.Duration(dur) * time.Second).Unix())
 		}
-		fromUnix = uint32(fromUnixInt)
 	}
 	to := req.Form.Get("to")
 	if to != "" {
@@ -133,6 +152,16 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			}
 			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
 			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
+		}
+
+		// if we're serving the legacy graphite api, set the id field by looking up the graphite target
+		if legacy {
+			def, ok := defCache.GetByKey(id)
+			if !ok {
+				http.Error(w, errMetricNotFound.Error(), http.StatusInternalServerError)
+				return
+			}
+			id = def.Id
 		}
 
 		if consolidateBy == "" {

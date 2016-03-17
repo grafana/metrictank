@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
@@ -22,13 +21,15 @@ import (
 
 type DefCache struct {
 	sync.RWMutex
-	defs      map[string]*schema.MetricDefinition
+	defsById  map[string]*schema.MetricDefinition // by hashed id
+	defsByKey map[string]*schema.MetricDefinition // by graphite key or "Name" in the def
 	defsStore metricdef.Defs
 }
 
 func NewDefCache(defsStore metricdef.Defs) *DefCache {
 	d := &DefCache{
-		defs:      make(map[string]*schema.MetricDefinition),
+		defsById:  make(map[string]*schema.MetricDefinition),
+		defsByKey: make(map[string]*schema.MetricDefinition),
 		defsStore: defsStore,
 	}
 	d.Backfill()
@@ -46,7 +47,8 @@ func (dc *DefCache) Backfill() {
 			total += len(met)
 			dc.Lock()
 			for _, def := range met {
-				dc.defs[def.Id] = def
+				dc.defsById[def.Id] = def
+				dc.defsByKey[def.Name] = def
 			}
 			dc.Unlock()
 		}
@@ -70,7 +72,7 @@ func (dc *DefCache) Backfill() {
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
 	dc.Lock()
-	mdef, ok := dc.defs[metric.Id]
+	mdef, ok := dc.defsById[metric.Id]
 	dc.Unlock()
 	if ok {
 		//If the time diff between this datapoint and the lastUpdate
@@ -97,15 +99,23 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	} else {
 		metricsToEsOK.Inc(1)
 		dc.Lock()
-		dc.defs[mdef.Id] = mdef
+		dc.defsById[mdef.Id] = mdef
+		dc.defsByKey[mdef.Name] = mdef
 		dc.Unlock()
 	}
 	esPutDuration.Value(time.Now().Sub(pre))
 }
 
-func (dc *DefCache) Get(key string) (*schema.MetricDefinition, bool) {
+func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	dc.RLock()
-	def, ok := dc.defs[key]
+	def, ok := dc.defsById[id]
+	dc.RUnlock()
+	return def, ok
+}
+
+func (dc *DefCache) GetByKey(key string) (*schema.MetricDefinition, bool) {
+	dc.RLock()
+	def, ok := dc.defsByKey[key]
 	dc.RUnlock()
 	return def, ok
 }
@@ -118,7 +128,7 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 
 	if !ok {
 		metricDefCacheMiss.Inc(1)
-		return errors.New("not found")
+		return errMetricNotFound
 	} else {
 		req.rawInterval = uint32(def.Interval)
 		metricDefCacheHit.Inc(1)
