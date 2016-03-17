@@ -259,11 +259,11 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	bufPool.Put(js[:0])
 
 	w.Header().Set("Content-Type", "application/json")
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
+	bufPool.Put(js[:0])
 }
 
 // report ApplicationStatus for use by loadBalancer healthChecks.
