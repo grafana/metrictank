@@ -261,6 +261,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
 	bufPool.Put(js[:0])
