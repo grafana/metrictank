@@ -68,7 +68,7 @@ func TestJsonMarshal(t *testing.T) {
 	}
 	js := bufPool.Get().([]byte)
 	for _, c := range cases {
-		js, err := graphiteJSON(js[:0], c.in)
+		js, err := graphiteRaintankJSON(js[:0], c.in)
 		if err != nil {
 			panic(err)
 		}
@@ -98,7 +98,7 @@ func BenchmarkSeriesJson(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		js := bufPool.Get().([]byte)
-		js, err := graphiteJSON(js, data)
+		js, err := graphiteRaintankJSON(js, data)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}
@@ -131,7 +131,7 @@ func BenchmarkHttpRespJson(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		js := bufPool.Get().([]byte)
-		js, err := graphiteJSON(js, data)
+		js, err := graphiteRaintankJSON(js, data)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}

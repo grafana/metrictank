@@ -47,7 +47,38 @@ func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
 	return b, nil
 }
 
+// regular graphite output
 func graphiteJSON(b []byte, series []Series) ([]byte, error) {
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"target":"`...)
+		b = append(b, s.Target...)
+		b = append(b, `","datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
+		}
+		if len(s.Datapoints) != 0 {
+			b = b[:len(b)-1] // cut last comma
+		}
+		b = append(b, `]},`...)
+	}
+	if len(series) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+}
+
+// data output for graphite raintank target -> Target, datapoints -> Datapoints, and adds Interval field
+func graphiteRaintankJSON(b []byte, series []Series) ([]byte, error) {
 	b = append(b, '[')
 	for _, s := range series {
 		b = append(b, `{"Target":"`...)
@@ -253,7 +284,11 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	}
 
 	js := bufPool.Get().([]byte)
-	js, err = graphiteJSON(js, out)
+	if legacy {
+		js, err = graphiteJSON(js, out)
+	} else {
+		js, err = graphiteRaintankJSON(js, out)
+	}
 	if err != nil {
 		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
