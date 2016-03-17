@@ -135,3 +135,15 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 	}
 	return nil
 }
+
+func (dc *DefCache) List() []*schema.MetricDefinition {
+	dc.RLock()
+	out := make([]*schema.MetricDefinition, len(dc.defsByKey))
+	i := 0
+	for _, md := range dc.defsByKey {
+		out[i] = md
+		i++
+	}
+	dc.RUnlock()
+	return out
+}

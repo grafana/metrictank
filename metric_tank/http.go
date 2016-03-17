@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,25 @@ type Series struct {
 	Target     string
 	Datapoints []schema.Point
 	Interval   uint32
+}
+
+func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
+	names := make([]string, len(defs))
+	for i := 0; i < len(defs); i++ {
+		names[i] = defs[i].Name
+	}
+	sort.Strings(names)
+	b = append(b, '[')
+	for _, name := range names {
+		b = append(b, '"')
+		b = append(b, name...)
+		b = append(b, `",`...)
+	}
+	if len(defs) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
 }
 
 func graphiteJSON(b []byte, series []Series) ([]byte, error) {
@@ -58,6 +78,21 @@ func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 	return b, nil
 }
 
+func IndexJson(defCache *DefCache) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		list := defCache.List()
+		js := bufPool.Get().([]byte)
+		js, err := listJSON(js, list)
+		if err != nil {
+			log.Error(0, err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(js)
+		bufPool.Put(js[:0])
+	}
+}
 func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, false)

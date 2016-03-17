@@ -48,3 +48,4 @@ when one primary is down you need to be careful about when to promote a secondar
 
 * `/render` has a very, very limited subset of the graphite render api. basically you can specify targets by their graphite key, set from, to and maxDataPoints, and use consolidateBy.
 No other function or parameter is currently supported.  Also we don't check org-id so don't expose this publically
+* `/metrics/index.json` is like graphite.  Don't expose this publically
