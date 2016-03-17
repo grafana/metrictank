@@ -125,9 +125,12 @@ var (
 	metricsToEsFail   met.Count
 	esPutDuration     met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 	clusterPrimary    met.Gauge
+	clusterPromoWait  met.Gauge
 	gcNum             met.Gauge // go GC
 	gcDur             met.Gauge // go GC
 	gcMetric          met.Count // metrics GC
+
+	promotionReadyAtChan chan uint32
 )
 
 func init() {
@@ -218,6 +221,7 @@ func main() {
 	// set our cluster state before we start consuming messages.
 	clusterStatus = NewClusterStatus(*instance, *primaryNode)
 
+	promotionReadyAtChan = make(chan uint32)
 	initMetrics(stats)
 
 	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
@@ -233,6 +237,7 @@ func main() {
 
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]aggSetting, 0)
+	highestChunkSpan := chunkSpan
 	for _, v := range set {
 		if v == "" {
 			continue
@@ -248,6 +253,7 @@ func main() {
 		if (month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
+		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
 		ready := true
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
@@ -308,6 +314,9 @@ func main() {
 			log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 		}
 		log.Info("consumer connected to nsqlookupd")
+
+		promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+
 	}()
 
 	InitCluster(metrics, stats)
@@ -378,6 +387,7 @@ func initMetrics(stats met.Backend) {
 	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
 	esPutDuration = stats.NewTimer("es_put_duration", 0)
 	clusterPrimary = stats.NewGauge("cluster.primary", 0)
+	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
 	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
 
@@ -385,11 +395,12 @@ func initMetrics(stats met.Backend) {
 	go func() {
 		currentPoints := 0
 		var m runtime.MemStats
+		var promotionReadyAtTs uint32
 
 		ticker := time.Tick(time.Duration(1) * time.Second)
 		for {
 			select {
-			case <-ticker:
+			case now := <-ticker:
 				points.Value(int64(currentPoints))
 				runtime.ReadMemStats(&m)
 				alloc.Value(int64(m.Alloc))
@@ -406,8 +417,20 @@ func initMetrics(stats met.Backend) {
 				clusterPrimary.Value(px)
 				cassWriters.Value(int64(*cassandraWriteConcurrency))
 				cassWriteQueueSize.Value(int64(*cassandraWriteQueueSize))
+				unix := uint32(now.Unix())
+				if unix >= promotionReadyAtTs {
+					if promotionReadyAtTs == 0 {
+						// not set yet. operator should hold off
+						clusterPromoWait.Value(1)
+					} else {
+						clusterPromoWait.Value(0)
+					}
+				} else {
+					clusterPromoWait.Value(int64(promotionReadyAtTs - unix))
+				}
 			case update := <-totalPoints:
 				currentPoints += update
+			case promotionReadyAtTs = <-promotionReadyAtChan:
 			}
 		}
 	}()
