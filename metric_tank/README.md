@@ -12,12 +12,14 @@
     * from is inclusive, to is exclusive.
     * so from=x, to=y returns data that can include x and y-1 but not y.
     * from defaults to now-24h, to to now+1.
+    * from can also be a human friendly pattern like -10min or -7d
 
 * the response will id the series by the target used to request them
 
 note:
 * it just serves up the data that it has, in timestamp ascending order. it does no effort to try to fill in gaps.
 * no support for wildcards, patterns, "magic" time specs like "-10min" etc.
+* it is assumed that authorisation (by org-id) has already been performed.  (the graphite-raintank plugin does this)
 
 ## other useful endpoints exemplified through curl commands:
 
@@ -40,3 +42,10 @@ when one primary is down you need to be careful about when to promote a secondar
 * after you see the "starting data consumption" log message for a primary, data consomuption starts. this timestamp is important.
 * look at your largest chunkSpan. secondary can only be promoted when a new interval starts for the largest chunkSpan. intervals start when clock unix timestamp divides without remainder by chunkSpan. How long you should wait is also shown (in seconds) via the `cluster.promotion_wait` metric.
 * of course there are other factors: any running primary should be depromoted and have saved its data to cassandra, all metricPersist message should have made it through NSQ into the about-to-be-promoted instance.
+
+
+# graphite-api
+
+* `/render` has a very, very limited subset of the graphite render api. basically you can specify targets by their graphite key, set from, to and maxDataPoints, and use consolidateBy.
+No other function or parameter is currently supported.  Also we don't check org-id so don't expose this publically
+* `/metrics/index.json` is like graphite.  Don't expose this publically

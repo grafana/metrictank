@@ -1,17 +1,22 @@
 package main
 
 import (
+	"errors"
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+var errMetricNotFound = errors.New("metric not found")
 
 var bufPool = sync.Pool{
 	New: func() interface{} { return make([]byte, 0) },
@@ -23,7 +28,57 @@ type Series struct {
 	Interval   uint32
 }
 
+func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
+	names := make([]string, len(defs))
+	for i := 0; i < len(defs); i++ {
+		names[i] = defs[i].Name
+	}
+	sort.Strings(names)
+	b = append(b, '[')
+	for _, name := range names {
+		b = append(b, '"')
+		b = append(b, name...)
+		b = append(b, `",`...)
+	}
+	if len(defs) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+}
+
+// regular graphite output
 func graphiteJSON(b []byte, series []Series) ([]byte, error) {
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"target":"`...)
+		b = append(b, s.Target...)
+		b = append(b, `","datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
+		}
+		if len(s.Datapoints) != 0 {
+			b = b[:len(b)-1] // cut last comma
+		}
+		b = append(b, `]},`...)
+	}
+	if len(series) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+}
+
+// data output for graphite raintank target -> Target, datapoints -> Datapoints, and adds Interval field
+func graphiteRaintankJSON(b []byte, series []Series) ([]byte, error) {
 	b = append(b, '[')
 	for _, s := range series {
 		b = append(b, `{"Target":"`...)
@@ -54,15 +109,36 @@ func graphiteJSON(b []byte, series []Series) ([]byte, error) {
 	return b, nil
 }
 
+func IndexJson(defCache *DefCache) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		list := defCache.List()
+		js := bufPool.Get().([]byte)
+		js, err := listJSON(js, list)
+		if err != nil {
+			log.Error(0, err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(js)
+		bufPool.Put(js[:0])
+	}
+}
 func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, defCache, aggSettings, logMinDur)
+		Get(w, req, store, defCache, aggSettings, logMinDur, false)
+	}
+}
+
+func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		Get(w, req, store, defCache, aggSettings, logMinDur, true)
 	}
 }
 
 // note: we don't normalize/quantize/fill-unknowns
 // we just serve what we know
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	req.ParseForm()
 
@@ -94,11 +170,20 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	from := req.Form.Get("from")
 	if from != "" {
 		fromUnixInt, err := strconv.Atoi(from)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if err == nil {
+			fromUnix = uint32(fromUnixInt)
+		} else {
+			if len(from) == 1 || from[0] != '-' {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			dur, err := dur.ParseUNsec(from[1:])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			fromUnix = uint32(now.Add(-time.Duration(dur) * time.Second).Unix())
 		}
-		fromUnix = uint32(fromUnixInt)
 	}
 	to := req.Form.Get("to")
 	if to != "" {
@@ -133,6 +218,16 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			}
 			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
 			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
+		}
+
+		// if we're serving the legacy graphite api, set the id field by looking up the graphite target
+		if legacy {
+			def, ok := defCache.GetByKey(id)
+			if !ok {
+				http.Error(w, errMetricNotFound.Error(), http.StatusInternalServerError)
+				return
+			}
+			id = def.Id
 		}
 
 		if consolidateBy == "" {
@@ -189,17 +284,22 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	}
 
 	js := bufPool.Get().([]byte)
-	js, err = graphiteJSON(js, out)
+	if legacy {
+		js, err = graphiteJSON(js, out)
+	} else {
+		js, err = graphiteRaintankJSON(js, out)
+	}
 	if err != nil {
 		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	bufPool.Put(js[:0])
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
+	bufPool.Put(js[:0])
 }
 
 // report ApplicationStatus for use by loadBalancer healthChecks.
