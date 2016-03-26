@@ -318,6 +318,25 @@ func TestFix(t *testing.T) {
 			10,
 			[]schema.Point{{1, 10}, {2, 20}, {math.NaN(), 30}},
 		},
+		{
+			// interval > from-to span with empty input.  saw this one in prod
+			// 1458966240 divides by 60 but is too low
+			// 1458966300 divides by 60 but is too high
+			// so there is no point in range, so output must be empty
+			[]schema.Point{},
+			1458966244, // 1458966240 divides by 60 but is too low
+			1458966274, // 1458966300 divides by 60 but is too high
+			60,
+			[]schema.Point{},
+		},
+		{
+			// let's try a similar case but now there is a point in range
+			[]schema.Point{},
+			1458966234,
+			1458966264,
+			60,
+			[]schema.Point{{math.NaN(), 1458966240}},
+		},
 	}
 
 	for i, c := range cases {
