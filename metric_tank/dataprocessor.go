@@ -45,6 +45,11 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
 	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
 	lastPoint := (to - 1) - ((to - 1) % interval)
+
+	if lastPoint < start {
+		// the requested range is too narrow for the requested interval
+		return []schema.Point{}
+	}
 	out := make([]schema.Point, (lastPoint-start)/interval+1)
 
 	// i iterates in. o iterates out. t is the ts we're looking to fill.
