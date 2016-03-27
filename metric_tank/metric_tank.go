@@ -15,6 +15,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
@@ -74,6 +75,11 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+
+	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
+	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
+	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
+	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 10000000, "if this many bytes allocated, trigger a profile")
 
 	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
 
@@ -264,6 +270,18 @@ func main() {
 			}
 		}
 		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
+	}
+	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
+	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
+	if proftrigFreq > 0 {
+		errors := make(chan error)
+		trigger, _ := heap.New(*proftrigPath, *proftrigHeapThresh, proftrigMinDiff, time.Duration(proftrigFreq)*time.Second, errors)
+		go func() {
+			for e := range errors {
+				log.Error(0, "profiletrigger heap: %s", e)
+			}
+		}()
+		go trigger.Run()
 	}
 
 	store, err := NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency)
