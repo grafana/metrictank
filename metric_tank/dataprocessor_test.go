@@ -220,6 +220,40 @@ func TestAggEvery(t *testing.T) {
 	}
 }
 
+func TestDivide(t *testing.T) {
+	cases := []struct {
+		a   []schema.Point
+		b   []schema.Point
+		out []schema.Point
+	}{
+		{
+			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{{2, 10}, {2, 20}, {1, 30}},
+			[]schema.Point{{0.5, 10}, {1, 20}, {3, 30}},
+		},
+		{
+			[]schema.Point{{100, 10}, {5000, 20}, {150.5, 30}, {150.5, 40}},
+			[]schema.Point{{2, 10}, {0.5, 20}, {2, 30}, {0.5, 40}},
+			[]schema.Point{{50, 10}, {10000, 20}, {75.25, 30}, {301, 40}},
+		},
+	}
+	for i, c := range cases {
+		got := divide(c.a, c.b)
+
+		if len(c.out) != len(got) {
+			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.out, got)
+		}
+		for j, pgot := range got {
+			pexp := c.out[j]
+			gotNan := math.IsNaN(pgot.Val)
+			expNan := math.IsNaN(pexp.Val)
+			if gotNan != expNan || (!gotNan && pgot.Val != pexp.Val) || pgot.Ts != pexp.Ts {
+				t.Fatalf("output for testcase %d at point %d mismatch: expected: %v, got: %v", i, j, c.out, got)
+			}
+		}
+	}
+}
+
 type fixc struct {
 	in       []schema.Point
 	from     uint32
@@ -970,6 +1004,20 @@ func BenchmarkFix1M(b *testing.B) {
 		l = len(in)
 		b.StartTimer()
 		out := fix(in, 0, 1000001, 1)
+		dummy = out
+	}
+	b.SetBytes(int64(l * 12))
+}
+
+func BenchmarkDivide1M(b *testing.B) {
+	var l int
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		ina := randFloats()
+		inb := randFloats()
+		l = len(ina)
+		b.StartTimer()
+		out := divide(ina, inb)
 		dummy = out
 	}
 	b.SetBytes(int64(l * 12))
