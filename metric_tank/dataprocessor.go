@@ -98,12 +98,10 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	if len(pointsA) != len(pointsB) {
 		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
 	}
-	out := make([]schema.Point, len(pointsA))
-	for i, a := range pointsA {
-		b := pointsB[i]
-		out[i] = schema.Point{a.Val / b.Val, a.Ts}
+	for i := range pointsA {
+		pointsA[i].Val /= pointsB[i].Val
 	}
-	return out
+	return pointsA
 }
 
 func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Consolidator) []schema.Point {
