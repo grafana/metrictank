@@ -224,7 +224,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		if legacy {
 			def, ok := defCache.GetByKey(id)
 			if !ok {
-				http.Error(w, errMetricNotFound.Error(), http.StatusInternalServerError)
+				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
 			id = def.Id
