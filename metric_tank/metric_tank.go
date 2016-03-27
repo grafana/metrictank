@@ -260,7 +260,7 @@ func main() {
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
 			if err != nil {
-				log.Fatal(4, "aggsettigs ready: %s", err)
+				log.Fatal(4, "aggsettings ready: %s", err)
 			}
 		}
 		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
