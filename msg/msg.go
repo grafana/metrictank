@@ -13,6 +13,10 @@ import (
 	"github.com/raintank/raintank-metric/schema"
 )
 
+var errTooSmall = errors.New("too small")
+var errFmtBinWriteFailed = "binary write failed: %q"
+var errFmtUnknownFormat = "unknown format %d"
+
 type MetricData struct {
 	Id       int64
 	Metrics  []*schema.MetricData
@@ -48,7 +52,7 @@ func MetricDataFromMsg(msg []byte) (MetricData, error) {
 	}
 
 	if len(msg) < 9 {
-		return m, errors.New("msg too small")
+		return m, errTooSmall
 	}
 
 	buf := bytes.NewReader(msg[1:9])
@@ -57,7 +61,7 @@ func MetricDataFromMsg(msg []byte) (MetricData, error) {
 
 	format := Format(msg[0])
 	if format != FormatMetricDataArrayJson && format != FormatMetricDataArrayMsgp {
-		return m, errors.New("unknown format")
+		return m, fmt.Errorf(errFmtUnknownFormat, format)
 	}
 	m.Format = format
 	return m, nil
@@ -85,11 +89,11 @@ func CreateMsg(metrics []*schema.MetricData, id int64, version Format) ([]byte, 
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, uint8(version))
 	if err != nil {
-		return nil, fmt.Errorf("binary.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	err = binary.Write(buf, binary.BigEndian, id)
 	if err != nil {
-		return nil, fmt.Errorf("binary.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	var msg []byte
 	switch version {
@@ -99,14 +103,14 @@ func CreateMsg(metrics []*schema.MetricData, id int64, version Format) ([]byte, 
 		m := schema.MetricDataArray(metrics)
 		msg, err = m.MarshalMsg(nil)
 	default:
-		return nil, errors.New("unsupported version")
+		return nil, fmt.Errorf(errFmtUnknownFormat, version)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("Failed to marshal metrics payload: %s", err)
 	}
 	_, err = buf.Write(msg)
 	if err != nil {
-		return nil, fmt.Errorf("buf.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	return buf.Bytes(), nil
 }
@@ -117,7 +121,7 @@ func ProbeEventFromMsg(msg []byte) (*ProbeEvent, error) {
 		Msg:   msg,
 	}
 	if len(msg) < 9 {
-		return e, errors.New("msg too small")
+		return e, errTooSmall
 	}
 
 	buf := bytes.NewReader(msg[1:9])
@@ -126,7 +130,7 @@ func ProbeEventFromMsg(msg []byte) (*ProbeEvent, error) {
 
 	format := Format(msg[0])
 	if format != FormatProbeEventJson && format != FormatProbeEventMsgp {
-		return e, errors.New("unknown format")
+		return e, fmt.Errorf(errFmtUnknownFormat, format)
 	}
 	e.Format = format
 	return e, nil
@@ -158,7 +162,7 @@ func (e *ProbeEvent) DecodeProbeEvent() error {
 	case FormatProbeEventMsgp:
 		_, err = e.Event.UnmarshalMsg(e.Msg[9:])
 	default:
-		return fmt.Errorf("unrecognized format %d", e.Msg[0])
+		return fmt.Errorf(errFmtUnknownFormat, e.Msg[0])
 	}
 	if err != nil {
 		return fmt.Errorf("ERROR: failure to unmarshal message body via format %q: %s", e.Format, err)
@@ -176,11 +180,11 @@ func CreateProbeEventMsg(event *schema.ProbeEvent, id int64, version Format) ([]
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, uint8(version))
 	if err != nil {
-		return nil, fmt.Errorf("binary.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	err = binary.Write(buf, binary.BigEndian, id)
 	if err != nil {
-		return nil, fmt.Errorf("binary.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	var msg []byte
 	switch version {
@@ -189,14 +193,14 @@ func CreateProbeEventMsg(event *schema.ProbeEvent, id int64, version Format) ([]
 	case FormatProbeEventMsgp:
 		msg, err = event.MarshalMsg(nil)
 	default:
-		return nil, errors.New("unsupported version")
+		return nil, fmt.Errorf(errFmtUnknownFormat, version)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("Failed to marshal metrics payload: %s", err)
 	}
 	_, err = buf.Write(msg)
 	if err != nil {
-		return nil, fmt.Errorf("buf.Write failed: %s", err.Error())
+		return nil, fmt.Errorf(errFmtBinWriteFailed, err)
 	}
 	return buf.Bytes(), nil
 }

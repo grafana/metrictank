@@ -32,6 +32,10 @@ const table_schema = `CREATE TABLE IF NOT EXISTS raintank.metric (
     AND read_repair_chance = 0.0
     AND dclocal_read_repair_chance = 0`
 
+var errChunkTooSmall = errors.New("unpossibly small chunk in cassandra")
+var errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
+var errStartBeforeEnd = errors.New("start must be before end.")
+
 /*
 https://godoc.org/github.com/gocql/gocql#Session
 Session is the interface used by users to interact with the database.
@@ -195,7 +199,7 @@ func (c *cassandraStore) processReadQueue() {
 func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 	iters := make([]Iter, 0)
 	if start > end {
-		return iters, fmt.Errorf("start must be before end.")
+		return iters, errStartBeforeEnd
 	}
 
 	crrs := make([]*ChunkReadRequest, 0)
@@ -271,14 +275,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 			chunks += 1
 			chunkSizeAtLoad.Value(int64(len(b)))
 			if len(b) < 2 {
-				err := errors.New("unpossibly small chunk in cassandra")
-				log.Error(3, err.Error())
-				return iters, err
+				log.Error(3, errChunkTooSmall.Error())
+				return iters, errChunkTooSmall
 			}
 			if Format(b[0]) != FormatStandardGoTsz {
-				err := errors.New("unrecognized chunk format in cassandra")
-				log.Error(3, err.Error())
-				return iters, err
+				log.Error(3, errUnknownChunkFormat.Error())
+				return iters, errUnknownChunkFormat
 			}
 			iter, err := tsz.NewIterator(b[1:])
 			if err != nil {

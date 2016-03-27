@@ -1,9 +1,13 @@
 package schema
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+var errInvalidEvent = errors.New("invalid event definition")
+var errFmtInvalidSeverity = "invalid severity level %q"
 
 //go:generate msgp
 
@@ -20,13 +24,13 @@ type ProbeEvent struct {
 
 func (e *ProbeEvent) Validate() error {
 	if e.EventType == "" || e.OrgId == 0 || e.Source == "" || e.Timestamp == 0 || e.Message == "" {
-		return fmt.Errorf("event definition not valid")
+		return errInvalidEvent
 	}
 	switch strings.ToLower(e.Severity) {
 	case "info", "ok", "warn", "error", "warning", "critical":
 		// nop
 	default:
-		return fmt.Errorf("'%s' is not a valid severity level", e.Severity)
+		return fmt.Errorf(errFmtInvalidSeverity, e.Severity)
 	}
 	return nil
 }
