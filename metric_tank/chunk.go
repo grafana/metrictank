@@ -10,7 +10,6 @@ import (
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
 	*tsz.Series
-	T0        uint32
 	LastTs    uint32 // last TS seen, not computed or anything
 	NumPoints uint32
 	Saved     bool
@@ -21,7 +20,7 @@ type Chunk struct {
 func NewChunk(t0 uint32) *Chunk {
 	// we must set LastWrite here as well to make sure a new Chunk doesn't get immediately
 	// garbage collected right after creating it, before we can push to it
-	return &Chunk{tsz.New(t0), t0, 0, 0, false, false, uint32(time.Now().Unix())}
+	return &Chunk{tsz.New(t0), 0, 0, false, false, uint32(time.Now().Unix())}
 }
 
 func (c *Chunk) String() string {
