@@ -30,37 +30,6 @@ type AggMetric struct {
 	ttl             uint32
 }
 
-// re-order the chunks with the oldest at start of the list and newest at the end.
-// this is to support increasing the chunkspan at startup.
-func (a *AggMetric) GrowNumChunks(numChunks uint32) {
-	a.Lock()
-	defer a.Unlock()
-	a.NumChunks = numChunks
-
-	if uint32(len(a.Chunks)) < a.NumChunks {
-		// the circular buffer has never reached the original max size,
-		// so it must still be ordered.
-		return
-	}
-
-	orderdChunks := make([]*Chunk, len(a.Chunks))
-	// start by writting the oldest chunk first, then each chunk in turn.
-	pos := a.CurrentChunkPos - 1
-	if pos < 0 {
-		pos += len(a.Chunks)
-	}
-	for i := 0; i < len(a.Chunks); i++ {
-		orderdChunks[i] = a.Chunks[pos]
-		pos++
-		if pos >= len(a.Chunks) {
-			pos = 0
-		}
-	}
-	a.Chunks = orderdChunks
-	a.CurrentChunkPos = len(a.Chunks) - 1
-	return
-}
-
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
 func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...aggSetting) *AggMetric {
