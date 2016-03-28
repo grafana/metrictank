@@ -94,6 +94,7 @@ func InitElasticsearch(addr, user, pass string, w chan *BulkSaveStatus, bulkMaxD
 						"tag_values": {
 							"mapping": {
 								"type": "string",
+								"index": "not_analyzed",
 								"norms": {
 									"enabled": false
 								},
