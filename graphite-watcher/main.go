@@ -45,7 +45,7 @@ var debug bool
 
 func init() {
 	flag.StringVar(&esAddr, "es-addr", "localhost:9200", "elasticsearch address")
-	flag.StringVar(&esIndex, "es-index", "metrictank", "elasticsearch index to query")
+	flag.StringVar(&esIndex, "es-index", "metric", "elasticsearch index to query")
 	flag.StringVar(&env, "env", "", "environment for metrics")
 	flag.StringVar(&carbonAddr, "carbon", "", "address to send metrics to")
 	flag.StringVar(&graphAddr, "graphite", "", "graphite address")
