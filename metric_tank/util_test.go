@@ -14,10 +14,10 @@ func TestLCM(t *testing.T) {
 		{[]uint32{40, 60}, 120},
 		{[]uint32{1, 3}, 3},
 	}
-	for _, c := range cases {
+	for i, c := range cases {
 		out := lcm(c.in)
 		if out != c.out {
-			t.Errorf("%s -> expected %d, got %d", c.out, out)
+			t.Errorf("case %d -> expected %d, got %d", i, c.out, out)
 		}
 	}
 }
