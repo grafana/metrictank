@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/Dieterbe/go-metrics"
+	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"log"
 	"math/rand"
@@ -36,18 +37,37 @@ var nullPoints = metrics.NewCounter()
 
 var env string
 var esAddr string
+var esIndex string
 var carbonAddr string
 var graphAddr string
 var listenAddr string
 var debug bool
 
 func init() {
+	flag.StringVar(&esAddr, "es-addr", "localhost:9200", "elasticsearch address")
+	flag.StringVar(&esIndex, "es-index", "metrictank", "elasticsearch index to query")
 	flag.StringVar(&env, "env", "", "environment for metrics")
-	flag.StringVar(&esAddr, "es", "", "elasticsearch address")
 	flag.StringVar(&carbonAddr, "carbon", "", "address to send metrics to")
 	flag.StringVar(&graphAddr, "graphite", "", "graphite address")
 	flag.StringVar(&listenAddr, "listen", ":6060", "http listener address.")
 	flag.BoolVar(&debug, "debug", false, "debug mode")
+}
+
+func getMetrics(defs *metricdef.DefsEs) []schema.MetricDefinition {
+	out := make([]schema.MetricDefinition, 0)
+	met, scroll_id, err := defs.GetMetrics("")
+	perror(err)
+	for _, m := range met {
+		out = append(out, *m)
+	}
+	for scroll_id != "" {
+		met, scroll_id, err = defs.GetMetrics(scroll_id)
+		perror(err)
+		for _, m := range met {
+			out = append(out, *m)
+		}
+	}
+	return out
 }
 
 // for a metric to exist in ES at t=Y, there must at least have been 1 point for that metric
@@ -79,6 +99,10 @@ func main() {
 		log.Println("starting listener on", listenAddr)
 		log.Printf("%s\n", http.ListenAndServe(listenAddr, nil))
 	}()
+
+	defs, err := metricdef.NewDefsEs(esAddr, "", "", esIndex)
+	perror(err)
+
 	metrics.Register("lag", lag)
 	metrics.Register("num_metrics", numMetrics)
 	metrics.Register("null_points", nullPoints)
@@ -86,11 +110,11 @@ func main() {
 	args := flag.Args()
 	if len(args) == 1 && args[0] == "one" {
 		log.Println("mode: oneshot")
-		metrics := getMetrics(esAddr)
+		metrics := getMetrics(defs)
 		for len(metrics) == 0 {
 			fmt.Println("waiting to see metrics in ES...")
 			time.Sleep(4 * time.Second)
-			metrics = getMetrics(esAddr)
+			metrics = getMetrics(defs)
 		}
 		updateMetrics(metrics, time.Now().Unix())
 		targetsLock.Lock()
@@ -102,7 +126,7 @@ func main() {
 		go func() {
 			getEsTick := time.NewTicker(time.Second * time.Duration(1))
 			for range getEsTick.C {
-				updateMetrics(getMetrics(esAddr), time.Now().Unix())
+				updateMetrics(getMetrics(defs), time.Now().Unix())
 			}
 		}()
 
