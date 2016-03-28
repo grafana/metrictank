@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in nsq_* metric_tank; do
+for i in $(grep 'func main' */*.go | sed 's#/.*##'); do
   cd $i
   echo ">>> $i"
   go build
