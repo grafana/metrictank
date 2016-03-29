@@ -10,5 +10,5 @@ type Metrics interface {
 type Metric interface {
 	Add(ts uint32, val float64)
 	Get(from, to uint32) (uint32, []Iter)
-	GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []Iter)
+	GetAggregated(consolidator consolidation.Consolidator, aggSpan uint16, from, to uint32) (uint32, []Iter)
 }

@@ -35,25 +35,26 @@ func doRecover(errp *error) {
 // note: values are quantized to the right because we can't lie about the future:
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
-func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
+func fix(in []schema.Point, from, to uint32, interval uint16) []schema.Point {
+	interval32 := uint32(interval)
 	// first point should be the first point at or after from that divides by interval
 	start := from
-	remain := from % interval
+	remain := from % interval32
 	if remain != 0 {
-		start = from + interval - remain
+		start = from + interval32 - remain
 	}
 
 	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
-	lastPoint := (to - 1) - ((to - 1) % interval)
+	lastPoint := (to - 1) - ((to - 1) % interval32)
 
 	if lastPoint < start {
 		// the requested range is too narrow for the requested interval
 		return []schema.Point{}
 	}
-	out := make([]schema.Point, (lastPoint-start)/interval+1)
+	out := make([]schema.Point, (lastPoint-start)/interval32+1)
 
 	// i iterates in. o iterates out. t is the ts we're looking to fill.
-	for t, i, o := start, 0, -1; t <= lastPoint; t += interval {
+	for t, i, o := start, 0, -1; t <= lastPoint; t += interval32 {
 		o += 1
 
 		// input is out of values. add a null
@@ -70,22 +71,22 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 		} else if p.Ts > t {
 			// point is too recent, append a null and reconsider same point for next slot
 			out[o] = schema.Point{math.NaN(), t}
-		} else if p.Ts > t-interval && p.Ts < t {
+		} else if p.Ts > t-interval32 && p.Ts < t {
 			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
 			out[o] = schema.Point{p.Val, t}
 			i++
-		} else if p.Ts <= t-interval {
+		} else if p.Ts <= t-interval32 {
 			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
 			// if those considerations are any of the above ones.
 			// if the last point would end up in this branch again, discard it as well.
-			for p.Ts <= t-interval && i < len(in)-1 {
+			for p.Ts <= t-interval32 && i < len(in)-1 {
 				i++
 				p = in[i]
 			}
-			if p.Ts <= t-interval {
+			if p.Ts <= t-interval32 {
 				i++
 			}
-			t -= interval
+			t -= interval32
 			o -= 1
 		}
 
@@ -105,17 +106,16 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 }
 
 func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Consolidator) []schema.Point {
-	num := int(aggNum)
 	aggFunc := consolidation.GetAggFunc(consolidator)
-	outLen := len(in) / num
+	outLen := len(in) / int(aggNum)
 	var out []schema.Point
-	cleanLen := num * outLen // what the len of input slice would be if it was a perfect fit
+	cleanLen := int(aggNum) * outLen // what the len of input slice would be if it was a perfect fit
 	if len(in) == cleanLen {
 		out = in[0:outLen]
 		out_i := 0
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
-			next_i = in_i + num
+			next_i = in_i + int(aggNum)
 			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
 			out_i += 1
 		}
@@ -125,7 +125,7 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 		out_i := 0
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
-			next_i = in_i + num
+			next_i = in_i + int(aggNum)
 			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
 			out_i += 1
 		}
@@ -137,9 +137,9 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 		if len(in) == 1 {
 			lastTs = in[0].Ts
 		} else {
-			interval := in[len(in)-1].Ts - in[len(in)-2].Ts
+			interval32 := in[len(in)-1].Ts - in[len(in)-2].Ts
 			// len 10, cleanLen 9, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
-			lastTs = in[cleanLen].Ts + (aggNum-1)*interval
+			lastTs = in[cleanLen].Ts + uint32(aggNum-1)*interval32
 		}
 		out[out_i] = schema.Point{aggFunc(in[cleanLen:len(in)]), lastTs}
 	}
@@ -148,11 +148,11 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 
 // returns how many points should be aggregated together so that you end up with as many points as possible,
 // but never more than maxPoints
-func aggEvery(numPoints, maxPoints uint32) uint32 {
+func aggEvery(numPoints uint32, maxPoints uint16) uint32 {
 	if numPoints == 0 {
 		return 1
 	}
-	return (numPoints + maxPoints - 1) / maxPoints
+	return (numPoints + uint32(maxPoints) - 1) / uint32(maxPoints)
 }
 
 // error is the error of the first failing target request
@@ -197,7 +197,7 @@ func getTargets(store Store, reqs []Req) ([]Series, error) {
 
 }
 
-func getTarget(store Store, req Req) (points []schema.Point, interval uint32, err error) {
+func getTarget(store Store, req Req) (points []schema.Point, interval uint16, err error) {
 	defer doRecover(&err)
 
 	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
@@ -294,13 +294,13 @@ func logLoad(typ, key string, from, to uint32) {
 	}
 }
 
-func aggMetricKey(key, archive string, aggSpan uint32) string {
+func aggMetricKey(key, archive string, aggSpan uint16) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
-func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
+func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan uint16, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]Iter, 0)
 	memIters := make([]Iter, 0)
 	oldest := toUnix
@@ -320,7 +320,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 		}
 		// if oldest < to -> search until oldest, we already have the rest from mem
 		// if to < oldest -> no need to search until oldest, only search until to
-		until := min(oldest, toUnix)
+		until := min32(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
 		storeIters, err := store.Search(key, fromUnix, until)
 		if err != nil {

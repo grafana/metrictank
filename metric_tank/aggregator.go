@@ -3,10 +3,10 @@ package main
 import "fmt"
 
 type aggSetting struct {
-	span      uint32 // in seconds, controls how many input points go into an aggregated point.
-	chunkSpan uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
-	numChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
-	ttl       uint32 // how many seconds to keep the chunk in cassandra
+	span      uint16 // in seconds, controls how many input points go into an aggregated point.
+	ttl       uint16 // how many hours to keep the chunk in cassandra
+	chunkSpan uint16 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
+	numChunks uint8  // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
 	ready     bool   // ready for reads?
 }
 
@@ -17,8 +17,8 @@ func (a aggSettingsSpanAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a aggSettingsSpanAsc) Less(i, j int) bool { return a[i].span < a[j].span }
 
 // see description for Aggregator and unit tests
-func aggBoundary(ts uint32, span uint32) uint32 {
-	return ts + span - ((ts-1)%span + 1)
+func aggBoundary(ts uint32, span uint16) uint32 {
+	return ts + uint32(span) - ((ts-1)%uint32(span) + 1)
 }
 
 // receives data and builds aggregations
@@ -26,7 +26,7 @@ func aggBoundary(ts uint32, span uint32) uint32 {
 // IOW an aggregation point reflects the data in the timeframe preceeding it.
 type Aggregator struct {
 	key             string // of the metric this aggregator corresponds to
-	span            uint32
+	span            uint16
 	currentBoundary uint32 // working on this chunk
 	agg             *Aggregation
 	minMetric       *AggMetric
@@ -35,7 +35,7 @@ type Aggregator struct {
 	cntMetric       *AggMetric
 }
 
-func NewAggregator(store Store, key string, aggSpan, aggChunkSpan, aggNumChunks uint32, ttl uint32) *Aggregator {
+func NewAggregator(store Store, key string, aggSpan, aggChunkSpan uint16, aggNumChunks uint8, ttl uint16) *Aggregator {
 	return &Aggregator{
 		key:       key,
 		span:      aggSpan,

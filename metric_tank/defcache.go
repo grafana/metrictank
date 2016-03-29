@@ -130,7 +130,7 @@ func (dc *DefCache) UpdateReq(req *Req) error {
 		metricDefCacheMiss.Inc(1)
 		return errMetricNotFound
 	} else {
-		req.rawInterval = uint32(def.Interval)
+		req.rawInterval = uint16(def.Interval)
 		metricDefCacheHit.Inc(1)
 	}
 	return nil

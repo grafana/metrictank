@@ -25,7 +25,7 @@ var bufPool = sync.Pool{
 type Series struct {
 	Target     string
 	Datapoints []schema.Point
-	Interval   uint32
+	Interval   uint16
 }
 
 func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
@@ -142,7 +142,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	pre := time.Now()
 	req.ParseForm()
 
-	maxDataPoints := uint32(800)
+	maxDataPoints := uint16(800)
 	maxDataPointsStr := req.Form.Get("maxDataPoints")
 	var err error
 	if maxDataPointsStr != "" {
@@ -151,7 +151,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		maxDataPoints = uint32(tmp)
+		maxDataPoints = uint16(tmp)
 	}
 
 	targets, ok := req.Form["target"]

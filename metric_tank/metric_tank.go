@@ -233,15 +233,20 @@ func main() {
 	initMetrics(stats)
 
 	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
-	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
-	numChunks := uint32(*numChunksInt)
+	chunkSpan32 := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
+	numChunks := uint8(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
 	metricMaxStale := dur.MustParseUNsec("metric-max-stale", *metricMaxStaleStr)
 	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
-	ttl := dur.MustParseUNsec("ttl", *ttlStr)
-	if (month_sec % chunkSpan) != 0 {
+	ttl32 := dur.MustParseUNsec("ttl", *ttlStr)
+	if (month_sec % chunkSpan32) != 0 {
 		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
+	ttl, err := hourlyTTL(ttl32)
+	if err != nil {
+		log.Fatal(4, err.Error())
+	}
+	chunkSpan := uint16(chunkSpan32)
 
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]aggSetting, 0)
@@ -254,14 +259,19 @@ func main() {
 		if len(fields) < 4 {
 			log.Fatal(4, "bad agg settings")
 		}
-		aggSpan := dur.MustParseUNsec("aggsettings", fields[0])
-		aggChunkSpan := dur.MustParseUNsec("aggsettings", fields[1])
-		aggNumChunks := dur.MustParseUNsec("aggsettings", fields[2])
-		aggTTL := dur.MustParseUNsec("aggsettings", fields[3])
-		if (month_sec % aggChunkSpan) != 0 {
+		aggSpan32 := dur.MustParseUNsec("aggsettings", fields[0])
+		aggChunkSpan32 := dur.MustParseUNsec("aggsettings", fields[1])
+		aggNumChunks32 := dur.MustParseUNsec("aggsettings", fields[2])
+		aggTTL32 := dur.MustParseUNsec("aggsettings", fields[3])
+		if (month_sec % aggChunkSpan32) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
+		aggTTL, err := hourlyTTL(aggTTL32)
+		if err != nil {
+			log.Fatal(4, err.Error())
+		}
+		aggChunkSpan := uint16(aggChunkSpan32)
+		highestChunkSpan = max16(highestChunkSpan, aggChunkSpan)
 		ready := true
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
@@ -269,7 +279,9 @@ func main() {
 				log.Fatal(4, "aggsettings ready: %s", err)
 			}
 		}
-		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
+		aggSpan := uint16(aggSpan32)
+		aggNumChunks := uint8(aggNumChunks32)
+		finalSettings = append(finalSettings, aggSetting{aggSpan, aggTTL, aggChunkSpan, aggNumChunks, ready})
 	}
 	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
 	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
@@ -335,7 +347,7 @@ func main() {
 		}
 		log.Info("consumer connected to nsqlookupd")
 
-		promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+		promotionReadyAtChan <- (uint32(time.Now().Unix())/uint32(highestChunkSpan) + 1) * uint32(highestChunkSpan)
 
 	}()
 
