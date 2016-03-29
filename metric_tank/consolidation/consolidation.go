@@ -7,7 +7,7 @@ import (
 
 // consolidator is a highlevel description of a point consolidation method
 // mostly for use by the http api, but can also be used internally for data processing
-type Consolidator int
+type Consolidator uint8
 
 const (
 	None Consolidator = iota
