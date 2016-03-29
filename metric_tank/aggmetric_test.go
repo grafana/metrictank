@@ -155,16 +155,16 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	clusterStatus = NewClusterStatus("default", false)
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
-	chunkSpan := uint32(2 * 3600)
-	numChunks := uint32(5)
+	chunkSpan := uint16(2 * 3600)
+	numChunks := uint8(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
-	ttl := uint32(84600)
+	ttl := uint16(24)
 	aggSettings := []aggSetting{
 		{
-			span:      uint32(300),
-			chunkSpan: uint32(24 * 3600),
-			numChunks: uint32(1),
+			span:      uint16(300),
+			chunkSpan: uint16(12 * 3600),
+			numChunks: uint8(1),
 		},
 	}
 
@@ -188,20 +188,20 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
 
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
+	chunkSpan := uint16(600)
+	numChunks := uint8(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
 	*topicNotifyPersist = ""
 	clusterStatus = NewClusterStatus("default", true)
 
-	ttl := uint32(84600)
+	ttl := uint16(24)
 	aggSettings := []aggSetting{
 		{
-			span:      uint32(300),
-			chunkSpan: uint32(24 * 3600),
-			numChunks: uint32(2),
+			span:      uint16(300),
+			chunkSpan: uint16(12 * 3600),
+			numChunks: uint8(2),
 		},
 	}
 
@@ -225,8 +225,8 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
 
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
+	chunkSpan := uint16(600)
+	numChunks := uint8(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
@@ -234,12 +234,12 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 
 	clusterStatus = NewClusterStatus("default", true)
 
-	ttl := uint32(84600)
+	ttl := uint16(24)
 	aggSettings := []aggSetting{
 		{
-			span:      uint32(300),
-			chunkSpan: uint32(24 * 3600),
-			numChunks: uint32(2),
+			span:      uint16(300),
+			chunkSpan: uint16(12 * 3600),
+			numChunks: uint8(2),
 		},
 	}
 
@@ -263,8 +263,8 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
 	initMetrics(stats)
 
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
+	chunkSpan := uint16(600)
+	numChunks := uint8(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
@@ -272,12 +272,12 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 
 	clusterStatus = NewClusterStatus("default", true)
 
-	ttl := uint32(84600)
+	ttl := uint16(24)
 	aggSettings := []aggSetting{
 		{
-			span:      uint32(300),
-			chunkSpan: uint32(24 * 3600),
-			numChunks: uint32(2),
+			span:      uint16(300),
+			chunkSpan: uint16(12 * 3600),
+			numChunks: uint8(2),
 		},
 	}
 

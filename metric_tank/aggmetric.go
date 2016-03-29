@@ -21,18 +21,19 @@ type AggMetric struct {
 	store Store
 	sync.RWMutex
 	Key             string
-	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
-	NumChunks       uint32 // max size of the circular buffer
-	ChunkSpan       uint32 // span of individual chunks in seconds
+	CurrentChunkPos uint8  // element in []Chunks that is active. All others are either finished or nil.
+	NumChunks       uint8  // max size of the circular buffer
+	ChunkSpan       uint16 // span of individual chunks in seconds
 	Chunks          []*Chunk
 	aggregators     []*Aggregator
 	firstChunkT0    uint32
-	ttl             uint32
+	ttl             uint16 // in hours
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...aggSetting) *AggMetric {
+// retention is specified in hours!
+func NewAggMetric(store Store, key string, chunkSpan uint16, numChunks uint8, ttl uint16, aggsetting ...aggSetting) *AggMetric {
 	m := AggMetric{
 		store:     store,
 		Key:       key,
@@ -87,15 +88,15 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 
 	// calculate the number of chunks ago our requested T0 is,
 	// assuming that chunks are sequential.
-	chunksAgo := int((currentT0 - ts) / a.ChunkSpan)
+	chunksAgo := uint8((currentT0 - ts) / uint32(a.ChunkSpan))
 
-	numChunks := len(a.Chunks)
+	numChunks := uint8(len(a.Chunks))
 	oldestPos := a.CurrentChunkPos + 1
 	if oldestPos >= numChunks {
 		oldestPos = 0
 	}
 
-	var guess int
+	var guess uint8
 
 	if chunksAgo >= (numChunks - 1) {
 		// set guess to the oldest chunk.
@@ -147,17 +148,17 @@ func (a *AggMetric) getChunkByT0(ts uint32) *Chunk {
 	return nil
 }
 
-func (a *AggMetric) getChunk(pos int) *Chunk {
+func (a *AggMetric) getChunk(pos uint8) *Chunk {
 	if pos < 0 {
 		return nil
 	}
-	if pos >= len(a.Chunks) {
+	if pos >= uint8(len(a.Chunks)) {
 		return nil
 	}
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan uint16, from, to uint32) (uint32, []Iter) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -204,7 +205,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		}
 		return math.MaxInt32, make([]Iter, 0)
 	}
-	if from >= newestChunk.T0+a.ChunkSpan {
+	if from >= newestChunk.T0+uint32(a.ChunkSpan) {
 		// request falls entirely ahead of the data we have
 		// this can happen in a few cases:
 		// * queries for the most recent data, but our ingestion has fallen behind.
@@ -234,7 +235,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	// | n-2 | n-1 | n | n-4 | n-3 |  CurrentChunkPos = 2
 	// -----------------------------
 	oldestPos := a.CurrentChunkPos + 1
-	if oldestPos >= len(a.Chunks) {
+	if oldestPos >= uint8(len(a.Chunks)) {
 		oldestPos = 0
 	}
 
@@ -249,7 +250,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	// if we are the primary node, then there is likely no data in Cassandra anyway.
 	if !clusterStatus.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
 		oldestPos++
-		if oldestPos >= len(a.Chunks) {
+		if oldestPos >= uint8(len(a.Chunks)) {
 			oldestPos = 0
 		}
 		oldestChunk = a.getChunk(oldestPos)
@@ -269,9 +270,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
 	// chunk, then we just use the oldest chunk.
-	for from >= oldestChunk.T0+a.ChunkSpan {
+	for from >= oldestChunk.T0+uint32(a.ChunkSpan) {
 		oldestPos++
-		if oldestPos >= len(a.Chunks) {
+		if oldestPos >= uint8(len(a.Chunks)) {
 			oldestPos = 0
 		}
 		oldestChunk = a.getChunk(oldestPos)
@@ -291,7 +292,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	for to <= newestChunk.T0 {
 		newestPos--
 		if newestPos < 0 {
-			newestPos += len(a.Chunks)
+			newestPos += uint8(len(a.Chunks))
 		}
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
@@ -306,7 +307,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		chunk := a.getChunk(oldestPos)
 		iters = append(iters, NewIter(chunk.Iter(), false))
 		oldestPos++
-		if oldestPos >= int(a.NumChunks) {
+		if oldestPos >= a.NumChunks {
 			oldestPos = 0
 		}
 	}
@@ -329,7 +330,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 }
 
 // write a chunk to peristant storage. This should only be called while holding a.Lock()
-func (a *AggMetric) persist(pos int) {
+func (a *AggMetric) persist(pos uint8) {
 	pre := time.Now()
 	chunk := a.Chunks[pos]
 	chunk.Finish()
@@ -354,8 +355,8 @@ func (a *AggMetric) persist(pos int) {
 	// that the old primary did not save.  We should check for those
 	// and save them.
 	previousPos := pos - 1
-	if previousPos < 0 {
-		previousPos += len(a.Chunks)
+	if pos == 0 {
+		previousPos = uint8(len(a.Chunks) - 1)
 	}
 	previousChunk := a.Chunks[previousPos]
 	for (previousChunk.T0 < chunk.T0) && !previousChunk.Saved && !previousChunk.Saving {
@@ -370,7 +371,7 @@ func (a *AggMetric) persist(pos int) {
 		})
 		previousPos--
 		if previousPos < 0 {
-			previousPos += len(a.Chunks)
+			previousPos += uint8(len(a.Chunks))
 		}
 		previousChunk = a.Chunks[previousPos]
 	}
@@ -405,7 +406,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
 
-	t0 := ts - (ts % a.ChunkSpan)
+	t0 := ts - (ts % uint32(a.ChunkSpan))
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
 	if currentChunk == nil {
@@ -444,7 +445,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.persist(a.CurrentChunkPos)
 
 		a.CurrentChunkPos++
-		if a.CurrentChunkPos >= int(a.NumChunks) {
+		if a.CurrentChunkPos >= a.NumChunks {
 			a.CurrentChunkPos = 0
 		}
 

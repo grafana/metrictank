@@ -6,13 +6,13 @@ import (
 
 func TestLCM(t *testing.T) {
 	cases := []struct {
-		in  []uint32
-		out uint32
+		in  []uint16
+		out uint16
 	}{
-		{[]uint32{10, 60}, 60},
-		{[]uint32{20, 30}, 60},
-		{[]uint32{40, 60}, 120},
-		{[]uint32{1, 3}, 3},
+		{[]uint16{10, 60}, 60},
+		{[]uint16{20, 30}, 60},
+		{[]uint16{40, 60}, 120},
+		{[]uint16{1, 3}, 3},
 	}
 	for i, c := range cases {
 		out := lcm(c.in)

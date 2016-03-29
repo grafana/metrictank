@@ -13,6 +13,6 @@ type ChunkReadRequest struct {
 type ChunkWriteRequest struct {
 	key       string
 	chunk     *Chunk
-	ttl       uint32
+	ttl       uint16
 	timestamp time.Time
 }

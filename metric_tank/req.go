@@ -11,30 +11,30 @@ type Req struct {
 	target       string // original input string like consolidateBy(key,'sum'). used in output so that graphite doesn't get confused
 	from         uint32
 	to           uint32
-	maxPoints    uint32
 	consolidator consolidation.Consolidator
+	maxPoints    uint16
 
 	// these fields need some more coordination and are typically set later
-	archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
-	rawInterval  uint32 // the interval of the raw metric before any consolidation
-	archInterval uint32 // the interval corresponding to the archive we'll fetch
-	outInterval  uint32 // the interval of the output data, after any runtime consolidation
+	archive      uint8  // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
+	rawInterval  uint16 // the interval of the raw metric before any consolidation
+	archInterval uint16 // the interval corresponding to the archive we'll fetch
+	outInterval  uint16 // the interval of the output data, after any runtime consolidation
 	aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key, target string, from, to, maxPoints uint32, consolidator consolidation.Consolidator) Req {
+func NewReq(key, target string, from, to uint32, maxPoints uint16, consolidator consolidation.Consolidator) Req {
 	return Req{
 		key,
 		target,
 		from,
 		to,
-		maxPoints,
 		consolidator,
-		-1, // this is supposed to be updated still!
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
+		maxPoints,
+		255, // this is supposed to be updated still!
+		0,   // this is supposed to be updated still
+		0,   // this is supposed to be updated still
+		0,   // this is supposed to be updated still
+		0,   // this is supposed to be updated still
 	}
 }
 

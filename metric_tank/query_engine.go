@@ -8,8 +8,8 @@ import (
 
 // represents a data "archive", i.e. the raw one, or an aggregated series
 type archive struct {
-	interval   uint32
 	pointCount uint32
+	interval   uint16
 	chosen     bool
 }
 
@@ -46,8 +46,8 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 
 	options := make([]archive, 1, len(aggs)+1)
 
-	minInterval := uint32(0) // will contain the smallest rawInterval from all requested series
-	rawIntervals := make(map[uint32]struct{})
+	minInterval := uint16(0) // will contain the smallest rawInterval from all requested series
+	rawIntervals := make(map[uint16]struct{})
 	for _, req := range reqs {
 		if minInterval == 0 || minInterval > req.rawInterval {
 			minInterval = req.rawInterval
@@ -57,27 +57,27 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	tsRange := (reqs[0].to - reqs[0].from)
 
 	// note: not all series necessarily have the same raw settings, will be fixed further down
-	options[0] = archive{minInterval, tsRange / minInterval, false}
+	options[0] = archive{tsRange / uint32(minInterval), minInterval, false}
 	// now model the archives we get from the aggregations
 	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
-	aggRef := []int{0}
+	aggRef := []uint8{0}
 	for j, agg := range aggs {
 		if agg.ready {
-			options = append(options, archive{agg.span, tsRange / agg.span, false})
-			aggRef = append(aggRef, j+1)
+			options = append(options, archive{tsRange / uint32(agg.span), agg.span, false})
+			aggRef = append(aggRef, uint8(j+1))
 		}
 	}
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
 	// if all options have too many points, fall back to the lowest-res option and apply runtime
 	// consolidation
-	selected := len(options) - 1
+	selected := uint8(len(options) - 1)
 	runTimeConsolidate := true
 	for i, opt := range options {
-		if opt.pointCount <= reqs[0].maxPoints {
+		if opt.pointCount <= uint32(reqs[0].maxPoints) {
 			runTimeConsolidate = false
-			selected = i
+			selected = uint8(i)
 			break
 		}
 	}
@@ -119,13 +119,13 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
 		runTimeConsolidate = true
-		var keys []uint32
+		var keys []uint16
 		for k := range rawIntervals {
 			keys = append(keys, k)
 		}
 		chosenInterval = lcm(keys)
 		options[0].interval = chosenInterval
-		options[0].pointCount = tsRange / chosenInterval
+		options[0].pointCount = tsRange / uint32(chosenInterval)
 		//make sure that the calculated interval is not greater then the interval of the first rollup.
 		if len(options) > 1 && chosenInterval >= options[1].interval {
 			selected = 1
@@ -137,9 +137,9 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 		options[selected].chosen = true
 		for i, archive := range options {
 			if archive.chosen {
-				log.Debug("QE %-2d %-6d %-6d <-", i, archive.interval, tsRange/archive.interval)
+				log.Debug("QE %-2d %-6d %-6d <-", i, archive.interval, tsRange/uint32(archive.interval))
 			} else {
-				log.Debug("QE %-2d %-6d %-6d", i, archive.interval, tsRange/archive.interval)
+				log.Debug("QE %-2d %-6d %-6d", i, archive.interval, tsRange/uint32(archive.interval))
 			}
 		}
 	}
@@ -163,10 +163,10 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 			// so adjust where needed.
 			if selected == 0 && chosenInterval != req.rawInterval {
 				req.archInterval = req.rawInterval
-				req.aggNum *= chosenInterval / req.rawInterval
+				req.aggNum *= uint32(chosenInterval / req.rawInterval)
 			}
 
-			req.outInterval = req.archInterval * req.aggNum
+			req.outInterval = req.archInterval * uint16(req.aggNum)
 		}
 	}
 	return reqs, nil

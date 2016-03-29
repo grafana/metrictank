@@ -183,7 +183,7 @@ func TestConsolidationFunctions(t *testing.T) {
 
 type c struct {
 	numPoints     uint32
-	maxDataPoints uint32
+	maxDataPoints uint16
 	every         uint32
 }
 
@@ -258,13 +258,13 @@ type fixc struct {
 	in       []schema.Point
 	from     uint32
 	to       uint32
-	interval uint32
+	interval uint16
 	out      []schema.Point
 }
 
-func nullPoints(from, to, interval uint32) []schema.Point {
+func nullPoints(from, to uint32, interval uint16) []schema.Point {
 	out := make([]schema.Point, 0)
-	for i := from; i < to; i += interval {
+	for i := from; i < to; i += uint32(interval) {
 		out = append(out, schema.Point{math.NaN(), i})
 	}
 	return out
@@ -398,12 +398,12 @@ type alignCase struct {
 	outErr      error
 }
 
-func reqRaw(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32) Req {
+func reqRaw(key string, from, to uint32, maxPoints uint16, consolidator consolidation.Consolidator, rawInterval uint16) Req {
 	req := NewReq(key, key, from, to, maxPoints, consolidator)
 	req.rawInterval = rawInterval
 	return req
 }
-func reqOut(key string, from, to, maxPoints uint32, consolidator consolidation.Consolidator, rawInterval uint32, archive int, archInterval, outInterval, aggNum uint32) Req {
+func reqOut(key string, from, to uint32, maxPoints uint16, consolidator consolidation.Consolidator, rawInterval uint16, archive uint8, archInterval, outInterval uint16, aggNum uint32) Req {
 	req := NewReq(key, key, from, to, maxPoints, consolidator)
 	req.rawInterval = rawInterval
 	req.archive = archive

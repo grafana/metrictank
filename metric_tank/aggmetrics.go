@@ -11,12 +11,12 @@ type AggMetrics struct {
 	store Store
 	sync.RWMutex
 	Metrics        map[string]*AggMetric
-	chunkSpan      uint32
-	numChunks      uint32
 	aggSettings    []aggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
-	ttl            uint32
+	chunkSpan      uint16
+	numChunks      uint8
+	ttl            uint16
 	gcInterval     time.Duration
 }
 
@@ -27,7 +27,7 @@ func init() {
 	totalPoints = make(chan int, 1000)
 }
 
-func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []aggSetting) *AggMetrics {
+func NewAggMetrics(store Store, chunkSpan uint16, numChunks uint8, chunkMaxStale, metricMaxStale uint32, ttl uint16, gcInterval time.Duration, aggSettings []aggSetting) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		Metrics:        make(map[string]*AggMetric),
@@ -59,8 +59,8 @@ func (ms *AggMetrics) GC() {
 		}
 		log.Info("checking for stale chunks that need persisting.")
 		now := uint32(time.Now().Unix())
-		chunkMinTs := now - (now % ms.chunkSpan) - uint32(ms.chunkMaxStale)
-		metricMinTs := now - (now % ms.chunkSpan) - uint32(ms.metricMaxStale)
+		chunkMinTs := now - (now % uint32(ms.chunkSpan)) - ms.chunkMaxStale
+		metricMinTs := now - (now % uint32(ms.chunkSpan)) - ms.metricMaxStale
 
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.
