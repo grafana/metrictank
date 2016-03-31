@@ -289,7 +289,11 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	} else {
 		js, err = graphiteRaintankJSON(js, out)
 	}
+	for _, serie := range out {
+		pointSlicePool.Put(serie.Datapoints[:0])
+	}
 	if err != nil {
+		bufPool.Put(js[:0])
 		log.Error(0, err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
