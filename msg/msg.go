@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/codeskyblue/go-uuid"
@@ -16,6 +17,10 @@ import (
 var errTooSmall = errors.New("too small")
 var errFmtBinWriteFailed = "binary write failed: %q"
 var errFmtUnknownFormat = "unknown format %d"
+
+var mdPool = sync.Pool{
+	New: func() interface{} { return make(schema.MetricDataArray, 5) }, // default size probably too small, but after some automatic reallocations should be well-tuned for real load
+}
 
 type MetricData struct {
 	Id       int64
@@ -73,9 +78,10 @@ func (m *MetricData) DecodeMetricData() error {
 	case FormatMetricDataArrayJson:
 		err = json.Unmarshal(m.Msg[9:], &m.Metrics)
 	case FormatMetricDataArrayMsgp:
-		var out schema.MetricDataArray
+		out := mdPool.Get().(schema.MetricDataArray)
 		_, err = out.UnmarshalMsg(m.Msg[9:])
 		m.Metrics = []*schema.MetricData(out)
+		mdPool.Put(out)
 	default:
 		return fmt.Errorf("unrecognized format %d", m.Msg[0])
 	}
