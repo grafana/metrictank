@@ -19,7 +19,7 @@ var errFmtBinWriteFailed = "binary write failed: %q"
 var errFmtUnknownFormat = "unknown format %d"
 
 var mdPool = sync.Pool{
-	New: func() interface{} { return make(schema.MetricDataArray, 5) }, // default size probably too small, but after some automatic reallocations should be well-tuned for real load
+	New: func() interface{} { return make(schema.MetricDataArray, 0, 5) }, // default size probably too small, but after some automatic reallocations should be well-tuned for real load
 }
 
 type MetricData struct {
