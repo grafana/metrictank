@@ -12,6 +12,14 @@ import (
 	"time"
 )
 
+const defaultPointSliceSize = 2000
+
+var pointSlicePool = sync.Pool{
+	// default size is probably bigger than what most responses need, but it saves [re]allocations
+	// also it's possible that occasionnally more size is needed, causing a realloc of underlying array, and that extra space will stick around until next GC run.
+	New: func() interface{} { return make([]schema.Point, 0, defaultPointSliceSize) },
+}
+
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
 func doRecover(errp *error) {
 	e := recover()
@@ -333,7 +341,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 	pre := time.Now()
 	iters = append(iters, memIters...)
 
-	points := make([]schema.Point, 0)
+	points := pointSlicePool.Get().([]schema.Point)
 	for _, iter := range iters {
 		total := 0
 		good := 0
