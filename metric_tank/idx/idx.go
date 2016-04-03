@@ -9,7 +9,6 @@
 package idx
 
 import (
-	//"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -26,6 +25,22 @@ type Glob struct {
 	IsLeaf bool
 }
 
+const OTTBase = uint32(2147483648)             // 1 << 31
+const PublicOrgTrigram = trigram.T(2147483648) // 1 << 31. eg base + 0
+
+// orgToTrigram takes in an orgid between -1 (special) and 214748345 and converts it to a special trigram
+func orgToTrigram(org int) trigram.T {
+	if org < -1 {
+		panic("orgid must be >= -1")
+	}
+	// org+1 cannot be 2147483647 because we would end up at MaxUint32 == 4294967295 == 0xffffffff which is reserved
+	if org > 2147483645 {
+		panic("org too high")
+	}
+	ret := OTTBase + uint32(org) + 1
+	return trigram.T(ret)
+}
+
 type globByName []Glob
 
 func (g globByName) Len() int           { return len(g) }
@@ -34,40 +49,62 @@ func (g globByName) Less(i, j int) bool { return g[i].Metric < g[j].Metric }
 
 type Idx struct {
 	// all metrics
-	keys  map[string]MetricID
-	revs  []string
-	count int
+	keys  []map[string]MetricID // slice is per org
+	revs  []string              // MetricID to string key. doesn't have to be isolated per org
+	count int                   // global across all orgs
 
 	// currently 'active'
-	active map[MetricID]int
-	prefix *radix.Tree
+	active map[MetricID]int // doesn't have to be isolated per org
 
+	prefix []*radix.Tree // per org. each org is stored at pos orgid+1 because we have a special org -1
+
+	// stores all orgs in one index, but with special org-id trigrams
 	Pathidx trigram.Index
 }
 
 func New() *Idx {
 	return &Idx{
-		keys: make(map[string]MetricID),
+		keys: make([]map[string]MetricID, 0),
 
 		active: make(map[MetricID]int),
-		prefix: radix.New(),
+		prefix: make([]*radix.Tree, 0),
 
 		Pathidx: trigram.NewIndex(nil),
 	}
+
 }
 
 func (l *Idx) Len() int {
 	return len(l.keys)
 }
 
-func (l *Idx) Get(key string) (MetricID, bool) {
-	id, ok := l.keys[key]
+// Get retrieves the metricId and whether it was found
+// it first checks the given org, but also falls back to org -1
+func (l *Idx) Get(org int, key string) (MetricID, bool) {
+	pos := org + 1 // org -1 is pos 0, etc
+
+	for len(l.keys) < pos+1 {
+		l.keys = append(l.keys, make(map[string]MetricID))
+	}
+
+	id, ok := l.keys[pos][key]
+	if !ok {
+		id, ok = l.keys[0][key]
+	}
+
 	return id, ok
 }
 
-func (l *Idx) GetOrAdd(key string) MetricID {
+// GetsOrAdd retrieves the key if it exists for the org (but doesn't do additional check for org -1)
+// and adds it for the org if non-existant
+func (l *Idx) GetOrAdd(org int, key string) MetricID {
+	pos := org + 1 // org -1 is pos 0, etc
 
-	id, ok := l.keys[key]
+	for len(l.keys) < pos+1 {
+		l.keys = append(l.keys, make(map[string]MetricID))
+	}
+
+	id, ok := l.keys[pos][key]
 
 	if ok {
 		return id
@@ -77,36 +114,40 @@ func (l *Idx) GetOrAdd(key string) MetricID {
 	l.count++
 	l.revs = append(l.revs, key)
 
-	l.keys[key] = id
+	l.keys[pos][key] = id
 
-	l.Pathidx.Insert(key, trigram.DocID(id))
+	// like l.Pathidx.Insert(key, trigram.DocID(id)) but with added org trigram
+	ts := trigram.ExtractAll(key, nil)
+	ts = append(ts, orgToTrigram(org))
+	l.Pathidx.InsertTrigrams(ts, trigram.DocID(id))
 
 	return id
-}
-
-func (l *Idx) GetById(i MetricID) string {
-	return l.revs[i]
 }
 
 func (l *Idx) Key(id MetricID) string {
 	return l.revs[id]
 }
 
-func (l *Idx) AddRef(id MetricID) {
+func (l *Idx) AddRef(org int, id MetricID) {
 	v, ok := l.active[id]
 	if !ok {
-		l.prefix.Insert(l.revs[id], id)
+		pos := org + 1
+		for len(l.prefix) < pos+1 {
+			l.prefix = append(l.prefix, radix.New())
+		}
+		l.prefix[pos].Insert(l.revs[id], id)
 	}
 
 	l.active[id] = v + 1
 }
 
-func (l *Idx) DelRef(id MetricID) {
+// only call this after having made sure the org entries exists! e.g. after Get/GetOrAdd and AddRef
+func (l *Idx) DelRef(org int, id MetricID) {
 	l.active[id]--
 	if l.active[id] == 0 {
 		delete(l.active, id)
-		delete(l.keys, l.revs[id])
-		l.prefix.Delete(l.revs[id])
+		delete(l.keys[org], l.revs[id])
+		l.prefix[org+1].Delete(l.revs[id])
 		if l.Pathidx != nil {
 			l.Pathidx.Delete(l.revs[id], trigram.DocID(id))
 		}
@@ -118,23 +159,25 @@ func (l *Idx) Active(id MetricID) bool {
 	return l.active[id] != 0
 }
 
-func (l *Idx) Prefix(query string, fn radix.WalkFn) {
-	l.prefix.WalkPrefix(query, fn)
+func (l *Idx) Prefix(org int, query string, fn radix.WalkFn) {
+	pos := org + 1
+	for len(l.prefix) < pos+1 {
+		l.prefix = append(l.prefix, radix.New())
+	}
+	l.prefix[pos].WalkPrefix(query, fn)
 }
 
 // for a "filesystem glob" query (e.g. supports * and [] but not {})
 // looks in the trigrams index
-func (l *Idx) QueryPath(query string) []Glob {
+func (l *Idx) QueryPath(org int, query string) []Glob {
 
 	if l.Pathidx == nil {
 		return nil
 	}
 
 	ts := extractTrigrams(query)
-
-	//pre := time.Now()
 	ids := l.Pathidx.QueryTrigrams(ts)
-	//fmt.Println("QueryTrigrams took", time.Now().Sub(pre))
+	ids = l.Pathidx.FilterOr(ids, [][]trigram.T{{PublicOrgTrigram}, {orgToTrigram(org)}})
 
 	seen := make(map[string]bool)
 	out := make([]Glob, 0)
@@ -164,15 +207,41 @@ func (l *Idx) QueryPath(query string) []Glob {
 	return out
 }
 
+func (i *Idx) QueryRadix(org int, query string) []Glob {
+	var response []Glob
+	l := len(query)
+	seen := make(map[string]bool)
+	fn := func(k string, v interface{}) bool {
+		// figure out if we're a leaf or not
+		dot := strings.IndexByte(k[l:], '.')
+		var leaf bool
+		m := k
+		if dot == -1 {
+			leaf = true
+		} else {
+			m = k[:dot+l]
+		}
+		if !seen[m] {
+			seen[m] = true
+			response = append(response, Glob{Metric: m, IsLeaf: leaf})
+		}
+		// false == "don't terminate iteration"
+		return false
+	}
+	i.Prefix(-1, query, fn)
+	i.Prefix(org, query, fn)
+	return response
+}
+
 // TODO(dgryski): this needs most of the logic in grobian/carbsonerver:findHandler()
 // Dieter: this doesn't support {, }, [, ]
 
-func (i *Idx) Match(query string) []Glob {
+func (i *Idx) Match(org int, query string) []Glob {
 
 	// no wildcard == exact match only
 	var star int
 	if star = strings.Index(query, "*"); star == -1 {
-		if _, ok := i.Get(query); !ok {
+		if _, ok := i.Get(org, query); !ok {
 			return nil
 		}
 		return []Glob{{Metric: query, IsLeaf: true}}
@@ -183,29 +252,11 @@ func (i *Idx) Match(query string) []Glob {
 	if star == len(query)-1 {
 		// only one trailing star
 		query = query[:len(query)-1]
+		response = i.QueryRadix(org, query)
 
-		l := len(query)
-		seen := make(map[string]bool)
-		i.Prefix(query, func(k string, v interface{}) bool {
-			// figure out if we're a leaf or not
-			dot := strings.IndexByte(k[l:], '.')
-			var leaf bool
-			m := k
-			if dot == -1 {
-				leaf = true
-			} else {
-				m = k[:dot+l]
-			}
-			if !seen[m] {
-				seen[m] = true
-				response = append(response, Glob{Metric: m, IsLeaf: leaf})
-			}
-			// false == "don't terminate iteration"
-			return false
-		})
 	} else {
 		// at least one interior star
-		response = i.QueryPath(query)
+		response = i.QueryPath(org, query)
 	}
 
 	sort.Sort(globByName(response))
