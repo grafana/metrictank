@@ -21,6 +21,7 @@ import (
 type MetricID uint32 // same thing as trigram.DocID. just syntactic sugar
 
 type Glob struct {
+	Id     MetricID
 	Metric string
 	IsLeaf bool
 }
@@ -194,19 +195,35 @@ func (l *Idx) QueryPath(org int, query string) []Glob {
 
 		if matched, err := filepath.Match(query, dir); err == nil && matched {
 			seen[dir] = true
-			out = append(out, Glob{dir, false})
+			out = append(out, Glob{0, dir, false}) // for directories we leave id=0
 			continue
 		}
 
 		if matched, err := filepath.Match(query, p); err == nil && matched {
 			seen[p] = true
-			out = append(out, Glob{p, true})
+			out = append(out, Glob{MetricID(id), p, true})
 		}
 	}
 
 	return out
 }
 
+func (l *Idx) List(org int) []MetricID {
+	var response []MetricID
+	fn := func(k string, v interface{}) bool {
+		response = append(response, v.(MetricID))
+		return false
+	}
+	if org == -1 {
+		for i := 0; i < len(l.prefix); i++ {
+			l.prefix[i].Walk(fn)
+		}
+	} else {
+		l.Prefix(-1, "", fn)
+		l.Prefix(org, "", fn)
+	}
+	return response
+}
 func (i *Idx) QueryRadix(org int, query string) []Glob {
 	var response []Glob
 	l := len(query)
@@ -223,7 +240,7 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 		}
 		if !seen[m] {
 			seen[m] = true
-			response = append(response, Glob{Metric: m, IsLeaf: leaf})
+			response = append(response, Glob{Id: v.(MetricID), Metric: m, IsLeaf: leaf})
 		}
 		// false == "don't terminate iteration"
 		return false
@@ -241,10 +258,12 @@ func (i *Idx) Match(org int, query string) []Glob {
 	// no wildcard == exact match only
 	var star int
 	if star = strings.Index(query, "*"); star == -1 {
-		if _, ok := i.Get(org, query); !ok {
+		var id MetricID
+		var ok bool
+		if id, ok = i.Get(org, query); !ok {
 			return nil
 		}
-		return []Glob{{Metric: query, IsLeaf: true}}
+		return []Glob{{Id: id, Metric: query, IsLeaf: true}}
 	}
 
 	var response []Glob

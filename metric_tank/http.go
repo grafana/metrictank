@@ -111,9 +111,15 @@ func graphiteRaintankJSON(b []byte, series []Series) ([]byte, error) {
 
 func IndexJson(defCache *DefCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		list := defCache.List()
+		orgStr := req.Header.Get("x-org-id")
+		org, err := strconv.Atoi(orgStr)
+		if err != nil {
+			http.Error(w, "bad org-id", http.StatusBadRequest)
+			return
+		}
+		list := defCache.List(org)
 		js := bufPool.Get().([]byte)
-		js, err := listJSON(js, list)
+		js, err = listJSON(js, list)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -140,6 +146,16 @@ func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMin
 // we just serve what we know
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
+	org := 0
+	if legacy {
+		orgStr := req.Header.Get("x-org-id")
+		var err error
+		org, err = strconv.Atoi(orgStr)
+		if err != nil {
+			http.Error(w, "bad org-id", http.StatusBadRequest)
+			return
+		}
+	}
 	req.ParseForm()
 
 	maxDataPoints := uint32(800)
@@ -203,8 +219,8 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	reqs := make([]Req, len(targets))
-	for i, target := range targets {
+	reqs := make([]Req, 0)
+	for _, target := range targets {
 		var consolidateBy string
 		id := target
 		// yes, i am aware of the arguably grossness of the below.
@@ -220,39 +236,48 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
 		}
 
-		// if we're serving the legacy graphite api, set the id field by looking up the graphite target
+		defs := make([]*schema.MetricDefinition, 0)
 		if legacy {
-			def, ok := defCache.GetByKey(id)
+			defs = defCache.Find(org, id)
+			if len(defs) == 0 {
+				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
+				return
+			}
+		} else {
+			def, ok := defCache.Get(id)
 			if !ok {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			id = def.Id
+			defs = append(defs, def)
 		}
 
-		if consolidateBy == "" {
-			def, ok := defCache.Get(id)
-			consolidateBy = "avg"
-			if ok && def.TargetType == "counter" {
-				consolidateBy = "last"
+		for _, def := range defs {
+
+			if consolidateBy == "" {
+				consolidateBy = "avg"
+				if def.TargetType == "counter" {
+					consolidateBy = "last"
+				}
 			}
+			var consolidator consolidation.Consolidator
+			switch consolidateBy {
+			case "avg", "average":
+				consolidator = consolidation.Avg
+			case "min":
+				consolidator = consolidation.Min
+			case "max":
+				consolidator = consolidation.Max
+			case "sum":
+				consolidator = consolidation.Sum
+			default:
+				http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
+				return
+			}
+			req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
+			req.rawInterval = uint32(def.Interval)
+			reqs = append(reqs, req)
 		}
-		var consolidator consolidation.Consolidator
-		switch consolidateBy {
-		case "avg", "average":
-			consolidator = consolidation.Avg
-		case "min":
-			consolidator = consolidation.Min
-		case "max":
-			consolidator = consolidation.Max
-		case "sum":
-			consolidator = consolidation.Sum
-		default:
-			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
-			return
-		}
-		req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
-		reqs[i] = req
 	}
 	if (toUnix - fromUnix) >= logMinDur {
 		log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
@@ -265,11 +290,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 	}
 
-	err = findMetricsForRequests(reqs, defCache)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	reqs, err = alignRequests(reqs, aggSettings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

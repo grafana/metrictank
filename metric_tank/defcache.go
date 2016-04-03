@@ -2,11 +2,14 @@ package main
 
 import (
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"sync"
 	"time"
 )
+
+// TODO call Prune every 5min or so
 
 // design notes:
 // MT pulls in all definitions when it starts up.
@@ -21,15 +24,16 @@ import (
 
 type DefCache struct {
 	sync.RWMutex
-	defsById  map[string]*schema.MetricDefinition // by hashed id
-	defsByKey map[string]*schema.MetricDefinition // by graphite key or "Name" in the def
+	defs      []*schema.MetricDefinition
+	ById      map[string]idx.MetricID // by hashed id. we store uints, not pointers, to lower GC workload.
+	ByKey     *idx.Idx                // by graphite key or "Name" in the def
 	defsStore metricdef.Defs
 }
 
 func NewDefCache(defsStore metricdef.Defs) *DefCache {
 	d := &DefCache{
-		defsById:  make(map[string]*schema.MetricDefinition),
-		defsByKey: make(map[string]*schema.MetricDefinition),
+		ById:      make(map[string]idx.MetricID),
+		ByKey:     idx.New(),
 		defsStore: defsStore,
 	}
 	d.Backfill()
@@ -47,8 +51,10 @@ func (dc *DefCache) Backfill() {
 			total += len(met)
 			dc.Lock()
 			for _, def := range met {
-				dc.defsById[def.Id] = def
-				dc.defsByKey[def.Name] = def
+				id := dc.ByKey.GetOrAdd(def.OrgId, def.Name) // gets id auto assigned from 0 and onwards
+				dc.ByKey.AddRef(def.OrgId, id)
+				dc.ById[def.Id] = id
+				dc.defs = append(dc.defs, def) // which maps 1:1 with pos in this array
 			}
 			dc.Unlock()
 		}
@@ -72,18 +78,30 @@ func (dc *DefCache) Backfill() {
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
 	dc.Lock()
-	mdef, ok := dc.defsById[metric.Id]
+	id, ok := dc.ById[metric.Id]
 	dc.Unlock()
 	if ok {
 		//If the time diff between this datapoint and the lastUpdate
 		// time of the metricDef is greater than 6hours, update the metricDef.
+		dc.Lock()
+		mdef := dc.defs[id]
+		dc.Unlock()
 		if mdef.LastUpdate < metric.Time-21600 {
 			mdef = schema.MetricDefinitionFromMetricData(metric)
 			dc.addToES(mdef)
+			dc.Lock()
+			dc.defs[id] = mdef
+			dc.Unlock()
 		}
 	} else {
-		mdef = schema.MetricDefinitionFromMetricData(metric)
+		mdef := schema.MetricDefinitionFromMetricData(metric)
 		dc.addToES(mdef)
+		dc.Lock()
+		id := dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
+		dc.ByKey.AddRef(mdef.OrgId, id)
+		dc.ById[mdef.Id] = id
+		dc.defs = append(dc.defs, mdef)
+		dc.Unlock()
 	}
 }
 
@@ -98,51 +116,44 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 		metricsToEsFail.Inc(1)
 	} else {
 		metricsToEsOK.Inc(1)
-		dc.Lock()
-		dc.defsById[mdef.Id] = mdef
-		dc.defsByKey[mdef.Name] = mdef
-		dc.Unlock()
 	}
 	esPutDuration.Value(time.Now().Sub(pre))
 }
 
+// note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
+// and we assume we can use that interval through history.
+// TODO: no support for interval changes, missing datablocks, ...
 func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	dc.RLock()
-	def, ok := dc.defsById[id]
-	dc.RUnlock()
-	return def, ok
-}
-
-func (dc *DefCache) GetByKey(key string) (*schema.MetricDefinition, bool) {
-	dc.RLock()
-	def, ok := dc.defsByKey[key]
-	dc.RUnlock()
-	return def, ok
-}
-
-func (dc *DefCache) UpdateReq(req *Req) error {
-	// note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
-	// and we assume we can use that interval through history.
-	// TODO: no support for interval changes, missing datablocks, ...
-	def, ok := dc.Get(req.key)
-
-	if !ok {
-		metricDefCacheMiss.Inc(1)
-		return errMetricNotFound
-	} else {
-		req.rawInterval = uint32(def.Interval)
+	i, ok := dc.ById[id]
+	var def *schema.MetricDefinition
+	if ok {
 		metricDefCacheHit.Inc(1)
+		def = dc.defs[i]
+	} else {
+		metricDefCacheMiss.Inc(1)
 	}
-	return nil
+	dc.RUnlock()
+	return def, ok
 }
 
-func (dc *DefCache) List() []*schema.MetricDefinition {
+func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
+	globs := dc.ByKey.Match(org, key)
+	defs := make([]*schema.MetricDefinition, len(globs))
 	dc.RLock()
-	out := make([]*schema.MetricDefinition, len(dc.defsByKey))
-	i := 0
-	for _, md := range dc.defsByKey {
-		out[i] = md
-		i++
+	for i, g := range globs {
+		defs[i] = dc.defs[g.Id]
+	}
+	dc.RUnlock()
+	return defs
+}
+
+func (dc *DefCache) List(org int) []*schema.MetricDefinition {
+	list := dc.ByKey.List(org)
+	out := make([]*schema.MetricDefinition, len(list))
+	dc.RLock()
+	for i, id := range list {
+		out[i] = dc.defs[id]
 	}
 	dc.RUnlock()
 	return out

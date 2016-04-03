@@ -138,29 +138,29 @@ func TestMatch(t *testing.T) {
 		out   []Glob
 	}{
 		// no stars
-		{1, "abc.def.ghi", []Glob{{"abc.def.ghi", true}}},
+		{1, "abc.def.ghi", []Glob{{1, "abc.def.ghi", true}}},
 
 		// no star try to get other org specifically
 		{1, "abc.def.ghij", []Glob{}},
 		{2, "abc.def.GHI", []Glob{}},
 
 		// prefix star
-		{1, "*.def.ghi", []Glob{{"abc.def.ghi", true}}},
+		{1, "*.def.ghi", []Glob{{1, "abc.def.ghi", true}}},
 
 		// postfix and mid stars
-		{1, "abc.def.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
-		{1, "abc.def.g*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}}},
-		{1, "abc.def.gh*", []Glob{{"abc.def.ghi", true}}},
-		{1, "abc.*e*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
-		{1, "abc.d*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
-		{1, "abc.*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
-		{1, "abc.*.ghi", []Glob{{"abc.def.ghi", true}}},
-		{1, "*.*.ghi", []Glob{{"abc.def.ghi", true}}},
+		{1, "abc.def.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "abc.def.g*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}}},
+		{1, "abc.def.gh*", []Glob{{1, "abc.def.ghi", true}}},
+		{1, "abc.*e*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "abc.d*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "abc.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "abc.*.ghi", []Glob{{1, "abc.def.ghi", true}}},
+		{1, "*.*.ghi", []Glob{{1, "abc.def.ghi", true}}},
 		{1, "*.*.ghij", []Glob{}},
 		{1, "bc.*.*", []Glob{}},
 
 		// all stars
-		{1, "*.*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "*.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
 	}
 	for i, c := range cases {
 		globs := ix.Match(c.org, c.query)
