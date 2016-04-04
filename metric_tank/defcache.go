@@ -128,10 +128,7 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	i, ok := dc.ById[id]
 	var def *schema.MetricDefinition
 	if ok {
-		metricDefCacheHit.Inc(1)
 		def = dc.defs[i]
-	} else {
-		metricDefCacheMiss.Inc(1)
 	}
 	dc.RUnlock()
 	return def, ok

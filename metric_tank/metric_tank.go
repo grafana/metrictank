@@ -98,8 +98,6 @@ var (
 	chunkClear            met.Count
 	chunkSaveOk           met.Count
 	chunkSaveFail         met.Count
-	metricDefCacheHit     met.Count
-	metricDefCacheMiss    met.Count
 	metricsReceived       met.Count
 	metricsTooOld         met.Count
 	cassRowsPerResponse   met.Meter
@@ -376,8 +374,6 @@ func initMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
-	metricDefCacheHit = stats.NewCount("metricmeta_cache.hit")
-	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
 	gcMetric = stats.NewCount("gc_metric")
