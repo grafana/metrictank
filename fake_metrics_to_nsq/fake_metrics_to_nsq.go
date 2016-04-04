@@ -152,11 +152,12 @@ func Publish(metrics []*schema.MetricData) error {
 func run(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int) {
 	// examples:
 	// flushperiod - metricperiod - speedup -> data to flush each flush
-	// 100           1              1          1/10 -> flush 1 of 10 fractions
-	// 100           1              2          1/5 -> flush 1 of 5 fractions
-	// 1000          1              2          2x -> flush ratio 2
-	// 2000          1              1          2x -> flush ratio 2
-	// 2000          1              2          4x -> flush ratio 4
+	// 100     ms    1 s            1          1/10 -> flush 1 of 10 fractions runDivided <-- default
+	// 100     ms    1 s            2          1/5 -> flush 1 of 5 fractions   runDivided
+	// 100     ms    1 s            100        1/5 -> flush 1x                 runMultiplied
+	// 1000    ms    1 s            2          2x -> flush 2x                  runMultiplied
+	// 2000    ms    1 s            1          2x -> flush 2x                  runMultiplied
+	// 2000    ms    1 s            2          4x -> flush 4x                  runMultiplied
 
 	if flushPeriod*speedup >= 1000*metricPeriod {
 		runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup)
