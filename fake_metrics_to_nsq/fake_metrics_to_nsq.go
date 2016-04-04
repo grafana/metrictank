@@ -205,15 +205,16 @@ func runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup 
 		for i := 0; i < len(metrics); i++ {
 			if i%uniqueKeys == 0 {
 				ts += mp
-				if ts > now && *stopAtNow {
-					return
-				}
-
 			}
 			metrics[i].Time = ts
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
+
 		Publish(metrics)
+
+		if ts >= now && *stopAtNow {
+			return
+		}
 	}
 }
 
@@ -259,14 +260,16 @@ func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int
 		endIndex = startIndex + metricsPerFrac
 		if startIndex == 0 {
 			ts += mp
-			if ts > now && *stopAtNow {
-				return
-			}
 		}
 		for i := startIndex; i < endIndex; i++ {
 			metrics[i].Time = ts
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
+
 		Publish(metrics[startIndex:endIndex])
+
+		if ts >= now && *stopAtNow {
+			return
+		}
 	}
 }
