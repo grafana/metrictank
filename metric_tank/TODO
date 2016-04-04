@@ -1,1 +1,4 @@
 we don't have a list of all keys inside the tsdb. consequences: you can't get lists/search/autocomplete and for non-existant keys we still query cassandra
+auto pruning of trigrams
+run with race detector to check concurrent access to index
+targets in json output contain the original query, not the series
