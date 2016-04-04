@@ -26,7 +26,7 @@ type DefCache struct {
 	sync.RWMutex
 	defs      []*schema.MetricDefinition
 	ById      map[string]idx.MetricID // by hashed id. we store uints, not pointers, to lower GC workload.
-	ByKey     *idx.Idx                // by graphite key or "Name" in the def
+	ByKey     *idx.Idx                // by graphite key aka "Name" in the def to support graphite native api. this index is experimental and may be removed in the future
 	defsStore metricdef.Defs
 }
 
