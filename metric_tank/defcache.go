@@ -24,7 +24,7 @@ import (
 
 type DefCache struct {
 	sync.RWMutex
-	defs      []*schema.MetricDefinition
+	defs      []schema.MetricDefinition
 	ById      map[string]idx.MetricID // by hashed id. we store uints, not pointers, to lower GC workload.
 	ByKey     *idx.Idx                // by graphite key aka "Name" in the def to support graphite native api. this index is experimental and may be removed in the future
 	defsStore metricdef.Defs
@@ -54,7 +54,7 @@ func (dc *DefCache) Backfill() {
 				id := dc.ByKey.GetOrAdd(def.OrgId, def.Name) // gets id auto assigned from 0 and onwards
 				dc.ByKey.AddRef(def.OrgId, id)
 				dc.ById[def.Id] = id
-				dc.defs = append(dc.defs, def) // which maps 1:1 with pos in this array
+				dc.defs = append(dc.defs, *def) // which maps 1:1 with pos in this array
 			}
 			dc.Unlock()
 		}
@@ -87,15 +87,15 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 		mdef := dc.defs[id]
 		dc.Unlock()
 		if mdef.LastUpdate < metric.Time-21600 {
-			mdef = schema.MetricDefinitionFromMetricData(metric)
-			dc.addToES(mdef)
+			mdef = *schema.MetricDefinitionFromMetricData(metric)
+			dc.addToES(&mdef)
 			dc.Lock()
 			dc.defs[id] = mdef
 			dc.Unlock()
 		}
 	} else {
-		mdef := schema.MetricDefinitionFromMetricData(metric)
-		dc.addToES(mdef)
+		mdef := *schema.MetricDefinitionFromMetricData(metric)
+		dc.addToES(&mdef)
 		dc.Lock()
 		id := dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
 		dc.ByKey.AddRef(mdef.OrgId, id)
@@ -128,7 +128,7 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	i, ok := dc.ById[id]
 	var def *schema.MetricDefinition
 	if ok {
-		def = dc.defs[i]
+		def = &dc.defs[i]
 	}
 	dc.RUnlock()
 	return def, ok
@@ -139,7 +139,7 @@ func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
 	defs := make([]*schema.MetricDefinition, len(globs))
 	dc.RLock()
 	for i, g := range globs {
-		defs[i] = dc.defs[g.Id]
+		defs[i] = &dc.defs[g.Id]
 	}
 	dc.RUnlock()
 	return defs
@@ -150,7 +150,7 @@ func (dc *DefCache) List(org int) []*schema.MetricDefinition {
 	out := make([]*schema.MetricDefinition, len(list))
 	dc.RLock()
 	for i, id := range list {
-		out[i] = dc.defs[id]
+		out[i] = &dc.defs[id]
 	}
 	dc.RUnlock()
 	return out
