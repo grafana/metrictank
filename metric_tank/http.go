@@ -234,23 +234,28 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
 		}
 
-		defs := make([]*schema.MetricDefinition, 0)
 		if legacy {
-			defs = defCache.Find(org, id)
+			// querying for a graphite pattern
+			defs := defCache.Find(org, id)
 			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
+			for _, def := range defs {
+				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				}
+				target := strings.Replace(target, id, def.Name, -1)
+				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			}
 		} else {
+			// querying for a MT id
 			def, ok := defCache.Get(id)
 			if !ok {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			defs = append(defs, def)
-		}
-
-		for _, def := range defs {
 			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)

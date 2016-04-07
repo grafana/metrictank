@@ -8,7 +8,7 @@ import (
 type Req struct {
 	// these fields can be set straight away:
 	key          string // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-raintank requests
-	target       string // original input string like consolidateBy(key,'sum') or "foo.bar.baz.*". used in output so that graphite doesn't get confused
+	target       string // the target we should return either to graphite or as if we're graphite.  this is usually the original input string like consolidateBy(key,'sum') except when it's a pattern than it becomes the concrete value like consolidateBy(foo.b*,'sum') -> consolidateBy(foo.bar,'sum') etc
 	from         uint32
 	to           uint32
 	maxPoints    uint32
