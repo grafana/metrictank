@@ -253,26 +253,9 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 
 		for _, def := range defs {
-
-			if consolidateBy == "" {
-				consolidateBy = "avg"
-				if def.TargetType == "counter" {
-					consolidateBy = "last"
-				}
-			}
-			var consolidator consolidation.Consolidator
-			switch consolidateBy {
-			case "avg", "average":
-				consolidator = consolidation.Avg
-			case "min":
-				consolidator = consolidation.Min
-			case "max":
-				consolidator = consolidation.Max
-			case "sum":
-				consolidator = consolidation.Sum
-			default:
-				http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
-				return
+			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
 			req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
 			req.rawInterval = uint32(def.Interval)
