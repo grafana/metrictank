@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
@@ -128,12 +131,20 @@ func graphiteRaintankJSON(b []byte, series []Series) ([]byte, error) {
 	return b, nil
 }
 
+func getOrg(req *http.Request) (int, error) {
+	orgStr := req.Header.Get("x-org-id")
+	org, err := strconv.Atoi(orgStr)
+	if err != nil {
+		return 0, errors.New("bad org-id")
+	}
+	return org, nil
+}
+
 func IndexJson(defCache *DefCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		orgStr := req.Header.Get("x-org-id")
-		org, err := strconv.Atoi(orgStr)
+		org, err := getOrg(req)
 		if err != nil {
-			http.Error(w, "bad org-id", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		list := defCache.List(org)
@@ -163,12 +174,11 @@ func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMin
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
+	var err error
 	if legacy {
-		orgStr := req.Header.Get("x-org-id")
-		var err error
-		org, err = strconv.Atoi(orgStr)
+		org, err = getOrg(req)
 		if err != nil {
-			http.Error(w, "bad org-id", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
@@ -176,7 +186,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := req.Form.Get("maxDataPoints")
-	var err error
 	if maxDataPointsStr != "" {
 		tmp, err := strconv.Atoi(maxDataPointsStr)
 		if err != nil {
@@ -254,7 +263,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 
 		if legacy {
 			// querying for a graphite pattern
-			defs := defCache.Find(org, id)
+			_, defs := defCache.Find(org, id)
 			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
@@ -342,4 +351,136 @@ func appStatus(w http.ResponseWriter, req *http.Request) {
 
 	w.Write([]byte("OK"))
 	return
+}
+
+func findHandler(w http.ResponseWriter, r *http.Request) {
+
+	format := r.FormValue("format")
+	jsonp := r.FormValue("jsonp")
+	query := r.FormValue("query")
+	org, err := getOrg(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if query == "" {
+		http.Error(w, "missing parameter `query`", http.StatusBadRequest)
+		return
+	}
+
+	if format != "" && format != "treejson" && format != "json" && format != "completer" {
+		http.Error(w, "invalid format", http.StatusBadRequest)
+	}
+
+	globs, _ := defCache.Find(org, query)
+
+	var b []byte
+	switch format {
+	case "", "treejson", "json":
+		b, err = findTreejson(query, globs)
+	case "completer":
+		b, err = findCompleter(globs)
+	}
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	writeResponse(w, b, httpTypeJSON, jsonp)
+}
+
+type completer struct {
+	Path   string `json:"path"`
+	Name   string `json:"name"`
+	IsLeaf string `json:"is_leaf"`
+}
+
+func findCompleter(globs []idx.Glob) ([]byte, error) {
+	var b bytes.Buffer
+
+	var complete = make([]completer, 0)
+
+	for _, g := range globs {
+		c := completer{
+			Path: g.Metric,
+		}
+
+		if g.IsLeaf {
+			c.IsLeaf = "1"
+		} else {
+			c.IsLeaf = "0"
+		}
+
+		i := strings.LastIndex(c.Path, ".")
+
+		if i != -1 {
+			c.Name = c.Path[i+1:]
+		}
+
+		complete = append(complete, c)
+	}
+
+	err := json.NewEncoder(&b).Encode(struct {
+		Metrics []completer `json:"metrics"`
+	}{
+		Metrics: complete},
+	)
+	return b.Bytes(), err
+}
+
+type treejson struct {
+	AllowChildren int            `json:"allowChildren"`
+	Expandable    int            `json:"expandable"`
+	Leaf          int            `json:"leaf"`
+	ID            string         `json:"id"`
+	Text          string         `json:"text"`
+	Context       map[string]int `json:"context"` // unused
+}
+
+var treejsonContext = make(map[string]int)
+
+func findTreejson(query string, globs []idx.Glob) ([]byte, error) {
+	var b bytes.Buffer
+
+	tree := make([]treejson, 0)
+	seen := make(map[string]struct{})
+
+	basepath := query
+	if i := strings.LastIndex(basepath, "."); i != -1 {
+		basepath = basepath[:i+1]
+	}
+
+	for _, g := range globs {
+
+		name := g.Metric
+
+		if i := strings.LastIndex(name, "."); i != -1 {
+			name = name[i+1:]
+		}
+
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+
+		t := treejson{
+			ID:      basepath + name,
+			Context: treejsonContext,
+			Text:    name,
+		}
+
+		if g.IsLeaf {
+			t.Leaf = 1
+		} else {
+			t.AllowChildren = 1
+			t.Expandable = 1
+		}
+
+		tree = append(tree, t)
+	}
+
+	err := json.NewEncoder(&b).Encode(tree)
+	return b.Bytes(), err
 }

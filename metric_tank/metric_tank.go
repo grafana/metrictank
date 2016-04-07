@@ -351,6 +351,7 @@ func main() {
 		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
 		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
 		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
+		http.HandleFunc("/metrics/find/", corsHandler(findHandler))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))

@@ -151,7 +151,7 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	return def, ok
 }
 
-func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
+func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefinition) {
 	pre := time.Now()
 	dc.RLock()
 	mt, globs := dc.ByKey.Match(org, key)
@@ -168,7 +168,7 @@ func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
 	case idx.MatchTrigram:
 		idxMatchTrigramDuration.Value(time.Now().Sub(pre))
 	}
-	return defs
+	return globs, defs
 }
 
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
