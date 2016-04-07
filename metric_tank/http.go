@@ -28,6 +28,12 @@ type Series struct {
 	Interval   uint32
 }
 
+type SeriesByTarget []Series
+
+func (g SeriesByTarget) Len() int           { return len(g) }
+func (g SeriesByTarget) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g SeriesByTarget) Less(i, j int) bool { return g[i].Target < g[j].Target }
+
 func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
 	names := make([]string, len(defs))
 	for i := 0; i < len(defs); i++ {
@@ -289,6 +295,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 
 	js := bufPool.Get().([]byte)
 	if legacy {
+		sort.Sort(SeriesByTarget(out))
 		js, err = graphiteJSON(js, out)
 	} else {
 		js, err = graphiteRaintankJSON(js, out)

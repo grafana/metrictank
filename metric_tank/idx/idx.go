@@ -10,9 +10,7 @@ package idx
 
 import (
 	"path/filepath"
-	"sort"
 	"strings"
-	//	"time"
 
 	"github.com/armon/go-radix"
 	"github.com/dgryski/go-trigram"
@@ -49,12 +47,6 @@ func orgToTrigram(org int) trigram.T {
 	ret := OTTBase + uint32(org) + 1
 	return trigram.T(ret)
 }
-
-type globByName []Glob
-
-func (g globByName) Len() int           { return len(g) }
-func (g globByName) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
-func (g globByName) Less(i, j int) bool { return g[i].Metric < g[j].Metric }
 
 type Idx struct {
 	// all metrics
@@ -260,7 +252,7 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 
 // TODO(dgryski): this needs most of the logic in grobian/carbsonerver:findHandler()
 // Dieter: this doesn't support {, }, [, ]
-
+// output is unsorted, if you want it sorted, do it yourself
 func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
 
 	// no wildcard == exact match only
@@ -287,8 +279,6 @@ func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
 		response = i.QueryPath(org, query)
 		matchType = MatchTrigram
 	}
-
-	sort.Sort(globByName(response))
 
 	return matchType, response
 }
