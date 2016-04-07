@@ -34,6 +34,19 @@ func (g SeriesByTarget) Len() int           { return len(g) }
 func (g SeriesByTarget) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
 func (g SeriesByTarget) Less(i, j int) bool { return g[i].Target < g[j].Target }
 
+func corsHandler(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			// nothing to do, CORS headers already sent
+			return
+		}
+		handler(w, r)
+	}
+}
+
 func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
 	names := make([]string, len(defs))
 	for i := 0; i < len(defs); i++ {
@@ -311,7 +324,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	w.Write(js)
 	bufPool.Put(js[:0])
