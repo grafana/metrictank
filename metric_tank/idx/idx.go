@@ -324,6 +324,18 @@ func extractTrigrams(query string) []trigram.T {
 	return trigrams
 }
 
-func (i *Idx) Prune(pct float64) int {
-	return i.Pathidx.Prune(pct)
+// Prune is a custom pruning function for the trigram index
+// it removes all trigrams that are present in more than the specified percentage of the documents.
+// However, it makes sure that neither tAllDocIDs,
+// nor any of the org specific trigrams used for access control are ever pruned.
+func (i *Idx) Prune(pct float64) {
+	// 0xFFFFFFFF is just tAllDocIDs in the trigram package but it's not yet exported
+	// https://github.com/dgryski/go-trigram/pull/18
+	maxDocs := int(pct * float64(len(i.Pathidx[0xFFFFFFFF])))
+	for k, v := range i.Pathidx {
+		// all values >= 1<<31 are special trigrams that should be kept
+		if uint32(k) < uint32(2147483648) && len(v) > maxDocs {
+			i.Pathidx[k] = nil
+		}
+	}
 }
