@@ -18,6 +18,14 @@ import (
 	"github.com/dgryski/go-trigram"
 )
 
+type MatchType uint8
+
+const (
+	MatchLiteral MatchType = iota
+	MatchPrefix
+	MatchTrigram
+)
+
 type MetricID uint32 // same thing as trigram.DocID. just syntactic sugar
 
 type Glob struct {
@@ -253,7 +261,7 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 // TODO(dgryski): this needs most of the logic in grobian/carbsonerver:findHandler()
 // Dieter: this doesn't support {, }, [, ]
 
-func (i *Idx) Match(org int, query string) []Glob {
+func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
 
 	// no wildcard == exact match only
 	var star int
@@ -261,26 +269,28 @@ func (i *Idx) Match(org int, query string) []Glob {
 		var id MetricID
 		var ok bool
 		if id, ok = i.Get(org, query); !ok {
-			return nil
+			return MatchLiteral, nil
 		}
-		return []Glob{{Id: id, Metric: query, IsLeaf: true}}
+		return MatchLiteral, []Glob{{Id: id, Metric: query, IsLeaf: true}}
 	}
 
 	var response []Glob
+	var matchType MatchType
 
 	if star == len(query)-1 {
 		// only one trailing star
 		query = query[:len(query)-1]
 		response = i.QueryRadix(org, query)
-
+		matchType = MatchPrefix
 	} else {
 		// at least one interior star
 		response = i.QueryPath(org, query)
+		matchType = MatchTrigram
 	}
 
 	sort.Sort(globByName(response))
 
-	return response
+	return matchType, response
 }
 
 func extractTrigrams(query string) []trigram.T {

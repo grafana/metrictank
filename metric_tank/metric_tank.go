@@ -135,6 +135,13 @@ var (
 	gcDur             met.Gauge // go GC
 	gcMetric          met.Count // metrics GC
 
+	idxPruneDuration        met.Timer
+	idxGetDuration          met.Timer
+	idxListDuration         met.Timer
+	idxMatchLiteralDuration met.Timer
+	idxMatchPrefixDuration  met.Timer
+	idxMatchTrigramDuration met.Timer
+
 	promotionReadyAtChan chan uint32
 )
 
@@ -408,6 +415,13 @@ func initMetrics(stats met.Backend) {
 	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
 	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
+
+	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
+	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
+	idxListDuration = stats.NewTimer("idx.list_duration", 0)
+	idxMatchLiteralDuration = stats.NewTimer("idx.match_literal_duration", 0)
+	idxMatchPrefixDuration = stats.NewTimer("idx.match_prefix_duration", 0)
+	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
 
 	// run a collector for some global stats
 	go func() {

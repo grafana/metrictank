@@ -47,9 +47,11 @@ func (dc *DefCache) Prune() {
 		// this only retains the trigram postlists in the index if <20%
 		// of the metrics contain them.  this keeps memory usage down
 		// and makes queries faster
+		pre := time.Now()
 		dc.Lock()
 		dc.ByKey.Prune(0.20)
 		dc.Unlock()
+		idxPruneDuration.Value(time.Now().Sub(pre))
 	}
 }
 
@@ -138,27 +140,39 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 // TODO: no support for interval changes, missing datablocks, ...
 func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	var def *schema.MetricDefinition
+	pre := time.Now()
 	dc.RLock()
 	i, ok := dc.ById[id]
 	if ok {
 		def = &dc.defs[i]
 	}
 	dc.RUnlock()
+	idxGetDuration.Value(time.Now().Sub(pre))
 	return def, ok
 }
 
 func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
+	pre := time.Now()
 	dc.RLock()
-	globs := dc.ByKey.Match(org, key)
+	mt, globs := dc.ByKey.Match(org, key)
 	defs := make([]*schema.MetricDefinition, len(globs))
 	for i, g := range globs {
 		defs[i] = &dc.defs[g.Id]
 	}
 	dc.RUnlock()
+	switch mt {
+	case idx.MatchLiteral:
+		idxMatchLiteralDuration.Value(time.Now().Sub(pre))
+	case idx.MatchPrefix:
+		idxMatchPrefixDuration.Value(time.Now().Sub(pre))
+	case idx.MatchTrigram:
+		idxMatchTrigramDuration.Value(time.Now().Sub(pre))
+	}
 	return defs
 }
 
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
+	pre := time.Now()
 	dc.RLock()
 	list := dc.ByKey.List(org)
 	out := make([]*schema.MetricDefinition, len(list))
@@ -166,5 +180,6 @@ func (dc *DefCache) List(org int) []*schema.MetricDefinition {
 		out[i] = &dc.defs[id]
 	}
 	dc.RUnlock()
+	idxListDuration.Value(time.Now().Sub(pre))
 	return out
 }
