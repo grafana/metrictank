@@ -38,6 +38,7 @@ func NewDefCache(defsStore metricdef.Defs) *DefCache {
 	d.Backfill()
 	return d
 }
+
 func (dc *DefCache) Prune() {
 	t := time.Tick(3 * time.Minute)
 	for range t {
@@ -46,7 +47,9 @@ func (dc *DefCache) Prune() {
 		// this only retains the trigram postlists in the index if <20%
 		// of the metrics contain them.  this keeps memory usage down
 		// and makes queries faster
-		d.ByKey.Prune(0.20)
+		dc.Lock()
+		dc.ByKey.Prune(0.20)
+		dc.Unlock()
 	}
 }
 
@@ -87,15 +90,15 @@ func (dc *DefCache) Backfill() {
 }
 
 func (dc *DefCache) Add(metric *schema.MetricData) {
-	dc.Lock()
+	dc.RLock()
 	id, ok := dc.ById[metric.Id]
-	dc.Unlock()
+	dc.RUnlock()
 	if ok {
 		//If the time diff between this datapoint and the lastUpdate
 		// time of the metricDef is greater than 6hours, update the metricDef.
-		dc.Lock()
+		dc.RLock()
 		mdef := dc.defs[id]
-		dc.Unlock()
+		dc.RUnlock()
 		if mdef.LastUpdate < metric.Time-21600 {
 			mdef = *schema.MetricDefinitionFromMetricData(metric)
 			dc.addToES(&mdef)
@@ -134,9 +137,9 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 // and we assume we can use that interval through history.
 // TODO: no support for interval changes, missing datablocks, ...
 func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
+	var def *schema.MetricDefinition
 	dc.RLock()
 	i, ok := dc.ById[id]
-	var def *schema.MetricDefinition
 	if ok {
 		def = &dc.defs[i]
 	}
@@ -145,9 +148,9 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 }
 
 func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
+	dc.RLock()
 	globs := dc.ByKey.Match(org, key)
 	defs := make([]*schema.MetricDefinition, len(globs))
-	dc.RLock()
 	for i, g := range globs {
 		defs[i] = &dc.defs[g.Id]
 	}
@@ -156,9 +159,9 @@ func (dc *DefCache) Find(org int, key string) []*schema.MetricDefinition {
 }
 
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
+	dc.RLock()
 	list := dc.ByKey.List(org)
 	out := make([]*schema.MetricDefinition, len(list))
-	dc.RLock()
 	for i, id := range list {
 		out[i] = &dc.defs[id]
 	}
