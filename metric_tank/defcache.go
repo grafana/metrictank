@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// TODO call Prune every 5min or so
-
 // design notes:
 // MT pulls in all definitions when it starts up.
 // those "old" ones + whatever it sees as inputs from the metrics queue
@@ -36,8 +34,20 @@ func NewDefCache(defsStore metricdef.Defs) *DefCache {
 		ByKey:     idx.New(),
 		defsStore: defsStore,
 	}
+	go d.Prune()
 	d.Backfill()
 	return d
+}
+func (dc *DefCache) Prune() {
+	t := time.Tick(3 * time.Minute)
+	for range t {
+		// there's some fragments that occur in a whole lot of metrics
+		// for example 'litmus'
+		// this only retains the trigram postlists in the index if <20%
+		// of the metrics contain them.  this keeps memory usage down
+		// and makes queries faster
+		d.ByKey.Prune(0.20)
+	}
 }
 
 // backfill definitions from ES
