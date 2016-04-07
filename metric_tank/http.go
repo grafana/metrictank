@@ -144,8 +144,7 @@ func IndexJson(defCache *DefCache) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		writeResponse(w, js, httpTypeJSON, "")
 		bufPool.Put(js[:0])
 	}
 }
@@ -323,9 +322,8 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	reqHandleDuration.Value(time.Now().Sub(pre))
-	w.Write(js)
+	writeResponse(w, js, httpTypeJSON, "")
 	bufPool.Put(js[:0])
 }
 
