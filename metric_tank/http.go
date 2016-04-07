@@ -142,8 +142,6 @@ func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMin
 	}
 }
 
-// note: we don't normalize/quantize/fill-unknowns
-// we just serve what we know
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
