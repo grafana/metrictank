@@ -257,9 +257,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
-			req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
-			req.rawInterval = uint32(def.Interval)
-			reqs = append(reqs, req)
+			reqs = append(reqs, NewReq(id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
 	}
 	if (toUnix - fromUnix) >= logMinDur {
