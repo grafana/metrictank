@@ -9,7 +9,7 @@
        example: `consolidateBy(1.2345foobar,'average')`.
   * `maxDataPoints`: max points to be returned. runs runtime consolidation when needed. optional
   * `from` and `to` unix timestamps. optional
-    * from is inclusive, to is exclusive.
+    * from is inclusive, to is exclusive. you can also use 'until' but to takes precedence.
     * so from=x, to=y returns data that can include x and y-1 but not y.
     * from defaults to now-24h, to to now+1.
     * from can also be a human friendly pattern like -10min or -7d

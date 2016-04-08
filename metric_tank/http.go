@@ -227,6 +227,9 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 	}
 	to := req.Form.Get("to")
+	if to == "" {
+		to = req.Form.Get("until")
+	}
 	if to != "" {
 		toUnixInt, err := strconv.Atoi(to)
 		if err != nil {
@@ -234,6 +237,13 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			return
 		}
 		toUnix = uint32(toUnixInt)
+	}
+	if legacy {
+		// in MT, both the external and internal api, from is inclusive, to is exclusive
+		// in graphite, from is exclusive and to inclusive
+		// so in this case, adjust for internal api.
+		fromUnix += 1
+		toUnix += 1
 	}
 	if fromUnix >= toUnix {
 		http.Error(w, "to must be higher than from", http.StatusBadRequest)
