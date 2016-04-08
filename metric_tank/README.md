@@ -49,3 +49,9 @@ when one primary is down you need to be careful about when to promote a secondar
 * `/render` has a very, very limited subset of the graphite render api. basically you can specify targets by their graphite key, set from, to and maxDataPoints, and use consolidateBy.
 No other function or parameter is currently supported.  Also we don't check org-id so don't expose this publically
 * `/metrics/index.json` is like graphite.  Don't expose this publically
+
+
+## design limitations to address at some point:
+
+* NSQ does not provide ordering guarantees, we need ordering for optimal compression, aggregations. currently we drop out of order points which may result in gaps.
+see https://github.com/raintank/raintank-metric/issues/41 for more info. also [it may also affect alerting](https://github.com/raintank/raintank-metric/issues/17). we're looking into kafka.
