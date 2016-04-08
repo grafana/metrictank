@@ -213,7 +213,8 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		// once we need to support several functions, we can implement
 		// a proper expression parser
 		if strings.HasPrefix(target, "consolidateBy(") {
-			if target[len(target)-2:] != "')" || !strings.Contains(target, ",'") || strings.Count(target, "'") != 2 || strings.Count(target, ",") != 1 {
+			t := target
+			if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 || strings.Count(t, ",") != 1 {
 				http.Error(w, "target parse error", http.StatusBadRequest)
 				return
 			}
