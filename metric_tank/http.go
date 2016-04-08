@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
@@ -233,7 +234,13 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		if consolidateBy == "" {
 			def, ok := defCache.Get(id)
 			consolidateBy = "avg"
-			if ok && def.TargetType == "counter" {
+			if !ok {
+				e := fmt.Sprintf("metric %q not found", id)
+				log.Error(0, e)
+				http.Error(w, e, http.StatusBadRequest)
+				return
+			}
+			if def.TargetType == "counter" {
 				consolidateBy = "last"
 			}
 		}
