@@ -23,16 +23,6 @@ func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 
-func findMetricsForRequests(reqs []Req, defCache *DefCache) error {
-	for i := range reqs {
-		err := defCache.UpdateReq(&reqs[i])
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!

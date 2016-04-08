@@ -45,9 +45,9 @@ type MetricDataArray []*MetricData
 type MetricDefinition struct {
 	Id         string            `json:"id"`
 	OrgId      int               `json:"org_id"`
-	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"`
-	Metric     string            `json:"metric"`
-	Interval   int               `json:"interval"` // minimum 10
+	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
+	Metric     string            `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
+	Interval   int               `json:"interval"`                                      // minimum 10
 	Unit       string            `json:"unit"`
 	TargetType string            `json:"target_type"` // an emum ["derive","gauge"] in nodejs
 	Tags       []string          `json:"tags" elastic:"type:string,index:not_analyzed"`

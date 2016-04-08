@@ -1,1 +1,2 @@
 we don't have a list of all keys inside the tsdb. consequences: you can't get lists/search/autocomplete and for non-existant keys we still query cassandra
+targets in json output contain the original query, not the series

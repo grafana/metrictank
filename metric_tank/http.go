@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
@@ -27,6 +30,25 @@ type Series struct {
 	Target     string
 	Datapoints []schema.Point
 	Interval   uint32
+}
+
+type SeriesByTarget []Series
+
+func (g SeriesByTarget) Len() int           { return len(g) }
+func (g SeriesByTarget) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g SeriesByTarget) Less(i, j int) bool { return g[i].Target < g[j].Target }
+
+func corsHandler(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			// nothing to do, CORS headers already sent
+			return
+		}
+		handler(w, r)
+	}
 }
 
 func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
@@ -110,18 +132,31 @@ func graphiteRaintankJSON(b []byte, series []Series) ([]byte, error) {
 	return b, nil
 }
 
+func getOrg(req *http.Request) (int, error) {
+	orgStr := req.Header.Get("x-org-id")
+	org, err := strconv.Atoi(orgStr)
+	if err != nil {
+		return 0, errors.New("bad org-id")
+	}
+	return org, nil
+}
+
 func IndexJson(defCache *DefCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		list := defCache.List()
+		org, err := getOrg(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		list := defCache.List(org)
 		js := bufPool.Get().([]byte)
-		js, err := listJSON(js, list)
+		js, err = listJSON(js, list)
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(js)
+		writeResponse(w, js, httpTypeJSON, "")
 		bufPool.Put(js[:0])
 	}
 }
@@ -137,15 +172,21 @@ func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMin
 	}
 }
 
-// note: we don't normalize/quantize/fill-unknowns
-// we just serve what we know
 func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
+	org := 0
+	var err error
+	if legacy {
+		org, err = getOrg(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	req.ParseForm()
 
 	maxDataPoints := uint32(800)
 	maxDataPointsStr := req.Form.Get("maxDataPoints")
-	var err error
 	if maxDataPointsStr != "" {
 		tmp, err := strconv.Atoi(maxDataPointsStr)
 		if err != nil {
@@ -187,6 +228,9 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 	}
 	to := req.Form.Get("to")
+	if to == "" {
+		to = req.Form.Get("until")
+	}
 	if to != "" {
 		toUnixInt, err := strconv.Atoi(to)
 		if err != nil {
@@ -194,6 +238,13 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			return
 		}
 		toUnix = uint32(toUnixInt)
+	}
+	if legacy {
+		// in MT, both the external and internal api, from is inclusive, to is exclusive
+		// in graphite, from is exclusive and to inclusive
+		// so in this case, adjust for internal api.
+		fromUnix += 1
+		toUnix += 1
 	}
 	if fromUnix >= toUnix {
 		http.Error(w, "to must be higher than from", http.StatusBadRequest)
@@ -204,8 +255,8 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	reqs := make([]Req, len(targets))
-	for i, target := range targets {
+	reqs := make([]Req, 0)
+	for _, target := range targets {
 		var consolidateBy string
 		id := target
 		// yes, i am aware of the arguably grossness of the below.
@@ -222,45 +273,36 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
 		}
 
-		// if we're serving the legacy graphite api, set the id field by looking up the graphite target
 		if legacy {
-			def, ok := defCache.GetByKey(id)
-			if !ok {
+			// querying for a graphite pattern
+			_, defs := defCache.Find(org, id)
+			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			id = def.Id
-		}
-
-		if consolidateBy == "" {
+			for _, def := range defs {
+				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				}
+				target := strings.Replace(target, id, def.Name, -1)
+				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			}
+		} else {
+			// querying for a MT id
 			def, ok := defCache.Get(id)
-			consolidateBy = "avg"
 			if !ok {
 				e := fmt.Sprintf("metric %q not found", id)
 				log.Error(0, e)
 				http.Error(w, e, http.StatusBadRequest)
 				return
 			}
-			if def.TargetType == "counter" {
-				consolidateBy = "last"
+			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
+			reqs = append(reqs, NewReq(id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
-		var consolidator consolidation.Consolidator
-		switch consolidateBy {
-		case "avg", "average":
-			consolidator = consolidation.Avg
-		case "min":
-			consolidator = consolidation.Min
-		case "max":
-			consolidator = consolidation.Max
-		case "sum":
-			consolidator = consolidation.Sum
-		default:
-			http.Error(w, "unrecognized consolidation function", http.StatusBadRequest)
-			return
-		}
-		req := NewReq(id, target, fromUnix, toUnix, maxDataPoints, consolidator)
-		reqs[i] = req
 	}
 	if (toUnix - fromUnix) >= logMinDur {
 		log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
@@ -273,11 +315,6 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		}
 	}
 
-	err = findMetricsForRequests(reqs, defCache)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	reqs, err = alignRequests(reqs, aggSettings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -293,6 +330,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 
 	js := bufPool.Get().([]byte)
 	if legacy {
+		sort.Sort(SeriesByTarget(out))
 		js, err = graphiteJSON(js, out)
 	} else {
 		js, err = graphiteRaintankJSON(js, out)
@@ -307,10 +345,8 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	reqHandleDuration.Value(time.Now().Sub(pre))
-	w.Write(js)
+	writeResponse(w, js, httpTypeJSON, "")
 	bufPool.Put(js[:0])
 }
 
@@ -329,4 +365,136 @@ func appStatus(w http.ResponseWriter, req *http.Request) {
 
 	w.Write([]byte("OK"))
 	return
+}
+
+func findHandler(w http.ResponseWriter, r *http.Request) {
+
+	format := r.FormValue("format")
+	jsonp := r.FormValue("jsonp")
+	query := r.FormValue("query")
+	org, err := getOrg(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if query == "" {
+		http.Error(w, "missing parameter `query`", http.StatusBadRequest)
+		return
+	}
+
+	if format != "" && format != "treejson" && format != "json" && format != "completer" {
+		http.Error(w, "invalid format", http.StatusBadRequest)
+	}
+
+	globs, _ := defCache.Find(org, query)
+
+	var b []byte
+	switch format {
+	case "", "treejson", "json":
+		b, err = findTreejson(query, globs)
+	case "completer":
+		b, err = findCompleter(globs)
+	}
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	writeResponse(w, b, httpTypeJSON, jsonp)
+}
+
+type completer struct {
+	Path   string `json:"path"`
+	Name   string `json:"name"`
+	IsLeaf string `json:"is_leaf"`
+}
+
+func findCompleter(globs []idx.Glob) ([]byte, error) {
+	var b bytes.Buffer
+
+	var complete = make([]completer, 0)
+
+	for _, g := range globs {
+		c := completer{
+			Path: g.Metric,
+		}
+
+		if g.IsLeaf {
+			c.IsLeaf = "1"
+		} else {
+			c.IsLeaf = "0"
+		}
+
+		i := strings.LastIndex(c.Path, ".")
+
+		if i != -1 {
+			c.Name = c.Path[i+1:]
+		}
+
+		complete = append(complete, c)
+	}
+
+	err := json.NewEncoder(&b).Encode(struct {
+		Metrics []completer `json:"metrics"`
+	}{
+		Metrics: complete},
+	)
+	return b.Bytes(), err
+}
+
+type treejson struct {
+	AllowChildren int            `json:"allowChildren"`
+	Expandable    int            `json:"expandable"`
+	Leaf          int            `json:"leaf"`
+	ID            string         `json:"id"`
+	Text          string         `json:"text"`
+	Context       map[string]int `json:"context"` // unused
+}
+
+var treejsonContext = make(map[string]int)
+
+func findTreejson(query string, globs []idx.Glob) ([]byte, error) {
+	var b bytes.Buffer
+
+	tree := make([]treejson, 0)
+	seen := make(map[string]struct{})
+
+	basepath := query
+	if i := strings.LastIndex(basepath, "."); i != -1 {
+		basepath = basepath[:i+1]
+	}
+
+	for _, g := range globs {
+
+		name := g.Metric
+
+		if i := strings.LastIndex(name, "."); i != -1 {
+			name = name[i+1:]
+		}
+
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+
+		t := treejson{
+			ID:      basepath + name,
+			Context: treejsonContext,
+			Text:    name,
+		}
+
+		if g.IsLeaf {
+			t.Leaf = 1
+		} else {
+			t.AllowChildren = 1
+			t.Expandable = 1
+		}
+
+		tree = append(tree, t)
+	}
+
+	err := json.NewEncoder(&b).Encode(tree)
+	return b.Bytes(), err
 }

@@ -98,8 +98,6 @@ var (
 	chunkClear            met.Count
 	chunkSaveOk           met.Count
 	chunkSaveFail         met.Count
-	metricDefCacheHit     met.Count
-	metricDefCacheMiss    met.Count
 	metricsReceived       met.Count
 	metricsTooOld         met.Count
 	cassRowsPerResponse   met.Meter
@@ -136,6 +134,13 @@ var (
 	gcNum             met.Gauge // go GC
 	gcDur             met.Gauge // go GC
 	gcMetric          met.Count // metrics GC
+
+	idxPruneDuration        met.Timer
+	idxGetDuration          met.Timer
+	idxListDuration         met.Timer
+	idxMatchLiteralDuration met.Timer
+	idxMatchPrefixDuration  met.Timer
+	idxMatchTrigramDuration met.Timer
 
 	promotionReadyAtChan chan uint32
 )
@@ -343,9 +348,10 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))          // metric-tank native api which deals with ID's, not target strings
-		http.HandleFunc("/render", getLegacy(store, defCache, finalSettings, logMinDur)) // traditional graphite api
-		http.HandleFunc("/metrics/index.json", IndexJson(defCache))
+		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
+		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
+		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
+		http.HandleFunc("/metrics/find/", corsHandler(findHandler))
 		http.HandleFunc("/cluster", clusterStatusHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
@@ -376,8 +382,6 @@ func initMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
-	metricDefCacheHit = stats.NewCount("metricmeta_cache.hit")
-	metricDefCacheMiss = stats.NewCount("metricmeta_cache.miss")
 	metricsReceived = stats.NewCount("metrics_received")
 	metricsTooOld = stats.NewCount("metrics_too_old")
 	gcMetric = stats.NewCount("gc_metric")
@@ -412,6 +416,13 @@ func initMetrics(stats met.Backend) {
 	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
 	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
+
+	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
+	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
+	idxListDuration = stats.NewTimer("idx.list_duration", 0)
+	idxMatchLiteralDuration = stats.NewTimer("idx.match_literal_duration", 0)
+	idxMatchPrefixDuration = stats.NewTimer("idx.match_prefix_duration", 0)
+	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
 
 	// run a collector for some global stats
 	go func() {
