@@ -3,19 +3,24 @@ package main
 import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/struc"
+	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/msg"
 	"time"
 )
 
 type Handler struct {
-	metrics  Metrics
-	defCache *DefCache
+	metrics  struc.Metrics
+	defCache *defcache.DefCache
+	usage    *usage.Usage
 }
 
-func NewHandler(metrics Metrics, defCache *DefCache) *Handler {
+func NewHandler(metrics struc.Metrics, defCache *defcache.DefCache, usg *usage.Usage) *Handler {
 	return &Handler{
 		metrics:  metrics,
 		defCache: defCache,
+		usage:    usg,
 	}
 }
 
@@ -46,6 +51,9 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 			h.defCache.Add(metric)
 			m := h.metrics.GetOrCreate(metric.Id)
 			m.Add(uint32(metric.Time), metric.Value)
+			if h.usage != nil {
+				h.usage.Add(metric.OrgId, metric.Id)
+			}
 		}
 	}
 

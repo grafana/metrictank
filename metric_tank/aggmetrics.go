@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/metric_tank/struc"
 )
 
 type AggMetrics struct {
@@ -95,14 +96,14 @@ func (ms *AggMetrics) stats() {
 	}
 }
 
-func (ms *AggMetrics) Get(key string) (Metric, bool) {
+func (ms *AggMetrics) Get(key string) (struc.Metric, bool) {
 	ms.RLock()
 	m, ok := ms.Metrics[key]
 	ms.RUnlock()
 	return m, ok
 }
 
-func (ms *AggMetrics) GetOrCreate(key string) Metric {
+func (ms *AggMetrics) GetOrCreate(key string) struc.Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {

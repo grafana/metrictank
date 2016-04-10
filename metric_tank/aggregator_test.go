@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/raintank/raintank-metric/metric_tank/struc"
 	"github.com/raintank/raintank-metric/schema"
 	"testing"
 )
@@ -37,7 +38,7 @@ func TestAggBoundary(t *testing.T) {
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
 	clusterStatus = NewClusterStatus("default", false)
-	compare := func(key string, metric Metric, expected []schema.Point) {
+	compare := func(key string, metric struc.Metric, expected []schema.Point) {
 		clusterStatus.Set(true)
 		_, iters := metric.Get(0, 1000)
 		got := make([]schema.Point, 0, len(expected))

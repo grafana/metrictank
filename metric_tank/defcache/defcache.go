@@ -1,12 +1,25 @@
-package main
+package defcache
 
 import (
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"sync"
 	"time"
+)
+
+var (
+	metricsToEsOK           met.Count
+	metricsToEsFail         met.Count
+	esPutDuration           met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
+	idxPruneDuration        met.Timer
+	idxGetDuration          met.Timer
+	idxListDuration         met.Timer
+	idxMatchLiteralDuration met.Timer
+	idxMatchPrefixDuration  met.Timer
+	idxMatchTrigramDuration met.Timer
 )
 
 // design notes:
@@ -28,7 +41,17 @@ type DefCache struct {
 	defsStore metricdef.Defs
 }
 
-func NewDefCache(defsStore metricdef.Defs) *DefCache {
+func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
+	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
+	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	esPutDuration = stats.NewTimer("es_put_duration", 0)
+	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
+	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
+	idxListDuration = stats.NewTimer("idx.list_duration", 0)
+	idxMatchLiteralDuration = stats.NewTimer("idx.match_literal_duration", 0)
+	idxMatchPrefixDuration = stats.NewTimer("idx.match_prefix_duration", 0)
+	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
+
 	d := &DefCache{
 		ById:      make(map[string]idx.MetricID),
 		ByKey:     idx.New(),

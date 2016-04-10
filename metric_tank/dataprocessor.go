@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"runtime"
@@ -309,8 +310,8 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
 func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
-	iters := make([]Iter, 0)
-	memIters := make([]Iter, 0)
+	iters := make([]iter.Iter, 0)
+	memIters := make([]iter.Iter, 0)
 	oldest := toUnix
 	if metric, ok := metrics.Get(key); ok {
 		if consolidator != consolidation.None {
@@ -354,7 +355,7 @@ func getSeries(store Store, key string, consolidator consolidation.Consolidator,
 			}
 		}
 		if logLevel < 2 {
-			if iter.cass {
+			if iter.Cass {
 				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
 			} else {
 				log.Debug("DP getSeries: iter mem %d values good/total %d/%d", iter.T0, good, total)

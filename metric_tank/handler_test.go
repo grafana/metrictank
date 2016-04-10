@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
@@ -16,8 +17,8 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 
 	store := NewDevnullStore()
 	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]aggSetting, 0))
-	defCache := NewDefCache(metricdef.NewDefsMock())
-	handler := NewHandler(aggmetrics, defCache)
+	defCache := defcache.New(metricdef.NewDefsMock(), stats)
+	handler := NewHandler(aggmetrics, defCache, nil)
 
 	metrics := make([]*schema.MetricData, 10)
 	for i := 0; i < len(metrics); i++ {

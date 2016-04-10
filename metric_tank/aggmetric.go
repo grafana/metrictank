@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/iter"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -157,7 +158,7 @@ func (a *AggMetric) getChunk(pos int) *Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []iter.Iter) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -184,7 +185,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
+func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 	pre := time.Now()
 	if logLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
@@ -202,7 +203,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		if logLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return math.MaxInt32, make([]Iter, 0)
+		return math.MaxInt32, make([]iter.Iter, 0)
 	}
 	if from >= newestChunk.T0+a.ChunkSpan {
 		// request falls entirely ahead of the data we have
@@ -219,7 +220,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		if logLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return from, make([]Iter, 0)
+		return from, make([]iter.Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -241,7 +242,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return math.MaxInt32, make([]Iter, 0)
+		return math.MaxInt32, make([]iter.Iter, 0)
 	}
 
 	// The first chunk is likely only a partial chunk. If we are not the primary node
@@ -255,7 +256,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return math.MaxInt32, make([]Iter, 0)
+			return math.MaxInt32, make([]iter.Iter, 0)
 		}
 	}
 
@@ -264,7 +265,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		if logLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
-		return oldestChunk.T0, make([]Iter, 0)
+		return oldestChunk.T0, make([]iter.Iter, 0)
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -277,7 +278,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]Iter, 0)
+			return to, make([]iter.Iter, 0)
 		}
 	}
 
@@ -296,15 +297,15 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]Iter, 0)
+			return to, make([]iter.Iter, 0)
 		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]Iter, 0, a.NumChunks)
+	iters := make([]iter.Iter, 0, a.NumChunks)
 	for oldestPos != newestPos {
 		chunk := a.getChunk(oldestPos)
-		iters = append(iters, NewIter(chunk.Iter(), false))
+		iters = append(iters, iter.New(chunk.Iter(), false))
 		oldestPos++
 		if oldestPos >= int(a.NumChunks) {
 			oldestPos = 0
@@ -312,7 +313,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []Iter) {
 	}
 	// add the last chunk
 	chunk := a.getChunk(oldestPos)
-	iters = append(iters, NewIter(chunk.Iter(), false))
+	iters = append(iters, iter.New(chunk.Iter(), false))
 
 	memToIterDuration.Value(time.Now().Sub(pre))
 	return oldestChunk.T0, iters

@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
@@ -141,7 +142,7 @@ func getOrg(req *http.Request) (int, error) {
 	return org, nil
 }
 
-func IndexJson(defCache *DefCache) http.HandlerFunc {
+func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		org, err := getOrg(req)
 		if err != nil {
@@ -160,19 +161,19 @@ func IndexJson(defCache *DefCache) http.HandlerFunc {
 		bufPool.Put(js[:0])
 	}
 }
-func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func get(store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, false)
 	}
 }
 
-func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func getLegacy(store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, true)
 	}
 }
 
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
+func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
 	var err error

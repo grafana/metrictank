@@ -16,6 +16,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/Dieterbe/profiletrigger/heap"
+	"github.com/benbjohnson/clock"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
@@ -23,6 +24,8 @@ import (
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/rakyll/globalconf"
 )
@@ -34,7 +37,7 @@ var (
 	GitHash      = "(none)"
 
 	metrics  *AggMetrics
-	defCache *DefCache
+	defCache *defcache.DefCache
 
 	showVersion = flag.Bool("version", false, "print version string")
 	listenAddr  = flag.String("listen", ":6060", "http listener address.")
@@ -75,6 +78,8 @@ var (
 
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+
+	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
@@ -126,21 +131,11 @@ var (
 	totalAlloc        met.Gauge
 	sysBytes          met.Gauge
 	metricsActive     met.Gauge
-	metricsToEsOK     met.Count
-	metricsToEsFail   met.Count
-	esPutDuration     met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 	clusterPrimary    met.Gauge
 	clusterPromoWait  met.Gauge
 	gcNum             met.Gauge // go GC
 	gcDur             met.Gauge // go GC
 	gcMetric          met.Count // metrics GC
-
-	idxPruneDuration        met.Timer
-	idxGetDuration          met.Timer
-	idxListDuration         met.Timer
-	idxMatchLiteralDuration met.Timer
-	idxMatchPrefixDuration  met.Timer
-	idxMatchTrigramDuration met.Timer
 
 	promotionReadyAtChan chan uint32
 )
@@ -307,12 +302,16 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
+	sec = dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
+	accountingPeriod := time.Duration(sec) * time.Second
+
 	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
 	metrics = NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
-	defCache = NewDefCache(defs)
-	handler := NewHandler(metrics, defCache)
+	defCache = defcache.New(defs, stats)
+	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
+	handler := NewHandler(metrics, defCache, usg)
 	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
 	consumer.AddConcurrentHandlers(handler, *concurrency)
 
@@ -409,20 +408,10 @@ func initMetrics(stats met.Backend) {
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
 	metricsActive = stats.NewGauge("metrics_active", 0)
-	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
-	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
-	esPutDuration = stats.NewTimer("es_put_duration", 0)
 	clusterPrimary = stats.NewGauge("cluster.primary", 0)
 	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
 	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
-
-	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
-	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
-	idxListDuration = stats.NewTimer("idx.list_duration", 0)
-	idxMatchLiteralDuration = stats.NewTimer("idx.match_literal_duration", 0)
-	idxMatchPrefixDuration = stats.NewTimer("idx.match_prefix_duration", 0)
-	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
 
 	// run a collector for some global stats
 	go func() {

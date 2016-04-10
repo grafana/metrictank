@@ -13,6 +13,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/met"
+	"github.com/raintank/raintank-metric/metric_tank/iter"
 )
 
 // write aggregated data to cassandra.
@@ -196,8 +197,8 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
-	iters := make([]Iter, 0)
+func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, error) {
+	iters := make([]iter.Iter, 0)
 	if start > end {
 		return iters, errStartBeforeEnd
 	}
@@ -282,12 +283,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]Iter, error) {
 				log.Error(3, errUnknownChunkFormat.Error())
 				return iters, errUnknownChunkFormat
 			}
-			iter, err := tsz.NewIterator(b[1:])
+			it, err := tsz.NewIterator(b[1:])
 			if err != nil {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
 			}
-			iters = append(iters, NewIter(iter, true))
+			iters = append(iters, iter.New(it, true))
 		}
 		cassChunksPerRow.Value(chunks)
 		err := outcome.i.Close()

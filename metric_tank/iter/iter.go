@@ -1,4 +1,4 @@
-package main
+package iter
 
 import (
 	"github.com/dgryski/go-tsz"
@@ -6,10 +6,10 @@ import (
 
 type Iter struct {
 	*tsz.Iter
-	cass bool //true = cass, false = mem
+	Cass bool //true = cass, false = mem
 }
 
-func NewIter(i *tsz.Iter, cass bool) Iter {
+func New(i *tsz.Iter, cass bool) Iter {
 	return Iter{
 		i,
 		cass,

@@ -16,6 +16,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/raintank-metric/metric_tank/struc"
 )
 
 var (
@@ -141,10 +142,10 @@ func (p *PersistMessageBatch) flush() {
 }
 
 type MetricPersistHandler struct {
-	metrics Metrics
+	metrics struc.Metrics
 }
 
-func NewMetricPersistHandler(metrics Metrics) *MetricPersistHandler {
+func NewMetricPersistHandler(metrics struc.Metrics) *MetricPersistHandler {
 	return &MetricPersistHandler{
 		metrics: metrics,
 	}
@@ -190,7 +191,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 	return nil
 }
 
-func InitCluster(metrics Metrics, stats met.Backend) {
+func InitCluster(metrics struc.Metrics, stats met.Backend) {
 	persistMessageBatch = &PersistMessageBatch{Instance: *instance, SavedChunks: make([]*savedChunk, 0)}
 	// init producers
 	pCfg := nsq.NewConfig()
