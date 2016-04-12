@@ -1,7 +1,7 @@
 package usage
 
 import (
-	"fmt"
+	//	"fmt"
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/struc"
@@ -22,33 +22,34 @@ type orgstat struct {
 // tracks for every org
 type Usage struct {
 	sync.Mutex
-	period time.Duration
-	now    []orgstat
-	prev   []orgstat
+	period uint32
+	now    map[int]orgstat
+	prev   map[int]orgstat
 }
 
-func New(t time.Duration, m struc.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
+func New(period uint32, m struc.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
 	metrics = m
 	defCache = d
 	Clock = cl
 	return &Usage{
-		period: t,
+		period: period,
 	}
 }
 
 func (u *Usage) Add(org int, key string) {
-	// org -1 is pos 0, etc.
-	// org 5 -> pos 6 -> we need len 7 or more -> len should be >= pos+1
-	pos := org + 1
-
 	u.Lock()
-	for len(u.now) < pos+1 {
-		u.now = append(u.now, orgstat{
-			keys: make(map[string]struct{}),
-		})
+	if o, ok := u.now[org]; !ok {
+		u.now[org] = orgstat{
+			keys: map[string]struct{}{
+				key: struct{}{},
+			},
+			points: 1,
+		}
+	} else {
+		o.keys[key] = struct{}{}
+		o.points += 1
+		u.now[org] = o
 	}
-	u.now[pos].keys[key] = struct{}{}
-	u.now[pos].points += 1
 	u.Unlock()
 }
 
@@ -57,23 +58,27 @@ func (u *Usage) Report() {
 	tick := func() time.Time {
 		now := Clock.Now()
 		nowUnix := now.UnixNano()
-		diff := u.period - (time.Duration(nowUnix) % u.period)
+		p := time.Duration(u.period) * time.Second
+		diff := p - (time.Duration(nowUnix) % p)
 		ideal := now.Add(diff)
 		ticker := Clock.Ticker(diff)
 		<-ticker.C
 		return ideal
 	}
 	met := schema.MetricData{
-		Interval: 300,
+		Interval: int(u.period),
 		Tags:     []string{},
 	}
 	for {
 		now := tick().Unix()
 		u.Lock()
 		u.prev = u.now
-		u.now = make([]orgstat, len(u.prev))
-		for i := range u.now {
-			u.now[i].points = u.prev[i].points
+		u.now = make(map[int]orgstat)
+		for i := range u.prev {
+			u.now[i] = orgstat{
+				keys:   make(map[string]struct{}),
+				points: u.prev[i].points,
+			}
 		}
 		u.Unlock()
 

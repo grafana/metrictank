@@ -302,8 +302,7 @@ func main() {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
 
-	sec = dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
-	accountingPeriod := time.Duration(sec) * time.Second
+	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
 	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
