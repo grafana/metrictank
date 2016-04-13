@@ -160,9 +160,11 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	esPutDuration.Value(time.Now().Sub(pre))
 }
 
+// Get gets a metricdef by id
 // note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 // and we assume we can use that interval through history.
 // TODO: no support for interval changes, missing datablocks, ...
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	var def *schema.MetricDefinition
 	pre := time.Now()
@@ -176,6 +178,8 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	return def, ok
 }
 
+// Find returns the results of a pattern match.
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefinition) {
 	pre := time.Now()
 	dc.RLock()
@@ -196,6 +200,10 @@ func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefin
 	return globs, defs
 }
 
+// List provides all metricdefs based on the provide org. if it is:
+// -1, then all metricdefs for all orgs are returned
+// any other org, then all defs for that org, as well as -1 are returned
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
 	pre := time.Now()
 	dc.RLock()
