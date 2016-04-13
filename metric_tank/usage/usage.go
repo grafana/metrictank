@@ -71,6 +71,19 @@ func (u *Usage) Report() {
 		Interval: int(u.period),
 		Tags:     []string{},
 	}
+
+	report := func(name, unit, tt string, val float64, met *schema.MetricData) {
+		met.Name = name
+		met.Metric = name
+		met.Unit = unit
+		met.TargetType = tt
+		met.Value = val
+		met.SetId()
+
+		m := metrics.GetOrCreate(met.Id)
+		m.Add(uint32(met.Time), met.Value)
+		defCache.Add(met)
+	}
 	for {
 		now := tick().Unix()
 		u.Lock()
@@ -86,29 +99,19 @@ func (u *Usage) Report() {
 
 		met.Time = now
 		for org, stat := range u.prev {
-			met.OrgId = org
-
-			met.Name = "metric_tank.usage.numSeries"
-			met.Metric = met.Name
-			met.Unit = "metrics"
-			met.TargetType = "gauge"
-			met.Value = float64(len(stat.keys))
-			met.SetId()
-
-			m := metrics.GetOrCreate(met.Id)
-			m.Add(uint32(met.Time), met.Value)
-			defCache.Add(&met)
-
-			met.Name = "metric_tank.usage.numPoints"
-			met.Metric = met.Name
-			met.Unit = "points"
-			met.TargetType = "counter"
-			met.Value = float64(stat.points)
-			met.SetId()
-
-			m = metrics.GetOrCreate(met.Id)
-			m.Add(uint32(met.Time), met.Value)
-			defCache.Add(&met)
+			if org == -1 {
+				// for the special case of org -1, meaning globally provided metrics visible to every org
+				// let's provide this metric to the admin org which has id 1.
+				// the reason we don't publish this with id -1 is that that would make it available to everyone
+				// and confuse people about which metrics it counts
+				met.OrgId = 1
+				report("metric_tank.usage-minus1.numSeries", "metrics", "gauge", float64(len(stat.keys)), &met)
+				report("metric_tank.usage-minus1.numPoints", "points", "counter", float64(stat.points), &met)
+			} else {
+				met.OrgId = org
+				report("metric_tank.usage.numSeries", "metrics", "gauge", float64(len(stat.keys)), &met)
+				report("metric_tank.usage.numPoints", "points", "counter", float64(stat.points), &met)
+			}
 		}
 	}
 }
