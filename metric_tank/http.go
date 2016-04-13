@@ -285,6 +285,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *defcac
 				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
 				}
 				target := strings.Replace(target, id, def.Name, -1)
 				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
@@ -301,6 +302,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *defcac
 			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 			reqs = append(reqs, NewReq(id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
@@ -386,6 +388,7 @@ func findHandler(w http.ResponseWriter, r *http.Request) {
 
 	if format != "" && format != "treejson" && format != "json" && format != "completer" {
 		http.Error(w, "invalid format", http.StatusBadRequest)
+		return
 	}
 
 	globs, _ := defCache.Find(org, query)
