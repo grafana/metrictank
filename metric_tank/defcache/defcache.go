@@ -114,6 +114,8 @@ func (dc *DefCache) Backfill() {
 	log.Debug("backfilled %d metric definitions", total)
 }
 
+// Adds the metric to the defcache.
+// after this function returns, it is safe to modify the data pointed to
 func (dc *DefCache) Add(metric *schema.MetricData) {
 	dc.RLock()
 	id, ok := dc.ById[metric.Id]

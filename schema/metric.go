@@ -73,6 +73,8 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 	return def, nil
 }
 
+// MetricDefinitionFromMetricData yields a MetricDefinition that has no references
+// to the original MetricData
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	nodesMap := make(map[string]string)
 	nodes := strings.Split(d.Name, ".")
@@ -80,6 +82,8 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		key := fmt.Sprintf("n%d", i)
 		nodesMap[key] = n
 	}
+	tags := make([]string, len(d.Tags))
+	copy(tags, d.Tags)
 	return &MetricDefinition{
 		Id:         d.Id,
 		Name:       d.Name,
@@ -89,7 +93,7 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		Interval:   d.Interval,
 		LastUpdate: d.Time,
 		Unit:       d.Unit,
-		Tags:       d.Tags,
+		Tags:       tags,
 		Nodes:      nodesMap,
 		NodeCount:  len(nodes),
 	}
