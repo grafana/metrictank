@@ -85,6 +85,7 @@ func (m *MetricData) DecodeMetricData() error {
 	if err != nil {
 		return fmt.Errorf("ERROR: failure to unmarshal message body via format %q: %s", m.Format, err)
 	}
+	m.Msg = nil // no more need for the original input
 	return nil
 }
 
