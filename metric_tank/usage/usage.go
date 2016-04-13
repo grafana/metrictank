@@ -1,7 +1,6 @@
 package usage
 
 import (
-	//	"fmt"
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/struc"
@@ -31,9 +30,12 @@ func New(period uint32, m struc.Metrics, d *defcache.DefCache, cl clock.Clock) *
 	metrics = m
 	defCache = d
 	Clock = cl
-	return &Usage{
+	ret := &Usage{
 		period: period,
+		now:    make(map[int]orgstat),
 	}
+	go ret.Report()
+	return ret
 }
 
 func (u *Usage) Add(org int, key string) {
@@ -83,8 +85,8 @@ func (u *Usage) Report() {
 		u.Unlock()
 
 		met.Time = now
-		for pos, stat := range u.prev {
-			met.OrgId = pos - 1
+		for org, stat := range u.prev {
+			met.OrgId = org
 
 			met.Name = "metric_tank.usage.numSeries"
 			met.Metric = met.Name
