@@ -5,7 +5,6 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
-	"github.com/raintank/raintank-metric/metric_tank/struc"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
@@ -14,7 +13,7 @@ import (
 )
 
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
-// this can expose bad reuse of data arrays in the handler and such
+// this can expose bad reuse of data arrays and such
 func Test_HandleMessage(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		test_HandleMessage(t)
@@ -29,27 +28,7 @@ func test_HandleMessage(t *testing.T) {
 	store := NewDevnullStore()
 	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]aggSetting, 0))
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
-
-	// mimic how we use nsq handlers:
-	// handlers operate concurrently, but within 1 handler, the handling is sequential
-
-	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics struc.Metrics, defCache *defcache.DefCache) {
-		handler := NewHandler(aggmetrics, defCache, nil)
-		for msg := range in {
-			err := handler.HandleMessage(msg)
-			if err != nil {
-				panic(err)
-			}
-		}
-		group.Done()
-	}
-
-	handlePool := make(chan *nsq.Message, 100)
-	handlerGroup := sync.WaitGroup{}
-	handlerGroup.Add(5)
-	for i := 0; i != 5; i++ {
-		go consumer(handlePool, &handlerGroup, aggmetrics, defCache)
-	}
+	handler := NewHandler(aggmetrics, defCache, nil)
 
 	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
 	// handle 5 messages, each containing different metrics
@@ -86,7 +65,7 @@ func test_HandleMessage(t *testing.T) {
 		ids: make(map[string]int),
 	}
 	for i := 0; i < 4; i++ {
-		go func(i int, tit *idToId, handlePool chan *nsq.Message) {
+		go func(i int, tit *idToId) {
 			metrics := make([]*schema.MetricData, 4)
 			for m := 0; m < len(metrics); m++ {
 				id := (i + 1) * (m + 1)
@@ -115,13 +94,14 @@ func test_HandleMessage(t *testing.T) {
 				panic(err)
 			}
 			msg := nsq.NewMessage(id, data)
-			handlePool <- msg
+			err = handler.HandleMessage(msg)
+			if err != nil {
+				panic(err)
+			}
 			wg.Done()
-		}(i, tit, handlePool)
+		}(i, tit)
 	}
 	wg.Wait()
-	close(handlePool)
-	handlerGroup.Wait()
 	defs := defCache.List(-1)
 	if len(defs) != 9 {
 		t.Fatalf("query for org -1 should result in 9 distinct metrics. not %d", len(defs))
