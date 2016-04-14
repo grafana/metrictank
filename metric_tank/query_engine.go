@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/grafana/pkg/log"
 	"sort"
+
+	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 )
 
 // represents a data "archive", i.e. the raw one, or an aggregated series
@@ -27,11 +29,11 @@ func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 // this function ignores the TTL values. it is assumed that you've set sensible TTL's
-func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
+func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
-	aggs := aggSettingsSpanAsc(aggSettings)
+	aggs := mdata.AggSettingsSpanAsc(aggSettings)
 	sort.Sort(aggs)
 
 	options := make([]archive, 1, len(aggs)+1)
@@ -53,8 +55,8 @@ func alignRequests(reqs []Req, aggSettings []aggSetting) ([]Req, error) {
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
 	aggRef := []int{0}
 	for j, agg := range aggs {
-		if agg.ready {
-			options = append(options, archive{agg.span, tsRange / agg.span, false})
+		if agg.Ready {
+			options = append(options, archive{agg.Span, tsRange / agg.Span, false})
 			aggRef = append(aggRef, j+1)
 		}
 	}

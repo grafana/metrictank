@@ -1,12 +1,25 @@
-package main
+package defcache
 
 import (
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
 	"sync"
 	"time"
+)
+
+var (
+	metricsToEsOK           met.Count
+	metricsToEsFail         met.Count
+	esPutDuration           met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
+	idxPruneDuration        met.Timer
+	idxGetDuration          met.Timer
+	idxListDuration         met.Timer
+	idxMatchLiteralDuration met.Timer
+	idxMatchPrefixDuration  met.Timer
+	idxMatchTrigramDuration met.Timer
 )
 
 // design notes:
@@ -28,7 +41,17 @@ type DefCache struct {
 	defsStore metricdef.Defs
 }
 
-func NewDefCache(defsStore metricdef.Defs) *DefCache {
+func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
+	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
+	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	esPutDuration = stats.NewTimer("es_put_duration", 0)
+	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
+	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
+	idxListDuration = stats.NewTimer("idx.list_duration", 0)
+	idxMatchLiteralDuration = stats.NewTimer("idx.match_literal_duration", 0)
+	idxMatchPrefixDuration = stats.NewTimer("idx.match_prefix_duration", 0)
+	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
+
 	d := &DefCache{
 		ById:      make(map[string]idx.MetricID),
 		ByKey:     idx.New(),
@@ -91,6 +114,8 @@ func (dc *DefCache) Backfill() {
 	log.Debug("backfilled %d metric definitions", total)
 }
 
+// Adds the metric to the defcache.
+// after this function returns, it is safe to modify the data pointed to
 func (dc *DefCache) Add(metric *schema.MetricData) {
 	dc.RLock()
 	id, ok := dc.ById[metric.Id]
@@ -102,17 +127,32 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 		mdef := dc.defs[id]
 		dc.RUnlock()
 		if mdef.LastUpdate < metric.Time-21600 {
+			// this is a little expensive, let's not hold the lock while we do this
 			mdef = *schema.MetricDefinitionFromMetricData(metric)
-			dc.addToES(&mdef)
+			// let's make sure only one concurrent Add() can addToES,
+			// because that function is a bit expensive and could block
+			// so now that we have the mdef, let's check again before proceeding.
 			dc.Lock()
-			dc.defs[id] = mdef
+			old := dc.defs[id]
+			if old.LastUpdate < metric.Time-21600 {
+				dc.addToES(&mdef)
+				dc.defs[id] = mdef
+			}
 			dc.Unlock()
 		}
 	} else {
 		mdef := *schema.MetricDefinitionFromMetricData(metric)
-		dc.addToES(&mdef)
+		// now that we have the mdef, let's make sure we only add this once concurrently.
+		// because addToES is pretty expensive and we should only call AddRef once.
 		dc.Lock()
-		id := dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
+		id, ok := dc.ById[metric.Id]
+		if ok {
+			// someone beat us to it. nothing left to do
+			dc.Unlock()
+			return
+		}
+		dc.addToES(&mdef)
+		id = dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
 		dc.ByKey.AddRef(mdef.OrgId, id)
 		dc.ById[mdef.Id] = id
 		dc.defs = append(dc.defs, mdef)
@@ -135,9 +175,11 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	esPutDuration.Value(time.Now().Sub(pre))
 }
 
+// Get gets a metricdef by id
 // note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 // and we assume we can use that interval through history.
 // TODO: no support for interval changes, missing datablocks, ...
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	var def *schema.MetricDefinition
 	pre := time.Now()
@@ -151,6 +193,8 @@ func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
 	return def, ok
 }
 
+// Find returns the results of a pattern match.
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefinition) {
 	pre := time.Now()
 	dc.RLock()
@@ -171,6 +215,10 @@ func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefin
 	return globs, defs
 }
 
+// List provides all metricdefs based on the provide org. if it is:
+// -1, then all metricdefs for all orgs are returned
+// any other org, then all defs for that org, as well as -1 are returned
+// note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
 	pre := time.Now()
 	dc.RLock()

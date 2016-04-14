@@ -1,4 +1,4 @@
-package main
+package chunk
 
 import (
 	"fmt"
@@ -6,6 +6,13 @@ import (
 
 	"github.com/dgryski/go-tsz"
 )
+
+var TotalPoints chan int
+
+func init() {
+	// measurements can lag a bit, that's ok
+	TotalPoints = make(chan int, 1000)
+}
 
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
@@ -17,7 +24,7 @@ type Chunk struct {
 	LastWrite uint32
 }
 
-func NewChunk(t0 uint32) *Chunk {
+func New(t0 uint32) *Chunk {
 	// we must set LastWrite here as well to make sure a new Chunk doesn't get immediately
 	// garbage collected right after creating it, before we can push to it
 	return &Chunk{tsz.New(t0), 0, 0, false, false, uint32(time.Now().Unix())}
@@ -35,6 +42,9 @@ func (c *Chunk) Push(t uint32, v float64) error {
 	c.NumPoints += 1
 	c.LastTs = t
 	c.LastWrite = uint32(time.Now().Unix())
-	totalPoints <- 1
+	TotalPoints <- 1
 	return nil
+}
+func (c *Chunk) Clear() {
+	TotalPoints <- -1 * int(c.NumPoints)
 }

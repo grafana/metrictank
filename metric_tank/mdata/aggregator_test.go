@@ -1,4 +1,4 @@
-package main
+package mdata
 
 import (
 	"github.com/raintank/raintank-metric/schema"
@@ -36,9 +36,9 @@ func TestAggBoundary(t *testing.T) {
 
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
-	clusterStatus = NewClusterStatus("default", false)
+	CluStatus = NewClusterStatus("default", false)
 	compare := func(key string, metric Metric, expected []schema.Point) {
-		clusterStatus.Set(true)
+		CluStatus.Set(true)
 		_, iters := metric.Get(0, 1000)
 		got := make([]schema.Point, 0, len(expected))
 		for _, iter := range iters {
@@ -58,7 +58,7 @@ func TestAggregator(t *testing.T) {
 				}
 			}
 		}
-		clusterStatus.Set(false)
+		CluStatus.Set(false)
 	}
 	agg := NewAggregator(dnstore, "test", 60, 120, 10, 86400)
 	agg.Add(100, 123.4)

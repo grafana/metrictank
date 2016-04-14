@@ -55,3 +55,10 @@ No other function or parameter is currently supported.  Also we don't check org-
 
 * NSQ does not provide ordering guarantees, we need ordering for optimal compression, aggregations. currently we drop out of order points which may result in gaps.
 see https://github.com/raintank/raintank-metric/issues/41 for more info. also [it may also affect alerting](https://github.com/raintank/raintank-metric/issues/17). we're looking into kafka.
+
+
+* rollups is a bit clunky:
+  - for simplicity just reuses AggMetric but this is not a good fit. it keeps too many string id's in memory, too much Sprintf overhead.
+  - also per-target-type aggregations (like counter -> last), not all aggregations always make sense for all types.
+  - no need to take all raw inputs into each aggregator, they can instead take summaries from previous aggregators
+  we should redo them at some point. 

@@ -1,4 +1,4 @@
-package main
+package mdata
 
 import (
 	"sync"
@@ -13,21 +13,14 @@ type AggMetrics struct {
 	Metrics        map[string]*AggMetric
 	chunkSpan      uint32
 	numChunks      uint32
-	aggSettings    []aggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
+	aggSettings    []AggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	ttl            uint32
 	gcInterval     time.Duration
 }
 
-var totalPoints chan int
-
-func init() {
-	// measurements can lag a bit, that's ok
-	totalPoints = make(chan int, 1000)
-}
-
-func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []aggSetting) *AggMetrics {
+func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		Metrics:        make(map[string]*AggMetric),
@@ -54,7 +47,7 @@ func (ms *AggMetrics) GC() {
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
-		if !clusterStatus.IsPrimary() {
+		if !CluStatus.IsPrimary() {
 			continue
 		}
 		log.Info("checking for stale chunks that need persisting.")

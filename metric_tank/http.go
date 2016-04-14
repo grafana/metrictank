@@ -8,7 +8,9 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
@@ -141,7 +143,7 @@ func getOrg(req *http.Request) (int, error) {
 	return org, nil
 }
 
-func IndexJson(defCache *DefCache) http.HandlerFunc {
+func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		org, err := getOrg(req)
 		if err != nil {
@@ -160,19 +162,19 @@ func IndexJson(defCache *DefCache) http.HandlerFunc {
 		bufPool.Put(js[:0])
 	}
 }
-func get(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func get(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, false)
 	}
 }
 
-func getLegacy(store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func getLegacy(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, true)
 	}
 }
 
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
+func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
 	var err error
@@ -284,6 +286,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
 				}
 				target := strings.Replace(target, id, def.Name, -1)
 				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
@@ -300,6 +303,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 			reqs = append(reqs, NewReq(id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
@@ -354,7 +358,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *DefCac
 // We only want requests to be sent to this node if it is the primary
 // node or if it has been online for at *warmUpPeriod
 func appStatus(w http.ResponseWriter, req *http.Request) {
-	if clusterStatus.IsPrimary() {
+	if mdata.CluStatus.IsPrimary() {
 		w.Write([]byte("OK"))
 		return
 	}
@@ -385,6 +389,7 @@ func findHandler(w http.ResponseWriter, r *http.Request) {
 
 	if format != "" && format != "treejson" && format != "json" && format != "completer" {
 		http.Error(w, "invalid format", http.StatusBadRequest)
+		return
 	}
 
 	globs, _ := defCache.Find(org, query)

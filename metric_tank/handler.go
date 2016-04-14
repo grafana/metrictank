@@ -3,31 +3,36 @@ package main
 import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
+	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/msg"
 	"time"
 )
 
 type Handler struct {
-	metrics  Metrics
-	defCache *DefCache
+	metrics  mdata.Metrics
+	defCache *defcache.DefCache
+	usage    *usage.Usage
 }
 
-func NewHandler(metrics Metrics, defCache *DefCache) *Handler {
+func NewHandler(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) *Handler {
 	return &Handler{
 		metrics:  metrics,
 		defCache: defCache,
+		usage:    usg,
 	}
 }
 
 func (h *Handler) HandleMessage(m *nsq.Message) error {
-	ms, err := msg.MetricDataFromMsg(m.Body)
+	ms, err := msg.MetricDataFromMsg(m.Body) // note: ms.Msg links to m.Body
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
 	}
 	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
 
-	err = ms.DecodeMetricData()
+	err = ms.DecodeMetricData() // reads metrics from ms.Msg and unsets it
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
@@ -46,6 +51,9 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 			h.defCache.Add(metric)
 			m := h.metrics.GetOrCreate(metric.Id)
 			m.Add(uint32(metric.Time), metric.Value)
+			if h.usage != nil {
+				h.usage.Add(metric.OrgId, metric.Id)
+			}
 		}
 	}
 

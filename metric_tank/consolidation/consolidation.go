@@ -85,7 +85,7 @@ func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, e
 	if consolidateBy == "" {
 		consolidateBy = "avg"
 		if def.TargetType == "counter" {
-			consolidateBy = "last"
+			consolidateBy = "max"
 		}
 	}
 	var consolidator Consolidator
