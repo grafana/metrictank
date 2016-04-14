@@ -179,6 +179,7 @@ func main() {
 	}
 	runtime.SetBlockProfileRate(*blockProfileRate)
 	runtime.MemProfileRate = *memProfileRate
+	mdata.InitMetrics(stats)
 
 	if *channel == "" {
 		rand.Seed(time.Now().UnixNano())
