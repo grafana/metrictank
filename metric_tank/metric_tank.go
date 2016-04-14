@@ -25,6 +25,8 @@ import (
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
+	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/rakyll/globalconf"
@@ -36,7 +38,7 @@ var (
 	startupTime  time.Time
 	GitHash      = "(none)"
 
-	metrics  *AggMetrics
+	metrics  *mdata.AggMetrics
 	defCache *defcache.DefCache
 
 	showVersion = flag.Bool("version", false, "print version string")
@@ -96,27 +98,11 @@ var (
 	reqSpanMem  met.Meter
 	reqSpanBoth met.Meter
 
-	// it's pretty expensive/impossible to do chunk sive in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
-	chunkSizeAtSave       met.Meter
-	chunkSizeAtLoad       met.Meter
-	chunkCreate           met.Count
-	chunkClear            met.Count
-	chunkSaveOk           met.Count
-	chunkSaveFail         met.Count
 	metricsReceived       met.Count
-	metricsTooOld         met.Count
-	cassRowsPerResponse   met.Meter
-	cassChunksPerRow      met.Meter
 	cassWriteQueueSize    met.Gauge
 	cassWriters           met.Gauge
-	cassPutDuration       met.Timer
-	cassBlockDuration     met.Timer
-	cassGetDuration       met.Timer
-	memToIterDuration     met.Timer
 	getTargetDuration     met.Timer
 	itersToPointsDuration met.Timer
-	cassToIterDuration    met.Timer
-	persistDuration       met.Timer
 	messagesSize          met.Meter
 	metricsPerMessage     met.Meter
 	msgsAge               met.Meter // in ms
@@ -130,12 +116,10 @@ var (
 	alloc             met.Gauge
 	totalAlloc        met.Gauge
 	sysBytes          met.Gauge
-	metricsActive     met.Gauge
 	clusterPrimary    met.Gauge
 	clusterPromoWait  met.Gauge
 	gcNum             met.Gauge // go GC
 	gcDur             met.Gauge // go GC
-	gcMetric          met.Count // metrics GC
 
 	promotionReadyAtChan chan uint32
 )
@@ -159,6 +143,7 @@ func main() {
 	}
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+	mdata.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
 	switch logLevel {
 	case 0:
@@ -227,7 +212,7 @@ func main() {
 	warmupPeriod = time.Duration(sec) * time.Second
 
 	// set our cluster state before we start consuming messages.
-	clusterStatus = NewClusterStatus(*instance, *primaryNode)
+	mdata.CluStatus = mdata.NewClusterStatus(*instance, *primaryNode)
 
 	promotionReadyAtChan = make(chan uint32)
 	initMetrics(stats)
@@ -239,12 +224,12 @@ func main() {
 	metricMaxStale := dur.MustParseUNsec("metric-max-stale", *metricMaxStaleStr)
 	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
 	ttl := dur.MustParseUNsec("ttl", *ttlStr)
-	if (month_sec % chunkSpan) != 0 {
+	if (mdata.Month_sec % chunkSpan) != 0 {
 		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
 	set := strings.Split(*aggSettings, ",")
-	finalSettings := make([]aggSetting, 0)
+	finalSettings := make([]mdata.AggSetting, 0)
 	highestChunkSpan := chunkSpan
 	for _, v := range set {
 		if v == "" {
@@ -258,7 +243,7 @@ func main() {
 		aggChunkSpan := dur.MustParseUNsec("aggsettings", fields[1])
 		aggNumChunks := dur.MustParseUNsec("aggsettings", fields[2])
 		aggTTL := dur.MustParseUNsec("aggsettings", fields[3])
-		if (month_sec % aggChunkSpan) != 0 {
+		if (mdata.Month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
 		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
@@ -269,7 +254,7 @@ func main() {
 				log.Fatal(4, "aggsettings ready: %s", err)
 			}
 		}
-		finalSettings = append(finalSettings, aggSetting{aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready})
+		finalSettings = append(finalSettings, mdata.NewAggSetting(aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready))
 	}
 	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
 	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
@@ -284,10 +269,11 @@ func main() {
 		go trigger.Run()
 	}
 
-	store, err := NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency)
+	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
+	store.InitMetrics(stats)
 
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "metrics_tank"
@@ -306,7 +292,7 @@ func main() {
 
 	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
-	metrics = NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
+	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 	defCache = defcache.New(defs, stats)
 	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
@@ -342,7 +328,7 @@ func main() {
 
 	}()
 
-	InitCluster(metrics, stats)
+	mdata.InitCluster(metrics, stats, *instance, *topicNotifyPersist, *channel, *producerOpts, *consumerOpts, nsqdAdds, lookupdAdds, *maxInFlight)
 
 	go func() {
 		http.HandleFunc("/", appStatus)
@@ -350,7 +336,7 @@ func main() {
 		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
 		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
 		http.HandleFunc("/metrics/find/", corsHandler(findHandler))
-		http.HandleFunc("/cluster", clusterStatusHandler)
+		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
@@ -374,27 +360,11 @@ func main() {
 func initMetrics(stats met.Backend) {
 	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
 	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
-	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
-	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
-	chunkCreate = stats.NewCount("chunks.create")
-	chunkClear = stats.NewCount("chunks.clear")
-	chunkSaveOk = stats.NewCount("chunks.save_ok")
-	chunkSaveFail = stats.NewCount("chunks.save_fail")
 	metricsReceived = stats.NewCount("metrics_received")
-	metricsTooOld = stats.NewCount("metrics_too_old")
-	gcMetric = stats.NewCount("gc_metric")
-	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
-	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
-	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
-	memToIterDuration = stats.NewTimer("mem.to_iter_duration", 0)
 	getTargetDuration = stats.NewTimer("get_target_duration", 0)
 	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	cassToIterDuration = stats.NewTimer("cassandra.to_iter_duration", 0)
-	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
-	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
-	persistDuration = stats.NewTimer("persist_duration", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
 	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
 	msgsAge = stats.NewMeter("message_age", 0)
@@ -406,7 +376,6 @@ func initMetrics(stats met.Backend) {
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
-	metricsActive = stats.NewGauge("metrics_active", 0)
 	clusterPrimary = stats.NewGauge("cluster.primary", 0)
 	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
@@ -430,7 +399,7 @@ func initMetrics(stats met.Backend) {
 				gcNum.Value(int64(m.NumGC))
 				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
 				var px int64
-				if clusterStatus.IsPrimary() {
+				if mdata.CluStatus.IsPrimary() {
 					px = 1
 				} else {
 					px = 0
@@ -449,7 +418,7 @@ func initMetrics(stats met.Backend) {
 				} else {
 					clusterPromoWait.Value(int64(promotionReadyAtTs - unix))
 				}
-			case update := <-totalPoints:
+			case update := <-chunk.TotalPoints:
 				currentPoints += update
 			case promotionReadyAtTs = <-promotionReadyAtChan:
 			}

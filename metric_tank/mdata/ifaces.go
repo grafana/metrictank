@@ -1,4 +1,4 @@
-package struc
+package mdata
 
 import "github.com/raintank/raintank-metric/metric_tank/consolidation"
 import "github.com/raintank/raintank-metric/metric_tank/iter"

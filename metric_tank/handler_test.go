@@ -6,6 +6,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
@@ -18,8 +19,9 @@ import (
 func Test_HandleMessage(t *testing.T) {
 
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
-	clusterStatus = NewClusterStatus("default", false)
+	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
+	mdata.InitMetrics(stats)
 
 	for i := 0; i < 100; i++ {
 		test_HandleMessage(t, stats)
@@ -28,8 +30,8 @@ func Test_HandleMessage(t *testing.T) {
 
 func test_HandleMessage(t *testing.T, stats met.Backend) {
 
-	store := NewDevnullStore()
-	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]aggSetting, 0))
+	store := mdata.NewDevnullStore()
+	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
 	handler := NewHandler(aggmetrics, defCache, nil)
 
@@ -133,11 +135,11 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 
 func BenchmarkHandler_HandleMessage(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
-	clusterStatus = NewClusterStatus("default", false)
+	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
 
-	store := NewDevnullStore()
-	aggmetrics := NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]aggSetting, 0))
+	store := mdata.NewDevnullStore()
+	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	defCache := defcache.New(metricdef.NewDefsMock(), stats)
 	handler := NewHandler(aggmetrics, defCache, nil)
 

@@ -4,19 +4,19 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
-	"github.com/raintank/raintank-metric/metric_tank/struc"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/msg"
 	"time"
 )
 
 type Handler struct {
-	metrics  struc.Metrics
+	metrics  mdata.Metrics
 	defCache *defcache.DefCache
 	usage    *usage.Usage
 }
 
-func NewHandler(metrics struc.Metrics, defCache *defcache.DefCache, usg *usage.Usage) *Handler {
+func NewHandler(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) *Handler {
 	return &Handler{
 		metrics:  metrics,
 		defCache: defCache,

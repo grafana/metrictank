@@ -1,4 +1,4 @@
-package main
+package mdata
 
 import (
 	"bytes"
@@ -14,11 +14,12 @@ import (
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/iter"
+	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
 )
 
 // write aggregated data to cassandra.
 
-const month_sec = 60 * 60 * 24 * 28
+const Month_sec = 60 * 60 * 24 * 28
 
 const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
 const table_schema = `CREATE TABLE IF NOT EXISTS raintank.metric (
@@ -33,9 +34,25 @@ const table_schema = `CREATE TABLE IF NOT EXISTS raintank.metric (
     AND read_repair_chance = 0.0
     AND dclocal_read_repair_chance = 0`
 
-var errChunkTooSmall = errors.New("unpossibly small chunk in cassandra")
-var errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
-var errStartBeforeEnd = errors.New("start must be before end.")
+var (
+	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
+	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
+	errStartBeforeEnd     = errors.New("start must be before end.")
+
+	cassBlockDuration met.Timer
+	cassGetDuration   met.Timer
+	cassPutDuration   met.Timer
+
+	cassChunksPerRow    met.Meter
+	cassRowsPerResponse met.Meter
+	cassToIterDuration  met.Timer
+
+	chunkSaveOk   met.Count
+	chunkSaveFail met.Count
+	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
+	chunkSizeAtSave met.Meter
+	chunkSizeAtLoad met.Meter
+)
 
 /*
 https://godoc.org/github.com/gocql/gocql#Session
@@ -51,7 +68,7 @@ type cassandraStore struct {
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers, readqsize, writeqsize int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -79,21 +96,36 @@ func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, re
 	c := &cassandraStore{
 		session:          session,
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
-		readQueue:        make(chan *ChunkReadRequest, *cassandraReadQueueSize),
+		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		writeQueueMeters: make([]met.Meter, writers),
 	}
 
-	for i := 0; i < *cassandraWriteConcurrency; i++ {
-		c.writeQueues[i] = make(chan *ChunkWriteRequest, *cassandraWriteQueueSize)
+	for i := 0; i < writers; i++ {
+		c.writeQueues[i] = make(chan *ChunkWriteRequest, writeqsize)
 		c.writeQueueMeters[i] = stats.NewMeter(fmt.Sprintf("cassandra.write_queue.%d.items", i+1), 0)
 		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
 	}
 
-	for i := 0; i < *cassandraReadConcurrency; i++ {
+	for i := 0; i < readers; i++ {
 		go c.processReadQueue()
 	}
 
 	return c, err
+}
+
+func (c *cassandraStore) InitMetrics(stats met.Backend) {
+	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
+	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
+	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
+
+	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
+	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
+	cassToIterDuration = stats.NewTimer("cassandra.to_iter_duration", 0)
+
+	chunkSaveOk = stats.NewCount("chunks.save_ok")
+	chunkSaveFail = stats.NewCount("chunks.save_fail")
+	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
+	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
 }
 
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
@@ -101,7 +133,7 @@ func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 	for _, char := range cwr.key {
 		sum += int(char)
 	}
-	which := sum % *cassandraWriteConcurrency
+	which := sum % len(c.writeQueues)
 	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
 	c.writeQueues[which] <- cwr
 	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
@@ -123,7 +155,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 
 			data := cwr.chunk.Series.Bytes()
 			chunkSizeAtSave.Value(int64(len(data)))
-			version := FormatStandardGoTsz
+			version := chunk.FormatStandardGoTsz
 			buf := new(bytes.Buffer)
 			err := binary.Write(buf, binary.LittleEndian, uint8(version))
 			if err != nil {
@@ -171,7 +203,7 @@ func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int
 		return nil
 	}
 	query := fmt.Sprintf("INSERT INTO metric (key, ts, data) values(?,?,?) USING TTL %d", ttl)
-	row_key := fmt.Sprintf("%s_%d", key, t0/month_sec) // "month number" based on unix timestamp (rounded down)
+	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ret := c.session.Query(query, row_key, t0, data).Exec()
 	cassPutDuration.Value(time.Now().Sub(pre))
@@ -209,8 +241,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, nil})
 	}
 
-	start_month := start - (start % month_sec)       // starting row has to be at, or before, requested start
-	end_month := (end - 1) - ((end - 1) % month_sec) // ending row has to be include the last point we might need
+	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
+	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to be include the last point we might need
 
 	pre := time.Now()
 
@@ -219,21 +251,21 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than will miss some data at the beginning
 	// we can't assume we know the chunkSpan so we can't just calculate the t0 >= start - <some-predefined-number> because chunkSpans may change over time.
 	// we effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
-	// since we make sure that you can only use chunkSpans so that month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
+	// since we make sure that you can only use chunkSpans so that Month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
 	// as the one that has start_month.
 
-	row_key := fmt.Sprintf("%s_%d", key, start_month/month_sec)
+	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
 	query(start_month, start_month, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
-		row_key = fmt.Sprintf("%s_%d", key, start_month/month_sec)
+		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 		query(start_month, start_month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
-		for month := start_month; month <= end_month; month += month_sec {
-			row_key = fmt.Sprintf("%s_%d", key, month/month_sec)
+		for month := start_month; month <= end_month; month += Month_sec {
+			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
 				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
@@ -279,7 +311,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 				log.Error(3, errChunkTooSmall.Error())
 				return iters, errChunkTooSmall
 			}
-			if Format(b[0]) != FormatStandardGoTsz {
+			if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
 				log.Error(3, errUnknownChunkFormat.Error())
 				return iters, errUnknownChunkFormat
 			}

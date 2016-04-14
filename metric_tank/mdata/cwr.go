@@ -1,6 +1,10 @@
-package main
+package mdata
 
-import "time"
+import (
+	"time"
+
+	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
+)
 
 type ChunkReadRequest struct {
 	month   uint32
@@ -12,7 +16,7 @@ type ChunkReadRequest struct {
 
 type ChunkWriteRequest struct {
 	key       string
-	chunk     *Chunk
+	chunk     *chunk.Chunk
 	ttl       uint32
 	timestamp time.Time
 }

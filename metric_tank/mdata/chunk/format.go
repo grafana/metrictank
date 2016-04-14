@@ -1,4 +1,4 @@
-package main
+package chunk
 
 // this exists so that we can later add more formats, perhaps for int/uint/float32/bool specific optimisations, or other encoding/decoding/compression algorithms
 // and have an easy time distinguishing the binary blobs

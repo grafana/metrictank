@@ -10,6 +10,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"net/http"
@@ -161,19 +162,19 @@ func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
 		bufPool.Put(js[:0])
 	}
 }
-func get(store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func get(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, false)
 	}
 }
 
-func getLegacy(store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32) http.HandlerFunc {
+func getLegacy(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		Get(w, req, store, defCache, aggSettings, logMinDur, true)
 	}
 }
 
-func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *defcache.DefCache, aggSettings []aggSetting, logMinDur uint32, legacy bool) {
+func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
 	var err error
@@ -357,7 +358,7 @@ func Get(w http.ResponseWriter, req *http.Request, store Store, defCache *defcac
 // We only want requests to be sent to this node if it is the primary
 // node or if it has been online for at *warmUpPeriod
 func appStatus(w http.ResponseWriter, req *http.Request) {
-	if clusterStatus.IsPrimary() {
+	if mdata.CluStatus.IsPrimary() {
 		w.Write([]byte("OK"))
 		return
 	}

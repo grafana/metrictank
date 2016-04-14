@@ -1,4 +1,4 @@
-package main
+package mdata
 
 import "github.com/raintank/raintank-metric/metric_tank/iter"
 

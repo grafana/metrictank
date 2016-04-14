@@ -3,14 +3,14 @@ package usage
 import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
-	"github.com/raintank/raintank-metric/metric_tank/struc"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/schema"
 	"sync"
 	"time"
 )
 
 var Clock clock.Clock
-var metrics struc.Metrics
+var metrics mdata.Metrics
 var defCache *defcache.DefCache
 
 type orgstat struct {
@@ -26,7 +26,7 @@ type Usage struct {
 	prev   map[int]orgstat
 }
 
-func New(period uint32, m struc.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
+func New(period uint32, m mdata.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
 	metrics = m
 	defCache = d
 	Clock = cl

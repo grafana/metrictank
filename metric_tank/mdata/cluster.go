@@ -1,4 +1,4 @@
-package main
+package mdata
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,13 +15,12 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
-	"github.com/raintank/raintank-metric/metric_tank/struc"
 )
 
 var (
 	hostPool            hostpool.HostPool
 	producers           map[string]*nsq.Producer
-	clusterStatus       *ClusterStatus
+	CluStatus           *ClusterStatus
 	persistMessageBatch *PersistMessageBatch
 )
 
@@ -31,16 +29,16 @@ const PersistMessageBatchV1 = 1
 
 type ClusterStatus struct {
 	sync.Mutex
-	Instance   string
-	Primary    bool
-	LastChange time.Time
+	instance   string
+	primary    bool
+	lastChange time.Time
 }
 
 func NewClusterStatus(instance string, initialState bool) *ClusterStatus {
 	return &ClusterStatus{
-		Instance:   instance,
-		Primary:    initialState,
-		LastChange: time.Now(),
+		instance:   instance,
+		primary:    initialState,
+		lastChange: time.Now(),
 	}
 }
 
@@ -52,15 +50,15 @@ func (c *ClusterStatus) Marshal() ([]byte, error) {
 
 func (c *ClusterStatus) Set(newState bool) {
 	c.Lock()
-	c.Primary = newState
-	c.LastChange = time.Now()
+	c.primary = newState
+	c.lastChange = time.Now()
 	c.Unlock()
 }
 
 func (c *ClusterStatus) IsPrimary() bool {
 	c.Lock()
 	defer c.Unlock()
-	return c.Primary
+	return c.primary
 }
 
 type PersistMessage struct {
@@ -71,6 +69,7 @@ type PersistMessage struct {
 
 type PersistMessageBatch struct {
 	sync.Mutex
+	topic       string
 	Instance    string        `json:"instance"`
 	SavedChunks []*savedChunk `json:"saved_chunks"`
 }
@@ -105,7 +104,7 @@ func (p *PersistMessageBatch) flush() {
 			continue
 		}
 
-		if *topicNotifyPersist == "" {
+		if p.topic == "" {
 			continue
 		}
 
@@ -125,8 +124,8 @@ func (p *PersistMessageBatch) flush() {
 			// then all hosts will be reset to alive and we will try them all again. This
 			// will result in this loop repeating forever until we successfully publish our msg.
 			hostPoolResponse := hostPool.Get()
-			p := producers[hostPoolResponse.Host()]
-			err = p.Publish(*topicNotifyPersist, buf.Bytes())
+			prod := producers[hostPoolResponse.Host()]
+			err = prod.Publish(p.topic, buf.Bytes())
 			// Hosts that are marked as dead will be retried after 30seconds.  If we published
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)
@@ -137,17 +136,17 @@ func (p *PersistMessageBatch) flush() {
 			}
 		}
 	}
-
-	return
 }
 
 type MetricPersistHandler struct {
-	metrics struc.Metrics
+	instance string
+	metrics  Metrics
 }
 
-func NewMetricPersistHandler(metrics struc.Metrics) *MetricPersistHandler {
+func NewMetricPersistHandler(instance string, metrics Metrics) *MetricPersistHandler {
 	return &MetricPersistHandler{
-		metrics: metrics,
+		instance: instance,
+		metrics:  metrics,
 	}
 }
 
@@ -161,12 +160,12 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 			log.Error(3, "failed to unmarsh batch message. skipping.", err)
 			return nil
 		}
-		if batch.Instance == *instance {
+		if batch.Instance == h.instance {
 			log.Debug("CLU skipping batch message we generated.")
 			return nil
 		}
 		for _, c := range batch.SavedChunks {
-			if agg, ok := metrics.Get(c.Key); ok {
+			if agg, ok := h.metrics.Get(c.Key); ok {
 				agg.(*AggMetric).SyncChunkSaveState(c.T0)
 			}
 		}
@@ -178,32 +177,32 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 			log.Error(3, "skipping message. %s", err)
 			return nil
 		}
-		if ms.Instance == *instance {
+		if ms.Instance == h.instance {
 			log.Debug("CLU skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
 			return nil
 		}
 
 		// get metric
-		if agg, ok := metrics.Get(ms.Key); ok {
+		if agg, ok := h.metrics.Get(ms.Key); ok {
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
 		}
 	}
 	return nil
 }
 
-func InitCluster(metrics struc.Metrics, stats met.Backend) {
-	persistMessageBatch = &PersistMessageBatch{Instance: *instance, SavedChunks: make([]*savedChunk, 0)}
+func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, producerOpts, consumerOpts string, nsqdAdds, lookupdAdds []string, maxInFlight int) {
+	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]*savedChunk, 0), topic: topic}
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
-	err := app.ParseOpts(pCfg, *producerOpts)
+	err := app.ParseOpts(pCfg, producerOpts)
 	if err != nil {
 		log.Fatal(4, "failed to parse nsq producer options. %s", err)
 	}
-	hostPool = hostpool.NewEpsilonGreedy(strings.Split(*nsqdTCPAddrs, ","), 0, &hostpool.LinearEpsilonValueCalculator{})
+	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
 
-	for _, addr := range strings.Split(*nsqdTCPAddrs, ",") {
+	for _, addr := range nsqdAdds {
 		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
 			log.Fatal(4, "failed creating producer %s", err.Error())
@@ -214,33 +213,25 @@ func InitCluster(metrics struc.Metrics, stats met.Backend) {
 	// init consumers
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "metrics_tank_cluster"
-	err = app.ParseOpts(cfg, *consumerOpts)
+	err = app.ParseOpts(cfg, consumerOpts)
 	if err != nil {
 		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
 	}
-	cfg.MaxInFlight = *maxInFlight
+	cfg.MaxInFlight = maxInFlight
 
-	consumer, err := insq.NewConsumer(*topicNotifyPersist, *channel, cfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(topic, channel, cfg, "metric_persist.%s", stats)
 	if err != nil {
 		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
 	}
-	handler := NewMetricPersistHandler(metrics)
+	handler := NewMetricPersistHandler(instance, metrics)
 	consumer.AddConcurrentHandlers(handler, 2)
 
-	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
-	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
-		nsqdAdds = []string{}
-	}
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQDs. %s", err)
 	}
 	log.Info("persist consumer connected to nsqd")
 
-	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
-	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
-		lookupdAdds = []string{}
-	}
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
@@ -248,21 +239,20 @@ func InitCluster(metrics struc.Metrics, stats met.Backend) {
 	go persistMessageBatch.flush()
 }
 
-// Handlers for HTTP interface.
 // Handle requests for /cluster. POST to set primary flag, GET to get current state.
-func clusterStatusHandler(w http.ResponseWriter, req *http.Request) {
+func (c *ClusterStatus) HttpHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "GET" {
-		getClusterStatus(w, req)
+		c.getClusterStatus(w, req)
 		return
 	}
 	if req.Method == "POST" {
-		setClusterStatus(w, req)
+		c.setClusterStatus(w, req)
 		return
 	}
 	http.Error(w, "not found.", http.StatusNotFound)
 }
 
-func setClusterStatus(w http.ResponseWriter, req *http.Request) {
+func (c *ClusterStatus) setClusterStatus(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	newState := req.Form.Get("primary")
 	if newState == "" {
@@ -275,14 +265,14 @@ func setClusterStatus(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "primary field could not be parsed to boolean value.", http.StatusBadRequest)
 		return
 	}
-	clusterStatus.Set(primary)
+	c.Set(primary)
 	log.Info("primary status is now %t", primary)
 	w.Write([]byte("OK"))
 }
 
-func getClusterStatus(w http.ResponseWriter, req *http.Request) {
+func (c *ClusterStatus) getClusterStatus(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	resp, err := clusterStatus.Marshal()
+	resp, err := c.Marshal()
 	if err != nil {
 		http.Error(w, "could not marshal status to json", http.StatusInternalServerError)
 		return

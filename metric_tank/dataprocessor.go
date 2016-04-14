@@ -3,14 +3,16 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/grafana/grafana/pkg/log"
-	"github.com/raintank/raintank-metric/metric_tank/consolidation"
-	"github.com/raintank/raintank-metric/metric_tank/iter"
-	"github.com/raintank/raintank-metric/schema"
 	"math"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/raintank-metric/metric_tank/consolidation"
+	"github.com/raintank/raintank-metric/metric_tank/iter"
+	"github.com/raintank/raintank-metric/metric_tank/mdata"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 const defaultPointSliceSize = 2000
@@ -165,7 +167,7 @@ func aggEvery(numPoints, maxPoints uint32) uint32 {
 }
 
 // error is the error of the first failing target request
-func getTargets(store Store, reqs []Req) ([]Series, error) {
+func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 	seriesChan := make(chan Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
@@ -206,7 +208,7 @@ func getTargets(store Store, reqs []Req) ([]Series, error) {
 
 }
 
-func getTarget(store Store, req Req) (points []schema.Point, interval uint32, err error) {
+func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 
 	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
@@ -309,7 +311,7 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
-func getSeries(store Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
+func getSeries(store mdata.Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]iter.Iter, 0)
 	memIters := make([]iter.Iter, 0)
 	oldest := toUnix
