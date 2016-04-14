@@ -54,7 +54,7 @@ var (
 	instance         = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
-	primaryNode      = flag.Bool("primary-node", false, "the primary node writes data to cassnadra. There should only be 1 primary node per cluster of nodes.")
+	primaryNode      = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 
 	chunkSpanStr = flag.String("chunkspan", "2h", "chunk span")
 	numChunksInt = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
