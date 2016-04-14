@@ -25,14 +25,14 @@ func NewHandler(metrics struc.Metrics, defCache *defcache.DefCache, usg *usage.U
 }
 
 func (h *Handler) HandleMessage(m *nsq.Message) error {
-	ms, err := msg.MetricDataFromMsg(m.Body)
+	ms, err := msg.MetricDataFromMsg(m.Body) // note: ms.Msg links to m.Body
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
 	}
 	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
 
-	err = ms.DecodeMetricData()
+	err = ms.DecodeMetricData() // reads metrics from ms.Msg and unsets it
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
