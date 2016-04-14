@@ -89,6 +89,12 @@ func TestOrgToTrigram(t *testing.T) {
 	}
 }
 
+type globByName []Glob
+
+func (g globByName) Len() int           { return len(g) }
+func (g globByName) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
+func (g globByName) Less(i, j int) bool { return g[i].Metric < g[j].Metric }
+
 func TestMatch(t *testing.T) {
 	ix := New()
 	cases := []struct {
@@ -102,7 +108,7 @@ func TestMatch(t *testing.T) {
 		{10, "abc.*.ghi", []Glob{}},
 	}
 	for i, c := range cases {
-		globs := ix.Match(c.org, c.query)
+		_, globs := ix.Match(c.org, c.query)
 		fail := func() {
 			for j := 0; j < len(c.out); j++ {
 				t.Logf("expected glob %d -> %s", j, c.out[j])
@@ -163,7 +169,8 @@ func TestMatch(t *testing.T) {
 		{1, "*.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
 	}
 	for i, c := range cases {
-		globs := ix.Match(c.org, c.query)
+		_, globs := ix.Match(c.org, c.query)
+		sort.Sort(globByName(globs))
 		sort.Sort(globByName(c.out))
 		fail := func() {
 			t.Logf("case %d: org: %d - query: %q . globs mismatch", i, c.org, c.query)
