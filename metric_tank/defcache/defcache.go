@@ -127,17 +127,32 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 		mdef := dc.defs[id]
 		dc.RUnlock()
 		if mdef.LastUpdate < metric.Time-21600 {
+			// this is a little expensive, let's not hold the lock while we do this
 			mdef = *schema.MetricDefinitionFromMetricData(metric)
-			dc.addToES(&mdef)
+			// let's make sure only one concurrent Add() can addToES,
+			// because that function is a bit expensive and could block
+			// so now that we have the mdef, let's check again before proceeding.
 			dc.Lock()
-			dc.defs[id] = mdef
+			old := dc.defs[id]
+			if old.LastUpdate < metric.Time-21600 {
+				dc.addToES(&mdef)
+				dc.defs[id] = mdef
+			}
 			dc.Unlock()
 		}
 	} else {
 		mdef := *schema.MetricDefinitionFromMetricData(metric)
-		dc.addToES(&mdef)
+		// now that we have the mdef, let's make sure we only add this once concurrently.
+		// because addToES is pretty expensive and we should only call AddRef once.
 		dc.Lock()
-		id := dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
+		id, ok := dc.ById[metric.Id]
+		if ok {
+			// someone beat us to it. nothing left to do
+			dc.Unlock()
+			return
+		}
+		dc.addToES(&mdef)
+		id = dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
 		dc.ByKey.AddRef(mdef.OrgId, id)
 		dc.ById[mdef.Id] = id
 		dc.defs = append(dc.defs, mdef)
