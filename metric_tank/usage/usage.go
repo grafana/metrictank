@@ -55,6 +55,16 @@ func (u *Usage) Add(org int, key string) {
 	u.Unlock()
 }
 
+// a bit of a hack only for package-internal use (e.g. testing) to manipulate the internal counter
+func (u *Usage) set(org int, key string, points uint32) {
+	u.Lock()
+	o := u.now[org]
+	o.keys[key] = struct{}{}
+	o.points = points
+	u.now[org] = o
+	u.Unlock()
+}
+
 func (u *Usage) Report() {
 	// provides "clean" ticks at precise intervals, and delivers them shortly after
 	tick := func() time.Time {
