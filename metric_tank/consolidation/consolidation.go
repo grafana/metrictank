@@ -38,7 +38,7 @@ func (c Consolidator) String() string {
 	case Sum:
 		return "SumConsolidator"
 	}
-	panic(fmt.Sprintf("Consolidator.String(): unknown consolidator %v", c))
+	panic(fmt.Sprintf("Consolidator.String(): unknown consolidator %d", c))
 }
 
 // provide the name of a stored archive

@@ -69,7 +69,7 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
 		// input is out of values. add a null
 		if i >= len(in) {
-			out[o] = schema.Point{math.NaN(), t}
+			out[o] = schema.Point{Val: math.NaN(), Ts: t}
 			continue
 		}
 
@@ -80,10 +80,10 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 			i++
 		} else if p.Ts > t {
 			// point is too recent, append a null and reconsider same point for next slot
-			out[o] = schema.Point{math.NaN(), t}
+			out[o] = schema.Point{Val: math.NaN(), Ts: t}
 		} else if p.Ts > t-interval && p.Ts < t {
 			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
-			out[o] = schema.Point{p.Val, t}
+			out[o] = schema.Point{Val: p.Val, Ts: t}
 			i++
 		} else if p.Ts <= t-interval {
 			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
@@ -127,7 +127,7 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
 			next_i = in_i + num
-			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out[out_i] = schema.Point{Val: aggFunc(in[in_i:next_i]), Ts: in[next_i-1].Ts}
 			out_i += 1
 		}
 	} else {
@@ -137,7 +137,7 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 		var next_i int
 		for in_i := 0; in_i < cleanLen; in_i = next_i {
 			next_i = in_i + num
-			out[out_i] = schema.Point{aggFunc(in[in_i:next_i]), in[next_i-1].Ts}
+			out[out_i] = schema.Point{Val: aggFunc(in[in_i:next_i]), Ts: in[next_i-1].Ts}
 			out_i += 1
 		}
 		// we have some leftover points that didn't get aggregated yet
@@ -152,7 +152,7 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 			// len 10, cleanLen 9, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
 			lastTs = in[cleanLen].Ts + (aggNum-1)*interval
 		}
-		out[out_i] = schema.Point{aggFunc(in[cleanLen:len(in)]), lastTs}
+		out[out_i] = schema.Point{Val: aggFunc(in[cleanLen:len(in)]), Ts: lastTs}
 	}
 	return out
 }
@@ -353,7 +353,7 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 			ts, val := iter.Values()
 			if ts >= fromUnix && ts < toUnix {
 				good += 1
-				points = append(points, schema.Point{val, ts})
+				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
 		if logLevel < 2 {

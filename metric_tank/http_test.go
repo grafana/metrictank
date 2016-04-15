@@ -84,7 +84,7 @@ func BenchmarkSeriesJson(b *testing.B) {
 	pA := make([]schema.Point, 1000, 1000)
 	baseTs := 1500000000
 	for i := 0; i < 1000; i++ {
-		pA[i] = schema.Point{float64(10000 * i), uint32(baseTs + 10*i)}
+		pA[i] = schema.Point{Val: float64(10000 * i), Ts: uint32(baseTs + 10*i)}
 	}
 	data := []Series{
 		Series{
@@ -111,8 +111,8 @@ func BenchmarkHttpRespJson(b *testing.B) {
 	pB := make([]schema.Point, 1000, 1000)
 	baseTs := 1500000000
 	for i := 0; i < 1000; i++ {
-		pA[i] = schema.Point{float64(10000 * i), uint32(baseTs + 10*i)}
-		pB[i] = schema.Point{12.34 * float64(i), uint32(baseTs + 10*i)}
+		pA[i] = schema.Point{Val: float64(10000 * i), Ts: uint32(baseTs + 10*i)}
+		pB[i] = schema.Point{Val: 12.34 * float64(i), Ts: uint32(baseTs + 10*i)}
 	}
 	data := []Series{
 		{

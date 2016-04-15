@@ -44,7 +44,7 @@ func TestAggregator(t *testing.T) {
 		for _, iter := range iters {
 			for iter.Next() {
 				ts, val := iter.Values()
-				got = append(got, schema.Point{val, ts})
+				got = append(got, schema.Point{Val: val, Ts: ts})
 			}
 		}
 		if len(got) != len(expected) {

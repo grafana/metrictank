@@ -47,7 +47,7 @@ func TestGetAddKey(t *testing.T) {
 			t.Fatalf("case %d: expected id %d - got %d", i, c.id, id)
 		}
 		if !ok {
-			t.Fatalf("case %d: expected ok true - got ok false")
+			t.Fatalf("case %d: expected ok true - got ok false", i)
 		}
 	}
 	// then try the new cases
@@ -65,7 +65,7 @@ func TestGetAddKey(t *testing.T) {
 	for i, c := range cases {
 		key := ix.Key(c.id)
 		if key != c.key {
-			t.Fatalf("case %d: expected key %d - got %d", i, c.key, key)
+			t.Fatalf("case %d: expected key %s - got %s", i, c.key, key)
 		}
 	}
 }

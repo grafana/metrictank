@@ -266,7 +266,7 @@ type fixc struct {
 func nullPoints(from, to, interval uint32) []schema.Point {
 	out := make([]schema.Point, 0)
 	for i := from; i < to; i += interval {
-		out = append(out, schema.Point{math.NaN(), i})
+		out = append(out, schema.Point{Val: math.NaN(), Ts: i})
 	}
 	return out
 }
@@ -861,7 +861,7 @@ func randFloats() []schema.Point {
 	// let's just do the "odd" case, since the non-odd will be sufficiently close
 	ret := make([]schema.Point, 1000001)
 	for i := 0; i < len(ret); i++ {
-		ret[i] = schema.Point{rand.Float64(), uint32(i)}
+		ret[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
 	}
 	return ret
 }
@@ -871,9 +871,9 @@ func randFloatsWithNulls() []schema.Point {
 	ret := make([]schema.Point, 1000001)
 	for i := 0; i < len(ret); i++ {
 		if i%2 == 0 {
-			ret[i] = schema.Point{math.NaN(), uint32(i)}
+			ret[i] = schema.Point{Val: math.NaN(), Ts: uint32(i)}
 		} else {
-			ret[i] = schema.Point{rand.Float64(), uint32(i)}
+			ret[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
 		}
 	}
 	return ret

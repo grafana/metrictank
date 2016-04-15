@@ -9,6 +9,7 @@
 package idx
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -30,6 +31,10 @@ type Glob struct {
 	Id     MetricID
 	Metric string
 	IsLeaf bool
+}
+
+func (g Glob) String() string {
+	return fmt.Sprintf("Glob id=%d metric=%s leaf=%t", g.Id, g.Metric, g.IsLeaf)
 }
 
 const OTTBase = uint32(2147483648)             // 1 << 31
