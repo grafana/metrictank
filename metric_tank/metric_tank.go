@@ -297,9 +297,11 @@ func main() {
 	pre := time.Now()
 	defCache = defcache.New(defs, stats)
 	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
-	handler := NewHandler(metrics, defCache, usg)
 	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
-	consumer.AddConcurrentHandlers(handler, *concurrency)
+	for i := 0; i < *concurrency; i++ {
+		handler := NewHandler(metrics, defCache, usg)
+		consumer.AddHandler(handler)
+	}
 
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
 	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {

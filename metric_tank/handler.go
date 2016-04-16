@@ -1,19 +1,22 @@
 package main
 
 import (
+	"time"
+
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/msg"
-	"time"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 type Handler struct {
 	metrics  mdata.Metrics
 	defCache *defcache.DefCache
 	usage    *usage.Usage
+	tmp      msg.MetricData
 }
 
 func NewHandler(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) *Handler {
@@ -21,27 +24,28 @@ func NewHandler(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.U
 		metrics:  metrics,
 		defCache: defCache,
 		usage:    usg,
+		tmp:      msg.MetricData{Metrics: make([]*schema.MetricData, 1)},
 	}
 }
 
 func (h *Handler) HandleMessage(m *nsq.Message) error {
-	ms, err := msg.MetricDataFromMsg(m.Body) // note: ms.Msg links to m.Body
+	err := h.tmp.InitFromMsg(m.Body)
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
 	}
-	msgsAge.Value(time.Now().Sub(ms.Produced).Nanoseconds() / 1000)
+	msgsAge.Value(time.Now().Sub(h.tmp.Produced).Nanoseconds() / 1000)
 
-	err = ms.DecodeMetricData() // reads metrics from ms.Msg and unsets it
+	err = h.tmp.DecodeMetricData() // reads metrics from h.tmp.Msg and unsets it
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
 		return nil
 	}
-	metricsPerMessage.Value(int64(len(ms.Metrics)))
+	metricsPerMessage.Value(int64(len(h.tmp.Metrics)))
 
-	metricsReceived.Inc(int64(len(ms.Metrics)))
+	metricsReceived.Inc(int64(len(h.tmp.Metrics)))
 
-	for _, metric := range ms.Metrics {
+	for _, metric := range h.tmp.Metrics {
 		if metric.Id == "" {
 			log.Fatal(3, "empty metric.Id - fix your datastream")
 		}
