@@ -74,7 +74,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 			metrics := make([]*schema.MetricData, 4)
 			for m := 0; m < len(metrics); m++ {
 				id := (i + 1) * (m + 1)
-				t.Logf("worker %d metric %d -> adding metric with id and orgid %d", i, m, id)
+				//t.Logf("worker %d metric %d -> adding metric with id and orgid %d", i, m, id)
 
 				metrics[m] = &schema.MetricData{
 					Id:         "",
