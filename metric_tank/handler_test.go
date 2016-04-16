@@ -125,11 +125,11 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	}
 	defs = defCache.List(2)
 	if len(defs) != 1 {
-		t.Fatalf("len of defs should be exactly 1. got defs with len %d: %s", len(defs), defs)
+		t.Fatalf("len of defs should be exactly 1. got defs with len %d: %v", len(defs), defs)
 	}
 	d := defs[0]
 	if d.OrgId != 2 {
-		t.Fatalf("incorrect metricdef returned: %s", d)
+		t.Fatalf("incorrect metricdef returned: %v", d)
 	}
 }
 
