@@ -1,17 +1,23 @@
 [![Circle CI](https://circleci.com/gh/raintank/raintank-metric.svg?style=shield)](https://circleci.com/gh/raintank/raintank-metric)
 
-this repo contains some common libraries, schema and message definitions, as well as the following apps who all pull data from NSQ:
+this repo contains:
+* schema and message definitions for metrics and events, and some common libraries.
+* programs:
+  - [metric-tank](https://github.com/raintank/raintank-metric/tree/master/metric_tank): metric storage chunking, compressing, aggregating graphite backend, backed by cassandra
+  - nsq_metrics_to_stdout: to see what flows through NSQ
+  - nsq_probe_events_to_elasticsearch: consume probe events and store them in elasticsearch.
+  - inspect-es: tool to query metric metadata for sanity checks and stress testing
+  - fake_metrics_to_nsq: generate a metrics workload to flow into NSQ for stress testing.
+  - graphite-watcher: runs sanity checks on graphite server (metric-tank)
 
-* nmt : nsq_metrics_tank (`tank` branch)
-* nme : nsq_metrics_to_elasticsearch (maintains metric definitions in ES)
-* nmk : nsq_metrics_to_kairos (stores metrics data in kairosdb)
-* nms : nsq_metrics_to_stdout: handy for manually looking which metrics are going through NSQ
-* npee: nsq_probe_events_to_elasticsearch (stores prove events to ES)
 
 # format used
 
-aims to be generic, and at the very least not litmus-specific.
+metrics and events are in the [metrics 2.0](http://metrics20.org/) format and messagepack encoded.
+see the [schema library](https://github.com/raintank/raintank-metric/tree/master/schema) for the exact format.
+
 metrics are defined in schema.MetricData, but multiple are packed in 1 NSQ message, see msg.MetricData
+see [msg](https://github.com/raintank/raintank-metric/tree/master/msg) library.
 probe events are in 1 message per event, and is defined in schema.ProbeEvent
 
 
