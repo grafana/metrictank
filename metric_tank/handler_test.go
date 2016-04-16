@@ -15,7 +15,7 @@ import (
 )
 
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
-// this can expose bad reuse of data arrays and such
+// this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
 
 	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
@@ -33,7 +33,27 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
-	handler := NewHandler(aggmetrics, defCache, nil)
+
+	// mimic how we use nsq handlers:
+	// handlers operate concurrently, but within 1 handler, the handling is sequential
+
+	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics mdata.Metrics, defCache *defcache.DefCache) {
+		handler := NewHandler(aggmetrics, defCache, nil)
+		for msg := range in {
+			err := handler.HandleMessage(msg)
+			if err != nil {
+				panic(err)
+			}
+		}
+		group.Done()
+	}
+
+	handlePool := make(chan *nsq.Message, 100)
+	handlerGroup := sync.WaitGroup{}
+	handlerGroup.Add(5)
+	for i := 0; i != 5; i++ {
+		go consumer(handlePool, &handlerGroup, aggmetrics, defCache)
+	}
 
 	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
 	// handle 5 messages, each containing different metrics
@@ -70,7 +90,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 		ids: make(map[string]int),
 	}
 	for i := 0; i < 4; i++ {
-		go func(i int, tit *idToId) {
+		go func(i int, tit *idToId, handlePool chan *nsq.Message) {
 			metrics := make([]*schema.MetricData, 4)
 			for m := 0; m < len(metrics); m++ {
 				id := (i + 1) * (m + 1)
@@ -99,14 +119,13 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 				panic(err)
 			}
 			msg := nsq.NewMessage(id, data)
-			err = handler.HandleMessage(msg)
-			if err != nil {
-				panic(err)
-			}
+			handlePool <- msg
 			wg.Done()
-		}(i, tit)
+		}(i, tit, handlePool)
 	}
 	wg.Wait()
+	close(handlePool)
+	handlerGroup.Wait()
 	defs := defCache.List(-1)
 	if len(defs) != 9 {
 		t.Fatalf("query for org -1 should result in 9 distinct metrics. not %d", len(defs))
