@@ -120,6 +120,7 @@ var (
 	clusterPromoWait  met.Gauge
 	gcNum             met.Gauge // go GC
 	gcDur             met.Gauge // go GC
+	gcCpuFraction     met.Gauge // go GC
 
 	promotionReadyAtChan chan uint32
 )
@@ -382,7 +383,8 @@ func initMetrics(stats met.Backend) {
 	clusterPrimary = stats.NewGauge("cluster.primary", 0)
 	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
 	gcNum = stats.NewGauge("gc.num", 0)
-	gcDur = stats.NewGauge("gc.dur", 0) // in nanoseconds. last known duration.
+	gcDur = stats.NewGauge("gc.dur", 0)                 // in nanoseconds. last known duration.
+	gcCpuFraction = stats.NewGauge("gc.cpufraction", 0) // reported as pro-mille
 
 	// run a collector for some global stats
 	go func() {
@@ -401,6 +403,7 @@ func initMetrics(stats met.Backend) {
 				sysBytes.Value(int64(m.Sys))
 				gcNum.Value(int64(m.NumGC))
 				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
+				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
 				var px int64
 				if mdata.CluStatus.IsPrimary() {
 					px = 1
