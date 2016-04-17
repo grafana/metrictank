@@ -17,6 +17,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/msg"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 var (
@@ -34,27 +35,30 @@ var (
 )
 
 type StdoutHandler struct {
+	tmp msg.MetricData
 }
 
 func NewStdoutHandler() (*StdoutHandler, error) {
 
-	return &StdoutHandler{}, nil
+	return &StdoutHandler{
+		tmp: msg.MetricData{Metrics: make([]*schema.MetricData, 1)},
+	}, nil
 }
 
-func (k *StdoutHandler) HandleMessage(m *nsq.Message) error {
-	ms, err := msg.MetricDataFromMsg(m.Body)
+func (h *StdoutHandler) HandleMessage(m *nsq.Message) error {
+	err := h.tmp.InitFromMsg(m.Body)
 	if err != nil {
 		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
-	err = ms.DecodeMetricData()
+	err = h.tmp.DecodeMetricData()
 	if err != nil {
 		log.Error(3, "%s: skipping message", err.Error())
 		return nil
 	}
 
-	for _, m := range ms.Metrics {
+	for _, m := range h.tmp.Metrics {
 		fmt.Println(m.Id, m.Interval, m.Name, m.Time, m.Value, m.Tags)
 	}
 	return nil

@@ -17,7 +17,6 @@ var errTooSmall = errors.New("too small")
 var errFmtBinWriteFailed = "binary write failed: %q"
 var errFmtUnknownFormat = "unknown format %d"
 
-
 type MetricData struct {
 	Id       int64
 	Metrics  []*schema.MetricData
@@ -46,26 +45,21 @@ type ProbeEventJson struct {
 }
 
 // parses format and id (cheap), but doesn't decode metrics (expensive) just yet.
-func MetricDataFromMsg(msg []byte) (MetricData, error) {
-	m := MetricData{
-		Metrics: make([]*schema.MetricData, 0),
-		Msg:     msg,
-	}
-
+func (m *MetricData) InitFromMsg(msg []byte) error {
 	if len(msg) < 9 {
-		return m, errTooSmall
+		return errTooSmall
 	}
+	m.Msg = msg
 
 	buf := bytes.NewReader(msg[1:9])
 	binary.Read(buf, binary.BigEndian, &m.Id)
 	m.Produced = time.Unix(0, m.Id)
 
-	format := Format(msg[0])
-	if format != FormatMetricDataArrayJson && format != FormatMetricDataArrayMsgp {
-		return m, fmt.Errorf(errFmtUnknownFormat, format)
+	m.Format = Format(msg[0])
+	if m.Format != FormatMetricDataArrayJson && m.Format != FormatMetricDataArrayMsgp {
+		return fmt.Errorf(errFmtUnknownFormat, m.Format)
 	}
-	m.Format = format
-	return m, nil
+	return nil
 }
 
 // sets m.Metrics to a []*schema.MetricData
