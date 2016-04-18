@@ -70,8 +70,8 @@ type PersistMessage struct {
 }
 
 type PersistMessageBatch struct {
-	sync.Mutex
-	topic       string
+	sync.Mutex  `json:"-"`
+	topic       string        `json:"-"`
 	Instance    string        `json:"instance"`
 	SavedChunks []*savedChunk `json:"saved_chunks"`
 }
