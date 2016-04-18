@@ -4,7 +4,7 @@ this repo contains:
 * schema and message definitions for metrics and events, and some common libraries.
 * programs:
   - [metric-tank](https://github.com/raintank/raintank-metric/tree/master/metric_tank): metric storage chunking, compressing, aggregating graphite backend, backed by cassandra
-  - nsq_metrics_to_stdout: to see what flows through NSQ
+  - nsq_metrics_to_stdout & nsq_metricpersist_to_stdout: to see what flows through NSQ: metrics and metrics persistence messages (from MT clustering)
   - nsq_probe_events_to_elasticsearch: consume probe events and store them in elasticsearch.
   - inspect-es: tool to query metric metadata for sanity checks and stress testing
   - fake_metrics_to_nsq: generate a metrics workload to flow into NSQ for stress testing.
