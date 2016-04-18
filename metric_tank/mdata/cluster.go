@@ -27,18 +27,20 @@ var (
 //PersistMessage format version
 const PersistMessageBatchV1 = 1
 
+// ClusterStatus has Exported fields but don't touch them directly
+// it's only for json marshaling. use the accessor methods.
 type ClusterStatus struct {
 	sync.Mutex
-	instance   string
-	primary    bool
-	lastChange time.Time
+	Instance   string    `json:"instance"`
+	Primary    bool      `json:"primary"`
+	LastChange time.Time `json:"lastChange"`
 }
 
 func NewClusterStatus(instance string, initialState bool) *ClusterStatus {
 	return &ClusterStatus{
-		instance:   instance,
-		primary:    initialState,
-		lastChange: time.Now(),
+		Instance:   instance,
+		Primary:    initialState,
+		LastChange: time.Now(),
 	}
 }
 
@@ -50,15 +52,15 @@ func (c *ClusterStatus) Marshal() ([]byte, error) {
 
 func (c *ClusterStatus) Set(newState bool) {
 	c.Lock()
-	c.primary = newState
-	c.lastChange = time.Now()
+	c.Primary = newState
+	c.LastChange = time.Now()
 	c.Unlock()
 }
 
 func (c *ClusterStatus) IsPrimary() bool {
 	c.Lock()
 	defer c.Unlock()
-	return c.primary
+	return c.Primary
 }
 
 type PersistMessage struct {
