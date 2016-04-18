@@ -71,7 +71,7 @@ type PersistMessage struct {
 
 type PersistMessageBatch struct {
 	sync.Mutex  `json:"-"`
-	topic       string        `json:"-"`
+	Topic       string        `json:"-"`
 	Instance    string        `json:"instance"`
 	SavedChunks []*savedChunk `json:"saved_chunks"`
 }
@@ -106,7 +106,7 @@ func (p *PersistMessageBatch) flush() {
 			continue
 		}
 
-		if p.topic == "" {
+		if p.Topic == "" {
 			continue
 		}
 
@@ -127,7 +127,7 @@ func (p *PersistMessageBatch) flush() {
 			// will result in this loop repeating forever until we successfully publish our msg.
 			hostPoolResponse := hostPool.Get()
 			prod := producers[hostPoolResponse.Host()]
-			err = prod.Publish(p.topic, buf.Bytes())
+			err = prod.Publish(p.Topic, buf.Bytes())
 			// Hosts that are marked as dead will be retried after 30seconds.  If we published
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)
@@ -193,7 +193,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 }
 
 func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, producerOpts, consumerOpts string, nsqdAdds, lookupdAdds []string, maxInFlight int) {
-	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]*savedChunk, 0), topic: topic}
+	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]*savedChunk, 0), Topic: topic}
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
