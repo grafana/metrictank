@@ -62,3 +62,5 @@ see https://github.com/raintank/raintank-metric/issues/41 for more info. also [i
   - also per-target-type aggregations (like counter -> last), not all aggregations always make sense for all types.
   - no need to take all raw inputs into each aggregator, they can instead take summaries from previous aggregators
   we should redo them at some point. 
+
+* we don't have a list of all keys inside the tsdb. consequences: you can't get lists/search/autocomplete and for non-existant keys we still query cassandra
