@@ -71,9 +71,9 @@ type PersistMessage struct {
 
 type PersistMessageBatch struct {
 	sync.Mutex  `json:"-"`
-	Topic       string        `json:"-"`
-	Instance    string        `json:"instance"`
-	SavedChunks []*savedChunk `json:"saved_chunks"`
+	Topic       string       `json:"-"`
+	Instance    string       `json:"instance"`
+	SavedChunks []savedChunk `json:"saved_chunks"`
 }
 
 type savedChunk struct {
@@ -84,7 +84,7 @@ type savedChunk struct {
 func (p *PersistMessageBatch) AddChunk(key string, t0 uint32) {
 	p.Lock()
 	defer p.Unlock()
-	p.SavedChunks = append(p.SavedChunks, &savedChunk{Key: key, T0: t0})
+	p.SavedChunks = append(p.SavedChunks, savedChunk{Key: key, T0: t0})
 }
 
 func SendPersistMessage(key string, t0 uint32) {
@@ -96,7 +96,7 @@ func (p *PersistMessageBatch) flush() {
 	for range ticker.C {
 		// get current savedChunks and clear our buffer.
 		p.Lock()
-		c := make([]*savedChunk, len(p.SavedChunks))
+		c := make([]savedChunk, len(p.SavedChunks))
 		copy(c, p.SavedChunks)
 		p.SavedChunks = nil
 		msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: c}
@@ -193,7 +193,7 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 }
 
 func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, producerOpts, consumerOpts string, nsqdAdds, lookupdAdds []string, maxInFlight int) {
-	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]*savedChunk, 0), Topic: topic}
+	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]savedChunk, 0), Topic: topic}
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
