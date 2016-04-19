@@ -8,7 +8,7 @@ test:
     - go test -v -race ./metric_tank/...
     - go test -v -race ./nsq_probe_events_to_elasticsearch
     - go test -v -race ./schema
-    - go vet ./...
+    - go vet $(go list ./... | grep -v /vendor/)
   post:
     - pkg/package.sh
 dependencies:
