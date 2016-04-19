@@ -59,7 +59,10 @@ func (h *StdoutHandler) HandleMessage(m *nsq.Message) error {
 			log.Error(3, "failed to unmarsh batch message. skipping.", err)
 			return nil
 		}
-		spew.Dump(batch)
+		fmt.Println("instance:", batch.Instance)
+		for _, c := range batch.SavedChunks {
+			fmt.Prinln("chunk", c.Key, c.T0)
+		}
 	} else {
 		// assume the old format.
 		ms := mdata.PersistMessage{}
