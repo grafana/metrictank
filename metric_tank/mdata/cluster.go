@@ -94,15 +94,12 @@ func SendPersistMessage(key string, t0 uint32) {
 func (p *PersistMessageBatch) flush() {
 	ticker := time.NewTicker(time.Second)
 	for range ticker.C {
-		// get current savedChunks and clear our buffer.
 		p.Lock()
-		c := make([]savedChunk, len(p.SavedChunks))
-		copy(c, p.SavedChunks)
+		msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: p.SavedChunks}
 		p.SavedChunks = nil
-		msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: c}
 		p.Unlock()
 
-		if len(c) == 0 {
+		if len(msg.SavedChunks) == 0 {
 			continue
 		}
 
@@ -110,7 +107,7 @@ func (p *PersistMessageBatch) flush() {
 			continue
 		}
 
-		log.Debug("CLU sending %d batch metricPersist messages", len(c))
+		log.Debug("CLU sending %d batch metricPersist messages", len(msg.SavedChunks))
 
 		data, err := json.Marshal(&msg)
 		if err != nil {
