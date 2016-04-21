@@ -209,38 +209,28 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 	}
 
 	now := time.Now()
-	fromUnix := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	toUnix := uint32(now.Add(time.Duration(1) * time.Second).Unix())
+
 	from := req.Form.Get("from")
-	if from != "" {
-		fromUnixInt, err := strconv.Atoi(from)
-		if err == nil {
-			fromUnix = uint32(fromUnixInt)
-		} else {
-			if len(from) == 1 || from[0] != '-' {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			dur, err := dur.ParseUNsec(from[1:])
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			fromUnix = uint32(now.Add(-time.Duration(dur) * time.Second).Unix())
-		}
-	}
 	to := req.Form.Get("to")
 	if to == "" {
 		to = req.Form.Get("until")
 	}
-	if to != "" {
-		toUnixInt, err := strconv.Atoi(to)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		toUnix = uint32(toUnixInt)
+
+	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
+
+	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	toUnix, err := dur.ParseTSpec(to, now, defaultTo)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if legacy {
 		// in MT, both the external and internal api, from is inclusive, to is exclusive
 		// in graphite, from is exclusive and to inclusive
