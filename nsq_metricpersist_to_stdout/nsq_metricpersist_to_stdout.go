@@ -61,7 +61,7 @@ func (h *StdoutHandler) HandleMessage(m *nsq.Message) error {
 		}
 		fmt.Println("instance:", batch.Instance)
 		for _, c := range batch.SavedChunks {
-			fmt.Prinln("chunk", c.Key, c.T0)
+			fmt.Println("chunk", c.Key, c.T0)
 		}
 	} else {
 		// assume the old format.
