@@ -175,7 +175,7 @@ func (l *Idx) Prefix(org int, query string, fn radix.WalkFn) {
 
 // for a "filesystem glob" query (e.g. supports * and [] but not {})
 // looks in the trigrams index
-func (l *Idx) QueryPath(org int, query string) []Glob {
+func (l *Idx) QueryTrigrams(org int, query string) []Glob {
 
 	if l.Pathidx == nil {
 		return nil
@@ -185,32 +185,82 @@ func (l *Idx) QueryPath(org int, query string) []Glob {
 	ids := l.Pathidx.QueryTrigrams(ts)
 	ids = l.Pathidx.FilterOr(ids, [][]trigram.T{{PublicOrgTrigram}, {orgToTrigram(org)}})
 
+	queries := expandQueries(query)
+
 	seen := make(map[string]bool)
 	out := make([]Glob, 0)
 
 	for _, id := range ids {
 
 		p := l.revs[MetricID(id)]
-
 		dir := filepath.Dir(p)
 
 		if seen[dir] {
 			continue
 		}
 
-		if matched, err := filepath.Match(query, dir); err == nil && matched {
+		if matchAny(queries, dir) {
 			seen[dir] = true
 			out = append(out, Glob{0, dir, false}) // for directories we leave id=0
 			continue
 		}
 
-		if matched, err := filepath.Match(query, p); err == nil && matched {
+		if matchAny(queries, p) {
 			seen[p] = true
 			out = append(out, Glob{MetricID(id), p, true})
 		}
 	}
 
 	return out
+}
+
+func matchAny(queries []string, id string) bool {
+	for _, query := range queries {
+		if matched, err := filepath.Match(query, id); err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
+// filepath.Match doesn't support {} because that's not posix, it's a bashism
+// the easiest way of implementing this extra feature is just expanding single queries
+// that contain these queries into multiple queries, who will be checked separately
+// and whose results will be ORed.
+func expandQueries(query string) []string {
+	queries := []string{query}
+
+	// as long as we find a { followed by a }, split it up into subqueries, and process
+	// all queries again
+	// we only stop once there are no more queries that still have {..} in them
+	keepLooking := true
+	for keepLooking {
+		expanded := make([]string, 0)
+		keepLooking = false
+		for _, query := range queries {
+			lbrace := strings.Index(query, "{")
+			rbrace := -1
+			if lbrace > -1 {
+				rbrace = strings.Index(query[lbrace:], "}")
+				if rbrace > -1 {
+					rbrace += lbrace
+				}
+			}
+
+			if lbrace > -1 && rbrace > -1 {
+				keepLooking = true
+				expansion := query[lbrace+1 : rbrace]
+				options := strings.Split(expansion, ",")
+				for _, option := range options {
+					expanded = append(expanded, query[:lbrace]+option+query[rbrace+1:])
+				}
+			} else {
+				expanded = append(expanded, query)
+			}
+		}
+		queries = expanded
+	}
+	return queries
 }
 
 func (l *Idx) List(org int) []MetricID {
@@ -255,14 +305,11 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 	return response
 }
 
-// TODO(dgryski): this needs most of the logic in grobian/carbsonerver:findHandler()
-// Dieter: this doesn't support {, }, [, ]
 // output is unsorted, if you want it sorted, do it yourself
 func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
 
-	// no wildcard == exact match only
-	var star int
-	if star = strings.Index(query, "*"); star == -1 {
+	// exact match only
+	if !strings.ContainsAny(query, "*{}[]?") {
 		var id MetricID
 		var ok bool
 		if id, ok = i.Get(org, query); !ok {
@@ -271,21 +318,14 @@ func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
 		return MatchLiteral, []Glob{{Id: id, Metric: query, IsLeaf: true}}
 	}
 
-	var response []Glob
-	var matchType MatchType
-
-	if star == len(query)-1 {
-		// only one trailing star
+	// only one trailing star -> prefix match
+	if strings.Index(query, "*") == len(query)-1 && !strings.ContainsAny(query, "{}[]?") {
 		query = query[:len(query)-1]
-		response = i.QueryRadix(org, query)
-		matchType = MatchPrefix
-	} else {
-		// at least one interior star
-		response = i.QueryPath(org, query)
-		matchType = MatchTrigram
+		return MatchPrefix, i.QueryRadix(org, query)
 	}
 
-	return matchType, response
+	// at least one interior star or a more complicated query
+	return MatchTrigram, i.QueryTrigrams(org, query)
 }
 
 func extractTrigrams(query string) []trigram.T {
@@ -300,11 +340,17 @@ func extractTrigrams(query string) []trigram.T {
 	var trigrams []trigram.T
 
 	for i < len(query) {
-		if query[i] == '[' || query[i] == '*' || query[i] == '?' {
+		if query[i] == '[' || query[i] == '{' || query[i] == '*' || query[i] == '?' {
 			trigrams = trigram.Extract(query[start:i], trigrams)
 
 			if query[i] == '[' {
 				for i < len(query) && query[i] != ']' {
+					i++
+				}
+			}
+
+			if query[i] == '{' {
+				for i < len(query) && query[i] != '}' {
 					i++
 				}
 			}

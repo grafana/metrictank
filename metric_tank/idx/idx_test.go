@@ -165,6 +165,11 @@ func TestMatch(t *testing.T) {
 		{1, "*.*.ghij", []Glob{}},
 		{1, "bc.*.*", []Glob{}},
 
+		// curly braces
+		{1, "abc.*.g{loballyvisible,hi}", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}}},
+		{1, "abc.*.{GHI,ghi}", []Glob{{1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "abc.*.{G,}HI", []Glob{{2, "abc.def.GHI", true}}},
+
 		// all stars
 		{1, "*.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
 	}
@@ -190,6 +195,41 @@ func TestMatch(t *testing.T) {
 		for j := 0; j < len(globs); j++ {
 			if globs[j] != c.out[j] {
 				fail()
+			}
+		}
+	}
+}
+
+func TestExpandQueries(t *testing.T) {
+	cases := []struct {
+		in  string
+		out []string
+	}{
+		{
+			"foo.bar",
+			[]string{"foo.bar"},
+		},
+		{
+			"foo.b{a,b,c}r",
+			[]string{"foo.bar", "foo.bbr", "foo.bcr"},
+		},
+		{
+			"foo.bar.{abc,}",
+			[]string{"foo.bar.abc", "foo.bar."},
+		},
+		{
+			"foo.bar.{abc",
+			[]string{"foo.bar.{abc"}, // this would be better if we returned error to user
+		},
+	}
+	for i, c := range cases {
+		ret := expandQueries(c.in)
+		if len(ret) != len(c.out) {
+			t.Fatalf("case %d: output mismatch: expected %v got %v", i, c.out, ret)
+		}
+		for f, expanded := range ret {
+			if expanded != c.out[f] {
+				t.Fatalf("case %d elem %d expected %q got %q", i, f, c.out[f], expanded)
 			}
 		}
 	}
