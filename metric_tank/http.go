@@ -156,6 +156,7 @@ func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
 		if err != nil {
 			log.Error(0, err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			bufPool.Put(js[:0])
 			return
 		}
 		writeResponse(w, js, httpTypeJSON, "")

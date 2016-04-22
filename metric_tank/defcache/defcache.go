@@ -215,7 +215,7 @@ func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefin
 	return globs, defs
 }
 
-// List provides all metricdefs based on the provide org. if it is:
+// List provides all metricdefs based on the provided org. if it is:
 // -1, then all metricdefs for all orgs are returned
 // any other org, then all defs for that org, as well as -1 are returned
 // note: do *not* modify the pointed-to data, as it will affect the data in the index!
