@@ -336,11 +336,15 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
-		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
+		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                        // metric-tank native api which deals with ID's, not target strings
+		http.HandleFunc("/get/", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
+		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur)))  // traditional graphite api
+		http.HandleFunc("/render/", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
 		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
+		http.HandleFunc("/metrics/find", corsHandler(findHandler))
 		http.HandleFunc("/metrics/find/", corsHandler(findHandler))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
+		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
