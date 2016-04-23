@@ -258,12 +258,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		// a proper expression parser
 		if strings.HasPrefix(target, "consolidateBy(") {
 			t := target
-			if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 || strings.Count(t, ",") != 1 {
+			if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 {
 				http.Error(w, "target parse error", http.StatusBadRequest)
 				return
 			}
 			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
-			id = target[strings.Index(target, "(")+1 : strings.Index(target, ",")]
+			id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
 		}
 
 		if legacy {
