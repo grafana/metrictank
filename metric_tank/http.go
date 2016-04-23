@@ -54,9 +54,16 @@ func corsHandler(handler http.HandlerFunc) http.HandlerFunc {
 }
 
 func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
-	names := make([]string, len(defs))
+	seen := make(map[string]struct{})
+
+	names := make([]string, 0, len(defs))
+
 	for i := 0; i < len(defs); i++ {
-		names[i] = defs[i].Name
+		_, ok := seen[defs[i].Name]
+		if !ok {
+			names = append(names, defs[i].Name)
+			seen[defs[i].Name] = struct{}{}
+		}
 	}
 	sort.Strings(names)
 	b = append(b, '[')
@@ -268,12 +275,27 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 
 		if legacy {
 			// querying for a graphite pattern
+			// for now we just pick random defs if we have multiple defs (e.g. multiple intervals) for the same key
+			// in the future we'll do something smarter.
 			_, defs := defCache.Find(org, id)
 			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			for _, def := range defs {
+			seen := make(map[idx.MetricKey]struct{})
+			filteredDefs := make([]*schema.MetricDefinition, 0, len(defs))
+
+			for _, d := range defs {
+				if d == nil {
+					continue
+				}
+				_, ok := seen[idx.MetricKey(d.Name)]
+				if !ok {
+					seen[idx.MetricKey(d.Name)] = struct{}{}
+					filteredDefs = append(filteredDefs, d)
+				}
+			}
+			for _, def := range filteredDefs {
 				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
@@ -284,8 +306,8 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 			}
 		} else {
 			// querying for a MT id
-			def, ok := defCache.Get(id)
-			if !ok {
+			def := defCache.Get(id)
+			if def == nil {
 				e := fmt.Sprintf("metric %q not found", id)
 				log.Error(0, e)
 				http.Error(w, e, http.StatusBadRequest)
@@ -384,6 +406,16 @@ func findHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	globs, _ := defCache.Find(org, query)
+	seen := make(map[idx.MetricKey]struct{})
+	filteredGlobs := make([]idx.Glob, 0, len(globs))
+
+	for _, g := range globs {
+		_, ok := seen[g.Metric]
+		if !ok {
+			seen[g.Metric] = struct{}{}
+			filteredGlobs = append(filteredGlobs, g)
+		}
+	}
 
 	var b []byte
 	switch format {
@@ -414,7 +446,7 @@ func findCompleter(globs []idx.Glob) ([]byte, error) {
 
 	for _, g := range globs {
 		c := completer{
-			Path: g.Metric,
+			Path: string(g.Metric),
 		}
 
 		if g.IsLeaf {
@@ -464,7 +496,7 @@ func findTreejson(query string, globs []idx.Glob) ([]byte, error) {
 
 	for _, g := range globs {
 
-		name := g.Metric
+		name := string(g.Metric)
 
 		if i := strings.LastIndex(name, "."); i != -1 {
 			name = name[i+1:]

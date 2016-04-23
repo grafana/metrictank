@@ -38,8 +38,8 @@ func TestAdd(t *testing.T) {
 		}
 	}
 
-	def, ok := defCache.Get("id")
-	if ok {
+	def := defCache.Get("id")
+	if def != nil {
 		t.Fatalf("lookup for 'id' should return no results")
 	}
 	m := &schema.MetricData{
@@ -56,8 +56,8 @@ func TestAdd(t *testing.T) {
 	}
 
 	defCache.Add(m)
-	def, ok = defCache.Get("id")
-	if !ok {
+	def = defCache.Get("id")
+	if def == nil {
 		t.Fatalf("lookup for 'id' should return a result")
 	}
 	assert(def, "id", 1, "name", "metric", 10, "unit", "gauge", "tag1", "tag2")
@@ -67,13 +67,13 @@ func TestAdd(t *testing.T) {
 	m.Tags[0] = "taga"
 	m.Tags[1] = "tagb"
 	defCache.Add(m)
-	def, ok = defCache.Get("id2")
-	if !ok {
+	def = defCache.Get("id2")
+	if def == nil {
 		t.Fatalf("lookup for 'id2' should return a result")
 	}
 	assert(def, "id2", 1, "name2", "metric", 10, "unit", "gauge", "taga", "tagb")
-	def, ok = defCache.Get("id")
-	if !ok {
+	def = defCache.Get("id")
+	if def == nil {
 		t.Fatalf("lookup for 'id' should return a result")
 	}
 	assert(def, "id", 1, "name", "metric", 10, "unit", "gauge", "tag1", "tag2")
