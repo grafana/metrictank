@@ -165,12 +165,20 @@ func (l *Idx) Active(id MetricID) bool {
 	return l.active[id] != 0
 }
 
-func (l *Idx) Prefix(org int, query string, fn radix.WalkFn) {
+func (l *Idx) WalkPrefix(org int, query string, fn radix.WalkFn) {
 	pos := org + 1
 	for len(l.prefix) < pos+1 {
 		l.prefix = append(l.prefix, radix.New())
 	}
 	l.prefix[pos].WalkPrefix(query, fn)
+}
+
+func (l *Idx) Walk(org int, fn radix.WalkFn) {
+	pos := org + 1
+	for len(l.prefix) < pos+1 {
+		l.prefix = append(l.prefix, radix.New())
+	}
+	l.prefix[pos].Walk(fn)
 }
 
 // for a "filesystem glob" query (e.g. supports * and [] but not {})
@@ -274,8 +282,8 @@ func (l *Idx) List(org int) []MetricID {
 			l.prefix[i].Walk(fn)
 		}
 	} else {
-		l.Prefix(-1, "", fn)
-		l.Prefix(org, "", fn)
+		l.Walk(-1, fn)
+		l.Walk(org, fn)
 	}
 	return response
 }
@@ -300,8 +308,8 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 		// false == "don't terminate iteration"
 		return false
 	}
-	i.Prefix(-1, query, fn)
-	i.Prefix(org, query, fn)
+	i.WalkPrefix(-1, query, fn)
+	i.WalkPrefix(org, query, fn)
 	return response
 }
 
