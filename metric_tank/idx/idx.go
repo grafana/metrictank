@@ -69,7 +69,6 @@ type Idx struct {
 	byid   map[MetricID]DocID // metric id to DocID
 	prefix []*radix.Tree      // metric name prefix to DocID. per org. each org is stored at pos orgid+1 because we have a special org -1
 	tridx  trigram.Index      // metric name snippets to DocID. uses special org-id trigrams to separate by org
-	active map[DocID]int      // track which docID's are active
 }
 
 func New() *Idx {
@@ -79,7 +78,6 @@ func New() *Idx {
 		byid:   make(map[MetricID]DocID),
 		prefix: make([]*radix.Tree, 0),
 		tridx:  trigram.NewIndex(nil),
-		active: make(map[DocID]int),
 	}
 
 }
@@ -102,7 +100,12 @@ func (l *Idx) Add(def schema.MetricDefinition) DocID {
 	ts := trigram.ExtractAll(def.Name, nil)
 	ts = append(ts, orgToTrigram(def.OrgId))
 	l.tridx.InsertTrigrams(ts, trigram.DocID(id))
-	l.AddRef(def.OrgId, id)
+
+	pos := def.OrgId + 1
+	for len(l.prefix) < pos+1 {
+		l.prefix = append(l.prefix, radix.New())
+	}
+	l.prefix[pos].Insert(def.Name, id)
 
 	return id
 }
@@ -118,36 +121,6 @@ func (l *Idx) GetById(metricID MetricID) *schema.MetricDefinition {
 		return nil
 	}
 	return &l.defs[d]
-}
-
-func (l *Idx) AddRef(org int, id DocID) {
-	v, ok := l.active[id]
-	if !ok {
-		pos := org + 1
-		for len(l.prefix) < pos+1 {
-			l.prefix = append(l.prefix, radix.New())
-		}
-		l.prefix[pos].Insert(string(l.defs[id].Name), id)
-	}
-
-	l.active[id] = v + 1
-}
-
-func (l *Idx) DelRef(org int, id DocID, metricKey string) {
-	l.active[id]--
-	metricId := MetricID(l.defs[id].Id)
-	if l.active[id] == 0 {
-		delete(l.active, id)
-		delete(l.byid, metricId)
-		l.prefix[org+1].Delete(string(metricId))
-		if l.tridx != nil {
-			l.tridx.Delete(metricKey, trigram.DocID(id))
-		}
-	}
-}
-
-func (l *Idx) Active(id DocID) bool {
-	return l.active[id] != 0
 }
 
 func (l *Idx) WalkPrefix(org int, query string, fn radix.WalkFn) {
