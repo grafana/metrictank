@@ -1,3 +1,5 @@
+// package defcache wraps our index with performance metrics, a mutex for threadsafe access
+// and synchronisation with a definition store
 package defcache
 
 import (
@@ -35,9 +37,7 @@ var (
 
 type DefCache struct {
 	sync.RWMutex
-	defs      []schema.MetricDefinition
-	ById      map[string]idx.MetricID // by hashed id. we store uints, not pointers, to lower GC workload.
-	ByKey     *idx.Idx                // by graphite key aka "Name" in the def to support graphite native api. this index is experimental and may be removed in the future
+	idx.Idx
 	defsStore metricdef.Defs
 }
 
@@ -53,9 +53,9 @@ func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
 	idxMatchTrigramDuration = stats.NewTimer("idx.match_trigram_duration", 0)
 
 	d := &DefCache{
-		ById:      make(map[string]idx.MetricID),
-		ByKey:     idx.New(),
-		defsStore: defsStore,
+		sync.RWMutex{},
+		*idx.New(),
+		defsStore,
 	}
 	go d.Prune()
 	d.Backfill()
@@ -72,7 +72,7 @@ func (dc *DefCache) Prune() {
 		// and makes queries faster
 		pre := time.Now()
 		dc.Lock()
-		dc.ByKey.Prune(0.20)
+		dc.Idx.Prune(0.20)
 		dc.Unlock()
 		idxPruneDuration.Value(time.Now().Sub(pre))
 	}
@@ -88,11 +88,9 @@ func (dc *DefCache) Backfill() {
 		if len(met) > 0 {
 			total += len(met)
 			dc.Lock()
+			// def.Id must be unique. if we process the same Id twice, bad things will happen.
 			for _, def := range met {
-				id := dc.ByKey.GetOrAdd(def.OrgId, def.Name) // gets id auto assigned from 0 and onwards
-				dc.ByKey.AddRef(def.OrgId, id)
-				dc.ById[def.Id] = id
-				dc.defs = append(dc.defs, *def) // which maps 1:1 with pos in this array
+				dc.Idx.Add(*def) // gets id auto assigned from 0 and onwards
 			}
 			dc.Unlock()
 		}
@@ -117,46 +115,34 @@ func (dc *DefCache) Backfill() {
 // Adds the metric to the defcache.
 // after this function returns, it is safe to modify the data pointed to
 func (dc *DefCache) Add(metric *schema.MetricData) {
-	dc.RLock()
-	id, ok := dc.ById[metric.Id]
-	dc.RUnlock()
-	if ok {
+	dc.Lock()
+	mdef := dc.GetById(idx.MetricID(metric.Id))
+	if mdef != nil {
 		//If the time diff between this datapoint and the lastUpdate
 		// time of the metricDef is greater than 6hours, update the metricDef.
-		dc.RLock()
-		mdef := dc.defs[id]
-		dc.RUnlock()
 		if mdef.LastUpdate < metric.Time-21600 {
-			// this is a little expensive, let's not hold the lock while we do this
-			mdef = *schema.MetricDefinitionFromMetricData(metric)
-			// let's make sure only one concurrent Add() can addToES,
-			// because that function is a bit expensive and could block
-			// so now that we have the mdef, let's check again before proceeding.
-			dc.Lock()
-			old := dc.defs[id]
-			if old.LastUpdate < metric.Time-21600 {
-				dc.addToES(&mdef)
-				dc.defs[id] = mdef
-			}
+			mdef = schema.MetricDefinitionFromMetricData(metric)
+			dc.Update(*mdef)
+			dc.Unlock()
+			dc.addToES(mdef)
+		} else {
 			dc.Unlock()
 		}
 	} else {
-		mdef := *schema.MetricDefinitionFromMetricData(metric)
+		dc.Unlock()
+		mdef = schema.MetricDefinitionFromMetricData(metric)
 		// now that we have the mdef, let's make sure we only add this once concurrently.
 		// because addToES is pretty expensive and we should only call AddRef once.
 		dc.Lock()
-		id, ok := dc.ById[metric.Id]
-		if ok {
+		def := dc.GetById(idx.MetricID(metric.Id))
+		if def != nil {
 			// someone beat us to it. nothing left to do
 			dc.Unlock()
 			return
 		}
-		dc.addToES(&mdef)
-		id = dc.ByKey.GetOrAdd(mdef.OrgId, mdef.Name)
-		dc.ByKey.AddRef(mdef.OrgId, id)
-		dc.ById[mdef.Id] = id
-		dc.defs = append(dc.defs, mdef)
+		dc.Idx.Add(*mdef)
 		dc.Unlock()
+		dc.addToES(mdef)
 	}
 }
 
@@ -175,34 +161,26 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 	esPutDuration.Value(time.Now().Sub(pre))
 }
 
-// Get gets a metricdef by id
+// Get gets a metricdef by metric id
 // note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
 // and we assume we can use that interval through history.
-// TODO: no support for interval changes, missing datablocks, ...
+// TODO: no support for interval changes, ...
 // note: do *not* modify the pointed-to data, as it will affect the data in the index!
-func (dc *DefCache) Get(id string) (*schema.MetricDefinition, bool) {
-	var def *schema.MetricDefinition
+func (dc *DefCache) Get(id string) *schema.MetricDefinition {
 	pre := time.Now()
 	dc.RLock()
-	i, ok := dc.ById[id]
-	if ok {
-		def = &dc.defs[i]
-	}
+	def := dc.GetById(idx.MetricID(id))
 	dc.RUnlock()
 	idxGetDuration.Value(time.Now().Sub(pre))
-	return def, ok
+	return def
 }
 
 // Find returns the results of a pattern match.
 // note: do *not* modify the pointed-to data, as it will affect the data in the index!
-func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefinition) {
+func (dc *DefCache) Find(org int, query string) ([]idx.Glob, []*schema.MetricDefinition) {
 	pre := time.Now()
 	dc.RLock()
-	mt, globs := dc.ByKey.Match(org, key)
-	defs := make([]*schema.MetricDefinition, len(globs))
-	for i, g := range globs {
-		defs[i] = &dc.defs[g.Id]
-	}
+	mt, globs, defs := dc.Match(org, query)
 	dc.RUnlock()
 	switch mt {
 	case idx.MatchLiteral:
@@ -222,12 +200,8 @@ func (dc *DefCache) Find(org int, key string) ([]idx.Glob, []*schema.MetricDefin
 func (dc *DefCache) List(org int) []*schema.MetricDefinition {
 	pre := time.Now()
 	dc.RLock()
-	list := dc.ByKey.List(org)
-	out := make([]*schema.MetricDefinition, len(list))
-	for i, id := range list {
-		out[i] = &dc.defs[id]
-	}
+	defs := dc.Idx.List(org)
 	dc.RUnlock()
 	idxListDuration.Value(time.Now().Sub(pre))
-	return out
+	return defs
 }

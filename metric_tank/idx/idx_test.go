@@ -1,71 +1,77 @@
 package idx
 
 import (
-	"github.com/dgryski/go-trigram"
 	"math"
+	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/dgryski/go-trigram"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 func TestGetAddKey(t *testing.T) {
 	ix := New()
 
-	// test GetOrAdd
-	cases := []struct {
-		org int
-		key string
-		id  MetricID
-	}{
+	type add struct {
+		org  int
+		name string
+		id   DocID
+	}
+	adds := []add{
 		{-1, "abc.def.globallyvisible", 0},
 		{1, "abc.def.ghi", 1},
 		{1, "abc.def.GHI", 2},
-		{1, "abc.def.ghi", 1},  // should already exist -> get same id back
-		{2, "abc.def.ghi", 3},  // non unique name, but unique org-key pair -> new docId
-		{2, "abc.def.ghij", 4}, // unique org-key combo -> new docId
+		{2, "abc.def.ghi", 3},
+		{2, "abc.def.ghij", 4},
 	}
-	for i, c := range cases {
-		id := ix.GetOrAdd(c.org, c.key)
-		if id != c.id {
-			t.Fatalf("case %d: expected id %d - got %d", i, c.id, id)
+	for i, a := range adds {
+		def := schema.MetricDefinition{
+			OrgId: a.org,
+			Name:  a.name,
 		}
+		def.SetId()
+		id := ix.Add(def)
+		if id != a.id {
+			t.Fatalf("case %d: expected id %d - got %d", i, a.id, id)
+		}
+	}
+
+	defs := func(m ...add) []schema.MetricDefinition {
+		out := make([]schema.MetricDefinition, len(m))
+		for i := range m {
+			out[i] = schema.MetricDefinition{
+				OrgId: m[i].org,
+				Name:  m[i].name,
+			}
+			out[i].SetId()
+		}
+		return out
 	}
 
 	// test Get()
-	newcases := []struct {
-		org int
-		key string
-		id  MetricID
-		ok  bool
+	gets := []struct {
+		org   int
+		query string
+		resp  []schema.MetricDefinition
 	}{
-		{2, "abc.def.globallyvisible", 0, true}, // any org should be able to get globally accessible metric
-		{2, "abc.def.GHI", 0, false},            // an org should not be able to see other orgs metrics
+		{-1, "abc.def.globallyvisible", defs(adds[0])},
+		{1, "abc.def.ghi", defs(adds[1])},
+		{1, "abc.def.GHI", defs(adds[2])},
+		{2, "abc.def.ghi", defs(adds[3])},
+		{2, "abc.def.ghij", defs(adds[4])},
+		{2, "abc.def.globallyvisible", defs(adds[0])}, // any org should be able to get globally accessible metric
+		{2, "abc.def.GHI", defs()},                    // an org should not be able to see other orgs metrics
 	}
-	// first repeat all cases from above. should all find with Get() as well.
-	for i, c := range cases {
-		id, ok := ix.Get(c.org, c.key)
-		if id != c.id {
-			t.Fatalf("case %d: expected id %d - got %d", i, c.id, id)
+	for i, g := range gets {
+		_, _, defs := ix.Match(g.org, g.query)
+		if len(defs) != len(g.resp) {
+			t.Fatalf("case %d: expected %d matches - got %d: %q", i, len(g.resp), len(defs), defs)
 		}
-		if !ok {
-			t.Fatalf("case %d: expected ok true - got ok false", i)
-		}
-	}
-	// then try the new cases
-	for i, c := range newcases {
-		id, ok := ix.Get(c.org, c.key)
-		if id != c.id {
-			t.Fatalf("case %d: expected id %d - got %d", i, c.id, id)
-		}
-		if ok != c.ok {
-			t.Fatalf("case %d: expected ok %t - got ok %t", i, c.ok, ok)
-		}
-	}
-
-	// test Key()
-	for i, c := range cases {
-		key := ix.Key(c.id)
-		if key != c.key {
-			t.Fatalf("case %d: expected key %s - got %s", i, c.key, key)
+		for j := range defs {
+			if !reflect.DeepEqual(*defs[j], g.resp[j]) {
+				t.Fatalf("case %d: expected %v - got %v", i, g.resp[j], defs[j])
+			}
 		}
 	}
 }
@@ -108,7 +114,7 @@ func TestMatch(t *testing.T) {
 		{10, "abc.*.ghi", []Glob{}},
 	}
 	for i, c := range cases {
-		_, globs := ix.Match(c.org, c.query)
+		_, globs, _ := ix.Match(c.org, c.query)
 		fail := func() {
 			for j := 0; j < len(c.out); j++ {
 				t.Logf("expected glob %d -> %s", j, c.out[j])
@@ -122,59 +128,62 @@ func TestMatch(t *testing.T) {
 			fail()
 		}
 		for j := 0; j < len(globs); j++ {
-			if globs[j] != c.out[j] {
+			if !reflect.DeepEqual(globs[j], c.out[j]) {
 				fail()
 			}
 		}
 	}
 	// now we make sure wildcards work, and you can see your own orgs stuff + org -1, but no other orgs of course
-	ix.GetOrAdd(-1, "abc.def.globallyvisible") // id 0
-	ix.GetOrAdd(1, "abc.def.ghi")              // id 1
-	ix.GetOrAdd(1, "abc.def.GHI")              // id 2
-	ix.GetOrAdd(2, "abc.def.ghi")              // id 3
-	ix.GetOrAdd(2, "abc.def.ghij")             // id 4
-	ix.AddRef(-1, 0)
-	ix.AddRef(1, 1)
-	ix.AddRef(1, 2)
-	ix.AddRef(2, 3)
-	ix.AddRef(2, 4)
+	def := func(org int, name string) schema.MetricDefinition {
+		s := schema.MetricDefinition{
+			OrgId: org,
+			Name:  name,
+		}
+		s.SetId()
+		return s
+	}
+	ix.Add(def(-1, "abc.def.globallyvisible")) // id 0
+	ix.Add(def(1, "abc.def.ghi"))              // id 1
+	ix.Add(def(1, "abc.def.GHI"))              // id 2
+	ix.Add(def(2, "abc.def.ghi"))              // id 3
+	ix.Add(def(2, "abc.def.ghij"))             // id 4
 	cases = []struct {
 		org   int
 		query string
 		out   []Glob
 	}{
 		// no stars
-		{1, "abc.def.ghi", []Glob{{1, "abc.def.ghi", true}}},
+		{1, "abc.def.ghi", []Glob{{"abc.def.ghi", true}}},
 
 		// no star try to get other org specifically
 		{1, "abc.def.ghij", []Glob{}},
 		{2, "abc.def.GHI", []Glob{}},
 
 		// prefix star
-		{1, "*.def.ghi", []Glob{{1, "abc.def.ghi", true}}},
+		{1, "*.def.ghi", []Glob{{"abc.def.ghi", true}}},
 
 		// postfix and mid stars
-		{1, "abc.def.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
-		{1, "abc.def.g*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}}},
-		{1, "abc.def.gh*", []Glob{{1, "abc.def.ghi", true}}},
-		{1, "abc.*e*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
-		{1, "abc.d*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
-		{1, "abc.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
-		{1, "abc.*.ghi", []Glob{{1, "abc.def.ghi", true}}},
-		{1, "*.*.ghi", []Glob{{1, "abc.def.ghi", true}}},
+		{1, "abc.def.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "abc.def.g*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}}},
+		{1, "abc.def.gh*", []Glob{{"abc.def.ghi", true}}},
+		{1, "abc.*e*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "abc.d*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "abc.*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "abc.*.ghi", []Glob{{"abc.def.ghi", true}}},
+		{1, "*.*.ghi", []Glob{{"abc.def.ghi", true}}},
 		{1, "*.*.ghij", []Glob{}},
 		{1, "bc.*.*", []Glob{}},
 
 		// curly braces
-		{1, "abc.*.g{loballyvisible,hi}", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}}},
-		{1, "abc.*.{GHI,ghi}", []Glob{{1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
-		{1, "abc.*.{G,}HI", []Glob{{2, "abc.def.GHI", true}}},
+		{1, "abc.*.g{loballyvisible,hi}", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}}},
+		{1, "abc.*.{GHI,ghi}", []Glob{{"abc.def.ghi", true}, {"abc.def.GHI", true}}},
+		{1, "abc.*.{G,}HI", []Glob{{"abc.def.GHI", true}}},
 
 		// all stars
-		{1, "*.*.*", []Glob{{0, "abc.def.globallyvisible", true}, {1, "abc.def.ghi", true}, {2, "abc.def.GHI", true}}},
+		{1, "*.*.*", []Glob{{"abc.def.globallyvisible", true}, {"abc.def.ghi", true}, {"abc.def.GHI", true}}},
 	}
 	for i, c := range cases {
-		_, globs := ix.Match(c.org, c.query)
+		_, globs, _ := ix.Match(c.org, c.query)
 		sort.Sort(globByName(globs))
 		sort.Sort(globByName(c.out))
 		fail := func() {

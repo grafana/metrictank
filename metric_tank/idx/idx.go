@@ -15,6 +15,7 @@ import (
 
 	"github.com/armon/go-radix"
 	"github.com/dgryski/go-trigram"
+	"github.com/raintank/raintank-metric/schema"
 )
 
 type MatchType uint8
@@ -25,16 +26,17 @@ const (
 	MatchTrigram
 )
 
-type MetricID uint32 // same thing as trigram.DocID. just syntactic sugar
+type DocID uint32     // same thing as trigram.DocID. just syntactic sugar
+type MetricID string  // our metric id's like 123.deadbeefc0xed
+type MetricKey string // graphite path.like.so
 
 type Glob struct {
-	Id     MetricID
-	Metric string
+	Metric MetricKey
 	IsLeaf bool
 }
 
 func (g Glob) String() string {
-	return fmt.Sprintf("Glob id=%d metric=%s leaf=%t", g.Id, g.Metric, g.IsLeaf)
+	return fmt.Sprintf("Glob metric=%s leaf=%t", g.Metric, g.IsLeaf)
 }
 
 const OTTBase = uint32(2147483648)             // 1 << 31
@@ -53,119 +55,75 @@ func orgToTrigram(org int) trigram.T {
 	return trigram.T(ret)
 }
 
+// Idx provides fast access to metricdefinitions based on several inputs:
+// * MetricID 1:1 look up
+// * graphite.key or graphite.* prefix lookup using a radix tree (1:M)
+// * *.foo.{bar,baz}.ba* style lookup using a trigram index (1:M)
+// internally we track definitions by DocID and the various indices resolve to DocID's.
+// note that MetricID's and DocID's are globally unique, across orgs
+// metric names are not, and we have to deal with that to provide multi-tenancy.
 type Idx struct {
-	// all metrics
-	keys  []map[string]MetricID // slice is per org
-	revs  []string              // MetricID to string key. doesn't have to be isolated per org
-	count int                   // global across all orgs
+	defs  []schema.MetricDefinition // docID to metric definition.
+	count int                       // global across all orgs
 
-	// currently 'active'
-	active map[MetricID]int // doesn't have to be isolated per org
-
-	prefix []*radix.Tree // per org. each org is stored at pos orgid+1 because we have a special org -1
-
-	// stores all orgs in one index, but with special org-id trigrams
-	Pathidx trigram.Index
+	byid   map[MetricID]DocID // metric id to DocID
+	prefix []*radix.Tree      // metric name prefix to DocID. per org. each org is stored at pos orgid+1 because we have a special org -1
+	tridx  trigram.Index      // metric name snippets to DocID. uses special org-id trigrams to separate by org
 }
 
 func New() *Idx {
 	return &Idx{
-		keys: make([]map[string]MetricID, 0),
+		defs: make([]schema.MetricDefinition, 0),
 
-		active: make(map[MetricID]int),
+		byid:   make(map[MetricID]DocID),
 		prefix: make([]*radix.Tree, 0),
-
-		Pathidx: trigram.NewIndex(nil),
+		tridx:  trigram.NewIndex(nil),
 	}
 
 }
 
 func (l *Idx) Len() int {
-	return len(l.keys)
+	return len(l.byid)
 }
 
-// Get retrieves the metricId and whether it was found
-// it first checks the given org, but also falls back to org -1
-func (l *Idx) Get(org int, key string) (MetricID, bool) {
-	pos := org + 1 // org -1 is pos 0, etc
-
-	for len(l.keys) < pos+1 {
-		l.keys = append(l.keys, make(map[string]MetricID))
-	}
-
-	id, ok := l.keys[pos][key]
-	if !ok {
-		id, ok = l.keys[0][key]
-	}
-
-	return id, ok
-}
-
-// GetsOrAdd retrieves the key if it exists for the org (but doesn't do additional check for org -1)
-// and adds it for the org if non-existant
-func (l *Idx) GetOrAdd(org int, key string) MetricID {
-	pos := org + 1 // org -1 is pos 0, etc
-
-	for len(l.keys) < pos+1 {
-		l.keys = append(l.keys, make(map[string]MetricID))
-	}
-
-	id, ok := l.keys[pos][key]
-
-	if ok {
-		return id
-	}
-
-	id = MetricID(l.count)
+// Add adds metricdefinitions to the index.  It's the callers
+// responsability to make sure that no def with the same .Id field exists already
+func (l *Idx) Add(def schema.MetricDefinition) DocID {
+	id := DocID(l.count)
 	l.count++
-	l.revs = append(l.revs, key)
 
-	l.keys[pos][key] = id
+	l.defs = append(l.defs, def)
 
-	// like l.Pathidx.Insert(key, trigram.DocID(id)) but with added org trigram
-	ts := trigram.ExtractAll(key, nil)
-	ts = append(ts, orgToTrigram(org))
-	l.Pathidx.InsertTrigrams(ts, trigram.DocID(id))
+	l.byid[MetricID(def.Id)] = id
+
+	// like l.tridx.Insert(key, trigram.DocID(id)) but with added org trigram
+	ts := trigram.ExtractAll(def.Name, nil)
+	ts = append(ts, orgToTrigram(def.OrgId))
+	l.tridx.InsertTrigrams(ts, trigram.DocID(id))
+
+	pos := def.OrgId + 1
+	for len(l.prefix) < pos+1 {
+		l.prefix = append(l.prefix, radix.New())
+	}
+	l.prefix[pos].Insert(def.Name, id)
 
 	return id
 }
 
-func (l *Idx) Key(id MetricID) string {
-	return l.revs[id]
+func (l *Idx) Update(def schema.MetricDefinition) {
+	id := l.byid[MetricID(def.Id)]
+	l.defs[id] = def
 }
 
-func (l *Idx) AddRef(org int, id MetricID) {
-	v, ok := l.active[id]
+func (l *Idx) GetById(metricID MetricID) *schema.MetricDefinition {
+	d, ok := l.byid[metricID]
 	if !ok {
-		pos := org + 1
-		for len(l.prefix) < pos+1 {
-			l.prefix = append(l.prefix, radix.New())
-		}
-		l.prefix[pos].Insert(l.revs[id], id)
+		return nil
 	}
-
-	l.active[id] = v + 1
+	return &l.defs[d]
 }
 
-// only call this after having made sure the org entries exists! e.g. after Get/GetOrAdd and AddRef
-func (l *Idx) DelRef(org int, id MetricID) {
-	l.active[id]--
-	if l.active[id] == 0 {
-		delete(l.active, id)
-		delete(l.keys[org], l.revs[id])
-		l.prefix[org+1].Delete(l.revs[id])
-		if l.Pathidx != nil {
-			l.Pathidx.Delete(l.revs[id], trigram.DocID(id))
-		}
-		l.revs[id] = ""
-	}
-}
-
-func (l *Idx) Active(id MetricID) bool {
-	return l.active[id] != 0
-}
-
-func (l *Idx) Prefix(org int, query string, fn radix.WalkFn) {
+func (l *Idx) WalkPrefix(org int, query string, fn radix.WalkFn) {
 	pos := org + 1
 	for len(l.prefix) < pos+1 {
 		l.prefix = append(l.prefix, radix.New())
@@ -173,45 +131,58 @@ func (l *Idx) Prefix(org int, query string, fn radix.WalkFn) {
 	l.prefix[pos].WalkPrefix(query, fn)
 }
 
-// for a "filesystem glob" query (e.g. supports * and [] but not {})
-// looks in the trigrams index
-func (l *Idx) QueryTrigrams(org int, query string) []Glob {
+func (l *Idx) Walk(org int, fn radix.WalkFn) {
+	pos := org + 1
+	for len(l.prefix) < pos+1 {
+		l.prefix = append(l.prefix, radix.New())
+	}
+	l.prefix[pos].Walk(fn)
+}
 
-	if l.Pathidx == nil {
-		return nil
+// for a "filesystem glob" query (e.g. supports * [] and {})
+// looks in the trigrams index
+func (l *Idx) QueryTrigrams(org int, query string) ([]Glob, []*schema.MetricDefinition) {
+
+	if l.tridx == nil {
+		return nil, nil
 	}
 
 	ts := extractTrigrams(query)
-	ids := l.Pathidx.QueryTrigrams(ts)
-	ids = l.Pathidx.FilterOr(ids, [][]trigram.T{{PublicOrgTrigram}, {orgToTrigram(org)}})
+	ids := l.tridx.QueryTrigrams(ts)
+	ids = l.tridx.FilterOr(ids, [][]trigram.T{{PublicOrgTrigram}, {orgToTrigram(org)}})
 
 	queries := expandQueries(query)
 
 	seen := make(map[string]bool)
-	out := make([]Glob, 0)
+	globs := make([]Glob, 0)
+	defs := make([]*schema.MetricDefinition, 0)
 
 	for _, id := range ids {
 
-		p := l.revs[MetricID(id)]
-		dir := filepath.Dir(p)
+		name := l.defs[id].Name
+		dir := filepath.Dir(name)
 
+		// if dir foo.bar already matched the expr, then any child foo.bar.baz won't match
+		// because all patterns are formed such that each level is explicit.
 		if seen[dir] {
 			continue
 		}
 
 		if matchAny(queries, dir) {
 			seen[dir] = true
-			out = append(out, Glob{0, dir, false}) // for directories we leave id=0
+			// directories are a special case, they don't correspond to an actual metricdefinition
+			globs = append(globs, Glob{MetricKey(dir), false})
+			defs = append(defs, nil)
 			continue
 		}
 
-		if matchAny(queries, p) {
-			seen[p] = true
-			out = append(out, Glob{MetricID(id), p, true})
+		if matchAny(queries, name) {
+			seen[name] = true
+			globs = append(globs, Glob{MetricKey(name), true})
+			defs = append(defs, &l.defs[id])
 		}
 	}
-
-	return out
+	return globs, defs
 }
 
 func matchAny(queries []string, id string) bool {
@@ -263,10 +234,10 @@ func expandQueries(query string) []string {
 	return queries
 }
 
-func (l *Idx) List(org int) []MetricID {
-	var response []MetricID
+func (l *Idx) List(org int) []*schema.MetricDefinition {
+	var defs []*schema.MetricDefinition
 	fn := func(k string, v interface{}) bool {
-		response = append(response, v.(MetricID))
+		defs = append(defs, &l.defs[int(v.(DocID))])
 		return false
 	}
 	if org == -1 {
@@ -274,13 +245,21 @@ func (l *Idx) List(org int) []MetricID {
 			l.prefix[i].Walk(fn)
 		}
 	} else {
-		l.Prefix(-1, "", fn)
-		l.Prefix(org, "", fn)
+		l.Walk(-1, fn)
+		l.Walk(org, fn)
 	}
-	return response
+	return defs
 }
-func (i *Idx) QueryRadix(org int, query string) []Glob {
-	var response []Glob
+
+// can do equality checks as well as prefix checks
+// for a given query 'foo.b'
+// results like:
+// foo.bar -> leaf (a valid metric)
+// foo.bar.baz -> not a leaf: return the "directory" foo.bar
+// in equality mode, will only return foo.b, not foo.bar
+func (i *Idx) QueryRadix(org int, query string, equal bool) ([]Glob, []*schema.MetricDefinition) {
+	var globs []Glob
+	var defs []*schema.MetricDefinition
 	l := len(query)
 	seen := make(map[string]bool)
 	fn := func(k string, v interface{}) bool {
@@ -293,39 +272,43 @@ func (i *Idx) QueryRadix(org int, query string) []Glob {
 		} else {
 			m = k[:dot+l]
 		}
+
+		if len(m) > len(query) && equal {
+			return false
+		}
 		if !seen[m] {
 			seen[m] = true
-			response = append(response, Glob{Id: v.(MetricID), Metric: m, IsLeaf: leaf})
+			globs = append(globs, Glob{Metric: MetricKey(m), IsLeaf: leaf})
+			defs = append(defs, &i.defs[int(v.(DocID))])
 		}
 		// false == "don't terminate iteration"
 		return false
 	}
-	i.Prefix(-1, query, fn)
-	i.Prefix(org, query, fn)
-	return response
+	i.WalkPrefix(-1, query, fn)
+	i.WalkPrefix(org, query, fn)
+	return globs, defs
 }
 
 // output is unsorted, if you want it sorted, do it yourself
-func (i *Idx) Match(org int, query string) (MatchType, []Glob) {
+func (i *Idx) Match(org int, query string) (MatchType, []Glob, []*schema.MetricDefinition) {
 
-	// exact match only
+	// exact match only, could still result in multiple definitions.
+	// the radix tree is a good option for this case
 	if !strings.ContainsAny(query, "*{}[]?") {
-		var id MetricID
-		var ok bool
-		if id, ok = i.Get(org, query); !ok {
-			return MatchLiteral, nil
-		}
-		return MatchLiteral, []Glob{{Id: id, Metric: query, IsLeaf: true}}
+		globs, defs := i.QueryRadix(org, query, true)
+		return MatchLiteral, globs, defs
 	}
 
 	// only one trailing star -> prefix match
 	if strings.Index(query, "*") == len(query)-1 && !strings.ContainsAny(query, "{}[]?") {
 		query = query[:len(query)-1]
-		return MatchPrefix, i.QueryRadix(org, query)
+		globs, defs := i.QueryRadix(org, query, false)
+		return MatchPrefix, globs, defs
 	}
 
 	// at least one interior star or a more complicated query
-	return MatchTrigram, i.QueryTrigrams(org, query)
+	globs, defs := i.QueryTrigrams(org, query)
+	return MatchTrigram, globs, defs
 }
 
 func extractTrigrams(query string) []trigram.T {
@@ -370,11 +353,11 @@ func extractTrigrams(query string) []trigram.T {
 // However, it makes sure that neither tAllDocIDs,
 // nor any of the org specific trigrams used for access control are ever pruned.
 func (i *Idx) Prune(pct float64) {
-	maxDocs := int(pct * float64(len(i.Pathidx[trigram.TAllDocIDs])))
-	for k, v := range i.Pathidx {
+	maxDocs := int(pct * float64(len(i.tridx[trigram.TAllDocIDs])))
+	for k, v := range i.tridx {
 		// all values >= 1<<31 are special trigrams that should be kept
 		if uint32(k) < uint32(2147483648) && len(v) > maxDocs {
-			i.Pathidx[k] = nil
+			i.tridx[k] = nil
 		}
 	}
 }

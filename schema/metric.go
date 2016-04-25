@@ -56,6 +56,16 @@ type MetricDefinition struct {
 	NodeCount  int               `json:"node_count"`
 }
 
+func (m *MetricDefinition) SetId() {
+	var buffer bytes.Buffer
+	buffer.WriteString(m.Name)
+	sort.Strings(m.Tags)
+	for _, k := range m.Tags {
+		buffer.WriteString(fmt.Sprintf(";%s", k))
+	}
+	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
+}
+
 func (m *MetricDefinition) Validate() error {
 	if m.Name == "" || m.OrgId == 0 || m.Interval == 0 {
 		// TODO: this error message ought to be more informative
