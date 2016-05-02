@@ -1,4 +1,6 @@
 [![Circle CI](https://circleci.com/gh/raintank/raintank-metric.svg?style=shield)](https://circleci.com/gh/raintank/raintank-metric)
+[![Go Report Card](https://goreportcard.com/badge/github.com/raintank/raintank-metric)](https://goreportcard.com/report/github.com/raintank/raintank-metric)
+[![GoDoc](https://godoc.org/github.com/raintank/raintank-metric?status.svg)](https://godoc.org/github.com/raintank/raintank-metric)
 
 this repo contains:
 * schema and message definitions for metrics and events, and some common libraries.
