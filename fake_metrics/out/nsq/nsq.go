@@ -11,7 +11,7 @@ import (
 )
 
 const NSQMaxMpubSize = 5 * 1024 * 1024 // nsq errors if more. not sure if can be changed
-const NSQMaxMetricPerMsg = 1000        // emperically found through benchmarks (should result in 64~128k messages)
+const NSQMaxMetricPerMsg = 1000        // empirically found through benchmarks (should result in 64~128k messages)
 
 var (
 	metricsPublished  met.Count

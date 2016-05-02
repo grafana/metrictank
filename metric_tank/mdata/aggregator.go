@@ -33,7 +33,7 @@ func aggBoundary(ts uint32, span uint32) uint32 {
 
 // receives data and builds aggregations
 // implementation detail: all points with timestamps t1, t2, t3, t4, t5 get aggregated into a point with ts t5,
-// IOW an aggregation point reflects the data in the timeframe preceeding it.
+// IOW an aggregation point reflects the data in the timeframe preceding it.
 type Aggregator struct {
 	key             string // of the metric this aggregator corresponds to
 	span            uint32

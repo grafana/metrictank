@@ -766,7 +766,7 @@ func TestAlignRequests(t *testing.T) {
 		// agg1 3600*24*365/600 -> 52560
 		// agg2 3600*24*365/7200 -> 4380
 		// agg3 3600*24*365/21600 -> 1460
-		// clearly agg3 is the best, and we have to runtime consolidate wih aggNum 2
+		// clearly agg3 is the best, and we have to runtime consolidate with aggNum 2
 		{
 			[]Req{
 				reqRaw("a", 0, 3600*24*365, 1000, 10, consolidation.Avg),

@@ -286,9 +286,9 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 	// find the newest Chunk that "to" falls in.  If "to" extends to after the newest data
 	// then just return the newest chunk.
 	// some examples to clarify this more. assume newestChunk.T0 is at 120, then
-	// for a to of 121 -> data upto (incl) 120 -> stay at this chunk, it has a point we need
-	// for a to of 120 -> data upto (incl) 119 -> use older chunk
-	// for a to of 119 -> data upto (incl) 118 -> use older chunk
+	// for a to of 121 -> data up to (incl) 120 -> stay at this chunk, it has a point we need
+	// for a to of 120 -> data up to (incl) 119 -> use older chunk
+	// for a to of 119 -> data up to (incl) 118 -> use older chunk
 	newestPos := a.CurrentChunkPos
 	for to <= newestChunk.T0 {
 		newestPos--
@@ -387,7 +387,7 @@ func (a *AggMetric) persist(pos int) {
 	// the calling function will block waiting for persist() to complete.
 	// This is intended to put backpressure on our message handlers so
 	// that they stop consuming messages, leaving them to buffer at
-	// the message bus. The "pending" array of chunks are proccessed
+	// the message bus. The "pending" array of chunks are processed
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {

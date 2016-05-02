@@ -57,7 +57,7 @@ func (ms *AggMetrics) GC() {
 
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.
-		// it doesnt matter if new metrics are added while we iterate this list.
+		// it doesn't matter if new metrics are added while we iterate this list.
 		ms.RLock()
 		keys := make([]string, 0, len(ms.Metrics))
 		for k := range ms.Metrics {

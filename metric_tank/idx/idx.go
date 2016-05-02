@@ -87,7 +87,7 @@ func (l *Idx) Len() int {
 }
 
 // Add adds metricdefinitions to the index.  It's the callers
-// responsability to make sure that no def with the same .Id field exists already
+// responsibility to make sure that no def with the same .Id field exists already
 func (l *Idx) Add(def schema.MetricDefinition) DocID {
 	id := DocID(l.count)
 	l.count++
