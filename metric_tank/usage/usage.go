@@ -43,7 +43,7 @@ func (u *Usage) Add(org int, key string) {
 	if o, ok := u.now[org]; !ok {
 		u.now[org] = orgstat{
 			keys: map[string]struct{}{
-				key: struct{}{},
+				key: {},
 			},
 			points: 1,
 		}

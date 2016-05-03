@@ -32,7 +32,7 @@ func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string, 
 	}
 	go func() {
 		t := time.Tick(time.Second * time.Duration(1))
-		for _ = range t {
+		for range t {
 			s := consumer.Stats()
 			c.msgsReceived.Value(int64(s.MessagesReceived))
 			c.msgsFinished.Value(int64(s.MessagesFinished))

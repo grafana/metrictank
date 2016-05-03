@@ -68,7 +68,7 @@ func (z *ProbeEvent) DecodeMsg(dc *msgp.Reader) (err error) {
 			if z.Tags == nil && msz > 0 {
 				z.Tags = make(map[string]string, msz)
 			} else if len(z.Tags) > 0 {
-				for key, _ := range z.Tags {
+				for key := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}
@@ -279,7 +279,7 @@ func (z *ProbeEvent) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if z.Tags == nil && msz > 0 {
 				z.Tags = make(map[string]string, msz)
 			} else if len(z.Tags) > 0 {
-				for key, _ := range z.Tags {
+				for key := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}

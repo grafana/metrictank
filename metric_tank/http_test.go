@@ -87,7 +87,7 @@ func BenchmarkSeriesJson(b *testing.B) {
 		pA[i] = schema.Point{Val: float64(10000 * i), Ts: uint32(baseTs + 10*i)}
 	}
 	data := []Series{
-		Series{
+		{
 			Target:     "some.metric.with.a-whole-bunch-of.integers",
 			Datapoints: pA,
 			Interval:   10,

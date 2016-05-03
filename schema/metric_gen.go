@@ -533,7 +533,7 @@ func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
 			if z.Nodes == nil && msz > 0 {
 				z.Nodes = make(map[string]string, msz)
 			} else if len(z.Nodes) > 0 {
-				for key, _ := range z.Nodes {
+				for key := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}
@@ -816,7 +816,7 @@ func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if z.Nodes == nil && msz > 0 {
 				z.Nodes = make(map[string]string, msz)
 			} else if len(z.Nodes) > 0 {
-				for key, _ := range z.Nodes {
+				for key := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}

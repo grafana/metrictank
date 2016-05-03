@@ -152,7 +152,7 @@ func consolidate(in []schema.Point, aggNum uint32, consolidator consolidation.Co
 			// len 10, cleanLen 9, num 3 -> 3*4 values supposedly -> "in[11].Ts" -> in[9].Ts + 2*interval
 			lastTs = in[cleanLen].Ts + (aggNum-1)*interval
 		}
-		out[out_i] = schema.Point{Val: aggFunc(in[cleanLen:len(in)]), Ts: lastTs}
+		out[out_i] = schema.Point{Val: aggFunc(in[cleanLen:]), Ts: lastTs}
 	}
 	return out
 }

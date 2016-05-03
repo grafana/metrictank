@@ -57,7 +57,7 @@ var (
 	msgsHandleFail met.Count
 
 	writeQueue *InProgressMessageQueue
-	GitHash = "(none)"
+	GitHash    = "(none)"
 )
 
 type ESHandler struct {

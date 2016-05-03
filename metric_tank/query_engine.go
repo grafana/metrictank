@@ -142,7 +142,7 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
 	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 	*/
-	for i, _ := range reqs {
+	for i := range reqs {
 		req := &reqs[i]
 		req.archive = aggRef[selected]
 		req.archInterval = options[selected].interval
