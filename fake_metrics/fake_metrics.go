@@ -159,7 +159,10 @@ func runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup 
 		}
 
 		for _, out := range outs {
-			out.Publish(metrics)
+			err := out.Publish(metrics)
+			if err != nil {
+				log.Error(0, err.Error())
+			}
 		}
 
 		if ts >= now && *stopAtNow {
