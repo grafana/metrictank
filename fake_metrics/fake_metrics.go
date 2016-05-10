@@ -13,6 +13,7 @@ import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
+	"github.com/raintank/raintank-metric/fake_metrics/out/carbon"
 	"github.com/raintank/raintank-metric/fake_metrics/out/kafka"
 	"github.com/raintank/raintank-metric/fake_metrics/out/nsq"
 	"github.com/raintank/raintank-metric/schema"
@@ -23,18 +24,19 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 
-	nsqdTCPAddr  = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
-	kafkaTCPAddr = flag.String("kafka-tcp-address", "", "kafka TCP address. e.g. localhost:9092")
-	logLevel     = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	orgs         = flag.Int("orgs", 2000, "how many orgs to simulate")
-	keysPerOrg   = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
-	speedup      = flag.Int("speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
-	metricPeriod = flag.Int("metricPeriod", 1, "period in seconds between metric points")
-	flushPeriod  = flag.Int("flushPeriod", 100, "period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant")
-	offset       = flag.String("offset", "0", "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc")
-	stopAtNow    = flag.Bool("stop-at-now", false, "stop program instead of starting to write data with future timestamps")
-	statsdAddr   = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType   = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+	nsqdTCPAddr   = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
+	kafkaTCPAddr  = flag.String("kafka-tcp-address", "", "kafka TCP address. e.g. localhost:9092")
+	carbonTCPAddr = flag.String("carbon-tcp-address", "", "carbon TCP address. e.g. localhost:2003")
+	logLevel      = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	orgs          = flag.Int("orgs", 2000, "how many orgs to simulate")
+	keysPerOrg    = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
+	speedup       = flag.Int("speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
+	metricPeriod  = flag.Int("metricPeriod", 1, "period in seconds between metric points")
+	flushPeriod   = flag.Int("flushPeriod", 100, "period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant")
+	offset        = flag.String("offset", "0", "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc")
+	stopAtNow     = flag.Bool("stop-at-now", false, "stop program instead of starting to write data with future timestamps")
+	statsdAddr    = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
 
 func main() {
@@ -51,8 +53,8 @@ func main() {
 		log.Fatal(4, "--topic is required")
 	}
 
-	if *nsqdTCPAddr == "" && *kafkaTCPAddr == "" {
-		log.Fatal(4, "must use at least either nsq or kafka")
+	if *carbonTCPAddr == "" && *kafkaTCPAddr == "" && *nsqdTCPAddr == "" {
+		log.Fatal(4, "must use at least either carbon, kafka or nsq")
 	}
 
 	hostname, err := os.Hostname()
@@ -64,10 +66,10 @@ func main() {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
 
-	if *nsqdTCPAddr != "" {
-		o, err := nsq.New(*topic, *nsqdTCPAddr, stats)
+	if *carbonTCPAddr != "" {
+		o, err := carbon.New(*carbonTCPAddr, stats)
 		if err != nil {
-			log.Fatal(4, "failed to create NSQ output. %s", err)
+			log.Fatal(4, "failed to create carbon output. %s", err)
 		}
 		outs = append(outs, o)
 	}
@@ -76,6 +78,14 @@ func main() {
 		o, err := kafka.New(*topic, []string{*kafkaTCPAddr}, stats)
 		if err != nil {
 			log.Fatal(4, "failed to create kafka output. %s", err)
+		}
+		outs = append(outs, o)
+	}
+
+	if *nsqdTCPAddr != "" {
+		o, err := nsq.New(*topic, *nsqdTCPAddr, stats)
+		if err != nil {
+			log.Fatal(4, "failed to create NSQ output. %s", err)
 		}
 		outs = append(outs, o)
 	}

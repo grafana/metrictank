@@ -1,6 +1,8 @@
 ```
 ./fake_metrics -h
 Usage of ./fake_metrics:
+  -carbon-tcp-address string
+    	carbon TCP address. e.g. localhost:2003
   -flushPeriod int
     	period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant (default 100)
   -kafka-tcp-address string
@@ -55,3 +57,7 @@ this gives a realistic workload for testing GC and such:
 ./fake_metrics -keys-per-org 100 -orgs 10 -statsd-addr statsdaemon:8125 -nsqd-tcp-address nsqd:4150
 ```
 
+# Outputs
+
+NSQ and kafka are multi-tenant outputs where structured data is sent and multiple orgs may have the same key in their own namespace.
+carbon is single-tenant and all data is in 1 metrics tree, prefixed by org id.
