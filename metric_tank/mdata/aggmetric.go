@@ -150,11 +150,8 @@ func (a *AggMetric) getChunkByT0(ts uint32) *chunk.Chunk {
 }
 
 func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
-	if pos < 0 {
-		return nil
-	}
-	if pos >= len(a.Chunks) {
-		return nil
+	if pos < 0 || pos >= len(a.Chunks) {
+		panic(fmt.Sprintf("aggmetric %s queried for chunk %d out of %d chunks", a.Key, pos, len(a.Chunks)))
 	}
 	return a.Chunks[pos]
 }
@@ -308,7 +305,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		chunk := a.getChunk(oldestPos)
 		iters = append(iters, iter.New(chunk.Iter(), false))
 		oldestPos++
-		if oldestPos >= int(a.NumChunks) {
+		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 	}
