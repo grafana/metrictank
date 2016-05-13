@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 )
+
+var errInvalidIntervalzero = errors.New("interval cannot be 0")
+var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
+var errInvalidEmptyName = errors.New("name cannot be empty")
 
 //go:generate msgp
 
@@ -67,10 +72,14 @@ func (m *MetricDefinition) SetId() {
 }
 
 func (m *MetricDefinition) Validate() error {
-	if m.Name == "" || m.OrgId == 0 || m.Interval == 0 {
-		// TODO: this error message ought to be more informative
-		err := fmt.Errorf("metric is not valid!")
-		return err
+	if m.OrgId == 0 {
+		return errInvalidOrgIdzero
+	}
+	if m.Interval == 0 {
+		return errInvalidIntervalzero
+	}
+	if m.Name == "" {
+		return errInvalidEmptyName
 	}
 	return nil
 }
