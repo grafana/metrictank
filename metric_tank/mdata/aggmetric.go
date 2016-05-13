@@ -308,7 +308,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		chunk := a.getChunk(oldestPos)
 		iters = append(iters, iter.New(chunk.Iter(), false))
 		oldestPos++
-		if oldestPos >= int(a.NumChunks) {
+		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 	}
