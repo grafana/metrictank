@@ -177,8 +177,8 @@ func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 		log.Error(3, "got async callback with ES result %t for %q, however it does not exist in the internal index", ok, id)
 		return
 	}
+	// normally we have to do dc.Update(*mdef) but in this case we can just modify the data pointed to, e.g. in the index.
 	mdef.LastUpdate = time.Now().Unix() - 19800
-	dc.Update(*mdef)
 	dc.Unlock()
 }
 
