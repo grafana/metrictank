@@ -181,7 +181,7 @@ func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 	}
 	// normally we have to do dc.Update(*mdef) but in this case we can just modify the data pointed to, e.g. in the index.
 	// we pretend the mdef was last updated some random time between 5h ago and 5h30min ago
-	mdef.LastUpdate = time.Now().Unix() - 5*3600 - rand.Intn(30*60)
+	mdef.LastUpdate = time.Now().Unix() - 5*3600 - int64(rand.Intn(30*60))
 	dc.Unlock()
 }
 
