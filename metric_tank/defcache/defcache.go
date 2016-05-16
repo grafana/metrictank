@@ -164,7 +164,7 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 
 // make defcache aware of asynchronous index calls of metric definitions to a defstore (ES) succeeding for a particular def or not.
 // if ok, nothing to do
-// if not ok, we pretend it was updated 5.5 hours ago, so that we'll retry in half an hour if/when a new one comes in
+// if not ok, we pretend it was updated 5~5.5 hours ago, so that we'll retry in half an hour to an hour if/when a new one comes in
 // so yes, there is a small chance we won't get to that if no new data comes in, which is something to address later.
 func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 	if ok {
@@ -178,7 +178,8 @@ func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 		return
 	}
 	// normally we have to do dc.Update(*mdef) but in this case we can just modify the data pointed to, e.g. in the index.
-	mdef.LastUpdate = time.Now().Unix() - 19800
+	// we pretend the mdef was last updated some random time between 5h ago and 5h30min ago
+	mdef.LastUpdate = time.Now().Unix() - 5*3600 - rand.Intn(30*60)
 	dc.Unlock()
 }
 
