@@ -151,12 +151,7 @@ func Save(e *schema.ProbeEvent) error {
 	// Add the event to the bulk indexer's queue
 	err := bulk.Index(idxName, e.EventType, e.Id, "", "", &t, e)
 	log.Debug("event queued to bulk indexer")
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // lovingly adaped from the elastigo bulk indexer Send function
