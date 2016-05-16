@@ -150,11 +150,8 @@ func (a *AggMetric) getChunkByT0(ts uint32) *chunk.Chunk {
 }
 
 func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
-	if pos < 0 {
-		return nil
-	}
-	if pos >= len(a.Chunks) {
-		return nil
+	if pos < 0 || pos >= len(a.Chunks) {
+		panic(fmt.Sprintf("aggmetric %s queried for chunk %d out of %d chunks", a.Key, pos, len(a.Chunks)))
 	}
 	return a.Chunks[pos]
 }
@@ -197,15 +194,16 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 	a.RLock()
 	defer a.RUnlock()
 
-	newestChunk := a.getChunk(a.CurrentChunkPos)
-
-	if newestChunk == nil {
+	if len(a.Chunks) == 0 {
 		// we dont have any data yet.
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
 		return math.MaxInt32, make([]iter.Iter, 0)
 	}
+
+	newestChunk := a.getChunk(a.CurrentChunkPos)
+
 	if from >= newestChunk.T0+a.ChunkSpan {
 		// request falls entirely ahead of the data we have
 		// this can happen in a few cases:
@@ -409,8 +407,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 	t0 := ts - (ts % a.ChunkSpan)
 
-	currentChunk := a.getChunk(a.CurrentChunkPos)
-	if currentChunk == nil {
+	if len(a.Chunks) == 0 {
 		chunkCreate.Inc(1)
 		// no data has been added to this metric at all.
 		a.Chunks = append(a.Chunks, chunk.New(t0))
@@ -424,7 +421,11 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
-	} else if t0 == currentChunk.T0 {
+	}
+
+	currentChunk := a.getChunk(a.CurrentChunkPos)
+
+	if t0 == currentChunk.T0 {
 		if currentChunk.Saved {
 			//TODO(awoods): allow the chunk to be re-opened.
 			log.Error(3, "cant write to chunk that has already been saved. %s T0:%d", a.Key, currentChunk.T0)
