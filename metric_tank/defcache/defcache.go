@@ -3,13 +3,15 @@
 package defcache
 
 import (
+	"math/rand"
+	"sync"
+	"time"
+
 	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/schema"
-	"sync"
-	"time"
 )
 
 var (
