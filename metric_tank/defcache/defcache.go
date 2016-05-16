@@ -59,6 +59,7 @@ func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
 	}
 	go d.Prune()
 	d.Backfill()
+	d.defsStore.SetAsyncResultCallback(d.AsyncResultCallback)
 	return d
 }
 
@@ -159,6 +160,26 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 		metricsToEsOK.Inc(1)
 	}
 	esPutDuration.Value(time.Now().Sub(pre))
+}
+
+// make defcache aware of asynchronous index calls of metric definitions to a defstore (ES) succeeding for a particular def or not.
+// if ok, nothing to do
+// if not ok, we pretend it was updated 5.5 hours ago, so that we'll retry in half an hour if/when a new one comes in
+// so yes, there is a small chance we won't get to that if no new data comes in, which is something to address later.
+func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
+	if ok {
+		return
+	}
+	dc.Lock()
+	mdef := dc.GetById(idx.MetricID(id))
+	if mdef == nil {
+		dc.Unlock()
+		log.Error(3, "got async callback with ES result %t for %q, however it does not exist in the internal index", ok, id)
+		return
+	}
+	mdef.LastUpdate = time.Now().Unix() - 19800
+	dc.Update(*mdef)
+	dc.Unlock()
 }
 
 // Get gets a metricdef by metric id
