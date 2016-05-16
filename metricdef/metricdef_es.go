@@ -17,6 +17,8 @@
 package metricdef
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -30,9 +32,11 @@ type DefsEs struct {
 	index string
 	*elastigo.Conn
 	*elastigo.BulkIndexer
+	cb ResultCallback
 }
 
-func NewDefsEs(addr, user, pass, indexName string) (*DefsEs, error) {
+// cb can be nil now, as long as it's set by the time you start indexing.
+func NewDefsEs(addr, user, pass, indexName string, cb ResultCallback) (*DefsEs, error) {
 	parts := strings.Split(addr, ":")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid tcp addr %q", addr)
@@ -42,6 +46,7 @@ func NewDefsEs(addr, user, pass, indexName string) (*DefsEs, error) {
 		indexName,
 		elastigo.NewConn(),
 		nil,
+		cb,
 	}
 
 	d.Conn.Domain = parts[0]
@@ -54,7 +59,7 @@ func NewDefsEs(addr, user, pass, indexName string) (*DefsEs, error) {
 		return nil, err
 	} else {
 		if !exists {
-			log.Info("initializing %s Index with mapping", indexName)
+			log.Info("ES: initializing %s Index with mapping", indexName)
 			//lets apply the mapping.
 			metricMapping := `{
 				"mappings": {
@@ -151,9 +156,71 @@ func NewDefsEs(addr, user, pass, indexName string) (*DefsEs, error) {
 	//flush at least every 10seconds.
 	d.BulkIndexer.BufferDelayMax = time.Second * 10
 	d.BulkIndexer.Refresh = true
+	d.BulkIndexer.Sender = d.getBulkSend()
 
 	d.BulkIndexer.Start()
 	return d, nil
+}
+
+func (d *DefsEs) SetAsyncResultCallback(fn ResultCallback) {
+	d.cb = fn
+}
+
+func (d *DefsEs) getBulkSend() func(buf *bytes.Buffer) error {
+	return func(buf *bytes.Buffer) error {
+
+		log.Debug("ES: sending defs batch")
+		body, err := d.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", d.BulkIndexer.Refresh), nil, buf)
+
+		// If something goes wrong at this stage, return an error and bulkIndexer will retry.
+		if err != nil {
+			log.Error(3, "ES: failed to send defs batch", err)
+			return err
+		}
+
+		return d.processEsResponse(body)
+	}
+}
+
+type responseStruct struct {
+	Took   int64                    `json:"took"`
+	Errors bool                     `json:"errors"`
+	Items  []map[string]interface{} `json:"items"`
+}
+
+func (d *DefsEs) processEsResponse(body []byte) error {
+	response := responseStruct{}
+
+	// check for response errors, bulk insert will give 200 OK but then include errors in response
+	err := json.Unmarshal(body, &response)
+	if err != nil {
+		// Something went *extremely* wrong trying to submit these items
+		// to elasticsearch. return an error and bulkIndexer will retry.
+		log.Error(3, "ES: bulkindex response parse failed: %q", err)
+		return err
+	}
+	if response.Errors {
+		log.Error(3, "ES: Bulk Insertion: some operations failed")
+	} else {
+		log.Debug("ES: Bulk Insertion: all operations succeeded")
+	}
+	for _, m := range response.Items {
+		for _, v := range m {
+			v := v.(map[string]interface{})
+			id := v["_id"].(string)
+			if errStr, ok := v["error"].(string); ok {
+				d.cb(id, false)
+				log.Debug("ES: %s failed: %s", id, errStr)
+			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
+				d.cb(id, false)
+				log.Debug("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
+			} else {
+				d.cb(id, true)
+				log.Debug("ES: completed %s successfully.", id)
+			}
+		}
+	}
+	return nil
 }
 
 // if scroll_id specified, will resume that scroll session.
@@ -195,7 +262,7 @@ func (d *DefsEs) IndexMetric(m *schema.MetricDefinition) error {
 	log.Debug("ES: indexing %s in elasticsearch", m.Id)
 	err := d.BulkIndexer.Index(d.index, "metric_index", m.Id, "", "", nil, m)
 	if err != nil {
-		log.Error(3, "failed to send payload to BulkApi indexer. %s", err)
+		log.Error(3, "ES: failed to send payload to BulkApi indexer. %s", err)
 		return err
 	}
 
@@ -212,7 +279,7 @@ func (d *DefsEs) GetMetricDefinition(id string) (*schema.MetricDefinition, bool,
 			log.Debug("ES: %s not in ES. %s", id, err)
 			return nil, false, nil
 		} else {
-			log.Error(3, "elasticsearch query failed. %s", err)
+			log.Error(3, "ES: elasticsearch query failed. %s", err)
 			return nil, false, err
 		}
 	}

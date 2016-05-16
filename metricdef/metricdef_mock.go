@@ -22,6 +22,7 @@ import (
 
 type DefsMock struct {
 	defs map[string]*schema.MetricDefinition
+	cb   ResultCallback
 }
 
 func NewDefsMock() *DefsMock {
@@ -44,6 +45,10 @@ func (d *DefsMock) GetMetrics(scroll_id string) ([]*schema.MetricDefinition, str
 func (d *DefsMock) IndexMetric(m *schema.MetricDefinition) error {
 	d.defs[m.Id] = m
 	return nil
+}
+
+func (d *DefsMock) SetAsyncResultCallback(fn ResultCallback) {
+	d.cb = fn
 }
 
 func (d *DefsMock) GetMetricDefinition(id string) (*schema.MetricDefinition, bool, error) {

@@ -202,7 +202,7 @@ func main() {
 		*cassandraAddrs = "localhost"
 	}
 
-	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName)
+	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
 	}

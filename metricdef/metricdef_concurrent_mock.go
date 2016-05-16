@@ -24,12 +24,17 @@ import (
 type DefsMockConcurrent struct {
 	sync.Mutex
 	defs map[string]*schema.MetricDefinition
+	cb   ResultCallback
 }
 
 func NewDefsMockConcurrent() *DefsMockConcurrent {
 	return &DefsMockConcurrent{
 		defs: make(map[string]*schema.MetricDefinition),
 	}
+}
+
+func (d *DefsMockConcurrent) SetAsyncResultCallback(fn ResultCallback) {
+	d.cb = fn
 }
 
 // this does not mimic ES's scroll mechanism, we can cut this corner for now.
