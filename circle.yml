@@ -3,11 +3,7 @@ machine:
     GOPATH: "/home/ubuntu/.go_workspace"
 test:
   override:
-    - go test -v -race ./dur
-    - go test -v -race ./eventdef
-    - go test -v -race ./metric_tank/...
-    - go test -v -race ./nsq_probe_events_to_elasticsearch
-    - go test -v -race ./schema
+    - go test -v -race ./...
     - go vet ./...
   post:
     - pkg/package.sh
