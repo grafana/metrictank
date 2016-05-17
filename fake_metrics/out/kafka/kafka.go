@@ -5,7 +5,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/met"
-	"github.com/raintank/raintank-metric/fake_metrics/out/lib"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
 )
@@ -75,7 +74,7 @@ func (k *Kafka) Publish(metrics []*schema.MetricData) error {
 	// 159569B msg /795  metrics per msg = 200B per msg
 	// so peak message size is about 3500*200 = 700k (seen 711k)
 
-	subslices := lib.Reslice(metrics, 3500)
+	subslices := schema.Reslice(metrics, 3500)
 
 	for _, subslice := range subslices {
 		id := time.Now().UnixNano()
