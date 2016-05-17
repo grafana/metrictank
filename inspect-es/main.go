@@ -101,7 +101,7 @@ func main() {
 	var err error
 	fromS, err = dur.ParseUNsec(*from)
 	perror(err)
-	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *esIndex)
+	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *esIndex, nil)
 	perror(err)
 	met, scroll_id, err := defs.GetMetrics("")
 	perror(err)

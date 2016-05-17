@@ -100,7 +100,7 @@ func main() {
 		log.Printf("%s\n", http.ListenAndServe(listenAddr, nil))
 	}()
 
-	defs, err := metricdef.NewDefsEs(esAddr, "", "", esIndex)
+	defs, err := metricdef.NewDefsEs(esAddr, "", "", esIndex, nil)
 	perror(err)
 
 	metrics.Register("lag", lag)
