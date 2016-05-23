@@ -24,6 +24,7 @@ type Usage struct {
 	period uint32
 	now    map[int]orgstat
 	prev   map[int]orgstat
+	stop   chan struct{}
 }
 
 func New(period uint32, m mdata.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
@@ -33,9 +34,14 @@ func New(period uint32, m mdata.Metrics, d *defcache.DefCache, cl clock.Clock) *
 	ret := &Usage{
 		period: period,
 		now:    make(map[int]orgstat),
+		stop:   make(chan struct{}),
 	}
 	go ret.Report()
 	return ret
+}
+
+func (u *Usage) Stop() {
+	u.stop <- struct{}{}
 }
 
 func (u *Usage) Add(org int, key string) {
@@ -66,16 +72,19 @@ func (u *Usage) set(org int, key string, points uint32) {
 }
 
 func (u *Usage) Report() {
+	period := time.Duration(u.period) * time.Second
 	// provides "clean" ticks at precise intervals, and delivers them shortly after
-	tick := func() time.Time {
+	tick := func() chan time.Time {
 		now := Clock.Now()
 		nowUnix := now.UnixNano()
-		p := time.Duration(u.period) * time.Second
-		diff := p - (time.Duration(nowUnix) % p)
+		diff := period - (time.Duration(nowUnix) % period)
 		ideal := now.Add(diff)
-		ticker := Clock.Ticker(diff)
-		<-ticker.C
-		return ideal
+		ch := make(chan time.Time)
+		go func() {
+			Clock.Sleep(diff)
+			ch <- ideal
+		}()
+		return ch
 	}
 	met := schema.MetricData{
 		Interval: int(u.period),
@@ -95,7 +104,13 @@ func (u *Usage) Report() {
 		defCache.Add(met)
 	}
 	for {
-		now := tick().Unix()
+		ticker := tick()
+		var now time.Time
+		select {
+		case <-u.stop:
+			return
+		case now = <-ticker:
+		}
 		u.Lock()
 		u.prev = u.now
 		u.now = make(map[int]orgstat)
@@ -107,7 +122,7 @@ func (u *Usage) Report() {
 		}
 		u.Unlock()
 
-		met.Time = now
+		met.Time = now.Unix()
 		for org, stat := range u.prev {
 			if org == -1 {
 				// for the special case of org -1, meaning globally provided metrics visible to every org

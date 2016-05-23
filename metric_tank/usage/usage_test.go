@@ -125,6 +125,8 @@ func TestUsageBasic(t *testing.T) {
 	assert(120, aggmetrics, 1, "metric_tank.usage.numPoints", 120, 3, t)
 	assert(120, aggmetrics, 2, "metric_tank.usage.numSeries", 120, 1, t)
 	assert(120, aggmetrics, 2, "metric_tank.usage.numPoints", 120, 3, t)
+
+	u.Stop()
 }
 func TestUsageMinusOne(t *testing.T) {
 	mock := clock.NewMock()
@@ -151,6 +153,8 @@ func TestUsageMinusOne(t *testing.T) {
 	assert(60, aggmetrics, 1, "metric_tank.usage.numPoints", 60, 1, t)
 	assert(60, aggmetrics, 2, "metric_tank.usage.numSeries", 60, 1, t)
 	assert(60, aggmetrics, 2, "metric_tank.usage.numPoints", 60, 1, t)
+
+	u.Stop()
 }
 func TestUsageWrap32(t *testing.T) {
 	mock := clock.NewMock()
@@ -182,4 +186,6 @@ func TestUsageWrap32(t *testing.T) {
 	assertLen(120, aggmetrics, 2, t)
 	assert(120, aggmetrics, 2, "metric_tank.usage.numSeries", 120, 1, t)
 	assert(120, aggmetrics, 2, "metric_tank.usage.numPoints", 120, 100000, t)
+
+	u.Stop()
 }
