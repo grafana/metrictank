@@ -127,7 +127,7 @@ func agent(id, metrics, period int, carbonTCPAddr, kafkaTCPAddr, nsqdTCPAddr str
 	do := func(t time.Time) {
 		for i := 0; i < metrics; i++ {
 			met[i].Time = t.Unix()
-			met[i].Value = float64(met[i].Time + int64(id+i))
+			met[i].Value = float64(id*metrics + i)
 		}
 		if std != nil {
 			err := std.Publish(met)
