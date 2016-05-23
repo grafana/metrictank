@@ -27,19 +27,19 @@ func NewFakeAggMetrics() *FakeAggMetrics {
 }
 
 func (f *FakeAggMetrics) Get(key string) (mdata.Metric, bool) {
-	//f.Lock()
+	f.Lock()
 	m, ok := f.Metrics[key]
-	//f.Unlock()
+	f.Unlock()
 	return m, ok
 }
 func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
-	//f.Lock()
+	f.Lock()
 	m, ok := f.Metrics[key]
 	if !ok {
 		m = &FakeAggMetric{key, 0, 0}
 		f.Metrics[key] = m
 	}
-	//	f.Unlock()
+	f.Unlock()
 	return m
 }
 
@@ -73,9 +73,11 @@ func idFor(org int, name string, tags []string) string {
 }
 
 func assertLen(epoch int, aggmetrics *FakeAggMetrics, l int, t *testing.T) {
+	aggmetrics.Lock()
 	if len(aggmetrics.Metrics) != l {
 		t.Fatalf("%d seconds in: there should be %d metrics at this point, not %d", epoch, l, len(aggmetrics.Metrics))
 	}
+	aggmetrics.Unlock()
 }
 func assert(epoch int, aggmetrics *FakeAggMetrics, org int, name string, ts uint32, val float64, t *testing.T) {
 	id := idFor(org, name, []string{})
