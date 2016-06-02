@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/fake_metrics/out/carbon"
+	"github.com/raintank/raintank-metric/fake_metrics/out/gnet"
 	"github.com/raintank/raintank-metric/fake_metrics/out/kafka"
 	"github.com/raintank/raintank-metric/fake_metrics/out/nsq"
 	"github.com/raintank/raintank-metric/schema"
@@ -27,6 +29,8 @@ var (
 	nsqdTCPAddr   = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
 	kafkaTCPAddr  = flag.String("kafka-tcp-address", "", "kafka TCP address. e.g. localhost:9092")
 	carbonTCPAddr = flag.String("carbon-tcp-address", "", "carbon TCP address. e.g. localhost:2003")
+	gnetAddr      = flag.String("gnet-address", "", "gnet address. e.g. http://localhost:8081")
+	gnetKey       = flag.String("gnet-key", "", "gnet api key")
 	logLevel      = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	orgs          = flag.Int("orgs", 2000, "how many orgs to simulate")
 	keysPerOrg    = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
@@ -53,8 +57,8 @@ func main() {
 		log.Fatal(4, "--topic is required")
 	}
 
-	if *carbonTCPAddr == "" && *kafkaTCPAddr == "" && *nsqdTCPAddr == "" {
-		log.Fatal(4, "must use at least either carbon, kafka or nsq")
+	if *carbonTCPAddr == "" && *gnetAddr == "" && *kafkaTCPAddr == "" && *nsqdTCPAddr == "" {
+		log.Fatal(4, "must use at least either carbon, gnet, kafka or nsq")
 	}
 
 	hostname, err := os.Hostname()
@@ -70,6 +74,17 @@ func main() {
 		o, err := carbon.New(*carbonTCPAddr, stats)
 		if err != nil {
 			log.Fatal(4, "failed to create carbon output. %s", err)
+		}
+		outs = append(outs, o)
+	}
+
+	if *gnetAddr != "" {
+		if *gnetKey == "" {
+			log.Fatal(4, "to use gnet, a key must be specified")
+		}
+		o, err := gnet.New(*gnetAddr, *gnetKey, stats)
+		if err != nil {
+			log.Fatal(4, "failed to create gnet output. %s", err)
 		}
 		outs = append(outs, o)
 	}
