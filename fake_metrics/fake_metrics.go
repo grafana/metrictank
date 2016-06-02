@@ -240,7 +240,10 @@ func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int
 		}
 
 		for _, out := range outs {
-			out.Publish(metrics[startIndex:endIndex])
+			err := out.Publish(metrics[startIndex:endIndex])
+			if err != nil {
+				log.Error(0, err.Error())
+			}
 		}
 
 		if ts >= now && *stopAtNow {
