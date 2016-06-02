@@ -76,7 +76,7 @@ func (g *Gnet) Publish(metrics []*schema.MetricData) error {
 	subslices := schema.Reslice(metrics, 3500)
 
 	for _, subslice := range subslices {
-		log.Debug("gnet asked to publish %d", len(subslice))
+		log.Debug("gnet asked to publish %d metrics at ts %s", len(subslice), time.Unix(subslice[0].Time, 0))
 		metrics := schema.MetricDataArray(subslice)
 		data, err := msg.CreateMsg(metrics, 0, msg.FormatMetricDataArrayMsgp)
 		if err != nil {

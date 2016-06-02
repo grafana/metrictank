@@ -39,7 +39,7 @@ var (
 	flushPeriod   = flag.Int("flushPeriod", 100, "period in ms between flushes. metricPeriod must be cleanly divisible by flushPeriod. does not affect volume/throughput per se. the message is adjusted as to keep the volume/throughput constant")
 	offset        = flag.String("offset", "0", "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc")
 	stopAtNow     = flag.Bool("stop-at-now", false, "stop program instead of starting to write data with future timestamps")
-	statsdAddr    = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdAddr    = flag.String("statsd-addr", "", "statsd address. e.g. localhost:8125")
 	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
 
@@ -65,7 +65,12 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
-	stats, err := helper.New(true, *statsdAddr, *statsdType, "fake_metrics", strings.Replace(hostname, ".", "_", -1))
+	var stats met.Backend
+	if *statsdAddr == "" {
+		stats, err = helper.New(false, *statsdAddr, *statsdType, "fake_metrics", strings.Replace(hostname, ".", "_", -1))
+	} else {
+		stats, err = helper.New(true, *statsdAddr, *statsdType, "fake_metrics", strings.Replace(hostname, ".", "_", -1))
+	}
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
