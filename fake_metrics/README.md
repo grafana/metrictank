@@ -62,3 +62,12 @@ this gives a realistic workload for testing GC and such:
 NSQ and kafka are multi-tenant outputs where structured data is sent and multiple orgs may have the same key in their own namespace.
 carbon is single-tenant and all data is in 1 metrics tree, prefixed by org id.
 for the gnet output, the org-id will be set to whatever you authenticate as (unless you use the admin key), so in that case only simulate one org otherwise the keys would overwrite each other
+
+# Important
+
+we use ticker based loops in which we increment timestamps and call output Publish methods.
+if a loop iteration takes too long (due to an output's Publish taking too long for example),
+ticks will be missed and the data will start lagging behind.
+The Gnet output decouples publishing for max reliability, but the others don't yet,
+so make sure your flushInterval is large enough to account for how long it may take.
+
