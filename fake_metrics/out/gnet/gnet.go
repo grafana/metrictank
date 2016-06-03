@@ -101,6 +101,7 @@ func (g *Gnet) Publish(metrics []*schema.MetricData) error {
 		if resp.StatusCode != 200 {
 			return fmt.Errorf("http response was %d - %s", resp.StatusCode, resp.Status)
 		}
+		resp.Body.Close()
 
 		publishDuration.Value(time.Since(pre))
 		metricsPublished.Inc(int64(len(subslice)))
