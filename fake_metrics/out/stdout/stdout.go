@@ -7,25 +7,20 @@ import (
 	"time"
 
 	"github.com/raintank/met"
+	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/schema"
-)
-
-var (
-	metricsPublished met.Count
-	publishDuration  met.Timer
 )
 
 type Stdout struct {
 	sync.Mutex
+	out.OutStats
 }
 
 func New(stats met.Backend) *Stdout {
 
-	metricsPublished = stats.NewCount("metricpublisher.stdout.metrics-published")
-	publishDuration = stats.NewTimer("metricpublisher.stdout.publish_duration", 0)
-
 	return &Stdout{
 		sync.Mutex{},
+		out.NewStats(stats, "stdout"),
 	}
 }
 
@@ -33,20 +28,29 @@ func (s *Stdout) Close() error {
 	return nil
 }
 
-func (s *Stdout) Publish(metrics []*schema.MetricData) error {
+func (s *Stdout) Flush(metrics []*schema.MetricData) error {
+	preFlush := time.Now()
 	if len(metrics) == 0 {
+		s.FlushDuration.Value(time.Since(preFlush))
 		return nil
 	}
-	pre := time.Now()
+	prePub := time.Now()
+	var n int64
 	s.Lock()
 	for _, m := range metrics {
-		_, err := fmt.Fprintf(os.Stdout, "org_%d.%s %f %d\n", m.OrgId, m.Name, m.Value, m.Time)
+		num, err := fmt.Fprintf(os.Stdout, "org_%d.%s %f %d\n", m.OrgId, m.Name, m.Value, m.Time)
 		if err != nil {
+			s.PublishErrors.Inc(1)
 			return err
 		}
+		n += int64(num)
 	}
+	s.MessageBytes.Value(n)
+	s.MessageMetrics.Value(int64(len(metrics)))
 	s.Unlock()
-	publishDuration.Value(time.Since(pre))
-	metricsPublished.Inc(int64(len(metrics)))
+	s.PublishedMetrics.Inc(int64(len(metrics)))
+	s.PublishedMessages.Inc(1)
+	s.PublishDuration.Value(time.Since(prePub))
+	s.FlushDuration.Value(time.Since(preFlush))
 	return nil
 }

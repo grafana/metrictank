@@ -8,32 +8,26 @@ import (
 	"time"
 
 	"github.com/raintank/met"
+	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/schema"
-)
-
-var (
-	metricsPublished met.Count
-	publishDuration  met.Timer
 )
 
 type Carbon struct {
 	sync.Mutex
+	out.OutStats
 	addr string
 	conn net.Conn
 }
 
 func New(addr string, stats met.Backend) (*Carbon, error) {
-
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	metricsPublished = stats.NewCount("metricpublisher.carbon.metrics-published")
-	publishDuration = stats.NewTimer("metricpublisher.carbon.publish_duration", 0)
-
 	return &Carbon{
 		sync.Mutex{},
+		out.NewStats(stats, "carbon"),
 		addr,
 		conn,
 	}, nil
@@ -43,22 +37,29 @@ func (n *Carbon) Close() error {
 	return n.conn.Close()
 }
 
-func (n *Carbon) Publish(metrics []*schema.MetricData) error {
+func (n *Carbon) Flush(metrics []*schema.MetricData) error {
+	preFlush := time.Now()
 	if len(metrics) == 0 {
+		n.FlushDuration.Value(time.Since(preFlush))
 		return nil
 	}
-	pre := time.Now()
 	buf := bytes.NewBufferString("")
 	for _, m := range metrics {
 		buf.WriteString(fmt.Sprintf("org_%d.%s %f %d\n", m.OrgId, m.Name, m.Value, m.Time))
 	}
+	prePub := time.Now()
 	n.Lock()
 	_, err := n.conn.Write(buf.Bytes())
 	n.Unlock()
 	if err != nil {
+		n.PublishErrors.Inc(1)
 		return err
 	}
-	publishDuration.Value(time.Since(pre))
-	metricsPublished.Inc(int64(len(metrics)))
+	n.MessageBytes.Value(int64(buf.Len()))
+	n.MessageMetrics.Value(int64(len(metrics)))
+	n.PublishedMetrics.Inc(int64(len(metrics)))
+	n.PublishedMessages.Inc(1)
+	n.PublishDuration.Value(time.Since(prePub))
+	n.FlushDuration.Value(time.Since(preFlush))
 	return nil
 }
