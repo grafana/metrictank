@@ -130,13 +130,13 @@ func agent(id, metrics, period int, carbonTCPAddr, kafkaTCPAddr, nsqdTCPAddr str
 			met[i].Value = float64(id*metrics + i)
 		}
 		if std != nil {
-			err := std.Publish(met)
+			err := std.Flush(met)
 			if err != nil {
 				log.Error(0, err.Error())
 			}
 		}
 		for _, out := range outs {
-			err := out.Publish(met)
+			err := out.Flush(met)
 			if err != nil {
 				log.Error(0, err.Error())
 			}

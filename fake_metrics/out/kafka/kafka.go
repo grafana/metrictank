@@ -5,19 +5,13 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/met"
+	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
 )
 
-var (
-	metricsPublished  met.Count
-	messagesPublished met.Count
-	messagesSize      met.Meter
-	metricsPerMessage met.Meter
-	publishDuration   met.Timer
-)
-
 type Kafka struct {
+	out.OutStats
 	topic   string
 	brokers []string
 	config  *sarama.Config
@@ -41,17 +35,12 @@ func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
 		return nil, err
 	}
 
-	metricsPublished = stats.NewCount("metricpublisher.kafka.metrics-published")
-	messagesPublished = stats.NewCount("metricpublisher.kafka.messages-published")
-	messagesSize = stats.NewMeter("metricpublisher.kafka.message_size", 0)
-	metricsPerMessage = stats.NewMeter("metricpublisher.kafka.metrics_per_message", 0)
-	publishDuration = stats.NewTimer("metricpublisher.kafka.publish_duration", 0)
-
 	return &Kafka{
-		topic:   topic,
-		brokers: brokers,
-		config:  config,
-		client:  client,
+		OutStats: out.NewStats(stats, "kafka"),
+		topic:    topic,
+		brokers:  brokers,
+		config:   config,
+		client:   client,
 	}, nil
 }
 
@@ -59,8 +48,10 @@ func (k *Kafka) Close() error {
 	return k.client.Close()
 }
 
-func (k *Kafka) Publish(metrics []*schema.MetricData) error {
+func (k *Kafka) Flush(metrics []*schema.MetricData) error {
+	preFlush := time.Now()
 	if len(metrics) == 0 {
+		k.FlushDuration.Value(time.Since(preFlush))
 		return nil
 	}
 	// typical metrics seem to be around 300B
@@ -83,10 +74,10 @@ func (k *Kafka) Publish(metrics []*schema.MetricData) error {
 			return err
 		}
 
-		messagesSize.Value(int64(len(data)))
-		metricsPerMessage.Value(int64(len(subslice)))
+		k.MessageBytes.Value(int64(len(data)))
+		k.MessageMetrics.Value(int64(len(subslice)))
 
-		pre := time.Now()
+		prePub := time.Now()
 
 		// We are not setting a message key, which means that all messages will
 		// be distributed randomly over the different partitions.
@@ -95,16 +86,14 @@ func (k *Kafka) Publish(metrics []*schema.MetricData) error {
 			Value: sarama.ByteEncoder(data),
 		})
 		if err != nil {
+			k.PublishErrors.Inc(1)
 			return err
 		}
 
-		publishDuration.Value(time.Since(pre))
-		metricsPublished.Inc(int64(len(subslice)))
-		messagesPublished.Inc(1)
-
-		if err != nil {
-			return err
-		}
+		k.PublishedMetrics.Inc(int64(len(subslice)))
+		k.PublishedMessages.Inc(1)
+		k.PublishDuration.Value(time.Since(prePub))
 	}
+	k.FlushDuration.Value(time.Since(preFlush))
 	return nil
 }

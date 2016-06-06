@@ -5,6 +5,7 @@ import (
 
 	n "github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
+	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
 )
@@ -12,15 +13,8 @@ import (
 const NSQMaxMpubSize = 5 * 1024 * 1024 // nsq errors if more. not sure if can be changed
 const NSQMaxMetricPerMsg = 1000        // empirically found through benchmarks (should result in 64~128k messages)
 
-var (
-	metricsPublished  met.Count
-	messagesPublished met.Count
-	messagesSize      met.Meter
-	metricsPerMessage met.Meter
-	publishDuration   met.Timer
-)
-
 type NSQ struct {
+	out.OutStats
 	topic    string
 	producer *n.Producer
 }
@@ -37,13 +31,8 @@ func New(topic, addr string, stats met.Backend) (*NSQ, error) {
 		return nil, err
 	}
 
-	metricsPublished = stats.NewCount("metricpublisher.nsq.metrics-published")
-	messagesPublished = stats.NewCount("metricpublisher.nsq.messages-published")
-	messagesSize = stats.NewMeter("metricpublisher.nsq.message_size", 0)
-	metricsPerMessage = stats.NewMeter("metricpublisher.nsq.metrics_per_message", 0)
-	publishDuration = stats.NewTimer("metricpublisher.nsq.publish_duration", 0)
-
 	return &NSQ{
+		OutStats: out.NewStats(stats, "nsq"),
 		topic:    topic,
 		producer: producer,
 	}, nil
@@ -54,8 +43,10 @@ func (n *NSQ) Close() error {
 	return nil
 }
 
-func (n *NSQ) Publish(metrics []*schema.MetricData) error {
+func (n *NSQ) Flush(metrics []*schema.MetricData) error {
+	preFlush := time.Now()
 	if len(metrics) == 0 {
+		n.FlushDuration.Value(time.Since(preFlush))
 		return nil
 	}
 	// typical metrics seem to be around 300B
@@ -78,23 +69,21 @@ func (n *NSQ) Publish(metrics []*schema.MetricData) error {
 			return err
 		}
 
-		messagesSize.Value(int64(len(data)))
-		metricsPerMessage.Value(int64(len(subslice)))
+		n.MessageBytes.Value(int64(len(data)))
+		n.MessageMetrics.Value(int64(len(subslice)))
 
-		pre := time.Now()
+		prePub := time.Now()
 
 		err = n.producer.Publish(n.topic, data)
 		if err != nil {
+			n.PublishErrors.Inc(1)
 			return err
 		}
 
-		publishDuration.Value(time.Since(pre))
-		metricsPublished.Inc(int64(len(subslice)))
-		messagesPublished.Inc(1)
-
-		if err != nil {
-			return err
-		}
+		n.PublishedMetrics.Inc(int64(len(subslice)))
+		n.PublishedMessages.Inc(1)
+		n.PublishDuration.Value(time.Since(prePub))
 	}
+	n.FlushDuration.Value(time.Since(preFlush))
 	return nil
 }

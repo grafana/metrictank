@@ -65,9 +65,12 @@ for the gnet output, the org-id will be set to whatever you authenticate as (unl
 
 # Important
 
-we use ticker based loops in which we increment timestamps and call output Publish methods.
-if a loop iteration takes too long (due to an output's Publish taking too long for example),
+we use ticker based loops in which we increment timestamps and call output Flush methods.
+if a loop iteration takes too long (due to an output's Flush taking too long for example),
 ticks will be missed and the data will start lagging behind.
-The Gnet output decouples publishing for max reliability, but the others don't yet,
-so make sure your flushInterval is large enough to account for how long it may take.
+So make sure your flushInterval is large enough to account for how long the publishing within each
+output may take.  The Gnet output helps a little by decoupling publishing from the Flush() call with a queue.
+If the queue runs full, or if any output's Flush() takes too long, ticks will be skipped and data will lag behind.
 
+Keep an eye on the flush (and publish) durations of your outputs and the queue size if applicable.
+see included dashboard.

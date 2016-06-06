@@ -41,6 +41,8 @@ var (
 	stopAtNow     = flag.Bool("stop-at-now", false, "stop program instead of starting to write data with future timestamps")
 	statsdAddr    = flag.String("statsd-addr", "", "statsd address. e.g. localhost:8125")
 	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+
+	flushDuration met.Timer
 )
 
 func main() {
@@ -74,6 +76,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
+	flushDuration = stats.NewTimer("metricpublisher.global.flush_duration", 0)
 
 	if *carbonTCPAddr != "" {
 		o, err := carbon.New(*carbonTCPAddr, stats)
@@ -178,12 +181,14 @@ func runMultiplied(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup 
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
 
+		preFlush := time.Now()
 		for _, out := range outs {
-			err := out.Publish(metrics)
+			err := out.Flush(metrics)
 			if err != nil {
 				log.Error(0, err.Error())
 			}
 		}
+		flushDuration.Value(time.Since(preFlush))
 
 		if ts >= now && *stopAtNow {
 			return
@@ -239,12 +244,14 @@ func runDivided(orgs, keysPerOrg, metricPeriod, flushPeriod, offset, speedup int
 			metrics[i].Value = rand.Float64() * float64(i+1)
 		}
 
+		preFlush := time.Now()
 		for _, out := range outs {
-			err := out.Publish(metrics[startIndex:endIndex])
+			err := out.Flush(metrics[startIndex:endIndex])
 			if err != nil {
 				log.Error(0, err.Error())
 			}
 		}
+		flushDuration.Value(time.Since(preFlush))
 
 		if ts >= now && *stopAtNow {
 			return
