@@ -140,9 +140,9 @@ func main() {
 	}
 
 	conf, err := globalconf.NewWithOptions(&globalconf.Options{
-		Filename: cfile,
+		Filename:  cfile,
 		EnvPrefix: "MT_",
-		})
+	})
 	if err != nil {
 		log.Fatal(4, "error with configuration file: %s", err)
 		os.Exit(1)
