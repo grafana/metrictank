@@ -22,6 +22,9 @@ var (
 	producers           map[string]*nsq.Producer
 	CluStatus           *ClusterStatus
 	persistMessageBatch *PersistMessageBatch
+
+	messagesPublished met.Count
+	messagesSize      met.Meter
 )
 
 //PersistMessage format version
@@ -70,7 +73,7 @@ type PersistMessage struct {
 }
 
 type PersistMessageBatch struct {
-	sync.Mutex  `json:"-"`
+	in          chan savedChunk
 	Topic       string       `json:"-"`
 	Instance    string       `json:"instance"`
 	SavedChunks []savedChunk `json:"saved_chunks"`
@@ -81,32 +84,39 @@ type savedChunk struct {
 	T0  uint32 `json:"t0"`
 }
 
-func (p *PersistMessageBatch) AddChunk(key string, t0 uint32) {
-	p.Lock()
-	defer p.Unlock()
-	p.SavedChunks = append(p.SavedChunks, savedChunk{Key: key, T0: t0})
-}
-
 func SendPersistMessage(key string, t0 uint32) {
-	persistMessageBatch.AddChunk(key, t0)
+	persistMessageBatch.in <- savedChunk{Key: key, T0: t0}
 }
 
-func (p *PersistMessageBatch) flush() {
+func (p *PersistMessageBatch) run() {
 	ticker := time.NewTicker(time.Second)
-	for range ticker.C {
-		p.Lock()
-		msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: p.SavedChunks}
-		p.SavedChunks = nil
-		p.Unlock()
-
-		if len(msg.SavedChunks) == 0 {
-			continue
+	max := 5000
+	for {
+		select {
+		case chunk := <-p.in:
+			p.SavedChunks = append(p.SavedChunks, chunk)
+			if len(p.SavedChunks) == max {
+				p.flush()
+			}
+		case <-ticker.C:
+			p.flush()
 		}
+	}
+}
 
-		if p.Topic == "" {
-			continue
-		}
+// flush makes sure the batch gets sent, asynchronously.
+func (p *PersistMessageBatch) flush() {
+	if len(p.SavedChunks) == 0 {
+		return
+	}
+	if p.Topic == "" {
+		return
+	}
 
+	msg := PersistMessageBatch{Instance: p.Instance, SavedChunks: p.SavedChunks}
+	p.SavedChunks = nil
+
+	go func() {
 		log.Debug("CLU sending %d batch metricPersist messages", len(msg.SavedChunks))
 
 		data, err := json.Marshal(&msg)
@@ -116,6 +126,7 @@ func (p *PersistMessageBatch) flush() {
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(PersistMessageBatchV1))
 		buf.Write(data)
+		messagesSize.Value(int64(buf.Len()))
 
 		sent := false
 		for !sent {
@@ -133,8 +144,10 @@ func (p *PersistMessageBatch) flush() {
 			} else {
 				sent = true
 			}
+			time.Sleep(time.Second)
 		}
-	}
+		messagesPublished.Inc(1)
+	}()
 }
 
 type MetricPersistHandler struct {
@@ -190,7 +203,10 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 }
 
 func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, producerOpts, consumerOpts string, nsqdAdds, lookupdAdds []string, maxInFlight int) {
-	persistMessageBatch = &PersistMessageBatch{Instance: instance, SavedChunks: make([]savedChunk, 0), Topic: topic}
+	messagesPublished = stats.NewCount("cluster.messages-published")
+	messagesSize = stats.NewMeter("cluster.message_size", 0)
+
+	persistMessageBatch = &PersistMessageBatch{in: make(chan savedChunk), Instance: instance, SavedChunks: make([]savedChunk, 0), Topic: topic}
 	// init producers
 	pCfg := nsq.NewConfig()
 	pCfg.UserAgent = "metrics_tank"
@@ -235,7 +251,7 @@ func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, p
 	if err != nil {
 		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
 	}
-	go persistMessageBatch.flush()
+	go persistMessageBatch.run()
 }
 
 // Handle requests for /cluster. POST to set primary flag, GET to get current state.

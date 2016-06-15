@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -89,10 +90,16 @@ func (k *ESHandler) HandleMessage(m *nsq.Message) error {
 		u := uuid.NewUUID()
 		ms.Event.Id = u.String()
 	}
+	if err := ms.Event.Validate(); err != nil {
+		e, _ := json.Marshal(ms.Event)
+		log.Error(3, "Skipping Invalid event payload: %s", string(e))
+		return nil
+	}
 	writeQueue.EnQueue(ms.Event.Id, m)
 
 	if err := eventdef.Save(ms.Event); err != nil {
 		log.Error(3, "couldn't process %s: %s", ms.Event.Id, err)
+
 		msgsHandleFail.Inc(1)
 		m.Requeue(-1)
 		return err
