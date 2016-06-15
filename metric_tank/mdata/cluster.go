@@ -22,6 +22,9 @@ var (
 	producers           map[string]*nsq.Producer
 	CluStatus           *ClusterStatus
 	persistMessageBatch *PersistMessageBatch
+
+	messagesPublished met.Count
+	messagesSize      met.Meter
 )
 
 //PersistMessage format version
@@ -123,6 +126,7 @@ func (p *PersistMessageBatch) flush() {
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(PersistMessageBatchV1))
 		buf.Write(data)
+		messagesSize.Value(int64(buf.Len()))
 
 		sent := false
 		for !sent {
@@ -141,6 +145,7 @@ func (p *PersistMessageBatch) flush() {
 				sent = true
 			}
 		}
+		messagesPublished.Inc(1)
 	}()
 }
 
@@ -197,6 +202,9 @@ func (h *MetricPersistHandler) HandleMessage(m *nsq.Message) error {
 }
 
 func InitCluster(metrics Metrics, stats met.Backend, instance, topic, channel, producerOpts, consumerOpts string, nsqdAdds, lookupdAdds []string, maxInFlight int) {
+	messagesPublished = stats.NewCount("cluster.messages-published")
+	messagesSize = stats.NewMeter("cluster.message_size", 0)
+
 	persistMessageBatch = &PersistMessageBatch{in: make(chan savedChunk), Instance: instance, SavedChunks: make([]savedChunk, 0), Topic: topic}
 	// init producers
 	pCfg := nsq.NewConfig()
