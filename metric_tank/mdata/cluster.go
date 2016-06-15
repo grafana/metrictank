@@ -144,6 +144,7 @@ func (p *PersistMessageBatch) flush() {
 			} else {
 				sent = true
 			}
+			time.Sleep(time.Second)
 		}
 		messagesPublished.Inc(1)
 	}()
