@@ -173,14 +173,23 @@ func NewInProgressMessageQueue() *InProgressMessageQueue {
 func main() {
 	flag.Parse()
 
-	// Only try and parse the conf file if it exists
+	// If a config file has been given, parse that file for options.
+	// Even if there's no config file, globalconf.NewWithOptions still needs
+	// to be called so options can be set via environment variable.
+	var cfile string
 	if _, err := os.Stat(*confFile); err == nil {
-		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
-		if err != nil {
-			log.Fatal(4, err.Error())
-		}
-		conf.ParseAll()
+		cfile = *confFile
 	}
+
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  cfile,
+		EnvPrefix: "NPE_",
+	})
+
+	if err != nil {
+		log.Fatal(4, err.Error())
+	}
+	conf.ParseAll()
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":true}`, *logLevel))
 
