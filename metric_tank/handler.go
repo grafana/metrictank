@@ -46,6 +46,9 @@ func (h *Handler) HandleMessage(m *nsq.Message) error {
 	metricsReceived.Inc(int64(len(h.tmp.Metrics)))
 
 	for _, metric := range h.tmp.Metrics {
+		if metric == nil {
+			continue
+		}
 		if metric.Id == "" {
 			log.Fatal(3, "empty metric.Id - fix your datastream")
 		}
