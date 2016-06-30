@@ -18,13 +18,12 @@ import (
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/benbjohnson/clock"
 	"github.com/grafana/grafana/pkg/log"
-	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/dur"
-	"github.com/raintank/raintank-metric/instrumented_nsq"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	inKafka "github.com/raintank/raintank-metric/metric_tank/in/kafka"
+	inNSQ "github.com/raintank/raintank-metric/metric_tank/in/nsq"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
@@ -95,17 +94,17 @@ var (
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
+	kafkaBroker = flag.String("kafka-broker", "", "tcp address for kafka")
+	kafkaTopic  = flag.String("kafka-topic", "", "test")
+
 	reqSpanMem  met.Meter
 	reqSpanBoth met.Meter
 
-	metricsReceived       met.Count
 	cassWriteQueueSize    met.Gauge
 	cassWriters           met.Gauge
 	getTargetDuration     met.Timer
 	itersToPointsDuration met.Timer
 	messagesSize          met.Meter
-	metricsPerMessage     met.Meter
-	msgsAge               met.Meter // in ms
 	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
 	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
 	reqHandleDuration met.Timer
@@ -277,33 +276,6 @@ func main() {
 	}
 	store.InitMetrics(stats)
 
-	cfg := nsq.NewConfig()
-	cfg.UserAgent = "metrics_tank"
-	err = app.ParseOpts(cfg, *consumerOpts)
-	if err != nil {
-		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
-	}
-	cfg.MaxInFlight = *maxInFlight
-
-	consumer, err := insq.NewConsumer(*topic, *channel, cfg, "%s", stats)
-	if err != nil {
-		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
-	}
-
-	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
-
-	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
-
-	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
-	pre := time.Now()
-	defCache = defcache.New(defs, stats)
-	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
-	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
-	for i := 0; i < *concurrency; i++ {
-		handler := NewHandler(metrics, defCache, usg)
-		consumer.AddHandler(handler)
-	}
-
 	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
 	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
 		nsqdAdds = []string{}
@@ -314,23 +286,35 @@ func main() {
 		lookupdAdds = []string{}
 	}
 
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		err = consumer.ConnectToNSQDs(nsqdAdds)
-		if err != nil {
-			log.Fatal(4, "failed to connect to NSQDs. %s", err)
-		}
-		log.Info("consumer connected to nsqd")
+	var nsq *inNSQ.NSQ
+	var kafka *inKafka.Kafka
 
-		err = consumer.ConnectToNSQLookupds(lookupdAdds)
-		if err != nil {
-			log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
-		}
-		log.Info("consumer connected to nsqlookupd")
+	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
+		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, metrics, defCache, stats)
+	}
 
-		promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+	if *kafkaBroker != "" && *kafkaTopic != "" {
+		kafka = inKafka.New(*kafkaBroker, *kafkaTopic, metrics, defCache, stats)
+	}
 
-	}()
+	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
+
+	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+
+	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
+	pre := time.Now()
+	defCache = defcache.New(defs, stats)
+	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
+
+	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
+
+	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
+		nsq.Start(usg)
+	}
+	if *kafkaBroker != "" && *kafkaTopic != "" {
+		kafka.Start(usg)
+	}
+	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
 	mdata.InitCluster(metrics, stats, *instance, *topicNotifyPersist, *channel, *producerOpts, *consumerOpts, nsqdAdds, lookupdAdds, *maxInFlight)
 
@@ -349,18 +333,40 @@ func main() {
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
+	stop := func() {
+		log.Info("closing store")
+		store.Stop()
+		defs.Stop()
+		log.Info("terminating.")
+		log.Close()
+	}
 	for {
 		select {
-		case <-consumer.StopChan:
-			log.Info("closing store")
-			store.Stop()
-			defs.Stop()
-			log.Info("terminating.")
-			log.Close()
+		case <-nsq.StopChan:
+			log.Info("nsq consumer finished shutdown")
+			if kafka != nil {
+				log.Info("waiting for kafka consumer to finish shutdown...")
+				<-kafka.StopChan
+			}
+			stop()
+			return
+		case <-kafka.StopChan:
+			log.Info("kafka consumer finished shutdown")
+			if nsq != nil {
+				log.Info("waiting for nsq consumer to finish shutdown...")
+				<-nsq.StopChan
+			}
+			stop()
 			return
 		case <-sigChan:
-			log.Info("Shutting down")
-			consumer.Stop()
+			if nsq != nil {
+				log.Info("Shutting down nsq consumer")
+				nsq.Stop()
+			}
+			if kafka != nil {
+				log.Info("Shutting down kafka consumer")
+				kafka.Stop()
+			}
 		}
 	}
 }
@@ -368,14 +374,11 @@ func main() {
 func initMetrics(stats met.Backend) {
 	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
 	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
-	metricsReceived = stats.NewCount("metrics_received")
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
 	getTargetDuration = stats.NewTimer("get_target_duration", 0)
 	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
-	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
-	msgsAge = stats.NewMeter("message_age", 0)
 	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
