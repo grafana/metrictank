@@ -290,11 +290,11 @@ func main() {
 	var kafka *inKafka.Kafka
 
 	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
-		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, metrics, defCache, stats)
+		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, stats)
 	}
 
 	if *kafkaBroker != "" && *kafkaTopic != "" {
-		kafka = inKafka.New(*kafkaBroker, *kafkaTopic, metrics, defCache, stats)
+		kafka = inKafka.New(*kafkaBroker, *kafkaTopic, stats)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -309,10 +309,10 @@ func main() {
 	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
-		nsq.Start(usg)
+		nsq.Start(metrics, defCache, usg)
 	}
 	if *kafkaBroker != "" && *kafkaTopic != "" {
-		kafka.Start(usg)
+		kafka.Start(metrics, defCache, usg)
 	}
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 

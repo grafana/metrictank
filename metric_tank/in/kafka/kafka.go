@@ -7,19 +7,22 @@ import (
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/in"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 )
 
 type Kafka struct {
+	in.In
 	consumer *cluster.Consumer
+	stats    met.Backend
 
 	wg sync.WaitGroup
 	// read from this channel to block until consumer is cleanly stopped
 	StopChan chan int
 }
 
-func New(broker, topic string, metrics mdata.Metrics, defCache *defcache.DefCache, stats met.Backend) *Kafka {
+func New(broker, topic string, stats met.Backend) *Kafka {
 	brokers := []string{broker}
 	groupId := "group1"
 	topics := []string{topic}
@@ -28,26 +31,25 @@ func New(broker, topic string, metrics mdata.Metrics, defCache *defcache.DefCach
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Group.Return.Notifications = true
 	err := config.Validate()
-	log.Println("1")
 	if err != nil {
 		log.Fatalln("invalid config", err)
 	}
-	log.Println("2")
 	consumer, err := cluster.NewConsumer(brokers, groupId, topics, config)
 	if err != nil {
 		log.Fatalln("failed to start consumer: ", err)
 	}
-	log.Println("3")
 	log.Println("consumer started without error")
 	k := Kafka{
 		consumer: consumer,
+		stats:    stats,
 		StopChan: make(chan int),
 	}
 
 	return &k
 }
 
-func (k *Kafka) Start(usg *usage.Usage) {
+func (k *Kafka) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
+	k.In = in.New(metrics, defCache, usg, "kafka", k.stats)
 	go k.notifications()
 	go k.consume()
 }
@@ -56,9 +58,8 @@ func (k *Kafka) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
 	for msg := range messageChan {
-		log.Printf("received message: Topic %s, Partition: %d, Offset: %d\n", msg.Topic, msg.Partition, msg.Offset)
-		log.Printf("message body: %s", string(msg.Value))
-		//Acknowledge that we have handled the message.
+		log.Printf("received message: Topic %s, Partition: %d, Offset: %d, Key: %s\n", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
+		k.In.Handle(msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
 	log.Println("kafka consumer ended.")

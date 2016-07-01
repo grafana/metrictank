@@ -14,27 +14,16 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 )
 
-var (
-	metricsPerMessage met.Meter
-	metricsReceived   met.Count
-	msgsAge           met.Meter // in ms
-)
-
 type NSQ struct {
 	nsqdAdds    []string
 	lookupdAdds []string
 	consumer    *insq.Consumer
 	concurrency int
-	metrics     mdata.Metrics
-	defCache    *defcache.DefCache
+	stats       met.Backend
 	StopChan    chan int
 }
 
-func New(consumerOpts, nsqdTCPAddrs, lookupdHTTPAddrs, topic, channel string, maxInFlight int, concurrency int, metrics mdata.Metrics, defCache *defcache.DefCache, stats met.Backend) *NSQ {
-	metricsPerMessage = stats.NewMeter("metrics_per_message", 0)
-	metricsReceived = stats.NewCount("metrics_received")
-	msgsAge = stats.NewMeter("message_age", 0)
-
+func New(consumerOpts, nsqdTCPAddrs, lookupdHTTPAddrs, topic, channel string, maxInFlight int, concurrency int, stats met.Backend) *NSQ {
 	cfg := nsq.NewConfig()
 	cfg.UserAgent = "metrics_tank"
 	err := app.ParseOpts(cfg, consumerOpts)
@@ -44,8 +33,7 @@ func New(consumerOpts, nsqdTCPAddrs, lookupdHTTPAddrs, topic, channel string, ma
 	cfg.MaxInFlight = maxInFlight
 	n := NSQ{
 		concurrency: concurrency,
-		metrics:     metrics,
-		defCache:    defCache,
+		stats:       stats,
 	}
 
 	consumer, err := insq.NewConsumer(topic, channel, cfg, "%s", stats)
@@ -70,9 +58,9 @@ func New(consumerOpts, nsqdTCPAddrs, lookupdHTTPAddrs, topic, channel string, ma
 
 }
 
-func (n *NSQ) Start(usg *usage.Usage) {
+func (n *NSQ) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
 	for i := 0; i < n.concurrency; i++ {
-		handler := NewHandler(n.metrics, n.defCache, usg)
+		handler := NewHandler(metrics, defCache, usg, n.stats)
 		n.consumer.AddHandler(handler)
 	}
 	time.Sleep(100 * time.Millisecond)
