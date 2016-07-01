@@ -1,7 +1,7 @@
 package kafka
 
 import (
-	"log"
+	"github.com/grafana/grafana/pkg/log"
 	"sync"
 
 	"github.com/bsm/sarama-cluster"
@@ -32,13 +32,13 @@ func New(broker, topic string, stats met.Backend) *Kafka {
 	config.Group.Return.Notifications = true
 	err := config.Validate()
 	if err != nil {
-		log.Fatalln("invalid config", err)
+		log.Fatal(2, "kafka invalid config: %s", err)
 	}
 	consumer, err := cluster.NewConsumer(brokers, groupId, topics, config)
 	if err != nil {
-		log.Fatalln("failed to start consumer: ", err)
+		log.Fatal(2, "kafka failed to start consumer: %s", err)
 	}
-	log.Println("consumer started without error")
+	log.Info("kafka consumer started without error")
 	k := Kafka{
 		consumer: consumer,
 		stats:    stats,
@@ -58,11 +58,11 @@ func (k *Kafka) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
 	for msg := range messageChan {
-		log.Printf("received message: Topic %s, Partition: %d, Offset: %d, Key: %s\n", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
+		log.Debug("kafka received message: Topic %s, Partition: %d, Offset: %d, Key: %s", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
 		k.In.Handle(msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
-	log.Println("kafka consumer ended.")
+	log.Info("kafka consumer ended.")
 	k.wg.Done()
 }
 
@@ -71,25 +71,25 @@ func (k *Kafka) notifications() {
 	for msg := range k.consumer.Notifications() {
 		if len(msg.Claimed) > 0 {
 			for topic, partitions := range msg.Claimed {
-				log.Printf("consumer claimed %d partitions on topic: %s\n", len(partitions), topic)
+				log.Info("consumer claimed %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 		if len(msg.Released) > 0 {
 			for topic, partitions := range msg.Released {
-				log.Printf("consumer released %d partitions on topic: %s\n", len(partitions), topic)
+				log.Info("consumer released %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 
 		if len(msg.Current) == 0 {
-			log.Printf("consumer is no longer consuming from any partitions.")
+			log.Info("consumer is no longer consuming from any partitions.")
 		} else {
-			log.Printf("Current partitions:\n")
+			log.Info("Current partitions:")
 			for topic, partitions := range msg.Current {
-				log.Printf("%s: %v\n", topic, partitions)
+				log.Info("Current partitions: %s: %v", topic, partitions)
 			}
 		}
 	}
-	log.Printf("kafka notification processing stopped")
+	log.Info("kafka notification processing stopped")
 	k.wg.Done()
 }
 
