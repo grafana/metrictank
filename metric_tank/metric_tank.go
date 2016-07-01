@@ -340,21 +340,30 @@ func main() {
 		log.Info("terminating.")
 		log.Close()
 	}
+	var nsqStopChan chan int
+	var kafkaStopChan chan int
+	if nsq != nil {
+		nsqStopChan = nsq.StopChan
+	}
+	if kafka != nil {
+		kafkaStopChan = kafka.StopChan
+	}
+
 	for {
 		select {
-		case <-nsq.StopChan:
+		case <-nsqStopChan:
 			log.Info("nsq consumer finished shutdown")
 			if kafka != nil {
 				log.Info("waiting for kafka consumer to finish shutdown...")
-				<-kafka.StopChan
+				<-kafkaStopChan
 			}
 			stop()
 			return
-		case <-kafka.StopChan:
+		case <-kafkaStopChan:
 			log.Info("kafka consumer finished shutdown")
 			if nsq != nil {
 				log.Info("waiting for nsq consumer to finish shutdown...")
-				<-nsq.StopChan
+				<-nsqStopChan
 			}
 			stop()
 			return
