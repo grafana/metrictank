@@ -13,6 +13,7 @@ import (
 	"github.com/raintank/raintank-metric/schema"
 )
 
+// In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
 type In struct {
 	metricsPerMessage met.Meter
 	metricsReceived   met.Count
