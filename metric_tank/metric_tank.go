@@ -95,7 +95,7 @@ var (
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
 	kafkaBroker = flag.String("kafka-broker", "", "tcp address for kafka")
-	kafkaTopic  = flag.String("kafka-topic", "", "test")
+	kafkaTopic  = flag.String("kafka-topic", "metrics", "kafka topic for metrics")
 
 	reqSpanMem  met.Meter
 	reqSpanBoth met.Meter
