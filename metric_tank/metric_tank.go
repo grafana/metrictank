@@ -133,15 +133,24 @@ func main() {
 	startupTime = time.Now()
 	flag.Parse()
 
-	// Only try and parse the conf file if it exists
+	// Only try and parse the conf file if it exists. 'cfile' is set
+	// separately from the globalconf initialization below, though, because
+	// even if there's not a conf file it still needs to be initialized so
+	// configuration items can be set with environment variables.
+	var cfile string
 	if _, err := os.Stat(*confFile); err == nil {
-		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
-		if err != nil {
-			log.Fatal(4, "error with configuration file: %s", err)
-			os.Exit(1)
-		}
-		conf.ParseAll()
+		cfile = *confFile
 	}
+
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  cfile,
+		EnvPrefix: "MT_",
+	})
+	if err != nil {
+		log.Fatal(4, "error with configuration file: %s", err)
+		os.Exit(1)
+	}
+	conf.ParseAll()
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
