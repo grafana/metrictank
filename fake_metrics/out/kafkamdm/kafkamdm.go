@@ -55,11 +55,10 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 	}
 
 	k.MessageMetrics.Value(1)
+	var data []byte
 
 	for _, metric := range metrics {
-		// TODO: reuse byte slice?
-		var data []byte
-		data, err := metric.MarshalMsg(nil)
+		data, err := metric.MarshalMsg(data[:])
 		if err != nil {
 			return err
 		}
