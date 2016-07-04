@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
@@ -27,6 +29,7 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 
+	listenAddr       = flag.String("listen", ":6764", "http listener address for pprof.")
 	nsqdTCPAddr      = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
 	kafkaMdmTCPAddr  = flag.String("kafka-mdm-tcp-address", "", "kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092")
 	kafkaMdamTCPAddr = flag.String("kafka-mdam-tcp-address", "", "kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092")
@@ -127,6 +130,17 @@ func main() {
 		panic("metricPeriod must be cleanly divisible by flushPeriod")
 	}
 	off := int(dur.MustParseUsec("offset", *offset))
+
+	if *listenAddr != "" {
+		go func() {
+			log.Info("starting listener on %s", *listenAddr)
+			err := http.ListenAndServe(*listenAddr, nil)
+			if err != nil {
+				log.Error(0, "%s", err)
+			}
+		}()
+	}
+
 	run(*orgs, *keysPerOrg, *metricPeriod, *flushPeriod, off, *speedup)
 }
 
