@@ -22,7 +22,8 @@ import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
-	inKafka "github.com/raintank/raintank-metric/metric_tank/in/kafka"
+	inKafkaMdam "github.com/raintank/raintank-metric/metric_tank/in/kafkamdam"
+	inKafkaMdm "github.com/raintank/raintank-metric/metric_tank/in/kafkamdm"
 	inNSQ "github.com/raintank/raintank-metric/metric_tank/in/nsq"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
@@ -94,8 +95,8 @@ var (
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
-	kafkaBroker = flag.String("kafka-broker", "", "tcp address for kafka")
-	kafkaTopic  = flag.String("kafka-topic", "metrics", "kafka topic for metrics")
+	kafkaMdmBroker  = flag.String("kafka-mdm-broker", "", "tcp address for kafka, for MetricData messages, msgp encoded")
+	kafkaMdamBroker = flag.String("kafka-mdam-broker", "", "tcp address for kafka, for MetricDataArray messages, msgp encoded")
 
 	reqSpanMem  met.Meter
 	reqSpanBoth met.Meter
@@ -287,14 +288,18 @@ func main() {
 	}
 
 	var nsq *inNSQ.NSQ
-	var kafka *inKafka.Kafka
+	var kafkaMdm *inKafkaMdm.KafkaMdm
+	var kafkaMdam *inKafkaMdam.KafkaMdam
 
 	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
 		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, stats)
 	}
 
-	if *kafkaBroker != "" && *kafkaTopic != "" {
-		kafka = inKafka.New(*kafkaBroker, *kafkaTopic, stats)
+	if *kafkaMdmBroker != "" {
+		kafkaMdm = inKafkaMdm.New(*kafkaMdmBroker, "mdm", stats)
+	}
+	if *kafkaMdamBroker != "" {
+		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", stats)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -311,8 +316,11 @@ func main() {
 	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
 		nsq.Start(metrics, defCache, usg)
 	}
-	if *kafkaBroker != "" && *kafkaTopic != "" {
-		kafka.Start(metrics, defCache, usg)
+	if kafkaMdm != nil {
+		kafkaMdm.Start(metrics, defCache, usg)
+	}
+	if kafkaMdam != nil {
+		kafkaMdam.Start(metrics, defCache, usg)
 	}
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
@@ -333,51 +341,56 @@ func main() {
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
-	stop := func() {
-		log.Info("closing store")
-		store.Stop()
-		defs.Stop()
-		log.Info("terminating.")
-		log.Close()
-	}
-	var nsqStopChan chan int
-	var kafkaStopChan chan int
-	if nsq != nil {
-		nsqStopChan = nsq.StopChan
-	}
-	if kafka != nil {
-		kafkaStopChan = kafka.StopChan
+	type ingestPlugin interface {
+		Stop()
 	}
 
-	for {
-		select {
-		case <-nsqStopChan:
-			log.Info("nsq consumer finished shutdown")
-			if kafka != nil {
-				log.Info("waiting for kafka consumer to finish shutdown...")
-				<-kafkaStopChan
-			}
-			stop()
-			return
-		case <-kafkaStopChan:
-			log.Info("kafka consumer finished shutdown")
-			if nsq != nil {
-				log.Info("waiting for nsq consumer to finish shutdown...")
-				<-nsqStopChan
-			}
-			stop()
-			return
-		case <-sigChan:
-			if nsq != nil {
-				log.Info("Shutting down nsq consumer")
-				nsq.Stop()
-			}
-			if kafka != nil {
-				log.Info("Shutting down kafka consumer")
-				kafka.Stop()
-			}
-		}
+	type waiter struct {
+		key    string
+		plugin ingestPlugin
+		ch     chan int
 	}
+
+	waiters := make([]waiter, 0)
+
+	if nsq != nil {
+		waiters = append(waiters, waiter{
+			"nsq",
+			nsq,
+			nsq.StopChan,
+		})
+	}
+	if kafkaMdm != nil {
+		waiters = append(waiters, waiter{
+			"kafka-mdm",
+			kafkaMdm,
+			kafkaMdm.StopChan,
+		})
+	}
+	if kafkaMdam != nil {
+		waiters = append(waiters, waiter{
+			"kafka-mdam",
+			kafkaMdam,
+			kafkaMdam.StopChan,
+		})
+	}
+	<-sigChan
+	for _, w := range waiters {
+		log.Info("Shutting down %s consumer", w.key)
+		w.plugin.Stop()
+	}
+	for _, w := range waiters {
+		// the order here is arbitrary, they could stop in either order, but it doesn't really matter
+		log.Info("waiting for %s consumer to finish shutdown", w.key)
+		<-w.ch
+		log.Info("%s consumer finished shutdown", w.key)
+	}
+	log.Info("closing store")
+	store.Stop()
+	defs.Stop()
+	log.Info("terminating.")
+	log.Close()
+
 }
 
 func initMetrics(stats met.Backend) {

@@ -38,7 +38,42 @@ func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage,
 	}
 }
 
+func (in In) process(metric *schema.MetricData) {
+	if metric == nil {
+		return
+	}
+	if metric.Id == "" {
+		log.Error(3, "empty metric.Id - fix your datastream")
+		return
+	}
+	if metric.Time == 0 {
+		log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
+	} else {
+		in.defCache.Add(metric)
+		m := in.metrics.GetOrCreate(metric.Id)
+		m.Add(uint32(metric.Time), metric.Value)
+		if in.usage != nil {
+			in.usage.Add(metric.OrgId, metric.Id)
+		}
+	}
+}
+
+// Handle processes simple messages without format spec or produced timestamp, so we don't track msgsAge here
 func (in In) Handle(data []byte) {
+	// TODO reuse?
+	md := schema.MetricData{}
+	_, err := md.UnmarshalMsg(data)
+	if err != nil {
+		log.Error(3, "skipping message. %s", err)
+		return
+	}
+	in.metricsPerMessage.Value(int64(1))
+	in.metricsReceived.Inc(1)
+	in.process(&md)
+}
+
+// HandleArray processes MetricDataArray messages that have a format spec and produced timestamp.
+func (in In) HandleArray(data []byte) {
 	err := in.tmp.InitFromMsg(data)
 	if err != nil {
 		log.Error(3, "skipping message. %s", err)
@@ -55,22 +90,6 @@ func (in In) Handle(data []byte) {
 	in.metricsReceived.Inc(int64(len(in.tmp.Metrics)))
 
 	for _, metric := range in.tmp.Metrics {
-		if metric == nil {
-			continue
-		}
-		if metric.Id == "" {
-			log.Error(3, "empty metric.Id - fix your datastream")
-			continue
-		}
-		if metric.Time == 0 {
-			log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
-		} else {
-			in.defCache.Add(metric)
-			m := in.metrics.GetOrCreate(metric.Id)
-			m.Add(uint32(metric.Time), metric.Value)
-			if in.usage != nil {
-				in.usage.Add(metric.OrgId, metric.Id)
-			}
-		}
+		in.process(metric)
 	}
 }

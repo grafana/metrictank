@@ -1,4 +1,4 @@
-package kafka
+package kafkamdam
 
 import (
 	"time"
@@ -10,7 +10,8 @@ import (
 	"github.com/raintank/raintank-metric/schema"
 )
 
-type Kafka struct {
+// kafka output that sends MetricDataArrayMsgp messages
+type KafkaMdam struct {
 	out.OutStats
 	topic   string
 	brokers []string
@@ -18,7 +19,7 @@ type Kafka struct {
 	client  sarama.SyncProducer
 }
 
-func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
+func New(topic string, brokers []string, stats met.Backend) (*KafkaMdam, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -35,8 +36,8 @@ func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
 		return nil, err
 	}
 
-	return &Kafka{
-		OutStats: out.NewStats(stats, "kafka"),
+	return &KafkaMdam{
+		OutStats: out.NewStats(stats, "kafka-mdam"),
 		topic:    topic,
 		brokers:  brokers,
 		config:   config,
@@ -44,11 +45,11 @@ func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
 	}, nil
 }
 
-func (k *Kafka) Close() error {
+func (k *KafkaMdam) Close() error {
 	return k.client.Close()
 }
 
-func (k *Kafka) Flush(metrics []*schema.MetricData) error {
+func (k *KafkaMdam) Flush(metrics []*schema.MetricData) error {
 	preFlush := time.Now()
 	if len(metrics) == 0 {
 		k.FlushDuration.Value(time.Since(preFlush))

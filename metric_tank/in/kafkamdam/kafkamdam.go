@@ -1,4 +1,4 @@
-package kafka
+package kafkamdam
 
 import (
 	"github.com/grafana/grafana/pkg/log"
@@ -12,7 +12,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 )
 
-type Kafka struct {
+type KafkaMdam struct {
 	in.In
 	consumer *cluster.Consumer
 	stats    met.Backend
@@ -22,7 +22,7 @@ type Kafka struct {
 	StopChan chan int
 }
 
-func New(broker, topic string, stats met.Backend) *Kafka {
+func New(broker, topic string, stats met.Backend) *KafkaMdam {
 	brokers := []string{broker}
 	groupId := "group1"
 	topics := []string{topic}
@@ -32,14 +32,14 @@ func New(broker, topic string, stats met.Backend) *Kafka {
 	config.Group.Return.Notifications = true
 	err := config.Validate()
 	if err != nil {
-		log.Fatal(2, "kafka invalid config: %s", err)
+		log.Fatal(2, "kafka-mdam invalid config: %s", err)
 	}
 	consumer, err := cluster.NewConsumer(brokers, groupId, topics, config)
 	if err != nil {
-		log.Fatal(2, "kafka failed to start consumer: %s", err)
+		log.Fatal(2, "kafka-mdam failed to start consumer: %s", err)
 	}
-	log.Info("kafka consumer started without error")
-	k := Kafka{
+	log.Info("kafka-mdam consumer started without error")
+	k := KafkaMdam{
 		consumer: consumer,
 		stats:    stats,
 		StopChan: make(chan int),
@@ -48,25 +48,25 @@ func New(broker, topic string, stats met.Backend) *Kafka {
 	return &k
 }
 
-func (k *Kafka) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
-	k.In = in.New(metrics, defCache, usg, "kafka", k.stats)
+func (k *KafkaMdam) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
+	k.In = in.New(metrics, defCache, usg, "kafka-mdam", k.stats)
 	go k.notifications()
 	go k.consume()
 }
 
-func (k *Kafka) consume() {
+func (k *KafkaMdam) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
 	for msg := range messageChan {
-		log.Debug("kafka received message: Topic %s, Partition: %d, Offset: %d, Key: %s", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
-		k.In.Handle(msg.Value)
+		log.Debug("kafka-mdam received message: Topic %s, Partition: %d, Offset: %d, Key: %s", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
+		k.In.HandleArray(msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
-	log.Info("kafka consumer ended.")
+	log.Info("kafka-mdam consumer ended.")
 	k.wg.Done()
 }
 
-func (k *Kafka) notifications() {
+func (k *KafkaMdam) notifications() {
 	k.wg.Add(1)
 	for msg := range k.consumer.Notifications() {
 		if len(msg.Claimed) > 0 {
@@ -89,14 +89,14 @@ func (k *Kafka) notifications() {
 			}
 		}
 	}
-	log.Info("kafka notification processing stopped")
+	log.Info("kafka-mdam notification processing stopped")
 	k.wg.Done()
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)
 //
 // NOTE: receive on StopChan to block until this process completes
-func (k *Kafka) Stop() {
+func (k *KafkaMdam) Stop() {
 	// closes notifications and messages channels, amongst others
 	k.consumer.Close()
 

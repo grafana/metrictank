@@ -20,6 +20,6 @@ func NewHandler(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.U
 }
 
 func (h *Handler) HandleMessage(m *nsq.Message) error {
-	h.In.Handle(m.Body)
+	h.In.HandleArray(m.Body)
 	return nil
 }
