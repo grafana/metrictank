@@ -3,6 +3,7 @@ package kafkamdm
 import (
 	"github.com/grafana/grafana/pkg/log"
 	"sync"
+	"time"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
@@ -30,6 +31,11 @@ func New(broker, topic string, stats met.Backend) *KafkaMdm {
 	config := cluster.NewConfig()
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Group.Return.Notifications = true
+	config.ChannelBufferSize = 10000
+	config.Consumer.Fetch.Min = 1024000     //1Mb
+	config.Consumer.Fetch.Default = 4096000 //4Mb
+	config.Consumer.MaxWaitTime = time.Second
+	config.Net.MaxOpenRequests = 100
 	err := config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
