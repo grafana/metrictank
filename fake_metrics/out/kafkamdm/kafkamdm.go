@@ -57,30 +57,32 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 	k.MessageMetrics.Value(1)
 	var data []byte
 
-	for _, metric := range metrics {
+	payload := make([]*sarama.ProducerMessage, len(metrics))
+
+	for i, metric := range metrics {
 		data, err := metric.MarshalMsg(data[:])
 		if err != nil {
 			return err
 		}
 
 		k.MessageBytes.Value(int64(len(data)))
-
-		prePub := time.Now()
-
 		// We are not setting a message key, which means that all messages will
 		// be distributed randomly over the different partitions.
-		_, _, err = k.client.SendMessage(&sarama.ProducerMessage{
+		payload[i] = &sarama.ProducerMessage{
 			Topic: k.topic,
 			Value: sarama.ByteEncoder(data),
-		})
-		if err != nil {
-			k.PublishErrors.Inc(1)
-			return err
 		}
 
-		k.PublishedMessages.Inc(1)
-		k.PublishDuration.Value(time.Since(prePub))
 	}
+	prePub := time.Now()
+	err := k.client.SendMessages(payload)
+	if err != nil {
+		k.PublishErrors.Inc(1)
+		return err
+	}
+
+	k.PublishedMessages.Inc(int64(len(metrics)))
+	k.PublishDuration.Value(time.Since(prePub))
 	k.PublishedMetrics.Inc(int64(len(metrics)))
 	k.FlushDuration.Value(time.Since(preFlush))
 	return nil
