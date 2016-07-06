@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 )
 

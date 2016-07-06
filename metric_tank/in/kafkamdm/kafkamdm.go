@@ -1,7 +1,7 @@
 package kafkamdm
 
 import (
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"sync"
 	"time"
 

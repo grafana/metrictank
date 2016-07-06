@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"

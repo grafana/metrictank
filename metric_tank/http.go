@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"

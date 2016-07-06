@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-hostpool"
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"

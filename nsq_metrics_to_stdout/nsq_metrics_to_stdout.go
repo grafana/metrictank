@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/msg"

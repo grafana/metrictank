@@ -1,7 +1,7 @@
 package kafkamdam
 
 import (
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"sync"
 
 	"github.com/bsm/sarama-cluster"

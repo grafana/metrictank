@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/grafana/grafana/pkg/log"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/jpillora/backoff"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
