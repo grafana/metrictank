@@ -80,6 +80,9 @@ func main() {
 	flushDuration = stats.NewTimer("metricpublisher.global.flush_duration", 0)
 
 	if *carbonTCPAddr != "" {
+		if *orgs > 1 {
+			log.Fatal(4, "can only simulate 1 org when using carbon output")
+		}
 		o, err := carbon.New(*carbonTCPAddr, stats)
 		if err != nil {
 			log.Fatal(4, "failed to create carbon output. %s", err)
