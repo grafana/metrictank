@@ -37,7 +37,7 @@ var (
 	gnetAddr         = flag.String("gnet-address", "", "gnet address. e.g. http://localhost:8081")
 	gnetKey          = flag.String("gnet-key", "", "gnet api key")
 	logLevel         = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	orgs             = flag.Int("orgs", 2000, "how many orgs to simulate")
+	orgs             = flag.Int("orgs", 1, "how many orgs to simulate")
 	keysPerOrg       = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
 	speedup          = flag.Int("speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
 	metricPeriod     = flag.Int("metricPeriod", 1, "period in seconds between metric points")
@@ -88,6 +88,9 @@ func main() {
 	}
 
 	if *gnetAddr != "" {
+		if *orgs > 1 {
+			log.Fatal(4, "can only simulate 1 org when using gnet output")
+		}
 		if *gnetKey == "" {
 			log.Fatal(4, "to use gnet, a key must be specified")
 		}

@@ -61,7 +61,8 @@ this gives a realistic workload for testing GC and such:
 
 NSQ and kafka are multi-tenant outputs where structured data is sent and multiple orgs may have the same key in their own namespace.
 carbon is single-tenant and all data is in 1 metrics tree, prefixed by org id.
-for the gnet output, the org-id will be set to whatever you authenticate as (unless you use the admin key), so in that case only simulate one org otherwise the keys would overwrite each other
+for the gnet output, the org-id will be set to whatever you authenticate as (unless you use the admin key),
+so in that case you can only simulate one org otherwise the keys would overwrite each other.
 
 # Important
 
