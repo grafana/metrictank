@@ -29,11 +29,11 @@ func (s *Stdout) Close() error {
 }
 
 func (s *Stdout) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		s.FlushDuration.Value(time.Since(preFlush))
+		s.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	prePub := time.Now()
 	var n int64
 	s.Lock()

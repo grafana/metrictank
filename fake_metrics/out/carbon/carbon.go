@@ -38,11 +38,11 @@ func (n *Carbon) Close() error {
 }
 
 func (n *Carbon) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		n.FlushDuration.Value(time.Since(preFlush))
+		n.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	buf := bytes.NewBufferString("")
 	for _, m := range metrics {
 		buf.WriteString(fmt.Sprintf("org_%d.%s %f %d\n", m.OrgId, m.Name, m.Value, m.Time))

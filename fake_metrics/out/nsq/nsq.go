@@ -44,11 +44,11 @@ func (n *NSQ) Close() error {
 }
 
 func (n *NSQ) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		n.FlushDuration.Value(time.Since(preFlush))
+		n.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	// typical metrics seem to be around 300B
 	// nsqd allows <= 10MiB messages.
 	// we ideally have 64kB ~ 1MiB messages (see benchmark https://gist.github.com/Dieterbe/604232d35494eae73f15)

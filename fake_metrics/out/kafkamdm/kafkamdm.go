@@ -48,11 +48,11 @@ func (k *KafkaMdm) Close() error {
 }
 
 func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		k.FlushDuration.Value(time.Since(preFlush))
+		k.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 
 	k.MessageMetrics.Value(1)
 	var data []byte

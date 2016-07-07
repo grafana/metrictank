@@ -50,11 +50,11 @@ func (k *KafkaMdam) Close() error {
 }
 
 func (k *KafkaMdam) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		k.FlushDuration.Value(time.Since(preFlush))
+		k.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	// typical metrics seem to be around 300B
 	// nsqd allows <= 10MiB messages.
 	// we ideally have 64kB ~ 1MiB messages (see benchmark https://gist.github.com/Dieterbe/604232d35494eae73f15)

@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/jpillora/backoff"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type Msg struct {
@@ -85,11 +85,11 @@ func (g *Gnet) Close() error {
 }
 
 func (g *Gnet) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
 	if len(metrics) == 0 {
-		g.FlushDuration.Value(time.Since(preFlush))
+		g.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	log.Debug("gnet asked to publish %d metrics at ts %s", len(metrics), time.Unix(metrics[0].Time, 0))
 	mda := schema.MetricDataArray(metrics)
 	data, err := msg.CreateMsg(mda, 0, msg.FormatMetricDataArrayMsgp)
