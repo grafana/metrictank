@@ -1,6 +1,7 @@
 package kafkamdm
 
 import (
+	"encoding/binary"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -66,9 +67,16 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 		}
 
 		k.MessageBytes.Value(int64(len(data)))
-		// We are not setting a message key, which means that all messages will
-		// be distributed randomly over the different partitions.
+
+		// partition by organisation: metrics for the same org should go to the same
+		// partition/MetricTank (optimize for locality~performance)
+		// the extra 4B (now initialized with zeroes) is to later enable a smooth transition
+		// to a more fine-grained partitioning scheme where
+		// large organisations can go to several partitions instead of just one.
+		key := make([]byte, 8)
+		binary.LittleEndian.PutUint32(key, uint32(metric.OrgId))
 		payload[i] = &sarama.ProducerMessage{
+			Key:   sarama.ByteEncoder(key),
 			Topic: k.topic,
 			Value: sarama.ByteEncoder(data),
 		}

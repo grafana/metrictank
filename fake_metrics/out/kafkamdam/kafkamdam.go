@@ -80,8 +80,8 @@ func (k *KafkaMdam) Flush(metrics []*schema.MetricData) error {
 
 		prePub := time.Now()
 
-		// We are not setting a message key, which means that all messages will
-		// be distributed randomly over the different partitions.
+		// We cannot set a message key, because metrics may have different orgs and other properties,
+		// which means that all messages will be distributed randomly over the different partitions.
 		_, _, err = k.client.SendMessage(&sarama.ProducerMessage{
 			Topic: k.topic,
 			Value: sarama.ByteEncoder(data),

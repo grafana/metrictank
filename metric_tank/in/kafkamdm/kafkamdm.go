@@ -64,7 +64,7 @@ func (k *KafkaMdm) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
 	for msg := range messageChan {
-		log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %s", msg.Topic, msg.Partition, msg.Offset, string(msg.Key))
+		log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 		k.In.Handle(msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
