@@ -1,9 +1,11 @@
 package kafkamdm
 
 import (
-	"github.com/raintank/worldping-api/pkg/log"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/raintank/worldping-api/pkg/log"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
@@ -37,6 +39,7 @@ func New(broker, topic, instance string, stats met.Backend) *KafkaMdm {
 	config.Consumer.Fetch.Default = 4096000 //4Mb
 	config.Consumer.MaxWaitTime = time.Second
 	config.Net.MaxOpenRequests = 100
+	config.Config.Version = sarama.V0_10_0_0
 	err := config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)

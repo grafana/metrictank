@@ -3,6 +3,7 @@ package kafkamdam
 import (
 	"sync"
 
+	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
 
 	"github.com/bsm/sarama-cluster"
@@ -32,6 +33,7 @@ func New(broker, topic, instance string, stats met.Backend) *KafkaMdam {
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.ClientID = instance + "-mdam"
 	config.Group.Return.Notifications = true
+	config.Config.Version = sarama.V0_10_0_0
 	err := config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-mdam invalid config: %s", err)
