@@ -23,13 +23,14 @@ type KafkaMdm struct {
 	StopChan chan int
 }
 
-func New(broker, topic string, stats met.Backend) *KafkaMdm {
+func New(broker, topic, instance string, stats met.Backend) *KafkaMdm {
 	brokers := []string{broker}
 	groupId := "group1"
 	topics := []string{topic}
 
 	config := cluster.NewConfig()
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.ClientID = instance + "-mdm"
 	config.Group.Return.Notifications = true
 	config.ChannelBufferSize = 10000
 	config.Consumer.Fetch.Min = 1024000     //1Mb
@@ -77,21 +78,21 @@ func (k *KafkaMdm) notifications() {
 	for msg := range k.consumer.Notifications() {
 		if len(msg.Claimed) > 0 {
 			for topic, partitions := range msg.Claimed {
-				log.Info("consumer claimed %d partitions on topic: %s", len(partitions), topic)
+				log.Info("kafka-mdm consumer claimed %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 		if len(msg.Released) > 0 {
 			for topic, partitions := range msg.Released {
-				log.Info("consumer released %d partitions on topic: %s", len(partitions), topic)
+				log.Info("kafka-mdm consumer released %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 
 		if len(msg.Current) == 0 {
-			log.Info("consumer is no longer consuming from any partitions.")
+			log.Info("kafka-mdm consumer is no longer consuming from any partitions.")
 		} else {
-			log.Info("Current partitions:")
+			log.Info("kafka-mdm Current partitions:")
 			for topic, partitions := range msg.Current {
-				log.Info("Current partitions: %s: %v", topic, partitions)
+				log.Info("kafka-mdm Current partitions: %s: %v", topic, partitions)
 			}
 		}
 	}

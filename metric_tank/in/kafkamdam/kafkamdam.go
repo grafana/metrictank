@@ -1,8 +1,9 @@
 package kafkamdam
 
 import (
-	"github.com/raintank/worldping-api/pkg/log"
 	"sync"
+
+	"github.com/raintank/worldping-api/pkg/log"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
@@ -22,13 +23,14 @@ type KafkaMdam struct {
 	StopChan chan int
 }
 
-func New(broker, topic string, stats met.Backend) *KafkaMdam {
+func New(broker, topic, instance string, stats met.Backend) *KafkaMdam {
 	brokers := []string{broker}
 	groupId := "group1"
 	topics := []string{topic}
 
 	config := cluster.NewConfig()
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.ClientID = instance + "-mdam"
 	config.Group.Return.Notifications = true
 	err := config.Validate()
 	if err != nil {
@@ -71,21 +73,21 @@ func (k *KafkaMdam) notifications() {
 	for msg := range k.consumer.Notifications() {
 		if len(msg.Claimed) > 0 {
 			for topic, partitions := range msg.Claimed {
-				log.Info("consumer claimed %d partitions on topic: %s", len(partitions), topic)
+				log.Info("kafka-mdam consumer claimed %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 		if len(msg.Released) > 0 {
 			for topic, partitions := range msg.Released {
-				log.Info("consumer released %d partitions on topic: %s", len(partitions), topic)
+				log.Info("kafka-mdam consumer released %d partitions on topic: %s", len(partitions), topic)
 			}
 		}
 
 		if len(msg.Current) == 0 {
-			log.Info("consumer is no longer consuming from any partitions.")
+			log.Info("kafka-mdam consumer is no longer consuming from any partitions.")
 		} else {
-			log.Info("Current partitions:")
+			log.Info("kafka-mdam Current partitions:")
 			for topic, partitions := range msg.Current {
-				log.Info("Current partitions: %s: %v", topic, partitions)
+				log.Info("kafka-mdam Current partitions: %s: %v", topic, partitions)
 			}
 		}
 	}

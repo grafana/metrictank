@@ -17,7 +17,6 @@ import (
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/benbjohnson/clock"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/dur"
@@ -29,6 +28,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
 	"github.com/raintank/raintank-metric/metricdef"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
@@ -296,10 +296,10 @@ func main() {
 	}
 
 	if *kafkaMdmBroker != "" {
-		kafkaMdm = inKafkaMdm.New(*kafkaMdmBroker, "mdm", stats)
+		kafkaMdm = inKafkaMdm.New(*kafkaMdmBroker, "mdm", *instance, stats)
 	}
 	if *kafkaMdamBroker != "" {
-		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", stats)
+		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", *instance, stats)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
