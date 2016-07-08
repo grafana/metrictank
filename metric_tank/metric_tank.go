@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	l "log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/Dieterbe/profiletrigger/heap"
+	"github.com/Shopify/sarama"
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
@@ -317,9 +319,11 @@ func main() {
 		nsq.Start(metrics, defCache, usg)
 	}
 	if kafkaMdm != nil {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		kafkaMdm.Start(metrics, defCache, usg)
 	}
 	if kafkaMdam != nil {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		kafkaMdam.Start(metrics, defCache, usg)
 	}
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
