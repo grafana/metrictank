@@ -8,6 +8,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type KafkaMdm struct {
@@ -87,6 +88,11 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 	err := k.client.SendMessages(payload)
 	if err != nil {
 		k.PublishErrors.Inc(1)
+		if errors, ok := err.(sarama.ProducerErrors); ok {
+			for i := 0; i < 10 && i < len(errors); i++ {
+				log.Error(4, "ProducerError %d/%d: %s", i, len(errors), errors[i].Error())
+			}
+		}
 		return err
 	}
 
