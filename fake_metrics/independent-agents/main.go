@@ -25,16 +25,17 @@ var (
 	topic       = flag.String("topic", "metrics", "NSQ topic")
 	std         out.Out // global resource because needs to be globally locked. os.Stdout is not threadsafe
 
-	nsqdTCPAddr     = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
-	kafkaMdmTCPAddr = flag.String("kafka-mdm-tcp-address", "", "kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092")
-	carbonTCPAddr   = flag.String("carbon-tcp-address", "", "carbon TCP address. e.g. localhost:2003")
-	stdoutOut       = flag.Bool("stdout", false, "enable emitting metrics to stdout")
-	logLevel        = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	agents          = flag.Int("agents", 1000, "how many agents to simulate")
-	metrics         = flag.Int("metrics", 10, "how many metrics per agent to simulate")
-	period          = flag.Int("period", 10, "period in seconds between metric points")
-	statsdAddr      = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType      = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+	nsqdTCPAddr      = flag.String("nsqd-tcp-address", "", "nsqd TCP address. e.g. localhost:4150")
+	kafkaMdmTCPAddr  = flag.String("kafka-mdm-tcp-address", "", "kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092")
+	kafkaCompression = flag.String("kafka-comp", "none", "compression: none|gzip|snappy")
+	carbonTCPAddr    = flag.String("carbon-tcp-address", "", "carbon TCP address. e.g. localhost:2003")
+	stdoutOut        = flag.Bool("stdout", false, "enable emitting metrics to stdout")
+	logLevel         = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	agents           = flag.Int("agents", 1000, "how many agents to simulate")
+	metrics          = flag.Int("metrics", 10, "how many metrics per agent to simulate")
+	period           = flag.Int("period", 10, "period in seconds between metric points")
+	statsdAddr       = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdType       = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 )
 
 func main() {
@@ -94,7 +95,7 @@ func agent(id, metrics, period int, carbonTCPAddr, kafkaMdmTCPAddr, nsqdTCPAddr 
 	}
 
 	if kafkaMdmTCPAddr != "" {
-		o, err := kafkamdm.New(*topic, []string{kafkaMdmTCPAddr}, stats)
+		o, err := kafkamdm.New(*topic, []string{kafkaMdmTCPAddr}, *kafkaCompression, stats)
 		if err != nil {
 			log.Fatal(4, "agent %d failed to create kafka-mdm output. %s", id, err)
 		}

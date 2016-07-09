@@ -36,6 +36,7 @@ var (
 	carbonTCPAddr    = flag.String("carbon-tcp-address", "", "carbon TCP address. e.g. localhost:2003")
 	gnetAddr         = flag.String("gnet-address", "", "gnet address. e.g. http://localhost:8081")
 	gnetKey          = flag.String("gnet-key", "", "gnet api key")
+	kafkaCompression = flag.String("kafka-comp", "none", "compression: none|gzip|snappy")
 	logLevel         = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	orgs             = flag.Int("orgs", 1, "how many orgs to simulate")
 	keysPerOrg       = flag.Int("keys-per-org", 100, "how many metrics per orgs to simulate")
@@ -105,7 +106,7 @@ func main() {
 	}
 
 	if *kafkaMdmTCPAddr != "" {
-		o, err := kafkamdm.New("mdm", []string{*kafkaMdmTCPAddr}, stats)
+		o, err := kafkamdm.New("mdm", []string{*kafkaMdmTCPAddr}, *kafkaCompression, stats)
 		if err != nil {
 			log.Fatal(4, "failed to create kafka-mdm output. %s", err)
 		}
@@ -113,7 +114,7 @@ func main() {
 	}
 
 	if *kafkaMdamTCPAddr != "" {
-		o, err := kafkamdam.New("mdam", []string{*kafkaMdamTCPAddr}, stats)
+		o, err := kafkamdam.New("mdam", []string{*kafkaMdamTCPAddr}, *kafkaCompression, stats)
 		if err != nil {
 			log.Fatal(4, "failed to create kafka-mdam output. %s", err)
 		}
