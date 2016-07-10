@@ -1,11 +1,13 @@
 package kafkamdm
 
 import (
+	"flag"
 	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/rakyll/globalconf"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
@@ -25,9 +27,22 @@ type KafkaMdm struct {
 	StopChan chan int
 }
 
-func New(broker, topic, instance string, stats met.Backend) *KafkaMdm {
+var Enabled bool
+var broker string
+var topic string
+var group string
+
+func ConfigSetup() {
+	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
+	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
+	inKafkaMdm.StringVar(&broker, "broker", "kafka:9092", "tcp address for kafka")
+	inKafkaMdm.StringVar(&topic, "topic", "mdm", "kafka topic")
+	inKafkaMdm.StringVar(&group, "group", "group1", "kafka consumer group")
+	globalconf.Register("kafka-mdm-in", inKafkaMdm)
+}
+
+func New(instance string, stats met.Backend) *KafkaMdm {
 	brokers := []string{broker}
-	groupId := "group1"
 	topics := []string{topic}
 
 	config := cluster.NewConfig()
@@ -44,7 +59,7 @@ func New(broker, topic, instance string, stats met.Backend) *KafkaMdm {
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
 	}
-	consumer, err := cluster.NewConsumer(brokers, groupId, topics, config)
+	consumer, err := cluster.NewConsumer(brokers, group, topics, config)
 	if err != nil {
 		log.Fatal(2, "kafka-mdm failed to start consumer: %s", err)
 	}

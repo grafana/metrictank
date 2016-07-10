@@ -99,7 +99,6 @@ var (
 	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
 	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
 
-	kafkaMdmBroker  = flag.String("kafka-mdm-broker", "", "tcp address for kafka, for MetricData messages, msgp encoded")
 	kafkaMdamBroker = flag.String("kafka-mdam-broker", "", "tcp address for kafka, for MetricDataArray messages, msgp encoded")
 
 	reqSpanMem  met.Meter
@@ -145,6 +144,7 @@ func main() {
 			os.Exit(1)
 		}
 		inCarbon.ConfigSetup()
+		inKafkaMdm.ConfigSetup()
 		conf.ParseAll()
 	}
 
@@ -301,8 +301,8 @@ func main() {
 		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, stats)
 	}
 
-	if *kafkaMdmBroker != "" {
-		kafkaMdm = inKafkaMdm.New(*kafkaMdmBroker, "mdm", *instance, stats)
+	if inKafkaMdm.Enabled {
+		kafkaMdm = inKafkaMdm.New(*instance, stats)
 	}
 	if *kafkaMdamBroker != "" {
 		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", *instance, stats)
