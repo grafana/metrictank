@@ -24,6 +24,7 @@ import (
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/in"
+	inCarbon "github.com/raintank/raintank-metric/metric_tank/in/carbon"
 	inKafkaMdam "github.com/raintank/raintank-metric/metric_tank/in/kafkamdam"
 	inKafkaMdm "github.com/raintank/raintank-metric/metric_tank/in/kafkamdm"
 	inNSQ "github.com/raintank/raintank-metric/metric_tank/in/nsq"
@@ -143,6 +144,7 @@ func main() {
 			log.Fatal(4, "error with configuration file: %s", err)
 			os.Exit(1)
 		}
+		inCarbon.ConfigSetup()
 		conf.ParseAll()
 	}
 
@@ -293,6 +295,7 @@ func main() {
 	var nsq *inNSQ.NSQ
 	var kafkaMdm *inKafkaMdm.KafkaMdm
 	var kafkaMdam *inKafkaMdam.KafkaMdam
+	var carbon *inCarbon.Carbon
 
 	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
 		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, stats)
@@ -303,6 +306,10 @@ func main() {
 	}
 	if *kafkaMdamBroker != "" {
 		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", *instance, stats)
+	}
+
+	if inCarbon.Enabled {
+		carbon = inCarbon.New(stats)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -327,6 +334,11 @@ func main() {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		kafkaMdam.Start(metrics, defCache, usg)
 	}
+
+	if carbon != nil {
+		carbon.Start(metrics, defCache, usg)
+	}
+
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
 	mdata.InitCluster(metrics, stats, *instance, *topicNotifyPersist, *channel, *producerOpts, *consumerOpts, nsqdAdds, lookupdAdds, *maxInFlight)

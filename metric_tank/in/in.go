@@ -58,6 +58,25 @@ func (in In) process(metric *schema.MetricData) {
 	}
 }
 
+// HandleLegacy processes legacy datapoints. we don't track msgsAge here
+func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
+	// TODO reuse?
+	md := &schema.MetricData{
+		Name:       name,
+		Interval:   interval,
+		Value:      val,
+		Unit:       "unknown",
+		Time:       int64(ts),
+		TargetType: "gauge",
+		Tags:       []string{},
+		OrgId:      1, // admin org
+	}
+	md.SetId()
+	in.metricsPerMessage.Value(int64(1))
+	in.metricsReceived.Inc(1)
+	in.process(md)
+}
+
 // Handle processes simple messages without format spec or produced timestamp, so we don't track msgsAge here
 func (in In) Handle(data []byte) {
 	// TODO reuse?
