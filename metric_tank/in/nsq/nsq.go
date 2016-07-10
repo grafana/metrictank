@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"
@@ -12,6 +11,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type NSQ struct {

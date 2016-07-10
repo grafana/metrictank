@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators

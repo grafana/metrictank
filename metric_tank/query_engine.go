@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 // represents a data "archive", i.e. the raw one, or an aggregated series

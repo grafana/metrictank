@@ -9,7 +9,6 @@ import (
 
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
@@ -18,6 +17,7 @@ import (
 	"github.com/raintank/raintank-metric/fake_metrics/out/nsq"
 	"github.com/raintank/raintank-metric/fake_metrics/out/stdout"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (

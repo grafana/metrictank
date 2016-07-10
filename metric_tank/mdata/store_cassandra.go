@@ -11,10 +11,10 @@ import (
 
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 // write aggregated data to cassandra.

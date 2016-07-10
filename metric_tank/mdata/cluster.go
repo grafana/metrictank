@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/bitly/go-hostpool"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/app"
 	"github.com/raintank/raintank-metric/instrumented_nsq"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
