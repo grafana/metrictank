@@ -421,6 +421,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
+		a.addAggregators(ts, val)
+		return
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
