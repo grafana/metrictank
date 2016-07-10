@@ -23,6 +23,7 @@ import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	"github.com/raintank/raintank-metric/metric_tank/in"
 	inKafkaMdam "github.com/raintank/raintank-metric/metric_tank/in/kafkamdam"
 	inKafkaMdm "github.com/raintank/raintank-metric/metric_tank/in/kafkamdm"
 	inNSQ "github.com/raintank/raintank-metric/metric_tank/in/nsq"
@@ -345,13 +346,9 @@ func main() {
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
-	type ingestPlugin interface {
-		Stop()
-	}
-
 	type waiter struct {
 		key    string
-		plugin ingestPlugin
+		plugin in.Plugin
 		ch     chan int
 	}
 
