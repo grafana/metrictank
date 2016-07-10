@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/codeskyblue/go-uuid"
-	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (

@@ -2,16 +2,18 @@ package main
 
 import (
 	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
+	Nsq "github.com/raintank/raintank-metric/metric_tank/in/nsq"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metricdef"
 	"github.com/raintank/raintank-metric/msg"
 	"github.com/raintank/raintank-metric/schema"
-	"sync"
-	"testing"
 )
 
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
@@ -38,7 +40,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	// handlers operate concurrently, but within 1 handler, the handling is sequential
 
 	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics mdata.Metrics, defCache *defcache.DefCache) {
-		handler := NewHandler(aggmetrics, defCache, nil)
+		handler := Nsq.NewHandler(aggmetrics, defCache, nil, stats)
 		for msg := range in {
 			err := handler.HandleMessage(msg)
 			if err != nil {
@@ -160,7 +162,7 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	defCache := defcache.New(metricdef.NewDefsMock(), stats)
-	handler := NewHandler(aggmetrics, defCache, nil)
+	handler := Nsq.NewHandler(aggmetrics, defCache, nil, stats)
 
 	metrics := make([]*schema.MetricData, 10)
 	for i := 0; i < len(metrics); i++ {

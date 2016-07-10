@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/grafana/pkg/log"
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type DefsEs struct {

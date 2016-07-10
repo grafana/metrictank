@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/grafana/pkg/log"
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/metric_tank/mdata/chunk"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -421,6 +421,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
+		a.addAggregators(ts, val)
+		return
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)

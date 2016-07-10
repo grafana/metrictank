@@ -1,4 +1,4 @@
-package kafka
+package kafkamdam
 
 import (
 	"time"
@@ -10,7 +10,8 @@ import (
 	"github.com/raintank/raintank-metric/schema"
 )
 
-type Kafka struct {
+// kafka output that sends MetricDataArrayMsgp messages
+type KafkaMdam struct {
 	out.OutStats
 	topic   string
 	brokers []string
@@ -18,13 +19,14 @@ type Kafka struct {
 	client  sarama.SyncProducer
 }
 
-func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
+func New(topic string, brokers []string, codec string, stats met.Backend) (*KafkaMdam, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack the message
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
+	config.Producer.Compression = out.GetCompression(codec)
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -35,8 +37,8 @@ func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
 		return nil, err
 	}
 
-	return &Kafka{
-		OutStats: out.NewStats(stats, "kafka"),
+	return &KafkaMdam{
+		OutStats: out.NewStats(stats, "kafka-mdam"),
 		topic:    topic,
 		brokers:  brokers,
 		config:   config,
@@ -44,16 +46,16 @@ func New(topic string, brokers []string, stats met.Backend) (*Kafka, error) {
 	}, nil
 }
 
-func (k *Kafka) Close() error {
+func (k *KafkaMdam) Close() error {
 	return k.client.Close()
 }
 
-func (k *Kafka) Flush(metrics []*schema.MetricData) error {
-	preFlush := time.Now()
+func (k *KafkaMdam) Flush(metrics []*schema.MetricData) error {
 	if len(metrics) == 0 {
-		k.FlushDuration.Value(time.Since(preFlush))
+		k.FlushDuration.Value(0)
 		return nil
 	}
+	preFlush := time.Now()
 	// typical metrics seem to be around 300B
 	// nsqd allows <= 10MiB messages.
 	// we ideally have 64kB ~ 1MiB messages (see benchmark https://gist.github.com/Dieterbe/604232d35494eae73f15)
@@ -79,8 +81,8 @@ func (k *Kafka) Flush(metrics []*schema.MetricData) error {
 
 		prePub := time.Now()
 
-		// We are not setting a message key, which means that all messages will
-		// be distributed randomly over the different partitions.
+		// We cannot set a message key, because metrics may have different orgs and other properties,
+		// which means that all messages will be distributed randomly over the different partitions.
 		_, _, err = k.client.SendMessage(&sarama.ProducerMessage{
 			Topic: k.topic,
 			Value: sarama.ByteEncoder(data),
