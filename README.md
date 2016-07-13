@@ -61,6 +61,14 @@ metrics2.0, kafka, carbon, json or msgpack over http.
 While Metrictank takes in tag metadata in the form of [metrics2.0](http://metrics20.org/) and indexes it, it is not exposed yet for querying.
 Adopting metrics2.0 fully will help with picking better defaults for consolidation.
 
+## Help, more info, documentation, ...
+
+[community slack](http://slack.raintank.io/). This is the raintank slack, it has a metrictank room (as well as a grafana room and a room for all of our products)
+
+[docs](https://github.com/raintank/metrictank/tree/master/docs)
+
+For help or questions, you can also just open tickets in GitHub.
+
 
 
 License
