@@ -17,7 +17,7 @@
 package metricdef
 
 import (
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"sync"
 )
 

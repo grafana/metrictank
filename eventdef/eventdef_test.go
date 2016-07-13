@@ -27,7 +27,7 @@ import (
 
 	"github.com/bmizerany/assert"
 	"github.com/codeskyblue/go-uuid"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 func makeEvent(timestamp time.Time) *schema.ProbeEvent {

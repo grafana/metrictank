@@ -20,7 +20,7 @@ import (
 	"github.com/raintank/raintank-metric/fake_metrics/out/kafkamdam"
 	"github.com/raintank/raintank-metric/fake_metrics/out/kafkamdm"
 	"github.com/raintank/raintank-metric/fake_metrics/out/nsq"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

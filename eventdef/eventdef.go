@@ -25,7 +25,7 @@ import (
 
 	"github.com/codeskyblue/go-uuid"
 	elastigo "github.com/mattbaird/elastigo/lib"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

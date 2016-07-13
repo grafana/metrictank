@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/raintank/dur"
 	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"log"
 	"math/rand"
 	"os"

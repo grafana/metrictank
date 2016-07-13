@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/raintank/met"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 type Out interface {

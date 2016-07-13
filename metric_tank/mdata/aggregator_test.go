@@ -1,7 +1,7 @@
 package mdata
 
 import (
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"testing"
 )
 
