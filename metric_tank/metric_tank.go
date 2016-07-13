@@ -21,7 +21,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/raintank-metric/dur"
+	"github.com/raintank/dur"
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/in"
 	inCarbon "github.com/raintank/raintank-metric/metric_tank/in/carbon"
