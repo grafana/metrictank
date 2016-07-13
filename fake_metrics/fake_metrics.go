@@ -11,9 +11,9 @@ import (
 	_ "net/http/pprof"
 	"time"
 
+	"github.com/raintank/dur"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/raintank-metric/dur"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
 	"github.com/raintank/raintank-metric/fake_metrics/out/carbon"
 	"github.com/raintank/raintank-metric/fake_metrics/out/gnet"
