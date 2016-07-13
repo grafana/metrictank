@@ -4,7 +4,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
-NAME=raintank-metric
+NAME=metrictank
 VERSION="0.1.0" # need an automatic way to do this again :-/
 BUILD="${DIR}/${NAME}-${VERSION}"
 ARCH="$(uname -m)"
@@ -26,20 +26,17 @@ mkdir -p ${BUILD}/etc/raintank
 
 #fpm -s dir -t deb \
   #-v ${VERSION} -n ${NAME} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric" \
-  #--deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/raintank-metric.conf \
+  #--deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/metrictank.conf \
   #-C ${BUILD} -p ${PACKAGE_NAME} .
 
-for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
-	NSQ_BUILD="${DIR}/$VAR-${VERSION}"
-	NSQ_PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
-	mkdir -p ${NSQ_BUILD}/usr/sbin
-	mkdir -p ${NSQ_BUILD}/etc/init
-	mkdir -p ${NSQ_BUILD}/etc/raintank
-	#cp ${DIR}/config/ubuntu/trusty/etc/init/${VAR}.conf ${NSQ_BUILD}/etc/init
-	cp ${DIR}/config/ubuntu/trusty/etc/raintank/${VAR}.ini ${NSQ_BUILD}/etc/raintank
-	cp ${DIR}/artifacts/$VAR ${NSQ_BUILD}/usr/sbin
-	fpm -s dir -t deb \
-	  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "Raintank Metric $VAR worker" \
-	  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR} \
-	  -C ${NSQ_BUILD} -p ${NSQ_PACKAGE_NAME} .
-done
+BUILD="${DIR}/metrictank-${VERSION}"
+PACKAGE_NAME="${DIR}/artifacts/${VAR}-VERSION_ITERATION_ARCH.deb"
+mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/etc/init
+mkdir -p ${BUILD}/etc/raintank
+cp ${DIR}/config/ubuntu/trusty/etc/raintank/${VAR}.ini ${BUILD}/etc/raintank
+cp ${DIR}/artifacts/$VAR ${BUILD}/usr/sbin
+fpm -s dir -t deb \
+  -v ${VERSION} -n ${VAR} -a ${ARCH} --iteration $ITERATION --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
+  --deb-upstart ${DIR}/config/ubuntu/trusty/etc/init/${VAR} \
+  -C ${BUILD} -p ${PACKAGE_NAME} .

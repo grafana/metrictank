@@ -35,14 +35,12 @@ if [ -z ${MYGOPATH} ]; then
 fi
 
 mkdir -p $MYGOPATH/src/github.com/raintank
-rm -rf $MYGOPATH/src/github.com/raintank/raintank-metric
+rm -rf $MYGOPATH/src/github.com/raintank/metrictank
 
 # link our checked out code to our gopath.
 ABS_CHECKOUT=$(readlink -e $CHECKOUT)
-ln -s $ABS_CHECKOUT ${MYGOPATH}/src/github.com/raintank/raintank-metric
+ln -s $ABS_CHECKOUT ${MYGOPATH}/src/github.com/raintank/metrictank
 
-for VAR in nsq_probe_events_to_elasticsearch metric_tank; do
-	cd ${MYGOPATH}/src/github.com/raintank/raintank-metric
-	go get -t -d ./...
-	cd ${DIR}
-done
+cd ${MYGOPATH}/src/github.com/raintank/metrictank
+go get -t -d ./...
+cd ${DIR}
