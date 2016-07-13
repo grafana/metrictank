@@ -2,11 +2,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/raintank/metrictank)](https://goreportcard.com/report/github.com/raintank/metrictank)
 [![GoDoc](https://godoc.org/github.com/raintank/metrictank?status.svg)](https://godoc.org/github.com/raintank/metrictank)
 
-# metrictank
-
-is a multi-tenant, gorilla-inspired, cassandra-backed timeries database 
 
 ## introduction
+*Metrictank is a multi-tenant, gorilla-inspired, cassandra-backed timeries database*
 
 metrictank is a timeseries database, inspired by the [Facebook gorilla paper](www.vldb.org/pvldb/vol8/p1816-teller.pdf).
 Most notably, it employs the float64 compression mechanism described in the paper to dramatically lower storage overhead,
@@ -34,31 +32,31 @@ and bugs to fix.  It should be considered an *alpha* project.
 ## main features
 
 
-### 100% open source
+#### 100% open source
 
 cause that's how we roll.
 
 
-### graphite integration
+#### graphite integration
 
 https://github.com/raintank/graphite-raintank
 
 
-### roll-ups
+#### roll-ups
 
-### in-memory component for hot data
+#### in-memory component for hot data
 
-### multi-tenancy
+#### multi-tenancy
 
-### ingestion options:
+#### ingestion options:
 
 metrics2.0, kafka, carbon, json or msgpack over http.
 
-### guards against excessive data requests
+#### guards against excessive data requests
 
 ## roadmap
 
-### tagging & metrics2.0
+#### tagging & metrics2.0
 
 While Metrictank takes in tag metadata in the form of [metrics2.0](http://metrics20.org/) and indexes it, it is not exposed yet for querying.
 Adopting metrics2.0 fully will help with picking better defaults for consolidation.
