@@ -10,7 +10,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/idx"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"math"
 	"net/http"

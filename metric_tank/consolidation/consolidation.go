@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/raintank/raintank-metric/metric_tank/batch"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 // consolidator is a highlevel description of a point consolidation method

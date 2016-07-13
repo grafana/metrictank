@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/raintank/raintank-metric/metric_tank/consolidation"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"math"
 	"math/rand"
 	"testing"

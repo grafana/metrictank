@@ -9,7 +9,7 @@ import (
 	"github.com/codeskyblue/go-uuid"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/raintank-metric/eventdef"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 func makeEvent(timestamp time.Time) *schema.ProbeEvent {

@@ -12,8 +12,8 @@ import (
 	Nsq "github.com/raintank/raintank-metric/metric_tank/in/nsq"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/msg"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 )
 
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct

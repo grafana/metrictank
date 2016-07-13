@@ -1,7 +1,7 @@
 package metricdef
 
 import (
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 type ResultCallback func(id string, ok bool)

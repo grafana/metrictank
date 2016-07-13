@@ -11,8 +11,8 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/raintank/met"
 	"github.com/raintank/raintank-metric/fake_metrics/out"
-	"github.com/raintank/raintank-metric/msg"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

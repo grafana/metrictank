@@ -12,7 +12,7 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/iter"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 type FakeAggMetrics struct {

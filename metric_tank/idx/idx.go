@@ -15,7 +15,7 @@ import (
 
 	"github.com/armon/go-radix"
 	"github.com/dgryski/go-trigram"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 )
 
 type MatchType uint8

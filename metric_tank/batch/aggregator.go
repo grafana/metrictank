@@ -2,7 +2,7 @@ package batch
 
 // aggregation functions for batches of data
 import (
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"math"
 )
 

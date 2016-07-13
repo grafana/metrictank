@@ -8,8 +8,8 @@ import (
 	"github.com/raintank/raintank-metric/metric_tank/defcache"
 	"github.com/raintank/raintank-metric/metric_tank/mdata"
 	"github.com/raintank/raintank-metric/metric_tank/usage"
-	"github.com/raintank/raintank-metric/msg"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

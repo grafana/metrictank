@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/Dieterbe/go-metrics"
 	"github.com/raintank/raintank-metric/metricdef"
-	"github.com/raintank/raintank-metric/schema"
+	"github.com/raintank/schema"
 	"log"
 	"math/rand"
 	"net"
