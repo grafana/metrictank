@@ -3,7 +3,7 @@ package defcache
 import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/metricdef"
-	"github.com/raintank/schema"
+	"gopkg.in/raintank/schema.v0"
 	"testing"
 )
 

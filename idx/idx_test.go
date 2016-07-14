@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dgryski/go-trigram"
-	"github.com/raintank/schema"
+	"gopkg.in/raintank/schema.v0"
 )
 
 func TestGetAddKey(t *testing.T) {

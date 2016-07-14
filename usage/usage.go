@@ -4,7 +4,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/metrictank/defcache"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/schema"
+	"gopkg.in/raintank/schema.v0"
 	"sync"
 	"time"
 )

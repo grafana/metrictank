@@ -2,7 +2,7 @@ package batch
 
 // aggregation functions for batches of data
 import (
-	"github.com/raintank/schema"
+	"gopkg.in/raintank/schema.v0"
 	"math"
 )
 

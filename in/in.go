@@ -8,9 +8,9 @@ import (
 	"github.com/raintank/metrictank/defcache"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v0/msg"
 )
 
 // In is a base handler for a metrics packet, aimed to be embedded by concrete implementations

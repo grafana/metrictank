@@ -10,8 +10,8 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/metricdef"
-	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v0"
 )
 
 var (

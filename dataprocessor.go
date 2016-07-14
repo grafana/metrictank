@@ -11,8 +11,8 @@ import (
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v0"
 )
 
 const defaultPointSliceSize = 2000
