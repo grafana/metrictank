@@ -45,24 +45,19 @@ var (
 	metrics  *mdata.AggMetrics
 	defCache *defcache.DefCache
 
+	// Misc:
 	showVersion = flag.Bool("version", false, "print version string")
 	listenAddr  = flag.String("listen", ":6060", "http listener address.")
 	confFile    = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
-	concurrency        = flag.Int("concurrency", 10, "number of workers parsing messages from NSQ")
-	topic              = flag.String("topic", "metrics", "NSQ topic for metrics")
-	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic for persist messages")
-	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
-	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+	// Clustering:
+	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
+	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 
-	instance         = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
-	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
-	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
-	primaryNode      = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
-
+	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "chunk span")
 	numChunksInt = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
-	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from cassandra")
+	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
@@ -71,6 +66,7 @@ var (
 
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
+	// Cassandra:
 	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraConsistency      = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cassandraTimeout          = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
@@ -79,13 +75,33 @@ var (
 	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 
+	// Elasticsearch:
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
 	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 
+	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
+
+	// NSQ:
+	topic              = flag.String("topic", "metrics", "NSQ topic for metrics")
+	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic for persist messages")
+	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
+	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
+
+	concurrency      = flag.Int("concurrency", 10, "number of workers parsing messages from NSQ")
+	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
+	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+
+	// Kafka:
+	kafkaMdamBroker = flag.String("kafka-mdam-broker", "", "tcp address for kafka, for MetricDataArray messages, msgp encoded")
+
+	// Profiling, instrumentation and logging:
+	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
+	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
+
 	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
 	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
-
-	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
@@ -93,13 +109,6 @@ var (
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 10000000, "if this many bytes allocated, trigger a profile")
 
 	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
-
-	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
-	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-
-	kafkaMdamBroker = flag.String("kafka-mdam-broker", "", "tcp address for kafka, for MetricDataArray messages, msgp encoded")
 
 	reqSpanMem  met.Meter
 	reqSpanBoth met.Meter
