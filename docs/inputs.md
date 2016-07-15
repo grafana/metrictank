@@ -1,9 +1,6 @@
 All input options - except for the carbon input - use the [metrics 2.0](http://metrics20.org/) format.
 See the [schema repository](https://github.com/raintank/schema) for more details.
 
-## general guidelines
-
-compression works best if you don't have decimals. So if you have latencies in ms, best store them as 35ms for example, not as 0.035 seconds.
 
 ## carbon
 useful for traditional graphite plaintext protocol.

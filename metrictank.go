@@ -356,8 +356,8 @@ func main() {
 		http.HandleFunc("/", appStatus)
 		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                        // metric-tank native api which deals with ID's, not target strings
 		http.HandleFunc("/get/", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
-		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur)))  // traditional graphite api
-		http.HandleFunc("/render/", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api
+		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur)))  // traditional graphite api, still lacking a lot of the api
+		http.HandleFunc("/render/", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api, still lacking a lot of the api
 		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
 		http.HandleFunc("/metrics/find", corsHandler(findHandler))
 		http.HandleFunc("/metrics/find/", corsHandler(findHandler))

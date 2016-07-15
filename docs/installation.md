@@ -1,5 +1,11 @@
 # installation guide
 
+## dependencies
+
+* Cassandra. TODO version ? Mostly tested with Cassandra 2.2.3
+* Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
+* optionally a queue: Kafka 0.10 is reccomended, but 0.9 should work too.
+
 ## installation
 
 ### from source
