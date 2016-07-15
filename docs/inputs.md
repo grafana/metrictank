@@ -19,12 +19,14 @@ note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
 
 ## kafka-mdm (recommended)
 
+`mdm = MetricData Messagepack-encoded` [MetricData schema definition](https://github.com/raintank/schema/blob/master/metric.go#L20)
 This is a kafka input wherein each point is sent as a unique kafka message. This is the best way,
 even though we haven't gotten it to perform on par with kafka-mdam yet, but we expect to get there soon.
 This is the recommended input option if you want a queue.
 
 ## kafka-mdam (experimental, discouraged)
 
+`mdm = MetricDataArray Messagepack-encoded` [MetricDatayArray schema definition](https://github.com/raintank/schema/blob/master/metric.go#L47)
 This is a kafka input that uses application-level batches stored within single kafka messages.
 It is discouraged because this does not allow proper routing/partitioning of messages and will be removed.
 It only exists to compare performance numbers against kafka-mdm, and make mdm as fast as mdam.
