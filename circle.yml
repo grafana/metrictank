@@ -15,7 +15,7 @@ dependencies:
     - scripts/build.sh
 general:
   artifacts:
-    - build/artifacts
+    - build
 deployment:
   production:
     branch: master
