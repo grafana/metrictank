@@ -16,4 +16,4 @@ rm -rf $BUILDDIR/*
 
 # Build binary
 cd ../
-go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metric-tank
+go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metrictank
