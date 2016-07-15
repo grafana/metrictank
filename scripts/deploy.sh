@@ -1,12 +1,12 @@
 #!/bin/bash
-
+set -x
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-
+ls -l  ${DIR}/../build/*.deb
 if [ -z ${PACKAGECLOUD_REPO} ] ; then
   echo "The environment variable PACKAGECLOUD_REPO must be set."
   exit 1
 fi
 
-package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty ${DIR}/artifacts/*.deb
-git push --tags
+# Only do the ubuntu pkg for now.
+package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty ${DIR}/../build/*.deb
