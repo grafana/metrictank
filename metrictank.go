@@ -50,6 +50,8 @@ var (
 	listenAddr  = flag.String("listen", ":6060", "http listener address.")
 	confFile    = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
 
+	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
+
 	// Clustering:
 	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
@@ -78,8 +80,6 @@ var (
 	// Elasticsearch:
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
 	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
-
-	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// NSQ:
 	topic              = flag.String("topic", "metrics", "NSQ topic for metrics")
