@@ -18,15 +18,15 @@ and bugs to fix.  It should be considered an *alpha* project.
 ## limitations
 
 * no strong isolation between tenants (other than to make sure they can't see each other's data). Tenants could negatively impact the performance for others.
-* no sharding/partitioning mechanism built-in.
+* no sharding/partitioning mechanism built-in (to metrictank itself. Cassandra of course does this on the data storage level)
 * master promotion is a manual process.
-* no computation locality: we pull in all the raw data first from cassandra, then process/consolidate it in metric-tank. Further processing/aggregation happens in Graphite.  At a certain scale you need to move the computation to the data, but we don't have that problem yet, though we do plan to move more of the graphite logic into metric-tank and further develop graphite-ng.
+* no computation locality: we pull in all the raw data first from cassandra, then process/consolidate it in metrictank. (further processing/aggregation can happen in Graphite).  At a certain scale you need to move the computation to the data, but we don't have that problem yet, though we do plan to move more of the graphite logic into metrictank and further develop graphite-ng.
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
-* only deals with float64 values. No ints, bools, text, etc. Some type optimisations may come, though using the float type for ints and bools works quite well thanks to the compression.
-* only uint32 unix timestamps in second resolution. We found higher-resolution is more useful for ad-hoc debugging, where you can [stream directly to grafana and can bypass the database](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
-* no data locality: we don't have anything that puts related series together.  Often this helps with read performance but we haven't needed to look into this yet.
+* only deals with float64 values. No ints, bools, text, etc. Some type optimisations may come, though using the float type for ints and bools works quite well thanks to the clever gorilla compression.
+* only uint32 unix timestamps in second resolution. We found higher-resolution is more useful for ad-hoc debugging, where you can [stream directly to grafana and bypass the database](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
+* no data locality: we don't have anything that puts related series together.  This may help with read performance but we haven't needed to look into this yet.
 
 
 ## main features
