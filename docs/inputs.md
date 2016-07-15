@@ -19,6 +19,10 @@ note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
 
 ## kafka-mdm (recommended)
 
+This is a kafka input wherein each point is sent as a unique kafka message. This is the best way,
+even though we haven't gotten it to perform on par with kafka-mdam yet, but we expect to get there soon.
+This is the recommended input option if you want a queue.
+
 ## kafka-mdam (experimental, discouraged)
 
 This is a kafka input that uses application-level batches stored within single kafka messages.
