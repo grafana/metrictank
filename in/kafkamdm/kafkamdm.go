@@ -27,6 +27,7 @@ type KafkaMdm struct {
 	StopChan chan int
 }
 
+var LogLevel int
 var Enabled bool
 var broker string
 var topic string
@@ -83,7 +84,9 @@ func (k *KafkaMdm) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
 	for msg := range messageChan {
-		log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
+		if LogLevel < 2 {
+			log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
+		}
 		k.In.Handle(msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
