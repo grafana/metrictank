@@ -48,7 +48,8 @@ func ConfigProcess(instance string) {
 	topics = []string{topic}
 
 	config := cluster.NewConfig()
-	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	// see https://github.com/raintank/metrictank/issues/236
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.ClientID = instance + "-mdam"
 	config.Group.Return.Notifications = true
 	config.Config.Version = sarama.V0_10_0_0

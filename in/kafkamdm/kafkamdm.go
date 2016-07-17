@@ -50,7 +50,8 @@ func ConfigProcess(instance string) {
 	topics = []string{topic}
 
 	config = cluster.NewConfig()
-	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	// see https://github.com/raintank/metrictank/issues/236
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.ClientID = instance + "-mdm"
 	config.Group.Return.Notifications = true
 	config.ChannelBufferSize = 10000
