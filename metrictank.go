@@ -72,7 +72,7 @@ var (
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
 	// Cassandra:
-	cassandraAddrs            = flag.String("cassandra-addrs", "", "cassandra host (may be given multiple times as comma-separated list)")
+	cassandraAddrs            = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraConsistency      = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cassandraTimeout          = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraReadConcurrency  = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
@@ -218,10 +218,6 @@ func main() {
 	}
 	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
 		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
-	}
-	// set default cassandra address if none is set.
-	if *cassandraAddrs == "" {
-		*cassandraAddrs = "localhost"
 	}
 
 	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
