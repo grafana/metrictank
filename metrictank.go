@@ -30,6 +30,7 @@ import (
 	inNSQ "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
+	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
 	"github.com/raintank/metrictank/metricdef"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -37,6 +38,8 @@ import (
 )
 
 var (
+	clNSQInst *mdata.ClNSQ
+
 	logLevel     int
 	warmupPeriod time.Duration
 	startupTime  time.Time
@@ -154,6 +157,7 @@ func main() {
 		}
 		inCarbon.ConfigSetup()
 		inKafkaMdm.ConfigSetup()
+		clNSQ.ConfigSetup()
 		conf.ParseAll()
 	}
 
@@ -185,6 +189,9 @@ func main() {
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
+
+	clNSQ.ConfigProcess()
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
@@ -351,7 +358,13 @@ func main() {
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
-	mdata.InitCluster(metrics, stats, *instance, *topicNotifyPersist, *channel, *producerOpts, *consumerOpts, nsqdAdds, lookupdAdds, *maxInFlight)
+	handlers := make([]mdata.ClusterHandler, 0)
+	if clNSQ.Enabled {
+		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
+		handlers = append(handlers, clNSQInst)
+	}
+
+	mdata.InitCluster(stats, handlers...)
 
 	go func() {
 		http.HandleFunc("/", appStatus)
