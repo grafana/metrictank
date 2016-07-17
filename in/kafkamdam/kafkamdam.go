@@ -1,10 +1,12 @@
 package kafkamdam
 
 import (
+	"flag"
 	"sync"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/rakyll/globalconf"
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
@@ -24,10 +26,26 @@ type KafkaMdam struct {
 	StopChan chan int
 }
 
-func New(broker, topic, instance string, stats met.Backend) *KafkaMdam {
-	brokers := []string{broker}
-	groupId := "group1"
-	topics := []string{topic}
+var Enabled bool
+var broker string
+var topic string
+var brokers []string
+var topics []string
+var group string
+var config *cluster.Config
+
+func ConfigSetup() {
+	inKafkaMdam := flag.NewFlagSet("kafka-mdam-in", flag.ExitOnError)
+	inKafkaMdam.BoolVar(&Enabled, "enabled", false, "")
+	inKafkaMdam.StringVar(&broker, "broker", "kafka:9092", "tcp address for kafka")
+	inKafkaMdam.StringVar(&topic, "topic", "mdam", "kafka topic")
+	inKafkaMdam.StringVar(&group, "group", "group1", "kafka consumer group")
+	globalconf.Register("kafka-mdam-in", inKafkaMdam)
+}
+
+func ConfigProcess(instance string) {
+	brokers = []string{broker}
+	topics = []string{topic}
 
 	config := cluster.NewConfig()
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
@@ -38,7 +56,10 @@ func New(broker, topic, instance string, stats met.Backend) *KafkaMdam {
 	if err != nil {
 		log.Fatal(2, "kafka-mdam invalid config: %s", err)
 	}
-	consumer, err := cluster.NewConsumer(brokers, groupId, topics, config)
+}
+
+func New(stats met.Backend) *KafkaMdam {
+	consumer, err := cluster.NewConsumer(brokers, group, topics, config)
 	if err != nil {
 		log.Fatal(2, "kafka-mdam failed to start consumer: %s", err)
 	}

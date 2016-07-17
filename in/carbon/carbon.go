@@ -30,6 +30,7 @@ type Carbon struct {
 var Enabled bool
 var addr string
 var schemasFile string
+var schemas persister.WhisperSchemas
 
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
@@ -39,9 +40,9 @@ func ConfigSetup() {
 	globalconf.Register("carbon-in", inCarbon)
 }
 
-func New(stats met.Backend) *Carbon {
-
-	schemas, err := persister.ReadWhisperSchemas(schemasFile)
+func ConfigProcess() {
+	var err error
+	schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
 		log.Fatal(4, "can't read schemas file %q: %s", schemasFile, err.Error())
 	}
@@ -60,6 +61,9 @@ func New(stats met.Backend) *Carbon {
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}
 
+}
+
+func New(stats met.Backend) *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		log.Fatal(4, err.Error())

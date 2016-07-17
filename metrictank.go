@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	l "log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
@@ -38,6 +37,10 @@ import (
 )
 
 var (
+	inCarbonInst    *inCarbon.Carbon
+	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
+	inKafkaMdamInst *inKafkaMdam.KafkaMdam
+	inNSQInst       *inNSQ.NSQ
 	clNSQInst *mdata.ClNSQ
 
 	logLevel     int
@@ -83,21 +86,6 @@ var (
 	// Elasticsearch:
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
 	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
-
-	// NSQ:
-	topic              = flag.String("topic", "metrics", "NSQ topic for metrics")
-	topicNotifyPersist = flag.String("topic-notify-persist", "metricpersist", "NSQ topic for persist messages")
-	channel            = flag.String("channel", "tank", "NSQ channel for both metric topic and metric-persist topic")
-	maxInFlight        = flag.Int("max-in-flight", 200, "max number of messages to allow in flight")
-
-	concurrency      = flag.Int("concurrency", 10, "number of workers parsing messages from NSQ")
-	producerOpts     = flag.String("producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	consumerOpts     = flag.String("consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	nsqdTCPAddrs     = flag.String("nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
-	lookupdHTTPAddrs = flag.String("lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-
-	// Kafka:
-	kafkaMdamBroker = flag.String("kafka-mdam-broker", "", "tcp address for kafka, for MetricDataArray messages, msgp encoded")
 
 	// Profiling, instrumentation and logging:
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
@@ -157,6 +145,8 @@ func main() {
 		}
 		inCarbon.ConfigSetup()
 		inKafkaMdm.ConfigSetup()
+		inKafkaMdam.ConfigSetup()
+		inNSQ.ConfigSetup()
 		clNSQ.ConfigSetup()
 		conf.ParseAll()
 	}
@@ -186,39 +176,34 @@ func main() {
 		fmt.Printf("metrics_tank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
+
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
 
+	inCarbon.ConfigProcess()
+	inKafkaMdm.ConfigProcess(*instance)
+	inKafkaMdam.ConfigProcess(*instance)
+	inNSQ.ConfigProcess()
 	clNSQ.ConfigProcess()
+
+	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
+		log.Fatal(4, "you should enable at least 1 input plugin")
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
+
 	stats, err := helper.New(true, *statsdAddr, *statsdType, "metric_tank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
+
 	runtime.SetBlockProfileRate(*blockProfileRate)
 	runtime.MemProfileRate = *memProfileRate
 	mdata.InitMetrics(stats)
-
-	if *channel == "" {
-		rand.Seed(time.Now().UnixNano())
-		*channel = fmt.Sprintf("metric_tank%06d#ephemeral", rand.Int()%999999)
-	}
-
-	if *topic == "" {
-		log.Fatal(4, "--topic is required")
-	}
-
-	if *nsqdTCPAddrs == "" && *lookupdHTTPAddrs == "" {
-		log.Fatal(4, "--nsqd-tcp-address or --lookupd-http-address required")
-	}
-	if *nsqdTCPAddrs != "" && *lookupdHTTPAddrs != "" {
-		log.Fatal(4, "use --nsqd-tcp-address or --lookupd-http-address not both")
-	}
 
 	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
 	if err != nil {
@@ -295,34 +280,22 @@ func main() {
 	}
 	store.InitMetrics(stats)
 
-	nsqdAdds := strings.Split(*nsqdTCPAddrs, ",")
-	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
-		nsqdAdds = []string{}
-	}
+	// note. all these New functions must either return a valid instance or call log.Fatal
 
-	lookupdAdds := strings.Split(*lookupdHTTPAddrs, ",")
-	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
-		lookupdAdds = []string{}
-	}
-
-	var nsq *inNSQ.NSQ
-	var kafkaMdm *inKafkaMdm.KafkaMdm
-	var kafkaMdam *inKafkaMdam.KafkaMdam
-	var carbon *inCarbon.Carbon
-
-	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
-		nsq = inNSQ.New(*consumerOpts, *nsqdTCPAddrs, *lookupdHTTPAddrs, *topic, *channel, *maxInFlight, *concurrency, stats)
+	if inCarbon.Enabled {
+		inCarbonInst = inCarbon.New(stats)
 	}
 
 	if inKafkaMdm.Enabled {
-		kafkaMdm = inKafkaMdm.New(*instance, stats)
-	}
-	if *kafkaMdamBroker != "" {
-		kafkaMdam = inKafkaMdam.New(*kafkaMdamBroker, "mdam", *instance, stats)
+		inKafkaMdmInst = inKafkaMdm.New(stats)
 	}
 
-	if inCarbon.Enabled {
-		carbon = inCarbon.New(stats)
+	if inKafkaMdam.Enabled {
+		inKafkaMdamInst = inKafkaMdam.New(stats)
+	}
+
+	if inNSQ.Enabled {
+		inNSQInst = inNSQ.New(stats)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -336,20 +309,20 @@ func main() {
 
 	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
 
-	if *nsqdTCPAddrs != "" || *lookupdHTTPAddrs != "" {
-		nsq.Start(metrics, defCache, usg)
-	}
-	if kafkaMdm != nil {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		kafkaMdm.Start(metrics, defCache, usg)
-	}
-	if kafkaMdam != nil {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		kafkaMdam.Start(metrics, defCache, usg)
+	if inCarbon.Enabled {
+		inCarbonInst.Start(metrics, defCache, usg)
 	}
 
-	if carbon != nil {
-		carbon.Start(metrics, defCache, usg)
+	if inKafkaMdm.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
+		inKafkaMdmInst.Start(metrics, defCache, usg)
+	}
+	if inKafkaMdam.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
+		inKafkaMdamInst.Start(metrics, defCache, usg)
+	}
+	if inNSQ.Enabled {
+		inNSQInst.Start(metrics, defCache, usg)
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
@@ -385,25 +358,25 @@ func main() {
 
 	waiters := make([]waiter, 0)
 
-	if nsq != nil {
+	if inNSQ.Enabled {
 		waiters = append(waiters, waiter{
 			"nsq",
-			nsq,
-			nsq.StopChan,
+			inNSQInst,
+			inNSQInst.StopChan,
 		})
 	}
-	if kafkaMdm != nil {
+	if inKafkaMdm.Enabled {
 		waiters = append(waiters, waiter{
 			"kafka-mdm",
-			kafkaMdm,
-			kafkaMdm.StopChan,
+			inKafkaMdmInst,
+			inKafkaMdmInst.StopChan,
 		})
 	}
-	if kafkaMdam != nil {
+	if inKafkaMdam.Enabled {
 		waiters = append(waiters, waiter{
 			"kafka-mdam",
-			kafkaMdam,
-			kafkaMdam.StopChan,
+			inKafkaMdamInst,
+			inKafkaMdamInst.StopChan,
 		})
 	}
 	<-sigChan

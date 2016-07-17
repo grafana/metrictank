@@ -31,7 +31,10 @@ var LogLevel int
 var Enabled bool
 var broker string
 var topic string
+var brokers []string
+var topics []string
 var group string
+var config *cluster.Config
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -42,11 +45,11 @@ func ConfigSetup() {
 	globalconf.Register("kafka-mdm-in", inKafkaMdm)
 }
 
-func New(instance string, stats met.Backend) *KafkaMdm {
-	brokers := []string{broker}
-	topics := []string{topic}
+func ConfigProcess(instance string) {
+	brokers = []string{broker}
+	topics = []string{topic}
 
-	config := cluster.NewConfig()
+	config = cluster.NewConfig()
 	//config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.ClientID = instance + "-mdm"
 	config.Group.Return.Notifications = true
@@ -60,6 +63,9 @@ func New(instance string, stats met.Backend) *KafkaMdm {
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
 	}
+}
+
+func New(stats met.Backend) *KafkaMdm {
 	consumer, err := cluster.NewConsumer(brokers, group, topics, config)
 	if err != nil {
 		log.Fatal(2, "kafka-mdm failed to start consumer: %s", err)
