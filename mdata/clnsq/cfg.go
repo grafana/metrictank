@@ -45,6 +45,9 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
+	if !Enabled {
+		return
+	}
 	if Topic == "" {
 		log.Fatal(4, "topic for nsq-cluster cannot be empty")
 	}

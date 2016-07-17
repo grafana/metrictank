@@ -41,6 +41,9 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
+	if !Enabled {
+		return
+	}
 	var err error
 	schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
@@ -56,7 +59,7 @@ func ConfigProcess() {
 		}
 	}
 	if !defaultFound {
-		// good graphite health (not sure what graphite does if there's no .*
+		// good graphite health (not sure what graphite does if there's no .*)
 		// but we definitely need to always be able to determine which interval to use
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}

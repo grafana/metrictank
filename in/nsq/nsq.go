@@ -57,6 +57,9 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
+	if !Enabled {
+		return
+	}
 	if channel == "" {
 		rand.Seed(time.Now().UnixNano())
 		channel = fmt.Sprintf("metrictank%06d#ephemeral", rand.Int()%999999)

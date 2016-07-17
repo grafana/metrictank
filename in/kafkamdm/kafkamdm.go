@@ -46,6 +46,9 @@ func ConfigSetup() {
 }
 
 func ConfigProcess(instance string) {
+	if !Enabled {
+		return
+	}
 	brokers = []string{broker}
 	topics = []string{topic}
 
