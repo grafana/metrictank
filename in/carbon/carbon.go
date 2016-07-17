@@ -35,8 +35,8 @@ var schemas persister.WhisperSchemas
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
-	inCarbon.StringVar(&addr, "addr", ":2003default", "")
-	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "")
+	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
+	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
 
