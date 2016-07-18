@@ -54,7 +54,7 @@ var (
 	// Misc:
 	showVersion = flag.Bool("version", false, "print version string")
 	listenAddr  = flag.String("listen", ":6060", "http listener address.")
-	confFile    = flag.String("config", "/etc/raintank/metric_tank.ini", "configuration file path")
+	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
 
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
@@ -173,13 +173,15 @@ func main() {
 	}
 
 	if *showVersion {
-		fmt.Printf("metrics_tank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
 
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
+
+	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
@@ -196,7 +198,7 @@ func main() {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
 
-	stats, err := helper.New(true, *statsdAddr, *statsdType, "metric_tank", strings.Replace(hostname, ".", "_", -1))
+	stats, err := helper.New(true, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
@@ -300,8 +302,6 @@ func main() {
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
-	log.Info("Metric tank starting. Built from %s - Go version %s", GitHash, runtime.Version())
-
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 	defCache = defcache.New(defs, stats)
@@ -337,8 +337,8 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                        // metric-tank native api which deals with ID's, not target strings
-		http.HandleFunc("/get/", get(store, defCache, finalSettings, logMinDur))                       // metric-tank native api which deals with ID's, not target strings
+		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                        // metrictank native api which deals with ID's, not target strings
+		http.HandleFunc("/get/", get(store, defCache, finalSettings, logMinDur))                       // metrictank native api which deals with ID's, not target strings
 		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur)))  // traditional graphite api, still lacking a lot of the api
 		http.HandleFunc("/render/", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api, still lacking a lot of the api
 		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))

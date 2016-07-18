@@ -13,11 +13,11 @@ mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/raintank
 
-cp ${BASE}/config/ubuntu/trusty/etc/raintank/metric_tank.ini ${BUILD}/etc/raintank/
+cp ${BASE}/config/ubuntu/trusty/etc/raintank/metrictank.ini ${BUILD}/etc/raintank/
 cp ${BUILD}/metrictank ${BUILD}/usr/sbin/
 
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
-  --deb-upstart ${BASE}/config/ubuntu/trusty/etc/init/metric_tank \
+  --deb-upstart ${BASE}/config/ubuntu/trusty/etc/init/metrictank \
   -C ${BUILD} -p ${PACKAGE_NAME} .
 

@@ -20,7 +20,7 @@ import (
 // this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
 
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
 	mdata.InitMetrics(stats)
@@ -155,7 +155,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 }
 
 func BenchmarkHandler_HandleMessage(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
 

@@ -69,7 +69,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 }
 
 func TestAggMetric(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	CluStatus = NewClusterStatus("default", false)
 	InitMetrics(stats)
 
@@ -146,11 +146,11 @@ func TestAggMetric(t *testing.T) {
 // 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
 // total -> 13 MB
 // go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out
-// go tool pprof -inuse_space metric_tank.test mem.out -> shows 25 MB in use
+// go tool pprof -inuse_space metrictank.test mem.out -> shows 25 MB in use
 
 // TODO update once we clean old data, then we should look at numChunks
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	InitMetrics(stats)
 	CluStatus = NewClusterStatus("default", false)
 	// we will store 10s metrics in 5 chunks of 2 hours
@@ -185,7 +185,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 }
 
 func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	InitMetrics(stats)
 
 	chunkSpan := uint32(600)
@@ -221,7 +221,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 }
 
 func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	InitMetrics(stats)
 
 	chunkSpan := uint32(600)
@@ -257,7 +257,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 }
 
 func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	InitMetrics(stats)
 
 	chunkSpan := uint32(600)

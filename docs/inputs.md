@@ -30,6 +30,6 @@ It only exists to compare performance numbers against kafka-mdm, and make mdm as
 
 
 ## nsq (deprecated)
-will be removed. NSQ does not guarantee ordering. Metric-tank needs ordered input for aggregations to work correctly,
+will be removed. NSQ does not guarantee ordering. Metrictank needs ordered input for aggregations to work correctly,
 and also for the compression to work optimally. The NSQ input "mostly works": we used to use it, but any out of order points
 will flat out be dropped on the floor.
