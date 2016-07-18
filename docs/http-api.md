@@ -1,32 +1,106 @@
-## data querying
+Note that some of the endpoints rely on being a fed a proper Org-Id.
+You may not want to expose directly to people if they can control that header.
+Instead, you may want to run [graphite-raintank](https://github.com/raintank/graphite-raintank) in front,
+which will authenticate the request and set the proper header, assuring security.
 
-* `http://localhost:6063/get` either POST or GET, with the following parameters:
-  * `target` mandatory. can be specified multiple times to request several series. Supported formats:
-    * simply the raw id of a metric. like `1.2345foobar`
-    * `consolidateBy(<id>,'<function>')`. single quotes only. accepted functions are avg, average, last, min, max, sum.
-       example: `consolidateBy(1.2345foobar,'average')`.
-  * `maxDataPoints`: max points to be returned. runs runtime consolidation when needed. optional
-  * `from` and `to` unix timestamps. optional
-    * from is inclusive, to is exclusive. you can also use 'until' but to takes precedence.
-    * so from=x, to=y returns data that can include x and y-1 but not y.
-    * from defaults to now-24h, to to now+1.
-    * from can also be a human friendly pattern like -10min or -7d
+## app status
 
-* the response will id the series by the target used to request them
+```
+GET /
+POST /
+```
 
-note:
-* it just serves up the data that it has, in timestamp ascending order. it does no effort to try to fill in gaps.
-* no support for wildcards, patterns, "magic" time specs like "-10min" etc.
-* it is assumed that authorisation (by org-id) has already been performed.  (the graphite-raintank plugin does this)
+returns:
 
-## other useful endpoints exemplified through curl commands:
+* `200 OK` if the node is primary or a warmed up secondary (`warmupPeriod` has elapsed)
+* `503 Service not ready` if the node is secondary and not yet warmed up.
 
-* `curl http://localhost:6063/` app status (OK if either primary or secondary that has been warmed up). good for loadbalancers.
-* `curl http://localhost:6063/cluster` cluster status
-* `curl -X POST -d primary=false http://localhost:6063/cluster` set primary true/false
 
-## graphite api
-* `/render` has a very, very limited subset of the graphite render api. basically you can specify targets by their graphite key, set from, to and maxDataPoints, and use consolidateBy.
-No other function or parameter is currently supported.  Also we don't check org-id so don't expose this publically
-* `/metrics/index.json` is like graphite.  Don't expose this publically
+
+## Walk the metrics tree and return every metric found as a sorted JSON array, for the given org (or public)
+
+```
+GET /metrics/index.json
+POST /metrics/index.json
+```
+
+* header `X-Org-Id` required
+
+If orgId is -1, returns the metrics for all orgs. (but you can't neccessarily distinguish which org they're from)
+If it is not, returns metrics for the given org, as well as org -1.
+
+## Find all metrics visible to the given org (or public)
+
+```
+GET /metrics/find
+POST /metrics/find
+```
+
+* header `X-Org-Id` required
+* query (required): can be an id, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
+* format: json, treejson, completer. (defaults to json)
+* jsonp
+
+the completer format is for completion UI's such as graphite-web.
+json and treejson are the same.
+
+## graphite query api
+
+This is the early beginning of a graphite-web/graphite-api replacement. It only returns JSON output
+This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-raintank in front of metrictank, for now.
+
+```
+GET /render
+POST /render
+```
+
+* header `X-Org-Id` required
+* maxDataPoints: int (default: 800)
+* target: mandatory. one or more metric names or patterns, like graphite.  
+  note: **no graphite functions are currently supported** except that
+  you can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see consolidation.md
+* from: see tspec.md (default: 24 ago) (exclusive)
+* to/until : see tspec.md (default: now) (inclusive)
+
+## low-level data query api 
+
+This query API is for applications that already know the UUID's of the metrics they're looking for.
+It currently is primarily used by [graphite-raintank](https://github.com/raintank/graphite-raintank)
+It returns JSON output in the same format as the graphite query api.
+
+```
+GET /get
+POST /get
+```
+
+* header `X-Org-Id` required
+* maxDataPoints: int (default: 800)
+* target: mandatory. one or more UUID's of metrics. You can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see consolidation.md
+* from: see tspec.md (default: 24 ago) (inclusive)
+* to/until : see tspec.md (default: now) (exclusive)
+
+
+## cluster status
+
+```
+GET /cluster
+```
+
+returns a json document with the following fields:
+
+* instance name
+* primary status
+* primary status last change timestamp
+
+## change primary role
+
+```
+POST /cluster
+```
+
+parameter values :
+
+* `primary true|false`
+
+Sets the primary status to this node to true or false.
 
