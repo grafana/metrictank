@@ -146,6 +146,9 @@ func TestUsageMinusOne(t *testing.T) {
 	mock.Add(29 * time.Second)
 	assertLen(59, aggmetrics, 0, t)
 	mock.Add(time.Second)
+	// not very pretty.. but an easy way to assure that the Usage Reporter
+	// goroutine has some time to push the results into our fake aggmetrics
+	time.Sleep(20 * time.Millisecond)
 	assertLen(60, aggmetrics, 6, t)
 	assert(60, aggmetrics, 1, "metrictank.usage-minus1.numSeries", 60, 1, t)
 	assert(60, aggmetrics, 1, "metrictank.usage-minus1.numPoints", 60, 1, t)
