@@ -12,7 +12,7 @@ as well as data chunking to lower the load on cassandra.
 
 ## status
 
-While [raintank](raintank.io) has been running it in production since december 2015, there are still plenty of kinks to work out
+While [raintank](raintank.io) has been running metrictank in production since december 2015, there are still plenty of kinks to work out
 and bugs to fix.  It should be considered an *alpha* project.
 
 ## limitations
@@ -21,11 +21,11 @@ and bugs to fix.  It should be considered an *alpha* project.
   So tenants could negatively impact the performance or availability for others.
 * no sharding/partitioning mechanism built into metrictank itself.  
   Cassandra of course does this on the data storage level
-* master promotion is a manual process.
+* runtime master promotions (for clusters) are a manual process.
 * no computation locality:   
   - we pull in (raw or pre-rolled-up) data first from cassandra
-  - then process/consolidate it in metrictank
-  - further processing/aggregation can happen in Graphite.  
+  - then process and possibly consolidate it further in metrictank
+  - further processing/aggregation (averaging series together etc) can happen in Graphite.  
   At a certain scale we will need to move the computation to the data, but we don't have that problem yet,  
   though we do plan to move more of the graphite logic into metrictank and further develop graphite-ng.
 * many of the key datastructures need to be redesigned for better performance and lower GC pressure.  
@@ -55,14 +55,25 @@ cause that's how we roll.
 
 #### graphite integration
 
-https://github.com/raintank/graphite-raintank
+Graphite is a first class citizen for metrictank.  You can use the [graphite-raintank](https://github.com/raintank/graphite-raintank) plugin, although
+at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.
 
 
 #### roll-ups
 
+Metrictank can store rollups for all your series.  Each "rollup" is actually 4 series: min/max/sum/count (from which it can also compute the average at runtime).
+
 #### in-memory component for hot data
 
+Metrictank is essentially a (clustered) write-back cache for cassandra, with configurable retention in RAM.  Most of your queries (for recent data) will come out of
+RAM and will be quite fast.  Thanks to dropping RAM prices and the gorilla compression, you can hold a lot of data in RAM this way.
+
 #### multi-tenancy
+
+Metrictank supports multiple tenants (e.g. users) that each have their own isolated data within the system, and can't see other users' data.
+Note:
+* you can simply use it as a single-tenant system by only using 1 organisation
+* you can also share data that every tenant can see by publish as org -1
 
 #### ingestion options:
 
@@ -75,7 +86,11 @@ metrics2.0, kafka, carbon, json or msgpack over http.
 #### tagging & metrics2.0
 
 While Metrictank takes in tag metadata in the form of [metrics2.0](http://metrics20.org/) and indexes it, it is not exposed yet for querying.
-Adopting metrics2.0 fully will help with picking better defaults for consolidation.
+There will be various benefits in adopting metrics2.0 fully (better choices for consolidation, data conversion, supplying unit information to Grafana, etc)
+
+#### sharding / partitioning
+
+As mentioned above Cassandra already does that for the storage layer, but at a certain point we'll need it for the memory layer as well.
 
 ## Help, more info, documentation, ...
 
