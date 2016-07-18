@@ -17,7 +17,6 @@ import (
 var (
 	hostPool    hostpool.HostPool
 	producers   map[string]*nsq.Producer
-	Enabled     bool
 	nsqdAdds    []string
 	lookupdAdds []string
 	topic       string
@@ -34,7 +33,6 @@ type ClNSQ struct {
 }
 
 func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
-	Enabled = clNSQ.Enabled
 	nsqdAdds = clNSQ.NsqdAdds
 	lookupdAdds = clNSQ.LookupdAdds
 	topic = clNSQ.Topic
