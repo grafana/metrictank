@@ -18,6 +18,8 @@ cp ${BUILD}/metrictank ${BUILD}/usr/sbin/
 
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
-  --deb-upstart ${BASE}/config/ubuntu/trusty/etc/init/metric_tank \
+  --deb-upstart ${BASE}/config/ubuntu/trusty/etc/init/metrictank.conf \
+  --replaces metric-tank --provides metric-tank \
+  --conflicts metric-tank \
   -C ${BUILD} -p ${PACKAGE_NAME} .
 
