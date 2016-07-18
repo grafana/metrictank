@@ -1,0 +1,19 @@
+[Unit]
+Description=Starts and stops a single metrictank instance on this system
+Documentation=https://github.com/raintank/metrictank/tree/master/docs
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+Restart=on-failure
+WorkingDirectory=/var/run/metrictank
+ExecStart=/usr/sbin/metrictank -config=/etc/raintank/metrictank.ini
+LimitNOFILE=102400
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+
