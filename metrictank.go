@@ -307,6 +307,14 @@ func main() {
 	defCache = defcache.New(defs, stats)
 	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
 
+	handlers := make([]mdata.ClusterHandler, 0)
+	if clNSQ.Enabled {
+		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
+		handlers = append(handlers, clNSQInst)
+	}
+
+	mdata.InitCluster(stats, handlers...)
+
 	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	if inCarbon.Enabled {
@@ -326,14 +334,6 @@ func main() {
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
-
-	handlers := make([]mdata.ClusterHandler, 0)
-	if clNSQ.Enabled {
-		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
-		handlers = append(handlers, clNSQInst)
-	}
-
-	mdata.InitCluster(stats, handlers...)
 
 	go func() {
 		http.HandleFunc("/", appStatus)
