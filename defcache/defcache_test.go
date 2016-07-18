@@ -8,7 +8,7 @@ import (
 )
 
 func TestAdd(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrics_tank", "")
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	defCache := New(metricdef.NewDefsMock(), stats)
 
 	assert := func(def *schema.MetricDefinition, id string, orgId int, name, metric string, interval int, unit, tt, tag1, tag2 string) {

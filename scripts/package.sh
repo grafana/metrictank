@@ -13,7 +13,7 @@ mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/raintank
 
-cp ${BASE}/config/ubuntu/trusty/etc/raintank/metric_tank.ini ${BUILD}/etc/raintank/
+cp ${BASE}/config/ubuntu/trusty/etc/raintank/metrictank.ini ${BUILD}/etc/raintank/
 cp ${BUILD}/metrictank ${BUILD}/usr/sbin/
 
 fpm -s dir -t deb \

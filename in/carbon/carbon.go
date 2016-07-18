@@ -30,18 +30,22 @@ type Carbon struct {
 var Enabled bool
 var addr string
 var schemasFile string
+var schemas persister.WhisperSchemas
 
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
-	inCarbon.StringVar(&addr, "addr", ":2003default", "")
-	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "")
+	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
+	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
 
-func New(stats met.Backend) *Carbon {
-
-	schemas, err := persister.ReadWhisperSchemas(schemasFile)
+func ConfigProcess() {
+	if !Enabled {
+		return
+	}
+	var err error
+	schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
 		log.Fatal(4, "can't read schemas file %q: %s", schemasFile, err.Error())
 	}
@@ -55,11 +59,14 @@ func New(stats met.Backend) *Carbon {
 		}
 	}
 	if !defaultFound {
-		// good graphite health (not sure what graphite does if there's no .*
+		// good graphite health (not sure what graphite does if there's no .*)
 		// but we definitely need to always be able to determine which interval to use
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}
 
+}
+
+func New(stats met.Backend) *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		log.Fatal(4, err.Error())
