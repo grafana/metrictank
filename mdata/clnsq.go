@@ -9,20 +9,14 @@ import (
 	"github.com/bitly/go-hostpool"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
-	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
+	cfg "github.com/raintank/metrictank/mdata/clnsq"
 	"github.com/raintank/misc/instrumented_nsq"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
-	hostPool    hostpool.HostPool
-	producers   map[string]*nsq.Producer
-	nsqdAdds    []string
-	lookupdAdds []string
-	topic       string
-	channel     string
-	pCfg        *nsq.Config
-	cCfg        *nsq.Config
+	hostPool  hostpool.HostPool
+	producers map[string]*nsq.Producer
 )
 
 type ClNSQ struct {
@@ -33,29 +27,22 @@ type ClNSQ struct {
 }
 
 func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
-	nsqdAdds = clNSQ.NsqdAdds
-	lookupdAdds = clNSQ.LookupdAdds
-	topic = clNSQ.Topic
-	channel = clNSQ.Channel
-	pCfg = clNSQ.PCfg
-	cCfg = clNSQ.CCfg
-
 	// producers
-	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
+	hostPool = hostpool.NewEpsilonGreedy(cfg.NsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
 
-	for _, addr := range nsqdAdds {
-		producer, err := nsq.NewProducer(addr, pCfg)
+	for _, addr := range cfg.NsqdAdds {
+		producer, err := nsq.NewProducer(addr, cfg.PCfg)
 		if err != nil {
-			log.Fatal(4, "failed creating producer %s", err.Error())
+			log.Fatal(4, "nsq-cluster failed creating producer %s", err.Error())
 		}
 		producers[addr] = producer
 	}
 
 	// consumers
-	consumer, err := insq.NewConsumer(topic, channel, cCfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(cfg.Topic, cfg.Channel, cfg.CCfg, "metric_persist.%s", stats)
 	if err != nil {
-		log.Fatal(4, "Failed to create NSQ consumer. %s", err)
+		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
 	c := &ClNSQ{
 		in:       make(chan SavedChunk),
@@ -67,15 +54,15 @@ func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
-	err = consumer.ConnectToNSQDs(nsqdAdds)
+	err = consumer.ConnectToNSQDs(cfg.NsqdAdds)
 	if err != nil {
-		log.Fatal(4, "failed to connect to NSQDs. %s", err)
+		log.Fatal(4, "nsq-cluster failed to connect to NSQDs. %s", err)
 	}
-	log.Info("persist consumer connected to nsqd")
+	log.Info("nsq-cluster persist consumer connected to nsqd")
 
-	err = consumer.ConnectToNSQLookupds(lookupdAdds)
+	err = consumer.ConnectToNSQLookupds(cfg.LookupdAdds)
 	if err != nil {
-		log.Fatal(4, "failed to connect to NSQLookupds. %s", err)
+		log.Fatal(4, "nsq-cluster failed to connect to NSQLookupds. %s", err)
 	}
 	go c.run()
 	return c
@@ -116,11 +103,11 @@ func (c *ClNSQ) flush() {
 	c.buf = nil
 
 	go func() {
-		log.Debug("CLU sending %d batch metricPersist messages", len(msg.SavedChunks))
+		log.Debug("CLU nsq-cluster sending %d batch metricPersist messages", len(msg.SavedChunks))
 
 		data, err := json.Marshal(&msg)
 		if err != nil {
-			log.Fatal(4, "failed to marshal persistMessage to json.")
+			log.Fatal(4, "CLU nsq-cluster failed to marshal persistMessage to json.")
 		}
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(PersistMessageBatchV1))
@@ -134,12 +121,12 @@ func (c *ClNSQ) flush() {
 			// will result in this loop repeating forever until we successfully publish our msg.
 			hostPoolResponse := hostPool.Get()
 			prod := producers[hostPoolResponse.Host()]
-			err = prod.Publish(topic, buf.Bytes())
+			err = prod.Publish(cfg.Topic, buf.Bytes())
 			// Hosts that are marked as dead will be retried after 30seconds.  If we published
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)
 			if err != nil {
-				log.Warn("publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+				log.Warn("CLU nsq-cluster publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
 			} else {
 				sent = true
 			}

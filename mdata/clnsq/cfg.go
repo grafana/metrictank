@@ -67,7 +67,7 @@ func ConfigProcess() {
 	PCfg.UserAgent = "metrictank-cluster"
 	err := app.ParseOpts(PCfg, ProducerOpts)
 	if err != nil {
-		log.Fatal(4, "failed to parse nsq producer options. %s", err)
+		log.Fatal(4, "nsq-cluster: failed to parse nsq producer options. %s", err)
 	}
 
 	// consumer
@@ -75,7 +75,7 @@ func ConfigProcess() {
 	CCfg.UserAgent = "metrictank-cluster"
 	err = app.ParseOpts(CCfg, ConsumerOpts)
 	if err != nil {
-		log.Fatal(4, "failed to parse nsq consumer options. %s", err)
+		log.Fatal(4, "nsq-cluster: failed to parse nsq consumer options. %s", err)
 	}
 	CCfg.MaxInFlight = MaxInFlight
 }

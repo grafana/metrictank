@@ -29,6 +29,7 @@ import (
 	inNSQ "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
+	clKafka "github.com/raintank/metrictank/mdata/clkafka"
 	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
 	"github.com/raintank/metrictank/metricdef"
 	"github.com/raintank/metrictank/usage"
@@ -41,7 +42,8 @@ var (
 	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
 	inKafkaMdamInst *inKafkaMdam.KafkaMdam
 	inNSQInst       *inNSQ.NSQ
-	clNSQInst *mdata.ClNSQ
+	clKafkaInst     *mdata.ClKafka
+	clNSQInst       *mdata.ClNSQ
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -148,6 +150,7 @@ func main() {
 		inKafkaMdam.ConfigSetup()
 		inNSQ.ConfigSetup()
 		clNSQ.ConfigSetup()
+		clKafka.ConfigSetup()
 		conf.ParseAll()
 	}
 
@@ -188,6 +191,7 @@ func main() {
 	inKafkaMdam.ConfigProcess(*instance)
 	inNSQ.ConfigProcess()
 	clNSQ.ConfigProcess()
+	clKafka.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -311,6 +315,10 @@ func main() {
 	if clNSQ.Enabled {
 		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
 		handlers = append(handlers, clNSQInst)
+	}
+	if clKafka.Enabled {
+		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
+		handlers = append(handlers, clKafkaInst)
 	}
 
 	mdata.InitCluster(stats, handlers...)
