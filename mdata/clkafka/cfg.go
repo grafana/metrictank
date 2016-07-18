@@ -50,6 +50,7 @@ func ConfigProcess(instance string) {
 	PConfig.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack the message
 	PConfig.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
 	PConfig.Producer.Compression = sarama.CompressionNone
+	PConfig.ClientID = instance + "-cluster"
 	err = PConfig.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-cluster invalid producer config: %s", err)
