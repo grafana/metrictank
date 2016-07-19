@@ -12,3 +12,6 @@ currently those all just stored individually in the radix tree and trigram index
 in the future, we might just index the metric names and then have a separate structure to resolve a name to its multiple metricdefs, which could be cheaper.
 
 * We're also seeing ES blocking due to the metadata indexing around the 100k/s mark.  Both can and will be optimized more.
+
+
+prefill at startup

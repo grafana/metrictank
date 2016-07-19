@@ -2,6 +2,11 @@ All input options - except for the carbon input - use the [metrics 2.0](http://m
 See the [schema repository](https://github.com/raintank/schema) for more details.
 
 
+## how to send data to MT
+
+see fakemetrics, tsdb-gw, carbon
+
+
 ## carbon
 useful for traditional graphite plaintext protocol.
 

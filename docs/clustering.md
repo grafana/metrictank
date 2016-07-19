@@ -7,6 +7,8 @@ for clustering and HA of the underlying storage, we of course can simply rely on
 
 for metrictank itself you can achieve redundancy and fault tolerance by running multiple instances.
 One of them needs to have the primary role, and the role can dynamically be reassigned (see http api docs)
+There's 2 transports for clustering (kafka and NSQ), and it's just used to send messages by the primary to the others,
+about which chunks have been saved to cassandra.
 Instances should not become primary when they have incomplete chunks (though in worst case scenario, you might
 have to do just that).  So they expose metrics that describe when they are ready to be upgraded.
 Notes:
