@@ -2,6 +2,7 @@ package kafkamdam
 
 import (
 	"flag"
+	"strings"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -27,9 +28,9 @@ type KafkaMdam struct {
 }
 
 var Enabled bool
-var broker string
-var topic string
+var brokerStr string
 var brokers []string
+var topicStr string
 var topics []string
 var group string
 var config *cluster.Config
@@ -37,8 +38,8 @@ var config *cluster.Config
 func ConfigSetup() {
 	inKafkaMdam := flag.NewFlagSet("kafka-mdam-in", flag.ExitOnError)
 	inKafkaMdam.BoolVar(&Enabled, "enabled", false, "")
-	inKafkaMdam.StringVar(&broker, "broker", "kafka:9092", "tcp address for kafka")
-	inKafkaMdam.StringVar(&topic, "topic", "mdam", "kafka topic")
+	inKafkaMdam.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
+	inKafkaMdam.StringVar(&topicStr, "topics", "mdam", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdam.StringVar(&group, "group", "group1", "kafka consumer group")
 	globalconf.Register("kafka-mdam-in", inKafkaMdam)
 }
@@ -47,8 +48,8 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
-	brokers = []string{broker}
-	topics = []string{topic}
+	brokers = strings.Split(brokerStr, ",")
+	topics = strings.Split(topicStr, ",")
 
 	config := cluster.NewConfig()
 	// see https://github.com/raintank/metrictank/issues/236

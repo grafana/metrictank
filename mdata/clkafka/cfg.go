@@ -3,6 +3,7 @@ package clkafka
 import (
 	"flag"
 	"log"
+	"strings"
 
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
@@ -10,8 +11,7 @@ import (
 )
 
 var Enabled bool
-var broker string
-var topic string
+var brokerStr string
 var Brokers []string
 var Topic string
 var Topics []string
@@ -22,7 +22,7 @@ var PConfig *sarama.Config
 func ConfigSetup() {
 	inKafkaMdam := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
 	inKafkaMdam.BoolVar(&Enabled, "enabled", false, "")
-	inKafkaMdam.StringVar(&broker, "broker", "kafka:9092", "tcp address for kafka")
+	inKafkaMdam.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	inKafkaMdam.StringVar(&Topic, "topic", "metricpersist", "kafka topic")
 	inKafkaMdam.StringVar(&Group, "group", "group1", "kafka consumer group")
 	globalconf.Register("kafka-cluster", inKafkaMdam)
@@ -32,7 +32,7 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
-	Brokers = []string{broker}
+	Brokers = strings.Split(brokerStr, ",")
 	Topics = []string{Topic}
 
 	CConfig = cluster.NewConfig()

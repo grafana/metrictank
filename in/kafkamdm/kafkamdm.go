@@ -2,6 +2,7 @@ package kafkamdm
 
 import (
 	"flag"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,9 +30,9 @@ type KafkaMdm struct {
 
 var LogLevel int
 var Enabled bool
-var broker string
-var topic string
+var brokerStr string
 var brokers []string
+var topicStr string
 var topics []string
 var group string
 var config *cluster.Config
@@ -39,8 +40,8 @@ var config *cluster.Config
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
-	inKafkaMdm.StringVar(&broker, "broker", "kafka:9092", "tcp address for kafka")
-	inKafkaMdm.StringVar(&topic, "topic", "mdm", "kafka topic")
+	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
+	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&group, "group", "group1", "kafka consumer group")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm)
 }
@@ -49,8 +50,8 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
-	brokers = []string{broker}
-	topics = []string{topic}
+	brokers = strings.Split(brokerStr, ",")
+	topics = strings.Split(topicStr, ",")
 
 	config = cluster.NewConfig()
 	// see https://github.com/raintank/metrictank/issues/236
