@@ -34,6 +34,11 @@ https://github.com/raintank/chef_metric_tank
 
 TODO
 
+## set up cassandra
+
+You can have metrictank initialize Cassandra with a schema without replication, good for development setups.
+Or you may want to tweak the schema yourself. See schema.md
+
 ## configuration
 
 See the [example config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) which guides you through the various options
