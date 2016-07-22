@@ -10,16 +10,12 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     ts int,
     data blob,
     PRIMARY KEY (key, ts)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (ts DESC)
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.DateTieredCompactionStrategy'}
+) WITH CLUSTERING ORDER BY (ts DESC)
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND read_repair_chance = 0.0
-    AND dclocal_read_repair_chance = 0
 ```
 
-These settings are good for development and geared towards Cassandra 2.2.3
-Note that `COMPACT STORAGE` is [discouraged as of Cassandra 3.0](http://www.datastax.com/2015/12/storage-engine-30)
+These settings are good for development and geared towards Cassandra 3.0
 
 For clustered scenarios, you may want to initialize Cassandra yourself with a schema like:
 
@@ -31,13 +27,9 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     ts int,
     data blob,
     PRIMARY KEY (key, ts)
-) WITH COMPACT STORAGE
-    AND CLUSTERING ORDER BY (ts DESC)
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.DateTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND read_repair_chance = 0.0
-    AND dclocal_read_repair_chance = 0;
-
+) WITH WITH CLUSTERING ORDER BY (ts DESC)
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 ```
 
 # write queues
