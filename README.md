@@ -6,13 +6,13 @@
 ## introduction
 *Metrictank is a multi-tenant, gorilla-inspired, cassandra-backed timeries database*
 
-metrictank is a timeseries database, inspired by the [Facebook gorilla paper](www.vldb.org/pvldb/vol8/p1816-teller.pdf).
+metrictank is a timeseries database, inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
 Most notably, it employs the float64 compression mechanism described in the paper to dramatically lower storage overhead,
 as well as data chunking to lower the load on cassandra.
 
 ## status
 
-While [raintank](raintank.io) has been running metrictank in production since december 2015, there are still plenty of kinks to work out
+While [raintank](http://raintank.io) has been running metrictank in production since december 2015, there are still plenty of kinks to work out
 and bugs to fix.  It should be considered an *alpha* project.
 
 ## limitations
