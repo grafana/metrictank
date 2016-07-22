@@ -84,6 +84,7 @@ var (
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
+	cqlProtocolVersion 	  = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	// Elasticsearch:
 	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
@@ -280,7 +281,7 @@ func main() {
 		go trigger.Run()
 	}
 
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize)
+	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cqlProtocolVersion)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
