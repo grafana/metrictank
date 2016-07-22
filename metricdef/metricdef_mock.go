@@ -17,7 +17,7 @@
 package metricdef
 
 import (
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type DefsMock struct {

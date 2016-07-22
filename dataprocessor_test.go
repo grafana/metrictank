@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 	"math"
 	"math/rand"
 	"testing"

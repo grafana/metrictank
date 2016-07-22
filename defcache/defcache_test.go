@@ -3,7 +3,7 @@ package defcache
 import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/metricdef"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 	"testing"
 )
 
@@ -11,7 +11,7 @@ func TestAdd(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	defCache := New(metricdef.NewDefsMock(), stats)
 
-	assert := func(def *schema.MetricDefinition, id string, orgId int, name, metric string, interval int, unit, tt, tag1, tag2 string) {
+	assert := func(def *schema.MetricDefinition, id string, orgId int, name, metric string, interval int, unit, mtype, tag1, tag2 string) {
 		if def.Id != id {
 			t.Fatalf("bad Id %q", def.Id)
 		}
@@ -30,8 +30,8 @@ func TestAdd(t *testing.T) {
 		if def.Unit != unit {
 			t.Fatalf("bad Unit %q", def.Unit)
 		}
-		if def.TargetType != tt {
-			t.Fatalf("bad TargetType %q", def.TargetType)
+		if def.Mtype != mtype {
+			t.Fatalf("bad Mtype %q", def.Mtype)
 		}
 		if len(def.Tags) != 2 || def.Tags[0] != tag1 || def.Tags[1] != tag2 {
 			t.Fatalf("bad Tags %q", def.Tags)
@@ -43,16 +43,16 @@ func TestAdd(t *testing.T) {
 		t.Fatalf("lookup for 'id' should return no results")
 	}
 	m := &schema.MetricData{
-		Id:         "id",
-		OrgId:      1,
-		Name:       "name",
-		Metric:     "metric",
-		Interval:   10,
-		Value:      1.5,
-		Unit:       "unit",
-		Time:       1234567890,
-		TargetType: "gauge",
-		Tags:       []string{"tag1", "tag2"},
+		Id:       "id",
+		OrgId:    1,
+		Name:     "name",
+		Metric:   "metric",
+		Interval: 10,
+		Value:    1.5,
+		Unit:     "unit",
+		Time:     1234567890,
+		Mtype:    "gauge",
+		Tags:     []string{"tag1", "tag2"},
 	}
 
 	defCache.Add(m)

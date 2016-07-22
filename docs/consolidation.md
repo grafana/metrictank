@@ -5,7 +5,7 @@ In metrictank, runtime consolidation works in concert with the rollup archives, 
 
 By default, metrictank will consolidate (at query time) like so:
 
-* max if targetType is `counter`.
+* max if mtype is `counter`.
 * avg for everything else.
 
 But you can override this (see http-api.md) to use avg, min, max, sum.

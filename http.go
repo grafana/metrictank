@@ -11,7 +11,7 @@ import (
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 	"math"
 	"net/http"
 	_ "net/http/pprof"

@@ -25,7 +25,7 @@ import (
 
 	elastigo "github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type DefsEs struct {
@@ -127,7 +127,7 @@ func NewDefsEs(addr, user, pass, indexName string, cb ResultCallback) (*DefsEs, 
 		                        "type": "string",
 		                        "index": "not_analyzed"
 		                    },
-		                    "target_type": {
+		                    "mtype": {
 		                        "type": "string",
 		                        "index": "not_analyzed"
 		                    },
