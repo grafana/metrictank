@@ -4,7 +4,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/metrictank/defcache"
 	"github.com/raintank/metrictank/mdata"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 	"sync"
 	"time"
 )
@@ -91,11 +91,11 @@ func (u *Usage) Report() {
 		Tags:     []string{},
 	}
 
-	report := func(name, unit, tt string, val float64, met *schema.MetricData) {
+	report := func(name, unit, mtype string, val float64, met *schema.MetricData) {
 		met.Name = name
 		met.Metric = name
 		met.Unit = unit
-		met.TargetType = tt
+		met.Mtype = mtype
 		met.Value = val
 		met.SetId()
 

@@ -12,7 +12,7 @@ import (
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/metricdef"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type FakeAggMetrics struct {

@@ -9,8 +9,8 @@ import (
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v0"
-	"gopkg.in/raintank/schema.v0/msg"
+	"gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 )
 
 // In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
@@ -62,14 +62,14 @@ func (in In) process(metric *schema.MetricData) {
 func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
 	// TODO reuse?
 	md := &schema.MetricData{
-		Name:       name,
-		Interval:   interval,
-		Value:      val,
-		Unit:       "unknown",
-		Time:       int64(ts),
-		TargetType: "gauge",
-		Tags:       []string{},
-		OrgId:      1, // admin org
+		Name:     name,
+		Interval: interval,
+		Value:    val,
+		Unit:     "unknown",
+		Time:     int64(ts),
+		Mtype:    "gauge",
+		Tags:     []string{},
+		OrgId:    1, // admin org
 	}
 	md.SetId()
 	in.metricsPerMessage.Value(int64(1))

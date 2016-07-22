@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/raintank/metrictank/batch"
-	"gopkg.in/raintank/schema.v0"
+	"gopkg.in/raintank/schema.v1"
 )
 
 // consolidator is a highlevel description of a point consolidation method
@@ -84,7 +84,7 @@ func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, e
 
 	if consolidateBy == "" {
 		consolidateBy = "avg"
-		if def.TargetType == "counter" {
+		if def.Mtype == "counter" {
 			consolidateBy = "max"
 		}
 	}
