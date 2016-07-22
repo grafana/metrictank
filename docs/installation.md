@@ -2,7 +2,7 @@
 
 ## dependencies
 
-* Cassandra. TODO version ? Mostly tested with Cassandra 2.2.3
+* Cassandra. We run and recommend 3.0.8 .  We used to run 2.2.3 which was fine too. See cassandra.md
 * Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
 * optionally a queue: Kafka 0.10 is reccomended, but 0.9 should work too.
 

@@ -1,4 +1,9 @@
-# schema initialisation
+# Cassandra version
+
+We run what is currently the latest version, 3.0.8, and recommend you do the same.
+It also works with 2.2 (we ran on 2.2.3 for a while), with some schema and compaction tweaks, see below.
+
+# schema
 
 by default, metrictank will initialize with the following settings:
 
@@ -31,6 +36,9 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 ```
+
+If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
+See [issue cassandra-9666](https://issues.apache.org/jira/browse/CASSANDRA-9666) for more information.
 
 # write queues
 
