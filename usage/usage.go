@@ -130,12 +130,12 @@ func (u *Usage) Report() {
 				// the reason we don't publish this with id -1 is that that would make it available to everyone
 				// and confuse people about which metrics it counts
 				met.OrgId = 1
-				report("metrictank.usage-minus1.numSeries", "metrics", "gauge", float64(len(stat.keys)), &met)
-				report("metrictank.usage-minus1.numPoints", "points", "counter", float64(stat.points), &met)
+				report("metrictank.usage-minus1.numSeries", "serie", "gauge", float64(len(stat.keys)), &met)
+				report("metrictank.usage-minus1.numPoints", "point", "counter", float64(stat.points), &met)
 			} else {
 				met.OrgId = org
-				report("metrictank.usage.numSeries", "metrics", "gauge", float64(len(stat.keys)), &met)
-				report("metrictank.usage.numPoints", "points", "counter", float64(stat.points), &met)
+				report("metrictank.usage.numSeries", "serie", "gauge", float64(len(stat.keys)), &met)
+				report("metrictank.usage.numPoints", "point", "counter", float64(stat.points), &met)
 			}
 		}
 	}

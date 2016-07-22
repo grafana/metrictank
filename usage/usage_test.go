@@ -62,11 +62,14 @@ func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, a
 	return 0, make([]iter.Iter, 0)
 }
 
-func idFor(org int, name string, tags []string) string {
+func idFor(org int, metric, unit, mtype string, tags []string, interval uint32) string {
 	md := schema.MetricData{
-		OrgId: org,
-		Name:  name,
-		Tags:  tags,
+		OrgId:    org,
+		Metric:   metric,
+		Unit:     unit,
+		Mtype:    mtype,
+		Tags:     tags,
+		Interval: int(interval),
 	}
 	md.SetId()
 	return md.Id
@@ -79,15 +82,15 @@ func assertLen(epoch int, aggmetrics *FakeAggMetrics, l int, t *testing.T) {
 	}
 	aggmetrics.Unlock()
 }
-func assert(epoch int, aggmetrics *FakeAggMetrics, org int, name string, ts uint32, val float64, t *testing.T) {
-	id := idFor(org, name, []string{})
+func assert(interval uint32, epoch int, aggmetrics *FakeAggMetrics, org int, metric, unit, mtype string, ts uint32, val float64, t *testing.T) {
+	id := idFor(org, metric, unit, mtype, []string{}, interval)
 	m, ok := aggmetrics.Get(id)
 	if !ok {
-		t.Fatalf("%d seconds in: assert org %d name %s ts %d val %f -> metric not found", epoch, org, name, ts, val)
+		t.Fatalf("%d seconds in: assert org %d metric %s ts %d val %f -> metric not found", epoch, org, metric, ts, val)
 	}
 	n := m.(*FakeAggMetric)
 	if n.lastVal != val || n.lastTs != ts {
-		t.Fatalf("%d seconds in: assert org %d name %s ts %d val %f -> got ts %d val %f", epoch, org, name, ts, val, n.lastTs, n.lastVal)
+		t.Fatalf("%d seconds in: assert org %d metric %s ts %d val %f -> got ts %d val %f", epoch, org, metric, ts, val, n.lastTs, n.lastVal)
 	}
 }
 
@@ -97,7 +100,8 @@ func TestUsageBasic(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
-	u := New(60, aggmetrics, defCache, mock)
+	interval := uint32(60)
+	u := New(interval, aggmetrics, defCache, mock)
 
 	assertLen(0, aggmetrics, 0, t)
 
@@ -112,19 +116,19 @@ func TestUsageBasic(t *testing.T) {
 	u.Add(2, "foo")
 	mock.Add(time.Second)
 	assertLen(60, aggmetrics, 4, t)
-	assert(60, aggmetrics, 1, "metrictank.usage.numSeries", 60, 2, t)
-	assert(60, aggmetrics, 1, "metrictank.usage.numPoints", 60, 2, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numSeries", 60, 1, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numPoints", 60, 2, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 60, 2, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 60, 2, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 2, t)
 
 	u.Add(1, "foo")
 	u.Add(2, "foo")
 	mock.Add(60 * time.Second)
 
-	assert(120, aggmetrics, 1, "metrictank.usage.numSeries", 120, 1, t)
-	assert(120, aggmetrics, 1, "metrictank.usage.numPoints", 120, 3, t)
-	assert(120, aggmetrics, 2, "metrictank.usage.numSeries", 120, 1, t)
-	assert(120, aggmetrics, 2, "metrictank.usage.numPoints", 120, 3, t)
+	assert(interval, 120, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
+	assert(interval, 120, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 120, 3, t)
+	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
+	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 120, 3, t)
 
 	u.Stop()
 }
@@ -134,7 +138,8 @@ func TestUsageMinusOne(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
-	u := New(60, aggmetrics, defCache, mock)
+	interval := uint32(60)
+	u := New(interval, aggmetrics, defCache, mock)
 
 	assertLen(0, aggmetrics, 0, t)
 
@@ -150,12 +155,12 @@ func TestUsageMinusOne(t *testing.T) {
 	// goroutine has some time to push the results into our fake aggmetrics
 	time.Sleep(20 * time.Millisecond)
 	assertLen(60, aggmetrics, 6, t)
-	assert(60, aggmetrics, 1, "metrictank.usage-minus1.numSeries", 60, 1, t)
-	assert(60, aggmetrics, 1, "metrictank.usage-minus1.numPoints", 60, 1, t)
-	assert(60, aggmetrics, 1, "metrictank.usage.numSeries", 60, 1, t)
-	assert(60, aggmetrics, 1, "metrictank.usage.numPoints", 60, 1, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numSeries", 60, 1, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numPoints", 60, 1, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage-minus1.numSeries", "serie", "gauge", 60, 1, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage-minus1.numPoints", "point", "counter", 60, 1, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
+	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 60, 1, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 1, t)
 
 	u.Stop()
 }
@@ -165,7 +170,8 @@ func TestUsageWrap32(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
-	u := New(60, aggmetrics, defCache, mock)
+	interval := uint32(60)
+	u := New(interval, aggmetrics, defCache, mock)
 
 	// max uint32 is 4294967295, let's verify the proper wrapping around that
 	// pretend an insert maxuint32 -900000
@@ -179,16 +185,16 @@ func TestUsageWrap32(t *testing.T) {
 	assertLen(59, aggmetrics, 0, t)
 	mock.Add(time.Second)
 	assertLen(60, aggmetrics, 2, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numSeries", 60, 1, t)
-	assert(60, aggmetrics, 2, "metrictank.usage.numPoints", 60, 4294067295, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
+	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 4294067295, t)
 
 	for i := 0; i < 1000001; i++ {
 		u.Add(2, "foo")
 	}
 	mock.Add(60 * time.Second)
 	assertLen(120, aggmetrics, 2, t)
-	assert(120, aggmetrics, 2, "metrictank.usage.numSeries", 120, 1, t)
-	assert(120, aggmetrics, 2, "metrictank.usage.numPoints", 120, 100000, t)
+	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
+	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 120, 100000, t)
 
 	u.Stop()
 }
