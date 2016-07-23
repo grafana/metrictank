@@ -1,3 +1,5 @@
+// Package in provides interfaces, concrete implementations, and utilities
+// to ingest data into metrictank
 package in
 
 import (

@@ -1,3 +1,5 @@
+// Package metricdef provides the interface and implementations
+// to interact with a metricdef[inition] index/database.
 package metricdef
 
 import (

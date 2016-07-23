@@ -1,3 +1,5 @@
+// Package batch implements batched processing for slices of points
+// in particular aggregations
 package batch
 
 // aggregation functions for batches of data

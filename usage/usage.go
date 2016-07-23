@@ -1,3 +1,5 @@
+// Package usage is the component that tracks and reports how many series and points
+// are being ingested for each organisation.
 package usage
 
 import (

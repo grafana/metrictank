@@ -1,3 +1,4 @@
+// Package consolidation provides an abstraction for consolidators
 package consolidation
 
 import (
