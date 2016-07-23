@@ -65,11 +65,12 @@ type cassandraStore struct {
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers, readqsize, writeqsize int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
 	cluster.NumConns = writers
+	cluster.ProtoVersion = protoVer
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {

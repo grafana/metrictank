@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
 
 If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
 See [issue cassandra-9666](https://issues.apache.org/jira/browse/CASSANDRA-9666) for more information.
+You may also need to lower the cql-protocol-version value in the config to 3 or 2.
 
 # write queues
 
