@@ -4,7 +4,7 @@
 // We don't necessarily want to start maintaining our own little search engine.
 // Future needs (scale, features) may deprecate this package in favor of something else
 // like ES, bleve, etc.  But for now it seems to work well, so let's see where it takes us
-
+//
 // callers are responsible for thread safety, period pruning if desired
 package idx
 
