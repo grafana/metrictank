@@ -17,6 +17,7 @@ import (
 type In struct {
 	metricsPerMessage met.Meter
 	metricsReceived   met.Count
+	MetricsDecodeErr  met.Count
 	msgsAge           met.Meter // in ms
 	tmp               msg.MetricData
 
@@ -29,6 +30,7 @@ func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage,
 	return In{
 		metricsPerMessage: stats.NewMeter(fmt.Sprintf("%s.metrics_per_message", input), 0),
 		metricsReceived:   stats.NewCount(fmt.Sprintf("%s.metrics_received", input)),
+		MetricsDecodeErr:  stats.NewCount(fmt.Sprintf("%s.metrics_decode_err", input)),
 		msgsAge:           stats.NewMeter(fmt.Sprintf("%s.message_age", input), 0),
 		tmp:               msg.MetricData{Metrics: make([]*schema.MetricData, 1)},
 
@@ -83,6 +85,7 @@ func (in In) Handle(data []byte) {
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
+		in.MetricsDecodeErr.Inc(1)
 		log.Error(3, "skipping message. %s", err)
 		return
 	}
@@ -95,6 +98,7 @@ func (in In) Handle(data []byte) {
 func (in In) HandleArray(data []byte) {
 	err := in.tmp.InitFromMsg(data)
 	if err != nil {
+		in.MetricsDecodeErr.Inc(1)
 		log.Error(3, "skipping message. %s", err)
 		return
 	}
@@ -102,6 +106,7 @@ func (in In) HandleArray(data []byte) {
 
 	err = in.tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
 	if err != nil {
+		in.MetricsDecodeErr.Inc(1)
 		log.Error(3, "skipping message. %s", err)
 		return
 	}

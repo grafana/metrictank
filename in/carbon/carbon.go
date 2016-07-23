@@ -117,6 +117,7 @@ func (c *Carbon) handle(conn net.Conn) {
 
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.Medium)
 		if err != nil {
+			c.In.MetricsDecodeErr.Inc(1)
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
