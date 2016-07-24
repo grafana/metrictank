@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	metricsToEsOK           met.Count
-	metricsToEsFail         met.Count
-	esPutDuration           met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
+	metricsToStoreOK        met.Count
+	metricsToStoreFail      met.Count
+	storePutDuration        met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 	idxPruneDuration        met.Timer
 	idxGetDuration          met.Timer
 	idxListDuration         met.Timer
@@ -44,9 +44,9 @@ type DefCache struct {
 }
 
 func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
-	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
-	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
-	esPutDuration = stats.NewTimer("es_put_duration", 0)
+	metricsToStoreOK = stats.NewCount("metrics_to_store.ok")
+	metricsToStoreFail = stats.NewCount("metrics_to_store.fail")
+	storePutDuration = stats.NewTimer("store_put_duration", 0)
 	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
 	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
 	idxListDuration = stats.NewTimer("idx.list_duration", 0)
@@ -100,14 +100,14 @@ func (dc *DefCache) Backfill() {
 	}
 	met, scroll_id, err := dc.defsStore.GetMetrics("")
 	if err != nil {
-		log.Error(3, "Could not backfill from ES: %s", err)
+		log.Error(3, "Could not backfill from index storage: %s", err)
 		return
 	}
 	add(met)
 	for scroll_id != "" {
 		met, scroll_id, err = dc.defsStore.GetMetrics(scroll_id)
 		if err != nil {
-			log.Error(3, "Could not backfill from ES: %s", err)
+			log.Error(3, "Could not backfill from index storage: %s", err)
 			return
 		}
 		add(met)
@@ -127,7 +127,7 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 			mdef = schema.MetricDefinitionFromMetricData(metric)
 			dc.Update(*mdef)
 			dc.Unlock()
-			dc.addToES(mdef)
+			dc.persist(mdef)
 		} else {
 			dc.Unlock()
 		}
@@ -145,23 +145,23 @@ func (dc *DefCache) Add(metric *schema.MetricData) {
 		}
 		dc.Idx.Add(*mdef)
 		dc.Unlock()
-		dc.addToES(mdef)
+		dc.persist(mdef)
 	}
 }
 
-func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
+func (dc *DefCache) persist(mdef *schema.MetricDefinition) {
 	pre := time.Now()
 	err := dc.defsStore.IndexMetric(mdef)
 	// NOTE: indexing to ES is done asyncrounously using the bulkAPI.
 	// so an error here is just an error adding the document to the
 	// bulkAPI buffer.
 	if err != nil {
-		log.Error(3, "couldn't index to ES %s: %s", mdef.Id, err)
-		metricsToEsFail.Inc(1)
+		log.Error(3, "couldn't save index to store %s: %s", mdef.Id, err)
+		metricsToStoreFail.Inc(1)
 	} else {
-		metricsToEsOK.Inc(1)
+		metricsToStoreOK.Inc(1)
 	}
-	esPutDuration.Value(time.Now().Sub(pre))
+	storePutDuration.Value(time.Now().Sub(pre))
 }
 
 // make defcache aware of asynchronous index calls of metric definitions to a defstore (ES) succeeding for a particular def or not.
