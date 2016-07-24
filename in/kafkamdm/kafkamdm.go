@@ -54,7 +54,7 @@ func ConfigSetup() {
 	inKafkaMdm.IntVar(&consumerFetchDefault, "consumer-fetch-default", 4096000, "The default number of message bytes to fetch in a request")
 	inKafkaMdm.StringVar(&consumerMaxWaitTime, "consumer-max-wait-time", "1s", "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
 	inKafkaMdm.StringVar(&consumerMaxProcessingTime, "consumer-max-processing-time", "1s", "The maximum amount of time the consumer expects a message takes to process")
-	inKafkaMdm.IntVar(&netMaxOpenRequests, "consumer-fetch-default", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
+	inKafkaMdm.IntVar(&netMaxOpenRequests, "net-max-open-requests", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm)
 }
 
