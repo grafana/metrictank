@@ -36,6 +36,12 @@ var topicStr string
 var topics []string
 var group string
 var config *cluster.Config
+var channelBufferSize int
+var consumerFetchMin int
+var consumerFetchDefault int
+var consumerMaxWaitTime string
+var consumerMaxProcessingTime string
+var netMaxOpenRequests int
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -43,6 +49,12 @@ func ConfigSetup() {
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&group, "group", "group1", "kafka consumer group")
+	inKafkaMdm.IntVar(&channelBufferSize, "channel-buffer-size", 1000000, "The number of metrics to buffer in internal and external channels")
+	inKafkaMdm.IntVar(&consumerFetchMin, "consumer-fetch-min", 1024000, "The minimum number of message bytes to fetch in a request")
+	inKafkaMdm.IntVar(&consumerFetchDefault, "consumer-fetch-default", 4096000, "The default number of message bytes to fetch in a request")
+	inKafkaMdm.StringVar(&consumerMaxWaitTime, "consumer-max-wait-time", "1s", "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
+	inKafkaMdm.StringVar(&consumerMaxProcessingTime, "consumer-max-processing-time", "1s", "The maximum amount of time the consumer expects a message takes to process")
+	inKafkaMdm.IntVar(&netMaxOpenRequests, "consumer-fetch-default", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm)
 }
 
@@ -50,6 +62,16 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
+
+	waitTime, err := time.ParseDuration(consumerMaxWaitTime)
+	if err != nil {
+		log.Fatal(4, "kafka-mdm invalid config, could not parse consumer-max-wait-time: %s", err)
+	}
+	processingTime, err := time.ParseDuration(consumerMaxProcessingTime)
+	if err != nil {
+		log.Fatal(4, "kafka-mdm invalid config, could not parse consumer-max-processing-time: %s", err)
+	}
+
 	brokers = strings.Split(brokerStr, ",")
 	topics = strings.Split(topicStr, ",")
 
@@ -58,13 +80,14 @@ func ConfigProcess(instance string) {
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.ClientID = instance + "-mdm"
 	config.Group.Return.Notifications = true
-	config.ChannelBufferSize = 10000
-	config.Consumer.Fetch.Min = 1024000     //1Mb
-	config.Consumer.Fetch.Default = 4096000 //4Mb
-	config.Consumer.MaxWaitTime = time.Second
-	config.Net.MaxOpenRequests = 100
+	config.ChannelBufferSize = channelBufferSize
+	config.Consumer.Fetch.Min = int32(consumerFetchMin)
+	config.Consumer.Fetch.Default = int32(consumerFetchDefault)
+	config.Consumer.MaxWaitTime = waitTime
+	config.Consumer.MaxProcessingTime = processingTime
+	config.Net.MaxOpenRequests = netMaxOpenRequests
 	config.Config.Version = sarama.V0_10_0_0
-	err := config.Validate()
+	err = config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
 	}
