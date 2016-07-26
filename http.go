@@ -29,7 +29,7 @@ var bufPool = sync.Pool{
 }
 
 type Series struct {
-	Target     string
+	Target     string // will be set to the target attribute of the given request
 	Datapoints []schema.Point
 	Interval   uint32
 }
@@ -301,6 +301,10 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 					http.Error(w, err.Error(), http.StatusBadRequest)
 					return
 				}
+				// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
+				// id is like foo.bar or foo.*
+				// def.Name is like foo.concretebar
+				// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
 				target := strings.Replace(target, id, def.Name, -1)
 				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 			}
