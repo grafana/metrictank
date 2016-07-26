@@ -155,14 +155,8 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			chunkSizeAtSave.Value(int64(len(data)))
 			version := chunk.FormatStandardGoTsz
 			buf := new(bytes.Buffer)
-			err := binary.Write(buf, binary.LittleEndian, uint8(version))
-			if err != nil {
-				// TODO
-			}
-			_, err = buf.Write(data)
-			if err != nil {
-				// TODO
-			}
+			binary.Write(buf, binary.LittleEndian, uint8(version))
+			buf.Write(data)
 			success := false
 			attempts := 0
 			for !success {
