@@ -29,6 +29,9 @@ An index plugin needs to support:
   - in the future we will want to extend these with tag constraints (e.g. must have given key, key must have given value, or value for key must match a pattern similar to above pattern)
 * prefix search of prefix pattern and orgid (2). this is a special case of a pattern search, but common for autocomplete/suggest with short prefix patterns.
 * listing (e.g. graphite's metrics.json but possibly in more detail for other tools) based on org-id (2).
+* in the future we may also do queries on tags such as:
+  - list all tags
+  - list all tags for a given series pattern
 
 
 ### notes
