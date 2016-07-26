@@ -274,9 +274,6 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		}
 
 		if legacy {
-			// querying for a graphite pattern
-			// for now we just pick random defs if we have multiple defs (e.g. multiple intervals) for the same key
-			// in the future we'll do something smarter.
 			_, defs := defCache.Find(org, id)
 			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
@@ -341,6 +338,8 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		sort.Sort(SeriesByTarget(merged))
 		js, err = graphiteJSON(js, merged)
 	} else {
+		// we dont merge here as graphite is expecting all metric.Ids it reqested.
+		// graphite will then handle the merging itself.
 		js, err = graphiteRaintankJSON(js, out)
 	}
 	for _, serie := range out {
