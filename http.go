@@ -337,37 +337,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 
 	js := bufPool.Get().([]byte)
 	if legacy {
-		//check for duplicate series names. If found merge the results.
-		seriesByTarget := make(map[string][]Series)
-		for _, series := range out {
-			if _, ok := seriesByTarget[series.Target]; !ok {
-				seriesByTarget[series.Target] = make([]Series, 0)
-			}
-			seriesByTarget[series.Target] = append(seriesByTarget[series.Target], series)
-		}
-		merged := make([]Series, len(seriesByTarget))
-		count := 0
-		for _, series := range seriesByTarget {
-			if len(series) == 1 {
-				merged[count] = series[0]
-			} else {
-				//we use the first series in the list as our result.  We check over every
-				// point and if it is null, we then check the other series for a non null
-				// value to use instead.
-				for i, pt := range series[0].Datapoints {
-					if pt.Val == math.NaN() {
-						for j := 1; j < len(series); j++ {
-							if series[j].Datapoints[i].Val != math.NaN() {
-								pt.Val = series[j].Datapoints[i].Val
-								break
-							}
-						}
-					}
-				}
-				merged[count] = series[0]
-			}
-			count++
-		}
+		merged := mergeSeries(out)
 		sort.Sort(SeriesByTarget(merged))
 		js, err = graphiteJSON(js, merged)
 	} else {
