@@ -885,7 +885,7 @@ func TestMergeSeries(t *testing.T) {
 
 	merged := mergeSeries(out)
 	if len(merged) != 5 {
-		t.Errorf("Expected data to be merged down to 5 series. got %s instead", len(merged))
+		t.Errorf("Expected data to be merged down to 5 series. got %d instead", len(merged))
 	}
 	for _, serie := range merged {
 		if serie.Target == "some.series.foo1" {
