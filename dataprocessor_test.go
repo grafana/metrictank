@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
@@ -853,6 +854,47 @@ func TestAlignRequests(t *testing.T) {
 					t.Errorf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
 				}
 			}
+		}
+	}
+}
+
+func TestMergeSeries(t *testing.T) {
+	out := make([]Series, 0)
+	for i := 0; i < 5; i++ {
+		out = append(out, Series{
+			Target: fmt.Sprintf("some.series.foo%d", i),
+			Datapoints: []schema.Point{
+				{math.NaN(), 1449178131},
+				{math.NaN(), 1449178141},
+				{3, 1449178151},
+				{4, 1449178161},
+			},
+			Interval: 10,
+		})
+	}
+	out = append(out, Series{
+		Target: "some.series.foo1",
+		Datapoints: []schema.Point{
+			{1, 1449178131},
+			{2, 1449178141},
+			{math.NaN(), 1449178151},
+			{math.NaN(), 1449178161},
+		},
+		Interval: 10,
+	})
+
+	merged := mergeSeries(out)
+	if len(merged) != 5 {
+		t.Errorf("Expected data to be merged down to 5 series. got %s instead", len(merged))
+	}
+	for _, serie := range merged {
+		if serie.Target == "some.series.foo1" {
+			for _, pt := range serie.Datapoints {
+				if pt.Val == math.NaN() {
+					t.Errorf("merging should have removed NaN values.")
+				}
+			}
+
 		}
 	}
 }
