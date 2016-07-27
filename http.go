@@ -274,28 +274,15 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		}
 
 		if legacy {
-			// querying for a graphite pattern
-			// for now we just pick random defs if we have multiple defs (e.g. multiple intervals) for the same key
-			// in the future we'll do something smarter.
 			_, defs := defCache.Find(org, id)
 			if len(defs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			seen := make(map[idx.MetricKey]struct{})
-			filteredDefs := make([]*schema.MetricDefinition, 0, len(defs))
-
-			for _, d := range defs {
-				if d == nil {
+			for _, def := range defs {
+				if def == nil {
 					continue
 				}
-				_, ok := seen[idx.MetricKey(d.Name)]
-				if !ok {
-					seen[idx.MetricKey(d.Name)] = struct{}{}
-					filteredDefs = append(filteredDefs, d)
-				}
-			}
-			for _, def := range filteredDefs {
 				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
@@ -351,9 +338,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 
 	js := bufPool.Get().([]byte)
 	if legacy {
-		sort.Sort(SeriesByTarget(out))
-		js, err = graphiteJSON(js, out)
+		merged := mergeSeries(out)
+		sort.Sort(SeriesByTarget(merged))
+		js, err = graphiteJSON(js, merged)
 	} else {
+		// we dont merge here as graphite is expecting all metric.Ids it reqested.
+		// graphite will then handle the merging itself.
 		js, err = graphiteRaintankJSON(js, out)
 	}
 	for _, serie := range out {
