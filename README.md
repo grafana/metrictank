@@ -93,6 +93,13 @@ see tags.md
 
 As mentioned above Cassandra already does that for the storage layer, but at a certain point we'll need it for the memory layer as well.
 
+
+## Development
+
+[govendor](https://github.com/kardianos/govendor) for managing vendored depedencies
+`go build` to build
+
+
 ## Help, more info, documentation, ...
 
 [community slack](http://slack.raintank.io/). This is the raintank slack, it has a metrictank room (as well as a grafana room and a room for all of our products)

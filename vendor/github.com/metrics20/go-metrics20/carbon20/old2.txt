@@ -1,0 +1,12 @@
+BenchmarkValidatePacket-8   	 1000000	      1125 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1122 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1127 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1123 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1124 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1121 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1120 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1145 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1120 ns/op	     104 B/op	       3 allocs/op
+BenchmarkValidatePacket-8   	 1000000	      1121 ns/op	     104 B/op	       3 allocs/op
+PASS
+ok  	github.com/metrics20/go-metrics20/carbon20	11.388s
