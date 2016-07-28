@@ -75,7 +75,6 @@ cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}.el6.${ARCH}.rpm"
-## CHECK IF THIS MAKES A WORKING RPM
 fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --replaces metric-tank --provides metric-tank \
