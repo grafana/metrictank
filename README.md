@@ -55,7 +55,7 @@ cause that's how we roll.
 
 #### graphite integration
 
-Graphite is a first class citizen for metrictank.  You can use the [graphite-raintank](https://github.com/raintank/graphite-raintank) plugin, although
+Graphite is a first class citizen for metrictank.  You can use the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin, although
 at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.
 
 

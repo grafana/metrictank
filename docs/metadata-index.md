@@ -7,7 +7,7 @@ Currently it's based on Elasticsearch, but we hope to add other options.
 ### ES
 
 metric definitions are currently stored in ES as well as internally.
-ES is the failsafe option used by graphite-raintank.py and such.
+ES is the failsafe option used by graphite-metrictank.py and such.
 
 We're also seeing ES blocking due to the metadata indexing around the 100k/s mark.
 E.g. you can hit this when indexing >=100k new metrics at once.
