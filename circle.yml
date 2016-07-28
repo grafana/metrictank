@@ -5,10 +5,10 @@ test:
   override:
     - go test -v -race ./...:
         pwd:
-          $GOPATH/src/github.com/raintank/metrictank
+          /home/ubuntu/.go_workspace/src/github.com/raintank/metrictank
     - go vet ./...:
         pwd:
-          $GOPATH/src/github.com/raintank/metrictank
+          /home/ubuntu/.go_workspace/src/github.com/raintank/metrictank
   post:
     - scripts/package.sh
 dependencies:
