@@ -3,8 +3,12 @@ machine:
     GOPATH: "/home/ubuntu/.go_workspace"
 test:
   override:
-    - go test -v -race ./...
-    - go vet ./...
+    - go test -v -race ./...:
+        pwd:
+          $GOPATH/src/github.com/raintank/metrictank
+    - go vet ./...:
+        pwd:
+          $GOPATH/src/github.com/raintank/metrictank
   post:
     - scripts/package.sh
 dependencies:
