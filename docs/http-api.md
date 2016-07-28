@@ -1,6 +1,6 @@
 Note that some of the endpoints rely on being a fed a proper Org-Id.
 You may not want to expose directly to people if they can control that header.
-Instead, you may want to run [graphite-raintank](https://github.com/raintank/graphite-raintank) in front,
+Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
 which will authenticate the request and set the proper header, assuring security.
 
 ## app status
@@ -47,7 +47,7 @@ json and treejson are the same.
 ## graphite query api
 
 This is the early beginning of a graphite-web/graphite-api replacement. It only returns JSON output
-This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-raintank in front of metrictank, for now.
+This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-metrictank in front of metrictank, for now.
 
 ```
 GET /render
@@ -65,7 +65,7 @@ POST /render
 ## low-level data query api 
 
 This query API is for applications that already know the UUID's of the metrics they're looking for.
-It currently is primarily used by [graphite-raintank](https://github.com/raintank/graphite-raintank)
+It currently is primarily used by [graphite-metrictank](https://github.com/raintank/graphite-metrictank)
 It returns JSON output in the same format as the graphite query api.
 
 ```
