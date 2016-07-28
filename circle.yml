@@ -1,19 +1,14 @@
 machine:
   environment:
     GOPATH: "/home/ubuntu/.go_workspace"
+    IMPORTPATH: "/home/ubuntu/.go_workspace/src/github.com/raintank/metrictank"
 test:
   override:
-    - go test -v -race ./...:
-        pwd:
-          /home/ubuntu/.go_workspace/src/github.com/raintank/metrictank
-    - go vet ./...:
-        pwd:
-          /home/ubuntu/.go_workspace/src/github.com/raintank/metrictank
+    - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v /vendor/)
+    - cd $IMPORTPATH && go vet $(go list ./... | grep -v /vendor/)
   post:
     - scripts/package.sh
 dependencies:
-  pre:
-    - if [[ ! -e /usr/local/go-1.6 ]]; then sudo mv /usr/local/go /usr/local/go-1.5.1; wget https://storage.googleapis.com/golang/go1.6.1.linux-amd64.tar.gz && sudo tar -C /usr/local -zxf go1.6.1.linux-amd64.tar.gz && sudo mv /usr/local/go /usr/local/go-1.6 && sudo ln -s /usr/local/go-1.6 /usr/local/go; fi
   override:
     - scripts/depends.sh
     - scripts/build.sh
