@@ -15,5 +15,5 @@ mkdir -p $BUILDDIR
 rm -rf $BUILDDIR/*
 
 # Build binary
-cd ../
+cd $GOPATH/src/github.com/raintank/metrictank
 go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metrictank
