@@ -14,6 +14,9 @@ mkdir -p $BUILDDIR
 # Clean build bin dir
 rm -rf $BUILDDIR/*
 
+# disable cgo
+export CGO_ENABLED=0
+
 # Build binary
 cd $GOPATH/src/github.com/raintank/metrictank
 go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metrictank
