@@ -81,7 +81,7 @@ An index plugin needs to support:
 ### notes
 
 (1) lookup: What do we need to lookup? For now we mainly want/only need interval (for alignRequests), mtype (to figure out the consolidation) and name (for listings),
-but ideally we can lookup the entire definition.  E.g. in the future we may end up determining rollup schema based on org and/or misc tags.
+but ideally we can lookup the entire definition.  E.g. in the future we may end up determining rollup schema based on org and/or misc tags.  
 (2) org-id: we need to return metrics corresponding to a given org, as well as metrics from org -1, since those are publically visible to everyone.
 
 ### other requirements
