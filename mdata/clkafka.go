@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -137,6 +138,9 @@ func (c *ClKafka) flush() {
 	}
 
 	msg := PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
+	if OffsetFence != nil {
+		msg.OffsetFence = atomic.LoadInt64(OffsetFence)
+	}
 	c.buf = nil
 
 	go func() {

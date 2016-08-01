@@ -4,6 +4,7 @@ import (
 	"flag"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -120,6 +121,11 @@ func (k *KafkaMdm) consume() {
 	for msg := range messageChan {
 		if LogLevel < 2 {
 			log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
+		}
+		// mark current offset, so that if the handling triggers metric persist messages, it is known to slaves that they need at least this offset
+		// before processing the metric persist messages
+		if mdata.OffsetFence != nil {
+			atomic.StoreInt64(mdata.OffsetFence, msg.Offset)
 		}
 		k.In.Handle(msg.Value)
 		k.consumer.MarkOffset(msg, "")
