@@ -186,9 +186,6 @@ func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 }
 
 // Get gets a metricdef by metric id
-// note: the defcache is clearly not a perfect all-knowning entity, it just knows the last interval of metrics seen since program start
-// and we assume we can use that interval through history.
-// TODO: no support for interval changes, ...
 // note: do *not* modify the pointed-to data, as it will affect the data in the index!
 func (dc *DefCache) Get(id string) *schema.MetricDefinition {
 	pre := time.Now()
