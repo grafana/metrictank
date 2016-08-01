@@ -328,7 +328,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
-// write a chunk to peristant storage. This should only be called while holding a.Lock()
+// write a chunk to peristent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
 	pre := time.Now()
 	chunk := a.Chunks[pos]
