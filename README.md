@@ -19,7 +19,7 @@ and bugs to fix.  It should be considered an *alpha* project.
 
 * no strong isolation between tenants (other than to make sure they can't see each other's data).  
   So tenants could negatively impact the performance or availability for others.
-* no sharding/partitioning mechanism built into metrictank itself.  
+* no sharding/partitioning mechanism built into metrictank itself yet.  
   Cassandra of course does this on the data storage level
 * runtime master promotions (for clusters) are a manual process.
 * no computation locality:   
@@ -33,6 +33,7 @@ and bugs to fix.  It should be considered an *alpha* project.
   which can trigger elevated request times (in the seconds range) when a GC runs)
 * the input protocol is currently unoptimized and inefficient.   
   For one thing we have to split up the data and metadata streams instead of sending all metadata with each point.
+* currently impossible to write back in time. E.g. for any series you can't write points that are earlier than previously written points.
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
@@ -59,9 +60,11 @@ Graphite is a first class citizen for metrictank.  You can use the [graphite-met
 at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.
 
 
-#### roll-ups
+#### better roll-ups
 
-Metrictank can store rollups for all your series.  Each "rollup" is actually 4 series: min/max/sum/count (from which it can also compute the average at runtime).
+Metrictank can store rollups for all your series.  Each rollup is currently 4 series: min/max/sum/count (from which it can also compute the average at runtime).
+This means we can do consolidation (by combining archived rollups with runtime consolidation) accurately and correctly,
+[unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 
 #### in-memory component for hot data
 
