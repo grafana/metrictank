@@ -20,12 +20,12 @@ var CConfig *cluster.Config
 var PConfig *sarama.Config
 
 func ConfigSetup() {
-	inKafkaMdam := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
-	inKafkaMdam.BoolVar(&Enabled, "enabled", false, "")
-	inKafkaMdam.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
-	inKafkaMdam.StringVar(&Topic, "topic", "metricpersist", "kafka topic")
-	inKafkaMdam.StringVar(&Group, "group", "group1", "kafka consumer group")
-	globalconf.Register("kafka-cluster", inKafkaMdam)
+	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
+	fs.BoolVar(&Enabled, "enabled", false, "")
+	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
+	fs.StringVar(&Topic, "topic", "metricpersist", "kafka topic")
+	fs.StringVar(&Group, "group", "group1", "kafka consumer group")
+	globalconf.Register("kafka-cluster", fs)
 }
 
 func ConfigProcess(instance string) {
