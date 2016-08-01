@@ -428,13 +428,17 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	currentChunk := a.getChunk(a.CurrentChunkPos)
 
 	if t0 == currentChunk.T0 {
-		if currentChunk.Saved {
-			//TODO(awoods): allow the chunk to be re-opened.
-			log.Error(3, "cant write to chunk that has already been saved. %s T0:%d", a.Key, currentChunk.T0)
-			return
-		}
 		// last prior data was in same chunk as new point
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err == nil {
+			if currentChunk.Saved {
+				// we allow adding data to already-saved chunks, but this doesn't mean we'll re-save them
+				// typically this happens when non-primaries receive metrics that the primary already saved (maybe cause they are running behind)
+				// if this happens on the primary, that indicates a problem so you should monitor this condition closely
+				// TODO: note that the chunk may already have its end-of-stream marker, and we put points beyond it. maybe we should not push when Saving == true
+
+				addToSavedChunk.Inc(1)
+			}
+		} else {
 			log.Debug("AM failed to add metric to chunk for %s. %s", a.Key, err)
 			metricsTooOld.Inc(1)
 			return

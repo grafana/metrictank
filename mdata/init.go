@@ -11,7 +11,8 @@ var (
 	chunkCreate met.Count
 	chunkClear  met.Count
 
-	metricsTooOld met.Count
+	metricsTooOld   met.Count
+	addToSavedChunk met.Count
 
 	memToIterDuration met.Timer
 	persistDuration   met.Timer
@@ -25,6 +26,7 @@ func InitMetrics(stats met.Backend) {
 	chunkClear = stats.NewCount("chunks.clear")
 
 	metricsTooOld = stats.NewCount("metrics_too_old")
+	addToSavedChunk = stats.NewCount("add_to_saved_chunk")
 
 	memToIterDuration = stats.NewTimer("mem.to_iter_duration", 0)
 	persistDuration = stats.NewTimer("persist_duration", 0)
