@@ -95,11 +95,11 @@ func (ms *AggMetrics) Get(key string) (Metric, bool) {
 	return m, ok
 }
 
-func (ms *AggMetrics) GetOrCreate(key string) Metric {
+func (ms *AggMetrics) GetOrCreate(key string, partKey []byte) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(ms.store, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
+		m = NewAggMetric(ms.store, key, ms.chunkSpan, ms.numChunks, ms.ttl, partKey, ms.aggSettings...)
 		ms.Metrics[key] = m
 	}
 	ms.Unlock()

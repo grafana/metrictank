@@ -5,7 +5,7 @@ import "github.com/raintank/metrictank/iter"
 
 type Metrics interface {
 	Get(key string) (Metric, bool)
-	GetOrCreate(key string) Metric
+	GetOrCreate(key string, partKey []byte) Metric
 }
 
 type Metric interface {

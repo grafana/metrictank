@@ -116,12 +116,13 @@ type PersistMessageBatch struct {
 }
 
 type SavedChunk struct {
-	Key string `json:"key"`
-	T0  uint32 `json:"t0"`
+	PartKey []byte `json:"-"`
+	Key     string `json:"key"`
+	T0      uint32 `json:"t0"`
 }
 
-func SendPersistMessage(key string, t0 uint32) {
-	sc := SavedChunk{Key: key, T0: t0}
+func SendPersistMessage(key string, t0 uint32, partKey []byte) {
+	sc := SavedChunk{Key: key, T0: t0, PartKey: partKey}
 	for _, h := range clusterHandlers {
 		h.Send(sc)
 	}
@@ -133,9 +134,17 @@ func InitCluster(stats met.Backend, handlers ...ClusterHandler) {
 	clusterHandlers = handlers
 }
 
+// Cl is a reusable component that will handle metricpersist messages
 type Cl struct {
 	instance string
 	metrics  Metrics
+}
+
+func NewCl(instance string, metrics Metrics) Cl {
+	return Cl{
+		instance: instance,
+		metrics:  metrics,
+	}
 }
 
 func (cl Cl) Handle(data []byte) {

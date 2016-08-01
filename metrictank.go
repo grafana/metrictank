@@ -24,6 +24,7 @@ import (
 	"github.com/raintank/metrictank/defcache"
 	"github.com/raintank/metrictank/in"
 	inCarbon "github.com/raintank/metrictank/in/carbon"
+	inKafkaAll "github.com/raintank/metrictank/in/kafkaall"
 	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
 	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
 	inNSQ "github.com/raintank/metrictank/in/nsq"
@@ -39,6 +40,7 @@ import (
 
 var (
 	inCarbonInst    *inCarbon.Carbon
+	inKafkaAllInst  *inKafkaAll.KafkaAll
 	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
 	inKafkaMdamInst *inKafkaMdam.KafkaMdam
 	inNSQInst       *inNSQ.NSQ
@@ -147,6 +149,7 @@ func main() {
 			os.Exit(1)
 		}
 		inCarbon.ConfigSetup()
+		inKafkaAll.ConfigSetup()
 		inKafkaMdm.ConfigSetup()
 		inKafkaMdam.ConfigSetup()
 		inNSQ.ConfigSetup()
@@ -157,6 +160,7 @@ func main() {
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
+	inKafkaAll.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
 	switch logLevel {
@@ -188,13 +192,14 @@ func main() {
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
 	inCarbon.ConfigProcess()
+	inKafkaAll.ConfigProcess(*instance)
 	inKafkaMdm.ConfigProcess(*instance)
 	inKafkaMdam.ConfigProcess(*instance)
 	inNSQ.ConfigProcess()
 	clNSQ.ConfigProcess()
 	clKafka.ConfigProcess(*instance)
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
+	if !inCarbon.Enabled && !inKafkaAll.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
@@ -313,10 +318,17 @@ func main() {
 	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
 
 	handlers := make([]mdata.ClusterHandler, 0)
+
+	if inKafkaAll.Enabled {
+		inKafkaAllInst = inKafkaAll.New(*instance, metrics, stats)
+		handlers = append(handlers, inKafkaAllInst)
+	}
+
 	if clNSQ.Enabled {
 		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
 		handlers = append(handlers, clNSQInst)
 	}
+
 	if clKafka.Enabled {
 		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
 		handlers = append(handlers, clKafkaInst)
@@ -328,6 +340,11 @@ func main() {
 
 	if inCarbon.Enabled {
 		inCarbonInst.Start(metrics, defCache, usg)
+	}
+
+	if inKafkaAll.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
+		inKafkaAllInst.Start(metrics, defCache, usg)
 	}
 
 	if inKafkaMdm.Enabled {
@@ -372,6 +389,13 @@ func main() {
 			"nsq",
 			inNSQInst,
 			inNSQInst.StopChan,
+		})
+	}
+	if inKafkaAll.Enabled {
+		waiters = append(waiters, waiter{
+			"kafka-all",
+			inKafkaAllInst,
+			inKafkaAllInst.StopChan,
 		})
 	}
 	if inKafkaMdm.Enabled {
