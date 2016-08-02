@@ -330,13 +330,20 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 // write a chunk to peristent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
-	pre := time.Now()
-	chunk := a.Chunks[pos]
-	chunk.Finish()
+
 	if !CluStatus.IsPrimary() {
 		if LogLevel < 2 {
 			log.Debug("AM persist(): node is not primary, not saving chunk.")
 		}
+		return
+	}
+
+	pre := time.Now()
+	chunk := a.Chunks[pos]
+
+	if chunk.Saved || chunk.Saving {
+		// this can happen if chunk was persisted by GC (stale) and then new data triggered another persist call
+		log.Debug("AM persist(): duplicate persist call for chunk.")
 		return
 	}
 
@@ -390,8 +397,9 @@ func (a *AggMetric) persist(pos int) {
 	// before newer data.
 	for pendingChunk >= 0 {
 		if LogLevel < 2 {
-			log.Debug("AM persist(): adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
+			log.Debug("AM persist(): sealing chunk %d/%d (%s:%d) and adding to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
 		}
+		pending[pendingChunk].chunk.Finish()
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
@@ -428,13 +436,23 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	currentChunk := a.getChunk(a.CurrentChunkPos)
 
 	if t0 == currentChunk.T0 {
-		if currentChunk.Saved {
-			//TODO(awoods): allow the chunk to be re-opened.
-			log.Error(3, "cant write to chunk that has already been saved. %s T0:%d", a.Key, currentChunk.T0)
+		// last prior data was in same chunk as new point
+		if currentChunk.Saving {
+			// if we're already saving the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
+			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
+			addToSavingChunk.Inc(1)
 			return
 		}
-		// last prior data was in same chunk as new point
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
+
+		if err := currentChunk.Push(ts, val); err == nil {
+			if currentChunk.Saved {
+				// if we're here, it means we marked it as Saved because it was saved by an other primary, not by us since Saving is false.
+				// typically this happens when non-primaries receive metrics that the primary already saved (maybe cause their metrics consumer is laggy)
+				// we allow adding data to such chunks in that case, though this open the possibility for data to be rejected by the primary, to be
+				// visible on secondaries.
+				addToSavedChunk.Inc(1)
+			}
+		} else {
 			log.Debug("AM failed to add metric to chunk for %s. %s", a.Key, err)
 			metricsTooOld.Inc(1)
 			return
@@ -488,8 +506,8 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			if currentChunk.LastWrite < metricMinTs {
 				return true
 			}
-		} else {
-			// chunk has not been written to in a while. Lets persist it.
+		} else if !currentChunk.Saving {
+			// chunk hasn't been written to in a while, and is not yet queued to persist. Let's persist it
 			log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
 			a.persist(a.CurrentChunkPos)
 		}
