@@ -5,6 +5,8 @@
 * Cassandra. We run and recommend 3.0.8 .  We used to run 2.2.3 which was fine too. See cassandra.md
 * Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
 * optionally a queue: Kafka 0.10 is recommended, but 0.9 should work too.
+* currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
+  and our [graphite-api fork](https://github.com/raintank/graphite-api/).
 
 ## how things fit together
 
@@ -14,8 +16,8 @@ is kept in RAM, but the chunks are being saved to Cassandra as well.  You can us
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
 Metrictank also needs elasticsearch to maintain an index of metrics metadata.
-You'll typically query metrictank by querying graphite which uses the graphite-metrictank plugin to talk
-to metrictank.  You can also query metrictank directly but this is experimental and not recommended.
+You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
+to metrictank.  You can also query metrictank directly but this is very limited, experimental and not recommended.
 
 
 ## installation
@@ -29,6 +31,8 @@ We recommend version 1.5 or higher.
 go get github.com/raintank/metrictank
 ```
 
+This installs only metrictank itself, and none of its dependencies.
+
 ### distribution packages
 
 We automatically build rpms and debs on circleCi whenever the build succeeds.
@@ -39,11 +43,18 @@ the 20th commit after `0.5.1`
 
 We aim to keep master stable so that's your best bet.
 
-[Get the packages here](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=)
+[Get the metrictank packages here](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=)
+
+We also automatically publish packages for our other pieces you need:
+
+* [our graphite-api fork](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=graphite-api&dist=)
+* [the graphite-metrictank finder plugin](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=graphite-metrictank&dist=)
 
 ### chef cookbook
 
 [chef_metric_tank](https://github.com/raintank/chef_metric_tank)
+
+This installs only metrictank itself, and none of its dependencies.
 
 ### docker
 
