@@ -31,16 +31,19 @@ go get github.com/raintank/metrictank
 
 ### distribution packages
 
-#### bleeding edge packages
+We automatically build rpms and debs on circleCi whenever the build succeeds.
+These packages are pushed to packagecloud.
+Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/raintank/metrictank/releases)),
+whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
+the 20th commit after `0.5.1`
 
-https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=
+We aim to keep master stable so that's your best bet.
 
-#### stable packages
+[Get the packages here](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=)
 
-TODO: stable packages, rpms
+### chef cookbook
 
-### using chef
-https://github.com/raintank/chef_metric_tank
+[chef_metric_tank](https://github.com/raintank/chef_metric_tank)
 
 ### docker
 
