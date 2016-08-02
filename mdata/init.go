@@ -20,6 +20,8 @@ var (
 
 	metricsActive met.Gauge
 	gcMetric      met.Count // metrics GC
+
+	OffsetFence *int64 // when using kafka for metrics and clustering, points to the offset of a kafka metrics stream to guarantee some synchronisation between cluster and metrics feeds
 )
 
 func InitMetrics(stats met.Backend) {

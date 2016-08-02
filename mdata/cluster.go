@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/raintank/met"
@@ -113,6 +114,7 @@ type PersistMessage struct {
 type PersistMessageBatch struct {
 	Instance    string       `json:"instance"`
 	SavedChunks []SavedChunk `json:"saved_chunks"`
+	OffsetFence int64
 }
 
 type SavedChunk struct {
@@ -151,6 +153,14 @@ func (cl Cl) Handle(data []byte) {
 		if batch.Instance == cl.instance {
 			log.Debug("CLU skipping batch message we generated.")
 			return
+		}
+		if OffsetFence != nil {
+			curOffset := atomic.LoadInt64(OffsetFence)
+			for curOffset < batch.OffsetFence {
+				log.Warn("CLU: offset in batch message %d is ahead of our current metrics offset %d . waiting...", batch.OffsetFence, curOffset)
+				time.Sleep(500 * time.Millisecond)
+				curOffset = atomic.LoadInt64(OffsetFence)
+			}
 		}
 		for _, c := range batch.SavedChunks {
 			if agg, ok := cl.metrics.Get(c.Key); ok {

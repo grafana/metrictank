@@ -320,6 +320,11 @@ func main() {
 	if clKafka.Enabled {
 		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
 		handlers = append(handlers, clKafkaInst)
+
+		// if we use kafka for clustering and the kafka-mdm, then synchronize them
+		if inKafkaMdm.Enabled {
+			mdata.OffsetFence = new(int64)
+		}
 	}
 
 	mdata.InitCluster(stats, handlers...)
