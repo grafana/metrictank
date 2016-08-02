@@ -330,13 +330,20 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 // write a chunk to peristent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
-	pre := time.Now()
-	chunk := a.Chunks[pos]
-	chunk.Finish()
+
 	if !CluStatus.IsPrimary() {
 		if LogLevel < 2 {
 			log.Debug("AM persist(): node is not primary, not saving chunk.")
 		}
+		return
+	}
+
+	pre := time.Now()
+	chunk := a.Chunks[pos]
+
+	if chunk.Saved || chunk.Saving {
+		// this can happen if chunk was persisted by GC (stale) and then new data triggered another persist call
+		log.Debug("AM persist(): duplicate persist call for chunk.")
 		return
 	}
 
@@ -390,8 +397,9 @@ func (a *AggMetric) persist(pos int) {
 	// before newer data.
 	for pendingChunk >= 0 {
 		if LogLevel < 2 {
-			log.Debug("AM persist(): adding chunk %d/%d (%s:%d) to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
+			log.Debug("AM persist(): sealing chunk %d/%d (%s:%d) and adding to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
 		}
+		pending[pendingChunk].chunk.Finish()
 		a.store.Add(pending[pendingChunk])
 		pending[pendingChunk].chunk.Saving = true
 		pendingChunk--
