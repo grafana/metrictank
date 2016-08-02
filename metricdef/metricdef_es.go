@@ -174,7 +174,7 @@ func (d *DefsEs) getBulkSend() func(buf *bytes.Buffer) error {
 
 		// If something goes wrong at this stage, return an error and bulkIndexer will retry.
 		if err != nil {
-			log.Error(3, "ES: failed to send defs batch", err)
+			log.Error(3, "ES: failed to send defs batch. will retry: %s", err)
 			return err
 		}
 
