@@ -47,7 +47,32 @@ We aim to keep master stable so that's your best bet.
 
 ### docker
 
-TODO
+[Docker](docker.io) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
+[docker installation instructions](https://www.docker.com/products/overview)
+
+You will also need to install [docker-compose](https://docs.docker.com/compose/)
+
+You can bring up the stack like so:
+
+```
+docker-compose up
+```
+
+Once the stack is up, metrictank should be running on port 6060:
+
+```
+$ curl http://localhost:6060
+OK
+$ curl http://localhost:6060/cluster
+{"instance":"default","primary":true,"lastChange":"2016-08-02T17:12:25.339785926Z"}
+```
+
+TODO: add datasource in grafana, send metrics to MT carbon port, validate MT own metrics show up, import MT own dashboard
+
+And tear it down like so:
+```
+docker-compose stop
+```
 
 ## set up cassandra
 
