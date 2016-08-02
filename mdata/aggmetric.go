@@ -437,13 +437,19 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 	if t0 == currentChunk.T0 {
 		// last prior data was in same chunk as new point
-		if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err == nil {
-			if currentChunk.Saved {
-				// we allow adding data to already-saved chunks, but this doesn't mean we'll re-save them
-				// typically this happens when non-primaries receive metrics that the primary already saved (maybe cause they are running behind)
-				// if this happens on the primary, that indicates a problem so you should monitor this condition closely
-				// TODO: note that the chunk may already have its end-of-stream marker, and we put points beyond it. maybe we should not push when Saving == true
+		if currentChunk.Saving {
+			// if we're already saving the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
+			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
+			addToSavingChunk.Inc(1)
+			return
+		}
 
+		if err := currentChunk.Push(ts, val); err == nil {
+			if currentChunk.Saved {
+				// if we're here, it means we marked it as Saved because it was saved by an other primary, not by us since Saving is false.
+				// typically this happens when non-primaries receive metrics that the primary already saved (maybe cause their metrics consumer is laggy)
+				// we allow adding data to such chunks in that case, though this open the possibility for data to be rejected by the primary, to be
+				// visible on secondaries.
 				addToSavedChunk.Inc(1)
 			}
 		} else {
