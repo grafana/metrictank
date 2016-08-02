@@ -164,7 +164,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 				if err == nil {
 					success = true
 					cwr.chunk.Saved = true
-					SendPersistMessage(cwr.key, cwr.chunk.T0)
+					SendPersistMessage(cwr.key, cwr.chunk.T0, cwr.partKey)
 					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc(1)
 				} else {

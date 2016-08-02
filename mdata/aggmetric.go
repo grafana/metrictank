@@ -30,11 +30,12 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	firstChunkT0    uint32
 	ttl             uint32
+	partKey         []byte // used with kafkaall, to route persist messages with same key as the metric came in with
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...AggSetting) *AggMetric {
+func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint32, partKey []byte, aggsetting ...AggSetting) *AggMetric {
 	m := AggMetric{
 		store:     store,
 		Key:       key,
@@ -42,9 +43,10 @@ func NewAggMetric(store Store, key string, chunkSpan, numChunks uint32, ttl uint
 		NumChunks: numChunks,
 		Chunks:    make([]*chunk.Chunk, 0, numChunks),
 		ttl:       ttl,
+		partKey:   partKey,
 	}
 	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(store, key, as.Span, as.ChunkSpan, as.NumChunks, as.Ttl))
+		m.aggregators = append(m.aggregators, NewAggregator(store, key, partKey, as.Span, as.ChunkSpan, as.NumChunks, as.Ttl))
 	}
 
 	return &m
@@ -355,6 +357,7 @@ func (a *AggMetric) persist(pos int) {
 		chunk:     chunk,
 		ttl:       a.ttl,
 		timestamp: time.Now(),
+		partKey:   a.partKey,
 	}
 
 	// if we recently became the primary, there may be older chunks
@@ -374,6 +377,7 @@ func (a *AggMetric) persist(pos int) {
 			chunk:     previousChunk,
 			ttl:       a.ttl,
 			timestamp: time.Now(),
+			partKey:   a.partKey,
 		})
 		previousPos--
 		if previousPos < 0 {

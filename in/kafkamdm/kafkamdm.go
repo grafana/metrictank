@@ -121,7 +121,7 @@ func (k *KafkaMdm) consume() {
 		if LogLevel < 2 {
 			log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 		}
-		k.In.Handle(msg.Value)
+		k.In.Handle(msg.Key, msg.Value)
 		k.consumer.MarkOffset(msg, "")
 	}
 	log.Info("kafka-mdm consumer ended.")

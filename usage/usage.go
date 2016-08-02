@@ -101,7 +101,7 @@ func (u *Usage) Report() {
 		met.Value = val
 		met.SetId()
 
-		m := metrics.GetOrCreate(met.Id)
+		m := metrics.GetOrCreate(met.Id, nil) // TODO: usage metrics should have an appropriate partition key so they end up with their org
 		m.Add(uint32(met.Time), met.Value)
 		defCache.Add(met)
 	}

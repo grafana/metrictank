@@ -42,7 +42,7 @@ func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage,
 	}
 }
 
-func (in In) process(metric *schema.MetricData) {
+func (in In) process(key []byte, metric *schema.MetricData) {
 	if metric == nil {
 		return
 	}
@@ -54,7 +54,7 @@ func (in In) process(metric *schema.MetricData) {
 		log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
 		in.defCache.Add(metric)
-		m := in.metrics.GetOrCreate(metric.Id)
+		m := in.metrics.GetOrCreate(metric.Id, key)
 		m.Add(uint32(metric.Time), metric.Value)
 		if in.usage != nil {
 			in.usage.Add(metric.OrgId, metric.Id)
@@ -78,11 +78,11 @@ func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
 	md.SetId()
 	in.metricsPerMessage.Value(int64(1))
 	in.metricsReceived.Inc(1)
-	in.process(md)
+	in.process(nil, md)
 }
 
 // Handle processes simple messages without format spec or produced timestamp, so we don't track msgsAge here
-func (in In) Handle(data []byte) {
+func (in In) Handle(key, data []byte) {
 	// TODO reuse?
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
@@ -93,7 +93,7 @@ func (in In) Handle(data []byte) {
 	}
 	in.metricsPerMessage.Value(int64(1))
 	in.metricsReceived.Inc(1)
-	in.process(&md)
+	in.process(key, &md)
 }
 
 // HandleArray processes MetricDataArray messages that have a format spec and produced timestamp.
@@ -116,6 +116,6 @@ func (in In) HandleArray(data []byte) {
 	in.metricsReceived.Inc(int64(len(in.tmp.Metrics)))
 
 	for _, metric := range in.tmp.Metrics {
-		in.process(metric)
+		in.process(nil, metric)
 	}
 }
