@@ -96,16 +96,31 @@ see tags.md
 
 As mentioned above Cassandra already does that for the storage layer, but at a certain point we'll need it for the memory layer as well.
 
+## Docs
 
+### installation, configuration and operation.
 
-## Help, more info, documentation, ...
+* [Installation guide](https://github.com/raintank/metrictank/blob/master/docs/installation.md)
+* [Configuration](https://github.com/raintank/metrictank/blob/master/docs/config.md)
+* [Data knobs](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md)
+* [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+* [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)
+* [Metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
+* [Operations](https://github.com/raintank/metrictank/blob/master/docs/operations.md)
 
-[community slack](http://slack.raintank.io/). This is the raintank slack, it has a metrictank room (as well as a grafana room and a room for all of our products)
+### features in-depth
 
-[docs](https://github.com/raintank/metrictank/tree/master/docs)
+* [Clustering](https://github.com/raintank/metrictank/blob/master/docs/clustering.md)
+* [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
+* [HTTP api](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
+* [Metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
+* [Tags](https://github.com/raintank/metrictank/blob/master/docs/tags.md)
+* [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
 
-For help or questions, you can also just open tickets in GitHub.
+### Other
 
+* [Development](https://github.com/raintank/metrictank/blob/master/docs/development.md)
+* [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
 
 
 License
