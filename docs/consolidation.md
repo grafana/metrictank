@@ -1,3 +1,5 @@
+# consolidation
+
 When you request a larger amount of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
 There's two pieces to this puzzle - rollups and runtime consolidation - explained below.
 
@@ -12,7 +14,7 @@ But you can override this (see http-api.md) to use avg, min, max, sum.
 Which ever function is used, metrictank will select the appropriate rollup band, and if necessary also perform runtime consolidation to further reduce the dataset.
 
 
-# rollups
+## rollups
 Rollups are additional archive series that are automatically created for each input series and stored in memory and in cassandra just like any other.
 We don't just store the raw data, but also statistical summaries, computed over configurable timeframes, and using different functions.
 
@@ -24,14 +26,14 @@ We don't just store the raw data, but also statistical summaries, computed over 
 (sum and count are used to compute the average on the fly)
 
 
-# runtime consolidation
+## runtime consolidation
 
 This further reduces data at runtime on an as-needed basis.
 
 It supports min, max, sum, average.
 
 
-# The request alignment algorithm
+## The request alignment algorithm
 
 Metrictank uses a function called `alignRequests` which will:
 
@@ -85,7 +87,7 @@ However, if a rollup band is available with higher resolution than this outcome,
 
 * At this point, we now know which archives to fetch for each series and which runtime consolidation to apply, to best match the given request.
 
-# configuration considerations
+## configuration considerations
 
 * avoid doing too many bands of data and having their TTL's be too similar, because they will all contain the most recent data and overlap.  
   Aim to achieve about 10x or more reduction from one level to the next

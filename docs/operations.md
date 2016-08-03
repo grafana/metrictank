@@ -1,5 +1,6 @@
+# operations
 
-# monitoring
+## monitoring
 
 You should monitor the dependencies according to their best practices.
 In particular, pay attention to delays in your kafka queue, if you use it.
@@ -8,12 +9,12 @@ when you move around the primary role.
 
 Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
 
-## dashboard
+### dashboard
 
 grafana.net
 
 
-## useful metrics to monitor/alert on
+### useful metrics to monitor/alert on
 
 * process is running and listening on its http port (and carbon port, if you enabled it) (use your monitoring agent of choice for this)
 * `stats.*.gauges.metric_tank.*.cluster.primary`: assures you have exactly 1 primary node (saving to cassandra)
@@ -28,6 +29,6 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 
 
-# primary failover
+## primary failover
 
 

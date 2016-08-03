@@ -1,3 +1,4 @@
+# usage reporting
 
 Every organisation will have 2 series automatically appear in their metrics tree:
 

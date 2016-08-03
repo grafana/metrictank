@@ -3,7 +3,7 @@
 We run what is currently the latest version, 3.0.8, and recommend you do the same.
 It also works with 2.2 (we ran on 2.2.3 for a while), with some schema and compaction tweaks, see below.
 
-# schema
+## schema
 
 by default, metrictank will initialize with the following settings:
 
@@ -41,7 +41,7 @@ If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](
 See [issue cassandra-9666](https://issues.apache.org/jira/browse/CASSANDRA-9666) for more information.
 You may also need to lower the cql-protocol-version value in the config to 3 or 2.
 
-# write queues
+## write queues
 
 Tuning the write queue is a bit tricky for now.
 Basically you have to make sure that `number of concurrent writers` times `write queue size` is enough to queue up all chunk writes that may occur at any given time.

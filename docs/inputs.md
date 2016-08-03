@@ -1,3 +1,5 @@
+# inputs
+
 All input options - except for the carbon input - use the [metrics 2.0](http://metrics20.org/) format.
 See the [schema repository](https://github.com/raintank/schema) for more details.
 
