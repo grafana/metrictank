@@ -62,25 +62,26 @@ The algorithm works like so:
   - if the latter number is lower, we move to the higher resolution option and turn on runtime consolidation.  
   the reasoning here is that the first one was much too low resolution and it makes more sense to start with higher resolution data and incur the overhead of runtime consolidation.
 
-  An example:
-  Let's say we requested a time range of 1 hour, and the options are:
+Let's clarify the 3rd step with an example.
+Let's say we requested a time range of 1 hour, and the options are:
 
-   i | span  | pointCount
-   ======================
-   0 | 10s   | 360
-   1 | 600s  | 6
-   2 | 7200s | 0
+| i   | span  | pointCount |
+| --- | ----- | ---------- |
+| 0   | 10s   | 360        |
+| 1   | 600s  | 6          |
+| 2   | 7200s | 0          |
 
-   if maxDataPoints is 100, then selected will initially be 1, our 600s rollups.
-   We then calculate the ratio between maxPoints and our
-   selected pointCount "6" and the previous option "360".
-   ```
-   belowMaxDataPointsRatio = 100/6   = 16.67
-   aboveMaxDataPointsRatio = 360/100 = 3.6
-   ```
+if maxDataPoints is 100, then selected will initially be 1, our 600s rollups.
+We then calculate the ratio between maxPoints and our
+selected pointCount "6" and the previous option "360".
 
-   As the maxDataPoint requested is much closer to 360 then it is to 6,
-   we will use the 360 raw points and do runtime consolidation.
+```
+belowMaxDataPointsRatio = 100/6   = 16.67
+aboveMaxDataPointsRatio = 360/100 = 3.6
+```
+
+As the maxDataPoint requested is much closer to 360 then it is to 6,
+we will use the 360 raw points and do runtime consolidation.
 
 * If the metrics have different raw intervals, and we selected the raw interval, then we change the interval to the least common multiple of the different raw intervals and turn on runtime consolidation to bridge the gap.
 However, if a rollup band is available with higher resolution than this outcome, then we'll use that instead, since all series can be assumed to have the same rollup configuration.  Note that this may be a sign of a suboptimal configuration: you want raw bands to be "compatible" with each other and the rollups, and rollup bands should not be higher resolution than the raw input data.
