@@ -97,11 +97,6 @@ see tags.md
 As mentioned above Cassandra already does that for the storage layer, but at a certain point we'll need it for the memory layer as well.
 
 
-## Development
-
-[govendor](https://github.com/kardianos/govendor) for managing vendored depedencies
-`go build` to build
-
 
 ## Help, more info, documentation, ...
 
