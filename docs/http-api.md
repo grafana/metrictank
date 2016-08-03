@@ -1,3 +1,5 @@
+# http api
+
 Note that some of the endpoints rely on being a fed a proper Org-Id.
 You may not want to expose directly to people if they can control that header.
 Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
@@ -59,8 +61,8 @@ POST /render
 * target: mandatory. one or more metric names or patterns, like graphite.  
   note: **no graphite functions are currently supported** except that
   you can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see consolidation.md
-* from: see tspec.md (default: 24 ago) (exclusive)
-* to/until : see tspec.md (default: now) (inclusive)
+* from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
+* to/until : see [timespec format](#tspec)(default: now) (inclusive)
 
 ## low-level data query api 
 
@@ -76,8 +78,8 @@ POST /get
 * header `X-Org-Id` required
 * maxDataPoints: int (default: 800)
 * target: mandatory. one or more UUID's of metrics. You can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see consolidation.md
-* from: see tspec.md (default: 24 ago) (inclusive)
-* to/until : see tspec.md (default: now) (exclusive)
+* from: see [timespec format](#tspec)(default: 24 ago) (inclusive)
+* to/until : see [timespec format](#tspec)(default: now) (exclusive)
 
 
 ## cluster status
@@ -103,4 +105,26 @@ parameter values :
 * `primary true|false`
 
 Sets the primary status to this node to true or false.
+
+## misc
+
+### tspec
+
+time specification used throughout the http api:
+can be any of these forms:
+
+* now: current time on server
+* any integer: unix timestamp
+* `-offset` or `offset` gets interpreted as current time minus offset.  
+  Where `offset` is a sequence of one or more `<num><unit>` where unit is one of:
+
+	- ``, `s`, `sec`, `secs`, `second`, `seconds`
+	- `m`, `min`, `mins`, `minute`, `minutes`
+	- `h`, `hour`, `hours`
+	- `d`, `day`, `days`
+	- `w`, `week`, `weeks`
+	- `mon`, `month`, `months`
+	- `y`, `year`, `years`
+
+* datetime in any of the following formats: `15:04 20060102`, `20060102`, `01/02/06`
 
