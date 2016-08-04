@@ -1,0 +1,32 @@
+version: '2'
+services:
+  metrictank:
+    build: metrictank/
+    ports:
+     - "6060:6060"
+    depends_on:
+     - statsdaemon
+     - cassandra
+     - elasticsearch
+  cassandra:
+    image: cassandra:3.0.8
+  statsdaemon:
+    build: statsdaemon/
+    ports:
+     - "8125:8125/udp"
+  graphite-api:
+    build: graphite-api/
+    ports:
+     - "8080:8080"
+    depends_on:
+     - metrictank
+     - statsdaemon
+     - elasticsearch
+  elasticsearch:
+    image: elasticsearch
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - graphite-api

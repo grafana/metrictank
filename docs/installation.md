@@ -56,10 +56,6 @@ We also automatically publish packages for our other pieces you need:
 
 This installs only metrictank itself, and none of its dependencies.
 
-### docker
-
-TODO
-
 ## set up cassandra
 
 You can have metrictank initialize Cassandra with a schema without replication, good for development setups.

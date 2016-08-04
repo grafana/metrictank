@@ -1,0 +1,55 @@
+cache:
+  CACHE_DIR: /tmp/graphite-api-cache
+  CACHE_TYPE: filesystem
+finders:
+- graphite_metrictank.RaintankFinder
+functions:
+- graphite_api.functions.SeriesFunctions
+- graphite_api.functions.PieFunctions
+raintank:
+  tank:
+    url: http://metrictank:6060/
+  es:
+    url: http://elasticsearch:9200/
+search_index: /var/lib/graphite/index
+time_zone: America/New_York
+statsd:
+  host: 'statsdaemon'
+  port: 8125
+logging:
+  version: 1
+  handlers:
+    raw:
+      level: DEBUG
+      class: logging.handlers.RotatingFileHandler
+      filename: /var/log/raintank/graphite-app.log
+      backupCount: 2
+      maxBytes: 536870912
+      formatter: raw
+    flask:
+      class : logging.handlers.RotatingFileHandler
+      formatter: default
+      level   : ERROR
+      filename: /var/log/raintank/graphite-flask.log
+      backupCount: 2
+      maxBytes: 536870912
+  loggers:
+    root:
+      handlers:
+        - raw
+      level: DEBUG
+      propagate: false
+    graphite_api:
+      handlers:
+        - raw
+      level: DEBUG
+  formatters:
+    default:
+      format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+      datefmt: '%Y-%m-%d %H:%M:%S'
+  root:
+    handlers:
+      - flask
+    level: ERROR
+allowed_origins:
+  - localhost:3000
