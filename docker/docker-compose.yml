@@ -5,13 +5,13 @@ services:
     ports:
      - "6060:6060"
     depends_on:
-     - graphite-statsd
+     - statsdaemon
      - cassandra
      - elasticsearch
   cassandra:
     image: cassandra:3.0.8
-  graphite-statsd:
-    build: graphite-statsd/
+  statsdaemon:
+    build: statsdaemon/
     ports:
      - "8125:8125/udp"
   graphite-api:
@@ -20,7 +20,7 @@ services:
      - "8080:8080"
     depends_on:
      - metrictank
-     - graphite-statsd
+     - statsdaemon
      - elasticsearch
   elasticsearch:
     image: elasticsearch

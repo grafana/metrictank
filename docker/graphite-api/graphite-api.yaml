@@ -14,7 +14,7 @@ raintank:
 search_index: /var/lib/graphite/index
 time_zone: America/New_York
 statsd:
-  host: 'graphite-statsd'
+  host: 'statsdaemon'
   port: 8125
 logging:
   version: 1
