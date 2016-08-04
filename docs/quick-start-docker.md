@@ -43,6 +43,8 @@ Add a new data source of name `metrictank`, type `Graphite`, uri `http://localho
 
 When you hit save, Grafana should succeed in talking to the data source.
 
+![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/img/add-datasource-docker.png)
+
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel, you can see that for the `metrictank` there
 will already be a bunch of data: 
 
