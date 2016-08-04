@@ -46,18 +46,6 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * input options: carbon, metrics2.0, kafka. (soon: json or msgpack over http)
 * guards against excessive data requests
 
-## roadmap
-
-#### tagging & metrics2.0
-
-While Metrictank takes in tag metadata in the form of [metrics2.0](http://metrics20.org/) and indexes it, it is not exposed yet for querying.
-There will be various benefits in adopting metrics2.0 fully (better choices for consolidation, data conversion, supplying unit information to Grafana, etc)
-see tags.md
-
-#### sharding / partitioning
-
-As mentioned above Cassandra already does that for the storage layer, but at a certain point we'll need it for the memory layer as well.
-
 ## Docs
 
 ### installation, configuration and operation.
@@ -84,6 +72,7 @@ As mentioned above Cassandra already does that for the storage layer, but at a c
 
 * [Development](https://github.com/raintank/metrictank/blob/master/docs/development.md)
 * [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
+* [Roadmap](https://github.com/raintank/metrictank/blob/master/docs/roadmap.md)
 
 
 License
