@@ -8,7 +8,7 @@
 
 metrictank is a timeseries database, inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
 Most notably, it employs the float64 compression mechanism described in the paper to dramatically lower storage overhead,
-as well as data chunking to lower the load on cassandra.
+as well as data chunking to lower the load on cassandra.  Graphite users are first-class citizens.
 
 ## status
 
