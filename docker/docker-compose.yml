@@ -1,6 +1,7 @@
 version: '2'
 services:
   metrictank:
+    hostname: metrictank-1
     build: metrictank/
     ports:
      - "6060:6060"
@@ -11,10 +12,12 @@ services:
   cassandra:
     image: cassandra:3.0.8
   statsdaemon:
+    hostname: statsdaemon-1
     build: statsdaemon/
     ports:
      - "8125:8125/udp"
   graphite-api:
+    hostname: graphite-api-1
     build: graphite-api/
     ports:
      - "8080:8080"
