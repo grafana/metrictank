@@ -47,16 +47,34 @@ When you hit save, Grafana should succeed in talking to the data source.
 
 ![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/img/add-datasource-docker.png)
 
-Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel, you can see that for the `metrictank` there
-will already be a bunch of data: 
+Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
+In the metrics tab you should see a bunch of data already: 
+
+* data under `stats`: these are metrics coming from metrictank and graphite-api.  
+  i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
+  and statsdaemon sends aggregated metrics into metrictank's carbon port.  Statsdaemon flushes every second.
+* statsdaemon's own internal metrics which it sends to metrictank's carbon port.
+* after about 5 minutes you'll also have some usage metrics show up under `metrictank`. See usage.md
+
+Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,
+you have to modify the storage-schemas.conf, just like with graphite.
+
+You can also send your own data into metrictank using the carbon input, like so:
 
 ```
-while true; do echo -n "example:$((RANDOM % 100))|c" | nc -w 1 -u localhost 8125; done
+echo "example.metric 123 $(date +%s)" | nc localhost 2003
 ```
 
-TODO: send metrics to MT carbon port, validate MT own metrics show up, import MT own dashboard
+TODO: import MT own dashboard
+
 
 Finally, you can tear down the entire stack like so:
 ```
 docker-compose stop
 ```
+
+To clean up all data so you can start fresh, run this after you stopped the stack:
+```
+docker rm -v $(docker ps -a -q -f status=exited)
+```
+This will remove the stopped containers and their data volumes.
