@@ -67,6 +67,7 @@ func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
 	// TODO reuse?
 	md := &schema.MetricData{
 		Name:     name,
+		Metric:   name,
 		Interval: interval,
 		Value:    val,
 		Unit:     "unknown",
