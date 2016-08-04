@@ -53,7 +53,7 @@ stream.close()
 
 args = [
   "graphite-api",
-  "-b", "0.0.0.0:8888",
+  "-b", "0.0.0.0:8080",
   "-w", '%d' % concurrency,
   "--log-level", "debug",
   "graphite_api.app:app",

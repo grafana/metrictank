@@ -17,7 +17,7 @@ services:
   graphite-api:
     build: graphite-api/
     ports:
-     - "8888:8888"
+     - "8080:8080"
     depends_on:
      - metrictank
      - graphite-statsd
