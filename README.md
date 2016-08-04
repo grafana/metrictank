@@ -17,72 +17,34 @@ and bugs to fix.  It should be considered an *alpha* project.
 
 ## limitations
 
-* no strong isolation between tenants (other than to make sure they can't see each other's data).  
-  So tenants could negatively impact the performance or availability for others.
-* no sharding/partitioning mechanism built into metrictank itself yet.  
-  Cassandra of course does this on the data storage level
+* no performance/availability isolation between tenants per instance. (only data isolation)
+* no sharding/partitioning mechanism in metrictank itself yet.  (Cassandra does it for storage)
 * runtime master promotions (for clusters) are a manual process.
-* no computation locality:   
-  - we pull in (raw or pre-rolled-up) data first from cassandra
-  - then process and possibly consolidate it further in metrictank
-  - further processing/aggregation (averaging series together etc) can happen in Graphite.  
-  At a certain scale we will need to move the computation to the data, but we don't have that problem yet,  
-  though we do plan to move more of the graphite logic into metrictank and further develop graphite-ng.
-* many of the key datastructures need to be redesigned for better performance and lower GC pressure.  
-  (there's a whole lot of pointers and strings which even [exposes a shortcoming in the Go GC](https://github.com/golang/go/issues/14812)
-  which can trigger elevated request times (in the seconds range) when a GC runs)
-* the input protocol is currently unoptimized and inefficient.   
-  For one thing we have to split up the data and metadata streams instead of sending all metadata with each point.
-* currently impossible to write back in time. E.g. for any series you can't write points that are earlier than previously written points.
+* no computation locality: we move the data from storage to processing code.  And we have 2 processing steps (metrictank and graphite-api)
+* the datastructures can use performance engineering.   [Our workload exposes a shortcoming in the Go GC](https://github.com/golang/go/issues/14812) which may occasionally inflate response times.
+* the native input protocol is currently not efficient.  Should split up data and metadata streams instead of sending all metadata with each point.
+* we use metrics2.0 in native input protocol and indexes, but barely do anything with it yet.
+* For any series you can't write points that are earlier than previously written points. (unless you restart MT)
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
-* only deals with float64 values. No ints, bools, text, etc.  
-  Some type optimisations may come, though using the float type for ints and bools works quite well thanks to the clever gorilla compression.
-* only uint32 unix timestamps in second resolution.   
-  We found higher-resolution is more useful for ad-hoc debugging, where you can
-  [stream directly to grafana and bypass the database](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
-* no data locality: we don't have anything that puts related series together.   
-  This may help with read performance but we haven't needed to look into this yet.
-
+* only float64 values Ints and bools are stored as floats (works quite well due to the gorilla compression),
+  No text support.  Might be revised later.
+* only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
+* no data locality: doesn't seem needed yet to put related series together.
 
 ## main features
 
-
-#### 100% open source
-
-cause that's how we roll.
-
-
-#### graphite integration
-
-Graphite is a first class citizen for metrictank.  You can use the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin, although
-at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.  We're working on compatibility with graphite-web.
-
-
-#### better roll-ups
-
-Metrictank can store rollups for all your series.  Each rollup is currently 4 series: min/max/sum/count (from which it can also compute the average at runtime).
-This means we can do consolidation (by combining archived rollups with runtime consolidation) accurately and correctly,
+* 100% open source
+* graphite is a first class citizen.  You can use the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin, although
+at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.
+* Accurate, flexible rollups by storing min/max/sum/count (from which it can also compute the average at runtime).
+So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
-
-#### in-memory component for hot data
-
-Metrictank is essentially a (clustered) write-back cache for cassandra, with configurable retention in RAM.  Most of your queries (for recent data) will come out of
-RAM and will be quite fast.  Thanks to dropping RAM prices and the gorilla compression, you can hold a lot of data in RAM this way.
-
-#### multi-tenancy
-
-Metrictank supports multiple tenants (e.g. users) that each have their own isolated data within the system, and can't see other users' data.
-Note:
-* you can simply use it as a single-tenant system by only using 1 organisation
-* you can also share data that every tenant can see by publish as org -1
-
-#### ingestion options:
-
-metrics2.0, kafka, carbon, json or msgpack over http.
-
-#### guards against excessive data requests
+* metrictank acts as a writeback RAM cache for recent data.
+* flexible tenancy: can be used single tenant, multi tenant (multile users who can't see each other's data), and selected data can be shared across all tenants.
+* input options: carbon, metrics2.0, kafka. (soon: json or msgpack over http)
+* guards against excessive data requests
 
 ## roadmap
 
