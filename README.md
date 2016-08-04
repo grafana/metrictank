@@ -20,29 +20,29 @@ and bugs to fix.  It should be considered an *alpha* project.
 * no performance/availability isolation between tenants per instance. (only data isolation)
 * no sharding/partitioning mechanism in metrictank itself yet.  (Cassandra does it for storage)
 * runtime master promotions (for clusters) are a manual process.
-* no computation locality: we move the data from storage to processing code.  And we have 2 processing steps (metrictank and graphite-api)
-* the datastructures can use performance engineering.   [Our workload exposes a shortcoming in the Go GC](https://github.com/golang/go/issues/14812) which may occasionally inflate response times.
-* the native input protocol is currently not efficient.  Should split up data and metadata streams instead of sending all metadata with each point.
+* no computation locality: we move the data from storage to processing code, which is both metrictank and graphite-api.
+* the datastructures can use performance engineering.   [A Go GC issue may occassionally inflate response times](https://github.com/golang/go/issues/14812).
+* the native input protocol is inefficient.  Should not send all metadata with each point.
 * we use metrics2.0 in native input protocol and indexes, but barely do anything with it yet.
 * For any series you can't write points that are earlier than previously written points. (unless you restart MT)
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
-* only float64 values Ints and bools are stored as floats (works quite well due to the gorilla compression),
-  No text support.  Might be revised later.
+* only float64 values. Ints and bools currently stored as floats (works quite well due to the gorilla compression),
+  No text support.
 * only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
 * no data locality: doesn't seem needed yet to put related series together.
 
 ## main features
 
 * 100% open source
-* graphite is a first class citizen.  You can use the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin, although
-at this point it does require a [fork of graphite-api](https://github.com/raintank/graphite-api/) to run.
-* Accurate, flexible rollups by storing min/max/sum/count (from which it can also compute the average at runtime).
+* graphite is a first class citizen.  Currently requires a [fork of graphite-api](https://github.com/raintank/graphite-api/)
+  and the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin.
+* Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 * metrictank acts as a writeback RAM cache for recent data.
-* flexible tenancy: can be used single tenant, multi tenant (multile users who can't see each other's data), and selected data can be shared across all tenants.
+* flexible tenancy: can be used as single tenant or multi tenant. Selected data can be shared across all tenants.
 * input options: carbon, metrics2.0, kafka. (soon: json or msgpack over http)
 * guards against excessive data requests
 
