@@ -51,3 +51,5 @@ logging:
     handlers:
       - flask
     level: ERROR
+allowed_origins:
+  - localhost:3000
