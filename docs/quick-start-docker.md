@@ -41,7 +41,7 @@ $ curl http://localhost:6060/cluster
 
 Then, in your browser, open Grafana which is at `http://localhost:3000` and log in as `admin:admin`
 In the menu upper left, hit `Data Sources` and then the `add data source` button.
-Add a new data source of name `metrictank`, type `Graphite`, uri `http://localhost:8080` and access mode `direct` (not `proxy`).
+Add a new data source with name `metrictank`, check "default", type `Graphite`, uri `http://localhost:8080` and access mode `direct` (not `proxy`).
 
 When you hit save, Grafana should succeed in talking to the data source.
 
