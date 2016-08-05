@@ -212,9 +212,9 @@ func main() {
 	runtime.MemProfileRate = *memProfileRate
 	mdata.InitMetrics(stats)
 
-	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
+	defs, err := metricdef.NewDefsLevelDB("/tmp/metrictank_index_" + *indexName)
 	if err != nil {
-		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
+		log.Fatal(4, "failed to initialize MetricDef storage. %s", err)
 	}
 
 	sigChan := make(chan os.Signal, 1)
