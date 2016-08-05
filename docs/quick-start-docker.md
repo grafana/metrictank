@@ -54,7 +54,9 @@ In the metrics tab you should see a bunch of data already:
   i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
   and statsdaemon sends aggregated metrics into metrictank's carbon port.  Statsdaemon flushes every second.
 * statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* after about 5 minutes you'll also have some usage metrics show up under `metrictank`. See usage.md
+* after about 5 minutes you'll also have some usage metrics show up under `metrictank`. See
+[Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
+
 
 Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,
 you have to modify the storage-schemas.conf, just like with graphite.
@@ -79,7 +81,9 @@ You should now have a functioning dashboard showing all metrictank's internal me
 
 Feel free to play around more, send in more data, create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
 
-If anything doesn't work, please let us know via a ticket on github or reach out on slack. See community.md
+If anything doesn't work, please let us know via a ticket on github or reach out on slack. See
+[Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
+
 
 
 Finally, you can tear down the entire stack like so:

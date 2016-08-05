@@ -10,7 +10,8 @@ By default, metrictank will consolidate (at query time) like so:
 * max if mtype is `counter`.
 * avg for everything else.
 
-But you can override this (see http-api.md) to use avg, min, max, sum.
+But you can override this
+(see [HTTP api](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)) to use avg, min, max, sum.
 Which ever function is used, metrictank will select the appropriate rollup band, and if necessary also perform runtime consolidation to further reduce the dataset.
 
 
