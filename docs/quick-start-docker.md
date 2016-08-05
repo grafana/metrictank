@@ -6,7 +6,28 @@ This tutorial will help you run metrictank, its dependencies, and grafana for da
 [docker installation instructions](https://www.docker.com/products/overview)
 You will also need to install [docker-compose](https://docs.docker.com/compose/)
 
-First go into the `docker` dir of this project.
+## Getting the repository
+
+If you already have go installed, you can just: 
+
+```
+go get github.com/raintank/metrictank
+cd $GOPATH/src/github.com/raintank/metrictank
+```
+
+If you don't, you can just use git, either of these commands should work:
+
+```
+git clone git@github.com:raintank/metrictank.git
+git clone https://github.com/raintank/metrictank.git
+```
+
+If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip) and extract it somewhere
+
+## Bring up the stack
+
+
+Go into the `docker` dir of this project.
 You can bring up the stack like so:
 
 ```
@@ -39,7 +60,11 @@ $ curl http://localhost:6060/cluster
 {"instance":"default","primary":true,"lastChange":"2016-08-02T17:12:25.339785926Z"}
 ```
 
-Then, in your browser, open Grafana which is at `http://localhost:3000` and log in as `admin:admin`
+And Grafana will be running on port 3000
+
+## Working with Grafana and metrictank
+
+In your browser, open Grafana which is at `http://localhost:3000` and log in as `admin:admin`
 In the menu upper left, hit `Data Sources` and then the `add data source` button.
 Add a new data source with name `metrictank`, check "default", type `Graphite`, uri `http://localhost:8080` and access mode `direct` (not `proxy`).
 
@@ -85,8 +110,9 @@ If anything doesn't work, please let us know via a ticket on github or reach out
 [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
 
 
+## Shut down the stack
 
-Finally, you can tear down the entire stack like so:
+You can tear down the entire stack like so:
 ```
 docker-compose stop
 ```
