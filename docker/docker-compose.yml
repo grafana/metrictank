@@ -2,11 +2,14 @@ version: '2'
 services:
   metrictank:
     hostname: metrictank-1
-    build: metrictank/
+    image: raintank/metrictank
     ports:
      - "6060:6060"
      - "2003:2003"
-    depends_on:
+    environment:
+     WAIT_HOSTS: cassandra:9042
+     WAIT_TIMEOUT: 40
+    links:
      - statsdaemon
      - cassandra
      - elasticsearch
@@ -22,7 +25,7 @@ services:
     build: graphite-api/
     ports:
      - "8080:8080"
-    depends_on:
+    links:
      - metrictank
      - statsdaemon
      - elasticsearch
@@ -32,5 +35,5 @@ services:
     image: grafana/grafana
     ports:
       - "3000:3000"
-    depends_on:
+    links:
       - graphite-api
