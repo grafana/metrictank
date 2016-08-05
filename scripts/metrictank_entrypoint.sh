@@ -1,11 +1,12 @@
-#!/bin/bash
+#!/bin/sh
 
 hosts=$(echo $WAIT_HOSTS | tr "," "\n")
 
-for endpoint in hosts; do
+for endpoint in $hosts; do
   while true; do
     echo "waiting for $endpoint to become up..."
-    IFS=: read host port <<< $endpoint
+    host=${endpoint#*:}
+    port=${endpoint%:*}
     nc -z $host $port && echo "$endpoint is up!" && break
     sleep 1
   done
