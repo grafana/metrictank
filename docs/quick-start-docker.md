@@ -45,7 +45,7 @@ Add a new data source with name `metrictank`, check "default", type `Graphite`, 
 
 When you hit save, Grafana should succeed in talking to the data source.
 
-![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/img/add-datasource-docker.png)
+![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/add-datasource-docker.png)
 
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
 In the metrics tab you should see a bunch of data already: 
@@ -65,7 +65,21 @@ You can also send your own data into metrictank using the carbon input, like so:
 echo "example.metric 123 $(date +%s)" | nc localhost 2003
 ```
 
-TODO: import MT own dashboard
+
+Now for something neat!  
+There is an extensive [dashboard on grafana.net](https://grafana.net/dashboards/279) that displays all vital metrictank stats.
+
+![Dashboard screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/dashboard-screenshot.png)
+
+So go to the dashboard dropdown -> import -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
+It will show a dialog with a choice of which graphite datasource to use, for which you can enter `metrictank`.
+
+You should now have a functioning dashboard showing all metrictank's internal metrics, which it reports via statsdaemon, back into itself.
+
+
+Feel free to play around more, send in more data, create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
+
+If anything doesn't work, please let us know via a ticket on github or reach out on slack. See community.md
 
 
 Finally, you can tear down the entire stack like so:

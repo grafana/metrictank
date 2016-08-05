@@ -1,0 +1,2029 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_METRICTANK",
+      "label": "metrictank",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "graphite",
+      "pluginName": "Graphite"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "3.1.1"
+    },
+    {
+      "type": "datasource",
+      "id": "graphite",
+      "name": "Graphite",
+      "version": "1.0.0"
+    }
+  ],
+  "id": null,
+  "title": "Metrictank",
+  "tags": [],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "hideControls": false,
+  "sharedCrosshair": true,
+  "rows": [
+    {
+      "collapse": false,
+      "editable": true,
+      "height": 217,
+      "panels": [
+        {
+          "aliasColors": {
+            "add-to-saving": "#C15C17",
+            "primary": "#2F575E",
+            "too old": "#890F02"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 9,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 9,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 0,
+          "links": [],
+          "nullPointMode": "null as zero",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "too old",
+              "lines": false,
+              "points": true
+            },
+            {
+              "alias": "primary",
+              "fill": 3,
+              "lines": true,
+              "linewidth": 0,
+              "points": false,
+              "yaxis": 2
+            },
+            {
+              "alias": "/ in/",
+              "lines": true,
+              "points": false
+            },
+            {
+              "alias": "/invalid/",
+              "color": "#C15C17"
+            },
+            {
+              "alias": "/decode err/",
+              "color": "#890F02"
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": true,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasSub(stats.$environment.metrictank.$host.*.metrics_received, '.*\\.([^\\.]+)\\.metrics_received', '\\1 in')",
+              "textEditor": false
+            },
+            {
+              "hide": true,
+              "refId": "B",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.primary, 'primary')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.metrictank.$host.metrics_too_old, 'too old')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.metrictank.$host.add_to_saved_chunk, 'add-to-saved')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.metrictank.$host.add_to_saving_chunk, 'add-to-saving')"
+            },
+            {
+              "refId": "F",
+              "target": "aliasSub(stats.$environment.metrictank.$host.*.metrics_decode_err, '.*\\.([^\\.]+)\\.metrics_decode_err', '\\1 decode err')",
+              "textEditor": false
+            },
+            {
+              "refId": "G",
+              "target": "aliasSub(stats.$environment.metrictank.$host.*.metric_invalid, '.*\\.([^\\.]+)\\.metric_invalid', '\\1 metric invalid')",
+              "textEditor": false
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "metrics in",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": 1,
+              "min": 0,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "95th": "#EAB839",
+            "999th": "#890F02",
+            "99th": "#99440A",
+            "GCd metrics/s": "#DEDAF7",
+            "mean": "#0A437C",
+            "median": "#3F6833",
+            "total_points": "#B7DBAB"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 2,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "total_points",
+              "fill": 0,
+              "linewidth": 1,
+              "yaxis": 2
+            },
+            {
+              "alias": "GCd metrics/s",
+              "lines": false,
+              "pointradius": 2,
+              "points": true
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "aliasByNode(stats.$environment.gauges.metrictank.$host.total_points, 5)"
+            },
+            {
+              "hide": false,
+              "refId": "B",
+              "target": "aliasByNode(stats.$environment.gauges.metrictank.$host.metrics_active, 5)"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.metrictank.$host.gc_metric, 'GCd metrics/s')",
+              "textEditor": false
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Metrics & points",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "primary": "#2F575E",
+            "promotion wait": "#E5AC0E",
+            "too old": "#890F02"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 17,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "primary",
+              "fill": 3,
+              "lines": true,
+              "linewidth": 0,
+              "points": false,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": true,
+          "targets": [
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.primary, 'primary')"
+            },
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.promotion_wait, 'promotion wait')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "cluster status",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "s",
+              "logBase": 1,
+              "max": null,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": 1,
+              "min": 0,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "Row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {
+            "GC cpu fraction - promille": "#BF1B00",
+            "alloc speed": "#C15C17"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 1,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 3,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "total_points",
+              "yaxis": 2
+            },
+            {
+              "alias": "bytes_per_point",
+              "linewidth": 1,
+              "yaxis": 1
+            },
+            {
+              "alias": "GC cpu fraction - promille",
+              "linewidth": 1,
+              "yaxis": 2
+            },
+            {
+              "alias": "MT cpu usage - percent",
+              "fill": 4,
+              "linewidth": 0,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": true,
+              "refId": "A",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_alloc.incl_freed, 'alloc incl freed')"
+            },
+            {
+              "hide": false,
+              "refId": "B",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_alloc.not_freed, 'alloc not freed')"
+            },
+            {
+              "hide": false,
+              "refId": "C",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_sys, 'bytes_sys')"
+            },
+            {
+              "hide": true,
+              "refId": "D",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.metrics_active, 'metrics_active')"
+            },
+            {
+              "hide": true,
+              "refId": "E",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.total_points, 'total_points')"
+            },
+            {
+              "hide": false,
+              "refId": "F",
+              "target": "alias(divideSeries(#B, #E), 'bytes_per_point')",
+              "textEditor": false
+            },
+            {
+              "hide": false,
+              "refId": "G",
+              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$host.bytes_alloc.not_freed), 'alloc speed')"
+            },
+            {
+              "hide": false,
+              "refId": "H",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.gc.cpufraction, 'GC cpu fraction - promille')"
+            },
+            {
+              "hide": false,
+              "refId": "I",
+              "target": "alias(measure.nmt_cpu, 'MT cpu usage - percent')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "memory & CPU usage",
+          "tooltip": {
+            "msResolution": true,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": "allocation",
+              "logBase": 1,
+              "max": null,
+              "min": 0,
+              "show": true
+            },
+            {
+              "format": "none",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 13,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "duration",
+              "lines": false,
+              "pointradius": 1,
+              "points": true,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$host.gc.num), 'collections')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.gc.dur, 'duration')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Golang GC",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "ns",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "max": "#890F02",
+            "median": "#CCA300",
+            "p90": "#C15C17"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 5,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "/idle/",
+              "lines": true,
+              "linewidth": 0,
+              "points": false,
+              "stack": true,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.median, 'median')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.upper_90, 'p90')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.upper, 'max')"
+            },
+            {
+              "refId": "D",
+              "target": "aliasByNode(perSecond(collectd.$environment.metric-tank.$host.cpu.*.cpu.idle), 5, 7)"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "request handle duration (all steps)",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "transparent": true,
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "New row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": 221,
+      "panels": [
+        {
+          "aliasColors": {
+            "mem max": "#3F6833",
+            "mem median": "#9AC48A",
+            "mem min": "#E0F9D7",
+            "mem p90": "#7EB26D",
+            "mem-cass max": "#890F02",
+            "mem-cass median": "#E24D42",
+            "mem-cass min": "#F9934E",
+            "mem-cass p90": "#EF843C"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 4,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.lower, 'mem-cass min')"
+            },
+            {
+              "hide": true,
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.upper_90, 'mem-cass p90')"
+            },
+            {
+              "hide": false,
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.median, 'mem-cass med')"
+            },
+            {
+              "hide": false,
+              "refId": "D",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.upper, 'mem-cass max')"
+            },
+            {
+              "hide": false,
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.lower, 'mem min')"
+            },
+            {
+              "hide": false,
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.median, 'mem med')"
+            },
+            {
+              "hide": true,
+              "refId": "G",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.upper_90, 'mem p90')"
+            },
+            {
+              "hide": false,
+              "refId": "H",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.upper, 'mem max')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "requests span",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "s",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "none",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "mem max": "#3F6833",
+            "mem median": "#9AC48A",
+            "mem min": "#E0F9D7",
+            "mem p90": "#7EB26D",
+            "mem-cass max": "#890F02",
+            "mem-cass median": "#E24D42",
+            "mem-cass min": "#F9934E",
+            "mem-cass p90": "#EF843C"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 10,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.count_ps, 'mem-cass req/s')"
+            },
+            {
+              "hide": false,
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.count_ps, 'mem req/s')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "requests rate",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "none",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "cassandra get": "#052B51",
+            "mem to iter": "#EAB839",
+            "total request handle": "#890F02"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 16,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.mean, 'total request handle')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.mean, 'cassandra get')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.to_iter_duration.mean, 'cassandra to iter')",
+              "textEditor": false
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.timers.metrictank.$host.get_target_duration.mean, 'total getTarget')",
+              "textEditor": false
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.iters_to_points_duration.mean, 'iters to points')",
+              "textEditor": false
+            },
+            {
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.mem.to_iter_duration.mean, 'mem to iter')",
+              "textEditor": false
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Duration breakdown per step",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "transparent": true,
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "logBase": 2,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "New row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 14,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "num write-workers",
+              "fill": 4,
+              "linewidth": 0,
+              "yaxis": 2
+            },
+            {
+              "alias": "/items/",
+              "lines": false,
+              "points": true
+            },
+            {
+              "alias": "/limit/",
+              "linewidth": 1
+            },
+            {
+              "alias": "stats.production.timers.metrictank.metric-tank-3-prod.persist_duration.upper",
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "hide": false,
+              "refId": "A",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper, 6, 7, 8)"
+            },
+            {
+              "hide": true,
+              "refId": "B",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size, 'write queue items limit (each)')"
+            },
+            {
+              "hide": false,
+              "refId": "C",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.cassandra.num_writers, 'num write-workers')"
+            },
+            {
+              "hide": false,
+              "refId": "D",
+              "target": "alias(consolidateBy(stats.$environment.timers.metrictank.$host.persist_duration.upper_75, 'sum'), 'persist-duration p75')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "write workers & queues",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "transparent": true,
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "message_size.mean": "#2F575E",
+            "message_size.upper": "#EF843C"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 18,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null as zero",
+          "percentage": false,
+          "pointradius": 1,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "msg published",
+              "fill": 4,
+              "linewidth": 0,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.cluster.message_size.{mean,upper}, 6, 7)"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.metrictank.$host.cluster.messages-published, 'msg published')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "metricpersist",
+          "tooltip": {
+            "msResolution": true,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "hertz",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "add-to-bulk-index-fail": "#58140C",
+            "add-to-bulk-index-ok": "#508642",
+            "mean": "#052B51",
+            "metrics_to_es.fail": "#BF1B00",
+            "metrics_to_es.ok": "#629E51",
+            "upper": "#DEDAF7",
+            "upper_75": "#0A50A1",
+            "upper_90": "#806EB7"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 19,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "mean",
+              "fill": 4,
+              "yaxis": 2
+            },
+            {
+              "alias": "upper",
+              "fill": 4,
+              "yaxis": 2
+            },
+            {
+              "alias": "upper_75",
+              "fill": 4,
+              "yaxis": 2
+            },
+            {
+              "alias": "upper_90",
+              "fill": 4,
+              "yaxis": 2
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.metrictank.$host.metrics_to_es.fail, 'add-to-bulk-index-fail')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.metrictank.$host.metrics_to_es.ok, 'add-to-bulk-index-ok')"
+            },
+            {
+              "refId": "C",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.es_put_duration.{mean,upper*}, 6)"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "ES index writes",
+          "tooltip": {
+            "msResolution": true,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "New row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": 243,
+      "panels": [
+        {
+          "aliasColors": {
+            "size at load max": "#B7DBAB",
+            "size at load median": "#3F6833",
+            "size at load p90": "#508642",
+            "size at save max": "#CFFAFF",
+            "size at save median": "#052B51",
+            "size at save p90": "#65C5DB"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 6,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.median, 'size at load median')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.upper_90, 'size at load p90')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.upper, 'size at load max')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.median, 'size at save median')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.upper_90, 'size at save p90')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.upper, 'size at save max')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "chunk sizes",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "bytes",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "get mean": "#052B51",
+            "get/s": "#052B51",
+            "mean": "#0A50A1",
+            "p90": "#65C5DB",
+            "put mean": "#58140C",
+            "put p90": "#F29191",
+            "put/s": "#BF1B00"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 3,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.count_ps, 'put/s')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.count_ps, 'get/s')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "cassandra req/s",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "block mean": "#3F6833",
+            "block p90": "#9AC48A",
+            "get mean": "#052B51",
+            "get/s": "#052B51",
+            "mean": "#0A50A1",
+            "p90": "#65C5DB",
+            "put mean": "#58140C",
+            "put p90": "#F29191",
+            "put/s": "#BF1B00"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 11,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.upper_90, 'put p90')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.mean, 'put mean')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.upper_90, 'get p90')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.mean, 'get mean')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.upper_90, 'block p90')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.mean, 'block mean')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "cassandra durations",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "New row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {
+            "chunks per row max": "#C15C17",
+            "chunks per row med": "#890F02",
+            "chunks per row min": "#E5AC0E",
+            "rows per resp max": "#508642",
+            "rows per resp med": "#052B51",
+            "rows per resp min": "#6ED0E0"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 7,
+          "legend": {
+            "alignAsTable": false,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "chunks per row max",
+              "fillBelowTo": "chunks per row min",
+              "lines": false
+            },
+            {
+              "alias": "chunks per row min",
+              "lines": false
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.median, 'chunks per row med')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.lower, 'chunks per row min')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.upper, 'chunks per row max')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.median, 'rows per resp med')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.rows_per_response.lower, 'rows per resp min')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.rows_per_response.upper, 'rows per resp max')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "cassandra responses",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "create/s": "#70DBED",
+            "save_fail/s": "#BF1B00",
+            "save_ok/s": "#3F6833"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 8,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.metrictank.$host.chunks.create, 'create/s')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(stats.$environment.metrictank.$host.chunks.clear, 'clear/s')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(stats.$environment.metrictank.$host.chunks.save_ok, 'save_ok/s')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.metrictank.$host.chunks.save_fail, 'save_fail/s')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "chunk operations",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "cache hit": "#3F6833",
+            "duration median": "#BA43A9",
+            "duration upper_90": "#511749",
+            "metricdef lookup duration median": "#E0752D",
+            "metricdef lookup duration upper_90": "#BF1B00"
+          },
+          "bars": false,
+          "datasource": "${DS_METRICTANK}",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 12,
+          "isNew": true,
+          "legend": {
+            "alignAsTable": true,
+            "avg": true,
+            "current": false,
+            "max": true,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": true
+          },
+          "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "/upper/",
+              "fill": 1,
+              "lines": true,
+              "linewidth": 0,
+              "points": false
+            },
+            {
+              "alias": "/prune/",
+              "lines": true,
+              "points": false
+            }
+          ],
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.mean, 6, 7)"
+            },
+            {
+              "refId": "B",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.upper_90, 6, 7)"
+            },
+            {
+              "hide": false,
+              "refId": "C",
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.upper, 6, 7)"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "metric def lookups",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ms",
+              "logBase": 2,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "title": "New row"
+    }
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "collapse": false,
+    "enable": true,
+    "notice": false,
+    "now": true,
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "status": "Stable",
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ],
+    "type": "timepicker"
+  },
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "metrictank",
+          "value": "metrictank",
+          "tags": []
+        },
+        "datasource": null,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "options": [
+          {
+            "text": "default",
+            "value": "default",
+            "selected": false
+          },
+          {
+            "text": "metrictank",
+            "value": "metrictank",
+            "selected": true
+          }
+        ],
+        "query": "graphite",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allFormat": "glob",
+        "current": {},
+        "datasource": "${DS_METRICTANK}",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "multiFormat": "glob",
+        "name": "environment",
+        "options": [],
+        "query": "stats.*",
+        "refresh": 1,
+        "refresh_on_load": false,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allFormat": "glob",
+        "current": {},
+        "datasource": "${DS_METRICTANK}",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "multiFormat": "glob",
+        "name": "host",
+        "options": [],
+        "query": "stats.$environment.metrictank.*",
+        "refresh": 1,
+        "refresh_on_load": false,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "refresh": false,
+  "schemaVersion": 12,
+  "version": 3,
+  "links": [],
+  "gnetId": null
+}
