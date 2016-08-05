@@ -2,24 +2,13 @@
 
 hosts=$(echo $WAIT_HOSTS | tr "," "\n")
 
-
-wait_for()
-{
-	IFS=: read HOST PORT <<< $1
-
-    while :
-    do
-        (echo > /dev/tcp/$HOST/$PORT) >/dev/null 2>&1
-        result=$?
-        if [[ $result -eq 0 ]]; then
-            break
-        fi
-        sleep 1
-    done
-}
-
-for h in $hosts; do
-	wait_for $h
+for endpoint in hosts; do
+  while true; do
+    echo "waiting for $endpoint to become up..."
+    IFS=: read host port <<< $endpoint
+    nc -z $host $port && echo "$endpoint is up!" && break
+    sleep 1
+  done
 done
 
 exec /usr/bin/metrictank $@
