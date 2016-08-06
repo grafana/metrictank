@@ -117,8 +117,6 @@ var (
 	reqHandleDuration met.Timer
 	inItems           met.Meter
 	points            met.Gauge
-	msgsHandleOK      met.Count
-	msgsHandleFail    met.Count
 	alloc             met.Gauge
 	totalAlloc        met.Gauge
 	sysBytes          met.Gauge
@@ -418,8 +416,6 @@ func initMetrics(stats met.Backend) {
 	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
-	msgsHandleOK = stats.NewCount("handle.ok")
-	msgsHandleFail = stats.NewCount("handle.fail")
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
 	sysBytes = stats.NewGauge("bytes_sys", 0)
