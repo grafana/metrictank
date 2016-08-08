@@ -17,6 +17,8 @@ import (
 var (
 	metricsToEsOK           met.Count
 	metricsToEsFail         met.Count
+	metricsIndexedOk        met.Count
+	metricsIndexedFail      met.Count
 	esPutDuration           met.Timer // note that due to our use of bulk indexer, most values will be very fast with the occasional "outlier" which triggers a flush
 	idxPruneDuration        met.Timer
 	idxGetDuration          met.Timer
@@ -46,6 +48,8 @@ type DefCache struct {
 func New(defsStore metricdef.Defs, stats met.Backend) *DefCache {
 	metricsToEsOK = stats.NewCount("metrics_to_es.ok")
 	metricsToEsFail = stats.NewCount("metrics_to_es.fail")
+	metricsIndexedOk = stats.NewCount("metrics_indexed.ok")
+	metricsIndexedFail = stats.NewCount("metrics_indexed.fail")
 	esPutDuration = stats.NewTimer("es_put_duration", 0)
 	idxPruneDuration = stats.NewTimer("idx.prune_duration", 0)
 	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
@@ -170,8 +174,10 @@ func (dc *DefCache) addToES(mdef *schema.MetricDefinition) {
 // so yes, there is a small chance we won't get to that if no new data comes in, which is something to address later.
 func (dc *DefCache) AsyncResultCallback(id string, ok bool) {
 	if ok {
+		metricsIndexedOk.Inc(1)
 		return
 	}
+	metricsIndexedFail.Inc(1)
 	dc.Lock()
 	mdef := dc.GetById(idx.MetricID(id))
 	if mdef == nil {

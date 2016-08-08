@@ -1284,6 +1284,14 @@
             },
             {
               "refId": "C",
+              "target": "alias(stats.$environment.metrictank.$host.metrics_indexed.fail, 'indexed-fail')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(stats.$environment.metrictank.$host.metrics_indexed.ok, 'indexed-ok')"
+            },
+            {
+              "refId": "E",
               "target": "aliasByNode(stats.$environment.timers.metrictank.$host.es_put_duration.{mean,upper*}, 6)"
             }
           ],
