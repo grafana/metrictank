@@ -19,7 +19,8 @@ import (
 type In struct {
 	metricsPerMessage met.Meter
 	metricsReceived   met.Count
-	MetricsDecodeErr  met.Count
+	MetricsDecodeErr  met.Count // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+	MetricInvalid     met.Count // metric metric_invalid is a count of times a metric did not validate
 	msgsAge           met.Meter // in ms
 	tmp               msg.MetricData
 
@@ -33,6 +34,7 @@ func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage,
 		metricsPerMessage: stats.NewMeter(fmt.Sprintf("%s.metrics_per_message", input), 0),
 		metricsReceived:   stats.NewCount(fmt.Sprintf("%s.metrics_received", input)),
 		MetricsDecodeErr:  stats.NewCount(fmt.Sprintf("%s.metrics_decode_err", input)),
+		MetricInvalid:     stats.NewCount(fmt.Sprintf("%s.metric_invalid", input)),
 		msgsAge:           stats.NewMeter(fmt.Sprintf("%s.message_age", input), 0),
 		tmp:               msg.MetricData{Metrics: make([]*schema.MetricData, 1)},
 
@@ -46,8 +48,10 @@ func (in In) process(metric *schema.MetricData) {
 	if metric == nil {
 		return
 	}
-	if metric.Id == "" {
-		log.Error(3, "empty metric.Id - fix your datastream")
+	err := metric.Validate()
+	if err != nil {
+		in.MetricInvalid.Inc(1)
+		log.Debug("Invalid metric %s %v", err, metric)
 		return
 	}
 	if metric.Time == 0 {
