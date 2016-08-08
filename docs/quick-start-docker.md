@@ -124,7 +124,10 @@ If anything doesn't work, please let us know via a ticket on github or reach out
 
 ## Shut down the stack
 
-You can tear down the entire stack like so:
+You can shut down the stack by just hitting `Ctrl-C` on your running `docker-compose up` command.
+
+
+You can remove the containers like so:
 ```
 docker-compose stop
 ```
