@@ -15,22 +15,22 @@ go get github.com/raintank/metrictank
 cd $GOPATH/src/github.com/raintank/metrictank
 ```
 
-If you don't, you can just use git, either of these commands should work:
+If you don't, you can just use git:
 
 ```
-git clone git@github.com:raintank/metrictank.git
 git clone https://github.com/raintank/metrictank.git
+cd metrictank
 ```
 
-If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip) and extract it somewhere
+If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip), extract it somewhere and cd into it.
 
 ## Bring up the stack
 
 
-Go into the `docker` dir of this project.
 You can bring up the stack like so:
 
 ```
+cd docker
 docker-compose up
 ```
 
