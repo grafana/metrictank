@@ -4,10 +4,10 @@
 
 
 ## introduction
-*Metrictank is a multi-tenant, gorilla-inspired, cassandra-backed timeries database*
+*Metrictank is a cassandra-backed, metrics2.0 based, multi-tenant timeries database for Graphite and friends*
 
 metrictank is a timeseries database, inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
-Most notably, it employs the float64 compression mechanism described in the paper to dramatically lower storage overhead,
+Most notably, it employs the compression mechanism described in the paper to dramatically lower storage overhead,
 as well as data chunking to lower the load on cassandra.  Graphite users are first-class citizens.
 
 ## status
@@ -36,8 +36,8 @@ and bugs to fix.  It should be considered an *alpha* project.
 ## main features
 
 * 100% open source
-* graphite is a first class citizen.  Currently requires a [fork of graphite-api](https://github.com/raintank/graphite-api/)
-  and the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin.
+* graphite is a first class citizen (note: currently requires a [fork of graphite-api](https://github.com/raintank/graphite-api/)
+  and the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin)
 * Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
@@ -45,6 +45,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * flexible tenancy: can be used as single tenant or multi tenant. Selected data can be shared across all tenants.
 * input options: carbon, metrics2.0, kafka. (soon: json or msgpack over http)
 * guards against excessive data requests
+* efficient data compression and efficient use of Cassandra.
 
 ## Docs
 
