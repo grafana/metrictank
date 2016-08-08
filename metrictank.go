@@ -210,6 +210,7 @@ func main() {
 	runtime.MemProfileRate = *memProfileRate
 	mdata.InitMetrics(stats)
 
+	// we don't set an AsyncResultCallback here, but will do so from defcache
 	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
