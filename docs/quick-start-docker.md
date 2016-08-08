@@ -26,6 +26,16 @@ If you have neither, just [download the zip](https://github.com/raintank/metrict
 
 ## Bring up the stack
 
+The stack will listen on the following ports:
+
+* 2003 tcp (metrictank's carbon input)
+* 3000 tcp (grafana's http port)
+* 6060 tcp (metrictank's internal endpoint)
+* 8080 tcp (the graphite api query endpoint)
+* 8125 udp (statsd endpoint)
+
+If you already have something else listen to that port (such as a carbon or grafana server), shut it down, as it will conflict.
+
 
 You can bring up the stack like so:
 
