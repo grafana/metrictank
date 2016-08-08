@@ -1,5 +1,8 @@
 # data knobs
 
+See [the example config](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) for an overview and basic explanation of what the config values are.
+Some of the values related to chunking and compression are a bit harder to tune, so this article will explain in more detail.
+
 ## compression tips
 
 * values that never - or infrequently - change compress extremely well, so are very cheap to track and store.
@@ -16,18 +19,26 @@ For more details, see the [go-tsz eval program](https://github.com/dgryski/go-ts
 
 ### basic guideline
 
-figuring out optimal configuration for the `chunkspan` and `numchunks` is not trivial.
-The standard recommendation is 120 points per chunk and keep at least as much in RAM as what your commonly query for (+1 maybe extra chunk, see example below)
+`chunkspan` is how long of a timeframe should be covered by your chunks. E.g. you could store anywhere between 10 minutes to 24 hours worth of data in a chunk (chunks for each raw metric).
+`numchunks` is simply how many chunks should be retained in RAM. (for each raw metric)
 
-Note that `chunkspan` and `numchunks` are currently global variables, which can't be finetuned on a per-metric or per-category level.
-So if your most common interval is 10s and most of your dashboards query for 2h worth of data, then the recommendation is:
+figuring out optimal configuration for the `chunkspan` and `numchunks` is not trivial.
+The standard recommendation is 120 points per chunk and keep at least as much in RAM as what your commonly query for (+1 extra chunk, see below)
+
+E.g. if your most common interval is 10s and most of your dashboards query for 2h worth of data, then the recommendation is:
 ```
 chunkspan = 20min
 numchunks = 7
 ```
+
+20min because 120 points per chunk every 10 seconds is 1200 seconds or 20 minutes.
 If you expected 6 chunks (20min * 6 = 2h), the answer is that you always need 1 extra chunk,
 because the current chunk is typically incomplete and only covers a fraction of the ongoing 20min timeslot,
 so you should always make sure to cover the requirements of one extra chunkspan.
+
+Note:
+* `chunkspan` and `numchunks` are currently global variables, which can't be finetuned on a per-metric or per-category level.
+* when defining consolidation (rollups), you can specify custom chunkspans and numchunks for each rollup setting.  As rollups will have more time between points, it makes sense to choose longer chunkspans for rollups.
 
 ### additional factors
 
@@ -37,7 +48,7 @@ Several factors come into play that may affect the above recommendation:
 If you roll-up data for archival storage, those chunks will also be in memory as per your configuration.
 Querying for large timeframes may use the consolidated chunks in RAM, and keeping
 extra raw (or higher-resolution) data in RAM becomes pointless, putting an upper bound on how many chunks to keep.  
-See rollups documentation.
+See [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 
 
 #### Compression efficiency
