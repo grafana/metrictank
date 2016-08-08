@@ -37,18 +37,23 @@ This installs only metrictank itself, and none of its dependencies.
 
 ### distribution packages
 
-We automatically build rpms and debs on circleCi whenever the build succeeds.
+We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
+
+[Instructions to enable the raintank packagecloud repository](https://packagecloud.io/raintank/raintank/install)
+
+You need to install these packages:
+
+* metrictank
+* graphite-metrictank (includes both our graphite-api variant as well as the graphite-metrictank finder plugin)
+
 Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/raintank/metrictank/releases)),
 whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
 the 20th commit after `0.5.1`
 
 We aim to keep master stable so that's your best bet.
 
-[Get the metrictank packages here](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=)
-
-We also automatically publish packages called [graphite-metrictank](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=graphite-metrictank&dist=)
-which include both our graphite-api variant as well as the graphite-metrictank finder plugin.
+Supported distributions: Ubuntu 14.04, Ubuntu 16.04, Debian Wheezy, Debian Jessie, Centos 6, Centos 7.
 
 ### chef cookbook
 
