@@ -7,7 +7,7 @@
 * Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
 * optionally a queue: Kafka 0.10 is recommended, but 0.9 should work too.
 * currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
-  and our [graphite-api fork](https://github.com/raintank/graphite-api/).
+  and our [graphite-api fork](https://github.com/raintank/graphite-api/). (which we install as 1 piece)
 
 ## how things fit together
 
@@ -37,20 +37,23 @@ This installs only metrictank itself, and none of its dependencies.
 
 ### distribution packages
 
-We automatically build rpms and debs on circleCi whenever the build succeeds.
+We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
+
+[Instructions to enable the raintank packagecloud repository](https://packagecloud.io/raintank/raintank/install)
+
+You need to install these packages:
+
+* metrictank
+* graphite-metrictank (includes both our graphite-api variant as well as the graphite-metrictank finder plugin)
+
 Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/raintank/metrictank/releases)),
 whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
 the 20th commit after `0.5.1`
 
 We aim to keep master stable so that's your best bet.
 
-[Get the metrictank packages here](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=metrictank&dist=)
-
-We also automatically publish packages for our other pieces you need:
-
-* [our graphite-api fork](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=graphite-api&dist=)
-* [the graphite-metrictank finder plugin](https://packagecloud.io/app/raintank/raintank/search?filter=all&q=graphite-metrictank&dist=)
+Supported distributions: Ubuntu 14.04, Ubuntu 16.04, Debian Wheezy, Debian Jessie, Centos 6, Centos 7.
 
 ### chef cookbook
 
