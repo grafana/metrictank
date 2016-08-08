@@ -211,7 +211,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		http.Error(w, "missing target arg", http.StatusBadRequest)
 		return
 	}
-	if len(targets)*int(maxDataPoints) > 500*2000 {
+	if *maxPointsPerReq != 0 && len(targets)*int(maxDataPoints) > *maxPointsPerReq {
 		http.Error(w, "too many targets/maxDataPoints requested", http.StatusBadRequest)
 		return
 	}
@@ -250,7 +250,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		http.Error(w, "to must be higher than from", http.StatusBadRequest)
 		return
 	}
-	if len(targets)*int(toUnix-fromUnix) > 500*2*365*24*3600 {
+	if *maxDaysPerReq != 0 && len(targets)*int(toUnix-fromUnix) > *maxDaysPerReq*(3600*24) {
 		http.Error(w, "too many targets/too large timeframe requested", http.StatusBadRequest)
 		return
 	}

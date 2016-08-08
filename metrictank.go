@@ -76,6 +76,11 @@ var (
 
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
+	// http:
+
+	maxPointsPerReq = flag.Int("max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
+	maxDaysPerReq   = flag.Int("max-days-per-req", 365000, "max amount of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
+
 	// Cassandra:
 	cassandraAddrs            = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraConsistency      = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
