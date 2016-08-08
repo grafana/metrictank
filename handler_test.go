@@ -158,6 +158,7 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
+	mdata.InitMetrics(stats)
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
