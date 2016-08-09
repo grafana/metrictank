@@ -1208,14 +1208,16 @@
         },
         {
           "aliasColors": {
-            "add-to-bulk-index-fail": "#58140C",
-            "add-to-bulk-index-ok": "#508642",
+            "add-to-bulk-index-fail": "#BF1B00",
+            "add-to-bulk-index-ok": "#3F6833",
             "mean": "#052B51",
             "metrics_to_es.fail": "#BF1B00",
             "metrics_to_es.ok": "#629E51",
             "upper": "#DEDAF7",
             "upper_75": "#0A50A1",
-            "upper_90": "#806EB7"
+            "upper_90": "#806EB7",
+            "indexed-fail": "#E0752D",
+            "indexed-ok": "#629E51"
           },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
@@ -1239,34 +1241,50 @@
             "total": false,
             "values": false
           },
-          "lines": true,
+          "lines": false,
           "linewidth": 1,
           "links": [],
-          "nullPointMode": "connected",
+          "nullPointMode": "null",
           "percentage": false,
-          "pointradius": 5,
-          "points": false,
+          "pointradius": 2,
+          "points": true,
           "renderer": "flot",
           "seriesOverrides": [
             {
               "alias": "mean",
-              "fill": 4,
-              "yaxis": 2
+              "fill": 3,
+              "yaxis": 2,
+              "lines": true,
+              "points": false,
+              "nullPointMode": "connected",
+              "linewidth": 0
             },
             {
               "alias": "upper",
-              "fill": 4,
-              "yaxis": 2
+              "fill": 3,
+              "yaxis": 2,
+              "nullPointMode": "connected",
+              "lines": true,
+              "points": false,
+              "linewidth": 0
             },
             {
               "alias": "upper_75",
-              "fill": 4,
-              "yaxis": 2
+              "fill": 3,
+              "yaxis": 2,
+              "nullPointMode": "connected",
+              "lines": true,
+              "points": false,
+              "linewidth": 0
             },
             {
               "alias": "upper_90",
-              "fill": 4,
-              "yaxis": 2
+              "fill": 3,
+              "yaxis": 2,
+              "nullPointMode": "connected",
+              "lines": true,
+              "points": false,
+              "linewidth": 0
             }
           ],
           "span": 4,
@@ -1321,7 +1339,7 @@
               "label": null,
               "logBase": 1,
               "max": null,
-              "min": null,
+              "min": 0,
               "show": true
             }
           ]
