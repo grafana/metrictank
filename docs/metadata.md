@@ -13,8 +13,9 @@ We're also seeing ES blocking due to the metadata indexing around the 100k/s mar
 E.g. you can hit this when indexing >=100k new metrics at once.
 The metricdefs will then just be rescheduled to index again in between 30~60 minutes
 
-Note that Metrictank will query ES at startup and backfill all definitions in ES before it starts
-consumption.
+Note:
+* Metrictank will query ES at startup and backfill all definitions in ES before it starts consumption.
+* All metrictanks write to ES.  this is not the most efficient, but not really harmful either.
 
 ### Internal index
 
