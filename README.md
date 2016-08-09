@@ -28,6 +28,8 @@ and bugs to fix.  It should be considered an *alpha* project.
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
+* upgrades / process restarts requires running multiple instances (potentially only for the duration of the maintenance) and re-assigning the primary role.
+Otherwise data loss of current chunks will be incurred.  See [operations guide](https://github.com/raintank/metrictank/blob/master/docs/operations.md)
 * only float64 values. Ints and bools currently stored as floats (works quite well due to the gorilla compression),
   No text support.
 * only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://blog.raintank.io/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
