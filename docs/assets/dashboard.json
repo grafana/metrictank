@@ -1097,7 +1097,6 @@
             "sort": 0,
             "value_type": "cumulative"
           },
-          "transparent": true,
           "type": "graph",
           "xaxis": {
             "show": true
