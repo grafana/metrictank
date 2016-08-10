@@ -84,7 +84,7 @@ When you hit save, Grafana should succeed in talking to the data source.
 Note: it also works with `proxy` mode but then you have to enter `http://graphite-api:8080` as uri.
 
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
-In the metrics tab you should see a bunch of data already: 
+In the metrics tab you should see a bunch of metrics already: 
 
 * data under `stats`: these are metrics coming from metrictank and graphite-api.  
   i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
