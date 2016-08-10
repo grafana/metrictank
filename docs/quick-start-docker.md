@@ -1,4 +1,4 @@
-# Quick start using docker
+# Quick start using Docker
 
 [Docker](docker.io) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
 This tutorial will help you run metrictank, its dependencies, and grafana for dashboarding, with minimal hassle.
@@ -22,7 +22,7 @@ git clone https://github.com/raintank/metrictank.git
 cd metrictank
 ```
 
-If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip), extract it somewhere and cd into it.
+If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip), extract it somewhere and cd into the metrictank directory.
 
 ## Bring up the stack
 
@@ -61,31 +61,34 @@ metrictank_1       | 2016/08/04 11:28:24 [I] carbon-in: listening on :2003/tcp
 metrictank_1       | 2016/08/04 11:28:24 [I] starting listener for metrics and http/debug on :6060
 ```
 
-Once the stack is up, metrictank should be running on port 6060:
+Once the stack is up, metrictank should be running on port 6060. If you're running Docker engine natively, you can connect using `localhost`. If you're using Docker Toolbox (which runs containers inside a VirtualBox VM), the host will be the IP address returned by `docker-machine ip`.
 
 ```
 $ curl http://localhost:6060
 OK
-$ curl http://localhost:6060/cluster
-{"instance":"default","primary":true,"lastChange":"2016-08-02T17:12:25.339785926Z"}
-```
 
-And Grafana will be running on port 3000
+$ curl -s http://localhost:6060/cluster | json_pp
+{
+   "instance" : "default",
+   "primary" : true,
+   "lastChange" : "2016-08-09T19:14:51.819370588Z"
+}
+```
 
 ## Working with Grafana and metrictank
 
-In your browser, open Grafana which is at `http://localhost:3000` and log in as `admin:admin`.  
-In the menu upper left, hit `Data Sources` and then the `add data source` button.  
-Add a new data source with name `metrictank`, check "default", type `Graphite`, uri `http://localhost:8080` and access mode `direct` (not `proxy`).
+In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
+In the upper left Grafana menu, choose `Data Sources`. On the next page, click the `Add data source` button.  
+Add a new data source with name `metrictank`, check "default", type `Graphite`, url `http://localhost:8080` and access mode `direct` (not `proxy`).
 
 When you hit save, Grafana should succeed in talking to the data source.
 
 ![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/add-datasource-docker.png)
 
-Note: it also works with `proxy` mode but then you have to enter `http://graphite-api:8080` as uri.
+Note: If you encounter an "Unknown error" message you can instead choose `proxy` mode with `http://graphite-api:8080` as the url.
 
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
-In the metrics tab you should see a bunch of data already: 
+In the metrics tab you should be able to add new metrics: 
 
 * data under `stats`: these are metrics coming from metrictank and graphite-api.  
   i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
