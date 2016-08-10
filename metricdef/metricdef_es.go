@@ -200,7 +200,7 @@ func (d *DefsEs) processEsResponse(body []byte) error {
 		return err
 	}
 	if response.Errors {
-		log.Warn("ES: Bulk Insertion: some operations failed. to be retried.")
+		log.Debug("ES: Bulk Insertion: some operations failed. to be retried.")
 	} else {
 		log.Debug("ES: Bulk Insertion: all operations succeeded")
 	}
