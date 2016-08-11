@@ -49,6 +49,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
    New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed.  If ES can't keep up, the ingest rate will decrease.  
    You can tell by looking at the 'ES index writes' chart in the dashboard to see if there's indexing activity and whether it lines up with the ingest decrease.
    ingest will go faster again once metrics have been indexed.
+   (note: metrics are also indexed in an internal index, but this hasn't resulted in backpressure yet)
 2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
    [based on the configuration of your write queues and how many series you have](https://github.com/raintank/metrictank/issues/125) the queues may run full and
