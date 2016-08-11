@@ -1063,7 +1063,10 @@
       "height": "250px",
       "panels": [
         {
-          "aliasColors": {},
+          "aliasColors": {
+	    "num write-workers": "#052B51",
+            "write queue items limit (each)": "#BF1B00"
+	  },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
           "editable": true,
@@ -1125,7 +1128,7 @@
               "target": "aliasByNode(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper, 6, 7, 8)"
             },
             {
-              "hide": true,
+              "hide": false,
               "refId": "B",
               "target": "alias(stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size, 'write queue items limit (each)')"
             },
