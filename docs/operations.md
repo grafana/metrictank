@@ -51,6 +51,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
    * Elasticsearch, which tends to not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
    ES backpressure is visualized in the 'metrics in' graph of the metrictank dashboard.
    For more details, look at the 'ES index writes' chart in the dashboard, specifically latency timings and adding to bulkindexer activity, those create the backpressure.
+
 2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
    [based on the configuration of your write queues and how many series you have](https://github.com/raintank/metrictank/issues/125) the queues may run full and
@@ -63,4 +64,6 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
    Of course, if metrictank is running near peak capacity, The added workload of saving data may also lower ingest speed.
 
 3) golang GC runs may cause ingest drops.  Look at 'golang GC' in the Grafana dashboard and see if you can get the dashboard zoom right to look at individual GC runs, and see if they correspond to the ingest drops. (shared cursor is really handy here)
-4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparant with large ingest rates where metrictank gets closer to saturation
+
+4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads
+from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparant with large ingest rates where metrictank gets closer to saturation
