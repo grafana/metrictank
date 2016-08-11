@@ -45,15 +45,22 @@ See [HTTP api docs](https://github.com/raintank/metrictank/blob/master/docs/http
 
 If metrictank ingestion speed is lower than expected, or decreased for seemingly no reason, it may be due to:
 
-1) [Indexing of metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) - currently using ElasticSearch - puts backpressure on the ingest stream.   
-   New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed.  If ES can't keep up, the ingest rate will decrease.  
-   You can tell by looking at the 'ES index writes' chart in the dashboard to see if there's indexing activity and whether it lines up with the ingest decrease.
-   ingest will go faster again once metrics have been indexed.
-   (note: metrics are also indexed in an internal index, but this hasn't resulted in backpressure yet)
+1) [Indexing of metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
+   New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed into:
+   * an internal index (which seems to always be snappy and not exert any backpressure)
+   * Elasticsearch, which tends to not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
+   ES backpressure is visualized in the 'metrics in' graph of the metrictank dashboard.
+   For more details, look at the 'ES index writes' chart in the dashboard, specifically latency timings and adding to bulkindexer activity, those create the backpressure.
 2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
    [based on the configuration of your write queues and how many series you have](https://github.com/raintank/metrictank/issues/125) the queues may run full and
    provide ingestion backpressure, also lowering ingestion speed.  
-   You can easily spot this on the dashboard when the write queues jump up in size and stay at the same size, despite chunks getting saved.  If this lines up with the ingestion drop, you have your culprit.  Of course, if metrictank is running near peak capacity, The added workload of saving data may also lower ingest speed.
+   Store (cassandra) saving backpressure is also visualized on the 'metrics in' graph of the dashboard.
+   Additionally, the 'write workers & queues' graph shows the queue limit and how many items are in the queues.   
+   The queues are drained by saving chunks, but populated by new chunks that need to be saved.  Backpressure is active is when the queues are full (when number of items equals the limit).
+   It's possible for the queues to stay at the limit for a while, despite chunks being saved (when there's new chunks that also need to be saved).
+   However you should probably tune your queue sizes in this case.  See [our Cassandra page](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+   Of course, if metrictank is running near peak capacity, The added workload of saving data may also lower ingest speed.
+
 3) golang GC runs may cause ingest drops.  Look at 'golang GC' in the Grafana dashboard and see if you can get the dashboard zoom right to look at individual GC runs, and see if they correspond to the ingest drops. (shared cursor is really handy here)
 4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparant with large ingest rates where metrictank gets closer to saturation
