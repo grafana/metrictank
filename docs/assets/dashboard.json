@@ -420,12 +420,6 @@
               "alias": "GC cpu fraction - promille",
               "linewidth": 1,
               "yaxis": 2
-            },
-            {
-              "alias": "MT cpu usage - percent",
-              "fill": 4,
-              "linewidth": 0,
-              "yaxis": 2
             }
           ],
           "span": 4,
@@ -472,16 +466,11 @@
               "hide": false,
               "refId": "H",
               "target": "alias(stats.$environment.gauges.metrictank.$host.gc.cpufraction, 'GC cpu fraction - promille')"
-            },
-            {
-              "hide": false,
-              "refId": "I",
-              "target": "alias(measure.nmt_cpu, 'MT cpu usage - percent')"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "memory & CPU usage",
+          "title": "memory",
           "tooltip": {
             "msResolution": true,
             "shared": true,
