@@ -508,7 +508,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			}
 		} else if !currentChunk.Saving {
 			// chunk hasn't been written to in a while, and is not yet queued to persist. Let's persist it
-			log.Info("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
+			log.Debug("Found stale Chunk, persisting it to Cassandra. key: %s T0: %d", a.Key, currentChunk.T0)
 			a.persist(a.CurrentChunkPos)
 		}
 	}
