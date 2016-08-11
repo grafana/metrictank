@@ -47,7 +47,9 @@
           "aliasColors": {
             "add-to-saving": "#C15C17",
             "primary": "#2F575E",
-            "too old": "#890F02"
+            "too old": "#890F02",
+            "store backpressure": "#962D82",
+            "ES backpressure": "#052B51"
           },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
@@ -104,6 +106,14 @@
             {
               "alias": "/decode err/",
               "color": "#890F02"
+            },
+            {
+              "alias": "/backpressure/",
+              "nullPointMode": "null",
+              "yaxis": 2,
+              "lines": true,
+              "points": false,
+              "fill": 4
             }
           ],
           "span": 4,
@@ -141,6 +151,59 @@
               "refId": "G",
               "target": "aliasSub(stats.$environment.metrictank.$host.*.metric_invalid, '.*\\.([^\\.]+)\\.metric_invalid', '\\1 metric invalid')",
               "textEditor": false
+            },
+            {
+              "refId": "H",
+              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$host.es_put_duration.mean, stats.$environment.timers.metrictank.$host.es_put_duration.count_ps), 5), 'ES backpressure')",
+              "textEditor": true
+            },
+            {
+              "target": "stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size",
+              "refId": "I",
+              "textEditor": false,
+              "hide": true
+            },
+            {
+              "target": "stats.$environment.gauges.metrictank.$host.cassandra.num_writers",
+              "refId": "J",
+              "textEditor": false,
+              "hide": true
+            },
+            {
+              "target": "multiplySeries(#I,#J)",
+              "refId": "K",
+              "textEditor": false,
+              "hide": true
+            },
+            {
+              "target": "maxSeries(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper)",
+              "refId": "L",
+              "textEditor": false,
+              "hide": true
+            },
+            {
+              "target": "alias(diffSeries(#K, multiplySeries(#L,#J)),'remaining capacity')",
+              "refId": "M",
+              "textEditor": true,
+              "hide": true
+            },
+            {
+              "target": "sumSeries(stats.$environment.metrictank.$host.*.metrics_received)",
+              "refId": "N",
+              "textEditor": false,
+              "hide": true
+            },
+            {
+              "target": "alias(offset(transformNull(removeAboveValue(#M,1),-1),1),'blocked')",
+              "refId": "O",
+              "textEditor": true,
+              "hide": true
+            },
+            {
+              "target": "alias(scale(multiplySeries(#O, #N), 0.1), 'store backpressure')",
+              "refId": "P",
+              "textEditor": true,
+              "hide": false
             }
           ],
           "timeFrom": null,
@@ -167,7 +230,7 @@
             {
               "format": "short",
               "logBase": 1,
-              "max": 1,
+              "max": null,
               "min": 0,
               "show": true
             }
