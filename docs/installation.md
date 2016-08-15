@@ -53,7 +53,11 @@ the 20th commit after `0.5.1`
 
 We aim to keep master stable so that's your best bet.
 
-Supported distributions: Ubuntu 14.04, Ubuntu 16.04, Debian Wheezy, Debian Jessie, Centos 6, Centos 7.
+Supported distributions:
+
+* Ubuntu 14.04, 16.04
+* Debian Wheezy, Jessie
+* Centos 6, 7
 
 ### chef cookbook
 
