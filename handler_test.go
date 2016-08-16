@@ -12,7 +12,6 @@ import (
 	"github.com/raintank/metrictank/idx/memory"
 	Nsq "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 	"gopkg.in/raintank/schema.v1/msg"
 )
@@ -20,7 +19,6 @@ import (
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
 // this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, 1))
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
@@ -131,7 +129,6 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	close(handlePool)
 	handlerGroup.Wait()
 	defs := metricIndex.List(-1)
-	log.Info("fetched defs from index. found %d", len(defs))
 	if len(defs) != 9 {
 		t.Fatalf("query for org -1 should result in 9 distinct metrics. not %d", len(defs))
 	}
