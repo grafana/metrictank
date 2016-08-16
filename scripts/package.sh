@@ -23,7 +23,7 @@ cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
-  --deb-upstart ${BASE}/config/upstart/metrictank.conf \
+  --deb-upstart ${BASE}/config/upstart/metrictank \
   --replaces metric-tank --provides metric-tank \
   --conflicts metric-tank \
   -C ${BUILD} -p ${PACKAGE_NAME} .
