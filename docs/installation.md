@@ -140,3 +140,28 @@ Then just run it.  Default settings are fine.
 ## Configuration
 
 See the [example config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) which guides you through the various options
+
+Out of the box, one input is enabled: the [Carbon line input](https://github.com/raintank/metrictank/blob/master/docs/inputs.md#carbon)
+It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs.
+(or simply what you already use in a pre-existing Graphite install).
+See the input plugin documentation referenced above.
+
+If you want to use Kafka, you should enable the Kafka-mdm input plugin.  See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
+See the `kafka-mdm-in` section in the config for the options you need to tweak.
+
+## Run it!
+
+If using upstart:
+```
+service metrictank start
+```
+
+If using systemd:
+```
+systemctl start metrictank
+```
+
+Note that metrictank simply logs to stdout.  So where the log data ends up depends on your init system.
+
+If using upstart, you can then find the logs at `/var/log/upstart/metrictank.log`.
+With systemd, you can use something like `journalctl -f metrictank`.
