@@ -11,7 +11,7 @@ import (
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
@@ -79,8 +79,8 @@ func New(stats met.Backend) *Carbon {
 	}
 }
 
-func (c *Carbon) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
-	c.In = in.New(metrics, defCache, usg, "carbon", c.stats)
+func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
+	c.In = in.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, err.Error())

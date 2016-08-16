@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -24,12 +24,12 @@ type In struct {
 	msgsAge           met.Meter // in ms
 	tmp               msg.MetricData
 
-	metrics  mdata.Metrics
-	defCache *defcache.DefCache
-	usage    *usage.Usage
+	metrics     mdata.Metrics
+	metricIndex idx.MetricIndex
+	usage       *usage.Usage
 }
 
-func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage, input string, stats met.Backend) In {
+func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string, stats met.Backend) In {
 	return In{
 		metricsPerMessage: stats.NewMeter(fmt.Sprintf("%s.metrics_per_message", input), 0),
 		metricsReceived:   stats.NewCount(fmt.Sprintf("%s.metrics_received", input)),
@@ -38,9 +38,9 @@ func New(metrics mdata.Metrics, defCache *defcache.DefCache, usage *usage.Usage,
 		msgsAge:           stats.NewMeter(fmt.Sprintf("%s.message_age", input), 0),
 		tmp:               msg.MetricData{Metrics: make([]*schema.MetricData, 1)},
 
-		metrics:  metrics,
-		defCache: defCache,
-		usage:    usage,
+		metrics:     metrics,
+		metricIndex: metricIndex,
+		usage:       usage,
 	}
 }
 
@@ -57,7 +57,7 @@ func (in In) process(metric *schema.MetricData) {
 	if metric.Time == 0 {
 		log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
-		in.defCache.Add(metric)
+		in.metricIndex.Add(metric)
 		m := in.metrics.GetOrCreate(metric.Id)
 		m.Add(uint32(metric.Time), metric.Value)
 		if in.usage != nil {

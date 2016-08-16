@@ -4,7 +4,7 @@ package usage
 
 import (
 	"github.com/benbjohnson/clock"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
 	"sync"
@@ -13,7 +13,7 @@ import (
 
 var Clock clock.Clock
 var metrics mdata.Metrics
-var defCache *defcache.DefCache
+var metricIndex idx.MetricIndex
 
 type orgstat struct {
 	keys   map[string]struct{} // track unique keys seen
@@ -29,9 +29,9 @@ type Usage struct {
 	stop   chan struct{}
 }
 
-func New(period uint32, m mdata.Metrics, d *defcache.DefCache, cl clock.Clock) *Usage {
+func New(period uint32, m mdata.Metrics, i idx.MetricIndex, cl clock.Clock) *Usage {
 	metrics = m
-	defCache = d
+	metricIndex = i
 	Clock = cl
 	ret := &Usage{
 		period: period,
@@ -103,7 +103,7 @@ func (u *Usage) Report() {
 
 		m := metrics.GetOrCreate(met.Id)
 		m.Add(uint32(met.Time), met.Value)
-		defCache.Add(met)
+		metricIndex.Add(met)
 	}
 	for {
 		ticker := tick()

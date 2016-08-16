@@ -8,10 +8,11 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/idx/memory"
 	Nsq "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/metricdef"
+	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 	"gopkg.in/raintank/schema.v1/msg"
 )
@@ -19,7 +20,7 @@ import (
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
 // this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
-
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, 1))
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	initMetrics(stats)
@@ -34,13 +35,14 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
-	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
+	metricIndex := memory.New()
+	metricIndex.Init(stats)
 
 	// mimic how we use nsq handlers:
 	// handlers operate concurrently, but within 1 handler, the handling is sequential
 
-	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics mdata.Metrics, defCache *defcache.DefCache) {
-		handler := Nsq.NewHandler(aggmetrics, defCache, nil, stats)
+	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics mdata.Metrics, metricIndex idx.MetricIndex) {
+		handler := Nsq.NewHandler(aggmetrics, metricIndex, nil, stats)
 		for msg := range in {
 			err := handler.HandleMessage(msg)
 			if err != nil {
@@ -54,7 +56,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	handlerGroup := sync.WaitGroup{}
 	handlerGroup.Add(5)
 	for i := 0; i != 5; i++ {
-		go consumer(handlePool, &handlerGroup, aggmetrics, defCache)
+		go consumer(handlePool, &handlerGroup, aggmetrics, metricIndex)
 	}
 
 	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
@@ -96,13 +98,13 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 			metrics := make([]*schema.MetricData, 4)
 			for m := 0; m < len(metrics); m++ {
 				id := (i + 1) * (m + 1)
-				//t.Logf("worker %d metric %d -> adding metric with id and orgid %d", i, m, id)
+				t.Logf("worker %d metric %d -> adding metric with id and orgid %d", i, m, id)
 
 				metrics[m] = &schema.MetricData{
 					Id:       "",
 					OrgId:    id,
 					Name:     fmt.Sprintf("some.id.%d", id),
-					Metric:   "metric",
+					Metric:   fmt.Sprintf("some.id.%d", id),
 					Interval: 60,
 					Value:    1234.567,
 					Unit:     "ms",
@@ -128,10 +130,12 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	wg.Wait()
 	close(handlePool)
 	handlerGroup.Wait()
-	defs := defCache.List(-1)
+	defs := metricIndex.List(-1)
+	log.Info("fetched defs from index. found %d", len(defs))
 	if len(defs) != 9 {
 		t.Fatalf("query for org -1 should result in 9 distinct metrics. not %d", len(defs))
 	}
+
 	for _, d := range defs {
 		id := tit.ids[d.Id]
 		if d.Name != fmt.Sprintf("some.id.%d", id) {
@@ -144,7 +148,8 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 			t.Fatalf("incorrect tags for %s : %s", d.Id, d.Tags)
 		}
 	}
-	defs = defCache.List(2)
+
+	defs = metricIndex.List(2)
 	if len(defs) != 1 {
 		t.Fatalf("len of defs should be exactly 1. got defs with len %d: %v", len(defs), defs)
 	}
@@ -162,8 +167,9 @@ func BenchmarkHandler_HandleMessage(b *testing.B) {
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
-	defCache := defcache.New(metricdef.NewDefsMock(), stats)
-	handler := Nsq.NewHandler(aggmetrics, defCache, nil, stats)
+	metricIndex := memory.New()
+	metricIndex.Init(stats)
+	handler := Nsq.NewHandler(aggmetrics, metricIndex, nil, stats)
 
 	metrics := make([]*schema.MetricData, 10)
 	for i := 0; i < len(metrics); i++ {
