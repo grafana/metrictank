@@ -69,7 +69,7 @@ Note:
 * metrictank is a multi-tenant system where different orgs cannot see each other's data
 * any given metric may appear multiple times, under different organisations
 
-### required query modes
+### Required query modes
 An index plugin needs to support:
 
 * lookup (1) by id (used by graphite-metrictank. may be deprecated long term)
@@ -84,12 +84,12 @@ An index plugin needs to support:
   - list all tags for a given series pattern
 
 
-### notes
+### Notes
 
 (1) lookup: What do we need to lookup? For now we mainly want/only need interval (for alignRequests), mtype (to figure out the consolidation) and name (for listings),
 but ideally we can lookup the entire definition.  E.g. in the future we may end up determining rollup schema based on org and/or misc tags.  
 (2) org-id: we need to return metrics corresponding to a given org, as well as metrics from org -1, since those are publically visible to everyone.
 
-### other requirements
+### Other requirements
 
 * warm up a cold index (e.g. when starting an instance, needs to know which metrics are known to the system, as to serve requests early. actual timeseries data may be in ram or in cassandra)

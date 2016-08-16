@@ -1,4 +1,4 @@
-# overview of metrics
+# Overview of metrics
 (only shows metrics that are documented. generated with [metrics2docs](github.com/Dieterbe/metrics2docs))
 
 * `metrics_too_old`:  

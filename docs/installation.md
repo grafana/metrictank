@@ -1,6 +1,6 @@
-# installation guide
+# Installation guide
 
-## dependencies
+## Dependencies
 
 * Cassandra. We run and recommend 3.0.8 . See
 [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
@@ -10,7 +10,7 @@
 * currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
   and our [graphite-api fork](https://github.com/raintank/graphite-api/). (which we install as 1 piece)
 
-## how things fit together
+## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
 [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md))
@@ -23,9 +23,9 @@ You'll typically query metrictank by querying graphite-api which uses the graphi
 to metrictank.  You can also query metrictank directly but this is very limited, experimental and not recommended.
 
 
-## installation
+## Installation
 
-### from source
+### From source
 
 Building metrictank requires a [Golang](https://golang.org/) compiler.
 We recommend version 1.5 or higher.
@@ -36,7 +36,7 @@ go get github.com/raintank/metrictank
 
 This installs only metrictank itself, and none of its dependencies.
 
-### distribution packages
+### Distribution packages
 
 We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
@@ -60,22 +60,22 @@ Supported distributions:
 * Debian Wheezy, Jessie
 * Centos 6, 7
 
-### chef cookbook
+### Chef cookbook
 
 [chef_metric_tank](https://github.com/raintank/chef_metric_tank)
 
 This installs only metrictank itself, and none of its dependencies.
 
-## set up cassandra
+## Set up cassandra
 
 For basic setups, you can just install it and start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
 
-## set up elasticsearch
+## Set up elasticsearch
 
 Also here, you can just install it and start it with default settings. 
 
-## optional: set up kafka
+## Optional: set up kafka
 
 You can run a persistent queue in front of metrictank.
 If your metric instance(s) go down, then a queue is helpful in buffering and saving all the data while your instance(s) is/are down.
@@ -89,6 +89,6 @@ So for now using Kafka is more about preparing for the future than getting immed
 You can install Kafka. Ideally 0.10 or later.
 Then just run it.  Default settings are fine.
 
-## configuration
+## Configuration
 
 See the [example config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) which guides you through the various options
