@@ -59,7 +59,7 @@ We aim to keep master stable so that's your best bet.
 
 Supported distributions:
 
-* Ubuntu 14.04, 16.04
+* Ubuntu 14.04i (Trusty Tahr), 16.04 (Xenial Xerus)
 * Debian Wheezy, Jessie
 * Centos 6, 7
 
