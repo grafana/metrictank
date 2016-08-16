@@ -9,6 +9,9 @@
 * optionally a queue if you want to buffer data in case metrictank goes down: Kafka 0.10 is recommended, but 0.9 should work too.
 * currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
   and our [graphite-api fork](https://github.com/raintank/graphite-api/). (which we install as 1 piece)
+* [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
+
+We'll go over these in more detail below.
 
 ## How things fit together
 
@@ -74,6 +77,51 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 ## Set up elasticsearch
 
 Also here, you can just install it and start it with default settings. 
+
+## Set up statsd
+
+Metrictank uses statsd or a statsd-compatible agent for its instrumentation.
+It will refuse to start if nothing listens on the configured `statsd-addr`.
+
+You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
+or an alternative. We recommend [vimeo/statsdaemon](https://github.com/vimeo/statsdaemon).
+
+For the [metrictank dashboard](https://grafana.net/dashboards/279) to work properly, you need the right statsd/statsdaemon settings.
+
+Below are instructions for statsd and statsdaemon:
+
+Note, for either one `<environment>` is however you choose to call your environment. (test, production, dev, ...).
+
+### Statsdaemon
+
+[Statsdaemon](https://github.com/vimeo/statsdaemon) is the recommended option.
+To install it, you need to have a [Golang](https://golang.org/) compiler installed.
+
+Then just run `go get github.com/Vimeo/statsdaemon/statsdaemon`
+
+Get the default config file from `https://github.com/vimeo/statsdaemon/blob/master/statsdaemon.ini`
+and update the following settings:
+
+```
+flush_interval = 1
+prefix_rates = "stats.<environment>."
+prefix_timers = "stats.<environment>.timers."
+prefix_gauges = "stats.<environment>.gauges."
+
+percentile_thresholds = "90,75"
+```
+
+Then just run `statsdaemon`.  If you use ubuntu there's an [upstart init config](https://github.com/vimeo/statsdaemon/blob/master/upstart-init-statsdaemon.conf)
+
+### Statsd
+
+See the instructions on the [statsd homepage](https://github.com/etsy/statsd)
+Set the following options:
+
+```
+flushInterval: 1000
+globalPrefix: "stats.<environment>"
+```
 
 ## Optional: set up kafka
 
