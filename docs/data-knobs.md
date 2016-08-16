@@ -1,9 +1,9 @@
-# data knobs
+# Data knobs
 
 See [the example config](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) for an overview and basic explanation of what the config values are.
 Some of the values related to chunking and compression are a bit harder to tune, so this article will explain in more detail.
 
-## compression tips
+## Compression tips
 
 * values that never - or infrequently - change compress extremely well, so are very cheap to track and store.
 * pay attention to your timestamps, make sure they are evenly spaced. That compresses better.
@@ -15,9 +15,9 @@ Some of the values related to chunking and compression are a bit harder to tune,
 For more details, see the [go-tsz eval program](https://github.com/dgryski/go-tsz/tree/master/eval) or the 
 [results table](https://raw.githubusercontent.com/dgryski/go-tsz/master/eval/eval-results.png)
 
-## chunk sizing and num chunks to keep in memory
+## Chunk sizing and num chunks to keep in memory
 
-### basic guideline
+### Basic guideline
 
 `chunkspan` is how long of a timeframe should be covered by your chunks. E.g. you could store anywhere between 10 minutes to 24 hours worth of data in a chunk (chunks for each raw metric).
 `numchunks` is simply how many chunks should be retained in RAM. (for each raw metric)
@@ -40,7 +40,7 @@ Note:
 * `chunkspan` and `numchunks` are currently global variables, which can't be finetuned on a per-metric or per-category level.
 * when defining consolidation (rollups), you can specify custom chunkspans and numchunks for each rollup setting.  As rollups will have more time between points, it makes sense to choose longer chunkspans for rollups.
 
-### additional factors
+### Additional factors
 
 Several factors come into play that may affect the above recommendation:
 

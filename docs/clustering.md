@@ -1,6 +1,6 @@
-# clustering
+# Clustering
 
-## underlying storage
+## Underlying storage
 for clustering and HA of the underlying storage, we of course can simply rely on Cassandra.
 
 ## Metrictank redundancy and fault tolerance
