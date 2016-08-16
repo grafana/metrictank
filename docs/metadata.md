@@ -2,20 +2,25 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently it's based on Elasticsearch, but we hope to add other options.
+Currently it's based on Elasticsearch, but we aim to provide alternatives soon.
 
 ### ES
 
-metric definitions are currently stored in ES as well as internally.
-ES is the failsafe option used by graphite-metrictank.py and such.
+metric definitions are currently stored in ES (for persistence) as well as internally (for faster lookups in some scenarios)
+ES is queried by graphite-metrictank.py.
 
-We're also seeing ES blocking due to the metadata indexing around the 100k/s mark.
-E.g. you can hit this when indexing >=100k new metrics at once.
-The metricdefs will then just be rescheduled to index again in between 30~60 minutes
+Metrictank will initialize ES with the needed schema/mapping settings. No configuration is needed.
 
 Note:
-* Metrictank will query ES at startup and backfill all definitions in ES before it starts consumption.
-* All metrictanks write to ES.  this is not the most efficient, but not really harmful either.
+* Metrictank will query ES at startup and backfill all definitions from ES into its internal index before it starts consumption.
+* All metrictanks write to ES.  this is not very efficient.  But we'll replace ES soon anyway.
+* When indexing more than around ~ 50-100k metrics/s ES can start to block.  So if you're sending a large volume of (previously unseen)
+  metrics all at once the indexing can [put backpressure on the ingestion](https://github.com/raintank/metrictank/blob/master/docs/operations.md#ingestion-stalls--backpressure), meaning
+  less metrics/s while indexing is ongoing.
+* Indexing to ES often tends to fail when doing many index operations at once.
+  In this case we just reschedule to index the metricdef again in between 30~60 minutes.
+  If you send a bunch of new data and the metrics are not showing up yet, this is typically why.
+
 
 ### Internal index
 

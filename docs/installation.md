@@ -2,10 +2,11 @@
 
 ## dependencies
 
-* Cassandra. We run and recommend 3.0.8 .  We used to run 2.2.3 which was fine too. See
+* Cassandra. We run and recommend 3.0.8 . See
 [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
 * Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
-* optionally a queue: Kafka 0.10 is recommended, but 0.9 should work too.
+  See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
+* optionally a queue if you want to buffer data in case metrictank goes down: Kafka 0.10 is recommended, but 0.9 should work too.
 * currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
   and our [graphite-api fork](https://github.com/raintank/graphite-api/). (which we install as 1 piece)
 
@@ -67,9 +68,17 @@ This installs only metrictank itself, and none of its dependencies.
 
 ## set up cassandra
 
-You can have metrictank initialize Cassandra with a schema without replication, good for development setups.
-Or you may want to tweak the schema yourself. See
-[Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+For basic setups, you can just install it and start it with default settings.
+To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+
+## set up elasticsearch
+
+Also here, you can just install it and start it with default settings. 
+
+## optional: set up kafka
+
+If you want to use a queue, install and start Kafka. Ideally 0.10
+Default settings are fine.
 
 ## configuration
 
