@@ -77,8 +77,17 @@ Also here, you can just install it and start it with default settings.
 
 ## optional: set up kafka
 
-If you want to use a queue, install and start Kafka. Ideally 0.10
-Default settings are fine.
+You can run a persistent queue in front of metrictank.
+If your metric instance(s) go down, then a queue is helpful in buffering and saving all the data while your instance(s) is/are down.
+The moment your metrictank instance(s) come(s) back up, they can replay everything they missed (and more, it's useful to load in older data
+so that you can serve queries for it out of RAM).
+Also, in case you want to make any change to your aggregations, Cassandra cluster, or whatever, it can be useful to re-process older data.
+
+** Note: the above actually doesn't work yet, as we don't have the seek-back-in-time implemented yet to fetch old data from Kafka.
+So for now using Kafka is more about preparing for the future than getting immediate benefit. **
+
+You can install Kafka. Ideally 0.10 or later.
+Then just run it.  Default settings are fine.
 
 ## configuration
 
