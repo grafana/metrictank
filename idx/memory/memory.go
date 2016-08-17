@@ -53,7 +53,7 @@ func (n *Node) String() string {
 
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
-	sync.Mutex
+	sync.RWMutex
 	DefById map[string]schema.MetricDefinition
 	Tree    map[int]*Tree
 }
@@ -179,8 +179,8 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 
 func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 	def, ok := m.DefById[id]
 	if ok {
 		idxGetDuration.Value(time.Now().Sub(pre))
@@ -192,8 +192,8 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 
 func (m *MemoryIdx) Find(orgId int, pattern string) []idx.Node {
 	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 	matchedNodes := m.find(orgId, pattern)
 	publicNodes := m.find(-1, pattern)
 	matchedNodes = append(matchedNodes, publicNodes...)
@@ -340,8 +340,8 @@ func match(pattern string, candidates []string) []string {
 
 func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 	orgs := []int{-1, orgId}
 	if orgId == -1 {
 		log.Info("returing all metricDefs for all orgs")
