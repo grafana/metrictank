@@ -12,13 +12,13 @@ see fakemetrics, tsdb-gw, carbon
 ## Carbon
 useful for traditional graphite plaintext protocol.
 
-http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf
-It only uses this file to determine the raw interval of the metrics, and will ignore all retention durations
-as well as intervals except for the first, highest-resolution (raw) one.
-
+** Important: this input requires a
+[carbon storage-schemas.conf](http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf) file.
+Metrictank uses this file to determine the raw interval of the metrics, but it ignores all retention durations
+as well as intervals after the first, raw one since metrictank already has its own config mechanism
+for retention and aggregation. **
 
 note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
-
 
 
 ## Kafka-mdm (recommended)

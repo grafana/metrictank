@@ -148,7 +148,7 @@ You may need to adjust the `statsd-addr` based on where you decided to run that 
 Out of the box, one input is enabled: the [Carbon line input](https://github.com/raintank/metrictank/blob/master/docs/inputs.md#carbon)
 It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs.
 (or simply what you already use in a pre-existing Graphite install).
-See the input plugin documentation referenced above.
+See the input plugin documentation referenced above for more details.
 
 If you want to use Kafka, you should enable the Kafka-mdm input plugin.  See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
 See the `kafka-mdm-in` section in the config for the options you need to tweak.
