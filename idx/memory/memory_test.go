@@ -246,6 +246,8 @@ func BenchmarkIndexing(b *testing.B) {
 
 	var series string
 	var data *schema.MetricData
+	b.ReportAllocs()
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
