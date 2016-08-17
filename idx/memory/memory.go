@@ -84,12 +84,12 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	existing, exists := m.DefById[data.Id]
-	if exists {
+	existing, ok := m.DefById[data.Id]
+	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
 		idxOk.Inc(1)
-		idxAddDuration.Value(time.Now().Sub(pre))
+		idxAddDuration.Value(time.Since(pre))
 		return
 	}
 
@@ -123,7 +123,7 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 			log.Debug("existing index entry for %s. Adding %s as child", path, data.Id)
 			node.Children = append(node.Children, data.Id)
 			idxOk.Inc(1)
-			idxAddDuration.Value(time.Now().Sub(pre))
+			idxAddDuration.Value(time.Since(pre))
 			return
 		}
 	}
@@ -136,6 +136,11 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 		for i := len(nodes) - 1; i > 0; i-- {
 			branch := strings.Join(nodes[0:i], ".")
 			if n, ok := tree.Items[branch]; ok {
+				if n.Leaf {
+					log.Error(3, "Branches cant be added to a leaf node.")
+					idxFail.Inc(1)
+					return
+				}
 				log.Debug("Found branch %s which metricDef %s is a decendent of", branch, path)
 				startNode = n
 				startPos = i
@@ -172,7 +177,7 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 		Children: []string{data.Id},
 	}
 	idxOk.Inc(1)
-	idxAddDuration.Value(time.Now().Sub(pre))
+	idxAddDuration.Value(time.Since(pre))
 	return
 }
 
@@ -182,10 +187,10 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 	defer m.RUnlock()
 	def, ok := m.DefById[id]
 	if ok {
-		idxGetDuration.Value(time.Now().Sub(pre))
+		idxGetDuration.Value(time.Since(pre))
 		return *def, nil
 	}
-	idxGetDuration.Value(time.Now().Sub(pre))
+	idxGetDuration.Value(time.Since(pre))
 	return schema.MetricDefinition{}, idx.DefNotFound
 }
 
@@ -220,7 +225,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string) []idx.Node {
 		}
 	}
 	log.Debug("%d nodes has %d unique paths.", len(matchedNodes), len(results))
-	idxFindDuration.Value(time.Now().Sub(pre))
+	idxFindDuration.Value(time.Since(pre))
 	return results
 }
 
@@ -366,7 +371,7 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 			}
 		}
 	}
-	idxListDuration.Value(time.Now().Sub(pre))
+	idxListDuration.Value(time.Since(pre))
 
 	return defs
 }
@@ -379,7 +384,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) {
 	for _, f := range found {
 		m.delete(orgId, f)
 	}
-	idxDeleteDuration.Value(time.Now().Sub(pre))
+	idxDeleteDuration.Value(time.Since(pre))
 }
 
 func (m *MemoryIdx) delete(orgId int, n *Node) {
