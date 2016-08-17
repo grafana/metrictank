@@ -10,6 +10,24 @@ BUILD_ROOT=$CODE_DIR/build
 ARCH="$(uname -m)"
 VERSION=$(git describe --long --always)
 
+## debian wheezy
+BUILD=${BUILD_ROOT}/sysvinit
+mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/etc/raintank
+
+cp ${BASE}/config/metrictank.ini ${BUILD}/etc/raintank/
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
+
+PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
+fpm -s dir -t deb \
+  -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
+  --deb-init ${BASE}/config/sysvinit/init.d/metrictank \
+  --deb-default ${BASE}/config/sysvinit/default/metrictank \
+  --replaces metric-tank --provides metric-tank \
+  --conflicts metric-tank \
+  -C ${BUILD} -p ${PACKAGE_NAME} .
+
 ## ubuntu 14.04
 BUILD=${BUILD_ROOT}/upstart
 
