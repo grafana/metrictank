@@ -4,7 +4,7 @@
 
 
 ## introduction
-*Metrictank is a cassandra-backed, metrics2.0 based, multi-tenant timeries database for Graphite and friends*
+*Metrictank is a cassandra-backed, metrics2.0 based, multi-tenant timeseries database for Graphite and friends*
 
 metrictank is a timeseries database, inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
 Most notably, it employs the compression mechanism described in the paper to dramatically lower storage overhead,
