@@ -54,13 +54,13 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]schema.MetricDefinition
+	DefById map[string]*schema.MetricDefinition
 	Tree    map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]schema.MetricDefinition),
+		DefById: make(map[string]*schema.MetricDefinition),
 		Tree:    make(map[int]*Tree),
 	}
 }
@@ -88,13 +88,12 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 	if exists {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
-		m.DefById[data.Id] = existing
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Now().Sub(pre))
 		return
 	}
 
-	m.DefById[data.Id] = *schema.MetricDefinitionFromMetricData(data)
+	m.DefById[data.Id] = schema.MetricDefinitionFromMetricData(data)
 	path := data.Name
 
 	//first check to see if a tree has been created for this OrgId
@@ -184,7 +183,7 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 	def, ok := m.DefById[id]
 	if ok {
 		idxGetDuration.Value(time.Now().Sub(pre))
-		return def, nil
+		return *def, nil
 	}
 	idxGetDuration.Value(time.Now().Sub(pre))
 	return schema.MetricDefinition{}, idx.DefNotFound
@@ -211,7 +210,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string) []idx.Node {
 			if n.Leaf {
 				idxNode.Defs = make([]schema.MetricDefinition, len(n.Children))
 				for i, id := range n.Children {
-					idxNode.Defs[i] = m.DefById[id]
+					idxNode.Defs[i] = *m.DefById[id]
 				}
 			}
 			results = append(results, idxNode)
@@ -363,7 +362,7 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 				continue
 			}
 			for _, id := range n.Children {
-				defs = append(defs, m.DefById[id])
+				defs = append(defs, *m.DefById[id])
 			}
 		}
 	}
