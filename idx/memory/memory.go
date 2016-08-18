@@ -93,22 +93,50 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 		return
 	}
 
-	m.DefById[data.Id] = schema.MetricDefinitionFromMetricData(data)
-	path := data.Name
+	def := schema.MetricDefinitionFromMetricData(data)
+	m.add(def)
+	idxAddDuration.Value(time.Since(pre))
+}
 
+func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
+	m.Lock()
+	for _, def := range defs {
+		m.add(&def)
+	}
+	m.Unlock()
+}
+
+func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) {
+	pre := time.Now()
+	m.Lock()
+	defer m.Unlock()
+	if existing, ok := m.DefById[def.Id]; ok {
+		log.Debug("metricDef with id %s already in index.", def.Id)
+		existing.LastUpdate = def.LastUpdate
+		idxOk.Inc(1)
+		idxAddDuration.Value(time.Since(pre))
+		return
+	}
+	m.add(def)
+	idxAddDuration.Value(time.Since(pre))
+}
+
+func (m *MemoryIdx) add(def *schema.MetricDefinition) {
+	m.DefById[def.Id] = def
+	path := def.Name
 	//first check to see if a tree has been created for this OrgId
-	tree, ok := m.Tree[data.OrgId]
+	tree, ok := m.Tree[def.OrgId]
 	if !ok {
-		log.Debug("first metricDef seen for orgId %d", data.OrgId)
+		log.Debug("first metricDef seen for orgId %d", def.OrgId)
 		root := &Node{
 			Path:     "",
 			Children: make([]string, 0),
 			Leaf:     false,
 		}
-		m.Tree[data.OrgId] = &Tree{
+		m.Tree[def.OrgId] = &Tree{
 			Items: map[string]*Node{"": root},
 		}
-		tree = m.Tree[data.OrgId]
+		tree = m.Tree[def.OrgId]
 	} else {
 		// now see if there is alread a leaf node. This happens
 		// when there are multiple metricDefs for the same path due
@@ -120,10 +148,9 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 				idxFail.Inc(1)
 				return
 			}
-			log.Debug("existing index entry for %s. Adding %s as child", path, data.Id)
-			node.Children = append(node.Children, data.Id)
+			log.Debug("existing index entry for %s. Adding %s as child", path, def.Id)
+			node.Children = append(node.Children, def.Id)
 			idxOk.Inc(1)
-			idxAddDuration.Value(time.Since(pre))
 			return
 		}
 	}
@@ -174,10 +201,9 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 	tree.Items[path] = &Node{
 		Leaf:     true,
 		Path:     path,
-		Children: []string{data.Id},
+		Children: []string{def.Id},
 	}
 	idxOk.Inc(1)
-	idxAddDuration.Value(time.Since(pre))
 	return
 }
 
@@ -387,18 +413,33 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) {
 	idxDeleteDuration.Value(time.Since(pre))
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node) {
+func (m *MemoryIdx) DeleteWithReport(orgId int, pattern string) []string {
+	pre := time.Now()
+	m.Lock()
+	defer m.Unlock()
+	found := m.find(orgId, pattern)
+	deletedIds := make([]string, 0)
+	for _, f := range found {
+		deletedIds = append(deletedIds, m.delete(orgId, f)...)
+	}
+	idxDeleteDuration.Value(time.Since(pre))
+	return deletedIds
+}
+
+func (m *MemoryIdx) delete(orgId int, n *Node) []string {
 	if !n.Leaf {
 		log.Debug("deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
 		for _, child := range m.find(orgId, n.Path+".*") {
-			log.Debug("delting child %s from branch %s", child.Path, n.Path)
+			log.Debug("deleting child %s from branch %s", child.Path, n.Path)
 			m.delete(orgId, child)
 		}
 	}
+	deletedIds := make([]string, len(n.Children))
 	// delete the metricDefs
-	for _, id := range n.Children {
+	for i, id := range n.Children {
 		delete(m.DefById, id)
+		deletedIds[i] = id
 	}
 	tree := m.Tree[orgId]
 	// delete the leaf.
@@ -437,6 +478,8 @@ func (m *MemoryIdx) delete(orgId int, n *Node) {
 		log.Debug("branch %s has no children, deleting it.", branch)
 		delete(tree.Items, branch)
 	}
+
+	return deletedIds
 }
 
 // filepath.Match doesn't support {} because that's not posix, it's a bashism
