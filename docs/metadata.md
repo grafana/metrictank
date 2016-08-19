@@ -2,36 +2,58 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently it's based on Elasticsearch, but we aim to provide alternatives soon.
+Currently there are 2 index options. Only 1 index options can be enabled at a time.
+* Memory-Idx: 
+* Elasticseach-Idx
 
-### ES
+### Elasticseach-Idx
 
-metric definitions are currently stored in ES (for persistence) as well as internally (for faster lookups in some scenarios)
-ES is queried by graphite-metrictank.py.
+The Elasticseach-Idx stores extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metricDefinitions stored in cassandra.
 
-Metrictank will initialize ES with the needed schema/mapping settings. No configuration is needed.
+Metrictank will initialize ES with the needed schema/mapping settings.
+
+#### Configuration
+The elasticsearch-idx includes the following configuration section in the metrictank configuration file.
+```
+[elasticsearch-idx]
+enabled = false
+# elasticsearch index name to use
+index = metric
+# Elasticsearch host addresses (multiple hosts can be specified as comma-separated list)
+hosts = localhost:9200
+# how often the retry buffer should be flushed to ES
+retry-interval = 1h
+# max number of concurrent connections to ES
+max-conns = 20
+# max number of docs to keep in the BulkIndexer buffer
+max-buffer-docs = 1000
+# max delay before the BulkIndexer flushes its buffer
+buffer-delay-max = 10s
+```
 
 Note:
-* Metrictank will query ES at startup and backfill all definitions from ES into its internal index before it starts consumption.
 * All metrictanks write to ES.  this is not very efficient.  But we'll replace ES soon anyway.
 * When indexing more than around ~ 50-100k metrics/s ES can start to block.  So if you're sending a large volume of (previously unseen)
   metrics all at once the indexing can [put backpressure on the ingestion](https://github.com/raintank/metrictank/blob/master/docs/operations.md#ingestion-stalls--backpressure), meaning
   less metrics/s while indexing is ongoing.
 * Indexing to ES often tends to fail when doing many index operations at once.
   In this case we just reschedule to index the metricdef again in between 30~60 minutes.
-  If you send a bunch of new data and the metrics are not showing up yet, this is typically why.
+  If you send a bunch of new data and the metrics are not showing up in ES yet, this is typically why.
 
 
-### Internal index
+### Memory-Idx
 
-Metrictank currently also has a built-in index, in the `idx` package,
-which is used when querying metrictank directly (e.g. bypassing graphite)
-and caching ES lookups.
-It is also experimental and may be removed later.
-It's powered by a radix tree and trigram index.
+The Memory-Idx provides a high performant index store for searching.  The index uses about 1KB of memory per metricDefinition and can support 100's of 1000's of indexes per second and 10's of 1000's of searches per second on moderate hardware.  The memory-Idx is ephemeral. The index will be empty at startup and metrics will be indexed as they are received by metrictank.
+
+#### Configuration
+The memory-idx includes the following configuration section in the metrictank configuration file.
+
+```
+[memory-idx]
+enabled = true
+```
 
 ## The anatomy of a metricdef
-
 
 definition id's are unique across the entire system and can be computed from the def itself, so don't require coordination across distributed nodes.
 
@@ -63,6 +85,8 @@ See [the schema spec](https://github.com/raintank/schema/blob/master/metric.go#L
 
 
 ## Developers' guide to index plugin writing
+Currently the index is solely used for supporting Graphite style queries.  So, the index only needs to be able to search by a pattern that matches the MetricDefinition.Name field.
+In future we plan to extend the searching capabilities to include the other fields in the definition.
 
 Note:
 
@@ -70,26 +94,32 @@ Note:
 * any given metric may appear multiple times, under different organisations
 
 ### Required query modes
-An index plugin needs to support:
+An index plugin just needs to implement the github.com/raintank/metrictank/idx/MetricIndex interface.
 
-* lookup (1) by id (used by graphite-metrictank. may be deprecated long term)
-* lookup (1) by orgid (2) + target spec, where target spec is:
-  - a graphite key
-  - a graphite pattern that has wildcards (`*`), one of multiple options `{foo,bar}`, character lists `[abc]` and ranges `[a-z0-9]`.
-  - in the future we will want to extend these with tag constraints (e.g. must have given key, key must have given value, or value for key must match a pattern similar to above pattern)
-* prefix search of prefix pattern and orgid (2). this is a special case of a pattern search, but common for autocomplete/suggest with short prefix patterns.
-* listing (e.g. graphite's metrics.json but possibly in more detail for other tools) based on org-id (2).
-* in the future we may also do queries on tags such as:
-  - list all tags
-  - list all tags for a given series pattern
+```
+type Node struct {
+	Path string
+	Leaf bool
+	Defs []schema.MetricDefinition
+}
+type MetricIndex interface {
+	Init(met.Backend) error
+	Stop()
+	Add(*schema.MetricData)
+	Get(string) (schema.MetricDefinition, error)
+	List(int) []schema.MetricDefinition
+	Find(int, string) []Node
+	Delete(int, string)
+}
+
+```
+
+* Init(met.Backend): This is the initialization step performed at startup.  This method should block until the index is ready to handle searches.
+* Stop(): This will be called when metrictank is shutting down.
+* Add(*schema.MetricData):  Every metric received will result in a call to this method to ensure the metric has been added to the index.
+* Get(string) (schema.MetricDefinition, error):  This method should return the MetricDefintion with the passed Id.
+* List(int) []schema.MetricDefinition: This method should return all MetricDefinitions for the passed OrgId.  If the passed OrgId is "-1", then all metricDefinitions across all organisations should be returned.
+* Find(int, string) []Node: This method provides searches.  The method is passed an OrgId and a query pattern. This pattern should be handled in the same way Graphite would. https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards.  Searches should return all nodes that match for the given OrgId and OrgId -1.
+* Delete(int, string): This method is used for deleting items from the index. The method is passed an OrgId and a query pattern.  If the pattern matches a branch node, then all leaf nodes on that branch should also be deleted. So if the pattern is "*", all items in the index should be deleted.
 
 
-### Notes
-
-(1) lookup: What do we need to lookup? For now we mainly want/only need interval (for alignRequests), mtype (to figure out the consolidation) and name (for listings),
-but ideally we can lookup the entire definition.  E.g. in the future we may end up determining rollup schema based on org and/or misc tags.  
-(2) org-id: we need to return metrics corresponding to a given org, as well as metrics from org -1, since those are publically visible to everyone.
-
-### Other requirements
-
-* warm up a cold index (e.g. when starting an instance, needs to know which metrics are known to the system, as to serve requests early. actual timeseries data may be in ram or in cassandra)
