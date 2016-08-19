@@ -74,14 +74,9 @@ func (r *RetryBuffer) Stop() {
 
 func (r *RetryBuffer) Items() []schema.MetricDefinition {
 	r.Lock()
-	defs := r.items()
-	r.Unlock()
-	return defs
-}
-
-func (r *RetryBuffer) items() []schema.MetricDefinition {
 	defs := make([]schema.MetricDefinition, len(r.Defs))
 	copy(defs, r.Defs)
+	r.Unlock()
 	return defs
 }
 
@@ -98,8 +93,8 @@ func (r *RetryBuffer) Retry(id string) {
 
 func (r *RetryBuffer) retry() {
 	r.Lock()
-	defs := r.items()
-	r.Defs = r.Defs[:0]
+	defs := r.Defs
+	r.Defs = make([]schema.MetricDefinition, 0, len(defs))
 	r.Unlock()
 	if len(defs) == 0 {
 		log.Debug("retry buffer is empty")
