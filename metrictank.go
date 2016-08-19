@@ -151,6 +151,8 @@ func main() {
 		inKafkaMdm.ConfigSetup()
 		inKafkaMdam.ConfigSetup()
 		inNSQ.ConfigSetup()
+
+		// load config for cluster handlers
 		clNSQ.ConfigSetup()
 		clKafka.ConfigSetup()
 
