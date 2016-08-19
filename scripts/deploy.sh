@@ -8,9 +8,10 @@ if [ -z ${PACKAGECLOUD_REPO} ] ; then
   exit 1
 fi
 
-# Ubuntu 14.04, 16.04, & debian 8 (jessie)
+# Ubuntu 14.04, 16.04, debian 7 (wheezy) & debian 8 (jessie)
 package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty ${DIR}/../build/upstart/*.deb
 package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/xenial ${DIR}/../build/systemd/*.deb
+package_cloud push ${PACKAGECLOUD_REPO}/debian/wheezy ${DIR}/../build/sysvinit/*.deb
 package_cloud push ${PACKAGECLOUD_REPO}/debian/jessie ${DIR}/../build/systemd/*.deb
 
 # CentOS 6

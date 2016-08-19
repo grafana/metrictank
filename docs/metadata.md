@@ -2,20 +2,25 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently it's based on Elasticsearch, but we hope to add other options.
+Currently it's based on Elasticsearch, but we aim to provide alternatives soon.
 
 ### ES
 
-metric definitions are currently stored in ES as well as internally.
-ES is the failsafe option used by graphite-metrictank.py and such.
+metric definitions are currently stored in ES (for persistence) as well as internally (for faster lookups in some scenarios)
+ES is queried by graphite-metrictank.py.
 
-We're also seeing ES blocking due to the metadata indexing around the 100k/s mark.
-E.g. you can hit this when indexing >=100k new metrics at once.
-The metricdefs will then just be rescheduled to index again in between 30~60 minutes
+Metrictank will initialize ES with the needed schema/mapping settings. No configuration is needed.
 
 Note:
-* Metrictank will query ES at startup and backfill all definitions in ES before it starts consumption.
-* All metrictanks write to ES.  this is not the most efficient, but not really harmful either.
+* Metrictank will query ES at startup and backfill all definitions from ES into its internal index before it starts consumption.
+* All metrictanks write to ES.  this is not very efficient.  But we'll replace ES soon anyway.
+* When indexing more than around ~ 50-100k metrics/s ES can start to block.  So if you're sending a large volume of (previously unseen)
+  metrics all at once the indexing can [put backpressure on the ingestion](https://github.com/raintank/metrictank/blob/master/docs/operations.md#ingestion-stalls--backpressure), meaning
+  less metrics/s while indexing is ongoing.
+* Indexing to ES often tends to fail when doing many index operations at once.
+  In this case we just reschedule to index the metricdef again in between 30~60 minutes.
+  If you send a bunch of new data and the metrics are not showing up yet, this is typically why.
+
 
 ### Internal index
 
@@ -64,7 +69,7 @@ Note:
 * metrictank is a multi-tenant system where different orgs cannot see each other's data
 * any given metric may appear multiple times, under different organisations
 
-### required query modes
+### Required query modes
 An index plugin needs to support:
 
 * lookup (1) by id (used by graphite-metrictank. may be deprecated long term)
@@ -79,12 +84,12 @@ An index plugin needs to support:
   - list all tags for a given series pattern
 
 
-### notes
+### Notes
 
 (1) lookup: What do we need to lookup? For now we mainly want/only need interval (for alignRequests), mtype (to figure out the consolidation) and name (for listings),
 but ideally we can lookup the entire definition.  E.g. in the future we may end up determining rollup schema based on org and/or misc tags.  
 (2) org-id: we need to return metrics corresponding to a given org, as well as metrics from org -1, since those are publically visible to everyone.
 
-### other requirements
+### Other requirements
 
 * warm up a cold index (e.g. when starting an instance, needs to know which metrics are known to the system, as to serve requests early. actual timeseries data may be in ram or in cassandra)
