@@ -108,8 +108,8 @@ type MetricIndex interface {
 	Add(*schema.MetricData)
 	Get(string) (schema.MetricDefinition, error)
 	List(int) []schema.MetricDefinition
-	Find(int, string) []Node
-	Delete(int, string)
+	Find(int, string) ([]Node, error)
+	Delete(int, string) error
 }
 
 ```
@@ -119,7 +119,7 @@ type MetricIndex interface {
 * Add(*schema.MetricData):  Every metric received will result in a call to this method to ensure the metric has been added to the index.
 * Get(string) (schema.MetricDefinition, error):  This method should return the MetricDefintion with the passed Id.
 * List(int) []schema.MetricDefinition: This method should return all MetricDefinitions for the passed OrgId.  If the passed OrgId is "-1", then all metricDefinitions across all organisations should be returned.
-* Find(int, string) []Node: This method provides searches.  The method is passed an OrgId and a query pattern. This pattern should be handled in the same way Graphite would. https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards.  Searches should return all nodes that match for the given OrgId and OrgId -1.
-* Delete(int, string): This method is used for deleting items from the index. The method is passed an OrgId and a query pattern.  If the pattern matches a branch node, then all leaf nodes on that branch should also be deleted. So if the pattern is "*", all items in the index should be deleted.
+* Find(int, string) ([]Node, error): This method provides searches.  The method is passed an OrgId and a query pattern. This pattern should be handled in the same way Graphite would. https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards.  Searches should return all nodes that match for the given OrgId and OrgId -1.
+* Delete(int, string) error: This method is used for deleting items from the index. The method is passed an OrgId and a query pattern.  If the pattern matches a branch node, then all leaf nodes on that branch should also be deleted. So if the pattern is "*", all items in the index should be deleted.
 
 

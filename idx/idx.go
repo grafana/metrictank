@@ -24,7 +24,7 @@ type MetricIndex interface {
 	Stop()
 	Add(*schema.MetricData)
 	Get(string) (schema.MetricDefinition, error)
-	Delete(int, string)
-	Find(int, string) []Node
+	Delete(int, string) error
+	Find(int, string) ([]Node, error)
 	List(int) []schema.MetricDefinition
 }

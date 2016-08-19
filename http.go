@@ -273,7 +273,11 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		}
 
 		if legacy {
-			nodes := metricIndex.Find(org, id)
+			nodes, err := metricIndex.Find(org, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			if len(nodes) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
@@ -397,7 +401,11 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 			return
 		}
 
-		nodes := metricIndex.Find(org, query)
+		nodes, err := metricIndex.Find(org, query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
 		var b []byte
 		switch format {

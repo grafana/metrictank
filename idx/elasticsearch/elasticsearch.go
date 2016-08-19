@@ -433,9 +433,13 @@ func (e *EsIdx) rebuildIndex() {
 	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
 }
 
-func (e *EsIdx) Delete(orgId int, pattern string) {
-	ids := e.MemoryIdx.DeleteWithReport(orgId, pattern)
+func (e *EsIdx) Delete(orgId int, pattern string) error {
+	ids, err := e.MemoryIdx.DeleteWithReport(orgId, pattern)
+	if err != nil {
+		return err
+	}
 	for _, id := range ids {
 		e.BulkIndexer.Delete(Index, "metric_index", id)
 	}
+	return nil
 }

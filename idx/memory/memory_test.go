@@ -118,14 +118,16 @@ func TestFind(t *testing.T) {
 
 	Convey("When listing root nodes", t, func() {
 		Convey("root nodes for orgId 1", func() {
-			nodes := ix.Find(1, "*")
+			nodes, err := ix.Find(1, "*")
+			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 2)
 			So(nodes[0].Path, ShouldBeIn, "metric", "foo")
 			So(nodes[1].Path, ShouldBeIn, "metric", "foo")
 			So(nodes[0].Leaf, ShouldBeFalse)
 		})
 		Convey("root nodes for orgId 2", func() {
-			nodes := ix.Find(2, "*")
+			nodes, err := ix.Find(2, "*")
+			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 1)
 			So(nodes[0].Path, ShouldEqual, "metric")
 			So(nodes[0].Leaf, ShouldBeFalse)
@@ -133,7 +135,8 @@ func TestFind(t *testing.T) {
 	})
 
 	Convey("When searching with GLOB", t, func() {
-		nodes := ix.Find(2, "metric.{f*,demo}.*")
+		nodes, err := ix.Find(2, "metric.{f*,demo}.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 10)
 		for _, n := range nodes {
 			So(n.Leaf, ShouldBeFalse)
@@ -141,7 +144,8 @@ func TestFind(t *testing.T) {
 	})
 
 	Convey("When searching with multiple wildcards", t, func() {
-		nodes := ix.Find(1, "*.*")
+		nodes, err := ix.Find(1, "*.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 2)
 		for _, n := range nodes {
 			So(n.Leaf, ShouldBeFalse)
@@ -149,21 +153,25 @@ func TestFind(t *testing.T) {
 	})
 
 	Convey("When searching nodes not in public series", t, func() {
-		nodes := ix.Find(1, "foo.demo.*")
+		nodes, err := ix.Find(1, "foo.demo.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 5)
 		Convey("When searching for specific series", func() {
-			found := ix.Find(1, nodes[0].Path)
+			found, err := ix.Find(1, nodes[0].Path)
+			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 1)
 			So(found[0].Path, ShouldEqual, nodes[0].Path)
 		})
 		Convey("When searching nodes that are children of a leaf", func() {
-			found := ix.Find(1, nodes[0].Path+".*")
+			found, err := ix.Find(1, nodes[0].Path+".*")
+			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 0)
 		})
 	})
 
 	Convey("When searching with multiple wildcards mixed leaf/branch", t, func() {
-		nodes := ix.Find(1, "*.demo.*")
+		nodes, err := ix.Find(1, "*.demo.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 15)
 		for _, n := range nodes {
 			if strings.HasPrefix(n.Path, "foo.demo") {
@@ -175,12 +183,14 @@ func TestFind(t *testing.T) {
 		}
 	})
 	Convey("When searching nodes for unkown orgId", t, func() {
-		nodes := ix.Find(4, "foo.demo.*")
+		nodes, err := ix.Find(4, "foo.demo.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 
 	Convey("When searching nodes that dont exist", t, func() {
-		nodes := ix.Find(1, "foo.demo.blah.*")
+		nodes, err := ix.Find(1, "foo.demo.blah.*")
+		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 
@@ -201,7 +211,8 @@ func TestDelete(t *testing.T) {
 		ix.Add(s)
 	}
 	Convey("when deleting exact path", t, func() {
-		ix.Delete(1, org1Series[0].Name)
+		err := ix.Delete(1, org1Series[0].Name)
+		So(err, ShouldBeNil)
 		Convey("series should not be present in the metricDef index", func() {
 			_, err := ix.Get(org1Series[0].Id)
 			So(err, ShouldEqual, idx.DefNotFound)
@@ -209,7 +220,8 @@ func TestDelete(t *testing.T) {
 		Convey("series should not be present in searchs", func() {
 			nodes := strings.Split(org1Series[0].Name, ".")
 			branch := strings.Join(nodes[0:len(nodes)-2], ".")
-			found := ix.Find(1, branch+".*.*")
+			found, err := ix.Find(1, branch+".*.*")
+			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 4)
 			for _, n := range found {
 				So(n.Path, ShouldNotEqual, org1Series[0].Name)
@@ -218,7 +230,8 @@ func TestDelete(t *testing.T) {
 	})
 
 	Convey("when deleting by wildcard", t, func() {
-		ix.Delete(1, "metric.org1.*")
+		err := ix.Delete(1, "metric.org1.*")
+		So(err, ShouldBeNil)
 		Convey("series should not be present in the metricDef index", func() {
 			for _, def := range org1Series {
 				_, err := ix.Get(def.Id)
@@ -229,10 +242,12 @@ func TestDelete(t *testing.T) {
 			for _, def := range org1Series {
 				nodes := strings.Split(def.Name, ".")
 				branch := strings.Join(nodes[0:len(nodes)-1], ".")
-				found := ix.Find(1, branch+".*")
+				found, err := ix.Find(1, branch+".*")
+				So(err, ShouldBeNil)
 				So(found, ShouldHaveLength, 0)
 			}
-			found := ix.Find(1, "metric.*")
+			found, err := ix.Find(1, "metric.*")
+			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 1)
 			So(found[0].Path, ShouldEqual, "metric.public")
 		})

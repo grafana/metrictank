@@ -137,8 +137,10 @@ func Init() {
 }
 
 func ixFind(org, q int) {
-
-	nodes := ix.Find(org, queries[q].Pattern)
+	nodes, err := ix.Find(org, queries[q].Pattern)
+	if err != nil {
+		panic(err)
+	}
 	if len(nodes) != queries[q].ExpectedResults {
 		for _, n := range nodes {
 			fmt.Println(n.Path)
