@@ -24,28 +24,28 @@ var (
 	idxEsAddDuration    met.Timer
 	idxEsDeleteDuration met.Timer
 
-	Enabled        bool
-	Index          string
-	Hosts          string
-	User           string
-	Pass           string
-	RetryInterval  string
-	MaxConns       int
-	MaxBufferDocs  int
-	BufferDelayMax string
+	Enabled          bool
+	esIndex          string
+	esHosts          string
+	esUser           string
+	esPass           string
+	esRetryInterval  time.Duration
+	esMaxConns       int
+	esMaxBufferDocs  int
+	esBufferDelayMax time.Duration
 )
 
 func ConfigSetup() {
 	esIdx := flag.NewFlagSet("elasticsearch-idx", flag.ExitOnError)
 	esIdx.BoolVar(&Enabled, "enabled", false, "")
-	esIdx.StringVar(&Index, "index", "metric", "Elasticsearch index name for storing metric index.")
-	esIdx.StringVar(&Hosts, "hosts", "localhost:9200", "comma separated list of elasticsearch address in host:port form")
-	esIdx.StringVar(&User, "user", "", "HTTP basic Auth username")
-	esIdx.StringVar(&Pass, "pass", "", "HTTP basic Auth password")
-	esIdx.StringVar(&RetryInterval, "retry-interval", "1h", "Interval to retry indexing Definitions in ES after failures")
-	esIdx.IntVar(&MaxConns, "max-conns", 20, "Max number of http conns in flight to ES servers at one time")
-	esIdx.IntVar(&MaxBufferDocs, "max-buffer-docs", 1000, "Max number of Docs to hold in buffer before forcing flush to ES")
-	esIdx.StringVar(&BufferDelayMax, "buffer-delay-max", "10s", "Max time to wait before flusing forcing flush to ES")
+	esIdx.StringVar(&esIndex, "index", "metric", "Elasticsearch index name for storing metric index.")
+	esIdx.StringVar(&esHosts, "hosts", "localhost:9200", "comma separated list of elasticsearch address in host:port form")
+	esIdx.StringVar(&esUser, "user", "", "HTTP basic Auth username")
+	esIdx.StringVar(&esPass, "pass", "", "HTTP basic Auth password")
+	esIdx.DurationVar(&esRetryInterval, "retry-interval", time.Minute*10, "Interval to retry indexing Definitions in ES after failures")
+	esIdx.IntVar(&esMaxConns, "max-conns", 20, "Max number of http conns in flight to ES servers at one time")
+	esIdx.IntVar(&esMaxBufferDocs, "max-buffer-docs", 1000, "Max number of Docs to hold in buffer before forcing flush to ES")
+	esIdx.DurationVar(&esBufferDelayMax, "buffer-delay-max", time.Second*10, "Max time to wait before flusing forcing flush to ES")
 	globalconf.Register("elasticsearch-idx", esIdx)
 }
 
@@ -106,7 +106,7 @@ func (r *RetryBuffer) retry() {
 		return
 	}
 	for _, d := range defs {
-		if err := r.Index.BulkIndexer.Index(Index, "metric_index", d.Id, "", "", nil, d); err != nil {
+		if err := r.Index.BulkIndexer.Index(esIndex, "metric_index", d.Id, "", "", nil, d); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 			r.Defs = append(r.Defs, d)
 			return
@@ -142,12 +142,12 @@ type EsIdx struct {
 
 func New() *EsIdx {
 	conn := elastigo.NewConn()
-	conn.SetHosts(strings.Split(Hosts, ","))
-	if User != "" {
-		conn.Username = User
+	conn.SetHosts(strings.Split(esHosts, ","))
+	if esUser != "" {
+		conn.Username = esUser
 	}
-	if Pass != "" {
-		conn.Password = Pass
+	if esPass != "" {
+		conn.Password = esPass
 	}
 
 	return &EsIdx{
@@ -158,7 +158,7 @@ func New() *EsIdx {
 
 func (e *EsIdx) Init(stats met.Backend) error {
 
-	log.Info("initializing EsIdx. Hosts=%s", Hosts)
+	log.Info("initializing EsIdx. Hosts=%s", esHosts)
 	if err := e.MemoryIdx.Init(stats); err != nil {
 		return err
 	}
@@ -168,12 +168,12 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	idxEsAddDuration = stats.NewTimer("es-idx.add_duration", 0)
 	idxEsDeleteDuration = stats.NewTimer("es-idx.delete_duration", 0)
 
-	log.Info("Checking if index %s exists in ES", Index)
-	if exists, err := e.Conn.ExistsIndex(Index, "", nil); err != nil && err.Error() != "record not found" {
+	log.Info("Checking if index %s exists in ES", esIndex)
+	if exists, err := e.Conn.ExistsIndex(esIndex, "", nil); err != nil && err.Error() != "record not found" {
 		return err
 	} else {
 		if !exists {
-			log.Info("ES: initializing %s Index with mapping", Index)
+			log.Info("ES: initializing %s Index with mapping", esIndex)
 			//lets apply the mapping.
 			metricMapping := `{
 				"mappings": {
@@ -254,7 +254,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 				}
 			}`
 
-			_, err = e.Conn.DoCommand("PUT", fmt.Sprintf("/%s", Index), nil, metricMapping)
+			_, err = e.Conn.DoCommand("PUT", fmt.Sprintf("/%s", esIndex), nil, metricMapping)
 			if err != nil {
 				return err
 			}
@@ -263,30 +263,22 @@ func (e *EsIdx) Init(stats met.Backend) error {
 		}
 	}
 	log.Info("Setting up ES bulkIndexer")
-	e.BulkIndexer = e.Conn.NewBulkIndexer(MaxConns)
+	e.BulkIndexer = e.Conn.NewBulkIndexer(esMaxConns)
 
 	//dont retry sends.
 	e.BulkIndexer.RetryForSeconds = 0
 
 	// index at most MaxBufferDocs per request.
-	e.BulkIndexer.BulkMaxDocs = MaxBufferDocs
+	e.BulkIndexer.BulkMaxDocs = esMaxBufferDocs
 	//Setting BulkMaxBuffer to 1KB per doc ensure we will hold at least MaxBufferDocs before flushing
-	e.BulkIndexer.BulkMaxBuffer = 1024 * MaxBufferDocs
+	e.BulkIndexer.BulkMaxBuffer = 1024 * esMaxBufferDocs
 
-	//flush at least every 10seconds.
-	bufferDelay, err := time.ParseDuration(BufferDelayMax)
-	if err != nil {
-		return err
-	}
-	e.BulkIndexer.BufferDelayMax = bufferDelay
+	//flush at least every esBufferDelayMax.
+	e.BulkIndexer.BufferDelayMax = esBufferDelayMax
 	e.BulkIndexer.Refresh = true
 	e.BulkIndexer.Sender = e.getBulkSend()
 
-	interval, err := time.ParseDuration(RetryInterval)
-	if err != nil {
-		return err
-	}
-	e.failures = NewRetryBuffer(e, interval)
+	e.failures = NewRetryBuffer(e, esRetryInterval)
 
 	log.Info("Starting BulkIndexer")
 	e.BulkIndexer.Start()
@@ -315,7 +307,7 @@ func (e *EsIdx) Add(data *schema.MetricData) {
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	e.MemoryIdx.AddDef(def)
-	if err := e.BulkIndexer.Index(Index, "metric_index", def.Id, "", "", nil, def); err != nil {
+	if err := e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
 		log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 		e.failures.Retry(def.Id)
 	}
@@ -408,7 +400,7 @@ func (e *EsIdx) rebuildIndex() {
 	scroll_id := ""
 	for loading {
 		if scroll_id == "" {
-			out, err = e.Conn.Search(Index, "metric_index", map[string]interface{}{"scroll": "1m", "size": 1000}, nil)
+			out, err = e.Conn.Search(esIndex, "metric_index", map[string]interface{}{"scroll": "1m", "size": 1000}, nil)
 		} else {
 			out, err = e.Conn.Scroll(map[string]interface{}{"scroll": "1m"}, scroll_id)
 		}
@@ -439,7 +431,7 @@ func (e *EsIdx) Delete(orgId int, pattern string) error {
 		return err
 	}
 	for _, id := range ids {
-		e.BulkIndexer.Delete(Index, "metric_index", id)
+		e.BulkIndexer.Delete(esIndex, "metric_index", id)
 	}
 	return nil
 }

@@ -22,12 +22,12 @@ func TestES(t *testing.T) {
 	http.DefaultClient.Transport = rt
 
 	// Initialize our config flags
-	Hosts = "localhost:9200"
-	MaxConns = 10
-	MaxBufferDocs = 2
-	RetryInterval = "1s"
-	BufferDelayMax = "100ms"
-	Index = "metrics"
+	esHosts = "localhost:9200"
+	esMaxConns = 10
+	esMaxBufferDocs = 2
+	esRetryInterval = time.Second
+	esBufferDelayMax = time.Millisecond * 100
+	esIndex = "metrics"
 
 	rt.Set("PUT http://localhost:9200/metrics", handleCreateIndexOk)
 	rt.Set("POST http://localhost:9200/metrics/metric_index/_search?scroll=1m&size=1000", handleSearchEmpty)
@@ -50,12 +50,12 @@ func TestES(t *testing.T) {
 		// we should see a PUT request to create the index mapping
 		req := <-reqChan
 		So(req.method, ShouldEqual, "PUT")
-		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s", Index))
+		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s", esIndex))
 
 		// we should see a POST request to search the index for rebuilding the Index
 		req = <-reqChan
 		So(req.method, ShouldEqual, "POST")
-		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", Index))
+		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", esIndex))
 		ix.Stop()
 	})
 
@@ -80,7 +80,7 @@ func TestES(t *testing.T) {
 		// we should see a POST request to search the index for rebuilding the Index
 		req := <-reqChan
 		So(req.method, ShouldEqual, "POST")
-		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", Index))
+		So(req.url, ShouldEqual, fmt.Sprintf("http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", esIndex))
 		req = <-reqChan
 		So(req.method, ShouldEqual, "POST")
 		So(req.url, ShouldEqual, "http://localhost:9200/_search/scroll?scroll=1m")
@@ -131,15 +131,15 @@ func TestGetAddKey(t *testing.T) {
 	http.DefaultClient.Transport = rt
 
 	// Initialize our config flags
-	Hosts = "localhost:9200"
-	MaxConns = 10
-	MaxBufferDocs = 2
-	RetryInterval = "1s"
-	BufferDelayMax = "100ms"
-	Index = "metrics"
+	esHosts = "localhost:9200"
+	esMaxConns = 10
+	esMaxBufferDocs = 2
+	esRetryInterval = time.Second
+	esBufferDelayMax = time.Millisecond * 100
+	esIndex = "metrics"
 
-	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", Index)] = handleCreateIndexOk
-	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", Index)] = handleSearchEmpty
+	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", esIndex)] = handleCreateIndexOk
+	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", esIndex)] = handleSearchEmpty
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
@@ -188,15 +188,15 @@ func TestFind(t *testing.T) {
 	http.DefaultClient.Transport = rt
 
 	// Initialize our config flags
-	Hosts = "localhost:9200"
-	MaxConns = 10
-	MaxBufferDocs = 2
-	RetryInterval = "1s"
-	BufferDelayMax = "100ms"
-	Index = "metrics"
+	esHosts = "localhost:9200"
+	esMaxConns = 10
+	esMaxBufferDocs = 2
+	esRetryInterval = time.Second
+	esBufferDelayMax = time.Millisecond * 100
+	esIndex = "metrics"
 
-	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", Index)] = handleCreateIndexOk
-	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", Index)] = handleSearchEmpty
+	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", esIndex)] = handleCreateIndexOk
+	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", esIndex)] = handleSearchEmpty
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
@@ -306,15 +306,15 @@ func TestDelete(t *testing.T) {
 	http.DefaultClient.Transport = rt
 
 	// Initialize our config flags
-	Hosts = "localhost:9200"
-	MaxConns = 10
-	MaxBufferDocs = 2
-	RetryInterval = "1s"
-	BufferDelayMax = "100ms"
-	Index = "metrics"
+	esHosts = "localhost:9200"
+	esMaxConns = 10
+	esMaxBufferDocs = 2
+	esRetryInterval = time.Second
+	esBufferDelayMax = time.Millisecond * 100
+	esIndex = "metrics"
 
-	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", Index)] = handleCreateIndexOk
-	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", Index)] = handleSearchEmpty
+	rt.Response[fmt.Sprintf("PUT http://localhost:9200/%s", esIndex)] = handleCreateIndexOk
+	rt.Response[fmt.Sprintf("POST http://localhost:9200/%s/metric_index/_search?scroll=1m&size=1000", esIndex)] = handleSearchEmpty
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
@@ -376,15 +376,15 @@ func TestDelete(t *testing.T) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
-	Hosts = "localhost:9200"
-	MaxConns = 10
-	MaxBufferDocs = 1000
-	RetryInterval = "1h"
-	BufferDelayMax = "1s"
-	Index = "metrics"
+	esHosts = "localhost:9200"
+	esMaxConns = 10
+	esMaxBufferDocs = 1000
+	esRetryInterval = time.Hour
+	esBufferDelayMax = time.Second
+	esIndex = "metrics"
 
 	ix := New()
-	ix.Conn.DeleteIndex(Index)
+	ix.Conn.DeleteIndex(esIndex)
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	ix.Init(stats)
 
