@@ -1,6 +1,6 @@
-# operations
+# Operations
 
-## monitoring
+## Monitoring
 
 You should monitor the dependencies according to their best practices.
 In particular, pay attention to delays in your kafka queue, if you use it.
@@ -9,14 +9,14 @@ when you move around the primary role.
 
 Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
 
-### dashboard
+### Dashboard
 
 You can import the [Metrictank dashboard from Grafana.net](https://grafana.net/dashboards/279) into your Grafana.
 this will give instant insights in all the performance metrics of Metrictank.
 Just make sure to have a properly configured statsd setup (or adjust the dashboard)
 
 
-### useful metrics to monitor/alert on
+### Useful metrics to monitor/alert on
 
 * process is running and listening on its http port (and carbon port, if you enabled it) (use your monitoring agent of choice for this)
 * `stats.*.gauges.metric_tank.*.cluster.primary`: assure you have exactly 1 primary node (saving to cassandra)
@@ -31,7 +31,7 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 
 
-## primary failover
+## Primary failover
 
 * stop the primary: `curl -X POST -d primary=false http://<node>:6060/cluster`
 * make sure it's finished saving metricpersist messages (see its dashboard)
@@ -41,7 +41,7 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 See [HTTP api docs](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
 
-## ingestion stalls & backpressure
+## Ingestion stalls & backpressure
 
 If metrictank ingestion speed is lower than expected, or decreased for seemingly no reason, it may be due to:
 
