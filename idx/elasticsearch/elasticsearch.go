@@ -405,8 +405,7 @@ func (e *EsIdx) rebuildIndex() {
 		for _, h := range out.Hits.Hits {
 			mdef, err := schema.MetricDefinitionFromJSON(*h.Source)
 			if err != nil {
-				log.Error(3, "Bad definition in index. %s", err)
-				log.Error(3, "Bad Def = %s", h.Source)
+				log.Error(3, "Bad definition in index. %s - %s", h.Source, err)
 			}
 			defs = append(defs, *mdef)
 		}
