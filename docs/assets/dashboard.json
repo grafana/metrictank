@@ -20,7 +20,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "3.1.1"
+      "version": "3.1.0"
     },
     {
       "type": "datasource",
@@ -45,11 +45,11 @@
       "panels": [
         {
           "aliasColors": {
+            "ES backpressure": "#052B51",
             "add-to-saving": "#C15C17",
             "primary": "#2F575E",
-            "too old": "#890F02",
             "store backpressure": "#962D82",
-            "ES backpressure": "#052B51"
+            "too old": "#890F02"
           },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
@@ -109,11 +109,11 @@
             },
             {
               "alias": "/backpressure/",
-              "nullPointMode": "null",
-              "yaxis": 2,
+              "fill": 4,
               "lines": true,
+              "nullPointMode": "null",
               "points": false,
-              "fill": 4
+              "yaxis": 2
             }
           ],
           "span": 4,
@@ -154,56 +154,56 @@
             },
             {
               "refId": "H",
-              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$host.es_put_duration.mean, stats.$environment.timers.metrictank.$host.es_put_duration.count_ps), 5), 'ES backpressure')",
+              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.mean, stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.count_ps), 5), 'ES backpressure')",
               "textEditor": true
             },
             {
-              "target": "stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size",
+              "hide": true,
               "refId": "I",
-              "textEditor": false,
-              "hide": true
+              "target": "stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size",
+              "textEditor": false
             },
             {
-              "target": "stats.$environment.gauges.metrictank.$host.cassandra.num_writers",
+              "hide": true,
               "refId": "J",
-              "textEditor": false,
-              "hide": true
+              "target": "stats.$environment.gauges.metrictank.$host.cassandra.num_writers",
+              "textEditor": false
             },
             {
-              "target": "multiplySeries(#I,#J)",
+              "hide": true,
               "refId": "K",
-              "textEditor": false,
-              "hide": true
+              "target": "multiplySeries(#I,#J)",
+              "textEditor": false
             },
             {
-              "target": "maxSeries(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper)",
+              "hide": true,
               "refId": "L",
-              "textEditor": false,
-              "hide": true
+              "target": "maxSeries(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper)",
+              "textEditor": false
             },
             {
-              "target": "alias(diffSeries(#K, multiplySeries(#L,#J)),'remaining capacity')",
+              "hide": true,
               "refId": "M",
-              "textEditor": true,
-              "hide": true
+              "target": "alias(diffSeries(#K, multiplySeries(#L,#J)),'remaining capacity')",
+              "textEditor": true
             },
             {
-              "target": "sumSeries(stats.$environment.metrictank.$host.*.metrics_received)",
+              "hide": true,
               "refId": "N",
-              "textEditor": false,
-              "hide": true
+              "target": "sumSeries(stats.$environment.metrictank.$host.*.metrics_received)",
+              "textEditor": false
             },
             {
-              "target": "alias(offset(transformNull(removeAboveValue(#M,1),-1),1),'blocked')",
+              "hide": true,
               "refId": "O",
-              "textEditor": true,
-              "hide": true
+              "target": "alias(offset(transformNull(removeAboveValue(#M,1),-1),1),'blocked')",
+              "textEditor": true
             },
             {
-              "target": "alias(scale(multiplySeries(#O, #N), 0.1), 'store backpressure')",
+              "hide": false,
               "refId": "P",
-              "textEditor": true,
-              "hide": false
+              "target": "alias(scale(multiplySeries(#O, #N), 0.1), 'store backpressure')",
+              "textEditor": true
             }
           ],
           "timeFrom": null,
@@ -1064,9 +1064,9 @@
       "panels": [
         {
           "aliasColors": {
-	    "num write-workers": "#052B51",
+            "num write-workers": "#052B51",
             "write queue items limit (each)": "#BF1B00"
-	  },
+          },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
           "editable": true,
@@ -1265,14 +1265,14 @@
           "aliasColors": {
             "add-to-bulk-index-fail": "#BF1B00",
             "add-to-bulk-index-ok": "#3F6833",
+            "indexed-fail": "#E0752D",
+            "indexed-ok": "#629E51",
             "mean": "#052B51",
             "metrics_to_es.fail": "#BF1B00",
             "metrics_to_es.ok": "#629E51",
             "upper": "#DEDAF7",
             "upper_75": "#0A50A1",
-            "upper_90": "#806EB7",
-            "indexed-fail": "#E0752D",
-            "indexed-ok": "#629E51"
+            "upper_90": "#806EB7"
           },
           "bars": false,
           "datasource": "${DS_METRICTANK}",
@@ -1308,38 +1308,38 @@
             {
               "alias": "mean",
               "fill": 3,
-              "yaxis": 2,
               "lines": true,
-              "points": false,
+              "linewidth": 0,
               "nullPointMode": "connected",
-              "linewidth": 0
+              "points": false,
+              "yaxis": 2
             },
             {
               "alias": "upper",
               "fill": 3,
-              "yaxis": 2,
-              "nullPointMode": "connected",
               "lines": true,
+              "linewidth": 0,
+              "nullPointMode": "connected",
               "points": false,
-              "linewidth": 0
+              "yaxis": 2
             },
             {
               "alias": "upper_75",
               "fill": 3,
-              "yaxis": 2,
-              "nullPointMode": "connected",
               "lines": true,
+              "linewidth": 0,
+              "nullPointMode": "connected",
               "points": false,
-              "linewidth": 0
+              "yaxis": 2
             },
             {
               "alias": "upper_90",
               "fill": 3,
-              "yaxis": 2,
-              "nullPointMode": "connected",
               "lines": true,
+              "linewidth": 0,
+              "nullPointMode": "connected",
               "points": false,
-              "linewidth": 0
+              "yaxis": 2
             }
           ],
           "span": 4,
@@ -1347,24 +1347,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "refId": "A",
-              "target": "alias(stats.$environment.metrictank.$host.metrics_to_es.fail, 'add-to-bulk-index-fail')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(stats.$environment.metrictank.$host.metrics_to_es.ok, 'add-to-bulk-index-ok')"
-            },
-            {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$host.metrics_indexed.fail, 'indexed-fail')"
+              "target": "alias(stats.$environment.metrictank.$host.idx.elasticsearch.fail, 'indexed-fail')",
+              "textEditor": false
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$host.metrics_indexed.ok, 'indexed-ok')"
+              "target": "alias(stats.$environment.metrictank.$host.idx.elasticsearch.ok, 'indexed-ok')",
+              "textEditor": false
             },
             {
               "refId": "E",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.es_put_duration.{mean,upper*}, 6)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.{mean,upper*}, 8)",
+              "textEditor": false
             }
           ],
           "timeFrom": null,
@@ -1953,16 +1948,18 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.mean, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.mean, 7, 8)"
             },
             {
               "refId": "B",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.upper_90, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.upper_90, 7, 8)",
+              "textEditor": false
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.upper, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.upper, 7, 8)",
+              "textEditor": false
             }
           ],
           "timeFrom": null,
@@ -2000,7 +1997,7 @@
     }
   ],
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -2038,9 +2035,8 @@
     "list": [
       {
         "current": {
-          "text": "metrictank",
-          "value": "metrictank",
-          "tags": []
+          "text": "graphite",
+          "value": "graphite"
         },
         "datasource": null,
         "hide": 0,
@@ -2049,14 +2045,14 @@
         "name": "datasource",
         "options": [
           {
-            "text": "default",
-            "value": "default",
-            "selected": false
+            "text": "graphite",
+            "value": "graphite",
+            "selected": true
           },
           {
-            "text": "metrictank",
-            "value": "metrictank",
-            "selected": true
+            "text": "raintank",
+            "value": "raintank",
+            "selected": false
           }
         ],
         "query": "graphite",
@@ -2103,7 +2099,7 @@
   },
   "refresh": false,
   "schemaVersion": 12,
-  "version": 3,
+  "version": 0,
   "links": [],
   "gnetId": null
 }

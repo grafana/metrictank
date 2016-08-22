@@ -8,10 +8,9 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/metricdef"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -99,9 +98,10 @@ func TestUsageBasic(t *testing.T) {
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
-	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
+	metricIndex := memory.New()
+	metricIndex.Init(stats)
 	interval := uint32(60)
-	u := New(interval, aggmetrics, defCache, mock)
+	u := New(interval, aggmetrics, metricIndex, mock)
 
 	assertLen(0, aggmetrics, 0, t)
 
@@ -137,9 +137,10 @@ func TestUsageMinusOne(t *testing.T) {
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
-	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
+	metricIndex := memory.New()
+	metricIndex.Init(stats)
 	interval := uint32(60)
-	u := New(interval, aggmetrics, defCache, mock)
+	u := New(interval, aggmetrics, metricIndex, mock)
 
 	assertLen(0, aggmetrics, 0, t)
 
@@ -169,9 +170,10 @@ func TestUsageWrap32(t *testing.T) {
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
-	defCache := defcache.New(metricdef.NewDefsMockConcurrent(), stats)
+	metricIndex := memory.New()
+	metricIndex.Init(stats)
 	interval := uint32(60)
-	u := New(interval, aggmetrics, defCache, mock)
+	u := New(interval, aggmetrics, metricIndex, mock)
 
 	// max uint32 is 4294967295, let's verify the proper wrapping around that
 	// pretend an insert maxuint32 -900000

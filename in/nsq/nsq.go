@@ -10,7 +10,7 @@ import (
 	"github.com/bitly/go-hostpool"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/misc/app"
@@ -109,9 +109,9 @@ func New(stats met.Backend) *NSQ {
 	}
 }
 
-func (n *NSQ) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
+func (n *NSQ) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	for i := 0; i < concurrency; i++ {
-		handler := NewHandler(metrics, defCache, usg, n.stats)
+		handler := NewHandler(metrics, metricIndex, usg, n.stats)
 		n.consumer.AddHandler(handler)
 	}
 	time.Sleep(100 * time.Millisecond)

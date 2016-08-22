@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/defcache"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -53,7 +52,7 @@ func corsHandler(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func listJSON(b []byte, defs []*schema.MetricDefinition) ([]byte, error) {
+func listJSON(b []byte, defs []schema.MetricDefinition) ([]byte, error) {
 	seen := make(map[string]struct{})
 
 	names := make([]string, 0, len(defs))
@@ -150,14 +149,14 @@ func getOrg(req *http.Request) (int, error) {
 	return org, nil
 }
 
-func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
+func IndexJson(metricIndex idx.MetricIndex) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		org, err := getOrg(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		list := defCache.List(org)
+		list := metricIndex.List(org)
 		js := bufPool.Get().([]byte)
 		js, err = listJSON(js, list)
 		if err != nil {
@@ -170,19 +169,19 @@ func IndexJson(defCache *defcache.DefCache) http.HandlerFunc {
 		bufPool.Put(js[:0])
 	}
 }
-func get(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
+func get(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, defCache, aggSettings, logMinDur, false)
+		Get(w, req, store, metricIndex, aggSettings, logMinDur, false)
 	}
 }
 
-func getLegacy(store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
+func getLegacy(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, defCache, aggSettings, logMinDur, true)
+		Get(w, req, store, metricIndex, aggSettings, logMinDur, true)
 	}
 }
 
-func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *defcache.DefCache, aggSettings []mdata.AggSetting, logMinDur uint32, legacy bool) {
+func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32, legacy bool) {
 	pre := time.Now()
 	org := 0
 	var err error
@@ -274,37 +273,40 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, defCache *
 		}
 
 		if legacy {
-			_, defs := defCache.Find(org, id)
-			if len(defs) == 0 {
+			nodes, err := metricIndex.Find(org, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if len(nodes) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			for _, def := range defs {
-				if def == nil {
-					continue
+			for _, node := range nodes {
+				for _, def := range node.Defs {
+					consolidator, err := consolidation.GetConsolidator(&def, consolidateBy)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusBadRequest)
+						return
+					}
+					// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
+					// id is like foo.bar or foo.*
+					// def.Name is like foo.concretebar
+					// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
+					target := strings.Replace(target, id, def.Name, -1)
+					reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 				}
-				consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
-				// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
-				// id is like foo.bar or foo.*
-				// def.Name is like foo.concretebar
-				// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-				target := strings.Replace(target, id, def.Name, -1)
-				reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 			}
 		} else {
 			// querying for a MT id
-			def := defCache.Get(id)
-			if def == nil {
+			def, err := metricIndex.Get(id)
+			if err == idx.DefNotFound {
 				e := fmt.Sprintf("metric %q not found", id)
 				log.Error(0, e)
 				http.Error(w, e, http.StatusBadRequest)
 				return
 			}
-			consolidator, err := consolidation.GetConsolidator(def, consolidateBy)
+			consolidator, err := consolidation.GetConsolidator(&def, consolidateBy)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -378,53 +380,48 @@ func appStatus(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func findHandler(w http.ResponseWriter, r *http.Request) {
-
-	format := r.FormValue("format")
-	jsonp := r.FormValue("jsonp")
-	query := r.FormValue("query")
-	org, err := getOrg(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if query == "" {
-		http.Error(w, "missing parameter `query`", http.StatusBadRequest)
-		return
-	}
-
-	if format != "" && format != "treejson" && format != "json" && format != "completer" {
-		http.Error(w, "invalid format", http.StatusBadRequest)
-		return
-	}
-
-	globs, _ := defCache.Find(org, query)
-	seen := make(map[idx.MetricKey]struct{})
-	filteredGlobs := make([]idx.Glob, 0, len(globs))
-
-	for _, g := range globs {
-		_, ok := seen[g.Metric]
-		if !ok {
-			seen[g.Metric] = struct{}{}
-			filteredGlobs = append(filteredGlobs, g)
+func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		format := r.FormValue("format")
+		jsonp := r.FormValue("jsonp")
+		query := r.FormValue("query")
+		org, err := getOrg(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-	}
 
-	var b []byte
-	switch format {
-	case "", "treejson", "json":
-		b, err = findTreejson(query, globs)
-	case "completer":
-		b, err = findCompleter(globs)
-	}
+		if query == "" {
+			http.Error(w, "missing parameter `query`", http.StatusBadRequest)
+			return
+		}
 
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
+		if format != "" && format != "treejson" && format != "json" && format != "completer" {
+			http.Error(w, "invalid format", http.StatusBadRequest)
+			return
+		}
 
-	writeResponse(w, b, httpTypeJSON, jsonp)
+		nodes, err := metricIndex.Find(org, query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var b []byte
+		switch format {
+		case "", "treejson", "json":
+			b, err = findTreejson(query, nodes)
+		case "completer":
+			b, err = findCompleter(nodes)
+		}
+
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		writeResponse(w, b, httpTypeJSON, jsonp)
+	}
 }
 
 type completer struct {
@@ -433,17 +430,17 @@ type completer struct {
 	IsLeaf string `json:"is_leaf"`
 }
 
-func findCompleter(globs []idx.Glob) ([]byte, error) {
+func findCompleter(nodes []idx.Node) ([]byte, error) {
 	var b bytes.Buffer
 
 	var complete = make([]completer, 0)
 
-	for _, g := range globs {
+	for _, g := range nodes {
 		c := completer{
-			Path: string(g.Metric),
+			Path: string(g.Path),
 		}
 
-		if g.IsLeaf {
+		if g.Leaf {
 			c.IsLeaf = "1"
 		} else {
 			c.IsLeaf = "0"
@@ -477,20 +474,20 @@ type treejson struct {
 
 var treejsonContext = make(map[string]int)
 
-func findTreejson(query string, globs []idx.Glob) ([]byte, error) {
+func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 	var b bytes.Buffer
 
 	tree := make([]treejson, 0)
 	seen := make(map[string]struct{})
 
-	basepath := query
-	if i := strings.LastIndex(basepath, "."); i != -1 {
-		basepath = basepath[:i+1]
+	basepath := ""
+	if i := strings.LastIndex(query, "."); i != -1 {
+		basepath = query[:i+1]
 	}
 
-	for _, g := range globs {
+	for _, g := range nodes {
 
-		name := string(g.Metric)
+		name := string(g.Path)
 
 		if i := strings.LastIndex(name, "."); i != -1 {
 			name = name[i+1:]
@@ -507,7 +504,7 @@ func findTreejson(query string, globs []idx.Glob) ([]byte, error) {
 			Text:    name,
 		}
 
-		if g.IsLeaf {
+		if g.Leaf {
 			t.Leaf = 1
 		} else {
 			t.AllowChildren = 1

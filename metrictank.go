@@ -21,7 +21,9 @@ import (
 	"github.com/raintank/dur"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/idx/elasticsearch"
+	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/in"
 	inCarbon "github.com/raintank/metrictank/in/carbon"
 	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
@@ -31,7 +33,6 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 	clKafka "github.com/raintank/metrictank/mdata/clkafka"
 	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
-	"github.com/raintank/metrictank/metricdef"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -50,8 +51,8 @@ var (
 	startupTime  time.Time
 	GitHash      = "(none)"
 
-	metrics  *mdata.AggMetrics
-	defCache *defcache.DefCache
+	metrics     *mdata.AggMetrics
+	metricIndex idx.MetricIndex
 
 	// Misc:
 	showVersion = flag.Bool("version", false, "print version string")
@@ -90,10 +91,6 @@ var (
 	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cqlProtocolVersion        = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-
-	// Elasticsearch:
-	esAddr    = flag.String("elastic-addr", "localhost:9200", "elasticsearch address for metric definitions")
-	indexName = flag.String("index-name", "metric", "Elasticsearch index name for storing metric index.")
 
 	// Profiling, instrumentation and logging:
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
@@ -149,12 +146,20 @@ func main() {
 			log.Fatal(4, "error with configuration file: %s", err)
 			os.Exit(1)
 		}
+		// load config for metric ingestors
 		inCarbon.ConfigSetup()
 		inKafkaMdm.ConfigSetup()
 		inKafkaMdam.ConfigSetup()
 		inNSQ.ConfigSetup()
+
+		// load config for cluster handlers
 		clNSQ.ConfigSetup()
 		clKafka.ConfigSetup()
+
+		// load config for metricIndexers
+		memory.ConfigSetup()
+		elasticsearch.ConfigSetup()
+
 		conf.ParseAll()
 	}
 
@@ -214,12 +219,6 @@ func main() {
 	runtime.SetBlockProfileRate(*blockProfileRate)
 	runtime.MemProfileRate = *memProfileRate
 	mdata.InitMetrics(stats)
-
-	// we don't set an AsyncResultCallback here, but will do so from defcache
-	defs, err := metricdef.NewDefsEs(*esAddr, "", "", *indexName, nil)
-	if err != nil {
-		log.Fatal(4, "failed to initialize Elasticsearch. %s", err)
-	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -313,8 +312,29 @@ func main() {
 
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
-	defCache = defcache.New(defs, stats)
-	usg := usage.New(accountingPeriod, metrics, defCache, clock.New())
+
+	if memory.Enabled {
+		if metricIndex != nil {
+			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
+		}
+		metricIndex = memory.New()
+		metricIndex.Init(stats)
+	}
+	if elasticsearch.Enabled {
+		if metricIndex != nil {
+			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
+		}
+		metricIndex = elasticsearch.New()
+		metricIndex.Init(stats)
+	}
+
+	if metricIndex == nil {
+		log.Fatal(4, "No metricIndex handlers enabled.")
+	}
+
+	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
+
+	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
 
 	handlers := make([]mdata.ClusterHandler, 0)
 	if clNSQ.Enabled {
@@ -328,35 +348,33 @@ func main() {
 
 	mdata.InitCluster(stats, handlers...)
 
-	log.Info("DefCache initialized in %s. starting data consumption", time.Now().Sub(pre))
-
 	if inCarbon.Enabled {
-		inCarbonInst.Start(metrics, defCache, usg)
+		inCarbonInst.Start(metrics, metricIndex, usg)
 	}
 
 	if inKafkaMdm.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdmInst.Start(metrics, defCache, usg)
+		inKafkaMdmInst.Start(metrics, metricIndex, usg)
 	}
 	if inKafkaMdam.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdamInst.Start(metrics, defCache, usg)
+		inKafkaMdamInst.Start(metrics, metricIndex, usg)
 	}
 	if inNSQ.Enabled {
-		inNSQInst.Start(metrics, defCache, usg)
+		inNSQInst.Start(metrics, metricIndex, usg)
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, defCache, finalSettings, logMinDur))                        // metrictank native api which deals with ID's, not target strings
-		http.HandleFunc("/get/", get(store, defCache, finalSettings, logMinDur))                       // metrictank native api which deals with ID's, not target strings
-		http.HandleFunc("/render", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur)))  // traditional graphite api, still lacking a lot of the api
-		http.HandleFunc("/render/", corsHandler(getLegacy(store, defCache, finalSettings, logMinDur))) // traditional graphite api, still lacking a lot of the api
-		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(defCache)))
-		http.HandleFunc("/metrics/find", corsHandler(findHandler))
-		http.HandleFunc("/metrics/find/", corsHandler(findHandler))
+		http.HandleFunc("/get", get(store, metricIndex, finalSettings, logMinDur))                        // metrictank native api which deals with ID's, not target strings
+		http.HandleFunc("/get/", get(store, metricIndex, finalSettings, logMinDur))                       // metrictank native api which deals with ID's, not target strings
+		http.HandleFunc("/render", corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))  // traditional graphite api, still lacking a lot of the api
+		http.HandleFunc("/render/", corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))) // traditional graphite api, still lacking a lot of the api
+		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(metricIndex)))
+		http.HandleFunc("/metrics/find", corsHandler(Find(metricIndex)))
+		http.HandleFunc("/metrics/find/", corsHandler(Find(metricIndex)))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
@@ -405,7 +423,7 @@ func main() {
 	}
 	log.Info("closing store")
 	store.Stop()
-	defs.Stop()
+	metricIndex.Stop()
 	log.Info("terminating.")
 	log.Close()
 

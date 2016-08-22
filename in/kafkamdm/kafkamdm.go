@@ -12,7 +12,7 @@ import (
 
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/defcache"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
@@ -108,8 +108,8 @@ func New(stats met.Backend) *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(metrics mdata.Metrics, defCache *defcache.DefCache, usg *usage.Usage) {
-	k.In = in.New(metrics, defCache, usg, "kafka-mdm", k.stats)
+func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
+	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	go k.notifications()
 	go k.consume()
 }
