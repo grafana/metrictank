@@ -386,7 +386,7 @@ func (e *EsIdx) Stop() {
 }
 
 func (e *EsIdx) rebuildIndex() {
-	log.Info("Rebuilding Memory Index from metricDefinitiosn in ES")
+	log.Info("Rebuilding Memory Index from metricDefinitions in ES")
 	pre := time.Now()
 	defs := make([]schema.MetricDefinition, 0)
 	var err error
