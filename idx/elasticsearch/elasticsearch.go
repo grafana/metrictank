@@ -158,10 +158,10 @@ func (e *EsIdx) Init(stats met.Backend) error {
 		return err
 	}
 
-	idxEsOk = stats.NewCount("es-idx.ok")
-	idxEsFail = stats.NewCount("es-idx.fail")
-	idxEsAddDuration = stats.NewTimer("es-idx.add_duration", 0)
-	idxEsDeleteDuration = stats.NewTimer("es-idx.delete_duration", 0)
+	idxEsOk = stats.NewCount("idx.elasticsearch.ok")
+	idxEsFail = stats.NewCount("idx.elasticsearch.fail")
+	idxEsAddDuration = stats.NewTimer("idx.elasticsearch.add_duration", 0)
+	idxEsDeleteDuration = stats.NewTimer("idx.elasticsearch.delete_duration", 0)
 
 	log.Info("Checking if index %s exists in ES", esIndex)
 	if exists, err := e.Conn.ExistsIndex(esIndex, "", nil); err != nil && err.Error() != "record not found" {

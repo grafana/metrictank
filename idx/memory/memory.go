@@ -66,13 +66,13 @@ func New() *MemoryIdx {
 }
 
 func (m *MemoryIdx) Init(stats met.Backend) error {
-	idxOk = stats.NewCount("idx.ok")
-	idxFail = stats.NewCount("idx.fail")
-	idxAddDuration = stats.NewTimer("idx.add_duration", 0)
-	idxGetDuration = stats.NewTimer("idx.get_duration", 0)
-	idxListDuration = stats.NewTimer("idx.list_duration", 0)
-	idxFindDuration = stats.NewTimer("idx.find_duration", 0)
-	idxDeleteDuration = stats.NewTimer("idx.delete_duration", 0)
+	idxOk = stats.NewCount("idx.memory.ok")
+	idxFail = stats.NewCount("idx.memory.fail")
+	idxAddDuration = stats.NewTimer("idx.memory.add_duration", 0)
+	idxGetDuration = stats.NewTimer("idx.memory.get_duration", 0)
+	idxListDuration = stats.NewTimer("idx.memory.list_duration", 0)
+	idxFindDuration = stats.NewTimer("idx.memory.find_duration", 0)
+	idxDeleteDuration = stats.NewTimer("idx.memory.delete_duration", 0)
 	return nil
 }
 
