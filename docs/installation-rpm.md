@@ -14,6 +14,8 @@ We'll go over these in more detail below.
   See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10 is recommended, but 0.9 should work too.
 
+Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
+
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
@@ -53,12 +55,43 @@ Supported distributions:
 
 ## Set up cassandra
 
+[official instructions, for more info](http://docs.datastax.com/en/cassandra/3.x/cassandra/install/installRHEL.html)
+
+* Add the DataStax Distribution of Apache Cassandra 3.x repository to the /etc/yum.repos.d/datastax.repo:
+
+```
+[datastax-ddc] 
+name = DataStax Repo for Apache Cassandra
+baseurl = http://rpm.datastax.com/datastax-ddc/3.1
+enabled = 1
+gpgcheck = 0
+```
+
+* Run `sudo yum install datastax-ddc`
+
 For basic setups, you can just install it and start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
 
 ## Set up elasticsearch
 
-Also here, you can just install it and start it with default settings. 
+* Install the GPG key with `rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch`
+
+* Add the following in your /etc/yum.repos.d/ directory in a file with a .repo suffix, for example elasticsearch.repo
+
+```
+[elasticsearch-2.x]
+name=Elasticsearch repository for 2.x packages
+baseurl=https://packages.elastic.co/elasticsearch/2.x/centos
+gpgcheck=1
+gpgkey=https://packages.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+```
+
+* Install elasticsearch with `yum install elasticsearch`
+
+[more details on official page](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
+
+You can start it with default settings. 
 
 ## Set up statsd
 
@@ -118,8 +151,50 @@ Also, in case you want to make any change to your aggregations, Cassandra cluste
 ** Note: the above actually doesn't work yet, as we don't have the seek-back-in-time implemented yet to fetch old data from Kafka.
 So for now using Kafka is more about preparing for the future than getting immediate benefit. **
 
-You can install Kafka. Ideally 0.10 or later.
-Then just run it.  Default settings are fine.
+### Zookeeper
+
+Kafka requires Zookeeper, so set that up first.
+
+* Download zookeeper. Find a mirror at http://www.apache.org/dyn/closer.cgi/zookeeper/, pick a stable zookeeper, and download it to your server.
+
+* Unpack zookeeper. For this guide we'll install it in `/opt`.
+
+```
+cd /opt
+tar -zxvf /path/to/zookeeper-3.4.8.tar.gz
+ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
+mkdir /var/lib/zookeeper
+```
+
+* Make a config file for zookeeper in `/opt/zookeeper/conf/zoo.cfg`:
+
+```
+tickTime=2000
+dataDir=/var/lib/zookeeper
+clientPort=2181
+```
+
+* Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
+
+([more details](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+
+### Kafka
+
+We recommend 0.10 or higher.
+
+* Download kafka. Find a mirror at https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz, and download kafka to your server.
+
+* Unpack kafka. Like zookeeper, we'll do so in `/opt`.
+
+```
+cd /opt
+tar -zxvf /path/to/kafka_2.11-0.10.0.1.tgz
+ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
+```
+
+* Start kafka: `/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties`
+
+([more details](https://kafka.apache.org/documentation.html#quickstart))
 
 ## Configuration
 

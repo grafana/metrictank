@@ -14,6 +14,8 @@ We'll go over these in more detail below.
   See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10 is recommended, but 0.9 should work too.
 
+Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
+
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
@@ -53,12 +55,35 @@ Supported distributions:
 
 ## Set up cassandra
 
-For basic setups, you can just install it and start it with default settings.
+Add this to your `/etc/apt/sources.list`:
+
+```
+deb http://www.apache.org/dist/cassandra/debian 30x main
+deb-src http://www.apache.org/dist/cassandra/debian 30x main
+```
+
+* Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | sudo apt-key add -` to add the GPG key.
+
+* Run `sudo apt-get update && sudo apt-get install cassandra cassandra-tools`
+
+For basic setups, you can just start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+
+[more details on official page](ttp://cassandra.apache.org/download/)):
 
 ## Set up elasticsearch
 
-Also here, you can just install it and start it with default settings. 
+* Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -`
+
+* Save the repository definition to /etc/apt/sources.list.d/elasticsearch-2.x.list:
+
+`echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
+
+* Install elasticsearch with `sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install elasticsearch`
+
+[more details on official page](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
+
+You can start it with default settings.
 
 ## Set up statsd
 
@@ -118,8 +143,50 @@ Also, in case you want to make any change to your aggregations, Cassandra cluste
 ** Note: the above actually doesn't work yet, as we don't have the seek-back-in-time implemented yet to fetch old data from Kafka.
 So for now using Kafka is more about preparing for the future than getting immediate benefit. **
 
-You can install Kafka. Ideally 0.10 or later.
-Then just run it.  Default settings are fine.
+### Zookeeper
+
+Kafka requires Zookeeper, so set that up first.
+
+* Download zookeeper. Find a mirror at http://www.apache.org/dyn/closer.cgi/zookeeper/, pick a stable zookeeper, and download it to your server.
+
+* Unpack zookeeper. For this guide we'll install it in `/opt`.
+
+```
+cd /opt
+tar -zxvf /path/to/zookeeper-3.4.8.tar.gz
+ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
+mkdir /var/lib/zookeeper
+```
+
+* Make a config file for zookeeper in `/opt/zookeeper/conf/zoo.cfg`:
+
+```
+tickTime=2000
+dataDir=/var/lib/zookeeper
+clientPort=2181
+```
+
+* Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
+
+([more details](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+
+### Kafka
+
+We recommend 0.10 or higher.
+
+* Download kafka. Find a mirror at https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz, and download kafka to your server.
+
+* Unpack kafka. Like zookeeper, we'll do so in `/opt`.
+
+```
+cd /opt
+tar -zxvf /path/to/kafka_2.11-0.10.0.1.tgz
+ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
+```
+
+* Start kafka: `/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties`
+
+([more details](https://kafka.apache.org/documentation.html#quickstart))
 
 ## Configuration
 
