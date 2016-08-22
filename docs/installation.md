@@ -70,12 +70,12 @@ Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/
 whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
 the 20th commit after `0.5.1`
 
-We aim to keep master stable so that's your best bet.
+We aim to keep master stable, so that's your best bet.
 
 Supported distributions:
 
-* Ubuntu 14.04i (Trusty Tahr), 16.04 (Xenial Xerus)
-* Debian Wheezy, Jessie
+* Ubuntu 14.04 (Trusty Tahr), 16.04 (Xenial Xerus)
+* Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
 
 ### Chef cookbook
@@ -156,7 +156,7 @@ Then just run it.  Default settings are fine.
 
 ## Configuration
 
-See the [example config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) which guides you through the various options
+See the [example config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) which guides you through the various options.
 
 You may need to adjust the `statsd-addr` based on where you decided to run that service.
 
