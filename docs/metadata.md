@@ -2,8 +2,8 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently there are 2 index options. Only 1 index options can be enabled at a time.
-* Memory-Idx: 
+Currently there are 2 index options. Only 1 index option can be enabled at a time.
+* Memory-Idx
 * Elasticseach-Idx
 
 ### Elasticseach-Idx
@@ -58,8 +58,6 @@ enabled = true
 definition id's are unique across the entire system and can be computed from the def itself, so don't require coordination across distributed nodes.
 
 there can be multiple definitions for each metric, if the interval changes for example
-currently those all just stored individually in the radix tree and trigram index, which is a bit redundant
-in the future, we might just index the metric names and then have a separate structure to resolve a name to its multiple metricdefs, which could be cheaper.
 
 The schema is as follows:
 
