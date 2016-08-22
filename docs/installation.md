@@ -1,17 +1,18 @@
 # Installation guide
 
-## Dependencies
-
-* Cassandra. We run and recommend 3.0.8 . See
-[Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
-* Elasticsearch is currently a dependency for metrics metadata, but we will remove this soon.
-  See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
-* optionally a queue if you want to buffer data in case metrictank goes down: Kafka 0.10 is recommended, but 0.9 should work too.
-* currently you also need the [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
-  and our [graphite-api fork](https://github.com/raintank/graphite-api/). (which we install as 1 piece)
-* [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
+## Dependencies overview
 
 We'll go over these in more detail below.
+
+* Cassandra. We run and recommend 3.0.8 .
+  See [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+* Our [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
+  and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
+  We're working toward simplifying this much more.
+* [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
+* Optional: Elasticsearch for persistence of metrics metadata.
+  See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
+* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10 is recommended, but 0.9 should work too.
 
 ## How things fit together
 
@@ -21,23 +22,37 @@ metrictank will compress the data into chunks in RAM, a configurable amount of t
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank also needs elasticsearch to maintain an index of metrics metadata.
+Metrictank maintains an index of metrics metadata, for all series it Sees. If you want the index to be maintained
+across restarts, it can use Elasticsearch to save and reload the data.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
-to metrictank.  You can also query metrictank directly but this is very limited, experimental and not recommended.
+to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
 
 ## Installation
 
 ### From source
 
-Building metrictank requires a [Golang](https://golang.org/) compiler.
-We recommend version 1.5 or higher.
+This option is not recommended, because it just gives you the metrictank binary. And no configuration for an init system.
+
+
+Building metrictank requires:
+* a [Golang](https://golang.org/) compiler.  We recommend version 1.5 or higher.
+* [Git](https://git-scm.com/).
+
+On Centos:
 
 ```
+yum install go git
+export GOPATH=$HOME/go
 go get github.com/raintank/metrictank
 ```
 
-This installs only metrictank itself, and none of its dependencies.
+Take the file from `go/src/github.com/raintank/metrictank/metrictank-sample.ini`, put it in `/etc/raintank/metrictank.ini` and make any changes.
+
+You can now run like so:
+```
+/root/go/bin/metrictank
+```
 
 ### Distribution packages
 
