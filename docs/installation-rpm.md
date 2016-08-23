@@ -95,7 +95,7 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 * Start cassandra:
 
 ```
-/etc/init.d/cassandra start
+systemctl start cassandra
 ```
 
 The log - should you need it - is at /var/log/cassandra/cassandra.log
