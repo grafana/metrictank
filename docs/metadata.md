@@ -21,8 +21,8 @@ enabled = false
 index = metric
 # Elasticsearch host addresses (multiple hosts can be specified as comma-separated list)
 hosts = localhost:9200
-# how often the retry buffer should be flushed to ES
-retry-interval = 1h
+# how often the retry buffer should be flushed to ES. Valid units are 's', 'm', 'h'.
+retry-interval = 10m
 # max number of concurrent connections to ES
 max-conns = 20
 # max number of docs to keep in the BulkIndexer buffer

@@ -3,6 +3,7 @@ package elasticsearch
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -152,6 +153,10 @@ func New() *EsIdx {
 }
 
 func (e *EsIdx) Init(stats met.Backend) error {
+
+	if esRetryInterval < time.Second {
+		return errors.New("Invalid retry-interval.  Valid units are 's', 'm', 'h'. Must be at least 1 second")
+	}
 
 	log.Info("initializing EsIdx. Hosts=%s", esHosts)
 	if err := e.MemoryIdx.Init(stats); err != nil {
