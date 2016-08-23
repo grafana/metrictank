@@ -275,3 +275,28 @@ systemctl start metrictank
 
 Note that metrictank simply logs to stdout.
 You can use something like `journalctl -f metrictank` to see the logs.
+
+## Play with it!
+
+In Grafana, you can now add a graphite datasource with url `http://<ip>:8080`.
+If you access Grafana over https, make sure to use proxy mode, otherwise browsers will refuse to load content from the http datasource.
+
+You can start visualizing the data that's already in there by importing
+* [Metrictank dashboard](https://grafana.net/dashboards/279): visualizes all metrictank's internal performance metrics, which it sends via statsd/statsdaemon, into itself.
+* [Statsdaemon dashboard](https://grafana.net/dashboards/297): if you use statsdaemon, you can visualize its performance metrics, stored in metrictank.
+
+You're probably interested in loading in some fake data as well, perhaps to benchmark metrictank.
+A full benchmarking guide is out of scope for this installation guide, but here are some suggestions:
+
+* Use the [haggar](https://github.com/gorsuch/haggar) tool, which simulates independent clients, gradually appearing and sending data at randomized intervals into metrictank's carbon input port.  Invoke like so:
+
+```
+./haggar -agents 10 -jitter 1ms
+```
+
+* Use [fakemetrics](https://github.com/raintank/fakemetrics). which has a few modes of operation.  But one of the useful features is that it can send metrics in metrics2.0 format, into kafka.  You can do so using:
+
+```
+./fakemetrics -kafka-mdm-tcp-address localhost:9092 -orgs 100 -keys-per-org 1000
+```
+
