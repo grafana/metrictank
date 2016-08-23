@@ -101,11 +101,11 @@ Metrictank needs statsd or a statsd-compatible agent for its instrumentation.
 It will refuse to start if nothing listens on the configured `statsd-addr`.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
-or an alternative. We recommend [vimeo/statsdaemon](https://github.com/vimeo/statsdaemon).
+or an alternative. We recommend [raintank/statsdaemon](https://github.com/raintank/statsdaemon).
 
 For the [metrictank dashboard](https://grafana.net/dashboards/279) to work properly, you need the right statsd/statsdaemon settings.
 
-Below are instructions for statsd and statsdaemon:
+Below are instructions for statsd and statsdaemon.
 
 Note:
  * `<environment>` is however you choose to call your environment. (test, production, dev, ...).
@@ -113,13 +113,14 @@ Note:
 
 ### Statsdaemon
 
-[Statsdaemon](https://github.com/vimeo/statsdaemon) is the recommended option.
-To install it, you can either use the deb packages from the aforementioned repository,
-or you need to have a [Golang](https://golang.org/) compiler installed.
-In that case just run `go get github.com/Vimeo/statsdaemon/statsdaemon`
+[Statsdaemon](https://github.com/raintank/statsdaemon) is the recommended option.
+Install the package from the raintank repository you enabled earlier:
 
-Get the default config file from `https://github.com/vimeo/statsdaemon/blob/master/statsdaemon.ini`
-and update the following settings:
+```
+apt-get install statsdaemon
+```
+
+Update the following settings in `/etc/statsdaemon.ini`:
 
 ```
 flush_interval = 1
@@ -130,7 +131,18 @@ prefix_gauges = "stats.<environment>.gauges."
 percentile_thresholds = "90,75"
 ```
 
-Then just run `statsdaemon`.  If you use ubuntu you can use the package or the [upstart init config](https://github.com/vimeo/statsdaemon/blob/master/upstart-init-statsdaemon.conf) from the statsdaemon repo.
+Run it:
+
+```
+systemctl start statsdaemon
+```
+
+Or:
+
+```
+service statsdaemon start
+```
+
 
 ### Statsd
 
