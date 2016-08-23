@@ -103,7 +103,7 @@ EOF
 
 [more details on official page](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
-You can start it with default settings. 
+You can start it with default settings.
 
 ## Set up statsd
 
