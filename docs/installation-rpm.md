@@ -81,13 +81,13 @@ yum localinstall jre-8u60-linux-x64.rpm
 cat << EOF > /etc/yum.repos.d/datastax.repo
 [datastax-ddc] 
 name = DataStax Repo for Apache Cassandra
-baseurl = http://rpm.datastax.com/datastax-ddc/3.1
+baseurl = http://rpm.datastax.com/community/
 enabled = 1
 gpgcheck = 0
 EOF
 ```
 
-* Run `sudo yum install datastax-ddc`
+* Run `sudo yum install cassandra30`
 
 For basic setups, you can just install it and start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
