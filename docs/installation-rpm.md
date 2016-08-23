@@ -61,9 +61,19 @@ yum install metrictank graphite-metrictank
 [more information](https://packagecloud.io/raintank/raintank/install)
 
 
-## Set up cassandra
+## Set up java
 
-[official instructions, for more info](http://docs.datastax.com/en/cassandra/3.x/cassandra/install/installRHEL.html)
+Download and install the oracle java rpm:
+
+```
+wget --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" \
+"http://download.oracle.com/otn-pub/java/jdk/8u60-b27/jre-8u60-linux-x64.rpm"
+yum localinstall jre-8u60-linux-x64.rpm
+```
+
+[more info](https://www.digitalocean.com/community/tutorials/how-to-install-java-on-centos-and-fedora)
+
+## Set up cassandra
 
 * Add the DataStax respository:
 
@@ -81,6 +91,17 @@ EOF
 
 For basic setups, you can just install it and start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+
+* Start cassandra:
+
+```
+/etc/init.d/cassandra start
+```
+
+The log - should you need it - is at /var/log/cassandra/cassandra.log
+
+[more info](http://docs.datastax.com/en/cassandra/3.x/cassandra/install/installRHEL.html)
+
 
 ## Set up elasticsearch
 

@@ -61,6 +61,20 @@ apt-get install metrictank graphite-metrictank
 [more information](https://packagecloud.io/raintank/raintank/install)
 
 
+## Set up java
+
+Download and install the oracle java rpm:
+
+```
+wget --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u5-b13/jdk-8u5-linux-x64.tar.gz
+mkdir /opt/jdk
+tar -zxf jdk-8u5-linux-x64.tar.gz -C /opt/jdk
+update-alternatives --install /usr/bin/java java /opt/jdk/jdk1.8.0_05/bin/java 100
+update-alternatives --install /usr/bin/javac javac /opt/jdk/jdk1.8.0_05/bin/javac 100
+```
+
+[more info](https://www.digitalocean.com/community/tutorials/how-to-manually-install-oracle-java-on-a-debian-or-ubuntu-vps)
+
 ## Set up cassandra
 
 Add the cassandra repository:
@@ -79,7 +93,17 @@ EOF
 For basic setups, you can just start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
 
-[more details on official page](ttp://cassandra.apache.org/download/)):
+
+* Start cassandra:
+
+```
+/etc/init.d/cassandra start
+```
+
+The log - should you need it - is at /var/log/cassandra/cassandra.log
+
+[more info](ttp://cassandra.apache.org/download/)):
+
 
 ## Set up elasticsearch
 
