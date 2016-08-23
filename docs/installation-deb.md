@@ -34,8 +34,6 @@ to metrictank.  You can also query metrictank directly but this is experimental 
 We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
 
-[Instructions to enable the raintank packagecloud repository](https://packagecloud.io/raintank/raintank/install)
-
 You need to install these packages:
 
 * metrictank
@@ -52,6 +50,16 @@ Supported distributions:
 * Ubuntu 14.04 (Trusty Tahr), 16.04 (Xenial Xerus)
 * Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
+
+You can enable the repository and install the packages like so:
+
+```
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
+apt-get install metrictank graphite-metrictank
+```
+
+[more information](https://packagecloud.io/raintank/raintank/install)
+
 
 ## Set up cassandra
 
