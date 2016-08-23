@@ -259,17 +259,9 @@ See the `kafka-mdm-in` section in the config for the options you need to tweak.
 
 ## Run it!
 
-If using upstart:
-```
-service metrictank start
-```
-
-If using systemd:
 ```
 systemctl start metrictank
 ```
 
-Note that metrictank simply logs to stdout.  So where the log data ends up depends on your init system.
-
-If using upstart, you can then find the logs at `/var/log/upstart/metrictank.log`.
-With systemd, you can use something like `journalctl -f metrictank`.
+Note that metrictank simply logs to stdout.
+You can use something like `journalctl -f metrictank` to see the logs.
