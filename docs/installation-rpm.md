@@ -148,6 +148,9 @@ Below are instructions for statsd and statsdaemon.
 Note:
  * `<environment>` is however you choose to call your environment. (test, production, dev, ...).
  * we recommend installing statsd/statsdaemon on the same host as metrictank.
+ * Note, statsd/statsdaemon will write to metrictank's carbon port on localhost:2003, while metrictank will send its own performance metrics to statsd/statsdaemon on localhost:8125.
+   This is a circular dependency, we typically just bring up statsdaemon first, and metrictank a bit later.  This means you will see some "unable to flush" errors from statsdaemon
+   or statsd during the timeframe where metrictank is not up yet.
 
 ### Statsdaemon
 
