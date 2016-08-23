@@ -102,7 +102,8 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 	m.Lock()
 	var pre time.Time
-	for _, def := range defs {
+	for i, _ := range defs {
+		def := defs[i]
 		pre = time.Now()
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
