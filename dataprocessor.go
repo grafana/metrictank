@@ -386,13 +386,12 @@ func mergeSeries(out []Series) []Series {
 			//we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
-			for i, pt := range series[0].Datapoints {
-				if pt.Val == math.NaN() {
-					for j := 1; j < len(series); j++ {
-						if series[j].Datapoints[i].Val != math.NaN() {
-							pt.Val = series[j].Datapoints[i].Val
-							break
-						}
+			log.Debug("%s has multiple series.", series[0].Target)
+			for i, _ := range series[0].Datapoints {
+				for j := 0; j < len(series); j++ {
+					if !math.IsNaN(series[j].Datapoints[i].Val) {
+						series[0].Datapoints[i].Val = series[j].Datapoints[i].Val
+						break
 					}
 				}
 			}

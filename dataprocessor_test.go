@@ -889,8 +889,11 @@ func TestMergeSeries(t *testing.T) {
 	}
 	for _, serie := range merged {
 		if serie.Target == "some.series.foo1" {
+			if len(serie.Datapoints) != 4 {
+				t.Errorf("expected 4 datapoints. got %d", len(serie.Datapoints))
+			}
 			for _, pt := range serie.Datapoints {
-				if pt.Val == math.NaN() {
+				if math.IsNaN(pt.Val) {
 					t.Errorf("merging should have removed NaN values.")
 				}
 			}
