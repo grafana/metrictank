@@ -188,7 +188,9 @@ tar -zxvf /path/to/kafka_2.11-0.10.0.1.tgz
 ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 ```
 
-* Start kafka: `/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties`
+* Start kafka: `/opt/kafka/bin/kafka-server-start.sh -daemon /opt/kafka/config/server.properties`
+
+The log - if you need it - lives at /opt/kafka/logs/server.log
 
 ([more details](https://kafka.apache.org/documentation.html#quickstart))
 
