@@ -65,7 +65,7 @@ systemctl start graphite-metrictank
 ```
 
 
-[more information](https://packagecloud.io/raintank/raintank/install)
+[more info](https://packagecloud.io/raintank/raintank/install)
 
 
 ## Set up java
@@ -129,7 +129,7 @@ EOF
 
 * Install elasticsearch with `yum install elasticsearch`
 
-[more details on official page](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
+[more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
 You can start it with default settings.
 
@@ -226,7 +226,7 @@ EOF
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
 
-([more details](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+([more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
 
 ### Kafka
 
@@ -246,7 +246,7 @@ ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 
 The log - if you need it - lives at /opt/kafka/logs/server.log
 
-([more details](https://kafka.apache.org/documentation.html#quickstart))
+([more info](https://kafka.apache.org/documentation.html#quickstart))
 
 ## Configuration
 
