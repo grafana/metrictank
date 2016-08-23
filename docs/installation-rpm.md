@@ -58,6 +58,13 @@ curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.rp
 yum install metrictank graphite-metrictank
 ```
 
+Then just start it:
+
+```
+systemctl start graphite-metrictank
+```
+
+
 [more information](https://packagecloud.io/raintank/raintank/install)
 
 

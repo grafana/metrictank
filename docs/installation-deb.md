@@ -58,6 +58,18 @@ curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.de
 apt-get install metrictank graphite-metrictank
 ```
 
+Then just start it:
+
+```
+systemctl start graphite-metrictank
+```
+
+Or:
+
+```
+service graphite-metrictank start
+```
+
 [more information](https://packagecloud.io/raintank/raintank/install)
 
 
