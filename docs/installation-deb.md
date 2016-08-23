@@ -55,11 +55,13 @@ Supported distributions:
 
 ## Set up cassandra
 
-Add this to your `/etc/apt/sources.list`:
+Add the cassandra repository:
 
 ```
+cat << EOF >> /etc/apt/sources.list
 deb http://www.apache.org/dist/cassandra/debian 30x main
 deb-src http://www.apache.org/dist/cassandra/debian 30x main
+EOF
 ```
 
 * Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | sudo apt-key add -` to add the GPG key.
@@ -75,7 +77,7 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 
 * Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -`
 
-* Save the repository definition to /etc/apt/sources.list.d/elasticsearch-2.x.list:
+* Save the repository definition:
 
 `echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
 
@@ -158,12 +160,14 @@ ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
 mkdir /var/lib/zookeeper
 ```
 
-* Make a config file for zookeeper in `/opt/zookeeper/conf/zoo.cfg`:
+* Make a config file for zookeeper:
 
 ```
+cat << EOF > /opt/zookeeper/conf/zoo.cfg
 tickTime=2000
 dataDir=/var/lib/zookeeper
 clientPort=2181
+EOF
 ```
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`

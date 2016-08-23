@@ -57,14 +57,16 @@ Supported distributions:
 
 [official instructions, for more info](http://docs.datastax.com/en/cassandra/3.x/cassandra/install/installRHEL.html)
 
-* Add the DataStax Distribution of Apache Cassandra 3.x repository to the /etc/yum.repos.d/datastax.repo:
+* Add the DataStax respository:
 
 ```
+cat << EOF > /etc/yum.repos.d/datastax.repo
 [datastax-ddc] 
 name = DataStax Repo for Apache Cassandra
 baseurl = http://rpm.datastax.com/datastax-ddc/3.1
 enabled = 1
 gpgcheck = 0
+EOF
 ```
 
 * Run `sudo yum install datastax-ddc`
@@ -76,15 +78,17 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 
 * Install the GPG key with `rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch`
 
-* Add the following in your /etc/yum.repos.d/ directory in a file with a .repo suffix, for example elasticsearch.repo
+* Add the elastic repository:
 
 ```
+cat << EOF > /etc/yum.repos.d/elasticsearch.repo
 [elasticsearch-2.x]
 name=Elasticsearch repository for 2.x packages
 baseurl=https://packages.elastic.co/elasticsearch/2.x/centos
 gpgcheck=1
 gpgkey=https://packages.elastic.co/GPG-KEY-elasticsearch
 enabled=1
+EOF
 ```
 
 * Install elasticsearch with `yum install elasticsearch`
@@ -166,12 +170,14 @@ ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
 mkdir /var/lib/zookeeper
 ```
 
-* Make a config file for zookeeper in `/opt/zookeeper/conf/zoo.cfg`:
+* Make a config file for zookeeper:
 
 ```
+cat << EOF > /opt/zookeeper/conf/zoo.cfg
 tickTime=2000
 dataDir=/var/lib/zookeeper
 clientPort=2181
+EOF
 ```
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
