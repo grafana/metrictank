@@ -82,7 +82,7 @@ func ConfigProcess(instance string) {
 	case "oldest":
 	case "newest":
 	default:
-		_, err := time.ParseDuration(offest)
+		_, err := time.ParseDuration(offset)
 		if err != nil {
 			log.Fatal(4, "kafkamdm: invalid offest format. %s", err)
 		}
