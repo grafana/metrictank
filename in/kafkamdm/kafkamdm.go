@@ -240,7 +240,8 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 }
 
 func (o *OffsetMgr) Close() {
-	o.Close()
+	log.Info("Closing partitionsOffset DB.")
+	o.db.Close()
 }
 
 func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
