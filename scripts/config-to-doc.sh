@@ -56,4 +56,4 @@ while read line; do
 			echo $line
 		fi
 	fi
-done < ../metrictank-sample.ini
+done < metrictank-sample.ini
