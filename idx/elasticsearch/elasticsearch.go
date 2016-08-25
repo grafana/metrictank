@@ -367,11 +367,11 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 			v := v.(map[string]interface{})
 			id := v["_id"].(string)
 			if errStr, ok := v["error"].(string); ok {
-				log.Warn("ES: %s failed: %s", id, errStr)
+				log.Debug("ES: %s failed: %s", id, errStr)
 				e.failures.Retry(id)
 				idxEsFail.Inc(1)
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
-				log.Warn("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
+				log.Debug("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
 				e.failures.Retry(id)
 				idxEsFail.Inc(1)
 			} else {
