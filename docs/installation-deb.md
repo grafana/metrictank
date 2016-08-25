@@ -29,7 +29,32 @@ across restarts, it can use Elasticsearch to save and reload the data.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
 to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
-## Installation
+## Metrictank and graphite-metrictank
+
+### Short version
+
+You can enable our repository and install the packages like so:
+
+```
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
+apt-get install metrictank graphite-metrictank
+```
+
+Then just start it:
+
+```
+systemctl start graphite-metrictank
+```
+
+Or:
+
+```
+service graphite-metrictank start
+```
+
+Logs - if you need them - will be at /var/log/graphite/graphite-metrictank.log
+
+### Long version
 
 We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
@@ -50,25 +75,6 @@ Supported distributions:
 * Ubuntu 14.04 (Trusty Tahr), 16.04 (Xenial Xerus)
 * Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
-
-You can enable the repository and install the packages like so:
-
-```
-curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
-apt-get install metrictank graphite-metrictank
-```
-
-Then just start it:
-
-```
-systemctl start graphite-metrictank
-```
-
-Or:
-
-```
-service graphite-metrictank start
-```
 
 [more info](https://packagecloud.io/raintank/raintank/install)
 
