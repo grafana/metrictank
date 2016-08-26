@@ -216,13 +216,17 @@ func BenchmarkIndexing(b *testing.B) {
 	protoVer = 4
 	ix := New()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	pre := time.Now()
 	ix.Init(stats)
+	loadTime := time.Since(pre)
+	currentMetrics := ix.MemoryIdx.List(-1)
+	b.Logf("there are %d metrics already in the index. Loaded in %s", len(currentMetrics), loadTime.String())
 
 	var series string
 	var data *schema.MetricData
 	b.ReportAllocs()
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for n := len(currentMetrics); n < len(currentMetrics)+b.N; n++ {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
@@ -233,4 +237,5 @@ func BenchmarkIndexing(b *testing.B) {
 		data.SetId()
 		ix.Add(data)
 	}
+	ix.Stop()
 }
