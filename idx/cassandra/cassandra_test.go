@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -215,6 +216,9 @@ func BenchmarkIndexing(b *testing.B) {
 	writeQueueSize = 10
 	protoVer = 4
 	ix := New()
+	tmpSession, _ := ix.cluster.CreateSession()
+	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Close()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	pre := time.Now()
 	ix.Init(stats)
@@ -222,11 +226,16 @@ func BenchmarkIndexing(b *testing.B) {
 	currentMetrics := ix.MemoryIdx.List(-1)
 	b.Logf("there are %d metrics already in the index. Loaded in %s", len(currentMetrics), loadTime.String())
 
-	var series string
-	var data *schema.MetricData
 	b.ReportAllocs()
 	b.ResetTimer()
-	for n := len(currentMetrics); n < len(currentMetrics)+b.N; n++ {
+	insertDefs(ix, b.N)
+	ix.Stop()
+}
+
+func insertDefs(ix idx.MetricIndex, i int) {
+	var series string
+	var data *schema.MetricData
+	for n := 0; n < i; n++ {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
@@ -237,5 +246,29 @@ func BenchmarkIndexing(b *testing.B) {
 		data.SetId()
 		ix.Add(data)
 	}
+}
+
+func BenchmarkLoad(b *testing.B) {
+	keyspace = "raintank"
+	hosts = "localhost:9042"
+	consistency = "one"
+	timeout = time.Second
+	numConns = 10
+	writeQueueSize = 10
+	protoVer = 4
+	ix := New()
+
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	tmpSession, _ := ix.cluster.CreateSession()
+	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Close()
+	ix.Init(stats)
+	insertDefs(ix, b.N)
+	ix.Stop()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	ix = New()
+	ix.Init(stats)
 	ix.Stop()
 }
