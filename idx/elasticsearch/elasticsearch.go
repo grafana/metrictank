@@ -355,7 +355,7 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 	if err != nil {
 		// Something went *extremely* wrong trying to submit these items
 		// to elasticsearch. return an error and bulkIndexer will retry.
-		log.Error(3, "ES: bulkindex response parse failed: %q", err)
+		log.Error(3, "ES: bulkindex response parse failed: %q. will retry", err)
 		return err
 	}
 	if response.Errors {
