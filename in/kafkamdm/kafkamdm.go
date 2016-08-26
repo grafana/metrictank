@@ -188,7 +188,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
 	currentOffset := partitionOffset
 	messages := pc.Messages()
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(offsetCommitInterval)
 	for {
 		select {
 		case msg := <-messages:
