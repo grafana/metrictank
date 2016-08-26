@@ -54,6 +54,7 @@ var consumerMaxWaitTime time.Duration
 var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
 var offsetMgr *OffsetMgr
+var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
 
 func ConfigSetup() {
@@ -93,7 +94,7 @@ func ConfigProcess(instance string) {
 	case "oldest":
 	case "newest":
 	default:
-		_, err := time.ParseDuration(offset)
+		offsetDuration, err = time.ParseDuration(offset)
 		if err != nil {
 			log.Fatal(4, "kafkamdm: invalid offest format. %s", err)
 		}
@@ -165,18 +166,12 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 				}
 				go k.consumePartition(topic, partition, o)
 			default:
-				// treat offset as a time duration.
-				dur, err := time.ParseDuration(offset)
-				if err != nil {
-					log.Fatal(4, "kafka-mdm: Failed to parse offset to time.Duration. %s", err)
-				}
-				o, err := k.client.GetOffset(topic, partition, time.Now().Add(-1*dur).UnixNano()/int64(time.Millisecond))
+				o, err := k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 				if err != nil {
 					log.Fatal(4, "kafka-mdm: failed to get offset for %s:%d.  %s", topic, partition, err)
 				}
 				go k.consumePartition(topic, partition, o)
 			}
-
 		}
 	}
 }
