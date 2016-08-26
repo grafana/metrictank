@@ -3,7 +3,7 @@
 When you request a larger amount of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
 There's two pieces to this puzzle - rollups and runtime consolidation - explained below.
 
-In metrictank, runtime consolidation works in concert with the rollup archives, in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series, so that if you select a different function with consolidateBy for runtime consolidation, you [can get nonsense back](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
+In metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))
 
 By default, metrictank will consolidate (at query time) like so:
 
@@ -25,6 +25,8 @@ We don't just store the raw data, but also statistical summaries, computed over 
 * count
 
 (sum and count are used to compute the average on the fly)
+
+Configure them using the [agg-settings in the data section of the config](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)
 
 
 ## Runtime consolidation
@@ -90,6 +92,9 @@ However, if a rollup band is available with higher resolution than this outcome,
 * At this point, we now know which archives to fetch for each series and which runtime consolidation to apply, to best match the given request.
 
 ## Configuration considerations
+
+
+Some considerations as you configure [the data options in the config, such as ttl and agg-settings](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)
 
 * avoid doing too many bands of data and having their TTL's be too similar, because they will all contain the most recent data and overlap.  
   Aim to achieve about 10x or more reduction from one level to the next
