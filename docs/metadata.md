@@ -2,13 +2,43 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently there are 2 index options. Only 1 index option can be enabled at a time.
+Currently there are 3 index options. Only 1 index option can be enabled at a time.
 * Memory-Idx
 * Elasticseach-Idx
+* Cassandra-Idx
+
+### Cassandra-Idx
+The Cassandra-Idx store extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metrics.  On low end hardware the index can be rebuilt at about 70000 metricDefinitions per second.
+
+Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suite your deployment.
+Refer to the [cassandra guide](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md) for more details.
+
+#### Configuration
+```
+[cassandra-idx]
+enabled = false
+# Cassandra keyspace to store metricDefinitions in.
+keyspace = raintank
+# comma separated list of cassandra addresses in host:port form
+hosts = localhost:9042
+#cql protocol version to use
+protocol-version = 4
+# write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
+consistency = one
+# cassandra request timeout
+timout = 1s
+# number of concurrent connections to cassandra
+num-conns = 10
+# Max number of metricDefs allowed to be unwritten to cassandra
+write-queue-size = 100000
+```
+
+Note:
+* All metrictanks write to Cassandra.  this is not very efficient.
 
 ### Elasticseach-Idx
 
-The Elasticseach-Idx stores extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Elasticsearch.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metricDefinitions stored in Elasticsearch.
+The Elasticseach-Idx store extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Elasticsearch.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metricDefinitions stored in Elasticsearch.
 
 Metrictank will initialize ES with the needed schema/mapping settings.
 
@@ -32,7 +62,7 @@ buffer-delay-max = 10s
 ```
 
 Note:
-* All metrictanks write to ES.  this is not very efficient.  But we'll replace ES soon anyway.
+* All metrictanks write to ES.  this is not very efficient.  
 * When indexing more than around ~ 50-100k metrics/s ES can start to block.  So if you're sending a large volume of (previously unseen)
   metrics all at once the indexing can [put backpressure on the ingestion](https://github.com/raintank/metrictank/blob/master/docs/operations.md#ingestion-stalls--backpressure), meaning
   less metrics/s while indexing is ongoing.
