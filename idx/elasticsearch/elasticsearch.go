@@ -339,6 +339,14 @@ type responseStruct struct {
 	Items  []map[string]interface{} `json:"items"`
 }
 
+type esError struct {
+	count       int
+	firstId     string
+	lastId      string
+	firstReason string
+	lastReason  string
+}
+
 func (e *EsIdx) processEsResponse(body []byte) error {
 	response := responseStruct{}
 
@@ -362,6 +370,8 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 		return nil
 	}
 
+	errors := make(map[string]esError)
+
 	for _, m := range response.Items {
 		for _, v := range m {
 			v := v.(map[string]interface{})
@@ -370,16 +380,56 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 				log.Debug("ES: %s failed: %s", id, errStr)
 				e.failures.Retry(id)
 				idxEsFail.Inc(1)
+				e, ok := errors[errStr]
+				if !ok {
+					errors[errStr] = esError{
+						count:   1,
+						firstId: id,
+						lastId:  id,
+					}
+				} else {
+					e.count += 1
+					e.lastId = id
+					errors[errStr] = e
+				}
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
-				log.Debug("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
+				errStr := errMap["type"].(string)
+				reason := errMap["reason"].(string)
+				log.Debug("ES: %s failed: %s: %q", id, errStr, reason)
 				e.failures.Retry(id)
 				idxEsFail.Inc(1)
+				e, ok := errors[errStr]
+				if !ok {
+					errors[errStr] = esError{
+						count:       1,
+						firstId:     id,
+						lastId:      id,
+						firstReason: reason,
+						lastReason:  reason,
+					}
+				} else {
+					e.count += 1
+					e.lastId = id
+					e.lastReason = reason
+					errors[errStr] = e
+				}
 			} else {
 				log.Debug("ES: completed %s successfully.", id)
 				idxEsOk.Inc(1)
 			}
 		}
 	}
+
+	args := make([]interface{}, 0, 6*len(errors))
+	for errStr, e := range errors {
+		args = append(args, e.count)
+		args = append(args, errStr)
+		args = append(args, e.firstId)
+		args = append(args, e.firstReason)
+		args = append(args, e.lastId)
+		args = append(args, e.lastReason)
+	}
+	log.Debug("ES: encountered errors: (all will be retried)"+strings.Repeat("\nES: count=%d type=%s\nES:   first: id=%s reason=%q\nES:   last: id=%s reason=%q", len(errors)), args)
 	return nil
 }
 
