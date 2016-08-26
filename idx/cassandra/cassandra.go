@@ -65,7 +65,6 @@ type CasIdx struct {
 	cluster    *gocql.ClusterConfig
 	session    *gocql.Session
 	writeQueue chan writeReq
-	mu         sync.Mutex
 	shutdown   chan struct{}
 	wg         sync.WaitGroup
 }
@@ -137,7 +136,7 @@ func (c *CasIdx) Init(stats met.Backend) error {
 func (c *CasIdx) Stop() {
 	log.Info("stopping Cassandra-idx")
 	c.MemoryIdx.Stop()
-	close(c.shutdown)
+	close(c.writeQueue)
 	c.wg.Wait()
 	c.session.Close()
 }
@@ -189,38 +188,33 @@ func (c *CasIdx) processWriteQueue() {
 	var success bool
 	var attempts int
 	var req writeReq
-	for {
-		select {
-		case req = <-c.writeQueue:
-			data.Reset()
-			err := encoder.Encode(req.def)
-			if err != nil {
-				log.Error(3, "Failed to Unmarshal metricDef. %s", err)
-				continue
-			}
-			success = false
-			attempts = 0
-			for !success {
-				if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data.Bytes()).Exec(); err != nil {
-					idxCasFail.Inc(1)
-					if (attempts % 20) == 0 {
-						log.Warn("Failed to write def to cassandra. it will be retried. %s", err)
-					}
-					sleepTime := 100 * attempts
-					if sleepTime > 2000 {
-						sleepTime = 2000
-					}
-					time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-					attempts++
-				} else {
-					success = true
-					idxCasAddDuration.Value(time.Since(req.recvTime))
-					idxCasOk.Inc(1)
-					log.Debug("metricDef saved to cassandra. %s", req.def.Id)
+	for req = range c.writeQueue {
+		data.Reset()
+		err := encoder.Encode(req.def)
+		if err != nil {
+			log.Error(3, "Failed to Unmarshal metricDef. %s", err)
+			continue
+		}
+		success = false
+		attempts = 0
+		for !success {
+			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data.Bytes()).Exec(); err != nil {
+				idxCasFail.Inc(1)
+				if (attempts % 20) == 0 {
+					log.Warn("Failed to write def to cassandra. it will be retried. %s", err)
 				}
+				sleepTime := 100 * attempts
+				if sleepTime > 2000 {
+					sleepTime = 2000
+				}
+				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				attempts++
+			} else {
+				success = true
+				idxCasAddDuration.Value(time.Since(req.recvTime))
+				idxCasOk.Inc(1)
+				log.Debug("metricDef saved to cassandra. %s", req.def.Id)
 			}
-		case <-c.shutdown:
-			break
 		}
 	}
 	log.Info("cassandra-idx writeQueue handler ended.")
