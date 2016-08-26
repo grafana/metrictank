@@ -220,11 +220,7 @@ func BenchmarkIndexing(b *testing.B) {
 	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
 	tmpSession.Close()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	pre := time.Now()
 	ix.Init(stats)
-	loadTime := time.Since(pre)
-	currentMetrics := ix.MemoryIdx.List(-1)
-	b.Logf("there are %d metrics already in the index. Loaded in %s", len(currentMetrics), loadTime.String())
 
 	b.ReportAllocs()
 	b.ResetTimer()
