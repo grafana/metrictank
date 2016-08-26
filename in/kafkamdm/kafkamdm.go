@@ -1,11 +1,7 @@
 package kafkamdm
 
 import (
-	"bytes"
-	"encoding/binary"
 	"flag"
-	"fmt"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -17,11 +13,9 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 type KafkaMdm struct {
@@ -53,7 +47,7 @@ var consumerFetchDefault int
 var consumerMaxWaitTime time.Duration
 var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
-var offsetMgr *OffsetMgr
+var offsetMgr *kafka.OffsetMgr
 var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
 
@@ -80,15 +74,15 @@ func ConfigProcess(instance string) {
 	}
 
 	if offsetCommitInterval == 0 {
-		log.Fatal("kafkamdm: offset-commit-interval must be greater then 0")
+		log.Fatal(4, "kafkamdm: offset-commit-interval must be greater then 0")
 	}
 	if consumerMaxWaitTime == 0 {
-		log.Fatal("kafkamdm: consumer-max-wait-time must be greater then 0")
+		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
 	}
 	if consumerMaxProcessingTime == 0 {
-		log.Fatal("kafkamdm: consumer-max-processing-time must be greater then 0")
+		log.Fatal(4, "kafkamdm: consumer-max-processing-time must be greater then 0")
 	}
-
+	var err error
 	switch offset {
 	case "last":
 	case "oldest":
@@ -100,8 +94,7 @@ func ConfigProcess(instance string) {
 		}
 	}
 
-	var err error
-	offsetMgr, err = NewOffsetMgr(dataDir)
+	offsetMgr, err = kafka.NewOffsetMgr(dataDir)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm couldnt create offsetMgr. %s", err)
 	}
@@ -223,64 +216,4 @@ func (k *KafkaMdm) Stop() {
 		offsetMgr.Close()
 		close(k.StopChan)
 	}()
-}
-
-type OffsetMgr struct {
-	db *leveldb.DB
-}
-
-func NewOffsetMgr(dir string) (*OffsetMgr, error) {
-	dbFile := filepath.Join(dir, "partitionOffsets.db")
-	db, err := leveldb.OpenFile(dbFile, &opt.Options{})
-	if err != nil {
-		if _, ok := err.(*storage.ErrCorrupted); ok {
-			log.Warn("partitionOffsets.db is corrupt. Recovering.")
-			db, err = leveldb.RecoverFile(dbFile, &opt.Options{})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
-	}
-	log.Info("Opened %s", dbFile)
-	return &OffsetMgr{
-		db: db,
-	}, nil
-}
-
-func (o *OffsetMgr) Close() {
-	log.Info("Closing partitionsOffset DB.")
-	o.db.Close()
-}
-
-func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
-	key := new(bytes.Buffer)
-	key.WriteString(fmt.Sprintf("T:%s-P:%d", topic, partition))
-	data := new(bytes.Buffer)
-	if err := binary.Write(data, binary.LittleEndian, offset); err != nil {
-		return err
-	}
-	log.Debug("commiting offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
-	return o.db.Put(key.Bytes(), data.Bytes(), &opt.WriteOptions{Sync: true})
-}
-
-func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
-	key := new(bytes.Buffer)
-	key.WriteString(fmt.Sprintf("T:%s-P:%d", topic, partition))
-	data, err := o.db.Get(key.Bytes(), nil)
-	if err != nil {
-		if err == leveldb.ErrNotFound {
-			log.Debug("no offset recorded for %s:%d", topic, partition)
-			return -1, nil
-		}
-		return 0, err
-	}
-	var offset int64
-	err = binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &offset)
-	if err != nil {
-		return 0, err
-	}
-	log.Debug("found saved offset %d for %s:%d", offset, topic, partition)
-	return offset, nil
 }
