@@ -203,7 +203,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 			}
 		case <-k.stopConsuming:
 			pc.Close()
-			offsetMgr.Commit(topic, partition, currentOffset)
+			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
+				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+			}
 			log.Info("kafka-mdm consumer for %s:%d ended.", topic, partition)
 			return
 		}
