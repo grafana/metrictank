@@ -77,6 +77,17 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
+
+	if offsetCommitInterval == 0 {
+		log.Fatal("kafkamdm: offset-commit-interval must be greater then 0")
+	}
+	if consumerMaxWaitTime == 0 {
+		log.Fatal("kafkamdm: consumer-max-wait-time must be greater then 0")
+	}
+	if consumerMaxProcessingTime == 0 {
+		log.Fatal("kafkamdm: consumer-max-processing-time must be greater then 0")
+	}
+
 	switch offset {
 	case "last":
 	case "oldest":
