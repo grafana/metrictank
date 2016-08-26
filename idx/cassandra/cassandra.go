@@ -85,7 +85,7 @@ func New() *CasIdx {
 }
 
 func (c *CasIdx) Init(stats met.Backend) error {
-	log.Info("initializing CasIdx. Hosts=%s", hosts)
+	log.Info("initializing cassandra-idx. Hosts=%s", hosts)
 	if err := c.MemoryIdx.Init(stats); err != nil {
 		return err
 	}
@@ -93,26 +93,26 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	var err error
 	tmpSession, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "failed to create cassandra session. %s", err)
+		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
 		return err
 	}
 
 	// ensure the keyspace and table exist.
 	err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
 	if err != nil {
-		log.Error(3, "failed to initialize cassandra keyspace. %s", err)
+		log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
 		return err
 	}
 	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
 	if err != nil {
-		log.Error(3, "failed to initialize cassandra table. %s", err)
+		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
 		return err
 	}
 	tmpSession.Close()
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "failed to create cassandra session. %s", err)
+		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
 		return err
 	}
 
@@ -134,7 +134,7 @@ func (c *CasIdx) Init(stats met.Backend) error {
 }
 
 func (c *CasIdx) Stop() {
-	log.Info("stopping Cassandra-idx")
+	log.Info("cassandra-idx stopping")
 	c.MemoryIdx.Stop()
 	close(c.writeQueue)
 	c.wg.Wait()
@@ -148,12 +148,12 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 		if err == idx.DefNotFound {
 			inMemory = false
 		} else {
-			log.Error(3, "Failed to query Memory Index for %s. %s", data.Id, err)
+			log.Error(3, "cassandra-idx Failed to query Memory Index for %s. %s", data.Id, err)
 			return
 		}
 	}
 	if inMemory {
-		log.Debug("def already seen before. Just updating memory Index")
+		log.Debug("cassandra-idx def already seen before. Just updating memory Index")
 		existing.LastUpdate = data.Time
 		c.MemoryIdx.AddDef(&existing)
 		return
@@ -164,7 +164,7 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 }
 
 func (c *CasIdx) rebuildIndex() {
-	log.Info("Rebuilding Memory Index from metricDefinitions in Cassandra")
+	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	defs := make([]schema.MetricDefinition, 0)
 	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
@@ -173,7 +173,7 @@ func (c *CasIdx) rebuildIndex() {
 	for iter.Scan(&data) {
 		mdef, err := schema.MetricDefinitionFromJSON(data)
 		if err != nil {
-			log.Error(3, "Bad definition in index. %s - %s", data, err)
+			log.Error(3, "cassandra-idx Bad definition in index. %s - %s", data, err)
 		}
 		defs = append(defs, *mdef)
 	}
@@ -201,7 +201,7 @@ func (c *CasIdx) processWriteQueue() {
 			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data.Bytes()).Exec(); err != nil {
 				idxCasFail.Inc(1)
 				if (attempts % 20) == 0 {
-					log.Warn("Failed to write def to cassandra. it will be retried. %s", err)
+					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
 				}
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -213,7 +213,7 @@ func (c *CasIdx) processWriteQueue() {
 				success = true
 				idxCasAddDuration.Value(time.Since(req.recvTime))
 				idxCasOk.Inc(1)
-				log.Debug("metricDef saved to cassandra. %s", req.def.Id)
+				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
 			}
 		}
 	}
@@ -229,7 +229,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) error {
 	for _, id := range ids {
 		err := c.session.Query("DELETE FROM metric_def_idx where id=?", id).Exec()
 		if err != nil {
-			log.Error(3, "Failed to delete metricDef %s from cassandra. %s", id, err)
+			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", id, err)
 			return err
 		}
 	}
