@@ -24,6 +24,16 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
 ```
 
+If you are using the [cassandra-idx](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
+
+```
+CREATE TABLE IF NOT EXISTS raintank.metric_def_idx (
+    id text PRIMARY KEY,
+    def blob,
+) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+```
+
 These settings are good for development and geared towards Cassandra 3.0
 
 For clustered scenarios, you may want to initialize Cassandra yourself with a schema like:
@@ -38,6 +48,12 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     PRIMARY KEY (key, ts)
 ) WITH WITH CLUSTERING ORDER BY (ts DESC)
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
+
+CREATE TABLE IF NOT EXISTS raintank.metric_def_idx (
+    id text PRIMARY KEY,
+    def blob,
+) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 ```
 

@@ -22,6 +22,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/elasticsearch"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/in"
@@ -159,6 +160,7 @@ func main() {
 		// load config for metricIndexers
 		memory.ConfigSetup()
 		elasticsearch.ConfigSetup()
+		cassandra.ConfigSetup()
 
 		conf.ParseAll()
 	}
@@ -325,6 +327,13 @@ func main() {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = elasticsearch.New()
+		metricIndex.Init(stats)
+	}
+	if cassandra.Enabled {
+		if metricIndex != nil {
+			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
+		}
+		metricIndex = cassandra.New()
 		metricIndex.Init(stats)
 	}
 
