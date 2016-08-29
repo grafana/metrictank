@@ -1,8 +1,6 @@
 package cassandra
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"strings"
@@ -170,12 +168,13 @@ func (c *CasIdx) rebuildIndex() {
 	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
 
 	var data []byte
+	mdef := schema.MetricDefinition{}
 	for iter.Scan(&data) {
-		mdef, err := schema.MetricDefinitionFromJSON(data)
+		_, err := mdef.UnmarshalMsg(data)
 		if err != nil {
 			log.Error(3, "cassandra-idx Bad definition in index. %s - %s", data, err)
 		}
-		defs = append(defs, *mdef)
+		defs = append(defs, mdef)
 	}
 	c.MemoryIdx.Load(defs)
 	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
@@ -183,22 +182,22 @@ func (c *CasIdx) rebuildIndex() {
 
 func (c *CasIdx) processWriteQueue() {
 	log.Info("cassandra-idx writeQueue handler started.")
-	var data bytes.Buffer
-	encoder := json.NewEncoder(&data)
+	data := make([]byte, 0)
 	var success bool
 	var attempts int
+	var err error
 	var req writeReq
 	for req = range c.writeQueue {
-		data.Reset()
-		err := encoder.Encode(req.def)
+		data = data[:0]
+		data, err = req.def.MarshalMsg(data)
 		if err != nil {
-			log.Error(3, "Failed to Unmarshal metricDef. %s", err)
+			log.Error(3, "Failed to marshal metricDef. %s", err)
 			continue
 		}
 		success = false
 		attempts = 0
 		for !success {
-			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data.Bytes()).Exec(); err != nil {
+			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data).Exec(); err != nil {
 				idxCasFail.Inc(1)
 				if (attempts % 20) == 0 {
 					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
