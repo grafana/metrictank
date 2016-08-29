@@ -173,6 +173,7 @@ func (c *CasIdx) rebuildIndex() {
 		_, err := mdef.UnmarshalMsg(data)
 		if err != nil {
 			log.Error(3, "cassandra-idx Bad definition in index. %s - %s", data, err)
+			continue
 		}
 		defs = append(defs, mdef)
 	}
