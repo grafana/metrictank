@@ -29,7 +29,38 @@ across restarts, it can use Elasticsearch to save and reload the data.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
 to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
-## Installation
+## Step 1
+
+We recommend a server with at least 8GB RAM and a few CPU's.
+You need root access. All the commands shown assume you're root.
+
+
+## Metrictank and graphite-metrictank
+
+### Short version
+
+You can enable our repository and install the packages like so:
+
+```
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
+apt-get install metrictank graphite-metrictank
+```
+
+Then just start it:
+
+```
+systemctl start graphite-metrictank
+```
+
+Or:
+
+```
+service graphite-metrictank start
+```
+
+Logs - if you need them - will be at /var/log/graphite/graphite-metrictank.log
+
+### Long version
 
 We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
@@ -50,25 +81,6 @@ Supported distributions:
 * Ubuntu 14.04 (Trusty Tahr), 16.04 (Xenial Xerus)
 * Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
-
-You can enable the repository and install the packages like so:
-
-```
-curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
-apt-get install metrictank graphite-metrictank
-```
-
-Then just start it:
-
-```
-systemctl start graphite-metrictank
-```
-
-Or:
-
-```
-service graphite-metrictank start
-```
 
 [more info](https://packagecloud.io/raintank/raintank/install)
 
@@ -127,6 +139,9 @@ The log - should you need it - is at /var/log/cassandra/cassandra.log
 
 * Install elasticsearch with `sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install elasticsearch`
 
+* You can start it with default settings.
+
+
 [more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
 You can start it with default settings.
@@ -183,9 +198,16 @@ service statsdaemon start
 ```
 
 
+The logs, should you need them:
+
+```
+journalctl -u statsdaemon
+```
+
 ### Statsd
 
-See the instructions on the [statsd homepage](https://github.com/etsy/statsd)
+If you want to use the origital statsd server instead of statsdaemon,
+see the instructions on the [statsd homepage](https://github.com/etsy/statsd)
 Set the following options:
 
 ```
@@ -214,7 +236,7 @@ Kafka requires Zookeeper, so set that up first.
 
 ```
 cd /opt
-tar -zxvf /path/to/zookeeper-3.4.8.tar.gz
+tar -zxvf /root/zookeeper-3.4.8.tar.gz # update path if you downloaded elsewhere.
 ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
 mkdir /var/lib/zookeeper
 ```
@@ -243,7 +265,7 @@ We recommend 0.10 or higher.
 
 ```
 cd /opt
-tar -zxvf /path/to/kafka_2.11-0.10.0.1.tgz
+tar -zxvf /root/kafka_2.11-0.10.0.1.tgz  # update path if you downloaded elsewhere
 ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 ```
 

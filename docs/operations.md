@@ -48,7 +48,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 1) [Indexing of metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
    New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed into:
    * an internal index (which seems to always be snappy and not exert any backpressure)
-   * Elasticsearch, which tends to not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
+   * Cassandra or Elasticsearch, which tends to not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
    ES backpressure is visualized in the 'metrics in' graph of the metrictank dashboard.
    For more details, look at the 'ES index writes' chart in the dashboard, specifically latency timings and adding to bulkindexer activity, those create the backpressure.
 
