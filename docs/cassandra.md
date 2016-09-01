@@ -9,7 +9,7 @@ The default Cassandra configuration is fine, especially for test/development set
 
 ## Schema
 
-By default, metrictank will initialize Cassandra with the following keyspace and table:
+By default, metrictank will initialize Cassandra with the following keyspace and table schema.  The keyspace to use can be set in the configuration using the "cassandra-keyspace" option:
 
 ```
 CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true

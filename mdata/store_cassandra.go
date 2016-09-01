@@ -21,8 +21,8 @@ import (
 
 const Month_sec = 60 * 60 * 24 * 28
 
-const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const table_schema = `CREATE TABLE IF NOT EXISTS raintank.metric (
+const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
+const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric (
     key ascii,
     ts int,
     data blob,
@@ -65,7 +65,7 @@ type cassandraStore struct {
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -77,16 +77,16 @@ func NewCassandraStore(stats met.Backend, addrs, consistency string, timeout, re
 		return nil, err
 	}
 	// ensure the keyspace and table exist.
-	err = tmpSession.Query(keyspace_schema).Exec()
+	err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
 	if err != nil {
 		return nil, err
 	}
-	err = tmpSession.Query(table_schema).Exec()
+	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
 	if err != nil {
 		return nil, err
 	}
 	tmpSession.Close()
-	cluster.Keyspace = "raintank"
+	cluster.Keyspace = keyspace
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
