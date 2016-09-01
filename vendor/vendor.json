@@ -15,10 +15,10 @@
 			"revisionTime": "2016-05-24T13:14:35Z"
 		},
 		{
-			"checksumSHA1": "hHRdFSZIysY5y0Nam8bvx30T8Po=",
+			"checksumSHA1": "AAXMx9vb6vmVZF2ieqNepAfeJFM=",
 			"path": "github.com/Shopify/sarama",
-			"revision": "e8020bffa1cae3ddf8068cb03416fc53d1627f3d",
-			"revisionTime": "2016-07-26T17:35:16Z"
+			"revision": "94895118af045d13c7e576477276a53afccdd6b1",
+			"revisionTime": "2016-08-23T12:00:18Z"
 		},
 		{
 			"checksumSHA1": "USQFwXWz6tO69wtZdj3zZDB1MA4=",
@@ -277,6 +277,12 @@
 			"path": "github.com/rakyll/goini",
 			"revision": "907cca0f578a5316fb864ec6992dc3d9730ec58c",
 			"revisionTime": "2014-01-12T23:31:26Z"
+		},
+		{
+			"checksumSHA1": "uINaciEjcazbP6QpNuU3po7q9qM=",
+			"path": "github.com/shopify/sarama",
+			"revision": "94895118af045d13c7e576477276a53afccdd6b1",
+			"revisionTime": "2016-08-23T12:00:18Z"
 		},
 		{
 			"checksumSHA1": "PcxMZX3aIoJbDC8ep9rdjTqdNwg=",
