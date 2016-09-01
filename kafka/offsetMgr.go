@@ -19,6 +19,10 @@ var (
 	mu       sync.Mutex
 )
 
+func init() {
+	managers = make(map[string]*OffsetMgr)
+}
+
 type OffsetMgr struct {
 	path string
 	db   *leveldb.DB
