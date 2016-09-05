@@ -38,7 +38,7 @@ var brokerStr string
 var brokers []string
 var topicStr string
 var topics []string
-var offset string
+var offsetStr string
 var dataDir string
 var config *sarama.Config
 var channelBufferSize int
@@ -56,7 +56,7 @@ func ConfigSetup() {
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
-	inKafkaMdm.StringVar(&offset, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
+	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
 	inKafkaMdm.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
 	inKafkaMdm.IntVar(&channelBufferSize, "channel-buffer-size", 1000000, "The number of metrics to buffer in internal and external channels")
@@ -83,12 +83,12 @@ func ConfigProcess(instance string) {
 		log.Fatal(4, "kafkamdm: consumer-max-processing-time must be greater then 0")
 	}
 	var err error
-	switch offset {
+	switch offsetStr {
 	case "last":
 	case "oldest":
 	case "newest":
 	default:
-		offsetDuration, err = time.ParseDuration(offset)
+		offsetDuration, err = time.ParseDuration(offsetStr)
 		if err != nil {
 			log.Fatal(4, "kafkamdm: invalid offest format. %s", err)
 		}
@@ -147,24 +147,21 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
 		}
 		for _, partition := range partitions {
-			switch offset {
+			var offset int64
+			switch offsetStr {
 			case "oldest":
-				go k.consumePartition(topic, partition, -2)
+				offset = -2
 			case "newest":
-				go k.consumePartition(topic, partition, -1)
+				offset = -1
 			case "last":
-				o, err := offsetMgr.Last(topic, partition)
-				if err != nil {
-					log.Fatal(4, "kafka-mdm: Failed to get offset for %s:%d. %s", topic, partition, err)
-				}
-				go k.consumePartition(topic, partition, o)
+				offset, err = offsetMgr.Last(topic, partition)
 			default:
-				o, err := k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
-				if err != nil {
-					log.Fatal(4, "kafka-mdm: failed to get offset for %s:%d.  %s", topic, partition, err)
-				}
-				go k.consumePartition(topic, partition, o)
+				offset, err = k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 			}
+			if err != nil {
+				log.Fatal(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+			}
+			go k.consumePartition(topic, partition, offset)
 		}
 	}
 }

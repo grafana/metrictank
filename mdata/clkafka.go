@@ -78,24 +78,21 @@ func (c *ClKafka) start() {
 		log.Fatal(4, "kafka-cluster: Faild to get partitions for topic %s. %s", topic, err)
 	}
 	for _, partition := range partitions {
-		switch cfg.Offset {
+		var offset int64
+		switch cfg.OffsetStr {
 		case "oldest":
-			go c.consumePartition(topic, partition, -2)
+			offset = -2
 		case "newest":
-			go c.consumePartition(topic, partition, -1)
+			offset = -1
 		case "last":
-			o, err := c.offsetMgr.Last(topic, partition)
-			if err != nil {
-				log.Fatal(4, "kafka-cluster: Failed to get offset for %s:%d. %s", topic, partition, err)
-			}
-			go c.consumePartition(topic, partition, o)
+			offset, err = c.offsetMgr.Last(topic, partition)
 		default:
-			o, err := c.client.GetOffset(topic, partition, time.Now().Add(-1*cfg.OffsetDuration).UnixNano()/int64(time.Millisecond))
-			if err != nil {
-				log.Fatal(4, "kafka-mdm: failed to get offset for %s:%d.  %s", topic, partition, err)
-			}
-			go c.consumePartition(topic, partition, o)
+			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*cfg.OffsetDuration).UnixNano()/int64(time.Millisecond))
 		}
+		if err != nil {
+			log.Fatal(4, "kafka-mdm: failed to get %q offset for %s:%d.  %q", cfg.OffsetStr, topic, partition, err)
+		}
+		go c.consumePartition(topic, partition, offset)
 	}
 }
 
