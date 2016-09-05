@@ -279,12 +279,6 @@
 			"revisionTime": "2014-01-12T23:31:26Z"
 		},
 		{
-			"checksumSHA1": "uINaciEjcazbP6QpNuU3po7q9qM=",
-			"path": "github.com/shopify/sarama",
-			"revision": "94895118af045d13c7e576477276a53afccdd6b1",
-			"revisionTime": "2016-08-23T12:00:18Z"
-		},
-		{
 			"checksumSHA1": "r8yq1UeCPjRb4GO2NyHqEyFxb1w=",
 			"path": "github.com/smartystreets/assertions",
 			"revision": "443d812296a84445c202c085f19e18fc238f8250",
