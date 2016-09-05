@@ -31,15 +31,19 @@ type OffsetMgr struct {
 }
 
 // Returns an OffsetMgr using a leveldb database in the passed directory.
+// directory can be empty for working dir, or any relative or absolute path.
 // If there is already a OffsetMgr open using the same dir, then it is
 // returned instead of creating a new one.
 func NewOffsetMgr(dir string) (*OffsetMgr, error) {
-	//make sure the dir exists.
-	err := os.MkdirAll(dir, 0755)
+
+	// note that dir can be anything like '' (working dir), ., .., ./., ./.. etc
+	dbFile := filepath.Join(dir, "partitionOffsets.db")
+
+	//make sure the needed directory exists.
+	err := os.MkdirAll(filepath.Base(dbFile), 0755)
 	if err != nil {
 		return nil, err
 	}
-	dbFile := filepath.Join(dir, "partitionOffsets.db")
 
 	//check if this db is already opened.
 	mu.Lock()

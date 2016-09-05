@@ -161,7 +161,8 @@ topics = mdm
 offset = last
 # save interval for offsets
 offset-commit-interval = 5s
-# directory to store partition offsets index. it will be created (incl parent dirs) if not existing.
+# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
+# it will be created (incl parent dirs) if not existing.
 data-dir =
 # The minimum number of message bytes to fetch in a request
 consumer-fetch-min = 1024000
@@ -202,7 +203,8 @@ topic = metricpersist
 offset = last
 # save interval for offsets
 offset-commit-interval = 5s
-# directory to store partition offsets index. it will be created (incl parent dirs) if not existing.
+# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
+# it will be created (incl parent dirs) if not existing.
 data-dir =
 ```
 
