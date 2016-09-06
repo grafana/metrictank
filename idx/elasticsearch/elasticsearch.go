@@ -81,7 +81,8 @@ func (r *RetryBuffer) Items() []schema.MetricDefinition {
 	return defs
 }
 
-func (r *RetryBuffer) Retry(id string) {
+// called when failing to bulkindexer fails, or when got a failure back from ES
+func (r *RetryBuffer) Queue(id string) {
 	def, err := r.Index.Get(id)
 	if err != nil {
 		log.Error(3, "Failed to get %s from Memory Index. %s", id, err)
@@ -132,7 +133,7 @@ type EsIdx struct {
 	memory.MemoryIdx
 	Conn        *elastigo.Conn
 	BulkIndexer *elastigo.BulkIndexer
-	failures    *RetryBuffer
+	retryBuf    *RetryBuffer
 	mu          sync.Mutex
 }
 
@@ -198,7 +199,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	e.BulkIndexer.Refresh = true
 	e.BulkIndexer.Sender = e.bulkSend
 
-	e.failures = NewRetryBuffer(e, esRetryInterval)
+	e.retryBuf = NewRetryBuffer(e, esRetryInterval)
 
 	log.Info("Starting BulkIndexer")
 	e.BulkIndexer.Start()
@@ -229,7 +230,7 @@ func (e *EsIdx) Add(data *schema.MetricData) {
 	e.MemoryIdx.AddDef(def)
 	if err := e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
 		log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
-		e.failures.Retry(def.Id)
+		e.retryBuf.Queue(def.Id)
 	}
 }
 
@@ -286,11 +287,11 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 			id := v["_id"].(string)
 			if errStr, ok := v["error"].(string); ok {
 				log.Warn("ES: %s failed: %s", id, errStr)
-				e.failures.Retry(id)
+				e.retryBuf.Queue(id)
 				idxEsFail.Inc(1)
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
 				log.Warn("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
-				e.failures.Retry(id)
+				e.retryBuf.Queue(id)
 				idxEsFail.Inc(1)
 			} else {
 				log.Debug("ES: completed %s successfully.", id)
@@ -305,7 +306,7 @@ func (e *EsIdx) Stop() {
 	log.Info("stopping ES Index")
 	e.MemoryIdx.Stop()
 	e.BulkIndexer.Stop()
-	e.failures.Stop()
+	e.retryBuf.Stop()
 }
 
 func (e *EsIdx) rebuildIndex() {
