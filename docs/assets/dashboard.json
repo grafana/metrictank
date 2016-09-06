@@ -1,8 +1,8 @@
 {
   "__inputs": [
     {
-      "name": "DS_METRICTANK",
-      "label": "metrictank",
+      "name": "DS_GRAPHITE",
+      "label": "graphite",
       "description": "",
       "type": "datasource",
       "pluginId": "graphite",
@@ -20,7 +20,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "3.1.0"
+      "version": "3.1.1"
     },
     {
       "type": "datasource",
@@ -52,7 +52,7 @@
             "too old": "#890F02"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 9,
@@ -247,7 +247,7 @@
             "total_points": "#B7DBAB"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -346,7 +346,7 @@
             "too old": "#890F02"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -441,7 +441,7 @@
             "alloc speed": "#C15C17"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -565,7 +565,7 @@
         {
           "aliasColors": {},
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -653,7 +653,7 @@
             "p90": "#C15C17"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -763,7 +763,7 @@
             "mem-cass p90": "#EF843C"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -879,7 +879,7 @@
             "mem-cass p90": "#EF843C"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -960,7 +960,7 @@
             "total request handle": "#890F02"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -1068,7 +1068,7 @@
             "write queue items limit (each)": "#BF1B00"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1179,7 +1179,7 @@
             "message_size.upper": "#EF843C"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1263,19 +1263,18 @@
         },
         {
           "aliasColors": {
-            "add-to-bulk-index-fail": "#BF1B00",
-            "add-to-bulk-index-ok": "#3F6833",
-            "indexed-fail": "#E0752D",
-            "indexed-ok": "#629E51",
-            "mean": "#052B51",
-            "metrics_to_es.fail": "#BF1B00",
-            "metrics_to_es.ok": "#629E51",
-            "upper": "#DEDAF7",
-            "upper_75": "#0A50A1",
-            "upper_90": "#806EB7"
+            "block mean": "#3F6833",
+            "block p90": "#9AC48A",
+            "get mean": "#052B51",
+            "get/s": "#052B51",
+            "mean": "#0A50A1",
+            "p90": "#65C5DB",
+            "put mean": "#58140C",
+            "put p90": "#F29191",
+            "put/s": "#BF1B00"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1285,8 +1284,7 @@
             "threshold2": null,
             "threshold2Color": "rgba(234, 112, 112, 0.22)"
           },
-          "id": 19,
-          "isNew": true,
+          "id": 21,
           "legend": {
             "avg": false,
             "current": false,
@@ -1301,72 +1299,28 @@
           "links": [],
           "nullPointMode": "null",
           "percentage": false,
-          "pointradius": 2,
+          "pointradius": 1,
           "points": true,
           "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "mean",
-              "fill": 3,
-              "lines": true,
-              "linewidth": 0,
-              "nullPointMode": "connected",
-              "points": false,
-              "yaxis": 2
-            },
-            {
-              "alias": "upper",
-              "fill": 3,
-              "lines": true,
-              "linewidth": 0,
-              "nullPointMode": "connected",
-              "points": false,
-              "yaxis": 2
-            },
-            {
-              "alias": "upper_75",
-              "fill": 3,
-              "lines": true,
-              "linewidth": 0,
-              "nullPointMode": "connected",
-              "points": false,
-              "yaxis": 2
-            },
-            {
-              "alias": "upper_90",
-              "fill": 3,
-              "lines": true,
-              "linewidth": 0,
-              "nullPointMode": "connected",
-              "points": false,
-              "yaxis": 2
-            }
-          ],
+          "seriesOverrides": [],
           "span": 4,
           "stack": false,
           "steppedLine": false,
           "targets": [
             {
-              "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$host.idx.elasticsearch.fail, 'indexed-fail')",
-              "textEditor": false
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$host.idx.elasticsearch.ok, 'indexed-ok')",
-              "textEditor": false
-            },
-            {
               "refId": "E",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.{mean,upper*}, 8)",
-              "textEditor": false
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.upper_90, 'p90')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.mean, 'mean')"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "ES index writes",
+          "title": "cassandra chunk save wait durations",
           "tooltip": {
-            "msResolution": true,
+            "msResolution": false,
             "shared": true,
             "sort": 0,
             "value_type": "cumulative"
@@ -1377,19 +1331,17 @@
           },
           "yaxes": [
             {
-              "format": "short",
-              "label": null,
+              "format": "ms",
               "logBase": 1,
               "max": null,
               "min": null,
               "show": true
             },
             {
-              "format": "ms",
-              "label": null,
+              "format": "short",
               "logBase": 1,
               "max": null,
-              "min": 0,
+              "min": null,
               "show": true
             }
           ]
@@ -1412,7 +1364,7 @@
             "size at save p90": "#65C5DB"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -1511,7 +1463,7 @@
             "put/s": "#BF1B00"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1596,7 +1548,7 @@
             "put/s": "#BF1B00"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1644,14 +1596,6 @@
             {
               "refId": "D",
               "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.mean, 'get mean')"
-            },
-            {
-              "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.upper_90, 'block p90')"
-            },
-            {
-              "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.mean, 'block mean')"
             }
           ],
           "timeFrom": null,
@@ -1702,7 +1646,7 @@
             "rows per resp min": "#6ED0E0"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1742,7 +1686,7 @@
               "lines": false
             }
           ],
-          "span": 4,
+          "span": 6,
           "stack": false,
           "steppedLine": false,
           "targets": [
@@ -1808,7 +1752,7 @@
             "save_ok/s": "#3F6833"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 0,
@@ -1837,7 +1781,7 @@
           "points": true,
           "renderer": "flot",
           "seriesOverrides": [],
-          "span": 4,
+          "span": 6,
           "stack": false,
           "steppedLine": false,
           "targets": [
@@ -1887,6 +1831,125 @@
               "show": true
             }
           ]
+        }
+      ],
+      "title": "New row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {
+            "add-to-bulk-index-fail": "#BF1B00",
+            "add-to-bulk-index-ok": "#3F6833",
+            "indexed-fail": "#E0752D",
+            "indexed-ok": "#629E51",
+            "mean": "#052B51",
+            "metrics_to_es.fail": "#BF1B00",
+            "metrics_to_es.ok": "#629E51",
+            "upper": "#DEDAF7",
+            "upper_75": "#0A50A1",
+            "upper_90": "#806EB7",
+            "memory.fail": "#BF1B00",
+            "memory.ok": "#629E51",
+            "elasticsearch.fail": "#E0752D",
+            "elasticsearch.ok": "#3F6833"
+          },
+          "bars": false,
+          "datasource": "${DS_GRAPHITE}",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 20,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": true,
+            "values": true,
+            "rightSide": true,
+            "alignAsTable": true
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "/memory/",
+              "lines": true,
+              "points": false,
+              "fill": 3,
+              "linewidth": 0
+            },
+            {
+              "alias": "es-retrybuf-items",
+              "lines": true,
+              "points": false
+            }
+          ],
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "C",
+              "target": "aliasByNode(stats.$environment.metrictank.$host.idx.*.*, 5, 6)",
+              "textEditor": false
+            },
+            {
+              "refId": "A",
+              "target": "alias(stats.$environment.gauges.metrictank.$host.idx.elasticsearch.retrybuf.items, 'es-retrybuf-items')",
+              "textEditor": false
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "index writes",
+          "tooltip": {
+            "msResolution": true,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "ms",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": 0,
+              "show": true
+            }
+          ],
+          "decimals": 0
         },
         {
           "aliasColors": {
@@ -1897,7 +1960,7 @@
             "metricdef lookup duration upper_90": "#BF1B00"
           },
           "bars": false,
-          "datasource": "${DS_METRICTANK}",
+          "datasource": "${DS_GRAPHITE}",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -1935,36 +1998,20 @@
               "lines": true,
               "linewidth": 0,
               "points": false
-            },
-            {
-              "alias": "/prune/",
-              "lines": true,
-              "points": false
             }
           ],
-          "span": 4,
+          "span": 6,
           "stack": false,
           "steppedLine": false,
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.mean, 7, 8)"
-            },
-            {
-              "refId": "B",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.upper_90, 7, 8)",
-              "textEditor": false
-            },
-            {
-              "hide": false,
-              "refId": "C",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.memory.*.upper, 7, 8)",
-              "textEditor": false
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.*.{mean,upper_90,upper}, 6, 7, 8)"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "metric def lookups",
+          "title": "index op durations",
           "tooltip": {
             "msResolution": false,
             "shared": true,
@@ -2050,8 +2097,8 @@
             "selected": true
           },
           {
-            "text": "raintank",
-            "value": "raintank",
+            "text": "metric-tank",
+            "value": "metric-tank",
             "selected": false
           }
         ],
@@ -2063,7 +2110,7 @@
       {
         "allFormat": "glob",
         "current": {},
-        "datasource": "${DS_METRICTANK}",
+        "datasource": "${DS_GRAPHITE}",
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -2079,7 +2126,7 @@
       {
         "allFormat": "glob",
         "current": {},
-        "datasource": "${DS_METRICTANK}",
+        "datasource": "${DS_GRAPHITE}",
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -2099,7 +2146,7 @@
   },
   "refresh": false,
   "schemaVersion": 12,
-  "version": 0,
+  "version": 2,
   "links": [],
   "gnetId": null
 }

@@ -94,7 +94,7 @@ func TestES(t *testing.T) {
 			So(req.url, ShouldEqual, "http://localhost:9200/_bulk?refresh=true")
 			So(req.body, ShouldContainSubstring, data.Id)
 			//retry queue should be empty
-			So(ix.failures.Items(), ShouldHaveLength, 0)
+			So(ix.retryBuf.Items(), ShouldHaveLength, 0)
 		})
 		Convey("When adding to index fails", func() {
 			rt.Set("POST http://localhost:9200/_bulk?refresh=true", handleBulkHalfError)
@@ -112,14 +112,14 @@ func TestES(t *testing.T) {
 			So(req.body, ShouldContainSubstring, "test0.data")
 			//retry should have 1 item
 			time.Sleep(time.Millisecond * 10)
-			So(ix.failures.Items(), ShouldHaveLength, 1)
-			So(ix.failures.Items()[0].Id, ShouldEqual, data.Id)
+			So(ix.retryBuf.Items(), ShouldHaveLength, 1)
+			So(ix.retryBuf.Items()[0].Id, ShouldEqual, data.Id)
 			req = <-reqChan
 			time.Sleep(time.Millisecond * 50)
 			So(req.method, ShouldEqual, "POST")
 			So(req.url, ShouldEqual, "http://localhost:9200/_bulk?refresh=true")
 			So(req.body, ShouldContainSubstring, "test2.data")
-			So(ix.failures.Items(), ShouldHaveLength, 0)
+			So(ix.retryBuf.Items(), ShouldHaveLength, 0)
 		})
 		ix.Stop()
 	})

@@ -24,6 +24,7 @@ var (
 	idxEsFail           met.Count
 	idxEsAddDuration    met.Timer
 	idxEsDeleteDuration met.Timer
+	retryBufItems       met.Gauge
 
 	Enabled          bool
 	esIndex          string
@@ -81,7 +82,8 @@ func (r *RetryBuffer) Items() []schema.MetricDefinition {
 	return defs
 }
 
-func (r *RetryBuffer) Retry(id string) {
+// called when failing to bulkindexer fails, or when got a failure back from ES
+func (r *RetryBuffer) Queue(id string) {
 	def, err := r.Index.Get(id)
 	if err != nil {
 		log.Error(3, "Failed to get %s from Memory Index. %s", id, err)
@@ -89,6 +91,7 @@ func (r *RetryBuffer) Retry(id string) {
 	}
 	r.Lock()
 	r.Defs = append(r.Defs, def)
+	retryBufItems.Value(int64(len(r.Defs)))
 	r.Unlock()
 }
 
@@ -96,6 +99,7 @@ func (r *RetryBuffer) retry() {
 	r.Lock()
 	defs := r.Defs
 	r.Defs = make([]schema.MetricDefinition, 0, len(defs))
+	retryBufItems.Value(0)
 	r.Unlock()
 	if len(defs) == 0 {
 		log.Debug("retry buffer is empty")
@@ -105,6 +109,7 @@ func (r *RetryBuffer) retry() {
 		if err := r.Index.BulkIndexer.Index(esIndex, "metric_index", d.Id, "", "", nil, d); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 			r.Defs = append(r.Defs, d)
+			retryBufItems.Value(int64(len(r.Defs)))
 			return
 		}
 	}
@@ -132,7 +137,7 @@ type EsIdx struct {
 	memory.MemoryIdx
 	Conn        *elastigo.Conn
 	BulkIndexer *elastigo.BulkIndexer
-	failures    *RetryBuffer
+	retryBuf    *RetryBuffer
 	mu          sync.Mutex
 }
 
@@ -167,6 +172,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	idxEsFail = stats.NewCount("idx.elasticsearch.fail")
 	idxEsAddDuration = stats.NewTimer("idx.elasticsearch.add_duration", 0)
 	idxEsDeleteDuration = stats.NewTimer("idx.elasticsearch.delete_duration", 0)
+	retryBufItems = stats.NewGauge("idx.elasticsearch.retrybuf.items", 0)
 
 	log.Info("Checking if index %s exists in ES", esIndex)
 	if exists, err := e.Conn.ExistsIndex(esIndex, "", nil); err != nil && err.Error() != "record not found" {
@@ -174,87 +180,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	} else {
 		if !exists {
 			log.Info("ES: initializing %s Index with mapping", esIndex)
-			//lets apply the mapping.
-			metricMapping := `{
-				"mappings": {
-		            "_default_": {
-		                "dynamic_templates": [
-		                    {
-		                        "strings": {
-		                            "mapping": {
-		                                "index": "not_analyzed",
-		                                "type": "string"
-		                            },
-		                            "match_mapping_type": "string"
-		                        }
-		                    }
-		                ],
-		                "_all": {
-		                    "enabled": false
-		                },
-		                "properties": {}
-		            },
-		            "metric_index": {
-		                "dynamic_templates": [
-		                    {
-		                        "strings": {
-		                            "mapping": {
-		                                "index": "not_analyzed",
-		                                "type": "string"
-		                            },
-		                            "match_mapping_type": "string"
-		                        }
-		                    }
-		                ],
-		                "_all": {
-		                    "enabled": false
-		                },
-		                "_timestamp": {
-		                    "enabled": false
-		                },
-		                "properties": {
-		                    "id": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    },
-		                    "interval": {
-		                        "type": "long"
-		                    },
-		                    "lastUpdate": {
-		                        "type": "long"
-		                    },
-		                    "metric": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    },
-		                    "name": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    },
-		                    "node_count": {
-		                        "type": "long"
-		                    },
-		                    "org_id": {
-		                        "type": "long"
-		                    },
-		                    "tags": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    },
-		                    "mtype": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    },
-		                    "unit": {
-		                        "type": "string",
-		                        "index": "not_analyzed"
-		                    }
-		                }
-					}
-				}
-			}`
-
-			_, err = e.Conn.DoCommand("PUT", fmt.Sprintf("/%s", esIndex), nil, metricMapping)
+			_, err = e.Conn.DoCommand("PUT", fmt.Sprintf("/%s", esIndex), nil, mapping)
 			if err != nil {
 				return err
 			}
@@ -276,9 +202,9 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	//flush at least every esBufferDelayMax.
 	e.BulkIndexer.BufferDelayMax = esBufferDelayMax
 	e.BulkIndexer.Refresh = true
-	e.BulkIndexer.Sender = e.getBulkSend()
+	e.BulkIndexer.Sender = e.bulkSend
 
-	e.failures = NewRetryBuffer(e, esRetryInterval)
+	e.retryBuf = NewRetryBuffer(e, esRetryInterval)
 
 	log.Info("Starting BulkIndexer")
 	e.BulkIndexer.Start()
@@ -309,28 +235,26 @@ func (e *EsIdx) Add(data *schema.MetricData) {
 	e.MemoryIdx.AddDef(def)
 	if err := e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
 		log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
-		e.failures.Retry(def.Id)
+		e.retryBuf.Queue(def.Id)
 	}
 }
 
-func (e *EsIdx) getBulkSend() func(buf *bytes.Buffer) error {
-	return func(buf *bytes.Buffer) error {
-		pre := time.Now()
-		log.Debug("ES: sending defs batch")
-		body, err := e.Conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", e.BulkIndexer.Refresh), nil, buf)
+func (e *EsIdx) bulkSend(buf *bytes.Buffer) error {
+	pre := time.Now()
+	log.Debug("ES: sending defs batch")
+	body, err := e.Conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", e.BulkIndexer.Refresh), nil, buf)
 
-		// If something goes wrong at this stage, return an error and bulkIndexer will retry.
-		if err != nil {
-			log.Error(3, "ES: failed to send defs batch. will retry: %s", err)
-			return err
-		}
-
-		if err := e.processEsResponse(body); err != nil {
-			return err
-		}
-		idxEsAddDuration.Value(time.Since(pre))
-		return nil
+	// If something goes wrong at this stage, return an error and bulkIndexer will retry.
+	if err != nil {
+		log.Error(3, "ES: failed to send defs batch. will retry: %s", err)
+		return err
 	}
+
+	if err := e.processEsResponse(body); err != nil {
+		return err
+	}
+	idxEsAddDuration.Value(time.Since(pre))
+	return nil
 }
 
 type responseStruct struct {
@@ -368,11 +292,11 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 			id := v["_id"].(string)
 			if errStr, ok := v["error"].(string); ok {
 				log.Warn("ES: %s failed: %s", id, errStr)
-				e.failures.Retry(id)
+				e.retryBuf.Queue(id)
 				idxEsFail.Inc(1)
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
 				log.Warn("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
-				e.failures.Retry(id)
+				e.retryBuf.Queue(id)
 				idxEsFail.Inc(1)
 			} else {
 				log.Debug("ES: completed %s successfully.", id)
@@ -387,7 +311,7 @@ func (e *EsIdx) Stop() {
 	log.Info("stopping ES Index")
 	e.MemoryIdx.Stop()
 	e.BulkIndexer.Stop()
-	e.failures.Stop()
+	e.retryBuf.Stop()
 }
 
 func (e *EsIdx) rebuildIndex() {
