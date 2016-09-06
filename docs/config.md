@@ -167,7 +167,7 @@ offset-commit-interval = 5s
 # it will be created (incl parent dirs) if not existing.
 data-dir =
 # The minimum number of message bytes to fetch in a request
-consumer-fetch-min = 1024000
+consumer-fetch-min = 1
 # The default number of message bytes to fetch in a request
 consumer-fetch-default = 4096000
 # The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it
