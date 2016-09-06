@@ -159,8 +159,13 @@ enabled = false
 brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
-# consumer group name
-group = group1
+# offset to start consuming from. Can be one of newest, oldest,last or a time duration
+offset = last
+# save interval for offsets
+offset-commit-interval = 5s
+# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
+# it will be created (incl parent dirs) if not existing.
+data-dir =
 # The minimum number of message bytes to fetch in a request
 consumer-fetch-min = 1024000
 # The default number of message bytes to fetch in a request
@@ -196,8 +201,13 @@ enabled = false
 brokers = kafka:9092
 # kafka topic (only one)
 topic = metricpersist
-# consumer group name
-group = group1
+# offset to start consuming from. Can be one of newest, oldest,last or a time duration
+offset = last
+# save interval for offsets
+offset-commit-interval = 5s
+# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
+# it will be created (incl parent dirs) if not existing.
+data-dir =
 ```
 
 ### nsq as transport for clustering messages

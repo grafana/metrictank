@@ -8,92 +8,127 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/kafka"
 	cfg "github.com/raintank/metrictank/mdata/clkafka"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type ClKafka struct {
-	in       chan SavedChunk
-	buf      []SavedChunk
-	wg       sync.WaitGroup
-	instance string
-	consumer *cluster.Consumer
-	producer sarama.SyncProducer
-	StopChan chan int
+	in        chan SavedChunk
+	buf       []SavedChunk
+	wg        sync.WaitGroup
+	instance  string
+	consumer  sarama.Consumer
+	client    sarama.Client
+	producer  sarama.SyncProducer
+	offsetMgr *kafka.OffsetMgr
+	StopChan  chan int
+	// signal to PartitionConsumers to shutdown
+	stopConsuming chan struct{}
 	Cl
 }
 
 func NewKafka(instance string, metrics Metrics, stats met.Backend) *ClKafka {
-	consumer, err := cluster.NewConsumer(cfg.Brokers, cfg.Group, cfg.Topics, cfg.CConfig)
+	client, err := sarama.NewClient(cfg.Brokers, cfg.Config)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster failed to start consumer: %s", err)
+		log.Fatal(2, "kafka-cluster failed to start client: %s", err)
 	}
-	log.Info("kafka-cluster consumer started without error")
-
-	producer, err := sarama.NewSyncProducer(cfg.Brokers, cfg.PConfig)
+	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster failed to start producer: %s", err)
+		log.Fatal(2, "kafka-cluster failed to initialize consumer: %s", err)
+	}
+	log.Info("kafka-cluster consumer initialized without error")
+
+	producer, err := sarama.NewSyncProducerFromClient(client)
+	if err != nil {
+		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
+	}
+
+	offsetMgr, err := kafka.NewOffsetMgr(cfg.DataDir)
+	if err != nil {
+		log.Fatal(2, "kafka-cluster couldnt create offsetMgr. %s", err)
 	}
 
 	c := ClKafka{
-		in:       make(chan SavedChunk),
-		consumer: consumer,
-		producer: producer,
-		instance: instance,
+		in:        make(chan SavedChunk),
+		offsetMgr: offsetMgr,
+		client:    client,
+		consumer:  consumer,
+		producer:  producer,
+		instance:  instance,
 		Cl: Cl{
 			instance: instance,
 			metrics:  metrics,
 		},
-		StopChan: make(chan int),
+		StopChan:      make(chan int),
+		stopConsuming: make(chan struct{}),
 	}
-	go c.notifications()
-	go c.consume()
+	c.start()
 	go c.produce()
 
 	return &c
 }
 
-func (c *ClKafka) consume() {
-	c.wg.Add(1)
-	messageChan := c.consumer.Messages()
-	for msg := range messageChan {
-		if LogLevel < 2 {
-			log.Debug("CLU kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-		}
-		c.Handle(msg.Value)
-		c.consumer.MarkOffset(msg, "")
+func (c *ClKafka) start() {
+	// get partitions.
+	topic := cfg.Topic
+	partitions, err := c.consumer.Partitions(topic)
+	if err != nil {
+		log.Fatal(4, "kafka-cluster: Faild to get partitions for topic %s. %s", topic, err)
 	}
-	log.Info("CLU kafka-cluster consumer ended.")
-	c.wg.Done()
+	for _, partition := range partitions {
+		var offset int64
+		switch cfg.OffsetStr {
+		case "oldest":
+			offset = -2
+		case "newest":
+			offset = -1
+		case "last":
+			offset, err = c.offsetMgr.Last(topic, partition)
+		default:
+			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*cfg.OffsetDuration).UnixNano()/int64(time.Millisecond))
+		}
+		if err != nil {
+			log.Fatal(4, "kafka-mdm: failed to get %q offset for %s:%d.  %q", cfg.OffsetStr, topic, partition, err)
+		}
+		go c.consumePartition(topic, partition, offset)
+	}
 }
 
-func (c *ClKafka) notifications() {
+func (c *ClKafka) consumePartition(topic string, partition int32, partitionOffset int64) {
 	c.wg.Add(1)
-	for msg := range c.consumer.Notifications() {
-		if len(msg.Claimed) > 0 {
-			for topic, partitions := range msg.Claimed {
-				log.Info("CLU kafka-cluster consumer claimed %d partitions on topic: %s", len(partitions), topic)
-			}
-		}
-		if len(msg.Released) > 0 {
-			for topic, partitions := range msg.Released {
-				log.Info("CLU kafka-cluster consumer released %d partitions on topic: %s", len(partitions), topic)
-			}
-		}
+	defer c.wg.Done()
 
-		if len(msg.Current) == 0 {
-			log.Info("CLU kafka-cluster consumer is no longer consuming from any partitions.")
-		} else {
-			log.Info("CLU kafka-cluster Current partitions:")
-			for topic, partitions := range msg.Current {
-				log.Info("CLU kafka-cluster Current partitions: %s: %v", topic, partitions)
+	pc, err := c.consumer.ConsumePartition(topic, partition, partitionOffset)
+	if err != nil {
+		log.Fatal(4, "kafka-cluster: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+	}
+	log.Info("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
+	currentOffset := partitionOffset
+	messages := pc.Messages()
+	ticker := time.NewTicker(cfg.OffsetCommitInterval)
+	for {
+		select {
+		case msg := <-messages:
+			if LogLevel < 2 {
+				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
+			c.Handle(msg.Value)
+			currentOffset = msg.Offset
+		case <-ticker.C:
+			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
+				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
+			}
+		case <-c.stopConsuming:
+			pc.Close()
+			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
+				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
+			}
+			log.Info("kafka-cluster consumer for %s:%d ended.", topic, partition)
+			return
 		}
 	}
-	log.Info("CLU kafka-cluster notification processing stopped")
-	c.wg.Done()
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)
@@ -101,11 +136,12 @@ func (c *ClKafka) notifications() {
 // NOTE: receive on StopChan to block until this process completes
 func (c *ClKafka) Stop() {
 	// closes notifications and messages channels, amongst others
-	c.consumer.Close()
+	close(c.stopConsuming)
 	c.producer.Close()
 
 	go func() {
 		c.wg.Wait()
+		c.offsetMgr.Close()
 		close(c.StopChan)
 	}()
 }

@@ -223,9 +223,6 @@ The moment your metrictank instance(s) come(s) back up, they can replay everythi
 so that you can serve queries for it out of RAM).
 Also, in case you want to make any change to your aggregations, Cassandra cluster, or whatever, it can be useful to re-process older data.
 
-** Note: the above actually doesn't work yet, as we don't have the seek-back-in-time implemented yet to fetch old data from Kafka.
-So for now using Kafka is more about preparing for the future than getting immediate benefit. **
-
 ### Zookeeper
 
 Kafka requires Zookeeper, so set that up first.

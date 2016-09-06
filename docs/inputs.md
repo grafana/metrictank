@@ -34,6 +34,7 @@ This is the recommended input option if you want a queue.
 This is a kafka input that uses application-level batches stored within single kafka messages.
 It is discouraged because this does not allow proper routing/partitioning of messages and will be removed.
 It only exists to compare performance numbers against kafka-mdm, and make mdm as fast as mdam.
+It also doesn't have the performance tuning options and offset control that has kafka-mdm has. (kafka-mdam always uses latest offset).
 
 
 ## NSQ (deprecated)
