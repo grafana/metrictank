@@ -24,6 +24,7 @@ var (
 	idxEsFail           met.Count
 	idxEsAddDuration    met.Timer
 	idxEsDeleteDuration met.Timer
+	retryBufItems       met.Gauge
 
 	Enabled          bool
 	esIndex          string
@@ -90,6 +91,7 @@ func (r *RetryBuffer) Queue(id string) {
 	}
 	r.Lock()
 	r.Defs = append(r.Defs, def)
+	retryBufItems.Value(int64(len(r.Defs)))
 	r.Unlock()
 }
 
@@ -97,6 +99,7 @@ func (r *RetryBuffer) retry() {
 	r.Lock()
 	defs := r.Defs
 	r.Defs = make([]schema.MetricDefinition, 0, len(defs))
+	retryBufItems.Value(0)
 	r.Unlock()
 	if len(defs) == 0 {
 		log.Debug("retry buffer is empty")
@@ -106,6 +109,7 @@ func (r *RetryBuffer) retry() {
 		if err := r.Index.BulkIndexer.Index(esIndex, "metric_index", d.Id, "", "", nil, d); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 			r.Defs = append(r.Defs, d)
+			retryBufItems.Value(int64(len(r.Defs)))
 			return
 		}
 	}
@@ -168,6 +172,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	idxEsFail = stats.NewCount("idx.elasticsearch.fail")
 	idxEsAddDuration = stats.NewTimer("idx.elasticsearch.add_duration", 0)
 	idxEsDeleteDuration = stats.NewTimer("idx.elasticsearch.delete_duration", 0)
+	retryBufItems = stats.NewGauge("idx.elasticsearch.retrybuf.items", 0)
 
 	log.Info("Checking if index %s exists in ES", esIndex)
 	if exists, err := e.Conn.ExistsIndex(esIndex, "", nil); err != nil && err.Error() != "record not found" {
