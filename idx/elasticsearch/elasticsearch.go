@@ -196,7 +196,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	//flush at least every esBufferDelayMax.
 	e.BulkIndexer.BufferDelayMax = esBufferDelayMax
 	e.BulkIndexer.Refresh = true
-	e.BulkIndexer.Sender = e.getBulkSend()
+	e.BulkIndexer.Sender = e.bulkSend
 
 	e.failures = NewRetryBuffer(e, esRetryInterval)
 
@@ -233,24 +233,22 @@ func (e *EsIdx) Add(data *schema.MetricData) {
 	}
 }
 
-func (e *EsIdx) getBulkSend() func(buf *bytes.Buffer) error {
-	return func(buf *bytes.Buffer) error {
-		pre := time.Now()
-		log.Debug("ES: sending defs batch")
-		body, err := e.Conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", e.BulkIndexer.Refresh), nil, buf)
+func (e *EsIdx) bulkSend(buf *bytes.Buffer) error {
+	pre := time.Now()
+	log.Debug("ES: sending defs batch")
+	body, err := e.Conn.DoCommand("POST", fmt.Sprintf("/_bulk?refresh=%t", e.BulkIndexer.Refresh), nil, buf)
 
-		// If something goes wrong at this stage, return an error and bulkIndexer will retry.
-		if err != nil {
-			log.Error(3, "ES: failed to send defs batch. will retry: %s", err)
-			return err
-		}
-
-		if err := e.processEsResponse(body); err != nil {
-			return err
-		}
-		idxEsAddDuration.Value(time.Since(pre))
-		return nil
+	// If something goes wrong at this stage, return an error and bulkIndexer will retry.
+	if err != nil {
+		log.Error(3, "ES: failed to send defs batch. will retry: %s", err)
+		return err
 	}
+
+	if err := e.processEsResponse(body); err != nil {
+		return err
+	}
+	idxEsAddDuration.Value(time.Since(pre))
+	return nil
 }
 
 type responseStruct struct {
