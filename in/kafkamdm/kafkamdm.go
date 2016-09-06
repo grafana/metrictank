@@ -50,7 +50,7 @@ func ConfigSetup() {
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&group, "group", "group1", "kafka consumer group")
 	inKafkaMdm.IntVar(&channelBufferSize, "channel-buffer-size", 1000000, "The number of metrics to buffer in internal and external channels")
-	inKafkaMdm.IntVar(&consumerFetchMin, "consumer-fetch-min", 1024000, "The minimum number of message bytes to fetch in a request")
+	inKafkaMdm.IntVar(&consumerFetchMin, "consumer-fetch-min", 1, "The minimum number of message bytes to fetch in a request")
 	inKafkaMdm.IntVar(&consumerFetchDefault, "consumer-fetch-default", 4096000, "The default number of message bytes to fetch in a request")
 	inKafkaMdm.StringVar(&consumerMaxWaitTime, "consumer-max-wait-time", "1s", "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
 	inKafkaMdm.StringVar(&consumerMaxProcessingTime, "consumer-max-processing-time", "1s", "The maximum amount of time the consumer expects a message takes to process")

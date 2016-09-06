@@ -162,7 +162,7 @@ topics = mdm
 # consumer group name
 group = group1
 # The minimum number of message bytes to fetch in a request
-consumer-fetch-min = 1024000
+consumer-fetch-min = 1
 # The default number of message bytes to fetch in a request
 consumer-fetch-default = 4096000
 # The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it
