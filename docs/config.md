@@ -237,7 +237,7 @@ max-in-flight = 200
 enabled = true
 ```
 
-### in memory and elasticsearch
+### in memory, elasticsearch-backed
 
 ```
 [elasticsearch-idx]
@@ -257,3 +257,25 @@ max-conns = 20
 max-buffer-docs = 1000
 # max delay befoer the BulkIndexer flushes its buffer
 buffer-delay-max = 10s
+```
+
+### in memory, cassandra-backed
+
+```
+[cassandra-idx]
+enabled = false
+# Cassandra keyspace to store metricDefinitions in.
+keyspace = raintank
+# comma separated list of cassandra addresses in host:port form
+hosts = localhost:9042
+#cql protocol version to use
+protocol-version = 4
+# write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
+consistency = one
+# cassandra request timeout
+timout = 1s
+# number of concurrent connections to cassandra
+num-conns = 10
+# Max number of metricDefs allowed to be unwritten to cassandra
+write-queue-size = 100000
+```
