@@ -171,13 +171,13 @@ data-dir =
 # The minimum number of message bytes to fetch in a request
 consumer-fetch-min = 1
 # The default number of message bytes to fetch in a request
-consumer-fetch-default = 4096000
+consumer-fetch-default = 32768
 # The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it
 consumer-max-wait-time = 1s
 #The maximum amount of time the consumer expects a message takes to process
 consumer-max-processing-time = 1s
 # How many outstanding requests a connection is allowed to have before sending on it blocks
-consumer-fetch-default = 100
+net-max-open-requests = 100
 ```
 
 ### kafka-mdam input (optional, discouraged)
