@@ -58,6 +58,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Configuration](https://github.com/raintank/metrictank/blob/master/docs/config.md)
 * [Data knobs](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md)
 * [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+* [Kafka](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
 * [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)
 * [Metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
 * [Operations](https://github.com/raintank/metrictank/blob/master/docs/operations.md)

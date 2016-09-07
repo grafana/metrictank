@@ -12,7 +12,8 @@ We'll go over these in more detail below.
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
 * Optional: Elasticsearch for persistence of metrics metadata.
   See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
-* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10 is recommended, but 0.9 should work too.
+* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
+  [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
 
 Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
 
@@ -252,7 +253,7 @@ EOF
 
 ### Kafka
 
-We recommend 0.10 or higher.
+Kafka 0.10.0.1 is highly recommended.  0.10.0.0 and 0.9 should work too, with some caveats [explained here](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
 
 * Download kafka. Find a mirror at https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz, and download kafka to your server.
 
