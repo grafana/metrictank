@@ -98,8 +98,9 @@ var (
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
-	statsdAddr = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+	statsdEnabled = flag.Bool("statsd-enabled", true, "enable sending statsd messages for instrumentation")
+	statsdAddr    = flag.String("statsd-addr", "localhost:8125", "statsd address")
+	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
 
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
@@ -214,7 +215,10 @@ func main() {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
 
-	stats, err := helper.New(true, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
+	if !*statsdEnabled {
+		log.Warn("running metrictank without statsd instrumentation.")
+	}
+	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}

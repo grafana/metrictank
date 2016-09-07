@@ -9,7 +9,7 @@ We'll go over these in more detail below.
 * Our [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
   and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
   We're working toward simplifying this much more.
-* [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
+* Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
 * Optional: Elasticsearch for persistence of metrics metadata.
   See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10 is recommended, but 0.9 should work too.
@@ -148,8 +148,10 @@ You can start it with default settings.
 
 ## Set up statsd
 
-Metrictank needs statsd or a statsd-compatible agent for its instrumentation.
-It will refuse to start if nothing listens on the configured `statsd-addr`.
+While optional, we highly recommend installing statsd or a statsd-compatible agent for instrumentation, so you can get insights into what's going on.
+To disable, set `statsd-enabled` to false in the configuration.
+
+Metrictank will refuse to start if `statsd-enabled` is true and nothing listens on the configured `statsd-addr`.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
 or an alternative. We recommend [raintank/statsdaemon](https://github.com/raintank/statsdaemon).
@@ -314,7 +316,7 @@ In Grafana, you can now add a graphite datasource with url `http://<ip>:8080`.
 If you access Grafana over https, make sure to use proxy mode, otherwise browsers will refuse to load content from the http datasource.
 
 You can start visualizing the data that's already in there by importing
-* [Metrictank dashboard](https://grafana.net/dashboards/279): visualizes all metrictank's internal performance metrics, which it sends via statsd/statsdaemon, into itself.
+* [Metrictank dashboard](https://grafana.net/dashboards/279): visualizes all metrictank's internal performance metrics, which it sends via statsd/statsdaemon, into itself.  This dashboard will not work if you disabled statsd.
 * [Statsdaemon dashboard](https://grafana.net/dashboards/297): if you use statsdaemon, you can visualize its performance metrics, stored in metrictank.
 
 You're probably interested in loading in some fake data as well, perhaps to benchmark metrictank.
