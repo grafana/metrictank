@@ -57,3 +57,8 @@ while read line; do
 		fi
 	fi
 done < metrictank-sample.ini
+
+# finish of pending code block
+if [ "$t" == code ]; then
+	echo '```'
+fi
