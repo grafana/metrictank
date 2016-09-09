@@ -67,8 +67,8 @@ var (
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 
 	// Data:
-	chunkSpanStr = flag.String("chunkspan", "2h", "chunk span")
-	numChunksInt = flag.Int("numchunks", 5, "number of chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
+	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
 	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
