@@ -382,13 +382,13 @@ func main() {
 
 	go func() {
 		http.HandleFunc("/", appStatus)
-		http.HandleFunc("/get", get(store, metricIndex, finalSettings, logMinDur))                        // metrictank native api which deals with ID's, not target strings
-		http.HandleFunc("/get/", get(store, metricIndex, finalSettings, logMinDur))                       // metrictank native api which deals with ID's, not target strings
-		http.HandleFunc("/render", corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))  // traditional graphite api, still lacking a lot of the api
-		http.HandleFunc("/render/", corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))) // traditional graphite api, still lacking a lot of the api
-		http.HandleFunc("/metrics/index.json", corsHandler(IndexJson(metricIndex)))
-		http.HandleFunc("/metrics/find", corsHandler(Find(metricIndex)))
-		http.HandleFunc("/metrics/find/", corsHandler(Find(metricIndex)))
+		http.Handle("/get", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                        // metrictank native api which deals with ID's, not target strings
+		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                       // metrictank native api which deals with ID's, not target strings
+		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))))  // traditional graphite api, still lacking a lot of the api
+		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))) // traditional graphite api, still lacking a lot of the api
+		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
+		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
+		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
