@@ -47,24 +47,24 @@ func doRecover(errp *error) {
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
 func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
-	// first point should be the first point at or after from that divides by interval
-	start := from
+	// first point should have the first timestamp >= from that divides by interval
+	first := from
 	remain := from % interval
 	if remain != 0 {
-		start = from + interval - remain
+		first = from + interval - remain
 	}
 
-	// last point should be the last value that divides by interval lower than to (because to is always exclusive)
-	lastPoint := (to - 1) - ((to - 1) % interval)
+	// last point should have the last timestamp < to that divides by interval (because to is always exclusive)
+	last := (to - 1) - ((to - 1) % interval)
 
-	if lastPoint < start {
+	if last < first {
 		// the requested range is too narrow for the requested interval
 		return []schema.Point{}
 	}
-	out := make([]schema.Point, (lastPoint-start)/interval+1)
+	out := make([]schema.Point, (last-first)/interval+1)
 
 	// i iterates in. o iterates out. t is the ts we're looking to fill.
-	for t, i, o := start, 0, -1; t <= lastPoint; t += interval {
+	for t, i, o := first, 0, -1; t <= last; t += interval {
 		o += 1
 
 		// input is out of values. add a null
@@ -99,7 +99,6 @@ func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 			t -= interval
 			o -= 1
 		}
-
 	}
 
 	return out
