@@ -369,12 +369,9 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 }
 
 // check for duplicate series names. If found merge the results.
-func mergeSeries(out []Series) []Series {
+func mergeSeries(in []Series) []Series {
 	seriesByTarget := make(map[string][]Series)
-	for _, series := range out {
-		if _, ok := seriesByTarget[series.Target]; !ok {
-			seriesByTarget[series.Target] = make([]Series, 0)
-		}
+	for _, series := range in {
 		seriesByTarget[series.Target] = append(seriesByTarget[series.Target], series)
 	}
 	merged := make([]Series, len(seriesByTarget))
