@@ -161,6 +161,8 @@ enabled = false
 brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
+# kafka partitions to consume. use '*' or a comma separated list of id's
+partitions = *
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
 offset = last
 # save interval for offsets

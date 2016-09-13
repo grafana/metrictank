@@ -2,6 +2,7 @@ package kafkamdm
 
 import (
 	"flag"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,8 @@ var brokerStr string
 var brokers []string
 var topicStr string
 var topics []string
+var partitionStr string
+var partitions []int32
 var offsetStr string
 var dataDir string
 var config *sarama.Config
@@ -56,6 +59,7 @@ func ConfigSetup() {
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
+	inKafkaMdm.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's")
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
 	inKafkaMdm.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
@@ -100,6 +104,16 @@ func ConfigProcess(instance string) {
 	}
 	brokers = strings.Split(brokerStr, ",")
 	topics = strings.Split(topicStr, ",")
+	if partitionStr != "*" {
+		parts := strings.Split(partitionStr, ",")
+		for _, part := range parts {
+			i, err := strconv.Atoi(part)
+			if err != nil {
+				log.Fatal(4, "could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
+			}
+			partitions = append(partitions, int32(i))
+		}
+	}
 
 	config = sarama.NewConfig()
 
@@ -140,11 +154,13 @@ func New(stats met.Backend) *KafkaMdm {
 
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
+	var err error
 	for _, topic := range topics {
-		// get partitions.
-		partitions, err := k.consumer.Partitions(topic)
-		if err != nil {
-			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+		if partitionStr == "*" {
+			partitions, err = k.consumer.Partitions(topic)
+			if err != nil {
+				log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+			}
 		}
 		for _, partition := range partitions {
 			var offset int64
