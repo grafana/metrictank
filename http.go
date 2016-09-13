@@ -517,3 +517,38 @@ func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 	err := json.NewEncoder(&b).Encode(tree)
 	return b.Bytes(), err
 }
+
+func Metricdefs(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		targets, ok := r.Form["target"]
+		if !ok {
+			http.Error(w, "missing target arg", http.StatusBadRequest)
+			return
+		}
+		org, err := getOrg(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var buf []byte
+		for _, target := range targets {
+			nodes, err := metricIndex.Find(org, target)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			for _, node := range nodes {
+				buf, err = node.MarshalMsg(buf)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		w.Header().Set("Content-Type", "msgpack")
+		w.Write(buf)
+	}
+}
