@@ -51,6 +51,7 @@ var (
 	warmupPeriod time.Duration
 	startupTime  time.Time
 	GitHash      = "(none)"
+	otherNodes   []string
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
@@ -63,8 +64,9 @@ var (
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Clustering:
-	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
-	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
+	instance      = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
+	primaryNode   = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
+	otherNodesStr = flag.String("other-nodes", "", "tcp addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
@@ -195,6 +197,13 @@ func main() {
 
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
+	}
+
+	if *otherNodesStr != "" {
+		// note that we add all nodes to the list even though we might detect issues
+		// they may become lively later though!
+		otherNodes = strings.Split(*otherNodesStr, ",")
+		mdata.TryNodes(otherNodes)
 	}
 
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())

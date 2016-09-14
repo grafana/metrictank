@@ -169,19 +169,19 @@ func IndexJson(metricIndex idx.MetricIndex) http.HandlerFunc {
 		bufPool.Put(js[:0])
 	}
 }
-func get(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
+func get(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32, otherNodes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, metricIndex, aggSettings, logMinDur, false)
+		Get(w, req, store, metricIndex, aggSettings, logMinDur, otherNodes, false)
 	}
 }
 
-func getLegacy(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32) http.HandlerFunc {
+func getLegacy(store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32, otherNodes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		Get(w, req, store, metricIndex, aggSettings, logMinDur, true)
+		Get(w, req, store, metricIndex, aggSettings, logMinDur, otherNodes, true)
 	}
 }
 
-func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32, legacy bool) {
+func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricIndex idx.MetricIndex, aggSettings []mdata.AggSetting, logMinDur uint32, otherNodes []string, legacy bool) {
 	pre := time.Now()
 	org := 0
 	var err error

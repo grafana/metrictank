@@ -1,5 +1,7 @@
 package mdata
 
+// this file is for "clustering" in the sense of keeping other instances who host the same data, aware of what data has been persisted and which has not
+
 import (
 	"encoding/json"
 	"net/http"
