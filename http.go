@@ -5,20 +5,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"net/http"
+	_ "net/http/pprof"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
-	"math"
-	"net/http"
-	_ "net/http/pprof"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 var errMetricNotFound = errors.New("metric not found")
@@ -284,6 +286,23 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+			// TODO: isolate out consolidation parsing, so that we can query other instances just once with all targets
+			if len(otherNodes) != 0 {
+				for _, inst := range otherNodes {
+					res, err := http.Get(inst)
+					http.PostForm("http://%s/index/find", url.Values{"target": targets})
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+					if res.StatusCode != 200 {
+						// if the romet had interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+						http.Error(w, res.Status, res.StatusCode)
+					}
+					defer res.Body.Close()
+					// TODO decode msgp data
+				}
+			}
+			// TODO for duplicates, pick most recent one
 			if len(nodes) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
@@ -307,6 +326,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			// querying for a MT id
 			def, err := metricIndex.Get(id)
 			if err == idx.DefNotFound {
+				// TODO
+				if len(otherNodes) != 0 {
+					// try to find elsewhere
+					// internal -> internal, bad req -> bad req, etc
+				}
+				// pick most recent one, or the one that has had an update in the last minute
 				e := fmt.Sprintf("metric %q not found", id)
 				log.Error(0, e)
 				http.Error(w, e, http.StatusBadRequest)
@@ -524,7 +549,7 @@ func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 	return b.Bytes(), err
 }
 
-func Metricdefs(metricIndex idx.MetricIndex) http.HandlerFunc {
+func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		targets, ok := r.Form["target"]
@@ -547,6 +572,32 @@ func Metricdefs(metricIndex idx.MetricIndex) http.HandlerFunc {
 			}
 			for _, node := range nodes {
 				buf, err = node.MarshalMsg(buf)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		w.Header().Set("Content-Type", "msgpack")
+		w.Write(buf)
+	}
+}
+
+func IndexGet(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		targets, ok := r.Form["target"]
+		if !ok {
+			http.Error(w, "missing target arg", http.StatusBadRequest)
+			return
+		}
+
+		var buf []byte
+		for _, target := range targets {
+			def, err := metricIndex.Get(target)
+			if err == nil {
+				buf, err = def.MarshalMsg(buf)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return

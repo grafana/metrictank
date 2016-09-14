@@ -390,15 +390,18 @@ func main() {
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
 	go func() {
+		sett := finalSettings
+		on := otherNodes
 		http.HandleFunc("/", appStatus)
-		http.Handle("/get", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                        // metrictank native api which deals with ID's, not target strings
-		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                       // metrictank native api which deals with ID's, not target strings
-		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))))  // traditional graphite api, still lacking a lot of the api
-		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))) // traditional graphite api, still lacking a lot of the api
+		http.Handle("/get", RecoveryHandler(get(store, metricIndex, sett, logMinDur, on)))                        // metrictank native api which deals with ID's, not target strings
+		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, sett, logMinDur, on)))                       // metrictank native api which deals with ID's, not target strings
+		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on))))  // traditional graphite api, still lacking a lot of the api
+		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on)))) // traditional graphite api, still lacking a lot of the api
 		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
 		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metricdefs", RecoveryHandler(corsHandler(Metricdefs(metricIndex))))
+		http.Handle("/index/find", RecoveryHandler(corsHandler(IndexFind(metricIndex))))
+		http.Handle("/index/get", RecoveryHandler(corsHandler(IndexGet(metricIndex))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
