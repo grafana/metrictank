@@ -80,6 +80,13 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 	return consFunc
 }
 
+func Validate(fn string) error {
+	if fn == "avg" || fn == "average" || fn == "min" || fn == "max" || fn == "sum" {
+		return nil
+	}
+	return errUnknownConsolidationFunction
+}
+
 func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, error) {
 	consolidateBy := pref
 

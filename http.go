@@ -269,6 +269,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				return
 			}
 			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
+			err := consolidation.Validate(consolidateBy)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
 		}
 
