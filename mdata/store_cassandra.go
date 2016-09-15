@@ -89,7 +89,17 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 		tmpSession.Close()
 	}
 	cluster.Keyspace = keyspace
-	session, err := cluster.CreateSession()
+	// if this fails, allow 10 seconds for another instance to initialize the schema
+	var err error
+	var session *gocql.Session
+	for i := 0; i < 10; i++ {
+		session, err = cluster.CreateSession()
+		if err == nil {
+			break
+		}
+		log.Warn("CS: could not bring up session yet. waiting a second. %q", err)
+		time.Sleep(time.Second)
+	}
 	if err != nil {
 		return nil, err
 	}
