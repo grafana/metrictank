@@ -258,26 +258,10 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 	reqs := make([]Req, 0)
 	for _, target := range targets {
-		var consolidateBy string
-		id := target
-		// yes, i am aware of the arguably grossness of the below.
-		// however, it is solid based on the documented allowed input format.
-		// once we need to support several functions, we can implement
-		// a proper expression parser
-		if strings.HasPrefix(target, "consolidateBy(") {
-			t := target
-			if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 {
-				http.Error(w, "target parse error", http.StatusBadRequest)
-				return
-			}
-			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
-			err := consolidation.Validate(consolidateBy)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
 
-			id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
+		id, consolidateBy, err := parseTarget(target)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 
 		if legacy {
@@ -392,6 +376,29 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 	reqHandleDuration.Value(time.Now().Sub(pre))
 	writeResponse(w, js, httpTypeJSON, "")
 	bufPool.Put(js[:0])
+}
+
+func parseTarget(target string) (string, string, error) {
+	var consolidateBy string
+	id := target
+	// yes, i am aware of the arguably grossness of the below.
+	// however, it is solid based on the documented allowed input format.
+	// once we need to support several functions, we can implement
+	// a proper expression parser
+	if strings.HasPrefix(target, "consolidateBy(") {
+		t := target
+		if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 {
+			return errors.New("target parse error")
+		}
+		consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
+		err := consolidation.Validate(consolidateBy)
+		if err != nil {
+			return err
+		}
+
+		id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
+	}
+	return id, consolidateBy, nil
 }
 
 // report ApplicationStatus for use by loadBalancer healthChecks.
