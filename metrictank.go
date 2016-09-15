@@ -142,32 +142,35 @@ func init() {
 
 func main() {
 	startupTime = time.Now()
-	flag.Parse()
 
 	// Only try and parse the conf file if it exists
+	path := ""
 	if _, err := os.Stat(*confFile); err == nil {
-		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
-		if err != nil {
-			log.Fatal(4, "error with configuration file: %s", err)
-			os.Exit(1)
-		}
-		// load config for metric ingestors
-		inCarbon.ConfigSetup()
-		inKafkaMdm.ConfigSetup()
-		inKafkaMdam.ConfigSetup()
-		inNSQ.ConfigSetup()
-
-		// load config for cluster handlers
-		clNSQ.ConfigSetup()
-		clKafka.ConfigSetup()
-
-		// load config for metricIndexers
-		memory.ConfigSetup()
-		elasticsearch.ConfigSetup()
-		cassandra.ConfigSetup()
-
-		conf.ParseAll()
+		path = *confFile
 	}
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  path,
+		EnvPrefix: "MT_",
+	})
+	if err != nil {
+		log.Fatal(4, "error with configuration file: %s", err)
+		os.Exit(1)
+	}
+	// load config for metric ingestors
+	inCarbon.ConfigSetup()
+	inKafkaMdm.ConfigSetup()
+	inKafkaMdam.ConfigSetup()
+	inNSQ.ConfigSetup()
+
+	// load config for cluster handlers
+	clNSQ.ConfigSetup()
+	clKafka.ConfigSetup()
+
+	// load config for metricIndexers
+	memory.ConfigSetup()
+	elasticsearch.ConfigSetup()
+	cassandra.ConfigSetup()
+	conf.ParseAll()
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
