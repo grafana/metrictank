@@ -556,12 +556,13 @@ func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 	return b.Bytes(), err
 }
 
+// IndexFind returns a sequence of msgp encoded idx.Node's
 func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		targets, ok := r.Form["target"]
+		pattern, ok := r.Form["pattern"]
 		if !ok {
-			http.Error(w, "missing target arg", http.StatusBadRequest)
+			http.Error(w, "missing pattern arg", http.StatusBadRequest)
 			return
 		}
 		org, err := getOrg(r)
