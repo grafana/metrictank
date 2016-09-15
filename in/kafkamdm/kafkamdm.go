@@ -162,6 +162,7 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 				log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
 			}
 		}
+		log.Info("kafka-mdm: will consume partitions %v", partitions)
 		for _, partition := range partitions {
 			var offset int64
 			switch offsetStr {
