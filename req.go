@@ -9,6 +9,7 @@ type Req struct {
 	// these fields can be set straight away:
 	key          string // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
 	target       string // the target we should return either to graphite or as if we're graphite.  this is usually the original input string like consolidateBy(key,'sum') except when it's a pattern than it becomes the concrete value like consolidateBy(foo.b*,'sum') -> consolidateBy(foo.bar,'sum') etc
+	loc          string // which instance to request from. tcp addr or 'local'
 	from         uint32
 	to           uint32
 	maxPoints    uint32
@@ -22,10 +23,11 @@ type Req struct {
 	aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key, target string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) Req {
+func NewReq(key, target, loc string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) Req {
 	return Req{
 		key,
 		target,
+		loc,
 		from,
 		to,
 		maxPoints,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
@@ -258,11 +259,17 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 	reqs := make([]Req, 0)
 	for _, target := range targets {
-
 		id, consolidateBy, err := parseTarget(target)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
+
+		type locatedDef struct {
+			def schema.MetricDefinition
+			loc string
+		}
+
+		locatedDefs := make(map[string]locatedDef)
 
 		if legacy {
 			nodes, err := metricIndex.Find(org, id)
@@ -270,52 +277,102 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			// TODO: isolate out consolidation parsing, so that we can query other instances just once with all targets
-			if len(otherNodes) != 0 {
-				for _, inst := range otherNodes {
-					res, err := http.Get(inst)
-					http.PostForm("http://%s/index/find", url.Values{"target": targets})
-					if err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					}
-					if res.StatusCode != 200 {
-						// if the romet had interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-						http.Error(w, res.Status, res.StatusCode)
-					}
-					defer res.Body.Close()
-					// TODO decode msgp data
+			for _, node := range nodes {
+				for _, def := range node.Defs {
+					locatedDefs[def.Id] = locatedDef{def, "local"}
 				}
 			}
-			// TODO for duplicates, pick most recent one
-			if len(nodes) == 0 {
+
+			for _, inst := range otherNodes {
+				res, err := http.Get(inst)
+				http.PostForm("http://%s/index/find", url.Values{"target": targets})
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				if res.StatusCode != 200 {
+					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+					msg, _ := ioutil.ReadAll(res.Body)
+					http.Error(w, string(msg), res.StatusCode)
+				}
+				defer res.Body.Close()
+				buf, _ := ioutil.ReadAll(res.Body)
+				var n idx.Node
+				for len(buf) != 0 {
+					buf, err = n.UnmarshalMsg(buf)
+					// different nodes may have overlapping data in their index.
+					// maybe because they loaded the entire index from a persistent store,
+					// or they used to receive a certain shard.
+					// so we need to select the node that has most recently seen each given metricDef.
+					for _, def := range n.Defs {
+						cur, ok := locatedDefs[def.Id]
+						if ok && cur.def.LastUpdate > def.LastUpdate {
+							continue
+						}
+						locatedDefs[def.Id] = locatedDef{def, inst}
+					}
+				}
+			}
+			if len(locatedDefs) == 0 {
 				http.Error(w, errMetricNotFound.Error(), http.StatusBadRequest)
 				return
 			}
-			for _, node := range nodes {
-				for _, def := range node.Defs {
-					consolidator, err := consolidation.GetConsolidator(&def, consolidateBy)
-					if err != nil {
-						http.Error(w, err.Error(), http.StatusBadRequest)
-						return
-					}
-					// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
-					// id is like foo.bar or foo.*
-					// def.Name is like foo.concretebar
-					// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-					target := strings.Replace(target, id, def.Name, -1)
-					reqs = append(reqs, NewReq(def.Id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			for _, locdef := range locatedDefs {
+				def := locdef.def
+				consolidator, err := consolidation.GetConsolidator(&def, consolidateBy)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
 				}
+				// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
+				// id is like foo.bar or foo.*
+				// def.Name is like foo.concretebar
+				// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
+				target := strings.Replace(target, id, def.Name, -1)
+				reqs = append(reqs, NewReq(def.Id, target, locdef.loc, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 			}
 		} else {
 			// querying for a MT id
 			def, err := metricIndex.Get(id)
-			if err == idx.DefNotFound {
-				// TODO
-				if len(otherNodes) != 0 {
-					// try to find elsewhere
-					// internal -> internal, bad req -> bad req, etc
+			ok := err == nil
+			loc := "local"
+			for _, inst := range otherNodes {
+				// if already have a very recent one, no need to look further
+				if ok && def.LastUpdate > time.Now().Add(-20*time.Second).Unix() {
+					break
 				}
-				// pick most recent one, or the one that has had an update in the last minute
+				res, err := http.Get(inst)
+				http.PostForm("http://%s/index/get", url.Values{"id": []string{id}})
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				if res.StatusCode == 200 {
+					defer res.Body.Close()
+					buf, _ := ioutil.ReadAll(res.Body)
+					var d schema.MetricDefinition
+					buf, err := d.UnmarshalMsg(buf)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+					// different nodes may have overlapping data in their index.
+					// maybe because they loaded the entire index from a persistent store,
+					// or they used to receive a certain shard.
+					// so we need to select the node that has most recently seen each given metricDef.
+					if ok && def.LastUpdate > d.LastUpdate {
+						continue
+					}
+					def = d
+					loc = inst
+					ok = true
+
+				} else if res.StatusCode == http.StatusNotFound {
+					continue
+				} else {
+					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+					msg, _ := ioutil.ReadAll(res.Body)
+					http.Error(w, string(msg), res.StatusCode)
+				}
+			}
+			if !ok {
 				e := fmt.Sprintf("metric %q not found", id)
 				log.Error(0, e)
 				http.Error(w, e, http.StatusBadRequest)
@@ -326,7 +383,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			reqs = append(reqs, NewReq(id, target, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			reqs = append(reqs, NewReq(id, target, loc, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
 	}
 	if (toUnix - fromUnix) >= logMinDur {
@@ -388,12 +445,12 @@ func parseTarget(target string) (string, string, error) {
 	if strings.HasPrefix(target, "consolidateBy(") {
 		t := target
 		if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 {
-			return errors.New("target parse error")
+			return "", "", errors.New("target parse error")
 		}
 		consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
 		err := consolidation.Validate(consolidateBy)
 		if err != nil {
-			return err
+			return "", "", err
 		}
 
 		id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
@@ -560,11 +617,16 @@ func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		pattern, ok := r.Form["pattern"]
+		patterns, ok := r.Form["pattern"]
 		if !ok {
 			http.Error(w, "missing pattern arg", http.StatusBadRequest)
 			return
 		}
+		if len(patterns) != 1 {
+			http.Error(w, "need exactly one pattern", http.StatusBadRequest)
+			return
+		}
+		pattern := patterns[0]
 		org, err := getOrg(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -572,18 +634,16 @@ func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 		}
 
 		var buf []byte
-		for _, target := range targets {
-			nodes, err := metricIndex.Find(org, target)
+		nodes, err := metricIndex.Find(org, pattern)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		for _, node := range nodes {
+			buf, err = node.MarshalMsg(buf)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
-			}
-			for _, node := range nodes {
-				buf, err = node.MarshalMsg(buf)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
 			}
 		}
 
@@ -592,28 +652,34 @@ func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 	}
 }
 
+// IndexGet returns a msgp encoded schema.MetricDefinition
 func IndexGet(metricIndex idx.MetricIndex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		targets, ok := r.Form["target"]
+		ids, ok := r.Form["id"]
 		if !ok {
-			http.Error(w, "missing target arg", http.StatusBadRequest)
+			http.Error(w, "missing id arg", http.StatusBadRequest)
 			return
 		}
+		if len(ids) != 1 {
+			http.Error(w, "need exactly one id", http.StatusBadRequest)
+			return
+		}
+		id := ids[0]
 
 		var buf []byte
-		for _, target := range targets {
-			def, err := metricIndex.Get(target)
-			if err == nil {
-				buf, err = def.MarshalMsg(buf)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
+		def, err := metricIndex.Get(id)
+		if err == nil {
+			buf, err = def.MarshalMsg(buf)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
+			w.Header().Set("Content-Type", "msgpack")
+			w.Write(buf)
+		} else { // currently this can only be notFound
+			http.Error(w, "not found", http.StatusNotFound)
 		}
 
-		w.Header().Set("Content-Type", "msgpack")
-		w.Write(buf)
 	}
 }

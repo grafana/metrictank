@@ -401,11 +401,11 @@ type alignCase struct {
 }
 
 func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) Req {
-	req := NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+	req := NewReq(key, key, "local", from, to, maxPoints, rawInterval, consolidator)
 	return req
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) Req {
-	req := NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+	req := NewReq(key, key, "local", from, to, maxPoints, rawInterval, consolidator)
 	req.archive = archive
 	req.archInterval = archInterval
 	req.outInterval = outInterval
