@@ -304,6 +304,11 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				var n idx.Node
 				for len(buf) != 0 {
 					buf, err = n.UnmarshalMsg(buf)
+					if err != nil {
+						log.Error(4, "HTTP error unmarshaling body from %s/index/find:  %q", inst, err)
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
 					// different nodes may have overlapping data in their index.
 					// maybe because they loaded the entire index from a persistent store,
 					// or they used to receive a certain shard.
@@ -367,6 +372,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					var d schema.MetricDefinition
 					buf, err := d.UnmarshalMsg(buf)
 					if err != nil {
+						log.Error(4, "HTTP error unmarshaling body from %s/index/get:  %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
