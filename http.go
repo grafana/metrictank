@@ -285,8 +285,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			}
 
 			for _, inst := range otherNodes {
-				res, err := http.Get(inst)
-				http.PostForm("http://%s/index/find", url.Values{"target": targets})
+				res, err := http.PostForm(fmt.Sprintf("http://%s/index/find", inst), url.Values{"pattern": []string{target}, "org": []string{fmt.Sprintf("%d", org)}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -343,8 +342,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				if ok && def.LastUpdate > time.Now().Add(-20*time.Second).Unix() {
 					break
 				}
-				res, err := http.Get(inst)
-				http.PostForm("http://%s/index/get", url.Values{"id": []string{id}})
+				res, err := http.PostForm(fmt.Sprintf("http://%s/index/get", inst), url.Values{"id": []string{id}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -633,7 +631,17 @@ func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 			return
 		}
 		pattern := patterns[0]
-		org, err := getOrg(r)
+
+		orgs, ok := r.Form["org"]
+		if !ok {
+			http.Error(w, "missing org arg", http.StatusBadRequest)
+			return
+		}
+		if len(orgs) != 1 {
+			http.Error(w, "need exactly one org id", http.StatusBadRequest)
+			return
+		}
+		org, err := strconv.Atoi(orgs[0])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
