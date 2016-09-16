@@ -370,7 +370,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					return
 				} else {
 					var d schema.MetricDefinition
-					buf, err := d.UnmarshalMsg(buf)
+					_, err = d.UnmarshalMsg(buf)
 					if err != nil {
 						log.Error(4, "HTTP error unmarshaling body from %s/index/get:  %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
