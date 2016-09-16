@@ -262,6 +262,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		id, consolidateBy, err := parseTarget(target)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
 		type locatedDef struct {
@@ -288,11 +289,13 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				http.PostForm("http://%s/index/find", url.Values{"target": targets})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
 					msg, _ := ioutil.ReadAll(res.Body)
 					http.Error(w, string(msg), res.StatusCode)
+					return
 				}
 				defer res.Body.Close()
 				buf, _ := ioutil.ReadAll(res.Body)
@@ -344,6 +347,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				http.PostForm("http://%s/index/get", url.Values{"id": []string{id}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
 				}
 				if res.StatusCode == 200 {
 					defer res.Body.Close()
@@ -352,6 +356,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					buf, err := d.UnmarshalMsg(buf)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
 					}
 					// different nodes may have overlapping data in their index.
 					// maybe because they loaded the entire index from a persistent store,
@@ -370,6 +375,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
 					msg, _ := ioutil.ReadAll(res.Body)
 					http.Error(w, string(msg), res.StatusCode)
+					return
 				}
 			}
 			if !ok {
