@@ -310,7 +310,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					// so we need to select the node that has most recently seen each given metricDef.
 					for _, def := range n.Defs {
 						cur, ok := locatedDefs[def.Id]
-						if ok && cur.def.LastUpdate > def.LastUpdate {
+						if ok && cur.def.LastUpdate >= def.LastUpdate {
 							continue
 						}
 						locatedDefs[def.Id] = locatedDef{def, inst}
@@ -374,7 +374,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					// maybe because they loaded the entire index from a persistent store,
 					// or they used to receive a certain shard.
 					// so we need to select the node that has most recently seen each given metricDef.
-					if ok && def.LastUpdate > d.LastUpdate {
+					if ok && def.LastUpdate >= d.LastUpdate {
 						continue
 					}
 					def = d
