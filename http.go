@@ -290,14 +290,17 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+				defer res.Body.Close()
+				buf, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					log.Error(4, "HTTP error reading body from %s/index/find:  %q", inst, err)
+				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-					msg, _ := ioutil.ReadAll(res.Body)
-					http.Error(w, string(msg), res.StatusCode)
+					// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+					http.Error(w, string(buf), res.StatusCode)
 					return
 				}
-				defer res.Body.Close()
-				buf, _ := ioutil.ReadAll(res.Body)
 				var n idx.Node
 				for len(buf) != 0 {
 					buf, err = n.UnmarshalMsg(buf)
@@ -347,9 +350,20 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				if res.StatusCode == 200 {
-					defer res.Body.Close()
-					buf, _ := ioutil.ReadAll(res.Body)
+				if res.StatusCode == http.StatusNotFound {
+					continue
+				}
+				defer res.Body.Close()
+				buf, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					log.Error(4, "HTTP error reading body from %s/index/get:  %q", inst, err)
+				}
+				if res.StatusCode != 200 {
+					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+					// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+					http.Error(w, string(buf), res.StatusCode)
+					return
+				} else {
 					var d schema.MetricDefinition
 					buf, err := d.UnmarshalMsg(buf)
 					if err != nil {
@@ -366,14 +380,6 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					def = d
 					loc = inst
 					ok = true
-
-				} else if res.StatusCode == http.StatusNotFound {
-					continue
-				} else {
-					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-					msg, _ := ioutil.ReadAll(res.Body)
-					http.Error(w, string(msg), res.StatusCode)
-					return
 				}
 			}
 			if !ok {
