@@ -154,12 +154,26 @@ func New(stats met.Backend) *KafkaMdm {
 
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
-	var err error
 	for _, topic := range topics {
+		availParts, err := k.consumer.Partitions(topic)
+		if err != nil {
+			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+		}
+		log.Info("kafka-mdm: available partitions: %v", availParts)
 		if partitionStr == "*" {
-			partitions, err = k.consumer.Partitions(topic)
-			if err != nil {
-				log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+			partitions = availParts
+		} else {
+			var missing []int32
+			for _, part := range partitions {
+				for _, availPart := range availParts {
+					if part == availPart {
+						break
+					}
+				}
+				missing = append(missing, part)
+			}
+			if len(missing) > 0 {
+				log.Fatal(5, "kafka-mdm: these requested partitions were not found: %v", missing)
 			}
 		}
 		log.Info("kafka-mdm: will consume partitions %v", partitions)
