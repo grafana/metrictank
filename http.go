@@ -709,3 +709,52 @@ func IndexGet(metricIndex idx.MetricIndex) http.HandlerFunc {
 
 	}
 }
+
+func getData(store mdata.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		pre := time.Now()
+		var err error
+		r.ParseForm()
+
+		reqs, ok := r.Form["req"]
+		if !ok {
+			http.Error(w, "missing req arg", http.StatusBadRequest)
+		}
+		if len(reqs) != 1 {
+			http.Error(w, "need exactly one req", http.StatusBadRequest)
+			return
+		}
+		var req Req
+		err = json.Unmarshal([]byte(reqs[0]), &req)
+		if !ok {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		points, interval, err := getTarget(store, req)
+		if err != nil {
+			log.Error(0, err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out := []Series{{
+			Target:     req.Target,
+			Datapoints: points,
+			Interval:   interval,
+		}}
+
+		js := bufPool.Get().([]byte)
+		js, err = graphiteRaintankJSON(js, out)
+		pointSlicePool.Put(out[0].Datapoints[:0])
+		if err != nil {
+			bufPool.Put(js[:0])
+			log.Error(0, err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		reqHandleDuration.Value(time.Now().Sub(pre))
+		writeResponse(w, js, httpTypeJSON, "")
+		bufPool.Put(js[:0])
+	}
+}

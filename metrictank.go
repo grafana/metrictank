@@ -401,6 +401,7 @@ func main() {
 		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, sett, logMinDur, on)))                       // metrictank native api which deals with ID's, not target strings
 		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on))))  // traditional graphite api, still lacking a lot of the api
 		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on)))) // traditional graphite api, still lacking a lot of the api
+		http.Handle("/getdata", RecoveryHandler(getData(store)))                                                  // api for requests for sharded data.
 		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
 		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
