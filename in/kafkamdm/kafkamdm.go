@@ -152,6 +152,21 @@ func New(stats met.Backend) *KafkaMdm {
 	return &k
 }
 
+// setDiff returns elements that are in a but not in b
+func setDiff(a []int32, b []int32) []int32 {
+	var diff []int32
+Iter:
+	for _, eA := range a {
+		for _, eB := range b {
+			if eA == eB {
+				continue Iter
+			}
+		}
+		diff = append(diff, eA)
+	}
+	return diff
+}
+
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	for _, topic := range topics {
@@ -163,15 +178,7 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 		if partitionStr == "*" {
 			partitions = availParts
 		} else {
-			var missing []int32
-			for _, part := range partitions {
-				for _, availPart := range availParts {
-					if part == availPart {
-						break
-					}
-				}
-				missing = append(missing, part)
-			}
+			missing := setDiff(partitions, availParts)
 			if len(missing) > 0 {
 				log.Fatal(5, "kafka-mdm: these requested partitions were not found: %v", missing)
 			}
