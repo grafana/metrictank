@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"net/http"
+	"net/url"
 	"runtime"
 	"sync"
 	"time"
@@ -220,6 +224,37 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		} else {
 			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.OutInterval)
 		}
+	}
+
+	if req.loc != "local" {
+		// unfortunately we can't use msgp yet for req due to https://github.com/tinylib/msgp/issues/158#issuecomment-247846164
+		buf, err := json.Marshal(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		res, err := http.PostForm(fmt.Sprintf("http://%s/getdata", req.loc), url.Values{"req": []string{string(buf)}})
+		if err != nil {
+			return nil, 0, err
+		}
+		defer res.Body.Close()
+		buf, err = ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, 0, err
+		}
+		if res.StatusCode != 200 {
+			// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+			// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+			return nil, 0, errors.New(string(buf))
+		}
+		series := make([]Series, 0)
+		err = json.Unmarshal(buf, series)
+		if err != nil {
+			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/getdata: %q", req.loc, err))
+		}
+		if len(series) != 1 {
+			return nil, 0, errors.New(fmt.Sprintf("%s/getdata: returned %d series instead of 1", req.loc, len(series)))
+		}
+		return series[0].Datapoints, series[0].Interval, nil
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
