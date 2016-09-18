@@ -41,12 +41,12 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 	minInterval := uint32(0) // will contain the smallest rawInterval from all requested series
 	rawIntervals := make(map[uint32]struct{})
 	for _, req := range reqs {
-		if minInterval == 0 || minInterval > req.rawInterval {
-			minInterval = req.rawInterval
+		if minInterval == 0 || minInterval > req.RawInterval {
+			minInterval = req.RawInterval
 		}
-		rawIntervals[req.rawInterval] = struct{}{}
+		rawIntervals[req.RawInterval] = struct{}{}
 	}
-	tsRange := (reqs[0].to - reqs[0].from)
+	tsRange := (reqs[0].To - reqs[0].From)
 
 	// note: not all series necessarily have the same raw settings, will be fixed further down
 	options[0] = archive{minInterval, tsRange / minInterval, false}
@@ -67,7 +67,7 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 	selected := len(options) - 1
 	runTimeConsolidate := true
 	for i, opt := range options {
-		if opt.pointCount <= reqs[0].maxPoints {
+		if opt.pointCount <= reqs[0].MaxPoints {
 			runTimeConsolidate = false
 			selected = i
 			break
@@ -97,8 +97,8 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 	   we will use 360 and do runtime consolidation.
 	*/
 	if selected > 0 {
-		belowMaxDataPointsRatio := float64(reqs[0].maxPoints) / float64(options[selected].pointCount)
-		aboveMaxDataPointsRatio := float64(options[selected-1].pointCount) / float64(reqs[0].maxPoints)
+		belowMaxDataPointsRatio := float64(reqs[0].MaxPoints) / float64(options[selected].pointCount)
+		aboveMaxDataPointsRatio := float64(options[selected-1].pointCount) / float64(reqs[0].MaxPoints)
 
 		if aboveMaxDataPointsRatio < belowMaxDataPointsRatio {
 			selected--
@@ -144,21 +144,21 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 	*/
 	for i := range reqs {
 		req := &reqs[i]
-		req.archive = aggRef[selected]
-		req.archInterval = options[selected].interval
-		req.outInterval = chosenInterval
-		req.aggNum = 1
+		req.Archive = aggRef[selected]
+		req.ArchInterval = options[selected].interval
+		req.OutInterval = chosenInterval
+		req.AggNum = 1
 		if runTimeConsolidate {
-			req.aggNum = aggEvery(options[selected].pointCount, req.maxPoints)
+			req.AggNum = aggEvery(options[selected].pointCount, req.MaxPoints)
 
 			// options[0].{interval,pointCount} didn't necessarily reflect the actual raw archive for this request,
 			// so adjust where needed.
-			if selected == 0 && chosenInterval != req.rawInterval {
-				req.archInterval = req.rawInterval
-				req.aggNum *= chosenInterval / req.rawInterval
+			if selected == 0 && chosenInterval != req.RawInterval {
+				req.ArchInterval = req.RawInterval
+				req.AggNum *= chosenInterval / req.RawInterval
 			}
 
-			req.outInterval = req.archInterval * req.aggNum
+			req.OutInterval = req.ArchInterval * req.AggNum
 		}
 	}
 	return reqs, nil

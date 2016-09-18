@@ -406,10 +406,10 @@ func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator co
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) Req {
 	req := NewReq(key, key, "local", from, to, maxPoints, rawInterval, consolidator)
-	req.archive = archive
-	req.archInterval = archInterval
-	req.outInterval = outInterval
-	req.aggNum = aggNum
+	req.Archive = archive
+	req.ArchInterval = archInterval
+	req.OutInterval = outInterval
+	req.AggNum = aggNum
 	return req
 }
 

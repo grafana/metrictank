@@ -182,7 +182,7 @@ func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
 				seriesChan <- Series{
-					Target:     req.target,
+					Target:     req.Target,
 					Datapoints: points,
 					Interval:   interval,
 				}
@@ -211,90 +211,90 @@ func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 
-	readConsolidated := req.archive != 0   // do we need to read from a downsampled series?
-	runtimeConsolidation := req.aggNum > 1 // do we need to compress any points at runtime?
+	readConsolidated := req.Archive != 0   // do we need to read from a downsampled series?
+	runtimeConsolidation := req.AggNum > 1 // do we need to compress any points at runtime?
 
 	if logLevel < 2 {
 		if runtimeConsolidation {
-			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.aggNum, req.outInterval)
+			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
 		} else {
-			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.outInterval)
+			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.OutInterval)
 		}
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
 		return fix(
-			getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
-			req.from,
-			req.to,
-			req.archInterval,
-		), req.outInterval, nil
+			getSeries(store, req.Key, consolidation.None, 0, req.From, req.To),
+			req.From,
+			req.To,
+			req.ArchInterval,
+		), req.OutInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
-				getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
-				req.from,
-				req.to,
-				req.archInterval,
+				getSeries(store, req.Key, consolidation.None, 0, req.From, req.To),
+				req.From,
+				req.To,
+				req.ArchInterval,
 			),
-			req.aggNum,
-			req.consolidator), req.outInterval, nil
+			req.AggNum,
+			req.Consolidator), req.OutInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
-		if req.consolidator == consolidation.Avg {
+		if req.Consolidator == consolidation.Avg {
 			return divide(
 				fix(
-					getSeries(store, req.key, consolidation.Sum, req.archInterval, req.from, req.to),
-					req.from,
-					req.to,
-					req.archInterval,
+					getSeries(store, req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
+					req.From,
+					req.To,
+					req.ArchInterval,
 				),
 				fix(
-					getSeries(store, req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
-					req.from,
-					req.to,
-					req.archInterval,
+					getSeries(store, req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
+					req.From,
+					req.To,
+					req.ArchInterval,
 				),
-			), req.outInterval, nil
+			), req.OutInterval, nil
 		} else {
 			return fix(
-				getSeries(store, req.key, req.consolidator, req.archInterval, req.from, req.to),
-				req.from,
-				req.to,
-				req.archInterval,
-			), req.outInterval, nil
+				getSeries(store, req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
+				req.From,
+				req.To,
+				req.ArchInterval,
+			), req.OutInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
-		if req.consolidator == consolidation.Avg {
+		if req.Consolidator == consolidation.Avg {
 			return divide(
 				consolidate(
 					fix(
-						getSeries(store, req.key, consolidation.Sum, req.archInterval, req.from, req.to),
-						req.from,
-						req.to,
-						req.archInterval,
+						getSeries(store, req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
+						req.From,
+						req.To,
+						req.ArchInterval,
 					),
-					req.aggNum,
+					req.AggNum,
 					consolidation.Sum),
 				consolidate(
 					fix(
-						getSeries(store, req.key, consolidation.Cnt, req.archInterval, req.from, req.to),
-						req.from,
-						req.to,
-						req.archInterval,
+						getSeries(store, req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
+						req.From,
+						req.To,
+						req.ArchInterval,
 					),
-					req.aggNum,
+					req.AggNum,
 					consolidation.Sum),
-			), req.outInterval, nil
+			), req.OutInterval, nil
 		} else {
 			return consolidate(
 				fix(
-					getSeries(store, req.key, req.consolidator, req.archInterval, req.from, req.to),
-					req.from,
-					req.to,
-					req.archInterval,
+					getSeries(store, req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
+					req.From,
+					req.To,
+					req.ArchInterval,
 				),
-				req.aggNum, req.consolidator), req.outInterval, nil
+				req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
