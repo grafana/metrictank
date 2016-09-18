@@ -179,9 +179,27 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 			partitions = availParts
 		} else {
 			missing := setDiff(partitions, availParts)
-			if len(missing) > 0 {
-				log.Fatal(5, "kafka-mdm: these requested partitions were not found: %v", missing)
+			ticker := time.NewTicker(time.Second)
+			timer := time.NewTimer(20 * time.Second)
+			for len(missing) > 0 {
+				select {
+				case <-ticker.C:
+					availParts, err := k.consumer.Partitions(topic)
+					if err != nil {
+						log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+					}
+					missing = setDiff(partitions, availParts)
+					if len(missing) == 0 {
+						log.Info("kafka-mdm: available partitions: %v (done waiting)", availParts)
+					} else {
+						log.Info("kafka-mdm: available partitions: %v (waiting...)", availParts)
+					}
+				case <-timer.C:
+					log.Fatal(5, "kafka-mdm: these requested partitions were not found: %v", missing)
+				}
 			}
+			ticker.Stop()
+			timer.Stop()
 		}
 		log.Info("kafka-mdm: will consume partitions %v", partitions)
 		for _, partition := range partitions {
