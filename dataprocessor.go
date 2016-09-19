@@ -246,15 +246,15 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 			// note that if we got http 500 back, the remote will already log the error, so we don't have to.
 			return nil, 0, errors.New(string(buf))
 		}
-		series := make([]Series, 0)
-		err = json.Unmarshal(buf, series)
+		var series Series
+		buf, err = series.UnmarshalMsg(buf)
 		if err != nil {
 			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/getdata: %q", req.loc, err))
 		}
-		if len(series) != 1 {
-			return nil, 0, errors.New(fmt.Sprintf("%s/getdata: returned %d series instead of 1", req.loc, len(series)))
+		if len(buf) != 0 {
+			return nil, 0, errors.New(fmt.Sprintf("%s/getdata: returned extra data", req.loc))
 		}
-		return series[0].Datapoints, series[0].Interval, nil
+		return series.Datapoints, series.Interval, nil
 	}
 
 	if !readConsolidated && !runtimeConsolidation {

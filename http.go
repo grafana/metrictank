@@ -30,6 +30,7 @@ var bufPool = sync.Pool{
 	New: func() interface{} { return make([]byte, 0) },
 }
 
+//go:generate msgp
 type Series struct {
 	Target     string // will be set to the target attribute of the given request
 	Datapoints []schema.Point
@@ -747,24 +748,21 @@ func getData(store mdata.Store) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		out := []Series{{
+		series := Series{
 			Target:     req.Target,
 			Datapoints: points,
 			Interval:   interval,
-		}}
+		}
 
-		js := bufPool.Get().([]byte)
-		js, err = graphiteRaintankJSON(js, out)
-		pointSlicePool.Put(out[0].Datapoints[:0])
+		var buf []byte
+		buf, err = series.MarshalMsg(buf)
 		if err != nil {
-			bufPool.Put(js[:0])
 			log.Error(0, "HTTP getData() %s", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		reqHandleDuration.Value(time.Now().Sub(pre))
-		writeResponse(w, js, httpTypeJSON, "")
-		bufPool.Put(js[:0])
+		writeResponse(w, buf, httpTypeMsgp, "")
 	}
 }

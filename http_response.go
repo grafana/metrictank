@@ -14,6 +14,7 @@ const (
 	httpTypePickle              = iota
 	httpTypePNG                 = iota
 	httpTypeCSV                 = iota
+	httpTypeMsgp                = iota
 )
 
 func writeResponse(w http.ResponseWriter, b []byte, format httpType, jsonp string) {
@@ -45,6 +46,9 @@ func writeResponse(w http.ResponseWriter, b []byte, format httpType, jsonp strin
 	case httpTypePNG:
 		w.Header().Set("Content-Type", contentTypePNG)
 		w.Write(b)
+	case httpTypeMsgp:
+		w.Header().Set("Content-Type", contentTypeMsgp)
+		w.Write(b)
 	}
 }
 
@@ -56,4 +60,5 @@ const (
 	contentTypePickle     = "application/pickle"
 	contentTypePNG        = "image/png"
 	contentTypeCSV        = "text/csv"
+	contentTypeMsgp       = "application/msgpack"
 )
