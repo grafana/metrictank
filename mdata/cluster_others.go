@@ -3,6 +3,7 @@ package mdata
 // this file is for clustering, in particular to talk to instances who host other data (shards)
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -11,9 +12,13 @@ import (
 
 func TryNodes(nodes []string) {
 	for _, node := range nodes {
-		res, err := http.Get(node)
+		if node == "" {
+			log.Fatal("CLU empty node in other-nodes")
+		}
+		res, err := http.Get(fmt.Sprintf("http://%s", node))
 		if err != nil {
-			log.Warn("failed to query other instance %q: %s", node, err)
+			log.Warn("CLU failed to query other instance %q: %s", node, err)
+			continue
 		}
 		body, err := ioutil.ReadAll(res.Body)
 		res.Body.Close()
