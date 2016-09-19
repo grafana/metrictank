@@ -92,7 +92,7 @@ func (c *ClusterStatus) setClusterStatus(w http.ResponseWriter, req *http.Reques
 		return
 	}
 	c.Set(primary)
-	log.Info("primary status is now %t", primary)
+	log.Info("CLU primary status is now %t", primary)
 	w.Write([]byte("OK"))
 }
 
@@ -100,6 +100,7 @@ func (c *ClusterStatus) getClusterStatus(w http.ResponseWriter, req *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	resp, err := c.Marshal()
 	if err != nil {
+		log.Error(3, "CLU could not marshal status to json: %s", err)
 		http.Error(w, "could not marshal status to json", http.StatusInternalServerError)
 		return
 	}
@@ -147,7 +148,7 @@ func (cl Cl) Handle(data []byte) {
 		batch := PersistMessageBatch{}
 		err := json.Unmarshal(data[1:], &batch)
 		if err != nil {
-			log.Error(3, "failed to unmarsh batch message. skipping.", err)
+			log.Error(3, "CLU failed to unmarsh batch message. skipping.", err)
 			return
 		}
 		if batch.Instance == cl.instance {
@@ -164,7 +165,7 @@ func (cl Cl) Handle(data []byte) {
 		ms := PersistMessage{}
 		err := json.Unmarshal(data, &ms)
 		if err != nil {
-			log.Error(3, "skipping message. %s", err)
+			log.Error(3, "CLU skipping message. %s", err)
 			return
 		}
 		if ms.Instance == cl.instance {

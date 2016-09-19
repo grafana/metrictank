@@ -18,11 +18,11 @@ func TryNodes(nodes []string) {
 		body, err := ioutil.ReadAll(res.Body)
 		res.Body.Close()
 		if err != nil {
-			log.Warn("failed to read body from other instance %q: %s", node, err)
+			log.Warn("CLU failed to read body from other instance %q: %s", node, err)
 		}
 		// TODO how to handle other instances that are still warming up? maybe invalidate and periodic retry?
 		if string(body) != "OK" {
-			log.Warn("other instance %q does not seem ready. got response %q", node, body)
+			log.Warn("CLU other instance %q does not seem ready. got response %q", node, body)
 		}
 	}
 }
