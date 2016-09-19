@@ -287,10 +287,10 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 			for _, inst := range otherNodes {
 				if logLevel < 2 {
-					log.Debug("HTTP Get() querying %s/index/find for %d:%s", inst, org, target)
+					log.Debug("HTTP Get() querying %s/internal/index/find for %d:%s", inst, org, target)
 				}
 
-				res, err := http.PostForm(fmt.Sprintf("http://%s/index/find", inst), url.Values{"pattern": []string{target}, "org": []string{fmt.Sprintf("%d", org)}})
+				res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/find", inst), url.Values{"pattern": []string{target}, "org": []string{fmt.Sprintf("%d", org)}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -298,7 +298,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				defer res.Body.Close()
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
-					log.Error(4, "HTTP Get() error reading body from %s/index/find: %q", inst, err)
+					log.Error(4, "HTTP Get() error reading body from %s/internal/index/find: %q", inst, err)
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
@@ -310,7 +310,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				for len(buf) != 0 {
 					buf, err = n.UnmarshalMsg(buf)
 					if err != nil {
-						log.Error(4, "HTTP Get() error unmarshaling body from %s/index/find: %q", inst, err)
+						log.Error(4, "HTTP Get() error unmarshaling body from %s/internal/index/find: %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
@@ -356,9 +356,9 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					break
 				}
 				if logLevel < 2 {
-					log.Debug("HTTP Get() querying %s/index/get for %s", inst, id)
+					log.Debug("HTTP Get() querying %s/internal/index/get for %s", inst, id)
 				}
-				res, err := http.PostForm(fmt.Sprintf("http://%s/index/get", inst), url.Values{"id": []string{id}})
+				res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/get", inst), url.Values{"id": []string{id}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -369,7 +369,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				defer res.Body.Close()
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
-					log.Error(4, "HTTP Get() error reading body from %s/index/get: %q", inst, err)
+					log.Error(4, "HTTP Get() error reading body from %s/internal/index/get: %q", inst, err)
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
@@ -380,7 +380,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					var d schema.MetricDefinition
 					_, err = d.UnmarshalMsg(buf)
 					if err != nil {
-						log.Error(4, "HTTP Get() error unmarshaling body from %s/index/get: %q", inst, err)
+						log.Error(4, "HTTP Get() error unmarshaling body from %s/internal/index/get: %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}

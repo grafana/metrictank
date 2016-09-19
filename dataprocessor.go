@@ -232,7 +232,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		if err != nil {
 			return nil, 0, err
 		}
-		res, err := http.PostForm(fmt.Sprintf("http://%s/getdata", req.loc), url.Values{"req": []string{string(buf)}})
+		res, err := http.PostForm(fmt.Sprintf("http://%s/internal/getdata", req.loc), url.Values{"req": []string{string(buf)}})
 		if err != nil {
 			return nil, 0, err
 		}
@@ -249,10 +249,10 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		var series Series
 		buf, err = series.UnmarshalMsg(buf)
 		if err != nil {
-			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/getdata: %q", req.loc, err))
+			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.loc, err))
 		}
 		if len(buf) != 0 {
-			return nil, 0, errors.New(fmt.Sprintf("%s/getdata: returned extra data", req.loc))
+			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.loc))
 		}
 		return series.Datapoints, series.Interval, nil
 	}
