@@ -163,7 +163,7 @@ func IndexJson(metricIndex idx.MetricIndex) http.HandlerFunc {
 		js := bufPool.Get().([]byte)
 		js, err = listJSON(js, list)
 		if err != nil {
-			log.Error(0, err.Error())
+			log.Error(0, "HTTP IndexJson() %s", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			bufPool.Put(js[:0])
 			return
@@ -285,6 +285,10 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			}
 
 			for _, inst := range otherNodes {
+				if logLevel < 2 {
+					log.Debug("HTTP Get() querying %s/index/find for %d:%s", inst, org, target)
+				}
+
 				res, err := http.PostForm(fmt.Sprintf("http://%s/index/find", inst), url.Values{"pattern": []string{target}, "org": []string{fmt.Sprintf("%d", org)}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -293,7 +297,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				defer res.Body.Close()
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
-					log.Error(4, "HTTP error reading body from %s/index/find:  %q", inst, err)
+					log.Error(4, "HTTP Get() error reading body from %s/index/find: %q", inst, err)
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
@@ -305,7 +309,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				for len(buf) != 0 {
 					buf, err = n.UnmarshalMsg(buf)
 					if err != nil {
-						log.Error(4, "HTTP error unmarshaling body from %s/index/find:  %q", inst, err)
+						log.Error(4, "HTTP Get() error unmarshaling body from %s/index/find: %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
@@ -350,6 +354,9 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				if ok && def.LastUpdate > time.Now().Add(-20*time.Second).Unix() {
 					break
 				}
+				if logLevel < 2 {
+					log.Debug("HTTP Get() querying %s/index/get for %s", inst, id)
+				}
 				res, err := http.PostForm(fmt.Sprintf("http://%s/index/get", inst), url.Values{"id": []string{id}})
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -361,7 +368,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				defer res.Body.Close()
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
-					log.Error(4, "HTTP error reading body from %s/index/get:  %q", inst, err)
+					log.Error(4, "HTTP Get() error reading body from %s/index/get: %q", inst, err)
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
@@ -372,7 +379,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 					var d schema.MetricDefinition
 					_, err = d.UnmarshalMsg(buf)
 					if err != nil {
-						log.Error(4, "HTTP error unmarshaling body from %s/index/get:  %q", inst, err)
+						log.Error(4, "HTTP Get() error unmarshaling body from %s/index/get: %q", inst, err)
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
 					}
@@ -390,7 +397,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			}
 			if !ok {
 				e := fmt.Sprintf("metric %q not found", id)
-				log.Error(0, e)
+				log.Error(0, "HTTP Get() %s", e)
 				http.Error(w, e, http.StatusBadRequest)
 				return
 			}
@@ -403,7 +410,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		}
 	}
 	if (toUnix - fromUnix) >= logMinDur {
-		log.Info("http.Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
+		log.Info("HTTP Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
 			req.Method, req.Form.Get("from"), req.Form.Get("to"), req.Form["target"], req.Form.Get("maxDataPoints"))
 	}
 
@@ -421,7 +428,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 	out, err := getTargets(store, reqs)
 	if err != nil {
-		log.Error(0, err.Error())
+		log.Error(0, "HTTP Get() %s", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -441,7 +448,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 	}
 	if err != nil {
 		bufPool.Put(js[:0])
-		log.Error(0, err.Error())
+		log.Error(0, "HTTP Get() %s", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -733,7 +740,7 @@ func getData(store mdata.Store) http.HandlerFunc {
 
 		points, interval, err := getTarget(store, req)
 		if err != nil {
-			log.Error(0, err.Error())
+			log.Error(0, "HTTP getData() %s", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -748,7 +755,7 @@ func getData(store mdata.Store) http.HandlerFunc {
 		pointSlicePool.Put(out[0].Datapoints[:0])
 		if err != nil {
 			bufPool.Put(js[:0])
-			log.Error(0, err.Error())
+			log.Error(0, "HTTP getData() %s", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
