@@ -422,6 +422,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 	reqs, err = alignRequests(reqs, aggSettings)
 	if err != nil {
+		log.Error(4, "HTTP Get() alignReq error: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
