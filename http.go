@@ -414,17 +414,17 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			req.Method, req.Form.Get("from"), req.Form.Get("to"), req.Form["target"], req.Form.Get("maxDataPoints"))
 	}
 
-	if logLevel < 2 {
-		for _, req := range reqs {
-			log.Debug("HTTP Get() %s", req)
-		}
-	}
-
 	reqs, err = alignRequests(reqs, aggSettings)
 	if err != nil {
 		log.Error(4, "HTTP Get() alignReq error: %s", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if logLevel < 2 {
+		for _, req := range reqs {
+			log.Debug("HTTP Get() %s - arch:%d archI:%d outI:%d aggN: %d", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum)
+		}
 	}
 
 	out, err := getTargets(store, reqs)
