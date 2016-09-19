@@ -41,7 +41,7 @@ func NewReq(key, target, loc string, from, to, maxPoints, rawInterval uint32, co
 }
 
 func (r Req) String() string {
-	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s", r.Key, r.From, r.To, TS(r.From), TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator)
+	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s. loc:%s", r.Key, r.From, r.To, TS(r.From), TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator, r.loc)
 }
 
 func (r Req) DebugString() string {
