@@ -727,6 +727,7 @@ func getData(store mdata.Store) http.HandlerFunc {
 		reqs, ok := r.Form["req"]
 		if !ok {
 			http.Error(w, "missing req arg", http.StatusBadRequest)
+			return
 		}
 		if len(reqs) != 1 {
 			http.Error(w, "need exactly one req", http.StatusBadRequest)
@@ -739,6 +740,7 @@ func getData(store mdata.Store) http.HandlerFunc {
 			return
 		}
 
+		req.loc = "local"
 		points, interval, err := getTarget(store, req)
 		if err != nil {
 			log.Error(0, "HTTP getData() %s", err.Error())
