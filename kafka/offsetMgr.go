@@ -56,7 +56,7 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 	db, err := leveldb.OpenFile(dbFile, &opt.Options{})
 	if err != nil {
 		if _, ok := err.(*storage.ErrCorrupted); ok {
-			log.Warn("partitionOffsets.db is corrupt. Recovering.")
+			log.Warn("OFSM partitionOffsets.db is corrupt. Recovering.")
 			db, err = leveldb.RecoverFile(dbFile, &opt.Options{})
 			if err != nil {
 				return nil, err
@@ -65,7 +65,7 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 			return nil, err
 		}
 	}
-	log.Info("Opened %s", dbFile)
+	log.Info("OFSM Opened %s", dbFile)
 	mgr := &OffsetMgr{
 		path:  dbFile,
 		db:    db,
@@ -89,7 +89,7 @@ func (o *OffsetMgr) Close() {
 	o.Lock()
 	o.users--
 	if o.users == 0 {
-		log.Info("Closing partitionsOffset DB.")
+		log.Info("OFSM Closing partitionsOffset DB.")
 		o.db.Close()
 
 		// remove the mgr from the registry
@@ -106,7 +106,7 @@ func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
 	if err := binary.Write(data, binary.LittleEndian, offset); err != nil {
 		return err
 	}
-	log.Debug("commiting offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
+	log.Debug("OFSM commiting offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
 	return o.db.Put(key.Bytes(), data.Bytes(), &opt.WriteOptions{Sync: true})
 }
 
@@ -116,7 +116,7 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	data, err := o.db.Get(key.Bytes(), nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			log.Debug("no offset recorded for %s:%d", topic, partition)
+			log.Debug("OFSM no offset recorded for %s:%d", topic, partition)
 			return -1, nil
 		}
 		return 0, err
@@ -126,6 +126,6 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Debug("found saved offset %d for %s:%d", offset, topic, partition)
+	log.Debug("OFSM found saved offset %d for %s:%d", offset, topic, partition)
 	return offset, nil
 }
