@@ -401,7 +401,7 @@ func main() {
 		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, sett, logMinDur, on)))                       // metrictank native api which deals with ID's, not target strings
 		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on))))  // traditional graphite api, still lacking a lot of the api
 		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on)))) // traditional graphite api, still lacking a lot of the api
-		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
+		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex, on))))
 		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
@@ -409,6 +409,7 @@ func main() {
 		http.Handle("/internal/getdata", RecoveryHandler(getData(store)))                         // requests for sharded data.
 		http.Handle("/internal/index/find", RecoveryHandler(corsHandler(IndexFind(metricIndex)))) // find requests on the index
 		http.Handle("/internal/index/get", RecoveryHandler(corsHandler(IndexGet(metricIndex))))   // get requests on the index
+		http.Handle("/internal/index/list", RecoveryHandler(corsHandler(IndexList(metricIndex)))) // list requests on the index
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()

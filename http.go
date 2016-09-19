@@ -153,7 +153,7 @@ func getOrg(req *http.Request) (int, error) {
 	return org, nil
 }
 
-func IndexJson(metricIndex idx.MetricIndex) http.HandlerFunc {
+func IndexJson(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		org, err := getOrg(req)
 		if err != nil {
@@ -161,6 +161,56 @@ func IndexJson(metricIndex idx.MetricIndex) http.HandlerFunc {
 			return
 		}
 		list := metricIndex.List(org)
+		var seen map[string]struct{}
+		if len(otherNodes) > 0 {
+			seen = make(map[string]struct{})
+			for _, def := range list {
+				seen[def.Id] = struct{}{}
+			}
+		}
+		for _, inst := range otherNodes {
+			if logLevel < 2 {
+				log.Debug("HTTP IndexJson() querying %s/internal/index/list for %d", inst, org)
+			}
+
+			res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/list", inst), url.Values{"org": []string{fmt.Sprintf("%d", org)}})
+			if err != nil {
+				log.Error(4, "HTTP IndexJson() error querying %s/internal/index/list: %q", inst, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer res.Body.Close()
+			buf, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				log.Error(4, "HTTP IndexJson() error reading body from %s/internal/index/list: %q", inst, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if res.StatusCode != 200 {
+				// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+				// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+				http.Error(w, string(buf), res.StatusCode)
+				return
+			}
+			for len(buf) != 0 {
+				var def schema.MetricDefinition
+				buf, err = def.UnmarshalMsg(buf)
+				if err != nil {
+					log.Error(4, "HTTP IndexJson() error unmarshaling body from %s/internal/index/list: %q", inst, err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				// different nodes may have overlapping data in their index.
+				// maybe because they loaded the entire index from a persistent store,
+				// or they used to receive a certain shard.
+				// so we need to filter out any duplicates
+				_, ok := seen[def.Id]
+				if !ok {
+					list = append(list, def)
+					seen[def.Id] = struct{}{}
+				}
+			}
+		}
 		js := bufPool.Get().([]byte)
 		js, err = listJSON(js, list)
 		if err != nil {
@@ -716,6 +766,40 @@ func IndexGet(metricIndex idx.MetricIndex) http.HandlerFunc {
 			http.Error(w, "not found", http.StatusNotFound)
 		}
 
+	}
+}
+
+// IndexList returns msgp encoded schema.MetricDefinition's
+func IndexList(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		orgs, ok := r.Form["org"]
+		if !ok {
+			http.Error(w, "missing org arg", http.StatusBadRequest)
+			return
+		}
+		if len(orgs) != 1 {
+			http.Error(w, "need exactly one org id", http.StatusBadRequest)
+			return
+		}
+		org, err := strconv.Atoi(orgs[0])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var buf []byte
+		defs := metricIndex.List(org)
+		for _, def := range defs {
+			buf, err = def.MarshalMsg(buf)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "msgpack")
+		w.Write(buf)
 	}
 }
 
