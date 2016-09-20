@@ -522,11 +522,12 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]string, error) {
 func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
 	oldestUnix := oldest.Unix()
 	pruned := make([]schema.MetricDefinition, 0)
+	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
 	orgs := []int{orgId}
 	if orgId == -1 {
-		log.Info("returing all metricDefs for all orgs")
+		log.Info("pruning stale metricDefs across all orgs")
 		orgs = make([]int, len(m.Tree))
 		i := 0
 		for org := range m.Tree {
@@ -561,6 +562,9 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 				}
 			}
 		}
+	}
+	if orgId == -1 {
+		log.Info("pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 	}
 	return pruned, nil
 }
