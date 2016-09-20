@@ -556,7 +556,7 @@ func appStatus(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
+func Find(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		format := r.FormValue("format")
 		jsonp := r.FormValue("jsonp")
@@ -581,6 +581,60 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		var seenPaths map[string]struct{}
+		if len(otherNodes) != 0 {
+			seenPaths = make(map[string]struct{})
+			for _, n := range nodes {
+				seenPaths[n.Path] = struct{}{}
+			}
+		}
+
+		for _, inst := range otherNodes {
+			if logLevel < 2 {
+				log.Debug("HTTP Find() querying %s/internal/index/find for %d:%s", inst, org, query)
+			}
+
+			res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/find", inst), url.Values{"pattern": []string{query}, "org": []string{fmt.Sprintf("%d", org)}})
+			if err != nil {
+				log.Error(4, "HTTP Find() error querying %s/internal/index/find: %q", inst, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer res.Body.Close()
+			buf, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				log.Error(4, "HTTP Find() error reading body from %s/internal/index/find: %q", inst, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if res.StatusCode != 200 {
+				// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
+				log.Error(4, "HTTP Find() %s/internal/index/find returned http %d: %v", inst, res.StatusCode, string(buf))
+				http.Error(w, string(buf), res.StatusCode)
+				return
+			}
+			var n idx.Node
+			for len(buf) != 0 {
+				buf, err = n.UnmarshalMsg(buf)
+				if err != nil {
+					log.Error(4, "HTTP Find() error unmarshaling body from %s/internal/index/find: %q", inst, err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				// different nodes may have overlapping data in their index.
+				// maybe because they loaded the entire index from a persistent store,
+				// or they used to receive a certain shard. or because they host metrics under branches
+				// that other nodes also host metrics under
+				// it may even happen that a node has a leaf that for another node is a branch, if the
+				// org has been sending improper data.  in this case there's no elegant way to nicely handle this
+				// so we'll just ignore one of them like we ignore other paths we've already seen.
+				_, ok := seenPaths[n.Path]
+				if !ok {
+					nodes = append(nodes, n)
+					seenPaths[n.Path] = struct{}{}
+				}
+			}
 		}
 
 		var b []byte

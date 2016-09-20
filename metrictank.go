@@ -402,8 +402,8 @@ func main() {
 		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on))))  // traditional graphite api, still lacking a lot of the api
 		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, sett, logMinDur, on)))) // traditional graphite api, still lacking a lot of the api
 		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex, on))))
-		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
+		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex, on))))
+		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex, on))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		http.Handle("/internal/getdata", RecoveryHandler(getData(store)))                         // requests for sharded data.
