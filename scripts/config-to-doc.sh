@@ -53,7 +53,7 @@ while read line; do
 		if [[ "$t" != code ]]; then
 			sed -e 's/^# //' -e 's/$/  /'<<< "$line"
 		else
-			echo $line
+			echo "$line"
 		fi
 	fi
 done < metrictank-sample.ini
