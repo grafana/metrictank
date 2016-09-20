@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx"
@@ -252,6 +253,71 @@ func TestDelete(t *testing.T) {
 			So(found[0].Path, ShouldEqual, "metric.public")
 		})
 	})
+}
+
+func TestPrune(t *testing.T) {
+	ix := New()
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	ix.Init(stats)
+
+	// add old series
+	for _, s := range getSeriesNames(2, 5, "metric.bah") {
+		d := &schema.MetricData{
+			Name:     s,
+			Metric:   s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     1,
+		}
+		d.SetId()
+		ix.Add(d)
+	}
+	//new series
+	for _, s := range getSeriesNames(2, 5, "metric.foo") {
+		d := &schema.MetricData{
+			Name:     s,
+			Metric:   s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     10,
+		}
+		d.SetId()
+		ix.Add(d)
+	}
+	Convey("after populating index", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 10)
+	})
+	Convey("When purging old series", t, func() {
+		purged, err := ix.Prune(1, time.Unix(2, 0))
+		So(err, ShouldBeNil)
+		So(purged, ShouldHaveLength, 5)
+		nodes, err := ix.Find(1, "metric.bah.*")
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 0)
+		nodes, err = ix.Find(1, "metric.foo.*")
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+
+	})
+	Convey("after purge", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 5)
+		newDef := defs[0]
+		newDef.Interval = 30
+		newDef.LastUpdate = 100
+		newDef.SetId()
+		ix.AddDef(&newDef)
+		Convey("When purging old series", func() {
+			purged, err := ix.Prune(1, time.Unix(12, 0))
+			So(err, ShouldBeNil)
+			So(purged, ShouldHaveLength, 5)
+			nodes, err := ix.Find(1, "metric.foo.*")
+			So(err, ShouldBeNil)
+			So(nodes, ShouldHaveLength, 1)
+		})
+	})
+
 }
 
 func BenchmarkIndexing(b *testing.B) {
