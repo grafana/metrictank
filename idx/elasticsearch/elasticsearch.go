@@ -358,3 +358,13 @@ func (e *EsIdx) Delete(orgId int, pattern string) error {
 	}
 	return nil
 }
+
+func (e *EsIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	pruned, err := e.MemoryIdx.Prune(orgId, oldest)
+	// if an error was encountered then pruned is probably a partial list of metricDefs
+	// deleted, so lets still try and delete these from Cassandra.
+	for _, def := range pruned {
+		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
+	}
+	return pruned, err
+}

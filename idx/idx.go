@@ -4,6 +4,7 @@ package idx
 
 import (
 	"errors"
+	"time"
 
 	"github.com/raintank/met"
 	"gopkg.in/raintank/schema.v1"
@@ -69,6 +70,12 @@ Interface
   all leaf nodes on that branch should also be deleted. So if the pattern is
   "*", all items in the index should be deleted.
 
+* Prune(int, time.Time) ([]schema.MetricDefinition, error):
+  This method should delete all metrics from the index for the passed org where
+  the last time the metric was seen is older then the passed timestamp. If the org
+  passed is -1, then the all orgs should be examined for stale metrics to be deleted.
+  The method returns a list of the metricDefinitions deleted from the index and any
+  error encountered.
 */
 type MetricIndex interface {
 	Init(met.Backend) error
@@ -78,4 +85,5 @@ type MetricIndex interface {
 	Delete(int, string) error
 	Find(int, string) ([]Node, error)
 	List(int) []schema.MetricDefinition
+	Prune(int, time.Time) ([]schema.MetricDefinition, error)
 }

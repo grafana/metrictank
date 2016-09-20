@@ -37,6 +37,8 @@ var (
 	numConns       int
 	writeQueueSize int
 	protoVer       int
+	maxStale       time.Duration
+	pruneInterval  time.Duration
 )
 
 func ConfigSetup() {
@@ -49,6 +51,8 @@ func ConfigSetup() {
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
+	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
+	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	globalconf.Register("cassandra-idx", casIdx)
 }
 
@@ -128,6 +132,9 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	//Rebuild the in-memory index.
 
 	c.rebuildIndex()
+	if maxStale > 0 {
+		go c.prune()
+	}
 	return nil
 }
 
@@ -234,4 +241,29 @@ func (c *CasIdx) Delete(orgId int, pattern string) error {
 		}
 	}
 	return nil
+}
+
+func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
+	// if an error was encountered then pruned is probably a partial list of metricDefs
+	// deleted, so lets still try and delete these from Cassandra.
+	for _, def := range pruned {
+		err := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+		if err != nil {
+			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+			continue
+		}
+	}
+	return pruned, err
+}
+
+func (c *CasIdx) prune() {
+	ticker := time.NewTicker(pruneInterval)
+	for range ticker.C {
+		staleTs := time.Now().Add(maxStale * -1)
+		_, err := c.Prune(-1, staleTs)
+		if err != nil {
+			log.Error(3, "cassandra-idx: prune error. %s", err)
+		}
+	}
 }

@@ -518,6 +518,53 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]string, error) {
 	return deletedIds, nil
 }
 
+// delete metricDefs from the index if they have not been seen since "oldest"
+func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	oldestUnix := oldest.Unix()
+	pruned := make([]schema.MetricDefinition, 0)
+	m.RLock()
+	defer m.RUnlock()
+	orgs := []int{orgId}
+	if orgId == -1 {
+		log.Info("returing all metricDefs for all orgs")
+		orgs = make([]int, len(m.Tree))
+		i := 0
+		for org := range m.Tree {
+			orgs[i] = org
+			i++
+		}
+	}
+
+	for _, org := range orgs {
+		tree, ok := m.Tree[org]
+		if !ok {
+			continue
+		}
+		for _, n := range tree.Items {
+			if !n.Leaf {
+				continue
+			}
+			for i := len(n.Children) - 1; i >= 0; i-- {
+				id := n.Children[i]
+				if m.DefById[id].LastUpdate < oldestUnix {
+					log.Info("memoryIdx: metricDef %s is stale. pruning it.", id)
+					n.Children = append(n.Children[:i], n.Children[i+1:]...)
+					pruned = append(pruned, *m.DefById[id])
+					delete(m.DefById, id)
+				}
+			}
+			if len(n.Children) == 0 {
+				//we need to delete this node.
+				_, err := m.delete(org, n)
+				if err != nil {
+					return pruned, err
+				}
+			}
+		}
+	}
+	return pruned, nil
+}
+
 // filepath.Match doesn't support {} because that's not posix, it's a bashism
 // the easiest way of implementing this extra feature is just expanding single queries
 // that contain these queries into multiple queries, who will be checked separately
