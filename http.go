@@ -188,7 +188,7 @@ func IndexJson(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFun
 			}
 			if res.StatusCode != 200 {
 				// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-				// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+				log.Error(4, "HTTP IndexJson() %s/internal/index/list returned http %d: %v", inst, res.StatusCode, string(buf))
 				http.Error(w, string(buf), res.StatusCode)
 				return
 			}
@@ -342,6 +342,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 
 				res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/find", inst), url.Values{"pattern": []string{target}, "org": []string{fmt.Sprintf("%d", org)}})
 				if err != nil {
+					log.Error(4, "HTTP Get() error querying %s/internal/index/find: %q", inst, err)
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -349,10 +350,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
 					log.Error(4, "HTTP Get() error reading body from %s/internal/index/find: %q", inst, err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-					// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+					log.Error(4, "HTTP Get() %s/internal/index/find returned http %d: %v", inst, res.StatusCode, string(buf))
 					http.Error(w, string(buf), res.StatusCode)
 					return
 				}
@@ -410,6 +413,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				}
 				res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/get", inst), url.Values{"id": []string{id}})
 				if err != nil {
+					log.Error(4, "HTTP Get() error querying %s/internal/index/get: %q", inst, err)
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -420,10 +424,12 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 				buf, err := ioutil.ReadAll(res.Body)
 				if err != nil {
 					log.Error(4, "HTTP Get() error reading body from %s/internal/index/get: %q", inst, err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
 				}
 				if res.StatusCode != 200 {
 					// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-					// note that if we got http 500 back, the remote will already log the error, so we don't have to.
+					log.Error(4, "HTTP Get() %s/internal/index/get returned http %d: %v", inst, res.StatusCode, string(buf))
 					http.Error(w, string(buf), res.StatusCode)
 					return
 				} else {
@@ -727,6 +733,7 @@ func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 		for _, node := range nodes {
 			buf, err = node.MarshalMsg(buf)
 			if err != nil {
+				log.Error(4, "HTTP IndexFind() marshal err: %q", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -757,6 +764,7 @@ func IndexGet(metricIndex idx.MetricIndex) http.HandlerFunc {
 		if err == nil {
 			buf, err = def.MarshalMsg(buf)
 			if err != nil {
+				log.Error(4, "HTTP IndexGet() marshal err: %q", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -794,6 +802,7 @@ func IndexList(metricIndex idx.MetricIndex) http.HandlerFunc {
 		for _, def := range defs {
 			buf, err = def.MarshalMsg(buf)
 			if err != nil {
+				log.Error(4, "HTTP IndexList() marshal err: %q", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
