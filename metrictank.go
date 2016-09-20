@@ -325,25 +325,27 @@ func main() {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = memory.New()
-		metricIndex.Init(stats)
 	}
 	if elasticsearch.Enabled {
 		if metricIndex != nil {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = elasticsearch.New()
-		metricIndex.Init(stats)
 	}
 	if cassandra.Enabled {
 		if metricIndex != nil {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = cassandra.New()
-		metricIndex.Init(stats)
 	}
 
 	if metricIndex == nil {
 		log.Fatal(4, "No metricIndex handlers enabled.")
+	}
+
+	err = metricIndex.Init(stats)
+	if err != nil {
+		log.Fatal(4, "failed to initialize metricIndex: %s", err)
 	}
 
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
