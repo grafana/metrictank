@@ -65,9 +65,10 @@ type CasIdx struct {
 	writeQueue chan writeReq
 	shutdown   chan struct{}
 	wg         sync.WaitGroup
+	initialize bool
 }
 
-func New() *CasIdx {
+func New(initialize bool) *CasIdx {
 	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = timeout
@@ -79,6 +80,7 @@ func New() *CasIdx {
 		cluster:    cluster,
 		writeQueue: make(chan writeReq, writeQueueSize),
 		shutdown:   make(chan struct{}),
+		initialize: initialize,
 	}
 }
 
@@ -89,24 +91,27 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	}
 
 	var err error
-	tmpSession, err := c.cluster.CreateSession()
-	if err != nil {
-		log.Error(3, "IDX-C failed to create cassandra session. %s", err)
-		return err
-	}
 
-	// ensure the keyspace and table exist.
-	err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "IDX-C failed to initialize cassandra keyspace. %s", err)
-		return err
+	if c.initialize {
+		tmpSession, err := c.cluster.CreateSession()
+		if err != nil {
+			log.Error(3, "IDX-C failed to create cassandra session. %s", err)
+			return err
+		}
+
+		// ensure the keyspace and table exist.
+		err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
+		if err != nil {
+			log.Error(3, "IDX-C failed to initialize cassandra keyspace. %s", err)
+			return err
+		}
+		err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
+		if err != nil {
+			log.Error(3, "IDX-C failed to initialize cassandra table. %s", err)
+			return err
+		}
+		tmpSession.Close()
 	}
-	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "IDX-C failed to initialize cassandra table. %s", err)
-		return err
-	}
-	tmpSession.Close()
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {

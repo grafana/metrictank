@@ -349,7 +349,7 @@ func main() {
 		if metricIndex != nil {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = cassandra.New()
+		metricIndex = cassandra.New(*cassandraInitialize)
 	}
 
 	if metricIndex == nil {
