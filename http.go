@@ -424,6 +424,38 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 	}
 }
 
+func Delete(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := r.FormValue("query")
+		org, err := getOrg(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if query == "" {
+			http.Error(w, "missing parameter `query`", http.StatusBadRequest)
+			return
+		}
+
+		defs, err := metricIndex.Delete(org, query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		resp := make(map[string]interface{})
+		resp["success"] = true
+		resp["deletedDefs"] = len(defs)
+		b, err := json.Marshal(resp)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		writeResponse(w, b, httpTypeJSON, "")
+	}
+}
+
 type completer struct {
 	Path   string `json:"path"`
 	Name   string `json:"name"`

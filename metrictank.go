@@ -391,6 +391,7 @@ func main() {
 		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
 		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
 		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
+		http.Handle("/metrics/delete", RecoveryHandler(corsHandler(Delete(metricIndex))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
