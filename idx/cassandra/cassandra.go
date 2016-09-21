@@ -133,6 +133,9 @@ func (c *CasIdx) Init(stats met.Backend) error {
 
 	c.rebuildIndex()
 	if maxStale > 0 {
+		if pruneInterval == 0 {
+			return fmt.Errorf("pruneInterval must be greater then 0")
+		}
 		go c.prune()
 	}
 	return nil
