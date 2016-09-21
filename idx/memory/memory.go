@@ -134,7 +134,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
-	if !ok {
+	if !ok || len(tree.Items) == 0 {
 		log.Debug("memory-idx: first metricDef seen for orgId %d", def.OrgId)
 		root := &Node{
 			Path:     "",
