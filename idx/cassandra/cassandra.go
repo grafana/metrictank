@@ -267,6 +267,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 	// if an error was encountered then pruned is probably a partial list of metricDefs
 	// deleted, so lets still try and delete these from Cassandra.
 	for _, def := range pruned {
+		log.Debug("cassandra-idx: metricDef %s pruned from the index.", def.Id)
 		attempts := 0
 		deleted := false
 		for !deleted && attempts < 5 {
@@ -286,6 +287,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 func (c *CasIdx) prune() {
 	ticker := time.NewTicker(pruneInterval)
 	for range ticker.C {
+		log.Debug("cassandra-idx: pruning items from index that have not been seen for %s", maxStale.String())
 		staleTs := time.Now().Add(maxStale * -1)
 		_, err := c.Prune(-1, staleTs)
 		if err != nil {
