@@ -3,6 +3,7 @@ package cassandra
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -29,16 +30,18 @@ var (
 	idxCasAddDuration    met.Timer
 	idxCasDeleteDuration met.Timer
 
-	Enabled        bool
-	keyspace       string
-	hosts          string
-	consistency    string
-	timeout        time.Duration
-	numConns       int
-	writeQueueSize int
-	protoVer       int
-	maxStale       time.Duration
-	pruneInterval  time.Duration
+	Enabled         bool
+	keyspace        string
+	hosts           string
+	consistency     string
+	timeout         time.Duration
+	numConns        int
+	writeQueueSize  int
+	protoVer        int
+	maxStale        time.Duration
+	pruneInterval   time.Duration
+	updateInterval  time.Duration
+	updateFuzzyness float64
 )
 
 func ConfigSetup() {
@@ -51,6 +54,8 @@ func ConfigSetup() {
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
+	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field.")
+	casIdx.Float64Var(&updateFuzzyness, "update-fuzzyness", 0.5, "fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.")
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	globalconf.Register("cassandra-idx", casIdx)
@@ -161,9 +166,13 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 		}
 	}
 	if inMemory {
-		log.Debug("cassandra-idx def already seen before. Just updating memory Index")
-		existing.LastUpdate = data.Time
-		c.MemoryIdx.AddDef(&existing)
+		oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
+		if existing.LastUpdate < oldest.Unix() {
+			log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
+			existing.LastUpdate = data.Time
+			c.MemoryIdx.AddDef(&existing)
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: &existing}
+		}
 		return
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
