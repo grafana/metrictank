@@ -419,22 +419,7 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 	return defs
 }
 
-func (m *MemoryIdx) Delete(orgId int, pattern string) error {
-	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
-	found, err := m.find(orgId, pattern)
-	if err != nil {
-		return err
-	}
-	for _, f := range found {
-		m.delete(orgId, f)
-	}
-	idxDeleteDuration.Value(time.Since(pre))
-	return nil
-}
-
-func (m *MemoryIdx) DeleteWithReport(orgId int, pattern string) ([]string, error) {
+func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -442,20 +427,19 @@ func (m *MemoryIdx) DeleteWithReport(orgId int, pattern string) ([]string, error
 	if err != nil {
 		return nil, err
 	}
-	deletedIds := make([]string, 0)
+	deletedDefs := make([]schema.MetricDefinition, 0)
 	for _, f := range found {
 		deleted, err := m.delete(orgId, f)
 		if err != nil {
 			return nil, err
 		}
-		deletedIds = append(deletedIds, deleted...)
+		deletedDefs = append(deletedDefs, deleted...)
 	}
 	idxDeleteDuration.Value(time.Since(pre))
-	return deletedIds, nil
+	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node) ([]string, error) {
-	deletedIds := make([]string, len(n.Children))
+func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error) {
 	if !n.Leaf {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
@@ -463,19 +447,23 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		deletedDefs := make([]schema.MetricDefinition, 0)
 		for _, child := range children {
 			log.Debug("memory-idx: deleting child %s from branch %s", child.Path, n.Path)
 			deleted, err := m.delete(orgId, child)
 			if err != nil {
-				return deletedIds, err
+				return deletedDefs, err
 			}
-			deletedIds = append(deletedIds, deleted...)
+			deletedDefs = append(deletedDefs, deleted...)
 		}
+		return deletedDefs, nil
 	}
+	deletedDefs := make([]schema.MetricDefinition, len(n.Children))
 	// delete the metricDefs
 	for i, id := range n.Children {
+		log.Debug("memory-idx: deleteing %s from index", id)
+		deletedDefs[i] = *m.DefById[id]
 		delete(m.DefById, id)
-		deletedIds[i] = id
 	}
 	tree := m.Tree[orgId]
 	// delete the leaf.
@@ -515,7 +503,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]string, error) {
 		delete(tree.Items, branch)
 	}
 
-	return deletedIds, nil
+	return deletedDefs, nil
 }
 
 // delete metricDefs from the index if they have not been seen since "oldest"

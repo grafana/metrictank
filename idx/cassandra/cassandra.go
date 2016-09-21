@@ -231,19 +231,26 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) Delete(orgId int, pattern string) error {
-	ids, err := c.MemoryIdx.DeleteWithReport(orgId, pattern)
+func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
-		return err
+		return defs, err
 	}
-	for _, id := range ids {
-		err := c.session.Query("DELETE FROM metric_def_idx where id=?", id).Exec()
-		if err != nil {
-			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", id, err)
-			return err
+	for _, def := range defs {
+		attempts := 0
+		deleted := false
+		for !deleted && attempts < 5 {
+			attempts++
+			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+			if cErr != nil {
+				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+				time.Sleep(time.Second)
+			} else {
+				deleted = true
+			}
 		}
 	}
-	return nil
+	return defs, nil
 }
 
 func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {

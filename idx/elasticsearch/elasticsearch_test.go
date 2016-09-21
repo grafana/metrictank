@@ -332,46 +332,50 @@ func TestDelete(t *testing.T) {
 		ix.Add(s)
 	}
 	Convey("when deleting exact path", t, func() {
-		err := ix.Delete(1, org1Series[0].Name)
+		defs, err := ix.Delete(1, org1Series[0].Name)
 		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 1)
 		Convey("series should not be present in the metricDef index", func() {
 			_, err := ix.Get(org1Series[0].Id)
 			So(err, ShouldEqual, idx.DefNotFound)
+			Convey("series should not be present in searchs", func() {
+				nodes := strings.Split(org1Series[0].Name, ".")
+				branch := strings.Join(nodes[0:len(nodes)-2], ".")
+				found, err := ix.Find(1, branch+".*.*")
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 4)
+				for _, n := range found {
+					So(n.Path, ShouldNotEqual, org1Series[0].Name)
+				}
+			})
 		})
-		Convey("series should not be present in searchs", func() {
-			nodes := strings.Split(org1Series[0].Name, ".")
-			branch := strings.Join(nodes[0:len(nodes)-2], ".")
-			found, err := ix.Find(1, branch+".*.*")
-			So(err, ShouldBeNil)
-			So(found, ShouldHaveLength, 4)
-			for _, n := range found {
-				So(n.Path, ShouldNotEqual, org1Series[0].Name)
-			}
-		})
+
 	})
 
 	Convey("when deleting by wildcard", t, func() {
-		err := ix.Delete(1, "metric.org1.*")
+		defs, err := ix.Delete(1, "metric.org1.*")
 		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 4)
 		Convey("series should not be present in the metricDef index", func() {
 			for _, def := range org1Series {
 				_, err := ix.Get(def.Id)
 				So(err, ShouldEqual, idx.DefNotFound)
 			}
-		})
-		Convey("series should not be present in searches", func() {
-			for _, def := range org1Series {
-				nodes := strings.Split(def.Name, ".")
-				branch := strings.Join(nodes[0:len(nodes)-1], ".")
-				found, err := ix.Find(1, branch+".*")
+			Convey("series should not be present in searches", func() {
+				for _, def := range org1Series {
+					nodes := strings.Split(def.Name, ".")
+					branch := strings.Join(nodes[0:len(nodes)-1], ".")
+					found, err := ix.Find(1, branch+".*")
+					So(err, ShouldBeNil)
+					So(found, ShouldHaveLength, 0)
+				}
+				found, err := ix.Find(1, "metric.*")
 				So(err, ShouldBeNil)
-				So(found, ShouldHaveLength, 0)
-			}
-			found, err := ix.Find(1, "metric.*")
-			So(err, ShouldBeNil)
-			So(found, ShouldHaveLength, 1)
-			So(found[0].Path, ShouldEqual, "metric.public")
+				So(found, ShouldHaveLength, 1)
+				So(found[0].Path, ShouldEqual, "metric.public")
+			})
 		})
+
 	})
 }
 

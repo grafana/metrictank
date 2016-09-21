@@ -348,15 +348,15 @@ func (e *EsIdx) rebuildIndex() {
 	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
 }
 
-func (e *EsIdx) Delete(orgId int, pattern string) error {
-	ids, err := e.MemoryIdx.DeleteWithReport(orgId, pattern)
+func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	defs, err := e.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
-		return err
+		return defs, err
 	}
-	for _, id := range ids {
-		e.BulkIndexer.Delete(esIndex, "metric_index", id)
+	for _, def := range defs {
+		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
 	}
-	return nil
+	return defs, nil
 }
 
 func (e *EsIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {

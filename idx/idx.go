@@ -64,11 +64,12 @@ Interface
   OrgId -1.  The pattern should be handled in the same way Graphite would. see
   https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
 
-* Delete(int, string) error:
+* Delete(int, string) ([]schema.MetricDefinition, error):
   This method is used for deleting items from the index. The method is passed
   an OrgId and a query pattern.  If the pattern matches a branch node, then
   all leaf nodes on that branch should also be deleted. So if the pattern is
-  "*", all items in the index should be deleted.
+  "*", all items in the index should be deleted.  A copy of all of the
+  metricDefinitions deleted are returned.
 
 * Prune(int, time.Time) ([]schema.MetricDefinition, error):
   This method should delete all metrics from the index for the passed org where
@@ -82,7 +83,7 @@ type MetricIndex interface {
 	Stop()
 	Add(*schema.MetricData)
 	Get(string) (schema.MetricDefinition, error)
-	Delete(int, string) error
+	Delete(int, string) ([]schema.MetricDefinition, error)
 	Find(int, string) ([]Node, error)
 	List(int) []schema.MetricDefinition
 	Prune(int, time.Time) ([]schema.MetricDefinition, error)
