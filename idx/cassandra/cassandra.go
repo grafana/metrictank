@@ -251,10 +251,17 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 	// if an error was encountered then pruned is probably a partial list of metricDefs
 	// deleted, so lets still try and delete these from Cassandra.
 	for _, def := range pruned {
-		err := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
-		if err != nil {
-			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
-			continue
+		attempts := 0
+		deleted := false
+		for !deleted && attempts < 5 {
+			attempts++
+			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+			if cErr != nil {
+				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+				time.Sleep(time.Second)
+			} else {
+				deleted = true
+			}
 		}
 	}
 	return pruned, err
