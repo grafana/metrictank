@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx"
@@ -211,47 +212,116 @@ func TestDelete(t *testing.T) {
 		ix.Add(s)
 	}
 	Convey("when deleting exact path", t, func() {
-		err := ix.Delete(1, org1Series[0].Name)
+		defs, err := ix.Delete(1, org1Series[0].Name)
 		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 1)
+		So(defs[0].Id, ShouldEqual, org1Series[0].Id)
 		Convey("series should not be present in the metricDef index", func() {
 			_, err := ix.Get(org1Series[0].Id)
 			So(err, ShouldEqual, idx.DefNotFound)
-		})
-		Convey("series should not be present in searchs", func() {
-			nodes := strings.Split(org1Series[0].Name, ".")
-			branch := strings.Join(nodes[0:len(nodes)-2], ".")
-			found, err := ix.Find(1, branch+".*.*")
-			So(err, ShouldBeNil)
-			So(found, ShouldHaveLength, 4)
-			for _, n := range found {
-				So(n.Path, ShouldNotEqual, org1Series[0].Name)
-			}
+			Convey("series should not be present in searchs", func() {
+				nodes := strings.Split(org1Series[0].Name, ".")
+				branch := strings.Join(nodes[0:len(nodes)-2], ".")
+				found, err := ix.Find(1, branch+".*.*")
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 4)
+				for _, n := range found {
+					So(n.Path, ShouldNotEqual, org1Series[0].Name)
+				}
+			})
 		})
 	})
 
 	Convey("when deleting by wildcard", t, func() {
-		err := ix.Delete(1, "metric.org1.*")
+		defs, err := ix.Delete(1, "metric.org1.*")
 		So(err, ShouldBeNil)
+		t.Log(len(defs))
+		So(defs, ShouldHaveLength, 4)
 		Convey("series should not be present in the metricDef index", func() {
 			for _, def := range org1Series {
 				_, err := ix.Get(def.Id)
 				So(err, ShouldEqual, idx.DefNotFound)
 			}
-		})
-		Convey("series should not be present in searchs", func() {
-			for _, def := range org1Series {
-				nodes := strings.Split(def.Name, ".")
-				branch := strings.Join(nodes[0:len(nodes)-1], ".")
-				found, err := ix.Find(1, branch+".*")
+			Convey("series should not be present in searchs", func() {
+				for _, def := range org1Series {
+					nodes := strings.Split(def.Name, ".")
+					branch := strings.Join(nodes[0:len(nodes)-1], ".")
+					found, err := ix.Find(1, branch+".*")
+					So(err, ShouldBeNil)
+					So(found, ShouldHaveLength, 0)
+				}
+				found, err := ix.Find(1, "metric.*")
 				So(err, ShouldBeNil)
-				So(found, ShouldHaveLength, 0)
-			}
-			found, err := ix.Find(1, "metric.*")
-			So(err, ShouldBeNil)
-			So(found, ShouldHaveLength, 1)
-			So(found[0].Path, ShouldEqual, "metric.public")
+				So(found, ShouldHaveLength, 1)
+				So(found[0].Path, ShouldEqual, "metric.public")
+			})
 		})
 	})
+}
+
+func TestPrune(t *testing.T) {
+	ix := New()
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	ix.Init(stats)
+
+	// add old series
+	for _, s := range getSeriesNames(2, 5, "metric.bah") {
+		d := &schema.MetricData{
+			Name:     s,
+			Metric:   s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     1,
+		}
+		d.SetId()
+		ix.Add(d)
+	}
+	//new series
+	for _, s := range getSeriesNames(2, 5, "metric.foo") {
+		d := &schema.MetricData{
+			Name:     s,
+			Metric:   s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     10,
+		}
+		d.SetId()
+		ix.Add(d)
+	}
+	Convey("after populating index", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 10)
+	})
+	Convey("When purging old series", t, func() {
+		purged, err := ix.Prune(1, time.Unix(2, 0))
+		So(err, ShouldBeNil)
+		So(purged, ShouldHaveLength, 5)
+		nodes, err := ix.Find(1, "metric.bah.*")
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 0)
+		nodes, err = ix.Find(1, "metric.foo.*")
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+
+	})
+	Convey("after purge", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 5)
+		newDef := defs[0]
+		newDef.Interval = 30
+		newDef.LastUpdate = 100
+		newDef.SetId()
+		ix.AddDef(&newDef)
+		Convey("When purging old series", func() {
+			purged, err := ix.Prune(1, time.Unix(12, 0))
+			So(err, ShouldBeNil)
+			So(purged, ShouldHaveLength, 5)
+			nodes, err := ix.Find(1, "metric.foo.*")
+			So(err, ShouldBeNil)
+			So(nodes, ShouldHaveLength, 1)
+		})
+	})
+
 }
 
 func BenchmarkIndexing(b *testing.B) {
