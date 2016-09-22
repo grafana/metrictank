@@ -512,7 +512,6 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 	pruned := make([]schema.MetricDefinition, 0)
 	pre := time.Now()
 	m.RLock()
-	defer m.RUnlock()
 	orgs := []int{orgId}
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs across all orgs")
@@ -523,12 +522,15 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 			i++
 		}
 	}
-
+	m.RUnlock()
 	for _, org := range orgs {
+		m.Lock()
 		tree, ok := m.Tree[org]
 		if !ok {
+			m.Unlock()
 			continue
 		}
+
 		for _, n := range tree.Items {
 			if !n.Leaf {
 				continue
@@ -536,7 +538,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 			for i := len(n.Children) - 1; i >= 0; i-- {
 				id := n.Children[i]
 				if m.DefById[id].LastUpdate < oldestUnix {
-					log.ConsoleDebugf("memoryIdx: metricDef %s is stale. pruning it.", id)
+					log.Debug("memoryIdx: metricDef %s is stale. pruning it.", id)
 					n.Children = append(n.Children[:i], n.Children[i+1:]...)
 					pruned = append(pruned, *m.DefById[id])
 					delete(m.DefById, id)
@@ -547,10 +549,12 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 				//we need to delete this node.
 				_, err := m.delete(org, n)
 				if err != nil {
+					m.Unlock()
 					return pruned, err
 				}
 			}
 		}
+		m.Unlock()
 	}
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
