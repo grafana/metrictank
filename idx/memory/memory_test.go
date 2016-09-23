@@ -208,7 +208,7 @@ func TestFind(t *testing.T) {
 			So(n.Path, ShouldNotContainSubstring, "foo.demo")
 		}
 		Convey("When searching with from timestamp on series with multiple defs.", func() {
-			nodes, err := ix.Find(1, "*.demo.*", 3*86400)
+			nodes, err := ix.Find(1, "*.demo.*", 2*86400)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 15)
 			for _, n := range nodes {
