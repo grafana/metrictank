@@ -256,7 +256,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 				idxNode.Defs = make([]schema.MetricDefinition, 0)
 				for _, id := range n.Children {
 					def := m.DefById[id]
-					if from != 0 && def.LastUpdate+86400 < from {
+					if from != 0 && def.LastUpdate < from {
 						continue
 					}
 					idxNode.Defs = append(idxNode.Defs, *def)
