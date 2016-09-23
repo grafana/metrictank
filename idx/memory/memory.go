@@ -228,7 +228,7 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 	return schema.MetricDefinition{}, idx.DefNotFound
 }
 
-func (m *MemoryIdx) Find(orgId int, pattern string) ([]idx.Node, error) {
+func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -253,9 +253,16 @@ func (m *MemoryIdx) Find(orgId int, pattern string) ([]idx.Node, error) {
 				Leaf: n.Leaf,
 			}
 			if n.Leaf {
-				idxNode.Defs = make([]schema.MetricDefinition, len(n.Children))
-				for i, id := range n.Children {
-					idxNode.Defs[i] = *m.DefById[id]
+				idxNode.Defs = make([]schema.MetricDefinition, 0)
+				for _, id := range n.Children {
+					def := m.DefById[id]
+					if from != 0 && def.LastUpdate+86400 < from {
+						continue
+					}
+					idxNode.Defs = append(idxNode.Defs, *def)
+				}
+				if len(idxNode.Defs) == 0 {
+					continue
 				}
 			}
 			results = append(results, idxNode)
@@ -506,7 +513,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error
 	return deletedDefs, nil
 }
 
-// delete metricDefs from the index if they have not been seen since "oldest"
+// delete series from the index if they have not been seen since "oldest"
 func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
 	oldestUnix := oldest.Unix()
 	pruned := make([]schema.MetricDefinition, 0)
@@ -535,23 +542,21 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 			if !n.Leaf {
 				continue
 			}
-			for i := len(n.Children) - 1; i >= 0; i-- {
-				id := n.Children[i]
+			staleCount := 0
+			for _, id := range n.Children {
 				if m.DefById[id].LastUpdate < oldestUnix {
-					log.Debug("memoryIdx: metricDef %s is stale. pruning it.", id)
-					n.Children = append(n.Children[:i], n.Children[i+1:]...)
-					pruned = append(pruned, *m.DefById[id])
-					delete(m.DefById, id)
+					staleCount++
 				}
 			}
-			if len(n.Children) == 0 {
+			if staleCount == len(n.Children) {
 				log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 				//we need to delete this node.
-				_, err := m.delete(org, n)
+				defs, err := m.delete(org, n)
 				if err != nil {
 					m.Unlock()
 					return pruned, err
 				}
+				pruned = append(pruned, defs...)
 			}
 		}
 		m.Unlock()

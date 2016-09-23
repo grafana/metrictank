@@ -273,7 +273,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		}
 
 		if legacy {
-			nodes, err := metricIndex.Find(org, id)
+			nodes, err := metricIndex.Find(org, id, int64(fromUnix))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -385,6 +385,8 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 		format := r.FormValue("format")
 		jsonp := r.FormValue("jsonp")
 		query := r.FormValue("query")
+		from, _ := strconv.ParseInt(r.FormValue("from"), 10, 64)
+
 		org, err := getOrg(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -401,7 +403,7 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 			return
 		}
 
-		nodes, err := metricIndex.Find(org, query)
+		nodes, err := metricIndex.Find(org, query, from)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
