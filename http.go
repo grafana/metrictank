@@ -279,7 +279,7 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 			// in the MetricIdx.
 			seenAfter := int64(fromUnix)
 			if seenAfter != 0 {
-				seenAfter += 86400
+				seenAfter -= 86400
 			}
 			nodes, err := metricIndex.Find(org, id, seenAfter)
 			if err != nil {
@@ -415,7 +415,7 @@ func Find(metricIndex idx.MetricIndex) http.HandlerFunc {
 		// but that will require significant refactoring to expose the updateInterval used
 		// in the MetricIdx.  So this will have to do for now.
 		if from != 0 {
-			from += 86400
+			from -= 86400
 		}
 		nodes, err := metricIndex.Find(org, query, from)
 		if err != nil {
