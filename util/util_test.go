@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestLCM(t *testing.T) {
 		{[]uint32{1, 3}, 3},
 	}
 	for i, c := range cases {
-		out := lcm(c.in)
+		out := Lcm(c.in)
 		if out != c.out {
 			t.Errorf("case %d -> expected %d, got %d", i, c.out, out)
 		}

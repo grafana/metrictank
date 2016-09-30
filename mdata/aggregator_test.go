@@ -1,8 +1,10 @@
 package mdata
 
 import (
+	"github.com/raintank/metrictank/cluster"
 	"gopkg.in/raintank/schema.v1"
 	"testing"
+	"time"
 )
 
 type testcase struct {
@@ -36,9 +38,9 @@ func TestAggBoundary(t *testing.T) {
 
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
-	CluStatus = NewClusterStatus("default", false)
+	cluster.InitManager("default", "test", false, time.Now())
 	compare := func(key string, metric Metric, expected []schema.Point) {
-		CluStatus.Set(true)
+		cluster.ThisCluster.SetPrimary(true)
 		_, iters := metric.Get(0, 1000)
 		got := make([]schema.Point, 0, len(expected))
 		for _, iter := range iters {
@@ -58,7 +60,7 @@ func TestAggregator(t *testing.T) {
 				}
 			}
 		}
-		CluStatus.Set(false)
+		cluster.ThisCluster.SetPrimary(false)
 	}
 	agg := NewAggregator(dnstore, "test", 60, 120, 10, 86400)
 	agg.Add(100, 123.4)

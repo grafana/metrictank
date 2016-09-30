@@ -1,4 +1,4 @@
-package clkafka
+package notifierKafka
 
 import (
 	"flag"

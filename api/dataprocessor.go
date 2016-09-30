@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -8,13 +8,13 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"runtime"
 	"sync"
 	"time"
 
+	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
-	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -25,24 +25,6 @@ var pointSlicePool = sync.Pool{
 	// default size is probably bigger than what most responses need, but it saves [re]allocations
 	// also it's possible that occasionnally more size is needed, causing a realloc of underlying array, and that extra space will stick around until next GC run.
 	New: func() interface{} { return make([]schema.Point, 0, defaultPointSliceSize) },
-}
-
-// doRecover is the handler that turns panics into returns from the top level of getTarget.
-func doRecover(errp *error) {
-	e := recover()
-	if e != nil {
-		if _, ok := e.(runtime.Error); ok {
-			panic(e)
-		}
-		if err, ok := e.(error); ok {
-			*errp = err
-		} else if errStr, ok := e.(string); ok {
-			*errp = errors.New(errStr)
-		} else {
-			*errp = fmt.Errorf("%v", e)
-		}
-	}
-	return
 }
 
 // fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
@@ -171,21 +153,21 @@ func aggEvery(numPoints, maxPoints uint32) uint32 {
 }
 
 // error is the error of the first failing target request
-func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
-	seriesChan := make(chan Series, len(reqs))
+func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
+	seriesChan := make(chan models.Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
 	wg := sync.WaitGroup{}
 	wg.Add(len(reqs))
 	for _, req := range reqs {
-		go func(wg *sync.WaitGroup, req Req) {
+		go func(wg *sync.WaitGroup, req models.Req) {
 			pre := time.Now()
-			points, interval, err := getTarget(store, req)
+			points, interval, err := s.getTarget(req)
 			if err != nil {
 				errorsChan <- err
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
-				seriesChan <- Series{
+				seriesChan <- models.Series{
 					Target:     req.Target,
 					Datapoints: points,
 					Interval:   interval,
@@ -199,7 +181,7 @@ func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 		close(seriesChan)
 		close(errorsChan)
 	}()
-	out := make([]Series, 0, len(reqs))
+	out := make([]models.Series, 0, len(reqs))
 	var err error
 	for series := range seriesChan {
 		out = append(out, series)
@@ -212,13 +194,11 @@ func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 
 }
 
-func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint32, err error) {
-	defer doRecover(&err)
-
+func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint32, err error) {
 	readConsolidated := req.Archive != 0   // do we need to read from a downsampled series?
 	runtimeConsolidation := req.AggNum > 1 // do we need to compress any points at runtime?
 
-	if logLevel < 2 {
+	if LogLevel < 2 {
 		if runtimeConsolidation {
 			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
 		} else {
@@ -226,13 +206,13 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		}
 	}
 
-	if req.loc != "local" {
+	if req.Loc != "local" {
 		// unfortunately we can't use msgp yet for req due to https://github.com/tinylib/msgp/issues/158#issuecomment-247846164
 		buf, err := json.Marshal(req)
 		if err != nil {
 			return nil, 0, err
 		}
-		res, err := http.PostForm(fmt.Sprintf("http://%s/internal/getdata", req.loc), url.Values{"req": []string{string(buf)}})
+		res, err := http.PostForm(fmt.Sprintf("http://%s/internal/getdata", req.Loc), url.Values{"req": []string{string(buf)}})
 		if err != nil {
 			return nil, 0, err
 		}
@@ -246,20 +226,20 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 			// note that if we got http 500 back, the remote will already log the error, so we don't have to.
 			return nil, 0, errors.New(string(buf))
 		}
-		var series Series
+		var series models.Series
 		buf, err = series.UnmarshalMsg(buf)
 		if err != nil {
-			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.loc, err))
+			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.Loc, err))
 		}
 		if len(buf) != 0 {
-			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.loc))
+			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.Loc))
 		}
 		return series.Datapoints, series.Interval, nil
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
 		return fix(
-			getSeries(store, req.Key, consolidation.None, 0, req.From, req.To),
+			s.getSeries(req.Key, consolidation.None, 0, req.From, req.To),
 			req.From,
 			req.To,
 			req.ArchInterval,
@@ -267,7 +247,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
-				getSeries(store, req.Key, consolidation.None, 0, req.From, req.To),
+				s.getSeries(req.Key, consolidation.None, 0, req.From, req.To),
 				req.From,
 				req.To,
 				req.ArchInterval,
@@ -278,13 +258,13 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		if req.Consolidator == consolidation.Avg {
 			return divide(
 				fix(
-					getSeries(store, req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
+					s.getSeries(req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
 					req.From,
 					req.To,
 					req.ArchInterval,
 				),
 				fix(
-					getSeries(store, req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
+					s.getSeries(req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
 					req.From,
 					req.To,
 					req.ArchInterval,
@@ -292,7 +272,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 			), req.OutInterval, nil
 		} else {
 			return fix(
-				getSeries(store, req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
+				s.getSeries(req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
 				req.From,
 				req.To,
 				req.ArchInterval,
@@ -304,7 +284,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 			return divide(
 				consolidate(
 					fix(
-						getSeries(store, req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
+						s.getSeries(req.Key, consolidation.Sum, req.ArchInterval, req.From, req.To),
 						req.From,
 						req.To,
 						req.ArchInterval,
@@ -313,7 +293,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 					consolidation.Sum),
 				consolidate(
 					fix(
-						getSeries(store, req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
+						s.getSeries(req.Key, consolidation.Cnt, req.ArchInterval, req.From, req.To),
 						req.From,
 						req.To,
 						req.ArchInterval,
@@ -324,7 +304,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 		} else {
 			return consolidate(
 				fix(
-					getSeries(store, req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
+					s.getSeries(req.Key, req.Consolidator, req.ArchInterval, req.From, req.To),
 					req.From,
 					req.To,
 					req.ArchInterval,
@@ -335,8 +315,8 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 }
 
 func logLoad(typ, key string, from, to uint32) {
-	if logLevel < 2 {
-		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+	if LogLevel < 2 {
+		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 	}
 }
 
@@ -346,11 +326,11 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
-func getSeries(store mdata.Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
+func (s *Server) getSeries(key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]iter.Iter, 0)
 	memIters := make([]iter.Iter, 0)
 	oldest := toUnix
-	if metric, ok := metrics.Get(key); ok {
+	if metric, ok := s.MemoryStore.Get(key); ok {
 		if consolidator != consolidation.None {
 			logLoad("memory", aggMetricKey(key, consolidator.Archive(), aggSpan), fromUnix, toUnix)
 			oldest, memIters = metric.GetAggregated(consolidator, aggSpan, fromUnix, toUnix)
@@ -366,9 +346,9 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 		}
 		// if oldest < to -> search until oldest, we already have the rest from mem
 		// if to < oldest -> no need to search until oldest, only search until to
-		until := min(oldest, toUnix)
+		until := util.Min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
-		storeIters, err := store.Search(key, fromUnix, until)
+		storeIters, err := s.BackendStore.Search(key, fromUnix, until)
 		if err != nil {
 			panic(err)
 		}
@@ -391,7 +371,7 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
-		if logLevel < 2 {
+		if LogLevel < 2 {
 			if iter.Cass {
 				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
 			} else {
@@ -404,15 +384,15 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 }
 
 // check for duplicate series names. If found merge the results.
-func mergeSeries(out []Series) []Series {
-	seriesByTarget := make(map[string][]Series)
+func mergeSeries(out []models.Series) []models.Series {
+	seriesByTarget := make(map[string][]models.Series)
 	for _, series := range out {
 		if _, ok := seriesByTarget[series.Target]; !ok {
-			seriesByTarget[series.Target] = make([]Series, 0)
+			seriesByTarget[series.Target] = make([]models.Series, 0)
 		}
 		seriesByTarget[series.Target] = append(seriesByTarget[series.Target], series)
 	}
-	merged := make([]Series, len(seriesByTarget))
+	merged := make([]models.Series, len(seriesByTarget))
 	i := 0
 	for _, series := range seriesByTarget {
 		if len(series) == 1 {

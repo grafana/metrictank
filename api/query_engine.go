@@ -1,10 +1,12 @@
-package main
+package api
 
 import (
 	"fmt"
 	"sort"
 
+	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -29,7 +31,7 @@ func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 // this function ignores the TTL values. it is assumed that you've set sensible TTL's
-func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
+func alignRequests(reqs []models.Req, aggSettings []mdata.AggSetting) ([]models.Req, error) {
 
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
@@ -115,7 +117,7 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 		for k := range rawIntervals {
 			keys = append(keys, k)
 		}
-		chosenInterval = lcm(keys)
+		chosenInterval = util.Lcm(keys)
 		options[0].interval = chosenInterval
 		options[0].pointCount = tsRange / chosenInterval
 		//make sure that the calculated interval is not greater then the interval of the first rollup.
@@ -125,7 +127,7 @@ func alignRequests(reqs []Req, aggSettings []mdata.AggSetting) ([]Req, error) {
 		}
 	}
 
-	if logLevel < 2 {
+	if LogLevel < 2 {
 		options[selected].chosen = true
 		for i, archive := range options {
 			if archive.chosen {
