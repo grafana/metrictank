@@ -1,12 +1,10 @@
-package main
+package api
 
 // NOTE: THIS FILE WAS PRODUCED BY THE
 // MSGP CODE GENERATION TOOL (github.com/tinylib/msgp)
 // DO NOT EDIT
 
 import (
-	_ "net/http/pprof"
-
 	"github.com/tinylib/msgp/msgp"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -15,13 +13,13 @@ import (
 func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zbzg uint32
-	zbzg, err = dc.ReadMapHeader()
+	var isz uint32
+	isz, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zbzg > 0 {
-		zbzg--
+	for isz > 0 {
+		isz--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -33,18 +31,18 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Datapoints":
-			var zbai uint32
-			zbai, err = dc.ReadArrayHeader()
+			var xsz uint32
+			xsz, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Datapoints) >= int(zbai) {
-				z.Datapoints = (z.Datapoints)[:zbai]
+			if cap(z.Datapoints) >= int(xsz) {
+				z.Datapoints = z.Datapoints[:xsz]
 			} else {
-				z.Datapoints = make([]schema.Point, zbai)
+				z.Datapoints = make([]schema.Point, xsz)
 			}
-			for zxvk := range z.Datapoints {
-				err = z.Datapoints[zxvk].DecodeMsg(dc)
+			for xvk := range z.Datapoints {
+				err = z.Datapoints[xvk].DecodeMsg(dc)
 				if err != nil {
 					return
 				}
@@ -85,8 +83,8 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zxvk := range z.Datapoints {
-		err = z.Datapoints[zxvk].EncodeMsg(en)
+	for xvk := range z.Datapoints {
+		err = z.Datapoints[xvk].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -113,8 +111,8 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Datapoints"
 	o = append(o, 0xaa, 0x44, 0x61, 0x74, 0x61, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Datapoints)))
-	for zxvk := range z.Datapoints {
-		o, err = z.Datapoints[zxvk].MarshalMsg(o)
+	for xvk := range z.Datapoints {
+		o, err = z.Datapoints[xvk].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -129,13 +127,13 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zcmr uint32
-	zcmr, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var isz uint32
+	isz, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zcmr > 0 {
-		zcmr--
+	for isz > 0 {
+		isz--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -147,18 +145,18 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Datapoints":
-			var zajw uint32
-			zajw, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var xsz uint32
+			xsz, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Datapoints) >= int(zajw) {
-				z.Datapoints = (z.Datapoints)[:zajw]
+			if cap(z.Datapoints) >= int(xsz) {
+				z.Datapoints = z.Datapoints[:xsz]
 			} else {
-				z.Datapoints = make([]schema.Point, zajw)
+				z.Datapoints = make([]schema.Point, xsz)
 			}
-			for zxvk := range z.Datapoints {
-				bts, err = z.Datapoints[zxvk].UnmarshalMsg(bts)
+			for xvk := range z.Datapoints {
+				bts, err = z.Datapoints[xvk].UnmarshalMsg(bts)
 				if err != nil {
 					return
 				}
@@ -179,92 +177,11 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	return
 }
 
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Series) Msgsize() (s int) {
 	s = 1 + 7 + msgp.StringPrefixSize + len(z.Target) + 11 + msgp.ArrayHeaderSize
-	for zxvk := range z.Datapoints {
-		s += z.Datapoints[zxvk].Msgsize()
+	for xvk := range z.Datapoints {
+		s += z.Datapoints[xvk].Msgsize()
 	}
 	s += 9 + msgp.Uint32Size
-	return
-}
-
-// DecodeMsg implements msgp.Decodable
-func (z *SeriesByTarget) DecodeMsg(dc *msgp.Reader) (err error) {
-	var zcua uint32
-	zcua, err = dc.ReadArrayHeader()
-	if err != nil {
-		return
-	}
-	if cap((*z)) >= int(zcua) {
-		(*z) = (*z)[:zcua]
-	} else {
-		(*z) = make(SeriesByTarget, zcua)
-	}
-	for zhct := range *z {
-		err = (*z)[zhct].DecodeMsg(dc)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-// EncodeMsg implements msgp.Encodable
-func (z SeriesByTarget) EncodeMsg(en *msgp.Writer) (err error) {
-	err = en.WriteArrayHeader(uint32(len(z)))
-	if err != nil {
-		return
-	}
-	for zxhx := range z {
-		err = z[zxhx].EncodeMsg(en)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-// MarshalMsg implements msgp.Marshaler
-func (z SeriesByTarget) MarshalMsg(b []byte) (o []byte, err error) {
-	o = msgp.Require(b, z.Msgsize())
-	o = msgp.AppendArrayHeader(o, uint32(len(z)))
-	for zxhx := range z {
-		o, err = z[zxhx].MarshalMsg(o)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *SeriesByTarget) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	var zdaf uint32
-	zdaf, bts, err = msgp.ReadArrayHeaderBytes(bts)
-	if err != nil {
-		return
-	}
-	if cap((*z)) >= int(zdaf) {
-		(*z) = (*z)[:zdaf]
-	} else {
-		(*z) = make(SeriesByTarget, zdaf)
-	}
-	for zlqf := range *z {
-		bts, err = (*z)[zlqf].UnmarshalMsg(bts)
-		if err != nil {
-			return
-		}
-	}
-	o = bts
-	return
-}
-
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z SeriesByTarget) Msgsize() (s int) {
-	s = msgp.ArrayHeaderSize
-	for zpks := range z {
-		s += z[zpks].Msgsize()
-	}
 	return
 }

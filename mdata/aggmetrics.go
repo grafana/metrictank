@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -47,7 +48,7 @@ func (ms *AggMetrics) GC() {
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
-		if !CluStatus.IsPrimary() {
+		if !cluster.ThisCluster.IsPrimary() {
 			continue
 		}
 		log.Info("checking for stale chunks that need persisting.")

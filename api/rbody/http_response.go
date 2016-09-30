@@ -1,7 +1,7 @@
-package main
+package rbody
 
 import (
-	"net/http"
+	"github.com/Unknwon/macaron"
 )
 
 type httpType uint
@@ -17,7 +17,7 @@ const (
 	httpTypeMsgp                = iota
 )
 
-func writeResponse(w http.ResponseWriter, b []byte, format httpType, jsonp string) {
+func writeResponse(w *macaron.Context, b []byte, format httpType, jsonp string) {
 
 	switch format {
 	case httpTypeJSON:

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -8,10 +8,10 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"runtime"
 	"sync"
 	"time"
 
+	"github.com/raintank/metrictank/api/util"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
@@ -25,24 +25,6 @@ var pointSlicePool = sync.Pool{
 	// default size is probably bigger than what most responses need, but it saves [re]allocations
 	// also it's possible that occasionnally more size is needed, causing a realloc of underlying array, and that extra space will stick around until next GC run.
 	New: func() interface{} { return make([]schema.Point, 0, defaultPointSliceSize) },
-}
-
-// doRecover is the handler that turns panics into returns from the top level of getTarget.
-func doRecover(errp *error) {
-	e := recover()
-	if e != nil {
-		if _, ok := e.(runtime.Error); ok {
-			panic(e)
-		}
-		if err, ok := e.(error); ok {
-			*errp = err
-		} else if errStr, ok := e.(string); ok {
-			*errp = errors.New(errStr)
-		} else {
-			*errp = fmt.Errorf("%v", e)
-		}
-	}
-	return
 }
 
 // fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
@@ -213,12 +195,10 @@ func getTargets(store mdata.Store, reqs []Req) ([]Series, error) {
 }
 
 func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint32, err error) {
-	defer doRecover(&err)
-
 	readConsolidated := req.Archive != 0   // do we need to read from a downsampled series?
 	runtimeConsolidation := req.AggNum > 1 // do we need to compress any points at runtime?
 
-	if logLevel < 2 {
+	if log.LogLevel < 2 {
 		if runtimeConsolidation {
 			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
 		} else {
@@ -335,8 +315,8 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 }
 
 func logLoad(typ, key string, from, to uint32) {
-	if logLevel < 2 {
-		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, TS(from), TS(to), to-from-1)
+	if log.LogLevel < 2 {
+		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 	}
 }
 
@@ -391,7 +371,7 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
-		if logLevel < 2 {
+		if log.LogLevel < 2 {
 			if iter.Cass {
 				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
 			} else {

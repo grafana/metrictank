@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"gopkg.in/raintank/schema.v1"
