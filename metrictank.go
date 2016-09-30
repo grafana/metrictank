@@ -406,6 +406,7 @@ func main() {
 		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex, on))))
 		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex, on))))
 		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex, on))))
+		http.Handle("/metrics/delete", RecoveryHandler(corsHandler(Delete(metricIndex))))
 		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
 		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
 		http.Handle("/internal/getdata", RecoveryHandler(getData(store)))                         // requests for sharded data.

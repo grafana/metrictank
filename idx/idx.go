@@ -4,6 +4,7 @@ package idx
 
 import (
 	"errors"
+	"time"
 
 	"github.com/raintank/met"
 	"gopkg.in/raintank/schema.v1"
@@ -58,25 +59,35 @@ Interface
   passed OrgId is "-1", then all metricDefinitions across all organisations
   should be returned.
 
-* Find(int, string) ([]Node, error):
-  This method provides searches.  The method is passed an OrgId and a query
-  pattern. Searches should return all nodes that match for the given OrgId and
-  OrgId -1.  The pattern should be handled in the same way Graphite would. see
-  https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
+* Find(int, string, int64) ([]Node, error):
+  This method provides searches.  The method is passed an OrgId, a query
+  pattern and a unix timestamp. Searches should return all nodes that match for
+  the given OrgId and OrgId -1.  The pattern should be handled in the same way
+  Graphite would. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
+  And the unix stimestamp is used to ignore series that have been stale since
+  the timestmap.
 
-* Delete(int, string) error:
+* Delete(int, string) ([]schema.MetricDefinition, error):
   This method is used for deleting items from the index. The method is passed
   an OrgId and a query pattern.  If the pattern matches a branch node, then
   all leaf nodes on that branch should also be deleted. So if the pattern is
-  "*", all items in the index should be deleted.
+  "*", all items in the index should be deleted.  A copy of all of the
+  metricDefinitions deleted are returned.
 
+* Prune(int, time.Time) ([]schema.MetricDefinition, error):
+  This method should delete all metrics from the index for the passed org where
+  the last time the metric was seen is older then the passed timestamp. If the org
+  passed is -1, then the all orgs should be examined for stale metrics to be deleted.
+  The method returns a list of the metricDefinitions deleted from the index and any
+  error encountered.
 */
 type MetricIndex interface {
 	Init(met.Backend) error
 	Stop()
 	Add(*schema.MetricData)
 	Get(string) (schema.MetricDefinition, error)
-	Delete(int, string) error
-	Find(int, string) ([]Node, error)
+	Delete(int, string) ([]schema.MetricDefinition, error)
+	Find(int, string, int64) ([]Node, error)
 	List(int) []schema.MetricDefinition
+	Prune(int, time.Time) ([]schema.MetricDefinition, error)
 }

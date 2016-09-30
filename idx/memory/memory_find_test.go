@@ -137,7 +137,7 @@ func Init() {
 }
 
 func ixFind(org, q int) {
-	nodes, err := ix.Find(org, queries[q].Pattern)
+	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
 		panic(err)
 	}

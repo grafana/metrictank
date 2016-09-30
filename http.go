@@ -324,7 +324,15 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		locatedDefs := make(map[string]locatedDef)
 
 		if legacy {
-			nodes, err := metricIndex.Find(org, id)
+			// metricDefs only get updated periodically, so we add a 1day (86400seconds) buffer when
+			// filtering by our From timestamp.  This should be moved to a configuration option,
+			// but that will require significant refactoring to expose the updateInterval used
+			// in the MetricIdx.
+			seenAfter := int64(fromUnix)
+			if seenAfter != 0 {
+				seenAfter -= 86400
+			}
+			nodes, err := metricIndex.Find(org, id, seenAfter)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -561,6 +569,8 @@ func Find(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFunc {
 		format := r.FormValue("format")
 		jsonp := r.FormValue("jsonp")
 		query := r.FormValue("query")
+		from, _ := strconv.ParseInt(r.FormValue("from"), 10, 64)
+
 		org, err := getOrg(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -576,8 +586,14 @@ func Find(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFunc {
 			http.Error(w, "invalid format", http.StatusBadRequest)
 			return
 		}
-
-		nodes, err := metricIndex.Find(org, query)
+		// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
+		// filtering by our From timestamp.  This should be moved to a configuration option,
+		// but that will require significant refactoring to expose the updateInterval used
+		// in the MetricIdx.  So this will have to do for now.
+		if from != 0 {
+			from -= 86400
+		}
+		nodes, err := metricIndex.Find(org, query, from)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -651,6 +667,38 @@ func Find(metricIndex idx.MetricIndex, otherNodes []string) http.HandlerFunc {
 		}
 
 		writeResponse(w, b, httpTypeJSON, jsonp)
+	}
+}
+
+func Delete(metricIndex idx.MetricIndex) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := r.FormValue("query")
+		org, err := getOrg(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if query == "" {
+			http.Error(w, "missing parameter `query`", http.StatusBadRequest)
+			return
+		}
+
+		defs, err := metricIndex.Delete(org, query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		resp := make(map[string]interface{})
+		resp["success"] = true
+		resp["deletedDefs"] = len(defs)
+		b, err := json.Marshal(resp)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		writeResponse(w, b, httpTypeJSON, "")
 	}
 }
 
@@ -778,8 +826,17 @@ func IndexFind(metricIndex idx.MetricIndex) http.HandlerFunc {
 			return
 		}
 
+		// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
+		// filtering by our From timestamp.  This should be moved to a configuration option,
+		// but that will require significant refactoring to expose the updateInterval used
+		// in the MetricIdx.  So this will have to do for now.
+		from, _ := strconv.ParseInt(r.FormValue("from"), 10, 64)
+		if from != 0 {
+			from -= 86400
+		}
+
 		var buf []byte
-		nodes, err := metricIndex.Find(org, pattern)
+		nodes, err := metricIndex.Find(org, pattern, from)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

@@ -3,6 +3,7 @@ package cassandra
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -29,14 +30,18 @@ var (
 	idxCasAddDuration    met.Timer
 	idxCasDeleteDuration met.Timer
 
-	Enabled        bool
-	keyspace       string
-	hosts          string
-	consistency    string
-	timeout        time.Duration
-	numConns       int
-	writeQueueSize int
-	protoVer       int
+	Enabled         bool
+	keyspace        string
+	hosts           string
+	consistency     string
+	timeout         time.Duration
+	numConns        int
+	writeQueueSize  int
+	protoVer        int
+	maxStale        time.Duration
+	pruneInterval   time.Duration
+	updateInterval  time.Duration
+	updateFuzzyness float64
 )
 
 func ConfigSetup() {
@@ -49,6 +54,10 @@ func ConfigSetup() {
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
+	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field.")
+	casIdx.Float64Var(&updateFuzzyness, "update-fuzzyness", 0.5, "fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.")
+	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
+	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	globalconf.Register("cassandra-idx", casIdx)
 }
 
@@ -133,6 +142,12 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	//Rebuild the in-memory index.
 
 	c.rebuildIndex()
+	if maxStale > 0 {
+		if pruneInterval == 0 {
+			return fmt.Errorf("pruneInterval must be greater then 0")
+		}
+		go c.prune()
+	}
 	return nil
 }
 
@@ -156,9 +171,13 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 		}
 	}
 	if inMemory {
-		log.Debug("IDX-C def already seen before. Just updating memory Index")
-		existing.LastUpdate = data.Time
-		c.MemoryIdx.AddDef(&existing)
+		oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
+		if existing.LastUpdate < oldest.Unix() {
+			log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
+			existing.LastUpdate = data.Time
+			c.MemoryIdx.AddDef(&existing)
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: &existing}
+		}
 		return
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
@@ -226,17 +245,58 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) Delete(orgId int, pattern string) error {
-	ids, err := c.MemoryIdx.DeleteWithReport(orgId, pattern)
+func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
-		return err
+		return defs, err
 	}
-	for _, id := range ids {
-		err := c.session.Query("DELETE FROM metric_def_idx where id=?", id).Exec()
-		if err != nil {
-			log.Error(3, "IDX-C Failed to delete metricDef %s from cassandra. %s", id, err)
-			return err
+	for _, def := range defs {
+		attempts := 0
+		deleted := false
+		for !deleted && attempts < 5 {
+			attempts++
+			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+			if cErr != nil {
+				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+				time.Sleep(time.Second)
+			} else {
+				deleted = true
+			}
 		}
 	}
-	return nil
+	return defs, nil
+}
+
+func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
+	// if an error was encountered then pruned is probably a partial list of metricDefs
+	// deleted, so lets still try and delete these from Cassandra.
+	for _, def := range pruned {
+		log.Debug("cassandra-idx: metricDef %s pruned from the index.", def.Id)
+		attempts := 0
+		deleted := false
+		for !deleted && attempts < 5 {
+			attempts++
+			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+			if cErr != nil {
+				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+				time.Sleep(time.Second)
+			} else {
+				deleted = true
+			}
+		}
+	}
+	return pruned, err
+}
+
+func (c *CasIdx) prune() {
+	ticker := time.NewTicker(pruneInterval)
+	for range ticker.C {
+		log.Debug("cassandra-idx: pruning items from index that have not been seen for %s", maxStale.String())
+		staleTs := time.Now().Add(maxStale * -1)
+		_, err := c.Prune(-1, staleTs)
+		if err != nil {
+			log.Error(3, "cassandra-idx: prune error. %s", err)
+		}
+	}
 }
