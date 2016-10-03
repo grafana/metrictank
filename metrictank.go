@@ -32,6 +32,7 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 	notifierKafka "github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/usage"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -73,11 +74,6 @@ var (
 
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
-	// http:
-
-	maxPointsPerReq = flag.Int("max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
-	maxDaysPerReq   = flag.Int("max-days-per-req", 365000, "max amount of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
-
 	// Cassandra:
 	cassandraAddrs            = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace         = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
@@ -102,11 +98,6 @@ var (
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 10000000, "if this many bytes allocated, trigger a profile")
-
-	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
-
-	reqSpanMem  met.Meter
-	reqSpanBoth met.Meter
 
 	cassWriteQueueSize met.Gauge
 	cassWriters        met.Gauge
@@ -160,6 +151,7 @@ func main() {
 	memory.ConfigSetup()
 	elasticsearch.ConfigSetup()
 	cassandra.ConfigSetup()
+	api.ConfigSetup()
 	conf.ParseAll()
 
 	/***********************************
@@ -167,6 +159,7 @@ func main() {
 	***********************************/
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+	api.LogLevel = logLevel
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
@@ -197,6 +190,7 @@ func main() {
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	notifierKafka.ConfigProcess(*instance)
+	api.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -216,7 +210,6 @@ func main() {
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
-	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
@@ -245,7 +238,7 @@ func main() {
 		if (mdata.Month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
+		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
@@ -472,15 +465,8 @@ func main() {
 }
 
 func initMetrics(stats met.Backend) {
-	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
-	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	messagesSize = stats.NewMeter("message_size", 0)
-	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
-	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)

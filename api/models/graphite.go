@@ -10,8 +10,12 @@ type GraphiteRender struct {
 
 type GraphiteFind struct {
 	Query  string `json:"query" form:"query" binding:"required"`
-	From   uint32 `json:"from" form:"from"`
-	Until  uint32 `json:"until" form:"until"`
+	From   int64  `json:"from" form:"from"`
+	Until  int64  `json:"until" form:"until"`
 	Format string `json:"format" form:"format"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
+}
+
+type MetricsDelete struct {
+	Query string `json:"query" form:"query" binding:"required"`
 }

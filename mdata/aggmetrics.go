@@ -106,3 +106,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Unlock()
 	return m
 }
+
+func (ms *AggMetrics) AggSettings() []AggSetting {
+	return ms.aggSettings
+}

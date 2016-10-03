@@ -1,6 +1,7 @@
-package api
+package models
 
 import (
+	"github.com/raintank/metrictank/util"
 	"gopkg.in/raintank/schema.v1"
 	"testing"
 )
@@ -66,9 +67,9 @@ func TestJsonMarshal(t *testing.T) {
 			out: `[{"Target":"a","Datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]],"Interval":60},{"Target":"foo(bar)","Datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]],"Interval":10}]`,
 		},
 	}
-	js := bufPool.Get().([]byte)
+	js := util.BufferPool.Get().([]byte)
 	for _, c := range cases {
-		js, err := graphiteRaintankJSON(js[:0], c.in)
+		js, err := SeriesByTarget(c.in).GraphiteRaintankJSON(js[:0])
 		if err != nil {
 			panic(err)
 		}
@@ -77,7 +78,7 @@ func TestJsonMarshal(t *testing.T) {
 			t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", c.out, got)
 		}
 	}
-	bufPool.Put(js[:0])
+	util.BufferPool.Put(js[:0])
 }
 
 func BenchmarkSeriesJson(b *testing.B) {
@@ -97,12 +98,12 @@ func BenchmarkSeriesJson(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		js := bufPool.Get().([]byte)
-		js, err := graphiteRaintankJSON(js, data)
+		js := util.BufferPool.Get().([]byte)
+		js, err := SeriesByTarget(data).GraphiteRaintankJSON(js)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}
-		bufPool.Put(js[:0])
+		util.BufferPool.Put(js[:0])
 	}
 }
 
@@ -130,11 +131,11 @@ func BenchmarkHttpRespJson(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		js := bufPool.Get().([]byte)
-		js, err := graphiteRaintankJSON(js, data)
+		js := util.BufferPool.Get().([]byte)
+		js, err := SeriesByTarget(data).GraphiteRaintankJSON(js)
 		if err != nil || len(js) < 1000 {
 			panic(err)
 		}
-		bufPool.Put(js[:0])
+		util.BufferPool.Put(js[:0])
 	}
 }

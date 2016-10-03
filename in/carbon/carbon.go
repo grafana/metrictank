@@ -11,6 +11,7 @@ import (
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
@@ -31,11 +32,13 @@ var Enabled bool
 var addr string
 var schemasFile string
 var schemas persister.WhisperSchemas
+var shardId int
 
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
+	inCarbon.IntVar(&shardId, "shard", 1, "shard Id.")
 	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
@@ -85,6 +88,7 @@ func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *
 	if nil != err {
 		log.Fatal(4, err.Error())
 	}
+	cluster.ThisCluster.SetPartitions([]uint32{uint32(shardId)})
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
 	go c.accept(l)
 }

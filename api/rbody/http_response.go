@@ -1,26 +1,29 @@
 package rbody
 
 import (
-	"github.com/Unknwon/macaron"
+	"errors"
+	"github.com/raintank/metrictank/api/middleware"
 )
 
-type httpType uint
+var ErrMetricNotFound = errors.New("metric not found")
+
+type HttpType uint
 
 const (
-	httpTypeJSON       httpType = iota
-	httpTypeProtobuf            = iota
-	httpTypeJavaScript          = iota
-	httpTypeRaw                 = iota
-	httpTypePickle              = iota
-	httpTypePNG                 = iota
-	httpTypeCSV                 = iota
-	httpTypeMsgp                = iota
+	HttpTypeJSON       HttpType = iota
+	HttpTypeProtobuf            = iota
+	HttpTypeJavaScript          = iota
+	HttpTypeRaw                 = iota
+	HttpTypePickle              = iota
+	HttpTypePNG                 = iota
+	HttpTypeCSV                 = iota
+	HttpTypeMsgp                = iota
 )
 
-func writeResponse(w *macaron.Context, b []byte, format httpType, jsonp string) {
+func WriteResponse(w *middleware.Context, b []byte, format HttpType, jsonp string) {
 
 	switch format {
-	case httpTypeJSON:
+	case HttpTypeJSON:
 		if jsonp != "" {
 			w.Header().Set("Content-Type", contentTypeJavaScript)
 			w.Write([]byte(jsonp))
@@ -31,22 +34,22 @@ func writeResponse(w *macaron.Context, b []byte, format httpType, jsonp string) 
 			w.Header().Set("Content-Type", contentTypeJSON)
 			w.Write(b)
 		}
-	case httpTypeProtobuf:
+	case HttpTypeProtobuf:
 		w.Header().Set("Content-Type", contentTypeProtobuf)
 		w.Write(b)
-	case httpTypeRaw:
+	case HttpTypeRaw:
 		w.Header().Set("Content-Type", contentTypeRaw)
 		w.Write(b)
-	case httpTypePickle:
+	case HttpTypePickle:
 		w.Header().Set("Content-Type", contentTypePickle)
 		w.Write(b)
-	case httpTypeCSV:
+	case HttpTypeCSV:
 		w.Header().Set("Content-Type", contentTypeCSV)
 		w.Write(b)
-	case httpTypePNG:
+	case HttpTypePNG:
 		w.Header().Set("Content-Type", contentTypePNG)
 		w.Write(b)
-	case httpTypeMsgp:
+	case HttpTypeMsgp:
 		w.Header().Set("Content-Type", contentTypeMsgp)
 		w.Write(b)
 	}

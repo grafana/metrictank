@@ -16,12 +16,16 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
+var LogLevel int
+
 var (
 	getTargetDuration     met.Timer
 	itersToPointsDuration met.Timer
 	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
 	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
 	reqHandleDuration met.Timer
+	reqSpanBoth       met.Meter
+	reqSpanMem        met.Meter
 )
 
 type Server struct {
@@ -56,6 +60,12 @@ func NewServer(addr string, stats met.Backend) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
+	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
+	getTargetDuration = stats.NewTimer("get_target_duration", 0)
+	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
+	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 
 	m := macaron.Classic()
 	// route pprof to where it belongs

@@ -41,6 +41,9 @@ func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
 	f.Unlock()
 	return m
 }
+func (f *FakeAggMetrics) AggSettings() []mdata.AggSetting {
+	return []mdata.AggSetting{}
+}
 
 type FakeAggMetric struct {
 	key     string

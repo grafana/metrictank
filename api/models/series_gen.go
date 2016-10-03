@@ -1,4 +1,4 @@
-package api
+package models
 
 // NOTE: THIS FILE WAS PRODUCED BY THE
 // MSGP CODE GENERATION TOOL (github.com/tinylib/msgp)
@@ -183,5 +183,84 @@ func (z *Series) Msgsize() (s int) {
 		s += z.Datapoints[xvk].Msgsize()
 	}
 	s += 9 + msgp.Uint32Size
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
+func (z *SeriesByTarget) DecodeMsg(dc *msgp.Reader) (err error) {
+	var xsz uint32
+	xsz, err = dc.ReadArrayHeader()
+	if err != nil {
+		return
+	}
+	if cap((*z)) >= int(xsz) {
+		(*z) = (*z)[:xsz]
+	} else {
+		(*z) = make(SeriesByTarget, xsz)
+	}
+	for bai := range *z {
+		err = (*z)[bai].DecodeMsg(dc)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z SeriesByTarget) EncodeMsg(en *msgp.Writer) (err error) {
+	err = en.WriteArrayHeader(uint32(len(z)))
+	if err != nil {
+		return
+	}
+	for cmr := range z {
+		err = z[cmr].EncodeMsg(en)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z SeriesByTarget) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	o = msgp.AppendArrayHeader(o, uint32(len(z)))
+	for cmr := range z {
+		o, err = z[cmr].MarshalMsg(o)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *SeriesByTarget) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var xsz uint32
+	xsz, bts, err = msgp.ReadArrayHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	if cap((*z)) >= int(xsz) {
+		(*z) = (*z)[:xsz]
+	} else {
+		(*z) = make(SeriesByTarget, xsz)
+	}
+	for ajw := range *z {
+		bts, err = (*z)[ajw].UnmarshalMsg(bts)
+		if err != nil {
+			return
+		}
+	}
+	o = bts
+	return
+}
+
+func (z SeriesByTarget) Msgsize() (s int) {
+	s = msgp.ArrayHeaderSize
+	for wht := range z {
+		s += z[wht].Msgsize()
+	}
 	return
 }
