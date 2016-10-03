@@ -5,13 +5,15 @@ import (
 
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/cluster"
 )
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
-	ctx.JSON(200, "ok")
+	ctx.JSON(200, cluster.ThisCluster)
 }
 
 func (s *Server) setClusterStatus(ctx *middleware.Context, status models.ClusterStatus) {
+	cluster.ThisCluster.SetPrimary(status.Primary)
 	ctx.JSON(200, "ok")
 }
 
