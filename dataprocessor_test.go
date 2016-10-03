@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
+	"reflect"
+	"testing"
+
+	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
-	"math"
-	"math/rand"
-	"testing"
 )
 
 type testCase struct {
@@ -391,6 +394,102 @@ func TestFix(t *testing.T) {
 		}
 	}
 
+}
+
+// TestGetTarget assures that series data is returned in proper form.
+// we treat quantisation and getSeries as a black box, and just care about the output.
+func TestGetTarget(t *testing.T) {
+	type req struct {
+		desc string
+		from uint32 // inclusive since we query internal api
+		to   uint32 // exclusive since we query internal api
+		out  []schema.Point
+	}
+	type c struct {
+		name string
+		in   []schema.Point
+		reqs []req
+	}
+
+	cases := []c{
+		{
+			"naturally-quantized",
+			[]schema.Point{
+				{3000, 3000},
+				{3060, 3060},
+			},
+			[]req{
+				{
+					"should correspond 1:1",
+					3000,
+					3120,
+					[]schema.Point{
+						{3000, 3000},
+						{3060, 3060},
+					},
+				},
+			},
+		},
+		{
+			"off-by-5", // these points will be quantized to later values, by 55seconds
+			[]schema.Point{
+				{3005, 3005}, // quantized to 3060
+				{3065, 3065}, // quantized to 3120
+				{3125, 3125}, // quantized to 3180
+			},
+			[]req{
+				{
+					"quantization moves points 55s later",
+					3001,
+					3121,
+					[]schema.Point{
+						{3005, 3060},
+						{3065, 3120},
+					},
+				},
+				{
+					"quantization moves points 55s later",
+					3011,
+					3121,
+					[]schema.Point{
+						{3005, 3060},
+						{3065, 3120},
+					},
+				},
+			},
+		},
+	}
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	store := mdata.NewDevnullStore()
+	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
+	//metricIndex := memory.New()
+	//metricIndex.Init(stats)
+	mdata.CluStatus = mdata.NewClusterStatus("default", false)
+	mdata.InitMetrics(stats)
+	initMetrics(stats)
+	for _, c := range cases {
+		metric := metrics.GetOrCreate(c.name)
+		for _, p := range c.in {
+			metric.Add(p.Ts, p.Val)
+		}
+		for _, req := range c.reqs {
+			r := NewReq(c.name, c.name, req.from, req.to, 100, 60, consolidation.None)
+			r.archive = 0
+			r.archInterval = 60
+			r.outInterval = 60
+			r.aggNum = 1
+			points, interval, err := getTarget(store, r)
+			if err != nil {
+				t.Errorf("case %q req %q from %d to %d - getTarget err %q", c.name, req.desc, r.from, r.to, err)
+			}
+			if interval != r.outInterval {
+				t.Errorf("case %q req %q from %d to %d - bad interval %d", c.name, req.desc, r.from, r.to, interval)
+			}
+			if !reflect.DeepEqual(req.out, points) {
+				t.Errorf("case %q req %q from %d to %d - exp: %v - got %v", c.name, req.desc, r.from, r.to, req.out, points)
+			}
+		}
+	}
 }
 
 type alignCase struct {
