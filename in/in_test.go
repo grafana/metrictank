@@ -1,27 +1,27 @@
-package main
+package in
 
 import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
-	Nsq "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/chunk"
+
 	"gopkg.in/raintank/schema.v1"
-	"gopkg.in/raintank/schema.v1/msg"
 )
 
 // handler.HandleMessage some messages concurrently and make sure the entries in defcache are correct
 // this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("default", false)
-	initMetrics(stats)
+	cluster.InitManager("default", "test", false, time.Now())
 	mdata.InitMetrics(stats)
 
 	for i := 0; i < 100; i++ {
@@ -39,18 +39,15 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 	// mimic how we use nsq handlers:
 	// handlers operate concurrently, but within 1 handler, the handling is sequential
 
-	consumer := func(in chan *nsq.Message, group *sync.WaitGroup, aggmetrics mdata.Metrics, metricIndex idx.MetricIndex) {
-		handler := Nsq.NewHandler(aggmetrics, metricIndex, nil, stats)
+	consumer := func(in chan []byte, group *sync.WaitGroup, aggmetrics mdata.Metrics, metricIndex idx.MetricIndex) {
+		handler := New(aggmetrics, metricIndex, nil, "test", stats)
 		for msg := range in {
-			err := handler.HandleMessage(msg)
-			if err != nil {
-				panic(err)
-			}
+			handler.Handle(msg)
 		}
 		group.Done()
 	}
 
-	handlePool := make(chan *nsq.Message, 100)
+	handlePool := make(chan []byte, 100)
 	handlerGroup := sync.WaitGroup{}
 	handlerGroup.Add(5)
 	for i := 0; i != 5; i++ {
@@ -92,13 +89,13 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 		ids: make(map[string]int),
 	}
 	for i := 0; i < 4; i++ {
-		go func(i int, tit *idToId, handlePool chan *nsq.Message) {
-			metrics := make([]*schema.MetricData, 4)
-			for m := 0; m < len(metrics); m++ {
+		go func(i int, tit *idToId, handlePool chan []byte) {
+			var metric *schema.MetricData
+			for m := 0; m < 4; m++ {
 				id := (i + 1) * (m + 1)
 				t.Logf("worker %d metric %d -> adding metric with id and orgid %d", i, m, id)
 
-				metrics[m] = &schema.MetricData{
+				metric = &schema.MetricData{
 					Id:       "",
 					OrgId:    id,
 					Name:     fmt.Sprintf("some.id.%d", id),
@@ -110,18 +107,18 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 					Mtype:    "gauge",
 					Tags:     []string{fmt.Sprintf("%d", id)},
 				}
-				metrics[m].SetId()
+				metric.SetId()
 				tit.Lock()
-				tit.ids[metrics[m].Id] = id
+				tit.ids[metric.Id] = id
 				tit.Unlock()
+				var data []byte
+				var err error
+				data, err = metric.MarshalMsg(data[:])
+				if err != nil {
+					t.Fatal(err.Error())
+				}
+				handlePool <- data
 			}
-			id := nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
-			data, err := msg.CreateMsg(metrics, 1, msg.FormatMetricDataArrayMsgp)
-			if err != nil {
-				panic(err)
-			}
-			msg := nsq.NewMessage(id, data)
-			handlePool <- msg
 			wg.Done()
 		}(i, tit, handlePool)
 	}
@@ -158,50 +155,54 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 
 func BenchmarkHandler_HandleMessage(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("default", false)
-	initMetrics(stats)
+	cluster.InitManager("default", "test", false, time.Now())
 	mdata.InitMetrics(stats)
-
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
-	handler := Nsq.NewHandler(aggmetrics, metricIndex, nil, stats)
+	handler := New(aggmetrics, metricIndex, nil, "test", stats)
 
-	metrics := make([]*schema.MetricData, 10)
-	for i := 0; i < len(metrics); i++ {
-		metrics[i] = &schema.MetricData{
-			Id:       "some.id.of.a.metric",
+	msgs := make([][]byte, b.N)
+	var metric *schema.MetricData
+	for i := 0; i < b.N; i++ {
+		metric = &schema.MetricData{
+			Id:       fmt.Sprintf("some.id.of.a.metric.%d", i),
 			OrgId:    500,
-			Name:     "some.id",
+			Name:     fmt.Sprintf("some.id.%d", i),
 			Metric:   "metric",
 			Interval: 60,
 			Value:    1234.567,
 			Unit:     "ms",
-			Time:     int64(i - len(metrics) + 1),
+			Time:     int64(1),
 			Mtype:    "gauge",
-			Tags:     []string{"some_tag", "ok"},
+			Tags:     []string{"some_tag", "ok", fmt.Sprintf("id%d", i)},
 		}
-	}
-	// timestamps start at 1 and go up from there. (we can't use 0, see AggMetric.Add())
-	msgs := make([]*nsq.Message, b.N)
-	for i := 0; i < len(msgs); i++ {
-		id := nsq.MessageID{'1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 's', 'd', 'f', 'g', 'h'}
-		for j := 0; j < len(metrics); j++ {
-			metrics[j].Time += 10
-		}
-		data, err := msg.CreateMsg(metrics, 1, msg.FormatMetricDataArrayMsgp)
+		metric.SetId()
+		var data []byte
+		var err error
+		data, err = metric.MarshalMsg(data[:])
 		if err != nil {
-			panic(err)
+			b.Fatal(err.Error())
 		}
-		msgs[i] = nsq.NewMessage(id, data)
+		msgs[i] = data
 	}
-
+	finished := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-chunk.TotalPoints:
+			case <-finished:
+				return
+			}
+		}
+	}()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		err := handler.HandleMessage(msgs[i])
-		if err != nil {
-			panic(err)
-		}
+	for _, msg := range msgs {
+		handler.Handle(msg)
 	}
+	metricIndex.Stop()
+	cluster.ThisCluster.Stop()
+	store.Stop()
+	close(finished)
 }
