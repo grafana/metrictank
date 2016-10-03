@@ -57,7 +57,8 @@ func (m *Manager) poll() {
 	for {
 		select {
 		case <-m.shutdown:
-			break
+			ticker.Stop()
+			return
 		case <-ticker.C:
 			m.Lock()
 			for _, node := range m.Peers {
