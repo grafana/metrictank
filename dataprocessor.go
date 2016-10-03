@@ -224,7 +224,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 
 	if !readConsolidated && !runtimeConsolidation {
 		return fix(
-			getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
+			getSeries(store, req.key, consolidation.None, req.archInterval, req.from, req.to),
 			req.from,
 			req.to,
 			req.archInterval,
@@ -232,7 +232,7 @@ func getTarget(store mdata.Store, req Req) (points []schema.Point, interval uint
 	} else if !readConsolidated && runtimeConsolidation {
 		return consolidate(
 			fix(
-				getSeries(store, req.key, consolidation.None, 0, req.from, req.to),
+				getSeries(store, req.key, consolidation.None, req.archInterval, req.from, req.to),
 				req.from,
 				req.to,
 				req.archInterval,
@@ -310,15 +310,24 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 }
 
 // getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
-// it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span.
-func getSeries(store mdata.Store, key string, consolidator consolidation.Consolidator, aggSpan, fromUnix, toUnix uint32) []schema.Point {
+// it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
+// pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
+func getSeries(store mdata.Store, key string, consolidator consolidation.Consolidator, interval, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]iter.Iter, 0)
 	memIters := make([]iter.Iter, 0)
 	oldest := toUnix
+
+	// note: since raw series may be non-quantized, we get up to `interval-1` earlier,
+	// so that if we have quantize later (in fix()) we have a valid first point.
+	// (at this point we can't tell whether the raw series will be quantized or not)
+	if consolidator == consolidation.None {
+		fromUnix = fromUnix - interval + 1
+	}
+
 	if metric, ok := metrics.Get(key); ok {
 		if consolidator != consolidation.None {
-			logLoad("memory", aggMetricKey(key, consolidator.Archive(), aggSpan), fromUnix, toUnix)
-			oldest, memIters = metric.GetAggregated(consolidator, aggSpan, fromUnix, toUnix)
+			logLoad("memory", aggMetricKey(key, consolidator.Archive(), interval), fromUnix, toUnix)
+			oldest, memIters = metric.GetAggregated(consolidator, interval, fromUnix, toUnix)
 		} else {
 			logLoad("memory", key, fromUnix, toUnix)
 			oldest, memIters = metric.Get(fromUnix, toUnix)
@@ -327,7 +336,7 @@ func getSeries(store mdata.Store, key string, consolidator consolidation.Consoli
 	if oldest > fromUnix {
 		reqSpanBoth.Value(int64(toUnix - fromUnix))
 		if consolidator != consolidation.None {
-			key = aggMetricKey(key, consolidator.Archive(), aggSpan)
+			key = aggMetricKey(key, consolidator.Archive(), interval)
 		}
 		// if oldest < to -> search until oldest, we already have the rest from mem
 		// if to < oldest -> no need to search until oldest, only search until to
