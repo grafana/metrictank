@@ -85,14 +85,14 @@ func (m *Manager) SetPrimary(p bool) {
 	m.Self.SetPrimary(p)
 }
 
-func (m *Manager) SetPartitions(partitions []uint32) {
+func (m *Manager) SetPartitions(partitions []int32) {
 	m.Self.SetPartitions(partitions)
 }
 
 // return the list of peers to broadcast requests to
 // Only 1 peer per partition is returned
 func (m *Manager) PeersForQuery() []*Node {
-	peersMap := make(map[uint32][]*Node)
+	peersMap := make(map[int32][]*Node)
 	for _, part := range m.Self.Partitions {
 		peersMap[part] = []*Node{m.Self}
 	}

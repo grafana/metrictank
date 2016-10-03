@@ -24,7 +24,7 @@ type Node struct {
 	RemoteAddr *url.URL  `json:"-"`
 	Name       string    `json:"name"`
 	Version    string    `json:"version"`
-	Partitions []uint32  `json:"partitions"`
+	Partitions []int32   `json:"partitions"`
 	Primary    bool      `json:"primary"`
 	State      NodeState `json:"state"`
 	Started    time.Time `json:"started"`
@@ -61,12 +61,12 @@ func (n *Node) SetState(s NodeState) {
 	n.Unlock()
 }
 
-func (n *Node) SetPartitions(part []uint32) {
+func (n *Node) SetPartitions(part []int32) {
 	n.Lock()
 	n.Partitions = part
 	n.Unlock()
 }
-func (n *Node) GetPartitions() []uint32 {
+func (n *Node) GetPartitions() []int32 {
 	n.Lock()
 	part := n.Partitions
 	n.Unlock()

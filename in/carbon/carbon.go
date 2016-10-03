@@ -88,7 +88,7 @@ func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *
 	if nil != err {
 		log.Fatal(4, err.Error())
 	}
-	cluster.ThisCluster.SetPartitions([]uint32{uint32(shardId)})
+	cluster.ThisCluster.SetPartitions([]int32{int32(shardId)})
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
 	go c.accept(l)
 }
