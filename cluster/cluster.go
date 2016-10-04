@@ -1,9 +1,12 @@
 package cluster
 
 import (
+	"fmt"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var ThisCluster *Manager
@@ -36,6 +39,7 @@ func NewManger(name, version string, primary bool, started time.Time) *Manager {
 
 func (m *Manager) AddPeer(remoteAddr *url.URL) {
 	m.Lock()
+	log.Info("adding peer with address: %s", remoteAddr.String())
 	m.Peers = append(m.Peers, &Node{
 		RemoteAddr: remoteAddr,
 		State:      NodeNotReady,
@@ -82,6 +86,7 @@ func (m *Manager) IsPrimary() bool {
 }
 
 func (m *Manager) SetPrimary(p bool) {
+	log.Info("setting this nodes primary flag to: %t", p)
 	m.Self.SetPrimary(p)
 }
 
@@ -102,17 +107,19 @@ func (m *Manager) PeersForQuery() []*Node {
 			continue
 		}
 		for _, part := range peer.GetPartitions() {
-			l, ok := peersMap[part]
+			_, ok := peersMap[part]
 			if !ok {
-				l = make([]*Node, 0)
-				peersMap[part] = l
+				peersMap[part] = make([]*Node, 0)
 			}
-			l = append(l, peer)
+			peersMap[part] = append(peersMap[part], peer)
 		}
 	}
 	m.Unlock()
 	selectedPeers := make(map[string]*Node)
 	for _, l := range peersMap {
+		if len(l) < 1 {
+			panic(fmt.Sprintf("%v", peersMap))
+		}
 		selectedPeers[l[0].Name] = l[0]
 	}
 

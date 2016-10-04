@@ -30,6 +30,9 @@ func OrgMiddleware() macaron.Handler {
 
 func getOrg(req *http.Request) (int, error) {
 	orgStr := req.Header.Get("x-org-id")
+	if orgStr == "" {
+		return 0, nil
+	}
 	org, err := strconv.Atoi(orgStr)
 	if err != nil {
 		return 0, errors.New("bad org-id")

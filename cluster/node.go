@@ -1,9 +1,11 @@
 package cluster
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -19,6 +21,25 @@ const (
 	NodeNotReady    NodeState = 1
 	NodeUnreachable NodeState = 2
 )
+
+var NodeStateText = map[NodeState]string{
+	NodeReady:       "Ready",
+	NodeNotReady:    "NotReady",
+	NodeUnreachable: "Unreachable",
+}
+
+var client = http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Proxy:           http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: time.Second,
+	},
+	Timeout: time.Second,
+}
 
 type Node struct {
 	RemoteAddr *url.URL  `json:"-"`
@@ -83,6 +104,12 @@ func (n *Node) Poll() {
 		log.Warn("cluster: failed to get status of peer %s. %s", name, err)
 	}
 	n.Lock()
+	if n.State != node.State {
+		if name == "" {
+			name = node.Name
+		}
+		log.Info("cluster: node %s in new state: %s", name, NodeStateText[node.State])
+	}
 	n.State = node.State
 	if err == nil {
 		n.Name = node.Name
@@ -98,7 +125,7 @@ func getPeerStatus(addr *url.URL) (*Node, error) {
 	n := &Node{
 		State: NodeNotReady,
 	}
-	res, err := http.Get(fmt.Sprintf("%scluster", addr.String()))
+	res, err := client.Get(fmt.Sprintf("%scluster", addr.String()))
 	if err != nil {
 		log.Warn("cluster: failed to query peer at address %s: %s", addr.String(), err)
 		n.State = NodeUnreachable
@@ -112,7 +139,7 @@ func getPeerStatus(addr *url.URL) (*Node, error) {
 	}
 	err = json.Unmarshal(body, n)
 	if err != nil {
-		log.Warn("cluster: failed to decode response from peer at address %s: %s", addr.String(), err)
+		log.Warn("cluster: failed to decode response from peer at address %s: %s\n\n%s", addr.String(), err, body)
 		n.State = NodeNotReady
 		return n, err
 	}

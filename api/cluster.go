@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
-	ctx.JSON(200, cluster.ThisCluster)
+	ctx.JSON(200, cluster.ThisCluster.Self)
 }
 
 func (s *Server) setClusterStatus(ctx *middleware.Context, status models.ClusterStatus) {
