@@ -35,7 +35,7 @@ func (s *Server) RegisterRoutes() {
 		r.Combo("/getdata", bind(models.Req{})).Get(s.getData).Post(s.getData)
 		r.Combo("/index/find").Get(s.indexFind).Post(s.indexFind)
 		r.Combo("/index/get").Get(s.indexGet).Post(s.indexGet)
-		r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexGet).Post(s.indexList)
+		r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
 	})
 
 }
