@@ -339,16 +339,16 @@ func main() {
 	/***********************************
 		Initialize our Receivers
 	***********************************/
-	recievers := make([]in.Plugin, 0)
+	receivers := make([]in.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
-		recievers = append(recievers, inCarbonInst)
+		receivers = append(receivers, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
 		inKafkaMdmInst = inKafkaMdm.New(stats)
-		recievers = append(recievers, inKafkaMdmInst)
+		receivers = append(receivers, inKafkaMdmInst)
 	}
 
 	/***********************************
@@ -459,7 +459,7 @@ func main() {
 	// to finish processing any metrics that have already ingested.
 	timer := time.NewTimer(time.Second * 10)
 	var wg sync.WaitGroup
-	for _, plugin := range recievers {
+	for _, plugin := range receivers {
 		wg.Add(1)
 		go func() {
 			log.Info("Shutting down %s consumer", plugin.Name())
