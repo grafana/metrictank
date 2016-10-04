@@ -10,6 +10,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -188,6 +189,12 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 func (c *CasIdx) rebuildIndex() {
 	log.Info("IDX-C Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
+	partitionCount := cluster.ThisCluster.GetPartitionCount()
+	partitioner := cluster.ThisCluster.GetPartitioner()
+	activePartitions := make(map[int32]struct{})
+	for _, part := range cluster.ThisNode.GetPartitions() {
+		activePartitions[part] = struct{}{}
+	}
 	defs := make([]schema.MetricDefinition, 0)
 	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
 
@@ -199,7 +206,11 @@ func (c *CasIdx) rebuildIndex() {
 			log.Error(3, "IDX-C Bad definition in index. %s - %s", data, err)
 			continue
 		}
-		defs = append(defs, mdef)
+		// only index metrics that match the partitions this node is handling.
+		part := partitioner.GetPartition(&mdef, partitionCount)
+		if _, ok := activePartitions[part]; ok {
+			defs = append(defs, mdef)
+		}
 	}
 	c.MemoryIdx.Load(defs)
 	log.Info("IDX-C Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())

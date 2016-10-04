@@ -36,12 +36,14 @@ var addr string
 var schemasFile string
 var schemas persister.WhisperSchemas
 var shardId int
+var shardCount int
 
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
 	inCarbon.IntVar(&shardId, "shard", 1, "shard Id.")
+	inCarbon.IntVar(&shardCount, "shard-count", 1, "number of shards in the cluster")
 	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
@@ -69,6 +71,9 @@ func ConfigProcess() {
 		// but we definitely need to always be able to determine which interval to use
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}
+
+	cluster.ThisNode.SetPartitions([]int32{int32(shardId)})
+	cluster.ThisCluster.SetPartitionCount(int32(shardCount))
 
 }
 

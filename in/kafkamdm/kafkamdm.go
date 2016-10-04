@@ -46,6 +46,7 @@ var topicStr string
 var topics []string
 var partitionStr string
 var partitions []int32
+var availablePartitions []int32
 var offsetStr string
 var dataDir string
 var config *sarama.Config
@@ -134,6 +135,41 @@ func ConfigProcess(instance string) {
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
 	}
+
+	// validate our partitions
+	client, err := sarama.NewClient(brokers, config)
+	if err != nil {
+		log.Fatal(4, "kafka-mdm failed to create client. %s", err)
+	}
+
+	for i, topic := range topics {
+		availParts, err := client.Partitions(topic)
+		if err != nil {
+			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+		}
+		if len(availParts) == 0 {
+			log.Fatal(4, "kafka-mdm: No partitions returned for topic %s", topic)
+		}
+		log.Info("kafka-mdm: available partitions: %v", availParts)
+		if i > 0 {
+			if len(availablePartitions) != len(availParts) {
+				log.Fatal(4, "kafka-mdm: configured topics have different partition counts, this is not supported")
+			}
+			continue
+		}
+		availablePartitions = availParts
+		if partitionStr == "*" {
+			partitions = availParts
+		} else {
+			missing := setDiff(partitions, availParts)
+			if len(missing) > 0 {
+				log.Fatal(4, "kafka-mdm: configured partitions not in list of available partitions.")
+			}
+		}
+	}
+	// update our ClusterMgr, so others (MetricIdx) can use the partitioning information.
+	cluster.ThisNode.SetPartitions(partitions)
+	cluster.ThisCluster.SetPartitionCount(int32(len(availablePartitions)))
 }
 
 func New(stats met.Backend) *KafkaMdm {
@@ -175,39 +211,8 @@ Iter:
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	for _, topic := range topics {
-		availParts, err := k.consumer.Partitions(topic)
-		if err != nil {
-			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
-		}
-		log.Info("kafka-mdm: available partitions: %v", availParts)
-		if partitionStr == "*" {
-			partitions = availParts
-		} else {
-			missing := setDiff(partitions, availParts)
-			ticker := time.NewTicker(time.Second)
-			timer := time.NewTimer(20 * time.Second)
-			for len(missing) > 0 {
-				select {
-				case <-ticker.C:
-					availParts, err := k.consumer.Partitions(topic)
-					if err != nil {
-						log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
-					}
-					missing = setDiff(partitions, availParts)
-					if len(missing) == 0 {
-						log.Info("kafka-mdm: available partitions: %v (done waiting)", availParts)
-					} else {
-						log.Info("kafka-mdm: available partitions: %v (waiting...)", availParts)
-					}
-				case <-timer.C:
-					log.Fatal(5, "kafka-mdm: these requested partitions were not found: %v", missing)
-				}
-			}
-			ticker.Stop()
-			timer.Stop()
-		}
-		cluster.ThisNode.SetPartitions(partitions)
 		log.Info("kafka-mdm: will consume partitions %v", partitions)
+		var err error
 		for _, partition := range partitions {
 			var offset int64
 			switch offsetStr {

@@ -42,6 +42,7 @@ var (
 	inCarbonInst      *inCarbon.Carbon
 	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
 	notifierKafkaInst *mdata.NotifierKafka
+	idxPartitioner    cluster.IdxPartitioner
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -62,6 +63,7 @@ var (
 	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 	peersStr    = flag.String("peers", "", "http/s addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
+	partitioner = flag.String("partitioner", "murmur2", "Algorithim used for partitioning metrics across peers. (murmur2 is currently the only implimentation)")
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
@@ -182,12 +184,40 @@ func main() {
 	}
 
 	/***********************************
-		Validate Config settings
+		Validate  settings needed for clustering
 	***********************************/
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
 
+	if *partitioner != "murmur2" {
+		log.Fatal(4, "Only the murmur2 partitioner is supported.")
+	}
+
+	/***********************************
+		Initialize our ClusterManager
+	***********************************/
+	if *partitioner == "murmur2" {
+		idxPartitioner = &cluster.Murmur2Partitioner{}
+	}
+	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime, idxPartitioner)
+	if *peersStr != "" {
+		for _, peer := range strings.Split(*peersStr, ",") {
+			if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
+				peer = fmt.Sprintf("http://%s", peer)
+			}
+			peer = strings.TrimSuffix(peer, "/")
+			addr, err := url.Parse(peer)
+			if err != nil {
+				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
+			}
+			cluster.ThisCluster.AddPeer(addr)
+		}
+	}
+
+	/***********************************
+		Validate remaining settings
+	***********************************/
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	notifierKafka.ConfigProcess(*instance)
@@ -271,25 +301,6 @@ func main() {
 	}
 
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
-
-	/***********************************
-		Initialize our ClusterManager
-	***********************************/
-	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime)
-	if *peersStr != "" {
-		for _, peer := range strings.Split(*peersStr, ",") {
-			if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
-				peer = fmt.Sprintf("http://%s", peer)
-			}
-			peer = strings.TrimSuffix(peer, "/")
-			addr, err := url.Parse(peer)
-			if err != nil {
-				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
-			}
-			cluster.ThisCluster.AddPeer(addr)
-		}
-	}
-	cluster.ThisCluster.Run()
 
 	/***********************************
 		configure StatsD
@@ -401,6 +412,11 @@ func main() {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdmInst.Start(metrics, metricIndex, usg)
 	}
+
+	/***********************************
+		Start discovering our cluster Peers
+	***********************************/
+	cluster.ThisCluster.Run()
 
 	/***********************************
 		Initialize our API server

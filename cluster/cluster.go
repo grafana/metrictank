@@ -12,8 +12,10 @@ import (
 var ThisCluster *Manager
 var ThisNode *Node
 
-func InitManager(name, version string, primary bool, started time.Time) {
+func InitManager(name, version string, primary bool, started time.Time, partitioner IdxPartitioner) {
 	ThisCluster = NewManger()
+	ThisCluster.Partitioner = partitioner
+
 	ThisNode = &Node{
 		Name:    name,
 		Primary: primary,
@@ -24,8 +26,10 @@ func InitManager(name, version string, primary bool, started time.Time) {
 }
 
 type Manager struct {
-	Peers    []*Node
-	shutdown chan struct{}
+	Peers          []*Node
+	PartitionCount int32
+	Partitioner    IdxPartitioner
+	shutdown       chan struct{}
 	sync.Mutex
 }
 
@@ -44,6 +48,26 @@ func (m *Manager) AddPeer(remoteAddr *url.URL) {
 		State:      NodeNotReady,
 	})
 	m.Unlock()
+}
+
+func (m *Manager) GetPartitioner() IdxPartitioner {
+	m.Lock()
+	p := m.Partitioner
+	m.Unlock()
+	return p
+}
+
+func (m *Manager) SetPartitionCount(count int32) {
+	m.Lock()
+	m.PartitionCount = count
+	m.Unlock()
+}
+
+func (m *Manager) GetPartitionCount() int32 {
+	m.Lock()
+	count := m.PartitionCount
+	m.Unlock()
+	return count
 }
 
 func (m *Manager) Run() {
