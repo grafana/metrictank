@@ -3,7 +3,7 @@ package cluster
 import (
 	"encoding/binary"
 
-	"github.com/aviddiviner/go-murmur"
+	"github.com/raintank/metrictank/kafka/murmur2"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -30,8 +30,9 @@ func (p *Murmur2Partitioner) GetPartition(def *schema.MetricDefinition, partitio
 	// large organisations can go to several partitions instead of just one.
 	key := make([]byte, 8)
 	binary.LittleEndian.PutUint32(key, uint32(def.OrgId))
-	// the seed value "0x9747b28c" is the same seed used by Kafka.
-	// https://apache.googlesource.com/kafka/+/0.10.0.1/clients/src/main/java/org/apache/kafka/common/utils/Utils.java#342
-	h := murmur.MurmurHash2(key, 0x9747b28c)
-	return int32(h) % partitionCount
+	h := murmur2.MurmurHash2(key)
+	if h < 0 {
+		h = -h
+	}
+	return h % partitionCount
 }
