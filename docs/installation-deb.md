@@ -226,8 +226,8 @@ Kafka requires Zookeeper, so set that up first.
 
 ```
 cd /opt
-tar -zxvf /root/zookeeper-3.4.8.tar.gz # update path if you downloaded elsewhere.
-ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
+tar -zxvf /root/zookeeper-3.4.9.tar.gz # update path if you downloaded elsewhere.
+ln -s /opt/zookeeper-3.4.9 /opt/zookeeper
 mkdir /var/lib/zookeeper
 ```
 
