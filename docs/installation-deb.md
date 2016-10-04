@@ -15,7 +15,7 @@ We'll go over these in more detail below.
 * (you can optionally use Elasticsearch for persistence of metrics metadata.  We recommend using Cassandra instead, much better and easier)
   See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 
-Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
+Note: Cassandra, Elasticsearch, and Kafka require Java, which will be automatically installed by apt as a dependency when we install Cassandra.
 
 ## How things fit together
 
@@ -85,20 +85,6 @@ Supported distributions:
 
 [more info](https://packagecloud.io/raintank/raintank/install)
 
-
-## Set up java
-
-Download and install the oracle java rpm:
-
-```
-wget --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u5-b13/jdk-8u5-linux-x64.tar.gz
-mkdir /opt/jdk
-tar -zxf jdk-8u5-linux-x64.tar.gz -C /opt/jdk
-update-alternatives --install /usr/bin/java java /opt/jdk/jdk1.8.0_05/bin/java 100
-update-alternatives --install /usr/bin/javac javac /opt/jdk/jdk1.8.0_05/bin/javac 100
-```
-
-[more info](https://www.digitalocean.com/community/tutorials/how-to-manually-install-oracle-java-on-a-debian-or-ubuntu-vps)
 
 ## Set up cassandra
 
