@@ -34,6 +34,10 @@ type KafkaMdm struct {
 	stopConsuming chan struct{}
 }
 
+func (k *KafkaMdm) Name() string {
+	return "kafkaMdm"
+}
+
 var LogLevel int
 var Enabled bool
 var brokerStr string
@@ -266,9 +270,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 func (k *KafkaMdm) Stop() {
 	// closes notifications and messages channels, amongst others
 	close(k.stopConsuming)
-	go func() {
-		k.wg.Wait()
-		offsetMgr.Close()
-		close(k.StopChan)
-	}()
+	k.wg.Wait()
+	offsetMgr.Close()
+	close(k.StopChan)
 }

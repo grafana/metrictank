@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -327,13 +328,16 @@ func main() {
 	/***********************************
 		Initialize our Receivers
 	***********************************/
+	recievers := make([]in.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
+		recievers = append(recievers, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
 		inKafkaMdmInst = inKafkaMdm.New(stats)
+		recievers = append(recievers, inKafkaMdmInst)
 	}
 
 	/***********************************
@@ -431,42 +435,40 @@ func main() {
 	/***********************************
 		Wait for Shutdown
 	***********************************/
-	type waiter struct {
-		key    string
-		plugin in.Plugin
-		ch     chan int
-	}
-
-	waiters := make([]waiter, 0)
-
-	if inKafkaMdm.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdm",
-			inKafkaMdmInst,
-			inKafkaMdmInst.StopChan,
-		})
-	}
-
 	<-sigChan
 	// stop the API server first, so we dont receive new connections.
 	apiServer.Stop()
 
-	for _, w := range waiters {
-		log.Info("Shutting down %s consumer", w.key)
-		w.plugin.Stop()
+	// shutdown our reciever plugins.  These may take a while as we allow them
+	// to finish processing any metrics that have already ingested.
+	timer := time.NewTimer(time.Second * 10)
+	var wg sync.WaitGroup
+	for _, plugin := range recievers {
+		wg.Add(1)
+		go func() {
+			log.Info("Shutting down %s consumer", plugin.Name())
+			plugin.Stop()
+			log.Info("%s consumer finished shutdown", plugin.Name())
+			wg.Done()
+		}()
 	}
-	for _, w := range waiters {
-		// the order here is arbitrary, they could stop in either order, but it doesn't really matter
-		log.Info("waiting for %s consumer to finish shutdown", w.key)
-		<-w.ch
-		log.Info("%s consumer finished shutdown", w.key)
+	pluginsStopped := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(pluginsStopped)
+	}()
+	select {
+	case <-timer.C:
+		log.Warn("Plugins taking too long to shutdown, not waiting any longer.")
+	case <-pluginsStopped:
+		timer.Stop()
 	}
+
 	log.Info("closing store")
 	store.Stop()
 	metricIndex.Stop()
 	log.Info("terminating.")
 	log.Close()
-
 }
 
 func initMetrics(stats met.Backend) {

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
@@ -22,10 +23,12 @@ import (
 
 type Carbon struct {
 	in.In
-	addrStr string
-	addr    *net.TCPAddr
-	schemas persister.WhisperSchemas
-	stats   met.Backend
+	addrStr          string
+	addr             *net.TCPAddr
+	schemas          persister.WhisperSchemas
+	stats            met.Backend
+	listener         *net.TCPListener
+	handlerWaitGroup sync.WaitGroup
 }
 
 var Enabled bool
@@ -82,26 +85,36 @@ func New(stats met.Backend) *Carbon {
 	}
 }
 
+func (c *Carbon) Name() string {
+	return "carbon"
+}
+
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	c.In = in.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, err.Error())
 	}
-	cluster.ThisNode.SetPartitions([]int32{int32(shardId)})
+	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
-	go c.accept(l)
+	go c.accept()
 }
 
-func (c *Carbon) accept(l *net.TCPListener) {
+func (c *Carbon) accept() {
 	for {
-		conn, err := l.AcceptTCP()
+		conn, err := c.listener.AcceptTCP()
 		if nil != err {
 			log.Error(4, err.Error())
 			break
 		}
+		c.handlerWaitGroup.Add(1)
 		go c.handle(conn)
 	}
+}
+
+func (c *Carbon) Stop() {
+	c.listener.Close()
+	c.handlerWaitGroup.Wait()
 }
 
 func (c *Carbon) handle(conn net.Conn) {
@@ -133,4 +146,5 @@ func (c *Carbon) handle(conn net.Conn) {
 		interval := s.Retentions[0].SecondsPerPoint()
 		c.HandleLegacy(string(key), val, ts, interval)
 	}
+	c.handlerWaitGroup.Done()
 }
