@@ -272,6 +272,27 @@ func main() {
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
 	/***********************************
+		Initialize our ClusterManager
+	***********************************/
+	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime)
+	if *peersStr != "" {
+		for _, peer := range strings.Split(*peersStr, ",") {
+			if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
+				peer = fmt.Sprintf("http://%s", peer)
+			}
+			if !strings.HasSuffix(peer, "/") {
+				peer += "/"
+			}
+			addr, err := url.Parse(peer)
+			if err != nil {
+				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
+			}
+			cluster.ThisCluster.AddPeer(addr)
+		}
+	}
+	cluster.ThisCluster.Run()
+
+	/***********************************
 		configure StatsD
 	***********************************/
 	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
@@ -315,20 +336,6 @@ func main() {
 
 	if inKafkaMdm.Enabled {
 		inKafkaMdmInst = inKafkaMdm.New(stats)
-	}
-
-	/***********************************
-		Initialize our ClusterManager
-	***********************************/
-	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime)
-	if *peersStr != "" {
-		for _, peer := range strings.Split(*peersStr, ",") {
-			addr, err := url.Parse(peer)
-			if err != nil {
-				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
-			}
-			cluster.ThisCluster.AddPeer(addr)
-		}
 	}
 
 	/***********************************
