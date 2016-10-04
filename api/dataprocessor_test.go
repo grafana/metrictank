@@ -21,7 +21,7 @@ type testCase struct {
 }
 
 func init() {
-	cluster.InitManager("default", "test", false, time.Now())
+	cluster.InitManager("default", "test", false, time.Now(), &cluster.Murmur2Partitioner{})
 }
 
 func validate(cases []testCase, t *testing.T) {

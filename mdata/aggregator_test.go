@@ -38,7 +38,7 @@ func TestAggBoundary(t *testing.T) {
 
 // note that values don't get "committed" to the metric until the aggregation interval is complete
 func TestAggregator(t *testing.T) {
-	cluster.InitManager("default", "test", false, time.Now())
+	cluster.InitManager("default", "test", false, time.Now(), &cluster.Murmur2Partitioner{})
 	compare := func(key string, metric Metric, expected []schema.Point) {
 		cluster.ThisNode.SetPrimary(true)
 		_, iters := metric.Get(0, 1000)

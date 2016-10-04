@@ -21,7 +21,7 @@ import (
 // this can expose bad reuse of data arrays in the handler and such
 func Test_HandleMessage(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.InitManager("default", "test", false, time.Now())
+	cluster.InitManager("default", "test", false, time.Now(), &cluster.Murmur2Partitioner{})
 	mdata.InitMetrics(stats)
 
 	for i := 0; i < 100; i++ {
@@ -155,7 +155,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 
 func BenchmarkHandler_HandleMessage(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.InitManager("default", "test", false, time.Now())
+	cluster.InitManager("default", "test", false, time.Now(), &cluster.Murmur2Partitioner{})
 	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
