@@ -20,17 +20,17 @@ Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracl
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
-[Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md))
-metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
+[Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)).  
+Metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank maintains an index of metrics metadata, for all series it Sees. If you want the index to be maintained
-across restarts, it can use Elasticsearch to save and reload the data.
+Metrictank maintains an index of metrics metadata, for all series it Sees.  
+You can use an index entirely in memory, or backed by Cassandra or Elasticsearch for persistence.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
 to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
-## Step 1
+## Get a machine with root access
 
 We recommend a server with at least 8GB RAM and a few CPU's.
 You need root access. All the commands shown assume you're root.
