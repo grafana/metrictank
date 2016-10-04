@@ -40,7 +40,7 @@ func TestAggBoundary(t *testing.T) {
 func TestAggregator(t *testing.T) {
 	cluster.InitManager("default", "test", false, time.Now())
 	compare := func(key string, metric Metric, expected []schema.Point) {
-		cluster.ThisCluster.SetPrimary(true)
+		cluster.ThisNode.SetPrimary(true)
 		_, iters := metric.Get(0, 1000)
 		got := make([]schema.Point, 0, len(expected))
 		for _, iter := range iters {
@@ -60,7 +60,7 @@ func TestAggregator(t *testing.T) {
 				}
 			}
 		}
-		cluster.ThisCluster.SetPrimary(false)
+		cluster.ThisNode.SetPrimary(false)
 	}
 	agg := NewAggregator(dnstore, "test", 60, 120, 10, 86400)
 	agg.Add(100, 123.4)

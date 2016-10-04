@@ -70,6 +70,12 @@ func (n *Node) IsReady() bool {
 	return p
 }
 
+func (n *Node) SetReady() {
+	n.Lock()
+	n.State = NodeReady
+	n.Unlock()
+}
+
 func (n *Node) SetPrimary(p bool) {
 	n.Lock()
 	n.Primary = p
@@ -125,7 +131,7 @@ func getPeerStatus(addr *url.URL) (*Node, error) {
 	n := &Node{
 		State: NodeNotReady,
 	}
-	res, err := client.Get(fmt.Sprintf("%scluster", addr.String()))
+	res, err := client.Get(fmt.Sprintf("%snode", addr.String()))
 	if err != nil {
 		log.Warn("cluster: failed to query peer at address %s: %s", addr.String(), err)
 		n.State = NodeUnreachable

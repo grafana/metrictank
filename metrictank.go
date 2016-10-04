@@ -419,14 +419,14 @@ func main() {
 		Set our status so we can accept
 		requests from users.
 	***********************************/
-	if cluster.ThisCluster.IsPrimary() {
-		cluster.ThisCluster.SetReady()
+	if cluster.ThisNode.IsPrimary() {
+		cluster.ThisNode.SetReady()
 	} else {
 		go func() {
 			// wait for warmupPeriod before marking ourselves
 			// as ready.
 			time.Sleep(warmupPeriod)
-			cluster.ThisCluster.SetReady()
+			cluster.ThisNode.SetReady()
 		}()
 	}
 
@@ -502,7 +502,7 @@ func initMetrics(stats met.Backend) {
 				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
 				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
 				var px int64
-				if cluster.ThisCluster.IsPrimary() {
+				if cluster.ThisNode.IsPrimary() {
 					px = 1
 				} else {
 					px = 0

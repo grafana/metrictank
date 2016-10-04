@@ -39,8 +39,8 @@ func (c *Checker) Add(ts uint32, val float64) {
 // first/last is what we use as data range to compare to (both inclusive)
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
-	currentClusterStatus := cluster.ThisCluster.IsPrimary()
-	cluster.ThisCluster.SetPrimary(primary)
+	currentClusterStatus := cluster.ThisNode.IsPrimary()
+	cluster.ThisNode.SetPrimary(primary)
 	_, iters := c.agg.Get(from, to)
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
 	var pi int // index of first point we want
@@ -67,7 +67,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	if index != pj {
 		c.t.Fatalf("not all values returned. missing %v", c.points[index:pj+1])
 	}
-	cluster.ThisCluster.SetPrimary(currentClusterStatus)
+	cluster.ThisNode.SetPrimary(currentClusterStatus)
 }
 
 func TestAggMetric(t *testing.T) {

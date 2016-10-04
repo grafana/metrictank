@@ -10,29 +10,28 @@ import (
 )
 
 var ThisCluster *Manager
+var ThisNode *Node
 
 func InitManager(name, version string, primary bool, started time.Time) {
-	ThisCluster = NewManger(name, version, primary, started)
-}
-
-type Manager struct {
-	Peers    []*Node
-	Self     *Node
-	shutdown chan struct{}
-	sync.Mutex
-}
-
-func NewManger(name, version string, primary bool, started time.Time) *Manager {
-	self := &Node{
+	ThisCluster = NewManger()
+	ThisNode = &Node{
 		Name:    name,
 		Primary: primary,
 		Version: version,
 		State:   NodeNotReady,
 		Started: started,
 	}
+}
+
+type Manager struct {
+	Peers    []*Node
+	shutdown chan struct{}
+	sync.Mutex
+}
+
+func NewManger() *Manager {
 	return &Manager{
 		Peers:    make([]*Node, 0),
-		Self:     self,
 		shutdown: make(chan struct{}),
 	}
 }
@@ -73,33 +72,12 @@ func (m *Manager) poll() {
 	}
 }
 
-func (m *Manager) SetReady() {
-	m.Self.SetState(NodeReady)
-}
-
-func (m *Manager) IsReady() bool {
-	return m.Self.IsReady()
-}
-
-func (m *Manager) IsPrimary() bool {
-	return m.Self.IsPrimary()
-}
-
-func (m *Manager) SetPrimary(p bool) {
-	log.Info("setting this nodes primary flag to: %t", p)
-	m.Self.SetPrimary(p)
-}
-
-func (m *Manager) SetPartitions(partitions []int32) {
-	m.Self.SetPartitions(partitions)
-}
-
 // return the list of peers to broadcast requests to
 // Only 1 peer per partition is returned
 func (m *Manager) PeersForQuery() []*Node {
 	peersMap := make(map[int32][]*Node)
-	for _, part := range m.Self.Partitions {
-		peersMap[part] = []*Node{m.Self}
+	for _, part := range ThisNode.GetPartitions() {
+		peersMap[part] = []*Node{ThisNode}
 	}
 	m.Lock()
 	for _, peer := range m.Peers {
@@ -125,7 +103,7 @@ func (m *Manager) PeersForQuery() []*Node {
 
 	answer := make([]*Node, 0)
 	for _, n := range selectedPeers {
-		if n.Name == m.Self.Name {
+		if n.Name == ThisNode.Name {
 			continue
 		}
 		answer = append(answer, n)

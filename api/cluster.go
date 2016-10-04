@@ -9,16 +9,20 @@ import (
 )
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
-	ctx.JSON(200, cluster.ThisCluster.Self)
+	ctx.JSON(200, cluster.ThisCluster)
 }
 
-func (s *Server) setClusterStatus(ctx *middleware.Context, status models.ClusterStatus) {
-	cluster.ThisCluster.SetPrimary(status.Primary)
+func (s *Server) getNodeStatus(ctx *middleware.Context) {
+	ctx.JSON(200, cluster.ThisNode)
+}
+
+func (s *Server) setNodeStatus(ctx *middleware.Context, status models.NodeStatus) {
+	cluster.ThisNode.SetPrimary(status.Primary)
 	ctx.JSON(200, "ok")
 }
 
 func (s *Server) appStatus(ctx *middleware.Context) {
-	if s.ClusterMgr.IsReady() {
+	if cluster.ThisNode.IsReady() {
 		ctx.JSON(200, "ok")
 		return
 	}

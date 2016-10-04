@@ -16,8 +16,9 @@ func (s *Server) RegisterRoutes() {
 	bind := binding.Bind
 
 	r.Get("/", s.appStatus)
+	r.Get("/node", s.getNodeStatus)
+	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
 	r.Get("/cluster", s.getClusterStatus)
-	r.Post("/cluster", bind(models.ClusterStatus{}), s.setClusterStatus)
 
 	/* not sure what even uses this.
 	r.Combo("/get").Get(s.getMetrics).Post(s.getMetrics)

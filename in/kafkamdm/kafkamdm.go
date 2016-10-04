@@ -202,7 +202,7 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 			ticker.Stop()
 			timer.Stop()
 		}
-		cluster.ThisCluster.SetPartitions(partitions)
+		cluster.ThisNode.SetPartitions(partitions)
 		log.Info("kafka-mdm: will consume partitions %v", partitions)
 		for _, partition := range partitions {
 			var offset int64

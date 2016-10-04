@@ -1,5 +1,5 @@
 package models
 
-type ClusterStatus struct {
+type NodeStatus struct {
 	Primary bool `json:"primary" form:"primary" binding:"required"`
 }
