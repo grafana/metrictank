@@ -10,10 +10,10 @@ We'll go over these in more detail below.
   and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
   We're working toward simplifying this much more.
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
-* Optional: Elasticsearch for persistence of metrics metadata.
-  See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
   [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
+* (you can optionally use Elasticsearch for persistence of metrics metadata.  We recommend using Cassandra instead, much better and easier)
+  See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 
 Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
 

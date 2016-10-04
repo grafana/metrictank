@@ -7,8 +7,27 @@ Currently there are 3 index options. Only 1 index option can be enabled at a tim
 * Elasticseach-Idx
 * Cassandra-Idx
 
+### Memory-Idx
+
+* type: in-process in memory
+* persistence: none.  index will be empty at every start of the process. Metrics are indexed as they are received by metrictank.
+* efficiency: about 1KB of memory per metricDefinition.  Supports 100's of 1000's of indexes per second and 10's of 1000's of searches per second on moderate hardware.
+
+#### Configuration
+The memory-idx includes the following configuration section in the metrictank configuration file.
+
+```
+[memory-idx]
+enabled = true
+```
+
 ### Cassandra-Idx
-The Cassandra-Idx store extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metrics.  On low end hardware the index can be rebuilt at about 70000 metricDefinitions per second.
+
+This is the recommended option because it persists and is the fastet.
+
+* type: Memory-Idx for search queries, backed by Cassandra for persistence
+* persistence:  persists new metricDefinitions as they are seen.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
+* efficiency: On low end hardware the index rebuilds at about 70000 metricDefinitions per second. Saving new metrics works pretty fast.
 
 Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suite your deployment.
 Refer to the [cassandra guide](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md) for more details.
@@ -38,7 +57,11 @@ Note:
 
 ### Elasticseach-Idx
 
-The Elasticseach-Idx store extends the Memory-Idx to provide persistent storage of the MetricDefinitions. At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Elasticsearch.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt. The rebuild can take a few minutes if there are a large number of metricDefinitions stored in Elasticsearch.
+* type: Memory-Idx for search queries, backed by Elasticsearch for persistence
+* persistence: persists new MetricDefinitions as they are seen.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Elasticsearch.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
+* efficiency: The rebuild can take a few minutes if there are a large number of metricDefinitions stored in Elasticsearch.  Large volumes of new incoming metrics can overwhelm Elasticsearch.
+
+This option is not recommended because it doesn't perform well and needs an additional dependency.  You should probably just use Cassandra-Idx.
 
 Metrictank will initialize ES with the needed schema/mapping settings.
 
@@ -70,19 +93,6 @@ Note:
   In this case we just reschedule to index the metricdef again within the next retry-interval.
   If you send a bunch of new data and the metrics are not showing up in ES yet, this is typically why.
 
-
-### Memory-Idx
-
-The Memory-Idx provides a high performant index store for searching.  The index uses about 1KB of memory per metricDefinition and can support 100's of 1000's of indexes per second and 10's of 1000's of searches per second on moderate hardware.  The memory-Idx is ephemeral. The index will be empty at startup and metrics will be indexed as they are received by metrictank.
-
-#### Configuration
-The memory-idx includes the following configuration section in the metrictank configuration file.
-
-```
-[memory-idx]
-enabled = true
-```
-
 ## The anatomy of a metricdef
 
 definition id's are unique across the entire system and can be computed from the def itself, so don't require coordination across distributed nodes.
@@ -108,9 +118,6 @@ type MetricDefinition struct {
 ```
 
 See [the schema spec](https://github.com/raintank/schema/blob/master/metric.go#L78) for more details
-
-
-
 
 ## Developers' guide to index plugin writing
 New indexes just need to implement the MetricIndex interface.
