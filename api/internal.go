@@ -7,6 +7,7 @@ import (
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/api/rbody"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -92,7 +93,7 @@ func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 func (s *Server) getData(ctx *middleware.Context, req models.Req) {
 	pre := time.Now()
 
-	req.Loc = "local"
+	req.Node = cluster.ThisNode
 	points, interval, err := s.getTarget(req)
 	if err != nil {
 		log.Error(3, "HTTP getData() %s", err.Error())

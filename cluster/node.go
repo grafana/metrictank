@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -52,21 +54,28 @@ type Node struct {
 	sync.RWMutex
 }
 
+func (n *Node) GetName() string {
+	n.RLock()
+	name := n.Name
+	n.RUnlock()
+	return name
+}
+
 // Returns True if the node is a Primary node which
 // perists data to the Backend Store (cassandra)
 func (n *Node) IsPrimary() bool {
-	n.Lock()
+	n.RLock()
 	p := n.Primary
-	n.Unlock()
+	n.RUnlock()
 	return p
 }
 
 // Returns true if the node is a ready to accept requests
 // from users.
 func (n *Node) IsReady() bool {
-	n.Lock()
+	n.RLock()
 	p := n.State == NodeReady
-	n.Unlock()
+	n.RUnlock()
 	return p
 }
 
@@ -94,9 +103,9 @@ func (n *Node) SetPartitions(part []int32) {
 	n.Unlock()
 }
 func (n *Node) GetPartitions() []int32 {
-	n.Lock()
+	n.RLock()
 	part := n.Partitions
-	n.Unlock()
+	n.RUnlock()
 	return part
 }
 
@@ -105,49 +114,97 @@ func (n *Node) Poll() {
 	addr := n.RemoteAddr
 	name := n.Name
 	n.RUnlock()
-	node, err := getPeerStatus(addr)
+	update := &Node{}
+	*update = *n
+	update.State = NodeNotReady
+
+	resp, err := n.Get("/node", nil)
+	n.Lock()
 	if err != nil {
 		log.Warn("cluster: failed to get status of peer %s. %s", name, err)
-	}
-	n.Lock()
-	if n.State != node.State {
-		if name == "" {
-			name = node.Name
+		update.State = NodeUnreachable
+	} else {
+		err = json.Unmarshal(resp, update)
+		if err != nil {
+			log.Warn("cluster: failed to decode response from peer at address %s: %s\n\n%s", addr.String(), err, resp)
+			update.State = NodeNotReady
 		}
-		log.Info("cluster: node %s in new state: %s", name, NodeStateText[node.State])
 	}
-	n.State = node.State
+
+	if n.State != update.State {
+		if name == "" {
+			name = update.Name
+		}
+		log.Info("cluster: node %s in new state: %s", name, NodeStateText[update.State])
+	}
+	n.State = update.State
 	if err == nil {
-		n.Name = node.Name
-		n.Version = node.Version
-		n.Partitions = node.Partitions
-		n.Primary = node.Primary
-		n.Started = node.Started
+		n.Name = update.Name
+		n.Version = update.Version
+		n.Partitions = update.Partitions
+		n.Primary = update.Primary
+		n.Started = update.Started
 	}
 	n.Unlock()
 }
 
-func getPeerStatus(addr *url.URL) (*Node, error) {
-	n := &Node{
-		State: NodeNotReady,
+func (n *Node) Get(path string, query interface{}) ([]byte, error) {
+	if query != nil {
+		qstr, err := ToQueryString(query)
+		if err != nil {
+			return nil, err
+		}
+		path = path + "?" + qstr
 	}
-	res, err := client.Get(fmt.Sprintf("%snode", addr.String()))
+	n.RLock()
+	addr := n.RemoteAddr.String() + path
+	n.RUnlock()
+	req, err := http.NewRequest("GET", addr, nil)
 	if err != nil {
-		log.Warn("cluster: failed to query peer at address %s: %s", addr.String(), err)
-		n.State = NodeUnreachable
-		return n, err
+		return nil, err
 	}
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
+	rsp, err := client.Do(req)
 	if err != nil {
-		log.Warn("cluster: failed to read body from peer at address %s: %s", addr.String(), err)
-		return n, err
+		return nil, err
 	}
-	err = json.Unmarshal(body, n)
+	return handleResp(rsp)
+}
+
+func (n *Node) Post(path string, body interface{}) ([]byte, error) {
+	b, err := json.Marshal(body)
 	if err != nil {
-		log.Warn("cluster: failed to decode response from peer at address %s: %s\n\n%s", addr.String(), err, body)
-		n.State = NodeNotReady
-		return n, err
+		return nil, err
 	}
-	return n, nil
+	var reader *bytes.Reader
+	reader = bytes.NewReader(b)
+	n.RLock()
+	addr := n.RemoteAddr.String() + path
+	n.RUnlock()
+	req, err := http.NewRequest("POST", addr, reader)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	rsp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return handleResp(rsp)
+}
+
+func handleResp(rsp *http.Response) ([]byte, error) {
+	defer rsp.Body.Close()
+	if rsp.StatusCode != 200 {
+		return nil, fmt.Errorf("error encountered. %s", rsp.Status)
+	}
+	return ioutil.ReadAll(rsp.Body)
+}
+
+// Convert an interface{} to a urlencoded querystring
+func ToQueryString(q interface{}) (string, error) {
+	v, err := query.Values(q)
+	if err != nil {
+		return "", err
+	}
+	return v.Encode(), nil
 }

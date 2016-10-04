@@ -3,12 +3,14 @@ package api
 import (
 	"fmt"
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
 	"math"
 	"math/rand"
 	"testing"
+	"time"
 )
 
 type testCase struct {
@@ -16,6 +18,10 @@ type testCase struct {
 	consol consolidation.Consolidator
 	num    uint32
 	out    []schema.Point
+}
+
+func init() {
+	cluster.InitManager("default", "test", false, time.Now())
 }
 
 func validate(cases []testCase, t *testing.T) {
@@ -402,11 +408,11 @@ type alignCase struct {
 }
 
 func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) models.Req {
-	req := models.NewReq(key, key, "local", from, to, maxPoints, rawInterval, consolidator)
+	req := models.NewReq(key, key, cluster.ThisNode, from, to, maxPoints, rawInterval, consolidator)
 	return req
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, "local", from, to, maxPoints, rawInterval, consolidator)
+	req := models.NewReq(key, key, cluster.ThisNode, from, to, maxPoints, rawInterval, consolidator)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.OutInterval = outInterval

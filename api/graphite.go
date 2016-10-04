@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +13,7 @@ import (
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/api/rbody"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/util"
@@ -84,8 +82,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 
 		type locatedDef struct {
-			def schema.MetricDefinition
-			loc string
+			def  schema.MetricDefinition
+			node *cluster.Node
 		}
 
 		locatedDefs := make(map[string]locatedDef)
@@ -105,39 +103,26 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 		for _, node := range nodes {
 			for _, def := range node.Defs {
-				locatedDefs[def.Id] = locatedDef{def, "local"}
+				locatedDefs[def.Id] = locatedDef{def, cluster.ThisNode}
 			}
 		}
 
 		for _, inst := range s.ClusterMgr.PeersForQuery() {
 			if LogLevel < 2 {
-				log.Debug("HTTP Get() querying %s/internal/index/find for %d:%s", inst.RemoteAddr.String(), ctx.OrgId, target)
+				log.Debug("HTTP Get() querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, target)
 			}
 
-			res, err := http.PostForm(fmt.Sprintf("%s/internal/index/find", inst.RemoteAddr.String()), url.Values{"pattern": []string{target}, "orgId": []string{fmt.Sprintf("%d", ctx.OrgId)}})
+			buf, err := inst.Post("/internal/index/find", models.IndexFind{Pattern: target, OrgId: ctx.OrgId})
 			if err != nil {
-				log.Error(4, "HTTP Get() error querying %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
-				ctx.Error(http.StatusInternalServerError, err.Error())
-				return
-			}
-			defer res.Body.Close()
-			buf, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				log.Error(4, "HTTP Get() error reading body from %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
-				ctx.Error(http.StatusInternalServerError, err.Error())
-				return
-			}
-			if res.StatusCode != 200 {
-				// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-				log.Error(4, "HTTP Get() %s/internal/index/find returned http %d: %v", inst.RemoteAddr.String(), res.StatusCode, string(buf))
-				ctx.Error(res.StatusCode, string(buf))
+				log.Error(4, "HTTP Get() error querying %s/internal/index/find: %q", inst.GetName(), err)
+				ctx.Error(http.StatusServiceUnavailable, err.Error())
 				return
 			}
 			var n idx.Node
 			for len(buf) != 0 {
 				buf, err = n.UnmarshalMsg(buf)
 				if err != nil {
-					log.Error(4, "HTTP Get() error unmarshaling body from %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
+					log.Error(4, "HTTP Get() error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
 					ctx.Error(http.StatusInternalServerError, err.Error())
 					return
 				}
@@ -150,7 +135,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 					if ok && cur.def.LastUpdate >= def.LastUpdate {
 						continue
 					}
-					locatedDefs[def.Id] = locatedDef{def, inst.RemoteAddr.String()}
+					locatedDefs[def.Id] = locatedDef{def, inst}
 				}
 			}
 		}
@@ -170,7 +155,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			// def.Name is like foo.concretebar
 			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
 			target := strings.Replace(target, id, def.Name, -1)
-			reqs = append(reqs, models.NewReq(def.Id, target, locdef.loc, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			reqs = append(reqs, models.NewReq(def.Id, target, locdef.node, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
 
 	}
@@ -258,33 +243,21 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 
 	for _, inst := range peers {
 		if LogLevel < 2 {
-			log.Debug("HTTP Find() querying %s/internal/index/find for %d:%s", inst.RemoteAddr.String(), ctx.OrgId, request.Query)
+			log.Debug("HTTP Find() querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, request.Query)
 		}
 
-		res, err := http.PostForm(fmt.Sprintf("http://%s/internal/index/find", inst.RemoteAddr.String()), url.Values{"pattern": []string{request.Query}, "orgId": []string{fmt.Sprintf("%d", ctx.OrgId)}})
+		buf, err := inst.Post("/internal/index/find", models.IndexFind{Pattern: request.Query, OrgId: ctx.OrgId})
 		if err != nil {
-			log.Error(4, "HTTP Find() error querying %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
+			log.Error(4, "HTTP Find() error querying %s/internal/index/find: %q", inst.GetName(), err)
+			ctx.Error(http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		defer res.Body.Close()
-		buf, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Error(4, "HTTP Find() error reading body from %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
-			return
-		}
-		if res.StatusCode != 200 {
-			// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-			log.Error(4, "HTTP Find() %s/internal/index/find returned http %d: %v", inst.RemoteAddr.String(), res.StatusCode, string(buf))
-			ctx.Error(res.StatusCode, string(buf))
-			return
-		}
+
 		var n idx.Node
 		for len(buf) != 0 {
 			buf, err = n.UnmarshalMsg(buf)
 			if err != nil {
-				log.Error(4, "HTTP Find() error unmarshaling body from %s/internal/index/find: %q", inst.RemoteAddr.String(), err)
+				log.Error(4, "HTTP Find() error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
 				ctx.Error(http.StatusInternalServerError, err.Error())
 				return
 			}
@@ -339,30 +312,18 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 			log.Debug("HTTP IndexJson() querying %s/internal/index/list for %d", inst.RemoteAddr.String(), ctx.OrgId)
 		}
 
-		res, err := http.PostForm(fmt.Sprintf("%s/internal/index/list", inst.RemoteAddr.String()), url.Values{"orgId": []string{fmt.Sprintf("%d", ctx.OrgId)}})
+		buf, err := inst.Post("/internal/index/list", models.IndexList{OrgId: ctx.OrgId})
 		if err != nil {
-			log.Error(4, "HTTP IndexJson() error querying %s/internal/index/list: %q", inst, err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
+			log.Error(4, "HTTP IndexJson() error querying %s/internal/index/list: %q", inst.GetName(), err)
+			ctx.Error(http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		defer res.Body.Close()
-		buf, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Error(4, "HTTP IndexJson() error reading body from %s/internal/index/list: %q", inst.RemoteAddr.String(), err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
-			return
-		}
-		if res.StatusCode != 200 {
-			// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-			log.Error(4, "HTTP IndexJson() %s/internal/index/list returned http %d: %v", inst.RemoteAddr.String(), res.StatusCode, string(buf))
-			ctx.Error(res.StatusCode, string(buf))
-			return
-		}
+
 		for len(buf) != 0 {
 			var def schema.MetricDefinition
 			buf, err = def.UnmarshalMsg(buf)
 			if err != nil {
-				log.Error(4, "HTTP IndexJson() error unmarshaling body from %s/internal/index/list: %q", inst.RemoteAddr.String(), err)
+				log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/internal/index/list: %q", inst.GetName(), err)
 				ctx.Error(http.StatusInternalServerError, err.Error())
 				return
 			}
@@ -381,7 +342,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	js := util.BufferPool.Get().([]byte)
 	js, err = listJSON(js, list)
 	if err != nil {
-		log.Error(0, "HTTP IndexJson() %s", err.Error())
+		log.Error(3, "HTTP IndexJson() %s", err.Error())
 		ctx.Error(http.StatusInternalServerError, err.Error())
 		util.BufferPool.Put(js[:0])
 		return

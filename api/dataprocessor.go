@@ -1,17 +1,14 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
-	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/util"
@@ -206,33 +203,18 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 		}
 	}
 
-	if req.Loc != "local" {
-		// unfortunately we can't use msgp yet for req due to https://github.com/tinylib/msgp/issues/158#issuecomment-247846164
-		buf, err := json.Marshal(req)
+	if req.Node != cluster.ThisNode {
+		buf, err := req.Node.Post("/internal/getdata", req)
 		if err != nil {
 			return nil, 0, err
-		}
-		res, err := http.PostForm(fmt.Sprintf("http://%s/internal/getdata", req.Loc), url.Values{"req": []string{string(buf)}})
-		if err != nil {
-			return nil, 0, err
-		}
-		defer res.Body.Close()
-		buf, err = ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, 0, err
-		}
-		if res.StatusCode != 200 {
-			// if the remote returned interval server error, or bad request, or whatever, we want to relay that as-is to the user.
-			// note that if we got http 500 back, the remote will already log the error, so we don't have to.
-			return nil, 0, errors.New(string(buf))
 		}
 		var series models.Series
 		buf, err = series.UnmarshalMsg(buf)
 		if err != nil {
-			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.Loc, err))
+			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.Node.GetName(), err))
 		}
 		if len(buf) != 0 {
-			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.Loc))
+			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.Node.GetName()))
 		}
 		return series.Datapoints, series.Interval, nil
 	}

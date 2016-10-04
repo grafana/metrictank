@@ -280,9 +280,7 @@ func main() {
 			if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
 				peer = fmt.Sprintf("http://%s", peer)
 			}
-			if !strings.HasSuffix(peer, "/") {
-				peer += "/"
-			}
+			peer = strings.TrimSuffix(peer, "/")
 			addr, err := url.Parse(peer)
 			if err != nil {
 				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
