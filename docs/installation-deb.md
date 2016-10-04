@@ -111,9 +111,9 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 /etc/init.d/cassandra start
 ```
 
-The log - should you need it - is at /var/log/cassandra/cassandra.log
+The log - should you need it - is at /var/log/cassandra/system.log
 
-[more info](ttp://cassandra.apache.org/download/)):
+[more info](http://cassandra.apache.org/download/)
 
 
 ## Set up elasticsearch
@@ -128,10 +128,14 @@ The log - should you need it - is at /var/log/cassandra/cassandra.log
 
 * You can start it with default settings.
 
+```
+/etc/init.d/elasticsearch start
+```
+
+The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
 
 [more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
-You can start it with default settings.
 
 ## Set up statsd
 
@@ -239,7 +243,7 @@ EOF
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
 
-([more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+[more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html)
 
 ### Kafka
 
@@ -259,7 +263,7 @@ ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 
 The log - if you need it - lives at /opt/kafka/logs/server.log
 
-([more info](https://kafka.apache.org/documentation.html#quickstart))
+[more info](https://kafka.apache.org/documentation.html#quickstart)
 
 ## Configuration
 
@@ -295,7 +299,7 @@ systemctl start metrictank
 Note that metrictank simply logs to stdout.  So where the log data ends up depends on your init system.
 
 If using upstart, you can then find the logs at `/var/log/upstart/metrictank.log`.
-With systemd, you can use something like `journalctl -f metrictank`.
+With systemd, you can use something like `journalctl -f -u metrictank`.
 
 ## Play with it!
 

@@ -147,6 +147,8 @@ EOF
 systemctl start elasticsearch.service
 ```
 
+The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
+
 [more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
 
@@ -249,7 +251,7 @@ EOF
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
 
-([more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+[more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html)
 
 ### Kafka
 
@@ -269,7 +271,7 @@ ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 
 The log - if you need it - lives at /opt/kafka/logs/server.log
 
-([more info](https://kafka.apache.org/documentation.html#quickstart))
+[more info](https://kafka.apache.org/documentation.html#quickstart)
 
 ## Configuration
 
