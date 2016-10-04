@@ -43,7 +43,7 @@ You need root access. All the commands shown assume you're root.
 You can enable our repository and install the packages like so:
 
 ```
-curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | bash
 apt-get install metrictank graphite-metrictank
 ```
 
@@ -97,9 +97,9 @@ deb-src http://www.apache.org/dist/cassandra/debian 30x main
 EOF
 ```
 
-* Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | sudo apt-key add -` to add the GPG key.
+* Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | apt-key add -` to add the GPG key.
 
-* Run `sudo apt-get update && sudo apt-get install cassandra cassandra-tools`
+* Run `apt-get update && apt-get install cassandra cassandra-tools`
 
 For basic setups, you can just start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
@@ -118,13 +118,13 @@ The log - should you need it - is at /var/log/cassandra/cassandra.log
 
 ## Set up elasticsearch
 
-* Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -`
+* Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | apt-key add -`
 
 * Save the repository definition:
 
-`echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
+`echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
 
-* Install elasticsearch with `sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install elasticsearch`
+* Install elasticsearch with `apt-get install apt-transport-https && apt-get update && apt-get install elasticsearch`
 
 * You can start it with default settings.
 
