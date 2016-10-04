@@ -155,8 +155,7 @@ The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
 ## Set up statsd
 
 While optional, we highly recommend installing statsd or a statsd-compatible agent for instrumentation, so you can get insights into what's going on.
-To disable, set `statsd-enabled` to false in the configuration.
-
+To disable, you will have to set `statsd-enabled` to false in `/etc/raintank/metrictank.ini`.
 Metrictank will refuse to start if `statsd-enabled` is true and nothing listens on the configured `statsd-addr`.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
