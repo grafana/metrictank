@@ -148,7 +148,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			}
 		}
 		if len(locatedDefs) == 0 {
-			ctx.Error(http.StatusBadRequest, rbody.ErrMetricNotFound.Error())
+			rbody.WriteResponse(ctx, []byte("[]"), rbody.HttpTypeJSON, "")
 			return
 		}
 		for _, locdef := range locatedDefs {
