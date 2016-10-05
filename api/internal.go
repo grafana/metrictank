@@ -31,7 +31,7 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	}
 
 	var buf []byte
-	nodes, err := s.MetricIndex.Find(ctx.OrgId, req.Pattern, req.From)
+	nodes, err := s.MetricIndex.Find(req.OrgId, req.Pattern, req.From)
 	if err != nil {
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return

@@ -74,8 +74,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	reqs := make([]models.Req, 0)
-	for _, target := range targets {
-		id, consolidateBy, err := parseTarget(target)
+	for _, query := range targets {
+		target, consolidateBy, err := parseTarget(query)
 		if err != nil {
 			ctx.Error(http.StatusBadRequest, err.Error())
 			return
@@ -96,7 +96,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		if seenAfter != 0 {
 			seenAfter -= 86400
 		}
-		nodes, err := s.MetricIndex.Find(ctx.OrgId, id, seenAfter)
+		nodes, err := s.MetricIndex.Find(ctx.OrgId, target, seenAfter)
 		if err != nil {
 			ctx.Error(http.StatusBadRequest, err.Error())
 			return
@@ -150,12 +150,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				ctx.Error(http.StatusBadRequest, err.Error())
 				return
 			}
-			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
-			// id is like foo.bar or foo.*
+			// query is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
+			// target is like foo.bar or foo.*
 			// def.Name is like foo.concretebar
-			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-			target := strings.Replace(target, id, def.Name, -1)
-			reqs = append(reqs, models.NewReq(def.Id, target, locdef.node, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
+			// so we want query to contain the concrete graphite name, potentially wrapped with consolidateBy().
+			query := strings.Replace(query, target, def.Name, -1)
+			reqs = append(reqs, models.NewReq(def.Id, query, locdef.node, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
 
 	}
