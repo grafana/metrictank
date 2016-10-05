@@ -17,18 +17,22 @@ services:
     image: cassandra:3.0.8
   statsdaemon:
     hostname: statsdaemon-1
-    build: statsdaemon/
+    image: raintank/statsdaemon
     ports:
      - "8125:8125/udp"
+    volumes:
+     - "./statsdaemon.ini:/etc/statsdaemon.ini"
   graphite-api:
     hostname: graphite-api-1
-    build: graphite-api/
+    image: raintank/graphite-metrictank
     ports:
      - "8080:8080"
     links:
      - metrictank
      - statsdaemon
      - elasticsearch
+    volumes:
+     - "./graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
   elasticsearch:
     image: elasticsearch
   grafana:
