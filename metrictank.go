@@ -63,7 +63,7 @@ var (
 	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 	peersStr    = flag.String("peers", "", "http/s addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
-	partitioner = flag.String("partitioner", "murmur2", "Algorithim used for partitioning metrics across peers. (murmur2 is currently the only implimentation)")
+	partitioner = flag.String("partitioner", "fnv1a", "Algorithim used for partitioning metrics across peers. (murmur2|fnv1a)")
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
@@ -190,15 +190,18 @@ func main() {
 		log.Fatal(4, "instance can't be empty")
 	}
 
-	if *partitioner != "murmur2" {
-		log.Fatal(4, "Only the murmur2 partitioner is supported.")
+	if *partitioner != "murmur2" && *partitioner != "fnv1a" {
+		log.Fatal(4, "partitioner must be one of murmur2 or fnv1a")
 	}
 
 	/***********************************
 		Initialize our ClusterManager
 	***********************************/
 	if *partitioner == "murmur2" {
-		idxPartitioner = &cluster.Murmur2Partitioner{}
+		idxPartitioner = cluster.NewMurmur2Partitioner()
+	}
+	if *partitioner == "fnv1a" {
+		idxPartitioner = cluster.NewFNV1aPartitioner()
 	}
 	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime, idxPartitioner)
 	if *peersStr != "" {
