@@ -24,7 +24,7 @@ and bugs to fix.  It should be considered an *alpha* project.
 * the datastructures can use performance engineering.   [A Go GC issue may occassionally inflate response times](https://github.com/golang/go/issues/14812).
 * the native input protocol is inefficient.  Should not send all metadata with each point.
 * we use metrics2.0 in native input protocol and indexes, but barely do anything with it yet.
-* For any series you can't write points that are earlier than previously written points. (unless you restart MT)
+* for any series you can't write points that are earlier than previously written points. (unless you restart MT)
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
@@ -40,7 +40,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 * 100% open source
 * graphite is a first class citizen (note: currently requires a [fork of graphite-api](https://github.com/raintank/graphite-api/)
   and the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin)
-* Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
+* accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 * metrictank acts as a writeback RAM cache for recent data.

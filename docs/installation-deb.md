@@ -10,27 +10,27 @@ We'll go over these in more detail below.
   and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
   We're working toward simplifying this much more.
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
-* Optional: Elasticsearch for persistence of metrics metadata.
-  See [metadata in ES](https://github.com/raintank/metrictank/blob/master/docs/metadata.md#es)
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
   [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
+* (you can optionally use Elasticsearch for persistence of metrics metadata.  We recommend Cassandra instead, much better and easier. So that's what we'll use here)
+  See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 
-Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
+Note: Cassandra, Elasticsearch, and Kafka require Java, which will be automatically installed by apt as a dependency when we install Cassandra.
 
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
-[Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md))
-metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
+[Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)).  
+Metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank maintains an index of metrics metadata, for all series it Sees. If you want the index to be maintained
-across restarts, it can use Elasticsearch to save and reload the data.
+Metrictank maintains an index of metrics metadata, for all series it Sees.  
+You can use an index entirely in memory, or backed by Cassandra or Elasticsearch for persistence.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
 to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
-## Step 1
+## Get a machine with root access
 
 We recommend a server with at least 8GB RAM and a few CPU's.
 You need root access. All the commands shown assume you're root.
@@ -43,7 +43,7 @@ You need root access. All the commands shown assume you're root.
 You can enable our repository and install the packages like so:
 
 ```
-curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | sudo bash
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | bash
 apt-get install metrictank graphite-metrictank
 ```
 
@@ -86,20 +86,6 @@ Supported distributions:
 [more info](https://packagecloud.io/raintank/raintank/install)
 
 
-## Set up java
-
-Download and install the oracle java rpm:
-
-```
-wget --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u5-b13/jdk-8u5-linux-x64.tar.gz
-mkdir /opt/jdk
-tar -zxf jdk-8u5-linux-x64.tar.gz -C /opt/jdk
-update-alternatives --install /usr/bin/java java /opt/jdk/jdk1.8.0_05/bin/java 100
-update-alternatives --install /usr/bin/javac javac /opt/jdk/jdk1.8.0_05/bin/javac 100
-```
-
-[more info](https://www.digitalocean.com/community/tutorials/how-to-manually-install-oracle-java-on-a-debian-or-ubuntu-vps)
-
 ## Set up cassandra
 
 Add the cassandra repository:
@@ -111,13 +97,12 @@ deb-src http://www.apache.org/dist/cassandra/debian 30x main
 EOF
 ```
 
-* Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | sudo apt-key add -` to add the GPG key.
+* Run `gpg --keyserver pgp.mit.edu --recv-keys 0353B12C && gpg --export --armor 0353B12C | apt-key add -` to add the GPG key.
 
-* Run `sudo apt-get update && sudo apt-get install cassandra cassandra-tools`
+* Run `apt-get update && apt-get install cassandra cassandra-tools`
 
 For basic setups, you can just start it with default settings.
 To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
-
 
 * Start cassandra:
 
@@ -125,33 +110,36 @@ To tweak schema and settings, see [Cassandra](https://github.com/raintank/metric
 /etc/init.d/cassandra start
 ```
 
-The log - should you need it - is at /var/log/cassandra/cassandra.log
+The log - should you need it - is at /var/log/cassandra/system.log
 
-[more info](ttp://cassandra.apache.org/download/)):
+[more info](http://cassandra.apache.org/download/)
 
 
 ## Set up elasticsearch
 
-* Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -`
+* Install the GPG key with `wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | apt-key add -`
 
 * Save the repository definition:
 
-`echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | sudo tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
+`echo "deb https://packages.elastic.co/elasticsearch/2.x/debian stable main" | tee -a /etc/apt/sources.list.d/elasticsearch-2.x.list`
 
-* Install elasticsearch with `sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install elasticsearch`
+* Install elasticsearch with `apt-get install apt-transport-https && apt-get update && apt-get install elasticsearch`
 
 * You can start it with default settings.
 
+```
+/etc/init.d/elasticsearch start
+```
+
+The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
 
 [more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
-You can start it with default settings.
 
 ## Set up statsd
 
 While optional, we highly recommend installing statsd or a statsd-compatible agent for instrumentation, so you can get insights into what's going on.
-To disable, set `statsd-enabled` to false in the configuration.
-
+To disable, you will have to set `statsd-enabled` to false in `/etc/raintank/metrictank.ini`.
 Metrictank will refuse to start if `statsd-enabled` is true and nothing listens on the configured `statsd-addr`.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
@@ -236,8 +224,8 @@ Kafka requires Zookeeper, so set that up first.
 
 ```
 cd /opt
-tar -zxvf /root/zookeeper-3.4.8.tar.gz # update path if you downloaded elsewhere.
-ln -s /opt/zookeeper-3.4.8 /opt/zookeeper
+tar -zxvf /root/zookeeper-3.4.9.tar.gz # update path if you downloaded elsewhere.
+ln -s /opt/zookeeper-3.4.9 /opt/zookeeper
 mkdir /var/lib/zookeeper
 ```
 
@@ -253,7 +241,7 @@ EOF
 
 * Start zookeeper: `/opt/zookeeper/bin/zkServer.sh start`
 
-([more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html))
+[more info](https://zookeeper.apache.org/doc/r3.1.2/zookeeperStarted.html)
 
 ### Kafka
 
@@ -273,26 +261,29 @@ ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
 
 The log - if you need it - lives at /opt/kafka/logs/server.log
 
-([more info](https://kafka.apache.org/documentation.html#quickstart))
+[more info](https://kafka.apache.org/documentation.html#quickstart)
 
 ## Configuration
 
 Now edit the file at `/etc/raintank/metrictank.ini`.  It should be commented enough to guide you through the various options.
 
-In particular, you'll probably want to change the following options:
-
-* `statsd-addr`
-* `cassandra-addrs`
-* `kafka-mdm-in`: `brokers`, `enabled`
-* `elasticsearch-idx`: `enabled`, `hosts`
+You may have to adjust `statsd-addr`, `cassandra-addrs`, `cassandra-idx`'s `hosts` option and `kafka-mdm-in`'s `brokers` option if you run
+any of these services on different locations then the localhost defaults.
 
 Out of the box, one input is enabled: the [Carbon line input](https://github.com/raintank/metrictank/blob/master/docs/inputs.md#carbon)
-It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs.
-At `/etc/raintank/storage-schemas.conf`. (or simply what you already use in a pre-existing Graphite install).
+It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs
+at `/etc/raintank/storage-schemas.conf`. (or simply what you already use in a pre-existing Graphite install).
 See the input plugin documentation referenced above for more details.
 
-If you want to use Kafka, you should enable the Kafka-mdm input plugin.  See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
-See the `kafka-mdm-in` section in the config for the options you need to tweak.
+If you want to use Kafka, you should enable the Kafka-mdm input plugin.
+See the `kafka-mdm-in` section, set `enabled` to true.
+See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
+
+Finally, by default `memory-idx` `enabled` is true, while `elasticsearch-idx` and `cassandra-idx` have `enabled` as false.
+This will use the non-persistent index, starting with a fresh index at every start of metrictank.
+You probably want to disable the memory index an enable `cassandra-idx` instead. (just switch the enabled values around).
+See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) for more details.
+
 
 ## Run it!
 
@@ -309,7 +300,7 @@ systemctl start metrictank
 Note that metrictank simply logs to stdout.  So where the log data ends up depends on your init system.
 
 If using upstart, you can then find the logs at `/var/log/upstart/metrictank.log`.
-With systemd, you can use something like `journalctl -f metrictank`.
+With systemd, you can use something like `journalctl -f -u metrictank`.
 
 ## Play with it!
 
