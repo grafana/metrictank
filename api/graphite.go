@@ -112,23 +112,25 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 		for _, inst := range s.ClusterMgr.PeersForQuery() {
 			if LogLevel < 2 {
-				log.Debug("HTTP Get() querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, target)
+				log.Debug("HTTP Render querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, target)
 			}
 
 			buf, err := inst.Post("/internal/index/find", models.IndexFind{Pattern: target, OrgId: ctx.OrgId})
 			if err != nil {
-				log.Error(4, "HTTP Get() error querying %s/internal/index/find: %q", inst.GetName(), err)
+				log.Error(4, "HTTP Render error querying %s/internal/index/find: %q", inst.GetName(), err)
 				ctx.Error(http.StatusServiceUnavailable, err.Error())
 				return
 			}
 			var n idx.Node
+			count := 0
 			for len(buf) != 0 {
 				buf, err = n.UnmarshalMsg(buf)
 				if err != nil {
-					log.Error(4, "HTTP Get() error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
+					log.Error(4, "HTTP Render error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
 					ctx.Error(http.StatusInternalServerError, err.Error())
 					return
 				}
+				count++
 				// different nodes may have overlapping data in their index.
 				// maybe because they loaded the entire index from a persistent store,
 				// or they used to receive a certain shard.
@@ -140,6 +142,9 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 					}
 					locatedDefs[def.Id] = locatedDef{def, inst}
 				}
+			}
+			if LogLevel < 2 {
+				log.Debug("HTTP Render response from %s/internal/index/find for %d:%s had %d nodes", inst.GetName(), ctx.OrgId, target, count)
 			}
 		}
 		if len(locatedDefs) == 0 {
@@ -163,26 +168,26 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	}
 	if (toUnix - fromUnix) >= logMinDur {
-		log.Info("HTTP Get(): INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
-			ctx.Req.Method, request.From, request.Until, request.Targets, request.MaxDataPoints)
+		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
+			ctx.Req.Method, from, to, request.Targets, request.MaxDataPoints)
 	}
 
 	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
 	if err != nil {
-		log.Error(3, "HTTP Get() alignReq error: %s", err)
+		log.Error(3, "HTTP Render alignReq error: %s", err)
 		ctx.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	if LogLevel < 2 {
 		for _, req := range reqs {
-			log.Debug("HTTP Get() %s - arch:%d archI:%d outI:%d aggN: %d", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum)
+			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum)
 		}
 	}
 
 	out, err := s.getTargets(reqs)
 	if err != nil {
-		log.Error(3, "HTTP Get() %s", err.Error())
+		log.Error(3, "HTTP Render %s", err.Error())
 		ctx.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -198,7 +203,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 	if err != nil {
 		util.BufferPool.Put(js[:0])
-		log.Error(3, "HTTP Get() %s", err.Error())
+		log.Error(3, "HTTP Render %s", err.Error())
 		ctx.Error(http.StatusInternalServerError, err.Error())
 		return
 	}

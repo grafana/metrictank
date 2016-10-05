@@ -109,7 +109,7 @@ func (s *Server) getData(ctx *middleware.Context, req models.Req) {
 	var buf []byte
 	buf, err = series.MarshalMsg(buf)
 	if err != nil {
-		log.Error(0, "HTTP getData() %s", err.Error())
+		log.Error(3, "HTTP getData() %s", err.Error())
 		ctx.Error(http.StatusInternalServerError, err.Error())
 		return
 	}

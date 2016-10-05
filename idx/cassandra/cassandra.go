@@ -213,7 +213,7 @@ func (c *CasIdx) rebuildIndex() {
 		}
 	}
 	c.MemoryIdx.Load(defs)
-	log.Info("IDX-C Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
+	log.Info("IDX-C Rebuilding Memory Index Complete. Took %s to load %d defs", time.Since(pre).String(), len(defs))
 }
 
 func (c *CasIdx) processWriteQueue() {
