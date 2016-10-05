@@ -113,10 +113,16 @@ func (n *Node) Poll() {
 	n.RLock()
 	addr := n.RemoteAddr
 	name := n.Name
+	update := &Node{
+		Name:       n.Name,
+		Version:    n.Version,
+		RemoteAddr: n.RemoteAddr,
+		Partitions: n.Partitions,
+		Primary:    n.Primary,
+		Started:    n.Started,
+		State:      NodeNotReady,
+	}
 	n.RUnlock()
-	update := &Node{}
-	*update = *n
-	update.State = NodeNotReady
 
 	resp, err := n.Get("/node", nil)
 	n.Lock()

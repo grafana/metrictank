@@ -464,12 +464,12 @@ func main() {
 	var wg sync.WaitGroup
 	for _, plugin := range receivers {
 		wg.Add(1)
-		go func() {
+		go func(plugin in.Plugin) {
 			log.Info("Shutting down %s consumer", plugin.Name())
 			plugin.Stop()
 			log.Info("%s consumer finished shutdown", plugin.Name())
 			wg.Done()
-		}()
+		}(plugin)
 	}
 	pluginsStopped := make(chan struct{})
 	go func() {
