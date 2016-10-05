@@ -41,7 +41,10 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	now := time.Now()
 
 	from := request.From
-	to := request.Until
+	to := request.To
+	if to == "" {
+		to = request.Until
+	}
 
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())

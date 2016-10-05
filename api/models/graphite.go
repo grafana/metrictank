@@ -5,6 +5,7 @@ type GraphiteRender struct {
 	Targets       []string `json:"target" form:"target" binding:"required"`
 	From          string   `json:"from" form:"from"`
 	Until         string   `json:"until" form:"until"`
+	To            string   `json:"to" form:"to"`
 	Format        string   `json:"format" form:"format"`
 }
 
