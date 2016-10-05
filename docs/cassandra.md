@@ -61,6 +61,15 @@ If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](
 See [issue cassandra-9666](https://issues.apache.org/jira/browse/CASSANDRA-9666) for more information.
 You may also need to lower the cql-protocol-version value in the config to 3 or 2.
 
+
+## Data persistence
+
+saving of chunks is initiated whenever the current time reaches a timestamp that divides without remainder by a chunkspan.
+Raw data has a certain chunkspan, and aggregated (rollup data) has chunkspans too (see [config](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)) which is
+why periodically e.g. on the hour and on every 6th our you'll see a burst in chunks being added to the write queue.
+The write queue is then gradually drained by the persistence workers.
+
+
 ## Write queues
 
 Tuning the write queue is a bit tricky for now.

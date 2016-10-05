@@ -4,8 +4,8 @@
 
 You should monitor the dependencies according to their best practices.
 In particular, pay attention to delays in your kafka queue, if you use it.
-Especially for metric persistence messages: if those have issues, chunks may be saved multiple times
-when you move around the primary role.
+Especially for metric persistence messages which flow from primary to secondary nodes: if those have issues, chunks may be saved multiple times
+when you move around the primary role. (see [clustering transport](https://github.com/raintank/metrictank/blob/master/docs/clustering.md))
 
 Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
 
