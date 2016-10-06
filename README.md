@@ -18,12 +18,12 @@ and bugs to fix.  It should be considered an *alpha* project.
 ## limitations
 
 * no performance/availability isolation between tenants per instance. (only data isolation)
-* no sharding/partitioning mechanism in metrictank itself yet.  (Cassandra does it for storage)
+* no sharding/partitioning mechanism in metrictank itself yet.  (Cassandra does it for storage) ([work in progress](https://github.com/raintank/metrictank/issues/315))
 * runtime master promotions (for clusters) are a manual process.
 * no computation locality: we move the data from storage to processing code, which is both metrictank and graphite-api.
 * the datastructures can use performance engineering.   [A Go GC issue may occassionally inflate response times](https://github.com/golang/go/issues/14812).
 * the native input protocol is inefficient.  Should not send all metadata with each point.
-* we use metrics2.0 in native input protocol and indexes, but barely do anything with it yet.
+* we use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/raintank/metrictank/blob/master/docs/tags.md).
 * for any series you can't write points that are earlier than previously written points. (unless you restart MT)
 
 ## interesting design characteristics (feature or limitation.. up to you)
