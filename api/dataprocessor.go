@@ -182,7 +182,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
 	wg := sync.WaitGroup{}
-	wg.Add(len(reqs))
+	wg.Add(len(localReqs))
 	for _, req := range localReqs {
 		go func(wg *sync.WaitGroup, req models.Req) {
 			pre := time.Now()
