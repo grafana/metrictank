@@ -26,7 +26,7 @@ func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []s
 		for host := hostOffset; host < hostCount+hostOffset; host++ {
 			for cpu := 0; cpu < cpuCount; cpu++ {
 				p := prefix + ".dc" + strconv.Itoa(dc) + ".host" + strconv.Itoa(host) + ".cpu." + strconv.Itoa(cpu)
-				for _, metric := range []string{"idle", "interupt", "nice", "softirq", "steal", "system", "user", "wait"} {
+				for _, metric := range []string{"idle", "interrupt", "nice", "softirq", "steal", "system", "user", "wait"} {
 					series = append(series, p+"."+metric)
 				}
 			}

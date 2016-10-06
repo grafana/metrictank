@@ -188,7 +188,7 @@ func TestFind(t *testing.T) {
 			}
 		}
 	})
-	Convey("When searching nodes for unkown orgId", t, func() {
+	Convey("When searching nodes for unknown orgId", t, func() {
 		nodes, err := ix.Find(4, "foo.demo.*", 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)

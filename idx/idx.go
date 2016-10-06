@@ -34,7 +34,7 @@ Note:
 * any given metric may appear multiple times, under different organisations
 
 * Each metric path can be mapped to multiple metricDefinitions in the case that
-  fields other then the Name vary.  The most common occurance of this is when
+  fields other then the Name vary.  The most common occurrence of this is when
   the Interval at which the metric is being collected has changed.
 
 Interface

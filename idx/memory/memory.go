@@ -176,7 +176,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 					idxFail.Inc(1)
 					return
 				}
-				log.Debug("memory-idx: Found branch %s which metricDef %s is a decendent of", branch, path)
+				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
 				startNode = n
 				startPos = i
 				break
