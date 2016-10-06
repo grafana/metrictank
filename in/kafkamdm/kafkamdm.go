@@ -2,6 +2,7 @@ package kafkamdm
 
 import (
 	"flag"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/rakyll/globalconf"
 
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/kafka"
@@ -32,12 +34,19 @@ type KafkaMdm struct {
 	stopConsuming chan struct{}
 }
 
+func (k *KafkaMdm) Name() string {
+	return "kafkaMdm"
+}
+
 var LogLevel int
 var Enabled bool
 var brokerStr string
 var brokers []string
 var topicStr string
 var topics []string
+var partitionStr string
+var partitions []int32
+var availablePartitions []int32
 var offsetStr string
 var dataDir string
 var config *sarama.Config
@@ -56,6 +65,7 @@ func ConfigSetup() {
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
+	inKafkaMdm.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's")
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
 	inKafkaMdm.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
@@ -100,6 +110,16 @@ func ConfigProcess(instance string) {
 	}
 	brokers = strings.Split(brokerStr, ",")
 	topics = strings.Split(topicStr, ",")
+	if partitionStr != "*" {
+		parts := strings.Split(partitionStr, ",")
+		for _, part := range parts {
+			i, err := strconv.Atoi(part)
+			if err != nil {
+				log.Fatal(4, "could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
+			}
+			partitions = append(partitions, int32(i))
+		}
+	}
 
 	config = sarama.NewConfig()
 
@@ -115,6 +135,41 @@ func ConfigProcess(instance string) {
 	if err != nil {
 		log.Fatal(2, "kafka-mdm invalid config: %s", err)
 	}
+
+	// validate our partitions
+	client, err := sarama.NewClient(brokers, config)
+	if err != nil {
+		log.Fatal(4, "kafka-mdm failed to create client. %s", err)
+	}
+
+	for i, topic := range topics {
+		availParts, err := client.Partitions(topic)
+		if err != nil {
+			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
+		}
+		if len(availParts) == 0 {
+			log.Fatal(4, "kafka-mdm: No partitions returned for topic %s", topic)
+		}
+		log.Info("kafka-mdm: available partitions: %v", availParts)
+		if i > 0 {
+			if len(availablePartitions) != len(availParts) {
+				log.Fatal(4, "kafka-mdm: configured topics have different partition counts, this is not supported")
+			}
+			continue
+		}
+		availablePartitions = availParts
+		if partitionStr == "*" {
+			partitions = availParts
+		} else {
+			missing := setDiff(partitions, availParts)
+			if len(missing) > 0 {
+				log.Fatal(4, "kafka-mdm: configured partitions not in list of available partitions.")
+			}
+		}
+	}
+	// update our ClusterMgr, so others (MetricIdx) can use the partitioning information.
+	cluster.ThisNode.SetPartitions(partitions)
+	cluster.ThisCluster.SetPartitionCount(int32(len(availablePartitions)))
 }
 
 func New(stats met.Backend) *KafkaMdm {
@@ -138,14 +193,26 @@ func New(stats met.Backend) *KafkaMdm {
 	return &k
 }
 
+// setDiff returns elements that are in a but not in b
+func setDiff(a []int32, b []int32) []int32 {
+	var diff []int32
+Iter:
+	for _, eA := range a {
+		for _, eB := range b {
+			if eA == eB {
+				continue Iter
+			}
+		}
+		diff = append(diff, eA)
+	}
+	return diff
+}
+
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	for _, topic := range topics {
-		// get partitions.
-		partitions, err := k.consumer.Partitions(topic)
-		if err != nil {
-			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
-		}
+		log.Info("kafka-mdm: will consume partitions %v", partitions)
+		var err error
 		for _, partition := range partitions {
 			var offset int64
 			switch offsetStr {
@@ -208,9 +275,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 func (k *KafkaMdm) Stop() {
 	// closes notifications and messages channels, amongst others
 	close(k.stopConsuming)
-	go func() {
-		k.wg.Wait()
-		offsetMgr.Close()
-		close(k.StopChan)
-	}()
+	k.wg.Wait()
+	offsetMgr.Close()
+	close(k.StopChan)
 }

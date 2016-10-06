@@ -4,7 +4,6 @@ package in
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
@@ -99,28 +98,4 @@ func (in In) Handle(data []byte) {
 	in.metricsPerMessage.Value(int64(1))
 	in.metricsReceived.Inc(1)
 	in.process(&md)
-}
-
-// HandleArray processes MetricDataArray messages that have a format spec and produced timestamp.
-func (in In) HandleArray(data []byte) {
-	err := in.tmp.InitFromMsg(data)
-	if err != nil {
-		in.MetricsDecodeErr.Inc(1)
-		log.Error(3, "skipping message. %s", err)
-		return
-	}
-	in.msgsAge.Value(time.Now().Sub(in.tmp.Produced).Nanoseconds() / 1000)
-
-	err = in.tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
-	if err != nil {
-		in.MetricsDecodeErr.Inc(1)
-		log.Error(3, "skipping message. %s", err)
-		return
-	}
-	in.metricsPerMessage.Value(int64(len(in.tmp.Metrics)))
-	in.metricsReceived.Inc(int64(len(in.tmp.Metrics)))
-
-	for _, metric := range in.tmp.Metrics {
-		in.process(metric)
-	}
 }

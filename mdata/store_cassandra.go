@@ -65,29 +65,41 @@ type cassandraStore struct {
 	writeQueueMeters []met.Meter
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int, initialize bool) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
 	cluster.NumConns = writers
 	cluster.ProtoVersion = protoVer
-	var err error
-	tmpSession, err := cluster.CreateSession()
-	if err != nil {
-		return nil, err
+	if initialize {
+		log.Info("CS: initializing schema")
+		tmpSession, err := cluster.CreateSession()
+		if err != nil {
+			return nil, err
+		}
+		// ensure the keyspace and table exist.
+		err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
+		if err != nil {
+			return nil, err
+		}
+		err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
+		if err != nil {
+			return nil, err
+		}
+		tmpSession.Close()
 	}
-	// ensure the keyspace and table exist.
-	err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
-	if err != nil {
-		return nil, err
-	}
-	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
-	if err != nil {
-		return nil, err
-	}
-	tmpSession.Close()
 	cluster.Keyspace = keyspace
-	session, err := cluster.CreateSession()
+	// if this fails, allow 10 seconds for another instance to initialize the schema
+	var err error
+	var session *gocql.Session
+	for i := 0; i < 10; i++ {
+		session, err = cluster.CreateSession()
+		if err == nil {
+			break
+		}
+		log.Warn("CS: could not bring up session yet. waiting a second. %q", err)
+		time.Sleep(time.Second)
+	}
 	if err != nil {
 		return nil, err
 	}

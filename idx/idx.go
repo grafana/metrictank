@@ -14,6 +14,7 @@ var (
 	DefNotFound = errors.New("MetricDef not found")
 )
 
+//go:generate msgp
 type Node struct {
 	Path string
 	Leaf bool

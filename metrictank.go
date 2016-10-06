@@ -4,16 +4,15 @@ import (
 	"flag"
 	"fmt"
 	l "log"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
-
-	"net/http"
-	_ "net/http/pprof"
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
@@ -21,31 +20,29 @@ import (
 	"github.com/raintank/dur"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/api"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/elasticsearch"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/in"
 	inCarbon "github.com/raintank/metrictank/in/carbon"
-	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
 	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
-	inNSQ "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
-	clKafka "github.com/raintank/metrictank/mdata/clkafka"
-	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
+	notifierKafka "github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/usage"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
 var (
-	inCarbonInst    *inCarbon.Carbon
-	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
-	inKafkaMdamInst *inKafkaMdam.KafkaMdam
-	inNSQInst       *inNSQ.NSQ
-	clKafkaInst     *mdata.ClKafka
-	clNSQInst       *mdata.ClNSQ
+	inCarbonInst      *inCarbon.Carbon
+	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
+	notifierKafkaInst *mdata.NotifierKafka
+	idxPartitioner    cluster.IdxPartitioner
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -65,6 +62,8 @@ var (
 	// Clustering:
 	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
+	peersStr    = flag.String("peers", "", "http/s addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
+	partitioner = flag.String("partitioner", "fnv1a", "Algorithim used for partitioning metrics across peers. (murmur2|fnv1a)")
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
@@ -78,11 +77,6 @@ var (
 
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
-	// http:
-
-	maxPointsPerReq = flag.Int("max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
-	maxDaysPerReq   = flag.Int("max-days-per-req", 365000, "max amount of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
-
 	// Cassandra:
 	cassandraAddrs            = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace         = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
@@ -92,6 +86,7 @@ var (
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
+	cassandraInitialize       = flag.Bool("cassandra-initialize", true, "whether to initialize the cassandra schema/table.  Multiple instances should not concurrently try to initialize cassandra")
 	cqlProtocolVersion        = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	// Profiling, instrumentation and logging:
@@ -107,31 +102,20 @@ var (
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 10000000, "if this many bytes allocated, trigger a profile")
 
-	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
+	cassWriteQueueSize met.Gauge
+	cassWriters        met.Gauge
 
-	reqSpanMem  met.Meter
-	reqSpanBoth met.Meter
+	points           met.Gauge
+	alloc            met.Gauge
+	totalAlloc       met.Gauge
+	sysBytes         met.Gauge
+	clusterPrimary   met.Gauge
+	clusterPromoWait met.Gauge
+	gcNum            met.Gauge // go GC
+	gcDur            met.Gauge // go GC
+	gcCpuFraction    met.Gauge // go GC
 
-	cassWriteQueueSize    met.Gauge
-	cassWriters           met.Gauge
-	getTargetDuration     met.Timer
-	itersToPointsDuration met.Timer
-	messagesSize          met.Meter
-	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
-	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-	reqHandleDuration met.Timer
-	inItems           met.Meter
-	points            met.Gauge
-	alloc             met.Gauge
-	totalAlloc        met.Gauge
-	sysBytes          met.Gauge
-	clusterPrimary    met.Gauge
-	clusterPromoWait  met.Gauge
-	gcNum             met.Gauge // go GC
-	gcDur             met.Gauge // go GC
-	gcCpuFraction     met.Gauge // go GC
-
-	promotionReadyAtChan chan uint32
+	promotionReadyAtTs uint32
 )
 
 func init() {
@@ -140,34 +124,45 @@ func init() {
 
 func main() {
 	startupTime = time.Now()
-	flag.Parse()
+
+	/***********************************
+		Initialize Configuration File
+	***********************************/
 
 	// Only try and parse the conf file if it exists
+	path := ""
 	if _, err := os.Stat(*confFile); err == nil {
-		conf, err := globalconf.NewWithOptions(&globalconf.Options{Filename: *confFile})
-		if err != nil {
-			log.Fatal(4, "error with configuration file: %s", err)
-			os.Exit(1)
-		}
-		// load config for metric ingestors
-		inCarbon.ConfigSetup()
-		inKafkaMdm.ConfigSetup()
-		inKafkaMdam.ConfigSetup()
-		inNSQ.ConfigSetup()
-
-		// load config for cluster handlers
-		clNSQ.ConfigSetup()
-		clKafka.ConfigSetup()
-
-		// load config for metricIndexers
-		memory.ConfigSetup()
-		elasticsearch.ConfigSetup()
-		cassandra.ConfigSetup()
-
-		conf.ParseAll()
+		path = *confFile
+	}
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  path,
+		EnvPrefix: "MT_",
+	})
+	if err != nil {
+		log.Fatal(4, "error with configuration file: %s", err)
+		os.Exit(1)
 	}
 
+	// load config for metric ingestors
+	inCarbon.ConfigSetup()
+	inKafkaMdm.ConfigSetup()
+
+	// load config for cluster handlers
+	notifierKafka.ConfigSetup()
+
+	// load config for metricIndexers
+	memory.ConfigSetup()
+	elasticsearch.ConfigSetup()
+	cassandra.ConfigSetup()
+	api.ConfigSetup()
+	conf.ParseAll()
+
+	/***********************************
+		Initialize Logging
+	***********************************/
+
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+	api.LogLevel = logLevel
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
@@ -188,25 +183,50 @@ func main() {
 		log.Level(log.FATAL)
 	}
 
-	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
-		return
-	}
-
+	/***********************************
+		Validate  settings needed for clustering
+	***********************************/
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
 
-	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+	if *partitioner != "murmur2" && *partitioner != "fnv1a" {
+		log.Fatal(4, "partitioner must be one of murmur2 or fnv1a")
+	}
 
+	/***********************************
+		Initialize our ClusterManager
+	***********************************/
+	if *partitioner == "murmur2" {
+		idxPartitioner = cluster.NewMurmur2Partitioner()
+	}
+	if *partitioner == "fnv1a" {
+		idxPartitioner = cluster.NewFNV1aPartitioner()
+	}
+	cluster.InitManager(*instance, GitHash, *primaryNode, startupTime, idxPartitioner)
+	if *peersStr != "" {
+		for _, peer := range strings.Split(*peersStr, ",") {
+			if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
+				peer = fmt.Sprintf("http://%s", peer)
+			}
+			peer = strings.TrimSuffix(peer, "/")
+			addr, err := url.Parse(peer)
+			if err != nil {
+				log.Fatal(4, "Unable to parse Peer address %s: %s", peer, err)
+			}
+			cluster.ThisCluster.AddPeer(addr)
+		}
+	}
+
+	/***********************************
+		Validate remaining settings
+	***********************************/
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
-	inKafkaMdam.ConfigProcess(*instance)
-	inNSQ.ConfigProcess()
-	clNSQ.ConfigProcess()
-	clKafka.ConfigProcess(*instance)
+	notifierKafka.ConfigProcess(*instance)
+	api.ConfigProcess()
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
+	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
@@ -218,28 +238,12 @@ func main() {
 	if !*statsdEnabled {
 		log.Warn("running metrictank without statsd instrumentation.")
 	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
-	if err != nil {
-		log.Fatal(4, "failed to initialize statsd. %s", err)
-	}
-
-	runtime.SetBlockProfileRate(*blockProfileRate)
-	runtime.MemProfileRate = *memProfileRate
-	mdata.InitMetrics(stats)
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
-	// set our cluster state before we start consuming messages.
-	mdata.CluStatus = mdata.NewClusterStatus(*instance, *primaryNode)
+	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
-	promotionReadyAtChan = make(chan uint32)
-	initMetrics(stats)
-
-	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
@@ -247,7 +251,7 @@ func main() {
 	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
 	ttl := dur.MustParseUNsec("ttl", *ttlStr)
 	if (mdata.Month_sec % chunkSpan) != 0 {
-		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		log.Fatal(4, "chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
 	set := strings.Split(*aggSettings, ",")
@@ -268,7 +272,7 @@ func main() {
 		if (mdata.Month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
+		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
@@ -291,35 +295,68 @@ func main() {
 		go trigger.Run()
 	}
 
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cqlProtocolVersion)
+	promotionReadyAtTs = (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+
+	// If requsted, show our version and exit
+	if *showVersion {
+		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		return
+	}
+
+	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+
+	/***********************************
+		configure StatsD
+	***********************************/
+	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
+	if err != nil {
+		log.Fatal(4, "failed to initialize statsd. %s", err)
+	}
+
+	initMetrics(stats)
+	mdata.InitMetrics(stats)
+
+	/***********************************
+		configure Profiling
+	***********************************/
+	runtime.SetBlockProfileRate(*blockProfileRate)
+	runtime.MemProfileRate = *memProfileRate
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	/***********************************
+		Initialize our backendStore
+	***********************************/
+	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cqlProtocolVersion, *cassandraInitialize)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 	store.InitMetrics(stats)
 
-	// note. all these New functions must either return a valid instance or call log.Fatal
+	/***********************************
+		Initialize our MemoryStore
+	***********************************/
+	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 
+	/***********************************
+		Initialize our Receivers
+	***********************************/
+	receivers := make([]in.Plugin, 0)
+	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
+		receivers = append(receivers, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
 		inKafkaMdmInst = inKafkaMdm.New(stats)
+		receivers = append(receivers, inKafkaMdmInst)
 	}
 
-	if inKafkaMdam.Enabled {
-		inKafkaMdamInst = inKafkaMdam.New(stats)
-	}
-
-	if inNSQ.Enabled {
-		inNSQInst = inNSQ.New(stats)
-	}
-
-	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
-
-	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
-	pre := time.Now()
-
+	/***********************************
+		Initialize our MetricIndex
+	***********************************/
 	if memory.Enabled {
 		if metricIndex != nil {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
@@ -336,13 +373,14 @@ func main() {
 		if metricIndex != nil {
 			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = cassandra.New()
+		metricIndex = cassandra.New(*cassandraInitialize)
 	}
 
 	if metricIndex == nil {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
 
+	pre := time.Now()
 	err = metricIndex.Init(stats)
 	if err != nil {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
@@ -350,20 +388,25 @@ func main() {
 
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
+	/***********************************
+		Initialize usage Reporting
+	***********************************/
 	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
 
-	handlers := make([]mdata.ClusterHandler, 0)
-	if clNSQ.Enabled {
-		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
-		handlers = append(handlers, clNSQInst)
-	}
-	if clKafka.Enabled {
-		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
-		handlers = append(handlers, clKafkaInst)
+	/***********************************
+		Initialize MetricPerrist notifiers
+	***********************************/
+	handlers := make([]mdata.NotifierHandler, 0)
+	if notifierKafka.Enabled {
+		notifierKafkaInst = mdata.NewNotifierKafka(*instance, metrics, stats)
+		handlers = append(handlers, notifierKafkaInst)
 	}
 
-	mdata.InitCluster(stats, handlers...)
+	mdata.InitPersistNotifier(stats, handlers...)
 
+	/***********************************
+		Start our receivers
+	***********************************/
 	if inCarbon.Enabled {
 		inCarbonInst.Start(metrics, metricIndex, usg)
 	}
@@ -372,90 +415,84 @@ func main() {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdmInst.Start(metrics, metricIndex, usg)
 	}
-	if inKafkaMdam.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdamInst.Start(metrics, metricIndex, usg)
-	}
-	if inNSQ.Enabled {
-		inNSQInst.Start(metrics, metricIndex, usg)
+
+	/***********************************
+		Start discovering our cluster Peers
+	***********************************/
+	cluster.ThisCluster.Run()
+
+	/***********************************
+		Initialize our API server
+	***********************************/
+	apiServer, err := api.NewServer(*listenAddr, stats)
+	if err != nil {
+		log.Fatal(4, "Failed to start API. %s", err.Error())
 	}
 
-	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+	apiServer.BindMetricIndex(metricIndex)
+	apiServer.BindMemoryStore(metrics)
+	apiServer.BindBackendStore(store)
+	apiServer.BindClusterMgr(cluster.ThisCluster)
 
-	go func() {
-		http.HandleFunc("/", appStatus)
-		http.Handle("/get", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                        // metrictank native api which deals with ID's, not target strings
-		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                       // metrictank native api which deals with ID's, not target strings
-		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))))  // traditional graphite api, still lacking a lot of the api
-		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))) // traditional graphite api, still lacking a lot of the api
-		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
-		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metrics/delete", RecoveryHandler(corsHandler(Delete(metricIndex))))
-		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
-		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
-		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
-		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
-	}()
+	go apiServer.Run()
 
-	type waiter struct {
-		key    string
-		plugin in.Plugin
-		ch     chan int
+	/***********************************
+		Set our status so we can accept
+		requests from users.
+	***********************************/
+	if cluster.ThisNode.IsPrimary() {
+		cluster.ThisNode.SetReady()
+	} else {
+		go func() {
+			// wait for warmupPeriod before marking ourselves
+			// as ready.
+			time.Sleep(warmupPeriod)
+			cluster.ThisNode.SetReady()
+		}()
 	}
 
-	waiters := make([]waiter, 0)
-
-	if inNSQ.Enabled {
-		waiters = append(waiters, waiter{
-			"nsq",
-			inNSQInst,
-			inNSQInst.StopChan,
-		})
-	}
-	if inKafkaMdm.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdm",
-			inKafkaMdmInst,
-			inKafkaMdmInst.StopChan,
-		})
-	}
-	if inKafkaMdam.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdam",
-			inKafkaMdamInst,
-			inKafkaMdamInst.StopChan,
-		})
-	}
+	/***********************************
+		Wait for Shutdown
+	***********************************/
 	<-sigChan
-	for _, w := range waiters {
-		log.Info("Shutting down %s consumer", w.key)
-		w.plugin.Stop()
+	// stop the API server first, so we dont receive new connections.
+	apiServer.Stop()
+
+	// shutdown our reciever plugins.  These may take a while as we allow them
+	// to finish processing any metrics that have already ingested.
+	timer := time.NewTimer(time.Second * 10)
+	var wg sync.WaitGroup
+	for _, plugin := range receivers {
+		wg.Add(1)
+		go func(plugin in.Plugin) {
+			log.Info("Shutting down %s consumer", plugin.Name())
+			plugin.Stop()
+			log.Info("%s consumer finished shutdown", plugin.Name())
+			wg.Done()
+		}(plugin)
 	}
-	for _, w := range waiters {
-		// the order here is arbitrary, they could stop in either order, but it doesn't really matter
-		log.Info("waiting for %s consumer to finish shutdown", w.key)
-		<-w.ch
-		log.Info("%s consumer finished shutdown", w.key)
+	pluginsStopped := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(pluginsStopped)
+	}()
+	select {
+	case <-timer.C:
+		log.Warn("Plugins taking too long to shutdown, not waiting any longer.")
+	case <-pluginsStopped:
+		timer.Stop()
 	}
+
 	log.Info("closing store")
 	store.Stop()
 	metricIndex.Stop()
 	log.Info("terminating.")
 	log.Close()
-
 }
 
 func initMetrics(stats met.Backend) {
-	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
-	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	messagesSize = stats.NewMeter("message_size", 0)
-	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
-	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
@@ -470,7 +507,6 @@ func initMetrics(stats met.Backend) {
 	go func() {
 		currentPoints := 0
 		var m runtime.MemStats
-		var promotionReadyAtTs uint32
 
 		ticker := time.Tick(time.Duration(1) * time.Second)
 		for {
@@ -485,7 +521,7 @@ func initMetrics(stats met.Backend) {
 				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
 				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
 				var px int64
-				if mdata.CluStatus.IsPrimary() {
+				if cluster.ThisNode.IsPrimary() {
 					px = 1
 				} else {
 					px = 0
@@ -506,7 +542,6 @@ func initMetrics(stats met.Backend) {
 				}
 			case update := <-chunk.TotalPoints:
 				currentPoints += update
-			case promotionReadyAtTs = <-promotionReadyAtChan:
 			}
 		}
 	}()

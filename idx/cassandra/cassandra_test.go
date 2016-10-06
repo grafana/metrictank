@@ -68,7 +68,7 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 }
 
 func TestGetAddKey(t *testing.T) {
-	ix := New()
+	ix := New(true)
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	ix.Init(stats)
 
@@ -108,7 +108,7 @@ func TestGetAddKey(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	ix := New()
+	ix := New(true)
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	ix.Init(stats)
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
@@ -215,7 +215,7 @@ func BenchmarkIndexing(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
-	ix := New()
+	ix := New(true)
 	tmpSession, _ := ix.cluster.CreateSession()
 	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
 	tmpSession.Close()
@@ -252,7 +252,7 @@ func BenchmarkLoad(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
-	ix := New()
+	ix := New(true)
 
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	tmpSession, _ := ix.cluster.CreateSession()
@@ -264,7 +264,7 @@ func BenchmarkLoad(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	ix = New()
+	ix = New(true)
 	ix.Init(stats)
 	ix.Stop()
 }

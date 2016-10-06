@@ -86,7 +86,7 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 	defer m.Unlock()
 	existing, ok := m.DefById[data.Id]
 	if ok {
-		log.Debug("metricDef with id %s already in index.", data.Id)
+		log.Debug("IDX-M metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))

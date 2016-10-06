@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -247,7 +248,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 	// The first chunk is likely only a partial chunk. If we are not the primary node
 	// we should not serve data from this chunk, and should instead get the chunk from cassandra.
 	// if we are the primary node, then there is likely no data in Cassandra anyway.
-	if !CluStatus.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
+	if !cluster.ThisNode.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
@@ -331,7 +332,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 // write a chunk to persistent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
 
-	if !CluStatus.IsPrimary() {
+	if !cluster.ThisNode.IsPrimary() {
 		if LogLevel < 2 {
 			log.Debug("AM persist(): node is not primary, not saving chunk.")
 		}

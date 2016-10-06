@@ -28,6 +28,8 @@ accounting-period = 5min
 instance = default
 # the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes
 primary-node = false
+# tcp addresses of other nodes, comma separated. use this if you shard your data and want to query other instances.
+other-nodes =
 ```
 
 ## data ##
@@ -85,6 +87,8 @@ cassandra-write-concurrency = 10
 cassandra-read-queue-size = 100
 # write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have
 cassandra-write-queue-size = 100000
+# whether to initialize the cassandra schema/table.  Multiple instances should not concurrently try to initialize cassandra. this also applies to the cassandra index if enabled
+cassandra-initialize = true
 # CQL protocol version. cassandra 3.x needs v3 or 4.
 cql-protocol-version = 4
 ```
@@ -148,7 +152,7 @@ enabled = false
 # tcp address
 addr = :2003
 # needed to know your raw resolution for your metrics. see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf
-# NOTE: does NOT use aggregation and retention settings from this file. We use agg-settings and ttl for that.
+# NOTE: does NOT use aggregation and retention settings from this file.  We use agg-settings and ttl for that.
 schemas-file = /path/to/your/schemas-file
 ```
 
@@ -161,6 +165,8 @@ enabled = false
 brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
+# kafka partitions to consume. use '*' or a comma separated list of id's
+partitions = *
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
 offset = last
 # save interval for offsets

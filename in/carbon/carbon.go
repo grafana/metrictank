@@ -7,10 +7,12 @@ import (
 	"flag"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
@@ -21,21 +23,27 @@ import (
 
 type Carbon struct {
 	in.In
-	addrStr string
-	addr    *net.TCPAddr
-	schemas persister.WhisperSchemas
-	stats   met.Backend
+	addrStr          string
+	addr             *net.TCPAddr
+	schemas          persister.WhisperSchemas
+	stats            met.Backend
+	listener         *net.TCPListener
+	handlerWaitGroup sync.WaitGroup
 }
 
 var Enabled bool
 var addr string
 var schemasFile string
 var schemas persister.WhisperSchemas
+var shardId int
+var shardCount int
 
 func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
+	inCarbon.IntVar(&shardId, "shard", 1, "shard Id.")
+	inCarbon.IntVar(&shardCount, "shard-count", 1, "number of shards in the cluster")
 	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
@@ -64,6 +72,9 @@ func ConfigProcess() {
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}
 
+	cluster.ThisNode.SetPartitions([]int32{int32(shardId)})
+	cluster.ThisCluster.SetPartitionCount(int32(shardCount))
+
 }
 
 func New(stats met.Backend) *Carbon {
@@ -79,25 +90,36 @@ func New(stats met.Backend) *Carbon {
 	}
 }
 
+func (c *Carbon) Name() string {
+	return "carbon"
+}
+
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
 	c.In = in.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, err.Error())
 	}
+	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
-	go c.accept(l)
+	go c.accept()
 }
 
-func (c *Carbon) accept(l *net.TCPListener) {
+func (c *Carbon) accept() {
 	for {
-		conn, err := l.AcceptTCP()
+		conn, err := c.listener.AcceptTCP()
 		if nil != err {
 			log.Error(4, err.Error())
 			break
 		}
+		c.handlerWaitGroup.Add(1)
 		go c.handle(conn)
 	}
+}
+
+func (c *Carbon) Stop() {
+	c.listener.Close()
+	c.handlerWaitGroup.Wait()
 }
 
 func (c *Carbon) handle(conn net.Conn) {
@@ -129,4 +151,5 @@ func (c *Carbon) handle(conn net.Conn) {
 		interval := s.Retentions[0].SecondsPerPoint()
 		c.HandleLegacy(string(key), val, ts, interval)
 	}
+	c.handlerWaitGroup.Done()
 }

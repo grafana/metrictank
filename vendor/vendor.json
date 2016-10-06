@@ -45,6 +45,12 @@
 			"revisionTime": "2015-04-25T18:03:51Z"
 		},
 		{
+			"checksumSHA1": "46AScqrWpSTDEec/t0nyD+xBDlQ=",
+			"path": "github.com/aviddiviner/go-murmur",
+			"revision": "b9740d71e571c1f4ccb570b9bc7f352329d3e600",
+			"revisionTime": "2015-05-19T21:49:47Z"
+		},
+		{
 			"checksumSHA1": "ek48rtBCnHMbp7CK+63djVf+9bY=",
 			"path": "github.com/benbjohnson/clock",
 			"revision": "a620c1cc9866f84a2550ad53f4f353ec030fa26b",
@@ -397,6 +403,18 @@
 			"path": "gopkg.in/inf.v0",
 			"revision": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4",
 			"revisionTime": "2015-09-11T12:57:57Z"
+		},
+		{
+			"checksumSHA1": "Fv3Cdgosf28iev/JTFWO6nsPFCA=",
+			"path": "gopkg.in/raintank/schema.v1",
+			"revision": "a2ba0a7af66d6cc470d93bb5725f22f4b3c1ea79",
+			"revisionTime": "2016-07-20T14:31:18Z"
+		},
+		{
+			"checksumSHA1": "MjwLYwIckCtBwXhQMt5ji/L5lJA=",
+			"path": "gopkg.in/raintank/schema.v1/msg",
+			"revision": "a2ba0a7af66d6cc470d93bb5725f22f4b3c1ea79",
+			"revisionTime": "2016-07-20T14:31:18Z"
 		}
 	],
 	"rootPath": "github.com/raintank/metrictank"
