@@ -1,67 +1,149 @@
 package rbody
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+
 	"github.com/raintank/metrictank/api/middleware"
+	"github.com/tinylib/msgp/msgp"
 )
 
 var ErrMetricNotFound = errors.New("metric not found")
 
-type HttpType uint
+func WriteResponse(w *middleware.Context, resp Response) {
+	body, err := resp.Body()
+	if err != nil {
+		w.Error(http.StatusInternalServerError, err.Error())
+		return
+	}
+	for k, v := range resp.Headers() {
+		w.Header().Set(k, v)
+	}
+	w.WriteHeader(resp.Code())
+	w.Write(body)
+	return
+}
 
-const (
-	HttpTypeJSON       HttpType = iota
-	HttpTypeProtobuf            = iota
-	HttpTypeJavaScript          = iota
-	HttpTypeRaw                 = iota
-	HttpTypePickle              = iota
-	HttpTypePNG                 = iota
-	HttpTypeCSV                 = iota
-	HttpTypeMsgp                = iota
-)
+type Response interface {
+	Code() int
+	Body() ([]byte, error)
+	Headers() map[string]string
+}
 
-func WriteResponse(w *middleware.Context, b []byte, format HttpType, jsonp string) {
+type JsonResponse struct {
+	code  int
+	body  interface{}
+	jsonp string
+}
 
-	switch format {
-	case HttpTypeJSON:
-		if jsonp != "" {
-			w.Header().Set("Content-Type", contentTypeJavaScript)
-			w.Write([]byte(jsonp))
-			w.Write([]byte{'('})
-			w.Write(b)
-			w.Write([]byte{')'})
-		} else {
-			w.Header().Set("Content-Type", contentTypeJSON)
-			w.Write(b)
-		}
-	case HttpTypeProtobuf:
-		w.Header().Set("Content-Type", contentTypeProtobuf)
-		w.Write(b)
-	case HttpTypeRaw:
-		w.Header().Set("Content-Type", contentTypeRaw)
-		w.Write(b)
-	case HttpTypePickle:
-		w.Header().Set("Content-Type", contentTypePickle)
-		w.Write(b)
-	case HttpTypeCSV:
-		w.Header().Set("Content-Type", contentTypeCSV)
-		w.Write(b)
-	case HttpTypePNG:
-		w.Header().Set("Content-Type", contentTypePNG)
-		w.Write(b)
-	case HttpTypeMsgp:
-		w.Header().Set("Content-Type", contentTypeMsgp)
-		w.Write(b)
+func NewJsonResponse(code int, body interface{}, jsonp string) *JsonResponse {
+	return &JsonResponse{
+		code:  code,
+		body:  body,
+		jsonp: jsonp,
 	}
 }
 
-const (
-	contentTypeJSON       = "application/json"
-	contentTypeProtobuf   = "application/x-protobuf"
-	contentTypeJavaScript = "text/javascript"
-	contentTypeRaw        = "text/plain"
-	contentTypePickle     = "application/pickle"
-	contentTypePNG        = "image/png"
-	contentTypeCSV        = "text/csv"
-	contentTypeMsgp       = "application/msgpack"
-)
+func (r *JsonResponse) Code() int {
+	return r.code
+}
+
+func (r *JsonResponse) Body() (buf []byte, err error) {
+	buf, err = json.Marshal(r.body)
+	if r.jsonp == "" || err != nil {
+		return buf, err
+	}
+	buf = append([]byte(r.jsonp+"("), buf...)
+	buf = append(buf, byte(')'))
+	return buf, err
+}
+
+func (r *JsonResponse) Headers() (headers map[string]string) {
+	headers = map[string]string{"content-type": "application/json"}
+	if r.jsonp != "" {
+		headers["content-type"] = "text/javascript"
+	}
+	return headers
+}
+
+type ErrorResponse struct {
+	code int
+	err  error
+}
+
+func NewErrorResponse(code int, err error) *ErrorResponse {
+	return &ErrorResponse{
+		code: code,
+		err:  err,
+	}
+}
+
+func (r *ErrorResponse) Code() int {
+	return r.code
+}
+
+func (r *ErrorResponse) Body() ([]byte, error) {
+	return []byte(r.err.Error()), nil
+}
+
+func (r *ErrorResponse) Headers() (headers map[string]string) {
+	headers = map[string]string{"content-type": "text/plain"}
+	return headers
+}
+
+type MsgpResponse struct {
+	code int
+	body msgp.Marshaler
+}
+
+func NewMsgpResponse(code int, body msgp.Marshaler) *MsgpResponse {
+	return &MsgpResponse{
+		code: code,
+		body: body,
+	}
+}
+
+func (r *MsgpResponse) Code() int {
+	return r.code
+}
+
+func (r *MsgpResponse) Body() (buf []byte, err error) {
+	return r.body.MarshalMsg(buf)
+}
+
+func (r *MsgpResponse) Headers() (headers map[string]string) {
+	headers = map[string]string{"content-type": "application/msgpack"}
+	return headers
+}
+
+type MsgpArrayResponse struct {
+	code int
+	body []msgp.Marshaler
+}
+
+func NewMsgpArrayResponse(code int, body []msgp.Marshaler) *MsgpArrayResponse {
+	return &MsgpArrayResponse{
+		code: code,
+		body: body,
+	}
+}
+
+func (r *MsgpArrayResponse) Code() int {
+	return r.code
+}
+
+func (r *MsgpArrayResponse) Body() (buf []byte, err error) {
+	for _, b := range r.body {
+		buf, err = b.MarshalMsg(buf)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (r *MsgpArrayResponse) Headers() (headers map[string]string) {
+	headers = map[string]string{"content-type": "application/msgpack"}
+	return headers
+}

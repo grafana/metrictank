@@ -60,7 +60,11 @@ type IndexGet struct {
 }
 
 type IndexFind struct {
-	Pattern string `json:"pattern" form:"pattern" binding:"required"`
-	OrgId   int    `json:"orgId" form:"orgId" binding:"required"`
-	From    int64  `json:"from" form:"from"`
+	Patterns []string `json:"patterns" form:"patterns" binding:"required"`
+	OrgId    int      `json:"orgId" form:"orgId" binding:"required"`
+	From     int64    `json:"from" form:"from"`
+}
+
+type GetData struct {
+	Requests []Req
 }

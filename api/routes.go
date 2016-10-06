@@ -32,7 +32,7 @@ func (s *Server) RegisterRoutes() {
 
 	// Internal api endpoints used for inter cluster communication
 	r.Group("/internal", func() {
-		r.Combo("/getdata", bind(models.Req{})).Get(s.getData).Post(s.getData)
+		r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
 		r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
 		r.Combo("/index/get", bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
 		r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)

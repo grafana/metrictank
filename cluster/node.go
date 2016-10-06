@@ -35,7 +35,7 @@ var client = http.Client{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Proxy:           http.ProxyFromEnvironment,
 		Dial: (&net.Dialer{
-			Timeout:   time.Second,
+			Timeout:   time.Second * 5,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
 		TLSHandshakeTimeout: time.Second,

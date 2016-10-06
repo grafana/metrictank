@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/raintank/dur"
@@ -21,9 +23,16 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+var MissingOrgHeaderErr = errors.New("orgId not set in headers")
+var MissingQueryErr = errors.New("missing query param")
+var InvalidFromatErr = errors.New("invalid format specified")
+var MaxPointsPerReqErr = errors.New("request would execed maxPointsPerReq setting")
+var MaxDaysPerReqErr = errors.New("request would execed maxDaysPerReq setting")
+var InvalidTimeRangeErr = errors.New("invalid time range requested")
+
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
 	if ctx.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "OrgId not set in headers")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgHeaderErr))
 		return
 	}
 	pre := time.Now()
@@ -34,7 +43,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	targets := request.Targets
 	if maxPointsPerReq != 0 && len(targets)*int(maxDataPoints) > maxPointsPerReq {
-		ctx.Error(http.StatusBadRequest, "too many targets/maxDataPoints requested")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MaxPointsPerReqErr))
 		return
 	}
 
@@ -51,13 +60,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
 	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 		return
 	}
 
 	toUnix, err := dur.ParseTSpec(to, now, defaultTo)
 	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 		return
 	}
 
@@ -68,28 +77,34 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	toUnix += 1
 
 	if fromUnix >= toUnix {
-		ctx.Error(http.StatusBadRequest, "to must be higher than from")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, InvalidTimeRangeErr))
 		return
 	}
 	if maxDaysPerReq != 0 && len(targets)*int(toUnix-fromUnix) > maxDaysPerReq*(3600*24) {
-		ctx.Error(http.StatusBadRequest, "too many targets/too large timeframe requested")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MaxDaysPerReqErr))
 		return
 	}
 
 	reqs := make([]models.Req, 0)
+	parsedTargets := make(map[string]string)
+	patterns := make([]string, 0)
+	type locatedDef struct {
+		def  schema.MetricDefinition
+		node *cluster.Node
+	}
+
+	locatedDefs := make(map[string]map[string]locatedDef)
+	queryForTarget := make(map[string]string)
 	for _, query := range targets {
 		target, consolidateBy, err := parseTarget(query)
 		if err != nil {
 			ctx.Error(http.StatusBadRequest, err.Error())
 			return
 		}
-
-		type locatedDef struct {
-			def  schema.MetricDefinition
-			node *cluster.Node
-		}
-
-		locatedDefs := make(map[string]locatedDef)
+		parsedTargets[target] = consolidateBy
+		patterns = append(patterns, target)
+		queryForTarget[target] = query
+		locatedDefs[target] = make(map[string]locatedDef)
 
 		// metricDefs only get updated periodically, so we add a 1day (86400seconds) buffer when
 		// filtering by our From timestamp.  This should be moved to a configuration option,
@@ -101,72 +116,105 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 		nodes, err := s.MetricIndex.Find(ctx.OrgId, target, seenAfter)
 		if err != nil {
-			ctx.Error(http.StatusBadRequest, err.Error())
+			rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 			return
 		}
 		for _, node := range nodes {
 			for _, def := range node.Defs {
-				locatedDefs[def.Id] = locatedDef{def, cluster.ThisNode}
+				locatedDefs[target][def.Id] = locatedDef{def, cluster.ThisNode}
 			}
 		}
-
-		for _, inst := range s.ClusterMgr.PeersForQuery() {
+	}
+	var defsLock sync.Mutex
+	peers := s.ClusterMgr.PeersForQuery()
+	respCh := make(chan error, len(peers))
+	var wg sync.WaitGroup
+	for _, inst := range peers {
+		wg.Add(1)
+		go func(inst *cluster.Node) {
+			defer wg.Done()
 			if LogLevel < 2 {
-				log.Debug("HTTP Render querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, target)
+				log.Debug("HTTP Render querying %s/internal/index/find for %d:%q", inst.GetName(), ctx.OrgId, patterns)
 			}
 
-			buf, err := inst.Post("/internal/index/find", models.IndexFind{Pattern: target, OrgId: ctx.OrgId})
+			buf, err := inst.Post("/internal/index/find", models.IndexFind{Patterns: patterns, OrgId: ctx.OrgId})
 			if err != nil {
 				log.Error(4, "HTTP Render error querying %s/internal/index/find: %q", inst.GetName(), err)
-				ctx.Error(http.StatusServiceUnavailable, err.Error())
+				respCh <- err
 				return
 			}
-			var n idx.Node
+			resp := models.NewIndexFindResp()
 			count := 0
 			for len(buf) != 0 {
-				buf, err = n.UnmarshalMsg(buf)
+				buf, err = resp.UnmarshalMsg(buf)
 				if err != nil {
-					log.Error(4, "HTTP Render error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
-					ctx.Error(http.StatusInternalServerError, err.Error())
+					log.Error(4, "HTTP Find() error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
+					rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 					return
 				}
-				count++
 				// different nodes may have overlapping data in their index.
 				// maybe because they loaded the entire index from a persistent store,
-				// or they used to receive a certain shard.
-				// so we need to select the node that has most recently seen each given metricDef.
-				for _, def := range n.Defs {
-					cur, ok := locatedDefs[def.Id]
-					if ok && cur.def.LastUpdate >= def.LastUpdate {
-						continue
+				// or they used to receive a certain shard. or because they host metrics under branches
+				// that other nodes also host metrics under
+				// it may even happen that a node has a leaf that for another node is a branch, if the
+				// org has been sending improper data.  in this case there's no elegant way to nicely handle this
+				// so we'll just ignore one of them like we ignore other paths we've already seen.
+				defsLock.Lock()
+				for pattern, nodes := range resp.Nodes {
+					for _, n := range nodes {
+						count++
+						for _, def := range n.Defs {
+							cur, ok := locatedDefs[pattern][def.Id]
+							if ok && cur.def.LastUpdate >= def.LastUpdate {
+								continue
+							}
+							locatedDefs[pattern][def.Id] = locatedDef{def, inst}
+						}
 					}
-					locatedDefs[def.Id] = locatedDef{def, inst}
 				}
+				defsLock.Unlock()
 			}
 			if LogLevel < 2 {
-				log.Debug("HTTP Render response from %s/internal/index/find for %d:%s had %d nodes", inst.GetName(), ctx.OrgId, target, count)
+				log.Debug("HTTP Render response from %s/internal/index/find for %d:%q had %d nodes", inst.GetName(), ctx.OrgId, patterns, count)
 			}
+			respCh <- nil
+		}(inst)
+	}
+	wg.Wait()
+	close(respCh)
+	errCount := 0
+	for err := range respCh {
+		if err != nil {
+			errCount++
 		}
-		if len(locatedDefs) == 0 {
-			rbody.WriteResponse(ctx, []byte("[]"), rbody.HttpTypeJSON, "")
-			return
-		}
-		for _, locdef := range locatedDefs {
+	}
+	// should we return an error here, or just return the partial results we have?
+	if errCount > 0 {
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, fmt.Errorf("%d of %d peer lookups failed", errCount, len(peers))))
+		return
+	}
+	for target, ldefs := range locatedDefs {
+		for _, locdef := range ldefs {
 			def := locdef.def
-			consolidator, err := consolidation.GetConsolidator(&def, consolidateBy)
+			consolidator, err := consolidation.GetConsolidator(&def, parsedTargets[target])
 			if err != nil {
-				ctx.Error(http.StatusBadRequest, err.Error())
+				rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 				return
 			}
 			// query is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
 			// target is like foo.bar or foo.*
 			// def.Name is like foo.concretebar
 			// so we want query to contain the concrete graphite name, potentially wrapped with consolidateBy().
-			query := strings.Replace(query, target, def.Name, -1)
+
+			query := strings.Replace(queryForTarget[target], target, def.Name, -1)
 			reqs = append(reqs, models.NewReq(def.Id, query, locdef.node, fromUnix, toUnix, maxDataPoints, uint32(def.Interval), consolidator))
 		}
-
 	}
+	if len(reqs) == 0 {
+		rbody.WriteResponse(ctx, rbody.NewJsonResponse(200, []string{}, ""))
+		return
+	}
+
 	if (toUnix - fromUnix) >= logMinDur {
 		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %q",
 			ctx.Req.Method, from, to, request.Targets, request.MaxDataPoints)
@@ -175,7 +223,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
-		ctx.Error(http.StatusInternalServerError, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		return
 	}
 
@@ -188,7 +236,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, err := s.getTargets(reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render %s", err.Error())
-		ctx.Error(http.StatusInternalServerError, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		return
 	}
 
@@ -204,28 +252,28 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	if err != nil {
 		util.BufferPool.Put(js[:0])
 		log.Error(3, "HTTP Render %s", err.Error())
-		ctx.Error(http.StatusInternalServerError, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		return
 	}
 
 	reqHandleDuration.Value(time.Now().Sub(pre))
-	rbody.WriteResponse(ctx, js, rbody.HttpTypeJSON, "")
+	rbody.WriteResponse(ctx, rbody.NewJsonResponse(200, json.RawMessage(js), ""))
 	util.BufferPool.Put(js[:0])
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
 	if ctx.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "OrgId not set in headers")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgHeaderErr))
 		return
 	}
 
 	if request.Query == "" {
-		ctx.Error(http.StatusBadRequest, "missing parameter `query`")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingQueryErr))
 		return
 	}
 
 	if request.Format != "" && request.Format != "treejson" && request.Format != "json" && request.Format != "completer" {
-		ctx.Error(http.StatusBadRequest, "invalid format")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, InvalidFromatErr))
 		return
 	}
 	// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
@@ -237,7 +285,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 	nodes, err := s.MetricIndex.Find(ctx.OrgId, request.Query, request.From)
 	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 		return
 	}
 	var seenPaths map[string]struct{}
@@ -254,19 +302,19 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 			log.Debug("HTTP Find() querying %s/internal/index/find for %d:%s", inst.GetName(), ctx.OrgId, request.Query)
 		}
 
-		buf, err := inst.Post("/internal/index/find", models.IndexFind{Pattern: request.Query, OrgId: ctx.OrgId})
+		buf, err := inst.Post("/internal/index/find", models.IndexFind{Patterns: []string{request.Query}, OrgId: ctx.OrgId})
 		if err != nil {
 			log.Error(4, "HTTP Find() error querying %s/internal/index/find: %q", inst.GetName(), err)
-			ctx.Error(http.StatusServiceUnavailable, err.Error())
+			rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 			return
 		}
 
-		var n idx.Node
+		resp := models.NewIndexFindResp()
 		for len(buf) != 0 {
-			buf, err = n.UnmarshalMsg(buf)
+			buf, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				log.Error(4, "HTTP Find() error unmarshaling body from %s/internal/index/find: %q", inst.GetName(), err)
-				ctx.Error(http.StatusInternalServerError, err.Error())
+				rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 				return
 			}
 			// different nodes may have overlapping data in their index.
@@ -276,10 +324,11 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 			// it may even happen that a node has a leaf that for another node is a branch, if the
 			// org has been sending improper data.  in this case there's no elegant way to nicely handle this
 			// so we'll just ignore one of them like we ignore other paths we've already seen.
-			_, ok := seenPaths[n.Path]
-			if !ok {
-				nodes = append(nodes, n)
-				seenPaths[n.Path] = struct{}{}
+			for _, n := range resp.Nodes[request.Query] {
+				if _, ok := seenPaths[n.Path]; !ok {
+					nodes = append(nodes, n)
+					seenPaths[n.Path] = struct{}{}
+				}
 			}
 		}
 	}
@@ -293,16 +342,15 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 
 	if err != nil {
-		ctx.Error(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		return
 	}
-
-	rbody.WriteResponse(ctx, b, rbody.HttpTypeJSON, request.Jsonp)
+	rbody.WriteResponse(ctx, rbody.NewJsonResponse(200, json.RawMessage(b), request.Jsonp))
 }
 
 func (s *Server) metricsIndex(ctx *middleware.Context) {
 	if ctx.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "OrgId not set in headers")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgHeaderErr))
 		return
 	}
 
@@ -323,7 +371,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		buf, err := inst.Post("/internal/index/list", models.IndexList{OrgId: ctx.OrgId})
 		if err != nil {
 			log.Error(4, "HTTP IndexJson() error querying %s/internal/index/list: %q", inst.GetName(), err)
-			ctx.Error(http.StatusServiceUnavailable, err.Error())
+			rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 			return
 		}
 
@@ -332,7 +380,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 			buf, err = def.UnmarshalMsg(buf)
 			if err != nil {
 				log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/internal/index/list: %q", inst.GetName(), err)
-				ctx.Error(http.StatusInternalServerError, err.Error())
+				rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 				return
 			}
 			// different nodes may have overlapping data in their index.
@@ -351,11 +399,11 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	js, err = listJSON(js, list)
 	if err != nil {
 		log.Error(3, "HTTP IndexJson() %s", err.Error())
-		ctx.Error(http.StatusInternalServerError, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		util.BufferPool.Put(js[:0])
 		return
 	}
-	rbody.WriteResponse(ctx, js, rbody.HttpTypeJSON, "")
+	rbody.WriteResponse(ctx, rbody.NewJsonResponse(200, json.RawMessage(js), ""))
 	util.BufferPool.Put(js[:0])
 }
 
@@ -504,23 +552,23 @@ func findTreejson(query string, nodes []idx.Node) ([]byte, error) {
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {
 	if ctx.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "OrgId not set in headers")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgHeaderErr))
 		return
 	}
 
 	if req.Query == "" {
-		ctx.Error(http.StatusBadRequest, "missing parameter `query`")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingQueryErr))
 		return
 	}
 
 	defs, err := s.MetricIndex.Delete(ctx.OrgId, req.Query)
 	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 		return
 	}
 
 	resp := make(map[string]interface{})
 	resp["success"] = true
 	resp["deletedDefs"] = len(defs)
-	ctx.JSON(200, resp)
+	rbody.WriteResponse(ctx, rbody.NewJsonResponse(200, resp, ""))
 }

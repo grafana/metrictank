@@ -152,10 +152,38 @@ func aggEvery(numPoints, maxPoints uint32) uint32 {
 func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	seriesChan := make(chan models.Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
+
+	// split reqs into local and remote.
+	localReqs := make([]models.Req, 0)
+	remoteReqs := make(map[*cluster.Node][]models.Req)
+	for _, req := range reqs {
+		if req.Node == nil || req.Node == cluster.ThisNode {
+			localReqs = append(localReqs, req)
+		} else {
+			remoteReqs[req.Node] = append(remoteReqs[req.Node], req)
+		}
+	}
+
+	for node, nodeReqs := range remoteReqs {
+		buf, err := node.Post("/internal/getdata", models.GetData{Requests: nodeReqs})
+		if err != nil {
+			return nil, err
+		}
+		var resp models.GetDataResp
+		buf, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", node.GetName(), err))
+		}
+		if len(buf) != 0 {
+			return nil, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", node.GetName()))
+		}
+		return resp.Series, nil
+	}
+
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
 	wg := sync.WaitGroup{}
 	wg.Add(len(reqs))
-	for _, req := range reqs {
+	for _, req := range localReqs {
 		go func(wg *sync.WaitGroup, req models.Req) {
 			pre := time.Now()
 			points, interval, err := s.getTarget(req)
@@ -200,22 +228,6 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 		} else {
 			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.OutInterval)
 		}
-	}
-
-	if req.Node != cluster.ThisNode {
-		buf, err := req.Node.Post("/internal/getdata", req)
-		if err != nil {
-			return nil, 0, err
-		}
-		var series models.Series
-		buf, err = series.UnmarshalMsg(buf)
-		if err != nil {
-			return nil, 0, errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/internal/getdata: %q", req.Node.GetName(), err))
-		}
-		if len(buf) != 0 {
-			return nil, 0, errors.New(fmt.Sprintf("%s/internal/getdata: returned extra data", req.Node.GetName()))
-		}
-		return series.Datapoints, series.Interval, nil
 	}
 
 	if !readConsolidated && !runtimeConsolidation {

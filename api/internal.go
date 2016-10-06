@@ -1,24 +1,30 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/api/rbody"
-	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/tinylib/msgp/msgp"
 )
+
+var MissingPatternErr = errors.New("missing pattern arg")
+var MissingOrgIdErr = errors.New("missing orgId arg")
+var MissingIdErr = errors.New("missing Id arg")
+var NotFoundErr = errors.New("not found")
 
 // IndexFind returns a sequence of msgp encoded idx.Node's
 func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
-	if req.Pattern == "" {
-		ctx.Error(http.StatusBadRequest, "missing pattern arg")
+	if len(req.Patterns) == 0 {
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingPatternErr))
 		return
 	}
 	if req.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "missing orgId arg")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgIdErr))
 		return
 	}
 
@@ -29,91 +35,59 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	if req.From != 0 {
 		req.From -= 86400
 	}
+	resp := models.NewIndexFindResp()
 
-	var buf []byte
-	nodes, err := s.MetricIndex.Find(req.OrgId, req.Pattern, req.From)
-	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
-		return
-	}
-	for _, node := range nodes {
-		buf, err = node.MarshalMsg(buf)
+	for _, pattern := range req.Patterns {
+		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From)
 		if err != nil {
-			log.Error(4, "HTTP IndexFind() marshal err: %q", err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
+			rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, err))
 			return
 		}
+		resp.Nodes[pattern] = nodes
 	}
-	rbody.WriteResponse(ctx, buf, rbody.HttpTypeMsgp, "")
+	rbody.WriteResponse(ctx, rbody.NewMsgpResponse(200, resp))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 	if req.Id == "" {
-		ctx.Error(http.StatusBadRequest, "missing ID")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingIdErr))
 		return
 	}
-	var buf []byte
 	def, err := s.MetricIndex.Get(req.Id)
-	if err == nil {
-		buf, err = def.MarshalMsg(buf)
-		if err != nil {
-			log.Error(4, "HTTP IndexGet() marshal err: %q", err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
-			return
-		}
+	if err != nil {
 	} else { // currently this can only be notFound
-		ctx.Error(http.StatusNotFound, "not found")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusNotFound, NotFoundErr))
 		return
 	}
 
-	rbody.WriteResponse(ctx, buf, rbody.HttpTypeMsgp, "")
+	rbody.WriteResponse(ctx, rbody.NewMsgpResponse(200, &def))
 }
 
 // IndexList returns msgp encoded schema.MetricDefinition's
 func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 	if req.OrgId == 0 {
-		ctx.Error(http.StatusBadRequest, "missing org arg")
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusBadRequest, MissingOrgIdErr))
 		return
 	}
-	var err error
-	var buf []byte
 	defs := s.MetricIndex.List(req.OrgId)
-	for _, def := range defs {
-		buf, err = def.MarshalMsg(buf)
-		if err != nil {
-			log.Error(4, "HTTP IndexList() marshal err: %q", err)
-			ctx.Error(http.StatusInternalServerError, err.Error())
-			return
-		}
+	resp := make([]msgp.Marshaler, len(defs))
+	for i, _ := range defs {
+		d := defs[i]
+		resp[i] = &d
 	}
-	rbody.WriteResponse(ctx, buf, rbody.HttpTypeMsgp, "")
+	rbody.WriteResponse(ctx, rbody.NewMsgpArrayResponse(200, resp))
 }
 
-func (s *Server) getData(ctx *middleware.Context, req models.Req) {
+func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 	pre := time.Now()
 
-	req.Node = cluster.ThisNode
-	points, interval, err := s.getTarget(req)
+	series, err := s.getTargets(request.Requests)
 	if err != nil {
 		log.Error(3, "HTTP getData() %s", err.Error())
-		ctx.Error(http.StatusInternalServerError, err.Error())
+		rbody.WriteResponse(ctx, rbody.NewErrorResponse(http.StatusInternalServerError, err))
 		return
 	}
-	series := models.Series{
-		Target:     req.Target,
-		Datapoints: points,
-		Interval:   interval,
-	}
-
-	var buf []byte
-	buf, err = series.MarshalMsg(buf)
-	if err != nil {
-		log.Error(3, "HTTP getData() %s", err.Error())
-		ctx.Error(http.StatusInternalServerError, err.Error())
-		return
-	}
-
 	reqHandleDuration.Value(time.Now().Sub(pre))
-	rbody.WriteResponse(ctx, buf, rbody.HttpTypeMsgp, "")
+	rbody.WriteResponse(ctx, rbody.NewMsgpResponse(200, &models.GetDataResp{Series: series}))
 }
