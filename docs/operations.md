@@ -31,6 +31,45 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 
 
+## Crash
+
+
+Metrictank crashed. What to do?
+
+### Diagnosis
+
+1) Check `dmesg` to see if it was killed by the kernel, maybe it was consuming too much RAM
+   If it was, check the grafana dashboard which may explain why. (sudden increase in ingested data? increase in requests or the amount of data requested? slow requests?)
+   Tips:
+   * The [profiletrigger](https://github.com/raintank/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger a memory profile and save it to disk.  This can be very helpful if suddently memory usage spikes up and then metrictank gets killed in seconds or minutes.  It helps diagnose problems in the code base that may lead to memory savings.  The profiletrigger looks at the `bytes_alloc.not_freed` metric which is just memory allocated within the runtime.  Amount of memory consumed by the process may be twice this.  So as a rule of thumb, if you have a system running just metrictank, set it to about 40% of available memory.
+   * Use [rollups](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
+2) Check the metrictank log.
+   If it exited due to a panic, you should probably open a [ticket](https://github.com/raintank/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceeding log data.
+   If it exited due to an error, it could be a problem in your infrastructure or a problem in the metrictank code (in the latter case, please open a ticket as described above)
+
+### Recovery
+
+#### If you run multiple instances
+
+* If the crashed instance was a secondary, you can just restart it and after it warmed up, it will ready to serve requests.  Verify that you have other instances who can serve requests, otherwise you may want to start it with a much shorter warm up time.  It will be ready to serve requests sooner, but may have to reach out to Cassandra more to load data.
+* If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#basic-guideline), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
+
+
+#### If you only run once instance
+
+If you use the kafka-mdm input (at raintank we do), before restarting check your [offset option](https://github.com/raintank/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immidiately getting realtime insights back, at the cost of missing older data.
+
+
+## Metrictank hangs
+
+if the metrictank process seems "stuck".. not doing anything, but up and running, you can report a bug.
+Please include the following information:
+
+* stacktrace obtained with `curl 'http://<ip>:<port>/debug/pprof/goroutine?debug=2'`
+* cpu profile obtained with `curl 'http://<ip>:<port>/debug/pprof/profile'`
+* output of `metrictank --version`.
+
+
 ## Primary failover
 
 * stop the primary: `curl -X POST -d primary=false http://<node>:6060/cluster`
