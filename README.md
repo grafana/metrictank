@@ -53,6 +53,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 
 ### installation, configuration and operation.
 
+* [Overview](https://github.com/raintank/metrictank/blob/master/docs/overview.md)
 * [Quick start using docker](https://github.com/raintank/metrictank/blob/master/docs/quick-start-docker.md)
 * [Installation guides](https://github.com/raintank/metrictank/blob/master/docs/installation.md)
 * [Configuration](https://github.com/raintank/metrictank/blob/master/docs/config.md)
