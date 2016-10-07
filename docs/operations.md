@@ -35,9 +35,10 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 * stop the primary: `curl -X POST -d primary=false http://<node>:6060/cluster`
 * make sure it's finished saving metricpersist messages (see its dashboard)
-* pick a candidate secondary to promote. (any node that has `promotion wait` value in its dashboard as 0, or as low as possible). It needs to run for a while, based on your chunkspan settings
-* promote the node to primary: `curl -X POST -d primary=true http://<node>:6060/cluster`
+* promote the candidate to primary: `curl -X POST -d primary=true http://<node>:6060/cluster`
 * you can verify the cluster status through `curl http://<node>:6060/cluster` or on the Grafana dashboard (see above)
+
+For more information see [Clustering: Promoting a secondary to primary](https://github.com/raintank/metrictank/blob/master/docs/clustering.md#promoting-a-secondary-to-primary)
 
 See [HTTP api docs](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
 
