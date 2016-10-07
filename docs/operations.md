@@ -41,7 +41,10 @@ Metrictank crashed. What to do?
 1) Check `dmesg` to see if it was killed by the kernel, maybe it was consuming too much RAM
    If it was, check the grafana dashboard which may explain why. (sudden increase in ingested data? increase in requests or the amount of data requested? slow requests?)
    Tips:
-   * The [profiletrigger](https://github.com/raintank/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger a memory profile and save it to disk.  This can be very helpful if suddently memory usage spikes up and then metrictank gets killed in seconds or minutes.  It helps diagnose problems in the code base that may lead to memory savings.  The profiletrigger looks at the `bytes_alloc.not_freed` metric which is just memory allocated within the runtime.  Amount of memory consumed by the process may be twice this.  So as a rule of thumb, if you have a system running just metrictank, set it to about 40% of available memory.
+   * The [profiletrigger](https://github.com/raintank/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger
+   a memory profile and save it to disk.  This can be very helpful if suddently memory usage spikes up and then metrictank gets killed in seconds or minutes.  
+   It helps diagnose problems in the codebase that may lead to memory savings.  The profiletrigger looks at the `bytes_sys` metric which is
+   the amount of memory consumed by the process.
    * Use [rollups](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
 2) Check the metrictank log.
    If it exited due to a panic, you should probably open a [ticket](https://github.com/raintank/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceeding log data.

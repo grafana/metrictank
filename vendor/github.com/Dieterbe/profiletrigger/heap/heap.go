@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
-// Heap will check every checkEvery for memory used (allocated minus free) to reach or exceed the threshold and take a memory profile to the path directory,
+// Heap will check every checkEvery for memory obtained from the system, by the process
+// - using the metric Sys at https://golang.org/pkg/runtime/#MemStats -
+// whether it reached or exceeds the threshold and take a memory profile to the path directory,
 // but no more often than every minTimeDiff seconds
 // any errors will be sent to the errors channel
 type Heap struct {
@@ -47,7 +49,7 @@ func (heap Heap) Run() {
 	for ts := range tick.C {
 		runtime.ReadMemStats(m)
 		unix := ts.Unix()
-		if m.Alloc >= uint64(heap.threshold) && unix >= heap.lastUnix+int64(heap.minTimeDiff) {
+		if m.Sys >= uint64(heap.threshold) && unix >= heap.lastUnix+int64(heap.minTimeDiff) {
 			f, err := os.Create(fmt.Sprintf("%s/%d.profile-heap", heap.path, unix))
 			if err != nil {
 				heap.logError(err)
