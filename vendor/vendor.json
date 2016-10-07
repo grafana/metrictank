@@ -9,10 +9,11 @@
 			"revisionTime": "2015-09-30T14:07:41Z"
 		},
 		{
-			"checksumSHA1": "GbgPwWPwxTliU7wwIwp93GcU+E4=",
+			"checksumSHA1": "P8h2SWEK3NsJleSPe+mVNNpLG6Y=",
+			"origin": "github.com/raintank/metrictank/vendor/github.com/Dieterbe/profiletrigger/heap",
 			"path": "github.com/Dieterbe/profiletrigger/heap",
-			"revision": "49951b329b2f0508075c2e8505599470bf7b20e3",
-			"revisionTime": "2016-05-24T13:14:35Z"
+			"revision": "d90c4b0cfeed756381675e85cc6e6b8a02cb01a6",
+			"revisionTime": "2016-10-07T15:24:48Z"
 		},
 		{
 			"checksumSHA1": "AAXMx9vb6vmVZF2ieqNepAfeJFM=",

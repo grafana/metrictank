@@ -109,7 +109,7 @@ proftrigger-path = /tmp
 # minimum time between triggered profiles
 proftrigger-min-diff = 1h
 # if this many bytes allocated, trigger a heap profile
-proftrigger-heap-thresh = 10000000
+proftrigger-heap-thresh = 25000000000
 # only log incoming requests if their timerange is at least this duration. Use 0 to disable
 log-min-dur = 5min
 # only log log-level and higher. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL

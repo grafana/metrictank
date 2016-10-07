@@ -14,11 +14,9 @@ your (infrequent) updates.  The primary won't add them to its in-memory chunks, 
 a counter of total amount of bytes allocated during process lifetime. (incl freed data)
 * `bytes_alloc.not_freed`:  
 a gauge of currently allocated (within the runtime) memory.
-it does not include freed data and drops at every GC run.
-this is what is inspected by the profiletrigger
-note that total memory used by the process can be about 2x this.
+it does not include freed data so it drops at every GC run.
 * `bytes_sys`:  
-the amount of bytes currently obtained from the system
+the amount of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
 * `cluster.promotion_wait`:  
 how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary

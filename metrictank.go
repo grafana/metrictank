@@ -105,7 +105,7 @@ var (
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
-	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 10000000, "if this many bytes allocated, trigger a profile")
+	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
 
 	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
 
@@ -124,13 +124,11 @@ var (
 	points            met.Gauge
 
 	// metric bytes_alloc.not_freed is a gauge of currently allocated (within the runtime) memory.
-	// it does not include freed data and drops at every GC run.
-	// this is what is inspected by the profiletrigger
-	// note that total memory used by the process can be about 2x this.
+	// it does not include freed data so it drops at every GC run.
 	alloc met.Gauge
 	// metric bytes_alloc.incl_freed is a counter of total amount of bytes allocated during process lifetime. (incl freed data)
 	totalAlloc met.Gauge
-	// metric bytes_sys is the amount of bytes currently obtained from the system
+	// metric bytes_sys is the amount of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
 	sysBytes       met.Gauge
 	clusterPrimary met.Gauge
 
