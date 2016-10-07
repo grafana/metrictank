@@ -126,10 +126,15 @@ var (
 	totalAlloc        met.Gauge
 	sysBytes          met.Gauge
 	clusterPrimary    met.Gauge
-	clusterPromoWait  met.Gauge
-	gcNum             met.Gauge // go GC
-	gcDur             met.Gauge // go GC
-	gcCpuFraction     met.Gauge // go GC
+
+	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
+	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
+	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
+	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+	clusterPromoWait met.Gauge
+	gcNum            met.Gauge // go GC
+	gcDur            met.Gauge // go GC
+	gcCpuFraction    met.Gauge // go GC
 
 	promotionReadyAtChan chan uint32
 )

@@ -18,3 +18,8 @@ has already been saved by a primary.  A secondary can add this data to its chunk
 the amount of currently known metrics (excl rollup series), measured every second
 * `gc_metric`:  
 the amount of times the metrics GC is about to inspect a metric (series)
+* `cluster.promotion_wait`:  
+how long a candidate (secondary node) has to wait until it can become a primary
+When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
+and it was able to save its complete chunks, this node will be able to take over without dataloss.
+You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
