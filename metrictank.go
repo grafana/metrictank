@@ -122,10 +122,17 @@ var (
 	reqHandleDuration met.Timer
 	inItems           met.Meter
 	points            met.Gauge
-	alloc             met.Gauge
-	totalAlloc        met.Gauge
-	sysBytes          met.Gauge
-	clusterPrimary    met.Gauge
+
+	// metric bytes_alloc.not_freed is a gauge of currently allocated (within the runtime) memory.
+	// it does not include freed data and drops at every GC run.
+	// this is what is inspected by the profiletrigger
+	// note that total memory used by the process can be about 2x this.
+	alloc met.Gauge
+	// metric bytes_alloc.incl_freed is a counter of total amount of bytes allocated during process lifetime. (incl freed data)
+	totalAlloc met.Gauge
+	// metric bytes_sys is the amount of bytes currently obtained from the system
+	sysBytes       met.Gauge
+	clusterPrimary met.Gauge
 
 	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
 	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary

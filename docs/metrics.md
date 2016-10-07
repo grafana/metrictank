@@ -10,6 +10,15 @@ when that chunk is already being saved (or has been saved).
 this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 your (infrequent) updates.  The primary won't add them to its in-memory chunks, but secondaries will
 (because they are never in "saving" state for them), see below.
+* `bytes_alloc.incl_freed`:  
+a counter of total amount of bytes allocated during process lifetime. (incl freed data)
+* `bytes_alloc.not_freed`:  
+a gauge of currently allocated (within the runtime) memory.
+it does not include freed data and drops at every GC run.
+this is what is inspected by the profiletrigger
+note that total memory used by the process can be about 2x this.
+* `bytes_sys`:  
+the amount of bytes currently obtained from the system
 * `cluster.promotion_wait`:  
 how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
