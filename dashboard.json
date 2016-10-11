@@ -221,7 +221,7 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "format": "hertz",
               "logBase": 1,
               "max": null,
               "min": null,
@@ -631,7 +631,7 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "format": "hertz",
               "logBase": 1,
               "max": null,
               "min": null,
