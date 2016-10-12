@@ -42,10 +42,10 @@ Inside your copy of the repository, you can bring up the stack like so:
 ```
 cd docker
 docker-compose up
-
-# if this gives you the error: "service 'version' doesn't have any configuration options"
-# your version of `docker-compose` is too old and you need to update to >=1.7.
 ```
+
+If this gives you the error `service 'version' doesn't have any configuration options`,
+your version of `docker-compose` is too old and you need to update to >=1.7.
 
 A bunch of text will whiz past on your screen, but you should see
 
@@ -56,12 +56,13 @@ metrictank_1     | waiting for cassandra:9042 to become up...
 statsdaemon_1    | 2016/08/04 12:31:22 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
 ```
 
-And a little bit later:
+And a little bit later you should see that metrictank starts its listener and statsdaemon connects to metrictank:
 
 ```
 metrictank_1       | 2016/08/04 11:28:24 [I] DefCache initialized in 50.40667ms. starting data consumption
 metrictank_1       | 2016/08/04 11:28:24 [I] carbon-in: listening on :2003/tcp
 metrictank_1       | 2016/08/04 11:28:24 [I] starting listener for metrics and http/debug on :6060
+statsdaemon_1      | 2016/08/04 11:28:25 now connected to metrictank:2003
 ```
 
 Once the stack is up, metrictank should be running on port 6060.  
@@ -87,14 +88,15 @@ When you hit save, Grafana should succeed in talking to the data source.
 Note: it also works with `proxy` mode but then you have to enter `http://graphite-api:8080` as uri.
 
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
-In the metrics tab you should see a bunch of metrics already: 
+In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
-* data under `stats`: these are metrics coming from metrictank and graphite-api.  
+* `stats`: these are metrics coming from metrictank and graphite-api.  
   i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
   and statsdaemon sends aggregated metrics into metrictank's carbon port.  Statsdaemon flushes every second.
-* statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* after about 5 minutes you'll also have some usage metrics show up under `metrictank`. See
+* `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
+* `metrictank`: usage metrics reported by metrictank.  See
 [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
+It may take a few minutes for the usage metrics to show up.
 
 
 Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,
@@ -104,6 +106,12 @@ You can also send your own data into metrictank using the carbon input, like so:
 
 ```
 echo "example.metric 123 $(date +%s)" | nc localhost 2003
+```
+
+Or into statsdaemon - which will compute statistical summaries - like so:
+
+```
+echo "hits:1|c" | nc -w 1 -u localhost 8125
 ```
 
 
@@ -117,8 +125,12 @@ It will show a dialog with a choice of which graphite datasource to use, for whi
 
 You should now have a functioning dashboard showing all metrictank's internal metrics, which it reports via statsdaemon, back into itself.
 
+Another dashboard you can import for instant gratification is the [statsdaemon](https://grafana.net/dashboards/297) dashboard, which shows you
+metrics about the metrics.  Very meta.
 
-Feel free to play around more, send in more data, create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
+Now you can send in more data [using the plaintext protocol](http://graphite.readthedocs.io/en/latest/feeding-carbon.html) or using any
+of the plethora of [tools that can send data in carbon format](http://graphite.readthedocs.io/en/latest/tools.html)
+, create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
 
 If anything doesn't work, please let us know via a ticket on github or reach out on slack. See
 [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
