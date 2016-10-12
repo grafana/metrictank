@@ -27,7 +27,8 @@ Just make sure to have a properly configured statsd setup (or adjust the dashboa
 If you expect consistent or predictable load, you may also want to monitor:
 
 * `stats.*.metric_tank.*.chunks.save_ok`: amount of saved chunks (based on your chunkspan settings)
-* `stats.*.timers.metric_tank.*.requests_span.*.count_ps` : volume of requests metrictank receives
+* `stats.*.timers.metrictank.*.request_handle_duration.count_ps` : rate per second of render requests
+* `stats.*.timers.metric_tank.*.requests_span.*.count_ps` : rate per second of series lookups
 
 
 
