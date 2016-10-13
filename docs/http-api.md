@@ -60,7 +60,7 @@ POST /render
 * maxDataPoints: int (default: 800)
 * target: mandatory. one or more metric names or patterns, like graphite.  
   note: **no graphite functions are currently supported** except that
-  you can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
+  you can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
   [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
@@ -78,7 +78,7 @@ POST /get
 
 * header `X-Org-Id` required
 * maxDataPoints: int (default: 800)
-* target: mandatory. one or more UUID's of metrics. You can use `consolidateBy(id, '<fn>')` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
+* target: mandatory. one or more UUID's of metrics. You can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
   [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec)(default: 24 ago) (inclusive)
 * to/until : see [timespec format](#tspec)(default: now) (exclusive)

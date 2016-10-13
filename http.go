@@ -22,6 +22,7 @@ import (
 )
 
 var errMetricNotFound = errors.New("metric not found")
+var errTargetParse = errors.New("target parse error")
 
 var bufPool = sync.Pool{
 	New: func() interface{} { return make([]byte, 0) },
@@ -263,13 +264,20 @@ func Get(w http.ResponseWriter, req *http.Request, store mdata.Store, metricInde
 		// once we need to support several functions, we can implement
 		// a proper expression parser
 		if strings.HasPrefix(target, "consolidateBy(") {
+			var q1, q2 int
 			t := target
-			if t[len(t)-2:] != "')" || (!strings.Contains(t, ",'") && !strings.Contains(t, ", '")) || strings.Count(t, "'") != 2 {
-				http.Error(w, "target parse error", http.StatusBadRequest)
+			if t[len(t)-2:] == "')" && (strings.Contains(t, ",'") || strings.Contains(t, ", '")) && strings.Count(t, "'") == 2 {
+				q1 = strings.Index(t, "'")
+				q2 = strings.LastIndex(t, "'")
+			} else if t[len(t)-2:] == "\")" && (strings.Contains(t, ",\"") || strings.Contains(t, ", \"")) && strings.Count(t, "\"") == 2 {
+				q1 = strings.Index(t, "\"")
+				q2 = strings.LastIndex(t, "\"")
+			} else {
+				http.Error(w, errTargetParse.Error(), http.StatusBadRequest)
 				return
 			}
-			consolidateBy = target[strings.Index(target, "'")+1 : strings.LastIndex(target, "'")]
-			id = target[strings.Index(target, "(")+1 : strings.LastIndex(target, ",")]
+			consolidateBy = t[q1+1 : q2]
+			id = t[strings.Index(t, "(")+1 : strings.LastIndex(t, ",")]
 		}
 
 		if legacy {
