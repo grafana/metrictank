@@ -17,7 +17,6 @@ import (
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
-	"github.com/benbjohnson/clock"
 	"github.com/raintank/dur"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
@@ -360,7 +359,7 @@ func main() {
 
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
-	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
+	usg := usage.New(time.Second*time.Duration(accountingPeriod), int(accountingPeriod), metrics, metricIndex)
 
 	handlers := make([]mdata.ClusterHandler, 0)
 	if clNSQ.Enabled {

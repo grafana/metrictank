@@ -3,15 +3,14 @@
 package usage
 
 import (
-	"github.com/benbjohnson/clock"
+	"sync"
+	"time"
+
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
-	"sync"
-	"time"
 )
 
-var Clock clock.Clock
 var metrics mdata.Metrics
 var metricIndex idx.MetricIndex
 
@@ -23,20 +22,27 @@ type orgstat struct {
 // tracks for every org
 type Usage struct {
 	sync.Mutex
-	period uint32
-	now    map[int]orgstat
-	prev   map[int]orgstat
-	stop   chan struct{}
+	period  time.Duration
+	seconds int
+	now     map[int]orgstat
+	prev    map[int]orgstat
+	stop    chan struct{}
 }
 
-func New(period uint32, m mdata.Metrics, i idx.MetricIndex, cl clock.Clock) *Usage {
+// New creates a new Usage reporter, reporting every period
+// secs controls the second-level interval of the output metrics
+// it's up to the caller to set this in accordance to period
+// we could deduce this from period using int(period.Seconds()) but I'm
+// concerned of float-to-int conversion rounding errors
+// for unit testing, the value of secs doesn't really matter
+func New(period time.Duration, secs int, m mdata.Metrics, i idx.MetricIndex) *Usage {
 	metrics = m
 	metricIndex = i
-	Clock = cl
 	ret := &Usage{
-		period: period,
-		now:    make(map[int]orgstat),
-		stop:   make(chan struct{}),
+		period:  period,
+		seconds: secs,
+		now:     make(map[int]orgstat),
+		stop:    make(chan struct{}),
 	}
 	go ret.Report()
 	return ret
@@ -74,22 +80,21 @@ func (u *Usage) set(org int, key string, points uint32) {
 }
 
 func (u *Usage) Report() {
-	period := time.Duration(u.period) * time.Second
 	// provides "clean" ticks at precise intervals, and delivers them shortly after
 	tick := func() chan time.Time {
-		now := Clock.Now()
+		now := time.Now()
 		nowUnix := now.UnixNano()
-		diff := period - (time.Duration(nowUnix) % period)
+		diff := u.period - (time.Duration(nowUnix) % u.period)
 		ideal := now.Add(diff)
 		ch := make(chan time.Time)
 		go func() {
-			Clock.Sleep(diff)
+			time.Sleep(diff)
 			ch <- ideal
 		}()
 		return ch
 	}
 	met := schema.MetricData{
-		Interval: int(u.period),
+		Interval: u.seconds,
 		Tags:     []string{},
 	}
 
