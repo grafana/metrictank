@@ -10,6 +10,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cass"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -25,10 +26,11 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_def_idx (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
-	idxCasOk             met.Count
-	idxCasFail           met.Count
+	idxCasOk             met.Count // metric idx.cassadra.ok is how many metrics are successfully being indexed
+	idxCasFail           met.Count // metric idx.cassandra.fail is how failures encountered while trying to index metrics
 	idxCasAddDuration    met.Timer
 	idxCasDeleteDuration met.Timer
+	metrics              cass.Metrics
 
 	Enabled         bool
 	keyspace        string
@@ -129,6 +131,8 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	idxCasFail = stats.NewCount("idx.cassandra.fail")
 	idxCasAddDuration = stats.NewTimer("idx.cassandra.add_duration", 0)
 	idxCasDeleteDuration = stats.NewTimer("idx.cassandra.delete_duration", 0)
+	metrics = cass.Metrics{}
+	metrics.Init("idx.cassandra", stats)
 
 	for i := 0; i < numConns; i++ {
 		c.wg.Add(1)
@@ -219,6 +223,7 @@ func (c *CasIdx) processWriteQueue() {
 		for !success {
 			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data).Exec(); err != nil {
 				idxCasFail.Inc(1)
+				metrics.Inc(err)
 				if (attempts % 20) == 0 {
 					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
 				}
@@ -252,6 +257,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 			attempts++
 			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
 			if cErr != nil {
+				metrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 				time.Sleep(time.Second)
 			} else {
@@ -274,6 +280,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 			attempts++
 			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
 			if cErr != nil {
+				metrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 				time.Sleep(time.Second)
 			} else {
