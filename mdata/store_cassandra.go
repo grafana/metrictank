@@ -49,6 +49,13 @@ var (
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
 	chunkSizeAtSave met.Meter
 	chunkSizeAtLoad met.Meter
+
+	cassErrTimeout         met.Count
+	cassErrTooManyTimeouts met.Count
+	cassErrConnClosed      met.Count
+	cassErrNoConns         met.Count
+	cassErrUnavailable     met.Count
+	cassErrOther           met.Count
 )
 
 /*
@@ -124,6 +131,14 @@ func (c *cassandraStore) InitMetrics(stats met.Backend) {
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
 	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
 	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
+
+	cassErrTimeout = stats.NewCount("cassandra.error.timeout")
+	cassErrTooManyTimeouts = stats.NewCount("cassandra.error.too-many-timeouts")
+	cassErrConnClosed = stats.NewCount("cassandra.error.conn-closed")
+	cassErrNoConns = stats.NewCount("cassandra.error.no-connections")
+	cassErrUnavailable = stats.NewCount("cassandra.error.unavailable")
+	cassErrOther = stats.NewCount("cassandra.error.other")
+
 }
 
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
@@ -314,10 +329,24 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 			}
 			iters = append(iters, iter.New(it, true))
 		}
-		cassChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
+			if err == gocql.ErrTimeoutNoResponse {
+				cassErrTimeout.Inc(1)
+			} else if err == gocql.ErrTooManyTimeouts {
+				cassErrTooManyTimeouts.Inc(1)
+			} else if err == gocql.ErrConnectionClosed {
+				cassErrConnClosed.Inc(1)
+			} else if err == gocql.ErrNoConnections {
+				cassErrNoConns.Inc(1)
+			} else if err == gocql.ErrUnavailable {
+				cassErrUnavailable.Inc(1)
+			} else {
+				cassErrOther.Inc(1)
+			}
+		} else {
+			cassChunksPerRow.Value(chunks)
 		}
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
