@@ -12,6 +12,7 @@ import (
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cass"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -49,13 +50,6 @@ var (
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
 	chunkSizeAtSave met.Meter
 	chunkSizeAtLoad met.Meter
-
-	cassErrTimeout         met.Count
-	cassErrTooManyTimeouts met.Count
-	cassErrConnClosed      met.Count
-	cassErrNoConns         met.Count
-	cassErrUnavailable     met.Count
-	cassErrOther           met.Count
 )
 
 /*
@@ -70,6 +64,7 @@ type cassandraStore struct {
 	writeQueues      []chan *ChunkWriteRequest
 	readQueue        chan *ChunkReadRequest
 	writeQueueMeters []met.Meter
+	metrics          cass.Metrics
 }
 
 func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
@@ -103,6 +98,7 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		writeQueueMeters: make([]met.Meter, writers),
+		metrics:          cass.Metrics{},
 	}
 
 	for i := 0; i < writers; i++ {
@@ -132,13 +128,7 @@ func (c *cassandraStore) InitMetrics(stats met.Backend) {
 	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
 	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
 
-	cassErrTimeout = stats.NewCount("cassandra.error.timeout")
-	cassErrTooManyTimeouts = stats.NewCount("cassandra.error.too-many-timeouts")
-	cassErrConnClosed = stats.NewCount("cassandra.error.conn-closed")
-	cassErrNoConns = stats.NewCount("cassandra.error.no-connections")
-	cassErrUnavailable = stats.NewCount("cassandra.error.unavailable")
-	cassErrOther = stats.NewCount("cassandra.error.other")
-
+	c.metrics.Init("cassandra", stats)
 }
 
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
@@ -332,19 +322,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		err := outcome.i.Close()
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
-			if err == gocql.ErrTimeoutNoResponse {
-				cassErrTimeout.Inc(1)
-			} else if err == gocql.ErrTooManyTimeouts {
-				cassErrTooManyTimeouts.Inc(1)
-			} else if err == gocql.ErrConnectionClosed {
-				cassErrConnClosed.Inc(1)
-			} else if err == gocql.ErrNoConnections {
-				cassErrNoConns.Inc(1)
-			} else if err == gocql.ErrUnavailable {
-				cassErrUnavailable.Inc(1)
-			} else {
-				cassErrOther.Inc(1)
-			}
+			c.metrics.Inc(err)
 		} else {
 			cassChunksPerRow.Value(chunks)
 		}
