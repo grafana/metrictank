@@ -650,7 +650,8 @@
           "aliasColors": {
             "max": "#890F02",
             "median": "#CCA300",
-            "p90": "#C15C17"
+            "p90": "#C15C17",
+            "reqs": "#2F575E"
           },
           "bars": false,
           "datasource": "${DS_GRAPHITE}",
@@ -689,6 +690,15 @@
               "points": false,
               "stack": true,
               "yaxis": 2
+            },
+            {
+              "alias": "reqs",
+              "yaxis": 2,
+              "lines": true,
+              "fill": 0,
+              "linewidth": 1,
+              "points": false,
+              "nullPointMode": "null as zero"
             }
           ],
           "span": 4,
@@ -710,11 +720,15 @@
             {
               "refId": "D",
               "target": "aliasByNode(perSecond(collectd.$environment.metric-tank.$host.cpu.*.cpu.idle), 5, 7)"
+            },
+            {
+              "refId": "E",
+              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.count_ps, 'reqs')"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "request handle duration (all steps)",
+          "title": "render request duration (all steps)",
           "tooltip": {
             "msResolution": false,
             "shared": true,
@@ -925,7 +939,7 @@
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "requests rate",
+          "title": "series requests rate",
           "tooltip": {
             "msResolution": false,
             "shared": true,
@@ -1025,7 +1039,7 @@
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "Duration breakdown per step",
+          "title": "render request duration per step",
           "tooltip": {
             "msResolution": false,
             "shared": true,
