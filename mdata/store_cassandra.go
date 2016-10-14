@@ -67,7 +67,7 @@ type cassandraStore struct {
 	metrics          cassandra.Metrics
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -89,6 +89,7 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 	}
 	tmpSession.Close()
 	cluster.Keyspace = keyspace
+	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err

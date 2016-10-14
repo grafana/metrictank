@@ -92,6 +92,7 @@ var (
 	cassandraWriteConcurrency = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraReadQueueSize    = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize   = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
+	cassandraRetries          = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
 	cqlProtocolVersion        = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	// Profiling, instrumentation and logging:
@@ -301,7 +302,7 @@ func main() {
 		go trigger.Run()
 	}
 
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cqlProtocolVersion)
+	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
