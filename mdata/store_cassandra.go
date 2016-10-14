@@ -173,6 +173,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc(1)
 				} else {
+					c.metrics.Inc(err)
 					if (attempts % 20) == 0 {
 						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
 					}
