@@ -13,4 +13,3 @@ cp ../build/metrictank build/
 docker build -t raintank/metrictank .
 docker tag raintank/metrictank raintank/metrictank:latest
 docker tag raintank/metrictank raintank/metrictank:$VERSION
-

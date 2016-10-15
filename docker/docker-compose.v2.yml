@@ -8,7 +8,7 @@ services:
      - "2003:2003"
     environment:
      WAIT_HOSTS: cassandra:9042
-     WAIT_TIMEOUT: 40
+     WAIT_TIMEOUT: 60
     links:
      - statsdaemon
      - cassandra

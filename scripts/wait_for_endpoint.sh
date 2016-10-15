@@ -7,9 +7,11 @@ WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
 timeout_exec=$(readlink `which timeout` | awk -F '/' '{print $NF}')
 if [ "${timeout_exec}" = "busybox" ]
 then
-    BUSYBOX=1
+  echo "using busybox"
+  BUSYBOX=1
 else
-    BUSYBOX=0
+  echo "not using busybox"
+  BUSYBOX=0
 fi
 
 for endpoint in $(echo $WAIT_HOSTS | tr "," "\n")
@@ -38,7 +40,7 @@ do
     then
       timeout -t 3 nc ${host} ${port}
       retval=${?}
-      expected=143
+      expected=0
     else
       timeout 3 nc ${host} ${port}
       retval=${?}
