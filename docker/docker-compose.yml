@@ -1,1 +1,42 @@
-docker-compose.v2.yml
+version: '2'
+services:
+  metrictank:
+    hostname: metrictank-1
+    image: raintank/metrictank
+    ports:
+     - "6060:6060"
+     - "2003:2003"
+    environment:
+     WAIT_HOSTS: cassandra:9042
+     WAIT_TIMEOUT: 60
+    links:
+     - statsdaemon
+     - cassandra
+     - elasticsearch
+  cassandra:
+    image: cassandra:3.0.8
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+  statsdaemon:
+    hostname: statsdaemon-1
+    build: statsdaemon/
+    ports:
+     - "8125:8125/udp"
+  graphite-api:
+    hostname: graphite-api-1
+    build: graphite-api/
+    ports:
+     - "8080:8080"
+    links:
+     - metrictank
+     - statsdaemon
+     - elasticsearch
+  elasticsearch:
+    image: elasticsearch
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    links:
+      - graphite-api

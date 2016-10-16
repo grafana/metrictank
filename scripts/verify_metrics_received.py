@@ -28,23 +28,29 @@ request_parameters = {
         'maxDataPoints': sys.argv[3],
     },
     'data': {
-        'target': 'stats.docker-env.metrictank.metrictank-1.carbon.metrics_received',
+        'target':
+            'stats.docker-env.metrictank.metrictank-1.carbon.metrics_received',
     },
 }
 
 # wait while metrics are being generated
 time.sleep(int(sys.argv[3]))
 
-#result = requests.post(url, data=data, params=params)
 result = requests.post(**request_parameters)
 
 if result.status_code != 200:
-    error('received bad response status code')
+    error(
+        'received bad response status code: {code}'
+        .format(code=result.status_code)
+    )
 
 try:
     parsed_result = json.loads(result.text)
 except Exception:
-    error('failed to parse response')
+    error(
+        'failed to parse response: {text}'
+        .format(text=result.text)
+    )
 
 # verify the format and content of the response is as we expect it
 if (
