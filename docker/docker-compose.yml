@@ -12,7 +12,6 @@ services:
     links:
      - statsdaemon
      - cassandra
-     - elasticsearch
   cassandra:
     image: cassandra:3.0.8
   statsdaemon:
@@ -30,11 +29,8 @@ services:
     links:
      - metrictank
      - statsdaemon
-     - elasticsearch
     volumes:
      - "./graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
-  elasticsearch:
-    image: elasticsearch
   grafana:
     image: grafana/grafana
     ports:
