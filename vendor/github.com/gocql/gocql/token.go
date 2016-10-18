@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/gocql/gocql/internal/murmur"
 )
 
 // a token partitioner
@@ -36,7 +38,7 @@ func (p murmur3Partitioner) Name() string {
 }
 
 func (p murmur3Partitioner) Hash(partitionKey []byte) token {
-	h1 := murmur3H1(partitionKey)
+	h1 := murmur.Murmur3H1(partitionKey)
 	return murmur3Token(int64(h1))
 }
 
@@ -87,13 +89,17 @@ func (r randomPartitioner) Name() string {
 	return "RandomPartitioner"
 }
 
-func (p randomPartitioner) Hash(partitionKey []byte) token {
-	hash := md5.New()
-	sum := hash.Sum(partitionKey)
+// 2 ** 128
+var maxHashInt, _ = new(big.Int).SetString("340282366920938463463374607431768211456", 10)
 
+func (p randomPartitioner) Hash(partitionKey []byte) token {
+	sum := md5.Sum(partitionKey)
 	val := new(big.Int)
-	val = val.SetBytes(sum)
-	val = val.Abs(val)
+	val.SetBytes(sum[:])
+	if sum[0] > 127 {
+		val.Sub(val, maxHashInt)
+		val.Abs(val)
+	}
 
 	return (*randomToken)(val)
 }
@@ -119,7 +125,7 @@ type tokenRing struct {
 	hosts       []*HostInfo
 }
 
-func newTokenRing(partitioner string, hosts []HostInfo) (*tokenRing, error) {
+func newTokenRing(partitioner string, hosts []*HostInfo) (*tokenRing, error) {
 	tokenRing := &tokenRing{
 		tokens: []token{},
 		hosts:  []*HostInfo{},
@@ -135,9 +141,8 @@ func newTokenRing(partitioner string, hosts []HostInfo) (*tokenRing, error) {
 		return nil, fmt.Errorf("Unsupported partitioner '%s'", partitioner)
 	}
 
-	for i := range hosts {
-		host := &hosts[i]
-		for _, strToken := range host.Tokens {
+	for _, host := range hosts {
+		for _, strToken := range host.Tokens() {
 			token := tokenRing.partitioner.ParseString(strToken)
 			tokenRing.tokens = append(tokenRing.tokens, token)
 			tokenRing.hosts = append(tokenRing.hosts, host)
@@ -179,7 +184,7 @@ func (t *tokenRing) String() string {
 		buf.WriteString("]")
 		buf.WriteString(t.tokens[i].String())
 		buf.WriteString(":")
-		buf.WriteString(t.hosts[i].Peer)
+		buf.WriteString(t.hosts[i].Peer())
 	}
 	buf.WriteString("\n}")
 	return string(buf.Bytes())
