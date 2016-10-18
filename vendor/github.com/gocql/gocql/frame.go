@@ -205,6 +205,22 @@ func ParseConsistency(s string) Consistency {
 	}
 }
 
+// ParseConsistencyWrapper wraps gocql.ParseConsistency to provide an err
+// return instead of a panic
+func ParseConsistencyWrapper(s string) (consistency Consistency, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("ParseConsistencyWrapper: %v", r)
+			}
+		}
+	}()
+	consistency = ParseConsistency(s)
+	return consistency, nil
+}
+
 type SerialConsistency uint16
 
 const (
@@ -228,8 +244,10 @@ const (
 )
 
 var (
-	ErrFrameTooBig = errors.New("frame length is bigger than the maximum alowed")
+	ErrFrameTooBig = errors.New("frame length is bigger than the maximum allowed")
 )
+
+const maxFrameHeaderSize = 9
 
 func writeInt(p []byte, n int32) {
 	p[0] = byte(n >> 24)
@@ -252,11 +270,12 @@ func readShort(p []byte) uint16 {
 }
 
 type frameHeader struct {
-	version protoVersion
-	flags   byte
-	stream  int
-	op      frameOp
-	length  int
+	version       protoVersion
+	flags         byte
+	stream        int
+	op            frameOp
+	length        int
+	customPayload map[string][]byte
 }
 
 func (f frameHeader) String() string {
@@ -338,23 +357,34 @@ type frame interface {
 }
 
 func readHeader(r io.Reader, p []byte) (head frameHeader, err error) {
-	_, err = io.ReadFull(r, p)
+	_, err = io.ReadFull(r, p[:1])
 	if err != nil {
-		return
+		return frameHeader{}, err
 	}
 
 	version := p[0] & protoVersionMask
 
 	if version < protoVersion1 || version > protoVersion4 {
-		err = fmt.Errorf("gocql: invalid version: %x", version)
-		return
+		return frameHeader{}, fmt.Errorf("gocql: unsupported response version: %d", version)
 	}
+
+	headSize := 9
+	if version < protoVersion3 {
+		headSize = 8
+	}
+
+	_, err = io.ReadFull(r, p[1:headSize])
+	if err != nil {
+		return frameHeader{}, err
+	}
+
+	p = p[:headSize]
 
 	head.version = protoVersion(p[0])
 	head.flags = p[1]
 
 	if version > protoVersion2 {
-		if len(p) < 9 {
+		if len(p) != 9 {
 			return frameHeader{}, fmt.Errorf("not enough bytes to read header require 9 got: %d", len(p))
 		}
 
@@ -362,7 +392,7 @@ func readHeader(r io.Reader, p []byte) (head frameHeader, err error) {
 		head.op = frameOp(p[4])
 		head.length = int(readInt(p[5:]))
 	} else {
-		if len(p) < 8 {
+		if len(p) != 8 {
 			return frameHeader{}, fmt.Errorf("not enough bytes to read header require 8 got: %d", len(p))
 		}
 
@@ -371,7 +401,7 @@ func readHeader(r io.Reader, p []byte) (head frameHeader, err error) {
 		head.length = int(readInt(p[4:]))
 	}
 
-	return
+	return head, nil
 }
 
 // explicitly enables tracing for the framers outgoing requests
@@ -400,9 +430,9 @@ func (f *framer) readFrame(head *frameHeader) error {
 	}
 
 	// assume the underlying reader takes care of timeouts and retries
-	_, err := io.ReadFull(f.r, f.rbuf)
+	n, err := io.ReadFull(f.r, f.rbuf)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read frame body: read %d/%d bytes: %v", n, head.length, err)
 	}
 
 	if head.flags&flagCompress == flagCompress {
@@ -446,7 +476,11 @@ func (f *framer) parseFrame() (frame frame, err error) {
 		}
 	}
 
-	// asumes that the frame body has been read into rbuf
+	if f.header.flags&flagCustomPayload == flagCustomPayload {
+		f.header.customPayload = f.readBytesMap()
+	}
+
+	// assumes that the frame body has been read into rbuf
 	switch f.header.op {
 	case opError:
 		frame = f.parseErrorFrame()
@@ -462,6 +496,8 @@ func (f *framer) parseFrame() (frame frame, err error) {
 		frame = f.parseAuthChallengeFrame()
 	case opAuthSuccess:
 		frame = f.parseAuthSuccessFrame()
+	case opEvent:
+		frame = f.parseEventFrame()
 	default:
 		return nil, NewErrProtocol("unknown op in frame header: %s", f.header.op)
 	}
@@ -537,6 +573,16 @@ func (f *framer) parseErrorFrame() frame {
 		res.BlockFor = f.readInt()
 		res.DataPresent = f.readByte() != 0
 		return res
+	case errWriteFailure:
+		res := &RequestErrWriteFailure{
+			errorFrame: errD,
+		}
+		res.Consistency = f.readConsistency()
+		res.Received = f.readInt()
+		res.BlockFor = f.readInt()
+		res.NumFailures = f.readInt()
+		res.WriteType = f.readString()
+		return res
 	case errFunctionFailure:
 		res := RequestErrFunctionFailure{
 			errorFrame: errD,
@@ -545,8 +591,12 @@ func (f *framer) parseErrorFrame() frame {
 		res.Function = f.readString()
 		res.ArgTypes = f.readStringList()
 		return res
+	case errInvalid, errBootstrapping, errConfig, errCredentials, errOverloaded,
+		errProtocol, errServer, errSyntax, errTruncate, errUnauthorized:
+		// TODO(zariel): we should have some distinct types for these errors
+		return errD
 	default:
-		return &errD
+		panic(fmt.Errorf("unknown error code: 0x%x", errD.code))
 	}
 }
 
@@ -592,7 +642,7 @@ func (f *framer) setLength(length int) {
 
 func (f *framer) finishWrite() error {
 	if len(f.wbuf) > maxFrameSize {
-		// huge app frame, lets remove it so it doesnt bloat the heap
+		// huge app frame, lets remove it so it doesn't bloat the heap
 		f.wbuf = make([]byte, defaultBufSize)
 		return ErrFrameTooBig
 	}
@@ -756,19 +806,19 @@ type preparedMetadata struct {
 }
 
 func (r preparedMetadata) String() string {
-	return fmt.Sprintf("[paging_metadata flags=0x%x pkey=%q paging_state=% X columns=%v]", r.flags, r.pkeyColumns, r.pagingState, r.columns)
+	return fmt.Sprintf("[prepared flags=0x%x pkey=%v paging_state=% X columns=%v col_count=%d actual_col_count=%d]", r.flags, r.pkeyColumns, r.pagingState, r.columns, r.colCount, r.actualColCount)
 }
 
 func (f *framer) parsePreparedMetadata() preparedMetadata {
 	// TODO: deduplicate this from parseMetadata
 	meta := preparedMetadata{}
-	meta.flags = f.readInt()
 
-	colCount := f.readInt()
-	if colCount < 0 {
-		panic(fmt.Errorf("received negative column count: %d", colCount))
+	meta.flags = f.readInt()
+	meta.colCount = f.readInt()
+	if meta.colCount < 0 {
+		panic(fmt.Errorf("received negative column count: %d", meta.colCount))
 	}
-	meta.actualColCount = colCount
+	meta.actualColCount = meta.colCount
 
 	if f.proto >= protoVersion4 {
 		pkeyCount := f.readInt()
@@ -795,16 +845,16 @@ func (f *framer) parsePreparedMetadata() preparedMetadata {
 	}
 
 	var cols []ColumnInfo
-	if colCount < 1000 {
+	if meta.colCount < 1000 {
 		// preallocate columninfo to avoid excess copying
-		cols = make([]ColumnInfo, colCount)
-		for i := 0; i < colCount; i++ {
+		cols = make([]ColumnInfo, meta.colCount)
+		for i := 0; i < meta.colCount; i++ {
 			f.readCol(&cols[i], &meta.resultMetadata, globalSpec, keyspace, table)
 		}
 	} else {
 		// use append, huge number of columns usually indicates a corrupt frame or
 		// just a huge row.
-		for i := 0; i < colCount; i++ {
+		for i := 0; i < meta.colCount; i++ {
 			var col ColumnInfo
 			f.readCol(&col, &meta.resultMetadata, globalSpec, keyspace, table)
 			cols = append(cols, col)
@@ -822,7 +872,8 @@ type resultMetadata struct {
 	// only if flagPageState
 	pagingState []byte
 
-	columns []ColumnInfo
+	columns  []ColumnInfo
+	colCount int
 
 	// this is a count of the total number of columns which can be scanned,
 	// it is at minimum len(columns) but may be larger, for instance when a column
@@ -854,15 +905,14 @@ func (f *framer) readCol(col *ColumnInfo, meta *resultMetadata, globalSpec bool,
 }
 
 func (f *framer) parseResultMetadata() resultMetadata {
-	meta := resultMetadata{
-		flags: f.readInt(),
-	}
+	var meta resultMetadata
 
-	colCount := f.readInt()
-	if colCount < 0 {
-		panic(fmt.Errorf("received negative column count: %d", colCount))
+	meta.flags = f.readInt()
+	meta.colCount = f.readInt()
+	if meta.colCount < 0 {
+		panic(fmt.Errorf("received negative column count: %d", meta.colCount))
 	}
-	meta.actualColCount = colCount
+	meta.actualColCount = meta.colCount
 
 	if meta.flags&flagHasMorePages == flagHasMorePages {
 		meta.pagingState = f.readBytes()
@@ -880,17 +930,17 @@ func (f *framer) parseResultMetadata() resultMetadata {
 	}
 
 	var cols []ColumnInfo
-	if colCount < 1000 {
+	if meta.colCount < 1000 {
 		// preallocate columninfo to avoid excess copying
-		cols = make([]ColumnInfo, colCount)
-		for i := 0; i < colCount; i++ {
+		cols = make([]ColumnInfo, meta.colCount)
+		for i := 0; i < meta.colCount; i++ {
 			f.readCol(&cols[i], &meta, globalSpec, keyspace, table)
 		}
 
 	} else {
 		// use append, huge number of columns usually indicates a corrupt frame or
 		// just a huge row.
-		for i := 0; i < colCount; i++ {
+		for i := 0; i < meta.colCount; i++ {
 			var col ColumnInfo
 			f.readCol(&col, &meta, globalSpec, keyspace, table)
 			cols = append(cols, col)
@@ -933,7 +983,8 @@ type resultRowsFrame struct {
 	frameHeader
 
 	meta resultMetadata
-	rows [][][]byte
+	// dont parse the rows here as we only need to do it once
+	numRows int
 }
 
 func (f *resultRowsFrame) String() string {
@@ -941,28 +992,15 @@ func (f *resultRowsFrame) String() string {
 }
 
 func (f *framer) parseResultRows() frame {
-	meta := f.parseResultMetadata()
+	result := &resultRowsFrame{}
+	result.meta = f.parseResultMetadata()
 
-	numRows := f.readInt()
-	if numRows < 0 {
-		panic(fmt.Errorf("invalid row_count in result frame: %d", numRows))
+	result.numRows = f.readInt()
+	if result.numRows < 0 {
+		panic(fmt.Errorf("invalid row_count in result frame: %d", result.numRows))
 	}
 
-	colCount := len(meta.columns)
-
-	rows := make([][][]byte, numRows)
-	for i := 0; i < numRows; i++ {
-		rows[i] = make([][]byte, colCount)
-		for j := 0; j < colCount; j++ {
-			rows[i][j] = f.readBytes()
-		}
-	}
-
-	return &resultRowsFrame{
-		frameHeader: *f.header,
-		meta:        meta,
-		rows:        rows,
-	}
+	return result
 }
 
 type resultKeyspaceFrame struct {
@@ -1005,18 +1043,6 @@ func (f *framer) parseResultPrepared() frame {
 	return frame
 }
 
-type resultSchemaChangeFrame struct {
-	frameHeader
-
-	change   string
-	keyspace string
-	table    string
-}
-
-func (s *resultSchemaChangeFrame) String() string {
-	return fmt.Sprintf("[result_schema_change change=%s keyspace=%s table=%s]", s.change, s.keyspace, s.table)
-}
-
 type schemaChangeKeyspace struct {
 	frameHeader
 
@@ -1051,20 +1077,29 @@ type schemaChangeFunction struct {
 
 func (f *framer) parseResultSchemaChange() frame {
 	if f.proto <= protoVersion2 {
-		frame := &resultSchemaChangeFrame{
-			frameHeader: *f.header,
+		change := f.readString()
+		keyspace := f.readString()
+		table := f.readString()
+
+		if table != "" {
+			return &schemaChangeTable{
+				frameHeader: *f.header,
+				change:      change,
+				keyspace:    keyspace,
+				object:      table,
+			}
+		} else {
+			return &schemaChangeKeyspace{
+				frameHeader: *f.header,
+				change:      change,
+				keyspace:    keyspace,
+			}
 		}
-
-		frame.change = f.readString()
-		frame.keyspace = f.readString()
-		frame.table = f.readString()
-
-		return frame
 	} else {
 		change := f.readString()
 		target := f.readString()
 
-		// TODO: could just use a seperate type for each target
+		// TODO: could just use a separate type for each target
 		switch target {
 		case "KEYSPACE":
 			frame := &schemaChangeKeyspace{
@@ -1154,6 +1189,56 @@ func (f *framer) parseAuthChallengeFrame() frame {
 	}
 }
 
+type statusChangeEventFrame struct {
+	frameHeader
+
+	change string
+	host   net.IP
+	port   int
+}
+
+func (t statusChangeEventFrame) String() string {
+	return fmt.Sprintf("[status_change change=%s host=%v port=%v]", t.change, t.host, t.port)
+}
+
+// essentially the same as statusChange
+type topologyChangeEventFrame struct {
+	frameHeader
+
+	change string
+	host   net.IP
+	port   int
+}
+
+func (t topologyChangeEventFrame) String() string {
+	return fmt.Sprintf("[topology_change change=%s host=%v port=%v]", t.change, t.host, t.port)
+}
+
+func (f *framer) parseEventFrame() frame {
+	eventType := f.readString()
+
+	switch eventType {
+	case "TOPOLOGY_CHANGE":
+		frame := &topologyChangeEventFrame{frameHeader: *f.header}
+		frame.change = f.readString()
+		frame.host, frame.port = f.readInet()
+
+		return frame
+	case "STATUS_CHANGE":
+		frame := &statusChangeEventFrame{frameHeader: *f.header}
+		frame.change = f.readString()
+		frame.host, frame.port = f.readInet()
+
+		return frame
+	case "SCHEMA_CHANGE":
+		// this should work for all versions
+		return f.parseResultSchemaChange()
+	default:
+		panic(fmt.Errorf("gocql: unknown event type: %q", eventType))
+	}
+
+}
+
 type writeAuthResponseFrame struct {
 	data []byte
 }
@@ -1187,7 +1272,8 @@ type queryParams struct {
 	pagingState       []byte
 	serialConsistency SerialConsistency
 	// v3+
-	defaultTimestamp bool
+	defaultTimestamp      bool
+	defaultTimestampValue int64
 }
 
 func (q queryParams) String() string {
@@ -1259,7 +1345,12 @@ func (f *framer) writeQueryParams(opts *queryParams) {
 
 	if f.proto > protoVersion2 && opts.defaultTimestamp {
 		// timestamp in microseconds
-		ts := time.Now().UnixNano() / 1000
+		var ts int64
+		if opts.defaultTimestampValue != 0 {
+			ts = opts.defaultTimestampValue
+		} else {
+			ts = time.Now().UnixNano() / 1000
+		}
 		f.writeLong(ts)
 	}
 }
@@ -1287,6 +1378,12 @@ func (f *framer) writeQueryFrame(streamID int, statement string, params *queryPa
 
 type frameWriter interface {
 	writeFrame(framer *framer, streamID int) error
+}
+
+type frameWriterFunc func(framer *framer, streamID int) error
+
+func (f frameWriterFunc) writeFrame(framer *framer, streamID int) error {
+	return f(framer, streamID)
 }
 
 type writeExecuteFrame struct {
@@ -1333,8 +1430,9 @@ type writeBatchFrame struct {
 	consistency Consistency
 
 	// v3+
-	serialConsistency SerialConsistency
-	defaultTimestamp  bool
+	serialConsistency     SerialConsistency
+	defaultTimestamp      bool
+	defaultTimestampValue int64
 }
 
 func (w *writeBatchFrame) writeFrame(framer *framer, streamID int) error {
@@ -1388,9 +1486,15 @@ func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame) error {
 		if w.serialConsistency > 0 {
 			f.writeConsistency(Consistency(w.serialConsistency))
 		}
+
 		if w.defaultTimestamp {
-			now := time.Now().UnixNano() / 1000
-			f.writeLong(now)
+			var ts int64
+			if w.defaultTimestampValue != 0 {
+				ts = w.defaultTimestampValue
+			} else {
+				ts = time.Now().UnixNano() / 1000
+			}
+			f.writeLong(ts)
 		}
 	}
 
@@ -1405,6 +1509,21 @@ func (w *writeOptionsFrame) writeFrame(framer *framer, streamID int) error {
 
 func (f *framer) writeOptionsFrame(stream int, _ *writeOptionsFrame) error {
 	f.writeHeader(f.flags, opOptions, stream)
+	return f.finishWrite()
+}
+
+type writeRegisterFrame struct {
+	events []string
+}
+
+func (w *writeRegisterFrame) writeFrame(framer *framer, streamID int) error {
+	return framer.writeRegisterFrame(streamID, w)
+}
+
+func (f *framer) writeRegisterFrame(streamID int, w *writeRegisterFrame) error {
+	f.writeHeader(f.flags, opRegister, streamID)
+	f.writeStringList(w.events)
+
 	return f.finishWrite()
 }
 
@@ -1493,18 +1612,27 @@ func (f *framer) readStringList() []string {
 	return l
 }
 
-func (f *framer) readBytes() []byte {
+func (f *framer) readBytesInternal() ([]byte, error) {
 	size := f.readInt()
 	if size < 0 {
-		return nil
+		return nil, nil
 	}
 
 	if len(f.rbuf) < size {
-		panic(fmt.Errorf("not enough bytes in buffer to read bytes require %d got: %d", size, len(f.rbuf)))
+		return nil, fmt.Errorf("not enough bytes in buffer to read bytes require %d got: %d", size, len(f.rbuf))
 	}
 
 	l := f.rbuf[:size]
 	f.rbuf = f.rbuf[size:]
+
+	return l, nil
+}
+
+func (f *framer) readBytes() []byte {
+	l, err := f.readBytesInternal()
+	if err != nil {
+		panic(err)
+	}
 
 	return l
 }
@@ -1562,6 +1690,19 @@ func (f *framer) readStringMap() map[string]string {
 	return m
 }
 
+func (f *framer) readBytesMap() map[string][]byte {
+	size := f.readShort()
+	m := make(map[string][]byte)
+
+	for i := 0; i < int(size); i++ {
+		k := f.readString()
+		v := f.readBytes()
+		m[k] = v
+	}
+
+	return m
+}
+
 func (f *framer) readStringMultiMap() map[string][]string {
 	size := f.readShort()
 	m := make(map[string][]string)
@@ -1577,6 +1718,15 @@ func (f *framer) readStringMultiMap() map[string][]string {
 
 func (f *framer) writeByte(b byte) {
 	f.wbuf = append(f.wbuf, b)
+}
+
+func appendBytes(p []byte, d []byte) []byte {
+	if d == nil {
+		return appendInt(p, -1)
+	}
+	p = appendInt(p, int32(len(d)))
+	p = append(p, d...)
+	return p
 }
 
 func appendShort(p []byte, n uint16) []byte {

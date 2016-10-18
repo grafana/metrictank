@@ -112,10 +112,29 @@
 			"revisionTime": "2015-06-06T11:53:03Z"
 		},
 		{
-			"checksumSHA1": "ZiI9RGmGieCm4+TO6e6GqkPOgeo=",
+			"checksumSHA1": "X3aO3d9K9ALtg4/XI4I9L57FPkM=",
+			"origin": "github.com/raintank/metrictank/vendor/github.com/gocql/gocql",
 			"path": "github.com/gocql/gocql",
-			"revision": "7e6c7975187592f32e17e102423b1c3298f6779e",
-			"revisionTime": "2015-11-19T10:57:03Z"
+			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
+			"revisionTime": "2016-09-27T08:26:32Z"
+		},
+		{
+			"checksumSHA1": "Z3N6HDGWcvcNu0FloZRq54uO3h4=",
+			"path": "github.com/gocql/gocql/internal/lru",
+			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
+			"revisionTime": "2016-09-27T08:26:32Z"
+		},
+		{
+			"checksumSHA1": "ctK9mwZKnt/8dHxx2Ef6nZTljZs=",
+			"path": "github.com/gocql/gocql/internal/murmur",
+			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
+			"revisionTime": "2016-09-27T08:26:32Z"
+		},
+		{
+			"checksumSHA1": "tZQDfMMTKrYMXqen0zjJWLtOf1A=",
+			"path": "github.com/gocql/gocql/internal/streams",
+			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
+			"revisionTime": "2016-09-27T08:26:32Z"
 		},
 		{
 			"checksumSHA1": "/7y+NZyEEvVbTwtNm+5eWJeQSBs=",
@@ -392,6 +411,12 @@
 			"path": "github.com/tinylib/msgp/msgp",
 			"revision": "0cea1fa86e8403be1284013014f87ab942056de8",
 			"revisionTime": "2015-10-23T22:38:53Z"
+		},
+		{
+			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
+			"path": "golang.org/x/net/context",
+			"revision": "1aafd77e1e7f6849ad16a7bdeb65e3589a10b2bb",
+			"revisionTime": "2016-04-27T01:54:49Z"
 		},
 		{
 			"checksumSHA1": "6f8MEU31llHM1sLM/GGH4/Qxu0A=",
