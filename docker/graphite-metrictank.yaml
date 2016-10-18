@@ -1,6 +1,3 @@
-cache:
-  dir: /tmp/graphite-api-cache
-  type: filesystem
 finders:
 - graphite_metrictank.RaintankFinder
 functions:
