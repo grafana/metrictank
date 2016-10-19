@@ -1866,8 +1866,10 @@
             "upper": "#DEDAF7",
             "upper_75": "#0A50A1",
             "upper_90": "#806EB7",
+            "cassandra.fail": "#E24D42",
+            "cassandra.ok": "#3F6833",
             "memory.fail": "#BF1B00",
-            "memory.ok": "#629E51",
+            "memory.ok": "#7EB26D",
             "elasticsearch.fail": "#E0752D",
             "elasticsearch.ok": "#3F6833"
           },
