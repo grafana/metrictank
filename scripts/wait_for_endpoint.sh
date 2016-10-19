@@ -4,7 +4,7 @@
 WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
 
 # test if we're using busybox for timeout
-timeout_exec=$(readlink `which timeout` | awk -F '/' '{print $NF}')
+timeout_exec=$(basename $(readlink $(which timeout)))
 if [ "$timeout_exec" = "busybox" ]
 then
   echo "using busybox"
@@ -38,7 +38,7 @@ do
     # connection stays up for 3 seconds.
     if [ $_using_busybox -eq 1 ]
     then
-      busybox timeout -t 3 busybox nc $host $port
+      timeout -t 3 busybox nc $host $port
       retval=$?
 
       # busybox-timeout on alpine returns 0 on timeout
