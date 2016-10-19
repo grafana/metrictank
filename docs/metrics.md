@@ -24,6 +24,10 @@ and it was able to save its complete chunks, this node will be able to take over
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
 * `gc_metric`:  
 the amount of times the metrics GC is about to inspect a metric (series)
+* `idx.cassadra.ok`:  
+how many metrics are successfully being indexed
+* `idx.cassandra.fail`:  
+how failures encountered while trying to index metrics
 * `metrics_active`:  
 the amount of currently known metrics (excl rollup series), measured every second
 * `metrics_too_old`:  
