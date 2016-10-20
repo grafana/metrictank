@@ -131,8 +131,7 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	idxCasFail = stats.NewCount("idx.cassandra.fail")
 	idxCasAddDuration = stats.NewTimer("idx.cassandra.add_duration", 0)
 	idxCasDeleteDuration = stats.NewTimer("idx.cassandra.delete_duration", 0)
-	metrics = cassandra.Metrics{}
-	metrics.Init("idx.cassandra", stats)
+	metrics = cassandra.NewMetrics("idx.cassandra", stats)
 
 	for i := 0; i < numConns; i++ {
 		c.wg.Add(1)

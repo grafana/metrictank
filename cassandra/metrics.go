@@ -16,13 +16,15 @@ type Metrics struct {
 	cassErrOther           met.Count
 }
 
-func (m *Metrics) Init(component string, stats met.Backend) {
-	m.cassErrTimeout = stats.NewCount(fmt.Sprintf("%s.error.timeout", component))
-	m.cassErrTooManyTimeouts = stats.NewCount(fmt.Sprintf("%s.error.too-many-timeouts", component))
-	m.cassErrConnClosed = stats.NewCount(fmt.Sprintf("%s.error.conn-closed", component))
-	m.cassErrNoConns = stats.NewCount(fmt.Sprintf("%s.error.no-connections", component))
-	m.cassErrUnavailable = stats.NewCount(fmt.Sprintf("%s.error.unavailable", component))
-	m.cassErrOther = stats.NewCount(fmt.Sprintf("%s.error.other", component))
+func NewMetrics(component string, stats met.Backend) Metrics {
+	return Metrics{
+		cassErrTimeout:         stats.NewCount(fmt.Sprintf("%s.error.timeout", component)),
+		cassErrTooManyTimeouts: stats.NewCount(fmt.Sprintf("%s.error.too-many-timeouts", component)),
+		cassErrConnClosed:      stats.NewCount(fmt.Sprintf("%s.error.conn-closed", component)),
+		cassErrNoConns:         stats.NewCount(fmt.Sprintf("%s.error.no-connections", component)),
+		cassErrUnavailable:     stats.NewCount(fmt.Sprintf("%s.error.unavailable", component)),
+		cassErrOther:           stats.NewCount(fmt.Sprintf("%s.error.other", component)),
+	}
 }
 
 func (m *Metrics) Inc(err error) {

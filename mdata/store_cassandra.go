@@ -98,7 +98,6 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		writeQueueMeters: make([]met.Meter, writers),
-		metrics:          cassandra.Metrics{},
 	}
 
 	for i := 0; i < writers; i++ {
@@ -128,7 +127,7 @@ func (c *cassandraStore) InitMetrics(stats met.Backend) {
 	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
 	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
 
-	c.metrics.Init("cassandra", stats)
+	c.metrics = cassandra.NewMetrics("cassandra", stats)
 }
 
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
