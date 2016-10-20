@@ -12,7 +12,7 @@ import (
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/cass"
+	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -64,7 +64,7 @@ type cassandraStore struct {
 	writeQueues      []chan *ChunkWriteRequest
 	readQueue        chan *ChunkReadRequest
 	writeQueueMeters []met.Meter
-	metrics          cass.Metrics
+	metrics          cassandra.Metrics
 }
 
 func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
@@ -98,7 +98,7 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		writeQueueMeters: make([]met.Meter, writers),
-		metrics:          cass.Metrics{},
+		metrics:          cassandra.Metrics{},
 	}
 
 	for i := 0; i < writers; i++ {

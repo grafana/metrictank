@@ -10,7 +10,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
-	"github.com/raintank/metrictank/cass"
+	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -30,7 +30,7 @@ var (
 	idxCasFail           met.Count // metric idx.cassandra.fail is how failures encountered while trying to index metrics
 	idxCasAddDuration    met.Timer
 	idxCasDeleteDuration met.Timer
-	metrics              cass.Metrics
+	metrics              cassandra.Metrics
 
 	Enabled         bool
 	keyspace        string
@@ -131,7 +131,7 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	idxCasFail = stats.NewCount("idx.cassandra.fail")
 	idxCasAddDuration = stats.NewTimer("idx.cassandra.add_duration", 0)
 	idxCasDeleteDuration = stats.NewTimer("idx.cassandra.delete_duration", 0)
-	metrics = cass.Metrics{}
+	metrics = cassandra.Metrics{}
 	metrics.Init("idx.cassandra", stats)
 
 	for i := 0; i < numConns; i++ {
