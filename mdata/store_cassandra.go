@@ -12,6 +12,7 @@ import (
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -63,6 +64,7 @@ type cassandraStore struct {
 	writeQueues      []chan *ChunkWriteRequest
 	readQueue        chan *ChunkReadRequest
 	writeQueueMeters []met.Meter
+	metrics          cassandra.Metrics
 }
 
 func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
@@ -124,6 +126,8 @@ func (c *cassandraStore) InitMetrics(stats met.Backend) {
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
 	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
 	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
+
+	c.metrics = cassandra.NewMetrics("cassandra", stats)
 }
 
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
@@ -168,6 +172,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc(1)
 				} else {
+					c.metrics.Inc(err)
 					if (attempts % 20) == 0 {
 						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
 					}
@@ -314,10 +319,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 			}
 			iters = append(iters, iter.New(it, true))
 		}
-		cassChunksPerRow.Value(chunks)
 		err := outcome.i.Close()
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
+			c.metrics.Inc(err)
+		} else {
+			cassChunksPerRow.Value(chunks)
 		}
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
