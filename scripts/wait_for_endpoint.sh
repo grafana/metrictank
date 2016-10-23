@@ -9,14 +9,25 @@ WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
 CONN_HOLD=${CONN_HOLD:-3}
 
 # test if we're using busybox for timeout
-timeout_exec=$(basename $(readlink $(which timeout)))
-if [ "$timeout_exec" = "busybox" ]
+timeout_path=$(readlink $(which timeout))
+if [ "$timeout_path" = "" ]
+then
+  _using_busybox=0
+else
+  timeout_exec=$(basename $timeout_path)
+  if [ "$timeout_exec" = "busybox" ]
+  then
+    _using_busybox=1
+  else
+    _using_busybox=0
+  fi
+fi
+
+if [ $_using_busybox -eq 1 ]
 then
   log "using busybox"
-  _using_busybox=1
 else
   log "not using busybox"
-  _using_busybox=0
 fi
 
 for endpoint in $(echo $WAIT_HOSTS | tr "," "\n")
