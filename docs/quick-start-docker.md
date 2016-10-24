@@ -4,7 +4,7 @@
 This tutorial will help you run metrictank, its dependencies, and grafana for dashboarding, with minimal hassle.
 
 [docker installation instructions](https://www.docker.com/products/overview)
-You will also need to install version >=1.7 of [docker-compose](https://docs.docker.com/compose/)
+You will also need to install version >=1.6 of [docker-compose](https://docs.docker.com/compose/)
 
 ## Getting the repository
 
@@ -45,7 +45,7 @@ docker-compose up
 ```
 
 If this gives you the error `service 'version' doesn't have any configuration options`,
-your version of `docker-compose` is too old and you need to update to >=1.7.
+your version of `docker-compose` is too old and you need to update to >=1.6.
 
 A bunch of text will whiz past on your screen, but you should see
 
