@@ -7,11 +7,12 @@ import (
 )
 
 type ChunkReadRequest struct {
-	month   uint32
-	sortKey uint32
-	q       string
-	p       []interface{}
-	out     chan outcome
+	month     uint32
+	sortKey   uint32
+	q         string
+	p         []interface{}
+	timestamp time.Time
+	out       chan outcome
 }
 
 type ChunkWriteRequest struct {
