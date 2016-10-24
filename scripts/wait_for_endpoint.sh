@@ -40,7 +40,7 @@ do
     # docker-proxy can listen to ports before the actual service is up,
     # in which case it will accept and then close the connection again.
     # this checks not only if the connect succeeds, but also if the 
-    # connection stays up for 3 seconds.
+    # connection stays up for $CONN_HOLD seconds.
     if [ $_using_busybox -eq 1 ]
     then
       timeout -t $CONN_HOLD busybox nc $host $port
@@ -58,7 +58,7 @@ do
 
     if [ $retval -eq $expected ]
     then
-      log "$endpoint is up. maintained connection for 3 seconds!"
+      log "$endpoint is up. maintained connection for $CONN_HOLD seconds!"
       break
     else
       log "returned value $retval, expecting $expected"
