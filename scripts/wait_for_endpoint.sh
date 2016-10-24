@@ -1,16 +1,21 @@
 #!/bin/sh
 
+function log () {
+	echo "$(date +'%Y/%m/%d %H:%M:%S') $@"
+}
+
 
 WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
+CONN_HOLD=${CONN_HOLD:-3}
 
 # test if we're using busybox for timeout
 timeout_exec=$(basename $(readlink $(which timeout)))
 if [ "$timeout_exec" = "busybox" ]
 then
-  echo "using busybox"
+  log "using busybox"
   _using_busybox=1
 else
-  echo "not using busybox"
+  log "not using busybox"
   _using_busybox=0
 fi
 
@@ -26,10 +31,10 @@ do
     _run_time=$(( $_now - $_start_time ))
     if [ $_run_time -gt $WAIT_TIMEOUT ]
     then
-        echo "timed out waiting for $endpoint"
+        log "timed out waiting for $endpoint"
         exit 1
     fi
-    echo "waiting for $endpoint to become up..."
+    log "waiting for $endpoint to become up..."
 
     # connect and see if connection stays up.
     # docker-proxy can listen to ports before the actual service is up,
@@ -38,13 +43,13 @@ do
     # connection stays up for 3 seconds.
     if [ $_using_busybox -eq 1 ]
     then
-      timeout -t 3 busybox nc $host $port
+      timeout -t $CONN_HOLD busybox nc $host $port
       retval=$?
 
       # busybox-timeout on alpine returns 0 on timeout
       expected=0
     else
-      timeout 3 nc $host $port
+      timeout $CONN_HOLD nc $host $port
       retval=$?
 
       # coreutils-timeout returns 124 if it had to kill the slow command
@@ -53,10 +58,10 @@ do
 
     if [ $retval -eq $expected ]
     then
-      echo "$endpoint is up!"
+      log "$endpoint is up. maintained connection for 3 seconds!"
       break
     else
-      echo "returned value $retval, expecting $expected"
+      log "returned value $retval, expecting $expected"
     fi
 
     sleep 1
