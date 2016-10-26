@@ -23,6 +23,7 @@ Just make sure to have a properly configured statsd setup (or adjust the dashboa
 * `stats.*.timers.metric_tank.*.cassandra.write_queue.*.items.upper`: make sure the write queues are able to drain and don't reach capacity, otherwise ingest will block
 * `stats.$environment.timers.metrictank.*.es_put_duration.{mean,upper*}`: if it takes too long to index to ES, ingest will start blocking
 * `stats.$environment.timers.metrictank.$host.request_handle_duration.median`: shows how fast/slow metrictank responds to http queries
+* `stats.$environment.metrictank.*.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.
 
 If you expect consistent or predictable load, you may also want to monitor:
 

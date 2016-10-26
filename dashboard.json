@@ -971,7 +971,9 @@
           "aliasColors": {
             "cassandra get": "#052B51",
             "mem to iter": "#EAB839",
-            "total request handle": "#890F02"
+            "total request handle": "#890F02",
+            "cassandra get chunks": "#70DBED",
+            "cassandra to iter": "#1F78C1"
           },
           "bars": false,
           "datasource": "${DS_GRAPHITE}",
@@ -1014,11 +1016,11 @@
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.mean, 'cassandra get')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_chunks.mean, 'cassandra get chunks')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.to_iter_duration.mean, 'cassandra to iter')",
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.to_iter.mean, 'cassandra to iter')",
               "textEditor": false
             },
             {
@@ -1284,8 +1286,9 @@
             "mean": "#0A50A1",
             "p90": "#65C5DB",
             "put mean": "#58140C",
-            "put p90": "#F29191",
-            "put/s": "#BF1B00"
+            "put p90": "#EA6460",
+            "put/s": "#BF1B00",
+            "get p90": "#65C5DB"
           },
           "bars": false,
           "datasource": "${DS_GRAPHITE}",
@@ -1323,16 +1326,16 @@
           "targets": [
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.upper_90, 'p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.wait.upper_90, 'get p90')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.block_duration.mean, 'mean')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.wait.upper_90, 'put p90')"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "cassandra chunk save wait durations",
+          "title": "cassandra queue wait durations",
           "tooltip": {
             "msResolution": false,
             "shared": true,
@@ -1597,24 +1600,24 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.upper_90, 'put p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.exec.upper_90, 'put p90')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.mean, 'put mean')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.exec.mean, 'put mean')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.upper_90, 'get p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.exec.upper_90, 'get p90')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.mean, 'get mean')"
+              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.exec.mean, 'get mean')"
             }
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "cassandra durations",
+          "title": "cassandra query durations",
           "tooltip": {
             "msResolution": false,
             "shared": true,

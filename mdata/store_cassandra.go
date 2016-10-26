@@ -11,6 +11,7 @@ import (
 
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
+	"github.com/hailocab/go-hostpool"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/iter"
@@ -37,13 +38,15 @@ var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errStartBeforeEnd     = errors.New("start must be before end.")
 
-	cassBlockDuration met.Timer
-	cassGetDuration   met.Timer
-	cassPutDuration   met.Timer
+	cassGetExecDuration met.Timer
+	cassGetWaitDuration met.Timer
+	cassPutExecDuration met.Timer
+	cassPutWaitDuration met.Timer
 
-	cassChunksPerRow    met.Meter
-	cassRowsPerResponse met.Meter
-	cassToIterDuration  met.Timer
+	cassChunksPerRow      met.Meter
+	cassRowsPerResponse   met.Meter
+	cassGetChunksDuration met.Timer
+	cassToIterDuration    met.Timer
 
 	chunkSaveOk   met.Count
 	chunkSaveFail met.Count
@@ -67,7 +70,7 @@ type cassandraStore struct {
 	metrics          cassandra.Metrics
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -89,6 +92,35 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 	}
 	tmpSession.Close()
 	cluster.Keyspace = keyspace
+	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
+
+	switch hostSelectionPolicy {
+	case "roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.RoundRobinHostPolicy()
+	case "hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(hostpool.New(nil))
+	case "hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(
+			hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+		)
+	case "tokenaware,roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.RoundRobinHostPolicy(),
+		)
+	case "tokenaware,hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(hostpool.New(nil)),
+		)
+	case "tokenaware,hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(
+				hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+			),
+		)
+	default:
+		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", hostSelectionPolicy)
+	}
+
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
@@ -114,13 +146,15 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 }
 
 func (c *cassandraStore) InitMetrics(stats met.Backend) {
-	cassBlockDuration = stats.NewTimer("cassandra.block_duration", 0)
-	cassGetDuration = stats.NewTimer("cassandra.get_duration", 0)
-	cassPutDuration = stats.NewTimer("cassandra.put_duration", 0)
+	cassGetExecDuration = stats.NewTimer("cassandra.get.exec", 0)
+	cassGetWaitDuration = stats.NewTimer("cassandra.get.wait", 0)
+	cassPutExecDuration = stats.NewTimer("cassandra.put.exec", 0)
+	cassPutWaitDuration = stats.NewTimer("cassandra.put.wait", 0)
 
 	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
 	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
-	cassToIterDuration = stats.NewTimer("cassandra.to_iter_duration", 0)
+	cassGetChunksDuration = stats.NewTimer("cassandra.get_chunks", 0)
+	cassToIterDuration = stats.NewTimer("cassandra.to_iter", 0)
 
 	chunkSaveOk = stats.NewCount("chunks.save_ok")
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
@@ -153,7 +187,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			meter.Value(int64(len(queue)))
 			log.Debug("CS: starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
-			cassBlockDuration.Value(time.Now().Sub(cwr.timestamp))
+			cassPutWaitDuration.Value(time.Now().Sub(cwr.timestamp))
 
 			data := cwr.chunk.Series.Bytes()
 			chunkSizeAtSave.Value(int64(len(data)))
@@ -203,7 +237,7 @@ func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ret := c.session.Query(query, row_key, t0, data).Exec()
-	cassPutDuration.Value(time.Now().Sub(pre))
+	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
 }
 
@@ -220,7 +254,11 @@ func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *cassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
-		crr.out <- outcome{crr.month, crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+		cassGetWaitDuration.Value(time.Since(crr.timestamp))
+		pre := time.Now()
+		iter := outcome{crr.month, crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+		cassGetExecDuration.Value(time.Since(pre))
+		crr.out <- iter
 	}
 }
 
@@ -232,16 +270,16 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		return iters, errStartBeforeEnd
 	}
 
+	pre := time.Now()
+
 	crrs := make([]*ChunkReadRequest, 0)
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, nil})
+		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, time.Now(), nil})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
 	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to be include the last point we might need
-
-	pre := time.Now()
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
@@ -289,10 +327,10 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		outcomes = append(outcomes, o)
 		if seen == numQueries {
 			close(results)
-			cassGetDuration.Value(time.Now().Sub(pre))
 			break
 		}
 	}
+	cassGetChunksDuration.Value(time.Since(pre))
 	pre = time.Now()
 	// we have all of the results, but they could have arrived in any order.
 	sort.Sort(asc(outcomes))

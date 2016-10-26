@@ -7,6 +7,13 @@ It also works with 2.2 (we ran on 2.2.3 for a while), with some schema and compa
 
 The default Cassandra configuration is fine, especially for test/development setups.
 
+Here are some settings that are worth elaborating on:
+
+* `cassandra-retries`: turning up this value will allow the data persistence layer to transparantly retry queries, should they error or time out.  The consequence of this is that
+  cassandra gets may take longer then what the timeout value is set to.  Note that queries may still be aborted due to an error or timeout without retrying as many times as the
+  configuration allows.  This is because based on your host-selection-policy, hosts may be marked offline if they timeout.  See [gocql/812](https://github.com/gocql/gocql/issues/812).
+  So just be aware of this as you configure your host selection policy.
+
 ## Schema
 
 By default, metrictank will initialize Cassandra with the following keyspace and table schema.  The keyspace to use can be set in the configuration using the "cassandra-keyspace" option:
