@@ -11,6 +11,7 @@ import (
 
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
+	"github.com/hailocab/go-hostpool"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/iter"
@@ -69,7 +70,7 @@ type cassandraStore struct {
 	metrics          cassandra.Metrics
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
@@ -92,6 +93,34 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency string, t
 	tmpSession.Close()
 	cluster.Keyspace = keyspace
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
+
+	switch hostSelectionPolicy {
+	case "roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.RoundRobinHostPolicy()
+	case "hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(hostpool.New(nil))
+	case "hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(
+			hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+		)
+	case "tokenaware,roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.RoundRobinHostPolicy(),
+		)
+	case "tokenaware,hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(hostpool.New(nil)),
+		)
+	case "tokenaware,hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(
+				hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+			),
+		)
+	default:
+		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", hostSelectionPolicy)
+	}
+
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
