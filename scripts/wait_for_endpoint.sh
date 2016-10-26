@@ -9,7 +9,7 @@ WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
 CONN_HOLD=${CONN_HOLD:-3}
 
 # test if we're using busybox for timeout
-timeout_exec=$(basename $(readlink $(which timeout)))
+timeout_exec=$(basename "$(readlink $(which timeout))")
 if [ "$timeout_exec" = "busybox" ]
 then
   log "using busybox"
