@@ -47,6 +47,8 @@ metric-max-stale = 6h
 # Interval to run garbage collection job
 gc-interval = 1h
 # duration before secondary nodes start serving requests
+# shorter warmup means metrictank will need to query cassandra more if it doesn't have requested data yet.
+# in clusters, best to assure the primary has saved all the data that a newly warmup instance will need to query, to prevent gaps in charts
 warm-up-period = 1h
 # settings for rollups (aggregation for archives)
 # comma-separated of archive specifications.
@@ -119,7 +121,8 @@ proftrigger-freq = 60s
 proftrigger-path = /tmp
 # minimum time between triggered profiles
 proftrigger-min-diff = 1h
-# if this many bytes allocated, trigger a heap profile
+# if process consumes this many bytes (see bytes_sys in dashboard), trigger a heap profile for developer diagnosis
+# set it higher than your typical memory usage, but lower than how much RAM the process can take before its get killed
 proftrigger-heap-thresh = 25000000000
 # only log incoming requests if their timerange is at least this duration. Use 0 to disable
 log-min-dur = 5min
@@ -173,6 +176,7 @@ brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
+# the further back in time you go, the more old data you can load into metrictank, but the longer it takes to catch up to realtime data
 offset = last
 # save interval for offsets
 offset-commit-interval = 5s
@@ -291,4 +295,11 @@ timout = 1s
 num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra
 write-queue-size = 100000
+#automatically clear series from the index if they have not been seen for this much time.
+max-stale = 0
+#Interval at which the index should be checked for stale series.
+prune-interval = 3h
+#frequency at which we should update the metricDef lastUpdate field.
+update-interval = 4h
+#fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.
 ```
