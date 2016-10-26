@@ -43,11 +43,11 @@ do
     # connection stays up for $CONN_HOLD seconds.
     if [ $_using_busybox -eq 1 ]
     then
-      timeout -t $CONN_HOLD busybox nc $host $port
+      timeout -t $CONN_HOLD busybox nc $host $port -e busybox sleep $(( $CONN_HOLD + 1 ))
       retval=$?
 
       # busybox-timeout on alpine returns 0 on timeout
-      expected=0
+      expected=143
     else
       timeout $CONN_HOLD nc $host $port
       retval=$?
