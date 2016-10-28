@@ -37,19 +37,19 @@ while read line; do
 	if [ "$line" == "" ]; then
 		continue
 	fi
-	if [[ $line =~ ^### ]]; then
+	if [[ "$line" =~ ^### ]]; then
 		if [ "$t" == code ]; then
 			echo '```'
 			echo
 		fi
-		echo $line
+		echo "$line"
 		t=h3
-	elif [[ $line =~ ^## ]]; then
+	elif [[ "$line" =~ ^## ]]; then
 		if [ "$t" == code ]; then
 			echo '```'
 			echo
 		fi
-		echo $line
+		echo "$line"
 		t=h2
 	else
 		if [ "$t" == h2 -o "$t" == h3 ]; then
@@ -59,11 +59,11 @@ while read line; do
 		# lines that start with a pound are fine within code blocks,
 		# but outside of code blocks, would be shown as headers, which is not how they are intended
 		# in the source file they are just regular comments too, so take away their #
-		#if [[ $line =~ ^# ]]; then
+		#if [[ "$line" =~ ^# ]]; then
 		if [[ "$t" != code ]]; then
 			sed -e 's/^# //' -e 's/$/  /'<<< "$line"
 		else
-			echo $line
+			echo "$line"
 		fi
 	fi
 done < metrictank-sample.ini

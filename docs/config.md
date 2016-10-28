@@ -89,11 +89,11 @@ cassandra-keyspace = raintank
 # desired write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
 cassandra-consistency = one
 # how to select which hosts to query
-# roundrobin : iterate all hosts, spreading queries evenly.
-# hostpool-simple : basic pool that tracks which hosts are up and which are not.
-# hostpool-epsilon-greedy : prefer best hosts, but regularly try other hosts to stay on top of all hosts.
-# tokenaware,roundrobin : prefer host that the needed data, fallback to roundrobin.
-# tokenaware,hostpool-simple : prefer host that the needed data, fallback to hostpool-simple.
+# roundrobin                : iterate all hosts, spreading queries evenly.
+# hostpool-simple           : basic pool that tracks which hosts are up and which are not.
+# hostpool-epsilon-greedy   : prefer best hosts, but regularly try other hosts to stay on top of all hosts.
+# tokenaware,roundrobin              : prefer host that the needed data, fallback to roundrobin.
+# tokenaware,hostpool-simple         : prefer host that the needed data, fallback to hostpool-simple.
 # tokenaware,hostpool-epsilon-greedy : prefer host that the needed data, fallback to hostpool-epsilon-greedy.
 cassandra-host-selection-policy = roundrobin
 # cassandra timeout in milliseconds
@@ -172,7 +172,7 @@ enabled = false
 # tcp address
 addr = :2003
 # needed to know your raw resolution for your metrics. see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf
-# NOTE: does NOT use aggregation and retention settings from this file. We use agg-settings and ttl for that.
+# NOTE: does NOT use aggregation and retention settings from this file.  We use agg-settings and ttl for that.
 schemas-file = /path/to/your/schemas-file
 ```
 
