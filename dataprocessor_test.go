@@ -396,6 +396,32 @@ func TestFix(t *testing.T) {
 
 }
 
+type pbCase struct {
+	ts       uint32
+	span     uint32
+	boundary uint32
+}
+
+func TestPrevBoundary(t *testing.T) {
+	cases := []pbCase{
+		{1, 60, 0},
+		{2, 60, 0},
+		{3, 60, 0},
+		{57, 60, 0},
+		{58, 60, 0},
+		{59, 60, 0},
+		{60, 60, 0},
+		{61, 60, 60},
+		{62, 60, 60},
+		{63, 60, 60},
+	}
+	for _, c := range cases {
+		if ret := prevBoundary(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("prevBoundary for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		}
+	}
+}
+
 // TestGetTarget assures that series data is returned in proper form.
 // we don't test getSeries individually, because it should always be used in conjuntion with fix().
 // see the comments for getSeries() in more detail.
@@ -404,6 +430,7 @@ func TestFix(t *testing.T) {
 func TestGetTarget(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
+
 	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	mdata.InitMetrics(stats)

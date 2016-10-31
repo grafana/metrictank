@@ -26,7 +26,8 @@ func (a AggSettingsSpanAsc) Len() int           { return len(a) }
 func (a AggSettingsSpanAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a AggSettingsSpanAsc) Less(i, j int) bool { return a[i].Span < a[j].Span }
 
-// see description for Aggregator and unit tests
+// aggBoundary returns ts if it is a boundary, or the next boundary otherwise.
+// see description for Aggregator and unit tests, for more details
 func aggBoundary(ts uint32, span uint32) uint32 {
 	return ts + span - ((ts-1)%span + 1)
 }

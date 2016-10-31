@@ -309,19 +309,34 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
-// getSeries just gets the needed raw iters from mem and/or cassandra, based on from/to
+func prevBoundary(ts uint32, span uint32) uint32 {
+	return ts - ((ts-1)%span + 1)
+}
+
+// getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
+// !! note that raw, unquantized data may be returned outside of the requested range.  We expect that callers of getSeries
+// will also call fix() afterwards which will fix that.
+// here's why: while aggregated archives are quantized, raw intervals are not.  And quantizing happens *after* calling this function. (in fix().)
+// So we have to be adjust the range:
+// (ranges described as a..b include both and b)
+// REQ           0[---FROM---60]----------120-----------180[----TO----240]  any request from 1..60 to 181..240 should ...
+// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules)
+// STORED DATA   0[----------60][---------120][---------180][---------240]  .. but data for 60 may be at ts 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
+// to retrieve the stored data, we also use from inclusive and to exclusive, so to make sure that the data after quantization (fix()) is correct), we have to make the following adjustment:
+// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
+// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
+
 func getSeries(store mdata.Store, key string, consolidator consolidation.Consolidator, interval, fromUnix, toUnix uint32) []schema.Point {
 	iters := make([]iter.Iter, 0)
 	memIters := make([]iter.Iter, 0)
 	oldest := toUnix
 
-	// note: since raw series may be non-quantized, we get up to `interval-1` earlier,
-	// so that if we have quantize later (in fix()) we have a valid first point.
-	// (at this point we can't tell whether the raw series will be quantized or not)
+	// see explanation in function documentation
 	if consolidator == consolidation.None {
-		fromUnix = fromUnix - interval + 1
+		fromUnix = prevBoundary(fromUnix, interval) + 1
+		toUnix = prevBoundary(toUnix, interval) + 1
 	}
 
 	if metric, ok := metrics.Get(key); ok {
