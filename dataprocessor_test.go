@@ -397,96 +397,54 @@ func TestFix(t *testing.T) {
 }
 
 // TestGetTarget assures that series data is returned in proper form.
+// we don't test getSeries individually, because it should always be used in conjuntion with fix().
+// see the comments for getSeries() in more detail.
+// that's why we call GetTarget here without consolidation, which basically tests getSeries+fix
 // we treat quantisation and getSeries as a black box, and just care about the output.
 func TestGetTarget(t *testing.T) {
-	type req struct {
-		desc string
-		from uint32 // inclusive since we query internal api
-		to   uint32 // exclusive since we query internal api
-		out  []schema.Point
-	}
-	type c struct {
-		name string
-		in   []schema.Point
-		reqs []req
-	}
-
-	cases := []c{
-		{
-			"naturally-quantized",
-			[]schema.Point{
-				{3000, 3000},
-				{3060, 3060},
-			},
-			[]req{
-				{
-					"should correspond 1:1",
-					3000,
-					3120,
-					[]schema.Point{
-						{3000, 3000},
-						{3060, 3060},
-					},
-				},
-			},
-		},
-		{
-			"off-by-5", // these points will be quantized to later values, by 55seconds
-			[]schema.Point{
-				{3005, 3005}, // quantized to 3060
-				{3065, 3065}, // quantized to 3120
-				{3125, 3125}, // quantized to 3180
-			},
-			[]req{
-				{
-					"quantization moves points 55s later",
-					3001,
-					3121,
-					[]schema.Point{
-						{3005, 3060},
-						{3065, 3120},
-					},
-				},
-				{
-					"quantization moves points 55s later",
-					3011,
-					3121,
-					[]schema.Point{
-						{3005, 3060},
-						{3065, 3120},
-					},
-				},
-			},
-		},
-	}
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
 	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
-	//metricIndex := memory.New()
-	//metricIndex.Init(stats)
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	mdata.InitMetrics(stats)
 	initMetrics(stats)
-	for _, c := range cases {
-		metric := metrics.GetOrCreate(c.name)
-		for _, p := range c.in {
-			metric.Add(p.Ts, p.Val)
-		}
-		for _, req := range c.reqs {
-			r := NewReq(c.name, c.name, req.from, req.to, 100, 60, consolidation.None)
-			r.archive = 0
-			r.archInterval = 60
-			r.outInterval = 60
-			r.aggNum = 1
-			points, interval, err := getTarget(store, r)
-			if err != nil {
-				t.Errorf("case %q req %q from %d to %d - getTarget err %q", c.name, req.desc, r.from, r.to, err)
-			}
-			if interval != r.outInterval {
-				t.Errorf("case %q req %q from %d to %d - bad interval %d", c.name, req.desc, r.from, r.to, interval)
-			}
-			if !reflect.DeepEqual(req.out, points) {
-				t.Errorf("case %q req %q from %d to %d - exp: %v - got %v", c.name, req.desc, r.from, r.to, req.out, points)
+
+	// the tests below cycles through every possible combination of:
+	// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
+	// * every possible `from` offset (against its quantized query results) e.g. offset between 0 and interval-1
+	// * every possible `to`   offset (against its quantized query results) e.g. offset between 0 and interval-1
+	// and asserts that we get the appropriate data back in all possible scenarios.
+
+	expected := []schema.Point{
+		{20, 20},
+		{30, 30},
+	}
+
+	for offset := uint32(1); offset <= 10; offset++ {
+		for from := uint32(11); from <= 20; from++ { // should always yield result with first point at 20 (because from is inclusive)
+			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
+				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
+				metric := metrics.GetOrCreate(name)
+				metric.Add(offset, 10)    // this point will always be quantized to 10
+				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
+				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
+				metric.Add(30+offset, 40) // this point will always be quantized to 40
+				metric.Add(40+offset, 50) // this point will always be quantized to 50
+				r := NewReq(name, name, from, to, 100, 10, consolidation.None)
+				r.archive = 0
+				r.archInterval = 10
+				r.outInterval = 10
+				r.aggNum = 1
+				points, interval, err := getTarget(store, r)
+				if err != nil {
+					t.Errorf("case %q - getTarget err %q", name, err)
+				}
+				if interval != r.outInterval {
+					t.Errorf("case %q - bad interval %d", name, interval)
+				}
+				if !reflect.DeepEqual(expected, points) {
+					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
+				}
 			}
 		}
 	}
