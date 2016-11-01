@@ -257,6 +257,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 				for _, id := range n.Children {
 					def := m.DefById[id]
 					if from != 0 && def.LastUpdate < from {
+						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, def.LastUpdate)
 						continue
 					}
 					idxNode.Defs = append(idxNode.Defs, *def)
