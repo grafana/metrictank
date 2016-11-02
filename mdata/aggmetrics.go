@@ -18,6 +18,7 @@ type AggMetrics struct {
 	metricMaxStale uint32
 	ttl            uint32
 	gcInterval     time.Duration
+	tickStats      *time.Ticker
 }
 
 func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
@@ -31,6 +32,7 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 		metricMaxStale: metricMaxStale,
 		ttl:            ttl,
 		gcInterval:     gcInterval,
+		tickStats:      time.NewTicker(time.Duration(1) * time.Second),
 	}
 
 	go ms.stats()
@@ -81,7 +83,7 @@ func (ms *AggMetrics) GC() {
 }
 
 func (ms *AggMetrics) stats() {
-	for range time.Tick(time.Duration(1) * time.Second) {
+	for range ms.tickStats.C {
 		ms.RLock()
 		metricsActive.Value(int64(len(ms.Metrics)))
 		ms.RUnlock()
@@ -93,6 +95,13 @@ func (ms *AggMetrics) Get(key string) (Metric, bool) {
 	m, ok := ms.Metrics[key]
 	ms.RUnlock()
 	return m, ok
+}
+
+// closes the stats reporting. Not the GC.
+// this is meant to be used by unit tests, which don't even start the GC
+// we can adjust this later as needed
+func (ms *AggMetrics) Stop() {
+	ms.tickStats.Stop()
 }
 
 func (ms *AggMetrics) GetOrCreate(key string) Metric {

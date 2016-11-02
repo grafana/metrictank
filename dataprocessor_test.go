@@ -428,6 +428,7 @@ func TestGetSeries(t *testing.T) {
 	store := mdata.NewDevnullStore()
 
 	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
+	defer metrics.Stop()
 	mdata.CluStatus = mdata.NewClusterStatus("default", false)
 	mdata.InitMetrics(stats)
 	initMetrics(stats)
