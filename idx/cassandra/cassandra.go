@@ -33,8 +33,13 @@ var (
 	metrics              cassandra.Metrics
 
 	Enabled         bool
+    Ssl             bool
+    Auth            bool
 	keyspace        string
 	hosts           string
+    CaPath          string
+    Username        string
+    Password        string
 	consistency     string
 	timeout         time.Duration
 	numConns        int
@@ -49,8 +54,13 @@ var (
 func ConfigSetup() {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
 	casIdx.BoolVar(&Enabled, "enabled", false, "")
+	casIdx.BoolVar(&Ssl, "ssl", false, "")
+	casIdx.BoolVar(&Auth, "auth", false, "")
 	casIdx.StringVar(&keyspace, "keyspace", "metric", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
+	casIdx.StringVar(&CaPath, "ca-path", "/etc/raintank/ca.pem", "cassandra Ca certficate path")
+	casIdx.StringVar(&Username, "username", "cassandra", "cassandra username")
+	casIdx.StringVar(&Password, "password", "cassandra", "cassandra password")
 	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
@@ -84,6 +94,19 @@ func New() *CasIdx {
 	cluster.Timeout = timeout
 	cluster.NumConns = numConns
 	cluster.ProtoVersion = protoVer
+    if Ssl == true {
+        cluster.SslOpts = &gocql.SslOptions {
+            CaPath: CaPath,
+            EnableHostVerification: false,
+        }
+    }
+    if Auth == true {
+        cluster.Authenticator = gocql.PasswordAuthenticator{
+        Username: Username,
+        Password: Password,
+        }
+    }
+
 
 	return &CasIdx{
 		MemoryIdx:  *memory.New(),

@@ -70,8 +70,20 @@ type cassandraStore struct {
 	metrics          cassandra.Metrics
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int) (*cassandraStore, error) {
+func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int,ssl , auth bool) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
+    if ssl == true {
+        cluster.SslOpts = &gocql.SslOptions {
+            CaPath: CaPath,
+            EnableHostVerification: false,
+       }
+    }
+    if auth == true {
+        cluster.Authenticator = gocql.PasswordAuthenticator{
+        Username: Username,
+        Password: Password,
+        }
+    }
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
 	cluster.NumConns = writers
