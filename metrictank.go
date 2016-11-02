@@ -152,6 +152,7 @@ func init() {
 
 func main() {
 	startupTime = time.Now()
+	flag.Parse()
 
 	// Only try and parse the conf file if it exists
 	path := ""
@@ -263,7 +264,7 @@ func main() {
 	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
 	ttl := dur.MustParseUNsec("ttl", *ttlStr)
 	if (mdata.Month_sec % chunkSpan) != 0 {
-		panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		log.Fatal(4, "chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
 
 	set := strings.Split(*aggSettings, ",")
