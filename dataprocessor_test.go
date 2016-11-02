@@ -422,12 +422,8 @@ func TestPrevBoundary(t *testing.T) {
 	}
 }
 
-// TestGetTarget assures that series data is returned in proper form.
-// we don't test getSeries individually, because it should always be used in conjuntion with fix().
-// see the comments for getSeries() in more detail.
-// that's why we call GetTarget here without consolidation, which basically tests getSeries+fix
-// we treat quantisation and getSeries as a black box, and just care about the output.
-func TestGetTarget(t *testing.T) {
+// TestGetSeries assures that series data is returned in proper form.
+func TestGetSeries(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
 
@@ -457,18 +453,8 @@ func TestGetTarget(t *testing.T) {
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				r := NewReq(name, name, from, to, 100, 10, consolidation.None)
-				r.archive = 0
-				r.archInterval = 10
-				r.outInterval = 10
-				r.aggNum = 1
-				points, interval, err := getTarget(store, r)
-				if err != nil {
-					t.Errorf("case %q - getTarget err %q", name, err)
-				}
-				if interval != r.outInterval {
-					t.Errorf("case %q - bad interval %d", name, interval)
-				}
+
+				points := getSeries(store, name, consolidation.None, 10, from, to)
 				if !reflect.DeepEqual(expected, points) {
 					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
 				}
