@@ -26,14 +26,18 @@ func (a AggSettingsSpanAsc) Len() int           { return len(a) }
 func (a AggSettingsSpanAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a AggSettingsSpanAsc) Less(i, j int) bool { return a[i].Span < a[j].Span }
 
-// see description for Aggregator and unit tests
+// aggBoundary returns ts if it is a boundary, or the next boundary otherwise.
+// see description for Aggregator and unit tests, for more details
 func aggBoundary(ts uint32, span uint32) uint32 {
 	return ts + span - ((ts-1)%span + 1)
 }
 
 // receives data and builds aggregations
-// implementation detail: all points with timestamps t1, t2, t3, t4, t5 get aggregated into a point with ts t5,
-// IOW an aggregation point reflects the data in the timeframe preceding it.
+// note: all points with timestamps t1, t2, t3, t4, [t5] get aggregated into a point with ts t5 where t5 % span = 0.
+// in other words:
+// * an aggregation point reflects the data in the timeframe preceding it.
+// * the timestamps for the aggregated series is quantized to the given span,
+// unlike the raw series which may have an offset (be non-quantized)
 type Aggregator struct {
 	key             string // of the metric this aggregator corresponds to
 	span            uint32

@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
+	"reflect"
+	"testing"
+
+	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"gopkg.in/raintank/schema.v1"
-	"math"
-	"math/rand"
-	"testing"
 )
 
 type testCase struct {
@@ -391,6 +394,74 @@ func TestFix(t *testing.T) {
 		}
 	}
 
+}
+
+type pbCase struct {
+	ts       uint32
+	span     uint32
+	boundary uint32
+}
+
+func TestPrevBoundary(t *testing.T) {
+	cases := []pbCase{
+		{1, 60, 0},
+		{2, 60, 0},
+		{3, 60, 0},
+		{57, 60, 0},
+		{58, 60, 0},
+		{59, 60, 0},
+		{60, 60, 0},
+		{61, 60, 60},
+		{62, 60, 60},
+		{63, 60, 60},
+	}
+	for _, c := range cases {
+		if ret := prevBoundary(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("prevBoundary for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		}
+	}
+}
+
+// TestGetSeries assures that series data is returned in proper form.
+func TestGetSeries(t *testing.T) {
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	store := mdata.NewDevnullStore()
+
+	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
+	defer metrics.Stop()
+	mdata.CluStatus = mdata.NewClusterStatus("default", false)
+	mdata.InitMetrics(stats)
+	initMetrics(stats)
+
+	// the tests below cycles through every possible combination of:
+	// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
+	// * every possible `from` offset (against its quantized query results) e.g. offset between 0 and interval-1
+	// * every possible `to`   offset (against its quantized query results) e.g. offset between 0 and interval-1
+	// and asserts that we get the appropriate data back in all possible scenarios.
+
+	expected := []schema.Point{
+		{20, 20},
+		{30, 30},
+	}
+
+	for offset := uint32(1); offset <= 10; offset++ {
+		for from := uint32(11); from <= 20; from++ { // should always yield result with first point at 20 (because from is inclusive)
+			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
+				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
+				metric := metrics.GetOrCreate(name)
+				metric.Add(offset, 10)    // this point will always be quantized to 10
+				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
+				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
+				metric.Add(30+offset, 40) // this point will always be quantized to 40
+				metric.Add(40+offset, 50) // this point will always be quantized to 50
+
+				points := getSeries(store, name, consolidation.None, 10, from, to)
+				if !reflect.DeepEqual(expected, points) {
+					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
+				}
+			}
+		}
+	}
 }
 
 type alignCase struct {

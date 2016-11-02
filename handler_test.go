@@ -33,6 +33,7 @@ func test_HandleMessage(t *testing.T, stats met.Backend) {
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
+	defer aggmetrics.Stop()
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
 
