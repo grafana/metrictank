@@ -152,6 +152,7 @@ func init() {
 
 func main() {
 	startupTime = time.Now()
+	flag.Parse()
 
 	// Only try and parse the conf file if it exists
 	path := ""
