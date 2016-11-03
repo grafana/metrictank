@@ -88,8 +88,9 @@ var (
 	cassandraKeyspace            = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
 	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cassandraCaPath              = flag.String("cassandra-ca-path", "/etc/raintank/ca.pem", "cassandra ca path for ssl connection")
+	cassandraHostVerification    = flag.Bool("cassandra-host-verification", true, "enable or disable verification of hostname and server cert")
 	cassandraUsername            = flag.String("cassandra-username", "cassandra", "username for authorization")
-	cassandraPassword              = flag.String("cassandra-password", "cassandra", "password for authorization")
+	cassandraPassword            = flag.String("cassandra-password", "cassandra", "password for authorization")
 	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "roundrobin", "")
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraReadConcurrency     = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
@@ -98,8 +99,8 @@ var (
 	cassandraWriteQueueSize      = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-    sslEnabled                   = flag.Bool("ssl-enabled",false,"Enable/Disable ssl connection")
-    authEnabled                  = flag.Bool("auth-enabled",false,"Enable/Disable auhtorization")
+	sslEnabled                   = flag.Bool("ssl-enabled", false, "Enable/Disable ssl connection")
+	authEnabled                  = flag.Bool("auth-enabled", false, "Enable/Disable auhtorization")
 
 	// Profiling, instrumentation and logging:
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
@@ -312,7 +313,7 @@ func main() {
 		go trigger.Run()
 	}
 
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *sslEnabled, *authEnabled)
+	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *sslEnabled, *authEnabled, *cassandraHostVerification)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}

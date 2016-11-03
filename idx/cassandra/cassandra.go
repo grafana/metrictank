@@ -32,35 +32,37 @@ var (
 	idxCasDeleteDuration met.Timer
 	metrics              cassandra.Metrics
 
-	Enabled         bool
-    Ssl             bool
-    Auth            bool
-	keyspace        string
-	hosts           string
-    CaPath          string
-    Username        string
-    Password        string
-	consistency     string
-	timeout         time.Duration
-	numConns        int
-	writeQueueSize  int
-	protoVer        int
-	maxStale        time.Duration
-	pruneInterval   time.Duration
-	updateInterval  time.Duration
-	updateFuzzyness float64
+	Enabled          bool
+	ssl              bool
+	auth             bool
+	hostverification bool
+	keyspace         string
+	hosts            string
+	capath           string
+	username         string
+	password         string
+	consistency      string
+	timeout          time.Duration
+	numConns         int
+	writeQueueSize   int
+	protoVer         int
+	maxStale         time.Duration
+	pruneInterval    time.Duration
+	updateInterval   time.Duration
+	updateFuzzyness  float64
 )
 
 func ConfigSetup() {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
 	casIdx.BoolVar(&Enabled, "enabled", false, "")
-	casIdx.BoolVar(&Ssl, "ssl", false, "")
-	casIdx.BoolVar(&Auth, "auth", false, "")
+	casIdx.BoolVar(&ssl, "ssl", false, "enable or disable ssl connection to cassandra")
+	casIdx.BoolVar(&auth, "auth", false, "enable or disable cassandra user authorization")
+	casIdx.BoolVar(&hostverification, "host-verification", true, "enable or disable ssl host verification")
 	casIdx.StringVar(&keyspace, "keyspace", "metric", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
-	casIdx.StringVar(&CaPath, "ca-path", "/etc/raintank/ca.pem", "cassandra Ca certficate path")
-	casIdx.StringVar(&Username, "username", "cassandra", "cassandra username")
-	casIdx.StringVar(&Password, "password", "cassandra", "cassandra password")
+	casIdx.StringVar(&capath, "ca-path", "/etc/raintank/ca.pem", "cassandra Ca certficate path")
+	casIdx.StringVar(&username, "username", "cassandra", "cassandra username")
+	casIdx.StringVar(&password, "password", "cassandra", "cassandra password")
 	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
@@ -94,19 +96,18 @@ func New() *CasIdx {
 	cluster.Timeout = timeout
 	cluster.NumConns = numConns
 	cluster.ProtoVersion = protoVer
-    if Ssl == true {
-        cluster.SslOpts = &gocql.SslOptions {
-            CaPath: CaPath,
-            EnableHostVerification: false,
-        }
-    }
-    if Auth == true {
-        cluster.Authenticator = gocql.PasswordAuthenticator{
-        Username: Username,
-        Password: Password,
-        }
-    }
-
+	if ssl {
+		cluster.SslOpts = &gocql.SslOptions{
+			CaPath:                 capath,
+			EnableHostVerification: hostverification,
+		}
+	}
+	if auth {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		}
+	}
 
 	return &CasIdx{
 		MemoryIdx:  *memory.New(),
