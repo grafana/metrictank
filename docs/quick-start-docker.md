@@ -51,7 +51,7 @@ A bunch of text will whiz past on your screen, but you should see
 
 ```
 metrictank_1     | waiting for cassandra:9042 to become up...
-statsdaemon_1    | 2016/08/04 12:31:21 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
+statsdaemon_1    | 2016/08/04 12:31:21 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused. will retry
 metrictank_1     | waiting for cassandra:9042 to become up...
 statsdaemon_1    | 2016/08/04 12:31:22 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
 ```
@@ -79,7 +79,13 @@ $ curl http://localhost:6060/cluster
 
 In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
 In the upper left Grafana menu, choose `Data Sources`. On the next page, click the `Add data source` button.  
-Add a new data source with name `metrictank`, check "default", type `Graphite`, Url `http://localhost:8080` and access mode `direct` (not `proxy`).
+Add a new data source with with these settings:
+
+* Name: `metrictank`
+* Default: `yes`
+* Type: `Graphite`
+* Url: `http://localhost:8080`
+* Access: `direct` (not `proxy`)
 
 When you hit save, Grafana should succeed in talking to the data source.
 
