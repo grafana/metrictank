@@ -72,18 +72,18 @@ type cassandraStore struct {
 
 func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int, ssl, auth, hostVerification bool) (*cassandraStore, error) {
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
-    if ssl {
-        cluster.SslOpts = &gocql.SslOptions {
-            CaPath: CaPath,
-            EnableHostVerification: hostVerification,
-       }
-    }
-    if auth {
-        cluster.Authenticator = gocql.PasswordAuthenticator{
-        Username: Username,
-        Password: Password,
-        }
-    }
+	if ssl {
+		cluster.SslOpts = &gocql.SslOptions{
+			CaPath:                 CaPath,
+			EnableHostVerification: hostVerification,
+		}
+	}
+	if auth {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: Username,
+			Password: Password,
+		}
+	}
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
 	cluster.NumConns = writers

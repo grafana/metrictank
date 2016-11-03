@@ -54,24 +54,28 @@ var (
 
 func ConfigSetup() {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
+
 	casIdx.BoolVar(&Enabled, "enabled", false, "")
-	casIdx.BoolVar(&ssl, "ssl", false, "enable or disable ssl connection to cassandra")
-	casIdx.BoolVar(&auth, "auth", false, "enable or disable cassandra user authorization")
-	casIdx.BoolVar(&hostverification, "host-verification", true, "enable or disable ssl host verification")
-	casIdx.StringVar(&keyspace, "keyspace", "metric", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
-	casIdx.StringVar(&capath, "ca-path", "/etc/raintank/ca.pem", "cassandra Ca certficate path")
-	casIdx.StringVar(&username, "username", "cassandra", "cassandra username")
-	casIdx.StringVar(&password, "password", "cassandra", "cassandra password")
+	casIdx.StringVar(&keyspace, "keyspace", "metric", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
-	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field.")
 	casIdx.Float64Var(&updateFuzzyness, "update-fuzzyness", 0.5, "fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.")
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
+	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
+
+	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
+	casIdx.StringVar(&capath, "ca-path", "/etc/raintank/ca.pem", "cassandra CA certficate path when using SSL")
+	casIdx.BoolVar(&hostverification, "host-verification", true, "host (hostname and server cert) verification when using SSL")
+
+	casIdx.BoolVar(&auth, "auth", false, "enable cassandra user authentication")
+	casIdx.StringVar(&username, "username", "cassandra", "username for authentication")
+	casIdx.StringVar(&password, "password", "cassandra", "password for authentication")
+
 	globalconf.Register("cassandra-idx", casIdx)
 }
 
