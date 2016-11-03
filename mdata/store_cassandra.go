@@ -137,6 +137,7 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, 
 	if err != nil {
 		return nil, err
 	}
+	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
 	c := &cassandraStore{
 		session:          session,
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
