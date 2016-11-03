@@ -29,7 +29,7 @@ request_parameters = {
     },
     'data': {
         'target':
-            'stats.docker-env.metrictank.metrictank-1.carbon.metrics_received',
+            'stats.docker-env.metrictank.default.carbon.metrics_received',
     },
 }
 
