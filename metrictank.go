@@ -235,15 +235,10 @@ func main() {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatal(4, "failed to lookup hostname. %s", err)
-	}
-
 	if !*statsdEnabled {
 		log.Warn("running metrictank without statsd instrumentation.")
 	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
+	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
