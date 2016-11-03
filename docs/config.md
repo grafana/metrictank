@@ -25,6 +25,8 @@ the defaults here match the default behavior.
 ## misc ##
 
 ```
+# instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics.
+instance = default
 # tcp address for metrictank to bind to for its HTTP interface
 listen = :6060
 # accounting period to track per-org usage metrics
@@ -34,8 +36,6 @@ accounting-period = 5min
 ## clustering ##
 
 ```
-# cluster node name and value used to differentiate metrics between nodes
-instance = default
 # the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes
 primary-node = false
 ```
