@@ -122,51 +122,51 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasSub(stats.$environment.metrictank.$host.*.metrics_received, '.*\\.([^\\.]+)\\.metrics_received', '\\1 in')",
+              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metrics_received, '.*\\.([^\\.]+)\\.metrics_received', '\\1 in')",
               "textEditor": false
             },
             {
               "hide": true,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.primary, 'primary')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.primary, 'primary')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$host.metrics_too_old, 'too old')"
+              "target": "alias(stats.$environment.metrictank.$instance.metrics_too_old, 'too old')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$host.add_to_saved_chunk, 'add-to-saved')"
+              "target": "alias(stats.$environment.metrictank.$instance.add_to_saved_chunk, 'add-to-saved')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.metrictank.$host.add_to_saving_chunk, 'add-to-saving')"
+              "target": "alias(stats.$environment.metrictank.$instance.add_to_saving_chunk, 'add-to-saving')"
             },
             {
               "refId": "F",
-              "target": "aliasSub(stats.$environment.metrictank.$host.*.metrics_decode_err, '.*\\.([^\\.]+)\\.metrics_decode_err', '\\1 decode err')",
+              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metrics_decode_err, '.*\\.([^\\.]+)\\.metrics_decode_err', '\\1 decode err')",
               "textEditor": false
             },
             {
               "refId": "G",
-              "target": "aliasSub(stats.$environment.metrictank.$host.*.metric_invalid, '.*\\.([^\\.]+)\\.metric_invalid', '\\1 metric invalid')",
+              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metric_invalid, '.*\\.([^\\.]+)\\.metric_invalid', '\\1 metric invalid')",
               "textEditor": false
             },
             {
               "refId": "H",
-              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.mean, stats.$environment.timers.metrictank.$host.idx.elasticsearch.add_duration.count_ps), 5), 'ES backpressure')",
+              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$instance.idx.elasticsearch.add_duration.mean, stats.$environment.timers.metrictank.$instance.idx.elasticsearch.add_duration.count_ps), 5), 'ES backpressure')",
               "textEditor": true
             },
             {
               "hide": true,
               "refId": "I",
-              "target": "stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size",
+              "target": "stats.$environment.gauges.metrictank.$instance.cassandra.write_queue.size",
               "textEditor": false
             },
             {
               "hide": true,
               "refId": "J",
-              "target": "stats.$environment.gauges.metrictank.$host.cassandra.num_writers",
+              "target": "stats.$environment.gauges.metrictank.$instance.cassandra.num_writers",
               "textEditor": false
             },
             {
@@ -178,7 +178,7 @@
             {
               "hide": true,
               "refId": "L",
-              "target": "maxSeries(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper)",
+              "target": "maxSeries(stats.$environment.timers.metrictank.$instance.cassandra.write_queue.*.items.upper)",
               "textEditor": false
             },
             {
@@ -190,7 +190,7 @@
             {
               "hide": true,
               "refId": "N",
-              "target": "sumSeries(stats.$environment.metrictank.$host.*.metrics_received)",
+              "target": "sumSeries(stats.$environment.metrictank.$instance.*.metrics_received)",
               "textEditor": false
             },
             {
@@ -296,16 +296,16 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.gauges.metrictank.$host.total_points, 5)"
+              "target": "aliasByNode(stats.$environment.gauges.metrictank.$instance.total_points, 5)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "aliasByNode(stats.$environment.gauges.metrictank.$host.metrics_active, 5)"
+              "target": "aliasByNode(stats.$environment.gauges.metrictank.$instance.metrics_active, 5)"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$host.gc_metric, 'GCd metrics/s')",
+              "target": "alias(stats.$environment.metrictank.$instance.gc_metric, 'GCd metrics/s')",
               "textEditor": false
             }
           ],
@@ -390,11 +390,11 @@
           "targets": [
             {
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.primary, 'primary')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.primary, 'primary')"
             },
             {
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.cluster.promotion_wait, 'promotion wait')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.promotion_wait, 'promotion wait')"
             }
           ],
           "timeFrom": null,
@@ -492,27 +492,27 @@
             {
               "hide": true,
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_alloc.incl_freed, 'alloc incl freed')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_alloc.incl_freed, 'alloc incl freed')"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_alloc.not_freed, 'alloc not freed')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_alloc.not_freed, 'alloc not freed')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.bytes_sys, 'bytes_sys')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_sys, 'bytes_sys')"
             },
             {
               "hide": true,
               "refId": "D",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.metrics_active, 'metrics_active')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.metrics_active, 'metrics_active')"
             },
             {
               "hide": true,
               "refId": "E",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.total_points, 'total_points')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.total_points, 'total_points')"
             },
             {
               "hide": false,
@@ -523,12 +523,12 @@
             {
               "hide": false,
               "refId": "G",
-              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$host.bytes_alloc.not_freed), 'alloc speed')"
+              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$instance.bytes_alloc.not_freed), 'alloc speed')"
             },
             {
               "hide": false,
               "refId": "H",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.gc.cpufraction, 'GC cpu fraction - promille')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.cpufraction, 'GC cpu fraction - promille')"
             }
           ],
           "timeFrom": null,
@@ -609,11 +609,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$host.gc.num), 'collections')"
+              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$instance.gc.num), 'collections')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.gc.dur, 'duration')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.dur, 'duration')"
             }
           ],
           "timeFrom": null,
@@ -707,23 +707,23 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.median, 'median')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.median, 'median')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.upper_90, 'p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.upper_90, 'p90')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.upper, 'max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.upper, 'max')"
             },
             {
               "refId": "D",
-              "target": "aliasByNode(perSecond(collectd.$environment.metric-tank.$host.cpu.*.cpu.idle), 5, 7)"
+              "target": "aliasByNode(perSecond(collectd.$environment.metric-tank.$instance.cpu.*.cpu.idle), 5, 7)"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.count_ps, 'reqs')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.count_ps, 'reqs')"
             }
           ],
           "timeFrom": null,
@@ -813,42 +813,42 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.lower, 'mem-cass min')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.lower, 'mem-cass min')"
             },
             {
               "hide": true,
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.upper_90, 'mem-cass p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.upper_90, 'mem-cass p90')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.median, 'mem-cass med')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.median, 'mem-cass med')"
             },
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.upper, 'mem-cass max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.upper, 'mem-cass max')"
             },
             {
               "hide": false,
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.lower, 'mem min')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.lower, 'mem min')"
             },
             {
               "hide": false,
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.median, 'mem med')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.median, 'mem med')"
             },
             {
               "hide": true,
               "refId": "G",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.upper_90, 'mem p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.upper_90, 'mem p90')"
             },
             {
               "hide": false,
               "refId": "H",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.upper, 'mem max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.upper, 'mem max')"
             }
           ],
           "timeFrom": null,
@@ -929,12 +929,12 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem_and_cassandra.count_ps, 'mem-cass req/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.count_ps, 'mem-cass req/s')"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.requests_span.mem.count_ps, 'mem req/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.count_ps, 'mem req/s')"
             }
           ],
           "timeFrom": null,
@@ -1012,30 +1012,30 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.mean, 'total request handle')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.mean, 'total request handle')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_chunks.mean, 'cassandra get chunks')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get_chunks.mean, 'cassandra get chunks')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.to_iter.mean, 'cassandra to iter')",
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.to_iter.mean, 'cassandra to iter')",
               "textEditor": false
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.get_target_duration.mean, 'total getTarget')",
+              "target": "alias(stats.$environment.timers.metrictank.$instance.get_target_duration.mean, 'total getTarget')",
               "textEditor": false
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.iters_to_points_duration.mean, 'iters to points')",
+              "target": "alias(stats.$environment.timers.metrictank.$instance.iters_to_points_duration.mean, 'iters to points')",
               "textEditor": false
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.mem.to_iter_duration.mean, 'mem to iter')",
+              "target": "alias(stats.$environment.timers.metrictank.$instance.mem.to_iter_duration.mean, 'mem to iter')",
               "textEditor": false
             }
           ],
@@ -1141,22 +1141,22 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.cassandra.write_queue.*.items.upper, 6, 7, 8)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.cassandra.write_queue.*.items.upper, 6, 7, 8)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.cassandra.write_queue.size, 'write queue items limit (each)')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.cassandra.write_queue.size, 'write queue items limit (each)')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.cassandra.num_writers, 'num write-workers')"
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.cassandra.num_writers, 'num write-workers')"
             },
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(consolidateBy(stats.$environment.timers.metrictank.$host.persist_duration.upper_75, 'sum'), 'persist-duration p75')"
+              "target": "alias(consolidateBy(stats.$environment.timers.metrictank.$instance.persist_duration.upper_75, 'sum'), 'persist-duration p75')"
             }
           ],
           "timeFrom": null,
@@ -1238,11 +1238,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.cluster.message_size.{mean,upper}, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.cluster.message_size.{mean,upper}, 6, 7)"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.metrictank.$host.cluster.messages-published, 'msg published')"
+              "target": "alias(stats.$environment.metrictank.$instance.cluster.messages-published, 'msg published')"
             }
           ],
           "timeFrom": null,
@@ -1326,11 +1326,11 @@
           "targets": [
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.wait.upper_90, 'get p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.wait.upper_90, 'get p90')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.wait.upper_90, 'put p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.wait.upper_90, 'put p90')"
             }
           ],
           "timeFrom": null,
@@ -1416,27 +1416,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.median, 'size at load median')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.median, 'size at load median')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.upper_90, 'size at load p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.upper_90, 'size at load p90')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_load.upper, 'size at load max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.upper, 'size at load max')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.median, 'size at save median')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.median, 'size at save median')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.upper_90, 'size at save p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.upper_90, 'size at save p90')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.chunk_size.at_save.upper, 'size at save max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.upper, 'size at save max')"
             }
           ],
           "timeFrom": null,
@@ -1515,11 +1515,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put_duration.count_ps, 'put/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put_duration.count_ps, 'put/s')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get_duration.count_ps, 'get/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get_duration.count_ps, 'get/s')"
             }
           ],
           "timeFrom": null,
@@ -1600,19 +1600,19 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.exec.upper_90, 'put p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.upper_90, 'put p90')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.put.exec.mean, 'put mean')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.mean, 'put mean')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.exec.upper_90, 'get p90')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.upper_90, 'get p90')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.get.exec.mean, 'get mean')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.mean, 'get mean')"
             }
           ],
           "timeFrom": null,
@@ -1709,27 +1709,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.median, 'chunks per row med')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.median, 'chunks per row med')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.lower, 'chunks per row min')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.lower, 'chunks per row min')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.upper, 'chunks per row max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.upper, 'chunks per row max')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.chunks_per_row.median, 'rows per resp med')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.median, 'rows per resp med')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.rows_per_response.lower, 'rows per resp min')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.rows_per_response.lower, 'rows per resp min')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$host.cassandra.rows_per_response.upper, 'rows per resp max')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.rows_per_response.upper, 'rows per resp max')"
             }
           ],
           "timeFrom": null,
@@ -1773,7 +1773,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.metrictank.$host.cassandra.error.*, 6)"
+              "target": "aliasByNode(stats.$environment.metrictank.$instance.cassandra.error.*, 6)"
             }
           ],
           "datasource": "${DS_GRAPHITE}",
@@ -1885,19 +1885,19 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.metrictank.$host.chunks.create, 'create/s')"
+              "target": "alias(stats.$environment.metrictank.$instance.chunks.create, 'create/s')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.metrictank.$host.chunks.clear, 'clear/s')"
+              "target": "alias(stats.$environment.metrictank.$instance.chunks.clear, 'clear/s')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$host.chunks.save_ok, 'save_ok/s')"
+              "target": "alias(stats.$environment.metrictank.$instance.chunks.save_ok, 'save_ok/s')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$host.chunks.save_fail, 'save_fail/s')"
+              "target": "alias(stats.$environment.metrictank.$instance.chunks.save_fail, 'save_fail/s')"
             }
           ],
           "timeFrom": null,
@@ -2010,12 +2010,12 @@
           "targets": [
             {
               "refId": "C",
-              "target": "aliasByNode(stats.$environment.metrictank.$host.idx.*.*, 5, 6)",
+              "target": "aliasByNode(stats.$environment.metrictank.$instance.idx.*.*, 5, 6)",
               "textEditor": false
             },
             {
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$host.idx.elasticsearch.retrybuf.items, 'es-retrybuf-items')",
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.idx.elasticsearch.retrybuf.items, 'es-retrybuf-items')",
               "textEditor": false
             }
           ],
@@ -2062,7 +2062,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.metrictank.$host.idx.cassandra.error.*, 7)"
+              "target": "aliasByNode(stats.$environment.metrictank.$instance.idx.cassandra.error.*, 7)"
             }
           ],
           "datasource": "${DS_GRAPHITE}",
@@ -2187,7 +2187,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$host.idx.*.*.{mean,upper_90,upper}, 6, 7, 8)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.idx.*.*.{mean,upper_90,upper}, 6, 7, 8)"
             }
           ],
           "timeFrom": null,
@@ -2312,7 +2312,7 @@
         "includeAll": false,
         "multi": false,
         "multiFormat": "glob",
-        "name": "host",
+        "name": "instance",
         "options": [],
         "query": "stats.$environment.metrictank.*",
         "refresh": 1,

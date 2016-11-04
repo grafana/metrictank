@@ -56,6 +56,7 @@ var (
 	metricIndex idx.MetricIndex
 
 	// Misc:
+	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
 	listenAddr  = flag.String("listen", ":6060", "http listener address.")
 	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
@@ -63,7 +64,6 @@ var (
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Clustering:
-	instance    = flag.String("instance", "default", "cluster node name and value used to differentiate metrics between nodes")
 	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
 
 	// Data:
@@ -235,15 +235,10 @@ func main() {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatal(4, "failed to lookup hostname. %s", err)
-	}
-
 	if !*statsdEnabled {
 		log.Warn("running metrictank without statsd instrumentation.")
 	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", strings.Replace(hostname, ".", "_", -1))
+	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
 	if err != nil {
 		log.Fatal(4, "failed to initialize statsd. %s", err)
 	}
