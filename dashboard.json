@@ -1515,11 +1515,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put_duration.count_ps, 'put/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.count_ps, 'put/s')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get_duration.count_ps, 'get/s')"
+              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.count_ps, 'get/s')"
             }
           ],
           "timeFrom": null,
