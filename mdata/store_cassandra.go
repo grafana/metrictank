@@ -34,9 +34,15 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
-	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
-	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
-	errStartBeforeEnd     = errors.New("start must be before end.")
+	// errors for users
+	errStartBeforeEnd = errors.New("start must be before end.")
+	errReadingData    = errors.New("error reading data")
+
+	// errors for operator
+	errFmtChunkTooSmall      = "unpossibly small chunk of size %d in cassandra"
+	errFmtUnknownChunkFormat = "unrecognized chunk format %d in cassandra"
+	errFmtFailedToCreateIter = "failed to create iterator from chunk: %q"
+	errFmtCassandraQueryErr  = "cassandra query error: %q"
 
 	cassGetExecDuration met.Timer
 	cassGetWaitDuration met.Timer
@@ -53,6 +59,8 @@ var (
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
 	chunkSizeAtSave met.Meter
 	chunkSizeAtLoad met.Meter
+
+	cassErrCantReadChunk met.Count
 )
 
 /*
@@ -65,7 +73,7 @@ object to interact with the whole Cassandra cluster.
 type cassandraStore struct {
 	session          *gocql.Session
 	writeQueues      []chan *ChunkWriteRequest
-	readQueue        chan *ChunkReadRequest
+	readQueue        chan ChunkReadRequest
 	writeQueueMeters []met.Meter
 	metrics          cassandra.Metrics
 }
@@ -141,7 +149,7 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, 
 	c := &cassandraStore{
 		session:          session,
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
-		readQueue:        make(chan *ChunkReadRequest, readqsize),
+		readQueue:        make(chan ChunkReadRequest, readqsize),
 		writeQueueMeters: make([]met.Meter, writers),
 	}
 
@@ -173,6 +181,8 @@ func (c *cassandraStore) InitMetrics(stats met.Backend) {
 	chunkSaveFail = stats.NewCount("chunks.save_fail")
 	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
 	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
+
+	cassErrCantReadChunk = stats.NewCount("cassandra.error.cant-read-chunk")
 
 	c.metrics = cassandra.NewMetrics("cassandra", stats)
 }
@@ -254,9 +264,12 @@ func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int
 	return ret
 }
 
+// outcome represents one of many iterators obtained from a query
+// if err, we logged a detailed error, up to caller to tell user something more abstract
 type outcome struct {
 	sortKey int
-	i       *gocql.Iter
+	err     bool
+	iters   []iter.Iter
 }
 type asc []outcome
 
@@ -268,26 +281,73 @@ func (c *cassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
 		cassGetWaitDuration.Value(time.Since(crr.timestamp))
 		pre := time.Now()
-		iter := outcome{crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+		cassIt := c.session.Query(crr.q, crr.p...).Iter()
 		cassGetExecDuration.Value(time.Since(pre))
-		crr.out <- iter
+		var b []byte
+		chunks := int64(0)
+		// TODO: for now, as soon as a chunk fails, we return an error to user, and no data.
+		// once we have https://github.com/grafana/grafana/issues/6448 it'll make sense
+		// to try to read as many chunks as we can
+		out := outcome{
+			sortKey: crr.sortKey,
+			iters:   make([]iter.Iter, 0),
+		}
+		for cassIt.Scan(&b) {
+			chunks += 1
+			chunkSizeAtLoad.Value(int64(len(b)))
+			if len(b) < 2 {
+				cassIt.Close()
+				log.Error(3, errFmtChunkTooSmall, len(b))
+				cassErrCantReadChunk.Inc(1)
+				out.err = true
+				crr.out <- out
+				return
+			}
+			if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
+				cassIt.Close()
+				log.Error(3, errFmtUnknownChunkFormat, chunk.Format(b[0]))
+				cassErrCantReadChunk.Inc(1)
+				out.err = true
+				crr.out <- out
+				return
+			}
+			tszIter, err := tsz.NewIterator(b[1:])
+			if err != nil {
+				cassIt.Close()
+				log.Error(3, errFmtFailedToCreateIter, err)
+				cassErrCantReadChunk.Inc(1)
+				out.err = true
+				crr.out <- out
+				return
+			}
+			out.iters = append(out.iters, iter.New(tszIter, true))
+		}
+		crr.out <- out
+		err := cassIt.Close()
+		if err != nil {
+			log.Error(3, errFmtCassandraQueryErr, err)
+			c.metrics.Inc(err)
+			// NOTE: this won't result in error shown to user, as we already sent out the outcome
+			// this seems fine however, as this probably didn't impact user
+		} else {
+			cassChunksPerRow.Value(chunks)
+		}
 	}
 }
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
 func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, error) {
-	iters := make([]iter.Iter, 0)
 	if start > end {
-		return iters, errStartBeforeEnd
+		return nil, errStartBeforeEnd
 	}
 
 	pre := time.Now()
 
-	crrs := make([]*ChunkReadRequest, 0)
+	crrs := make([]ChunkReadRequest, 0)
 
 	query := func(sortKey int, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{sortKey, q, p, time.Now(), nil})
+		crrs = append(crrs, ChunkReadRequest{sortKey, q, p, time.Now(), nil})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -303,12 +363,12 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 
 	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
-	query(0, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
+	query(0, "SELECT data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
+		query(1, "SELECT data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		sortKey := 1
@@ -316,13 +376,13 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
+				query(sortKey, "SELECT data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
+				query(sortKey, "SELECT data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
 			} else {
 				// we want all columns
-				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
+				query(sortKey, "SELECT data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
 			}
 			sortKey++
 		}
@@ -348,37 +408,16 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	pre = time.Now()
 	// we have all of the results, but they could have arrived in any order.
 	sort.Sort(asc(outcomes))
-
-	var b []byte
-	var ts int
+	// each of numQueries outcomes could have anywhere between 0 and N iters (already ordered)
+	iters := make([]iter.Iter, 0, numQueries)
 	for _, outcome := range outcomes {
-		chunks := int64(0)
-		for outcome.i.Scan(&ts, &b) {
-			chunks += 1
-			chunkSizeAtLoad.Value(int64(len(b)))
-			if len(b) < 2 {
-				log.Error(3, errChunkTooSmall.Error())
-				return iters, errChunkTooSmall
-			}
-			if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
-				log.Error(3, errUnknownChunkFormat.Error())
-				return iters, errUnknownChunkFormat
-			}
-			it, err := tsz.NewIterator(b[1:])
-			if err != nil {
-				log.Error(3, "failed to unpack cassandra payload. %s", err)
-				return iters, err
-			}
-			iters = append(iters, iter.New(it, true))
+		if outcome.err {
+			// error already handled/instrumented, just need to pass it to user
+			return nil, errReadingData
 		}
-		err := outcome.i.Close()
-		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
-			c.metrics.Inc(err)
-		} else {
-			cassChunksPerRow.Value(chunks)
-		}
+		iters = append(iters, outcome.iters...)
 	}
+
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(int64(len(outcomes)))
 	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
