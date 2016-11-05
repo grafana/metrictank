@@ -22,6 +22,8 @@ how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 and it was able to save its complete chunks, this node will be able to take over without dataloss.
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+* `gc.heap_objects`:  
+how many objects are allocated on the heap, it's a key indicator for GC workload
 * `gc_metric`:  
 the amount of times the metrics GC is about to inspect a metric (series)
 * `idx.cassadra.ok`:  
