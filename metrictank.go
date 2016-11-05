@@ -151,7 +151,7 @@ var (
 	gcDur            met.Gauge // go GC
 	gcCpuFraction    met.Gauge // go GC
 
-	// metric gc.heap_objects measures how many objects are allocated on the heap, it's a key indicator for GC workload
+	// metric gc.heap_objects is how many objects are allocated on the heap, it's a key indicator for GC workload
 	heapObjects met.Gauge
 
 	promotionReadyAtChan chan uint32
