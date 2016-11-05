@@ -151,6 +151,9 @@ var (
 	gcDur            met.Gauge // go GC
 	gcCpuFraction    met.Gauge // go GC
 
+	// metric gc.heap_objects measures how many objects are allocated on the heap, it's a key indicator for GC workload
+	heapObjects met.Gauge
+
 	promotionReadyAtChan chan uint32
 )
 
@@ -485,6 +488,7 @@ func initMetrics(stats met.Backend) {
 	gcNum = stats.NewGauge("gc.num", 0)
 	gcDur = stats.NewGauge("gc.dur", 0)                 // in nanoseconds. last known duration.
 	gcCpuFraction = stats.NewGauge("gc.cpufraction", 0) // reported as pro-mille
+	heapObjects = stats.NewGauge("gc.heap_objects", 0)
 
 	// run a collector for some global stats
 	go func() {
@@ -504,6 +508,7 @@ func initMetrics(stats met.Backend) {
 				gcNum.Value(int64(m.NumGC))
 				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
 				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
+				heapObjects.Value(int64(m.HeapObjects))
 				var px int64
 				if mdata.CluStatus.IsPrimary() {
 					px = 1

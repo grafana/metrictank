@@ -287,6 +287,11 @@
               "lines": false,
               "pointradius": 2,
               "points": true
+            },
+            {
+              "alias": "heap objects",
+              "yaxis": 2,
+              "linewidth": 1
             }
           ],
           "span": 4,
@@ -307,6 +312,10 @@
               "refId": "C",
               "target": "alias(stats.$environment.metrictank.$instance.gc_metric, 'GCd metrics/s')",
               "textEditor": false
+            },
+            {
+              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.heap_objects, 'heap objects')",
+              "refId": "D"
             }
           ],
           "timeFrom": null,
