@@ -255,8 +255,7 @@ func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int
 }
 
 type outcome struct {
-	month   uint32
-	sortKey uint32
+	sortKey int
 	i       *gocql.Iter
 }
 type asc []outcome
@@ -269,7 +268,7 @@ func (c *cassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
 		cassGetWaitDuration.Value(time.Since(crr.timestamp))
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+		iter := outcome{crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -287,8 +286,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 
 	crrs := make([]*ChunkReadRequest, 0)
 
-	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, time.Now(), nil})
+	query := func(sortKey int, q string, p ...interface{}) {
+		crrs = append(crrs, &ChunkReadRequest{sortKey, q, p, time.Now(), nil})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -304,26 +303,28 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 
 	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
-	query(start_month, start_month, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
+	query(0, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(start_month, start_month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
+		query(1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
+		sortKey := 1
 		for month := start_month; month <= end_month; month += Month_sec {
 			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
+				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
+				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
 			} else {
 				// we want all columns
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
+				query(sortKey, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
 			}
+			sortKey++
 		}
 	}
 	numQueries := len(crrs)

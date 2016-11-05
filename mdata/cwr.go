@@ -7,8 +7,7 @@ import (
 )
 
 type ChunkReadRequest struct {
-	month     uint32
-	sortKey   uint32
+	sortKey   int
 	q         string
 	p         []interface{}
 	timestamp time.Time
