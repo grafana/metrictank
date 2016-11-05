@@ -292,7 +292,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
-	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to be include the last point we might need
+	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to include the last point we might need (end-1)
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
