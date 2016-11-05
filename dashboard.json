@@ -719,7 +719,7 @@
             },
             {
               "refId": "D",
-              "target": "aliasByNode(perSecond(collectd.$environment.metric-tank.$instance.cpu.*.cpu.idle), 5, 7)"
+              "target": "aliasByNode(perSecond(collectd.$environment.metrictank.$instance.cpu.*.cpu.idle), 5, 7)"
             },
             {
               "refId": "E",
