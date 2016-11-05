@@ -29,7 +29,6 @@ import (
 	inCarbon "github.com/raintank/metrictank/in/carbon"
 	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
 	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
-	inNSQ "github.com/raintank/metrictank/in/nsq"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	clKafka "github.com/raintank/metrictank/mdata/clkafka"
@@ -43,7 +42,6 @@ var (
 	inCarbonInst    *inCarbon.Carbon
 	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
 	inKafkaMdamInst *inKafkaMdam.KafkaMdam
-	inNSQInst       *inNSQ.NSQ
 	clKafkaInst     *mdata.ClKafka
 	clNSQInst       *mdata.ClNSQ
 
@@ -179,7 +177,6 @@ func main() {
 	inCarbon.ConfigSetup()
 	inKafkaMdm.ConfigSetup()
 	inKafkaMdam.ConfigSetup()
-	inNSQ.ConfigSetup()
 
 	// load config for cluster handlers
 	clNSQ.ConfigSetup()
@@ -227,11 +224,10 @@ func main() {
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	inKafkaMdam.ConfigProcess(*instance)
-	inNSQ.ConfigProcess()
 	clNSQ.ConfigProcess()
 	clKafka.ConfigProcess(*instance)
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled && !inNSQ.Enabled {
+	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
@@ -331,10 +327,6 @@ func main() {
 		inKafkaMdamInst = inKafkaMdam.New(stats)
 	}
 
-	if inNSQ.Enabled {
-		inNSQInst = inNSQ.New(stats)
-	}
-
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
@@ -373,10 +365,6 @@ func main() {
 	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
 
 	handlers := make([]mdata.ClusterHandler, 0)
-	if clNSQ.Enabled {
-		clNSQInst = mdata.NewNSQ(*instance, metrics, stats)
-		handlers = append(handlers, clNSQInst)
-	}
 	if clKafka.Enabled {
 		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
 		handlers = append(handlers, clKafkaInst)
@@ -395,9 +383,6 @@ func main() {
 	if inKafkaMdam.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdamInst.Start(metrics, metricIndex, usg)
-	}
-	if inNSQ.Enabled {
-		inNSQInst.Start(metrics, metricIndex, usg)
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
@@ -426,13 +411,6 @@ func main() {
 
 	waiters := make([]waiter, 0)
 
-	if inNSQ.Enabled {
-		waiters = append(waiters, waiter{
-			"nsq",
-			inNSQInst,
-			inNSQInst.StopChan,
-		})
-	}
 	if inKafkaMdm.Enabled {
 		waiters = append(waiters, waiter{
 			"kafka-mdm",

@@ -35,9 +35,3 @@ This is a kafka input that uses application-level batches stored within single k
 It is discouraged because this does not allow proper routing/partitioning of messages and will be removed.
 It only exists to compare performance numbers against kafka-mdm, and make mdm as fast as mdam.
 It also doesn't have the performance tuning options and offset control that has kafka-mdm has. (kafka-mdam always uses latest offset).
-
-
-## NSQ (deprecated)
-will be removed. NSQ does not guarantee ordering. Metrictank needs ordered input for aggregations to work correctly,
-and also for the compression to work optimally. The NSQ input "mostly works": we used to use it, but any out of order points
-will flat out be dropped on the floor.
