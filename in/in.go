@@ -44,6 +44,9 @@ func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage,
 	}
 }
 
+// process makes sure the data is stored and the metadata is in the index,
+// and the usage is tracked, if enabled.
+// concurrency-safe.
 func (in In) process(metric *schema.MetricData) {
 	if metric == nil {
 		return
@@ -67,6 +70,7 @@ func (in In) process(metric *schema.MetricData) {
 }
 
 // HandleLegacy processes legacy datapoints. we don't track msgsAge here
+// concurrency-safe
 func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
 	// TODO reuse?
 	md := &schema.MetricData{
@@ -87,6 +91,7 @@ func (in In) HandleLegacy(name string, val float64, ts uint32, interval int) {
 }
 
 // Handle processes simple messages without format spec or produced timestamp, so we don't track msgsAge here
+// concurrency-safe
 func (in In) Handle(data []byte) {
 	// TODO reuse?
 	md := schema.MetricData{}
@@ -102,6 +107,7 @@ func (in In) Handle(data []byte) {
 }
 
 // HandleArray processes MetricDataArray messages that have a format spec and produced timestamp.
+// not concurrency-safe!
 func (in In) HandleArray(data []byte) {
 	err := in.tmp.InitFromMsg(data)
 	if err != nil {

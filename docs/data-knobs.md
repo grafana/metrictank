@@ -84,5 +84,6 @@ The more data is needed in RAM, the more intense / longer the backfill or warm u
 
 #### Getting ready to become primary
 
-longer chunk sizes means a longer backfill (with Kafka) (or a longer warm up with NSQ)
+longer chunk sizes means a longer backfill of more older data (e.g. with kafka oldest offset),
+or a longer warm up if you only consume realtime data (e.g. with kafka offset latest).
 
