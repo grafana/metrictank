@@ -367,7 +367,6 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
-		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 		query(1, "SELECT data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
@@ -419,7 +418,10 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	}
 
 	cassToIterDuration.Value(time.Now().Sub(pre))
-	cassRowsPerResponse.Value(int64(len(outcomes)))
+
+	// each query hits a different row, except for start_month we used 2 queries (and outcomes)
+	cassRowsPerResponse.Value(int64(len(outcomes) - 1))
+
 	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil
 }
