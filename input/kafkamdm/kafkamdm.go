@@ -26,8 +26,6 @@ type KafkaMdm struct {
 	stats    met.Backend
 
 	wg sync.WaitGroup
-	// read from this channel to block until consumer is cleanly stopped
-	StopChan chan int
 
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
@@ -136,7 +134,6 @@ func New(stats met.Backend) *KafkaMdm {
 		consumer:      consumer,
 		client:        client,
 		stats:         stats,
-		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
 	}
 

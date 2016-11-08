@@ -26,8 +26,6 @@ type KafkaMdam struct {
 	stats    met.Backend
 
 	wg sync.WaitGroup
-	// read from this channel to block until consumer is cleanly stopped
-	StopChan chan int
 }
 
 func (k *KafkaMdam) Name() string {
@@ -79,7 +77,6 @@ func New(stats met.Backend) *KafkaMdam {
 	k := KafkaMdam{
 		consumer: consumer,
 		stats:    stats,
-		StopChan: make(chan int),
 	}
 
 	return &k
