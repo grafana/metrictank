@@ -26,10 +26,10 @@ import (
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/elasticsearch"
 	"github.com/raintank/metrictank/idx/memory"
-	"github.com/raintank/metrictank/in"
-	inCarbon "github.com/raintank/metrictank/in/carbon"
-	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
-	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
+	"github.com/raintank/metrictank/input"
+	inCarbon "github.com/raintank/metrictank/input/carbon"
+	inKafkaMdam "github.com/raintank/metrictank/input/kafkamdam"
+	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
@@ -318,25 +318,25 @@ func main() {
 	store.InitMetrics(stats)
 
 	/***********************************
-		Initialize our Receivers
+		Initialize our Inputs
 	***********************************/
-	receivers := make([]in.Plugin, 0)
+	inputs := make([]input.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
-		receivers = append(receivers, inCarbonInst)
+		inputs = append(inputs, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdmInst = inKafkaMdm.New(stats)
-		receivers = append(receivers, inKafkaMdmInst)
+		inputs = append(inputs, inKafkaMdmInst)
 	}
 
 	if inKafkaMdam.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdamInst = inKafkaMdam.New(stats)
-		receivers = append(receivers, inKafkaMdamInst)
+		inputs = append(inputs, inKafkaMdamInst)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -385,9 +385,9 @@ func main() {
 	mdata.InitPersistNotifier(stats, handlers...)
 
 	/***********************************
-		Start our receivers
+		Start our inputs
 	***********************************/
-	for _, plugin := range receivers {
+	for _, plugin := range inputs {
 		plugin.Start(metrics, metricIndex, usg)
 	}
 
@@ -414,13 +414,13 @@ func main() {
 	***********************************/
 	<-sigChan
 
-	// shutdown our reciever plugins.  These may take a while as we allow them
+	// shutdown our input plugins.  These may take a while as we allow them
 	// to finish processing any metrics that have already been ingested.
 	timer := time.NewTimer(time.Second * 10)
 	var wg sync.WaitGroup
-	for _, plugin := range receivers {
+	for _, plugin := range inputs {
 		wg.Add(1)
-		go func(plugin in.Plugin) {
+		go func(plugin input.Plugin) {
 			log.Info("Shutting down %s consumer", plugin.Name())
 			plugin.Stop()
 			log.Info("%s consumer finished shutdown", plugin.Name())

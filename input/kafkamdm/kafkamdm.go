@@ -12,7 +12,7 @@ import (
 
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
@@ -20,7 +20,7 @@ import (
 )
 
 type KafkaMdm struct {
-	in.In
+	input.Input
 	consumer sarama.Consumer
 	client   sarama.Client
 	stats    met.Backend
@@ -144,7 +144,7 @@ func New(stats met.Backend) *KafkaMdm {
 }
 
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
+	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	for _, topic := range topics {
 		// get partitions.
 		partitions, err := k.consumer.Partitions(topic)
@@ -211,12 +211,12 @@ func (k *KafkaMdm) handleMsg(data []byte) {
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
-		k.In.MetricsDecodeErr.Inc(1)
+		k.Input.MetricsDecodeErr.Inc(1)
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
-	k.In.MetricsPerMessage.Value(int64(1))
-	k.In.Process(&md)
+	k.Input.MetricsPerMessage.Value(int64(1))
+	k.Input.Process(&md)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

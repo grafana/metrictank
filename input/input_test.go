@@ -1,4 +1,4 @@
-package in
+package input
 
 import (
 	"fmt"
@@ -59,7 +59,7 @@ func Test_Process(t *testing.T) {
 	}
 }
 
-func test_Process(worker int, in *In, t *testing.T) map[string]int {
+func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 	var metric *schema.MetricData
 	metrics := make(map[string]int)
 	for m := 0; m < 4; m++ {

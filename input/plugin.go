@@ -1,4 +1,4 @@
-package in
+package input
 
 import (
 	"github.com/raintank/metrictank/idx"

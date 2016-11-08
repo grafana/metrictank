@@ -13,7 +13,7 @@ import (
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -22,7 +22,7 @@ import (
 )
 
 type Carbon struct {
-	in.In
+	input.Input
 	addrStr          string
 	addr             *net.TCPAddr
 	schemas          persister.WhisperSchemas
@@ -88,7 +88,7 @@ func New(stats met.Backend) *Carbon {
 }
 
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	c.In = in.New(metrics, metricIndex, usg, "carbon", c.stats)
+	c.Input = input.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, err.Error())
@@ -132,7 +132,7 @@ func (c *Carbon) handle(conn net.Conn) {
 
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.Medium)
 		if err != nil {
-			c.In.MetricsDecodeErr.Inc(1)
+			c.Input.MetricsDecodeErr.Inc(1)
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
@@ -154,8 +154,8 @@ func (c *Carbon) handle(conn net.Conn) {
 			OrgId:    1, // admin org
 		}
 		md.SetId()
-		c.In.MetricsPerMessage.Value(int64(1))
-		c.In.Process(md)
+		c.Input.MetricsPerMessage.Value(int64(1))
+		c.Input.Process(md)
 	}
 	c.handlerWaitGroup.Done()
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
@@ -21,7 +21,7 @@ import (
 )
 
 type KafkaMdam struct {
-	in.In
+	input.Input
 	consumer *cluster.Consumer
 	stats    met.Backend
 
@@ -86,7 +86,7 @@ func New(stats met.Backend) *KafkaMdam {
 }
 
 func (k *KafkaMdam) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.In = in.New(metrics, metricIndex, usg, "kafka-mdam", k.stats)
+	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdam", k.stats)
 	go k.notifications()
 	go k.consume()
 }
@@ -107,20 +107,20 @@ func (k *KafkaMdam) consume() {
 func (k *KafkaMdam) handleMsg(data []byte, tmp *schemaMsg.MetricData) {
 	err := tmp.InitFromMsg(data)
 	if err != nil {
-		k.In.MetricsDecodeErr.Inc(1)
+		k.Input.MetricsDecodeErr.Inc(1)
 		log.Error(3, "skipping message. %s", err)
 		return
 	}
-	k.In.MsgsAge.Value(time.Now().Sub(tmp.Produced).Nanoseconds() / 1000)
+	k.Input.MsgsAge.Value(time.Now().Sub(tmp.Produced).Nanoseconds() / 1000)
 	err = tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
 	if err != nil {
-		k.In.MetricsDecodeErr.Inc(1)
+		k.Input.MetricsDecodeErr.Inc(1)
 		log.Error(3, "skipping message. %s", err)
 		return
 	}
-	k.In.MetricsPerMessage.Value(int64(len(tmp.Metrics)))
+	k.Input.MetricsPerMessage.Value(int64(len(tmp.Metrics)))
 	for _, metric := range tmp.Metrics {
-		k.In.Process(metric)
+		k.Input.Process(metric)
 	}
 }
 

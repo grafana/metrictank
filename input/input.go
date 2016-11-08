@@ -1,6 +1,6 @@
 // Package in provides interfaces, concrete implementations, and utilities
 // to ingest data into metrictank
-package in
+package input
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 )
 
 // In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
-type In struct {
+type Input struct {
 	MetricsPerMessage met.Meter
 	metricsReceived   met.Count
 	MetricsDecodeErr  met.Count // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
@@ -26,8 +26,8 @@ type In struct {
 	usage       *usage.Usage
 }
 
-func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string, stats met.Backend) In {
-	return In{
+func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string, stats met.Backend) Input {
+	return Input{
 		MetricsPerMessage: stats.NewMeter(fmt.Sprintf("%s.metrics_per_message", input), 0),
 		metricsReceived:   stats.NewCount(fmt.Sprintf("%s.metrics_received", input)),
 		MetricsDecodeErr:  stats.NewCount(fmt.Sprintf("%s.metrics_decode_err", input)),
@@ -43,7 +43,7 @@ func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage,
 // process makes sure the data is stored and the metadata is in the index,
 // and the usage is tracked, if enabled.
 // concurrency-safe.
-func (in In) Process(metric *schema.MetricData) {
+func (in Input) Process(metric *schema.MetricData) {
 	if metric == nil {
 		return
 	}

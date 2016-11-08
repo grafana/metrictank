@@ -7,7 +7,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx/memory"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 
@@ -24,7 +24,7 @@ func Test_HandleMessage(t *testing.T) {
 	metricIndex.Init(stats)
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
 	k := KafkaMdm{
-		In: in.New(aggmetrics, metricIndex, usage, "test", stats),
+		Input: input.New(aggmetrics, metricIndex, usage, "test", stats),
 	}
 
 	allMetrics := make(map[string]int)
