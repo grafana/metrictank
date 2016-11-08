@@ -16,6 +16,7 @@ import (
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type KafkaMdm struct {
@@ -189,7 +190,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 			if LogLevel < 2 {
 				log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
-			k.In.Handle(msg.Value)
+			k.handleMsg(msg.Value)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
@@ -204,6 +205,18 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 			return
 		}
 	}
+}
+
+func (k *KafkaMdm) handleMsg(data []byte) {
+	md := schema.MetricData{}
+	_, err := md.UnmarshalMsg(data)
+	if err != nil {
+		k.In.MetricsDecodeErr.Inc(1)
+		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+		return
+	}
+	k.In.MetricsPerMessage.Value(int64(1))
+	k.In.Process(&md)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

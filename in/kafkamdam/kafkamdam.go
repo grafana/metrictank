@@ -4,6 +4,7 @@ import (
 	"flag"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -15,6 +16,8 @@ import (
 	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
+	"gopkg.in/raintank/schema.v1"
+	schemaMsg "gopkg.in/raintank/schema.v1/msg"
 )
 
 type KafkaMdam struct {
@@ -91,13 +94,34 @@ func (k *KafkaMdam) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, us
 func (k *KafkaMdam) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
+	tmp := schemaMsg.MetricData{Metrics: make([]*schema.MetricData, 1)}
 	for msg := range messageChan {
 		log.Debug("kafka-mdam received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-		k.In.HandleArray(msg.Value)
+		k.handleMsg(msg.Value, &tmp)
 		k.consumer.MarkOffset(msg, "")
 	}
 	log.Info("kafka-mdam consumer ended.")
 	k.wg.Done()
+}
+
+func (k *KafkaMdam) handleMsg(data []byte, tmp *schemaMsg.MetricData) {
+	err := tmp.InitFromMsg(data)
+	if err != nil {
+		k.In.MetricsDecodeErr.Inc(1)
+		log.Error(3, "skipping message. %s", err)
+		return
+	}
+	k.In.MsgsAge.Value(time.Now().Sub(tmp.Produced).Nanoseconds() / 1000)
+	err = tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
+	if err != nil {
+		k.In.MetricsDecodeErr.Inc(1)
+		log.Error(3, "skipping message. %s", err)
+		return
+	}
+	k.In.MetricsPerMessage.Value(int64(len(tmp.Metrics)))
+	for _, metric := range tmp.Metrics {
+		k.In.Process(metric)
+	}
 }
 
 func (k *KafkaMdam) notifications() {

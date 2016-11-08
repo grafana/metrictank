@@ -1,4 +1,4 @@
-package in
+package kafkamdm
 
 import (
 	"fmt"
@@ -7,13 +7,14 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx/memory"
+	"github.com/raintank/metrictank/in"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/usage"
+
 	"gopkg.in/raintank/schema.v1"
 )
 
-func Test_Process(t *testing.T) {
+func Test_HandleMessage(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.CluStatus = mdata.NewClusterStatus("test", false)
 	mdata.InitMetrics(stats)
@@ -22,11 +23,13 @@ func Test_Process(t *testing.T) {
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test", stats)
+	k := KafkaMdm{
+		In: in.New(aggmetrics, metricIndex, usage, "test", stats),
+	}
 
 	allMetrics := make(map[string]int)
 	for i := 0; i < 5; i++ {
-		metrics := test_Process(i, &in, t)
+		metrics := test_handleMessage(i, &k, t)
 		for mId, id := range metrics {
 			allMetrics[mId] = id
 		}
@@ -59,7 +62,7 @@ func Test_Process(t *testing.T) {
 	}
 }
 
-func test_Process(worker int, in *In, t *testing.T) map[string]int {
+func test_handleMessage(worker int, k *KafkaMdm, t *testing.T) map[string]int {
 	var metric *schema.MetricData
 	metrics := make(map[string]int)
 	for m := 0; m < 4; m++ {
@@ -80,47 +83,13 @@ func test_Process(worker int, in *In, t *testing.T) map[string]int {
 		}
 		metric.SetId()
 		metrics[metric.Id] = id
-		in.Process(metric)
+		var data []byte
+		var err error
+		data, err = metric.MarshalMsg(data[:])
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		k.handleMsg(data)
 	}
 	return metrics
-}
-
-func BenchmarkProcess(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("default", false)
-	mdata.InitMetrics(stats)
-
-	store := mdata.NewDevnullStore()
-	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
-	metricIndex := memory.New()
-	metricIndex.Init(stats)
-	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test", stats)
-
-	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
-	datas := make([]*schema.MetricData, b.N)
-	for i := 0; i < b.N; i++ {
-		metric := &schema.MetricData{
-			Id:       "some.id.of.a.metric",
-			OrgId:    500,
-			Name:     "some.id",
-			Metric:   "metric",
-			Interval: 10,
-			Value:    1234.567,
-			Unit:     "ms",
-			Time:     int64((i + 1) * 10),
-			Mtype:    "gauge",
-			Tags:     []string{"some_tag", "ok"},
-		}
-		datas[i] = metric
-	}
-
-	b.ResetTimer()
-	go func() {
-		for range chunk.TotalPoints {
-		}
-	}()
-	for i := 0; i < b.N; i++ {
-		in.Process(datas[i])
-	}
 }

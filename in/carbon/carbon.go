@@ -18,6 +18,7 @@ import (
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type Carbon struct {
@@ -141,7 +142,20 @@ func (c *Carbon) handle(conn net.Conn) {
 			log.Fatal(4, "carbon-in: couldn't find a schema for %q - this is impossible since we asserted there was a default with patt .*", name)
 		}
 		interval := s.Retentions[0].SecondsPerPoint()
-		c.HandleLegacy(string(key), val, ts, interval)
+		md := &schema.MetricData{
+			Name:     name,
+			Metric:   name,
+			Interval: interval,
+			Value:    val,
+			Unit:     "unknown",
+			Time:     int64(ts),
+			Mtype:    "gauge",
+			Tags:     []string{},
+			OrgId:    1, // admin org
+		}
+		md.SetId()
+		c.In.MetricsPerMessage.Value(int64(1))
+		c.In.Process(md)
 	}
 	c.handlerWaitGroup.Done()
 }
