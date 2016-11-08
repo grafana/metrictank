@@ -29,6 +29,39 @@ type Carbon struct {
 	stats            met.Backend
 	listener         *net.TCPListener
 	handlerWaitGroup sync.WaitGroup
+	quit             chan struct{}
+	connTrack        *ConnTrack
+}
+
+type ConnTrack struct {
+	sync.Mutex
+	conns map[string]net.Conn
+}
+
+func NewConnTrack() *ConnTrack {
+	return &ConnTrack{
+		conns: make(map[string]net.Conn),
+	}
+}
+
+func (c *ConnTrack) Add(conn net.Conn) {
+	c.Lock()
+	c.conns[conn.RemoteAddr().String()] = conn
+	c.Unlock()
+}
+
+func (c *ConnTrack) Remove(conn net.Conn) {
+	c.Lock()
+	delete(c.conns, conn.RemoteAddr().String())
+	c.Unlock()
+}
+
+func (c *ConnTrack) CloseAll() {
+	c.Lock()
+	for _, conn := range c.conns {
+		conn.Close()
+	}
+	c.Unlock()
 }
 
 func (c *Carbon) Name() string {
@@ -55,7 +88,7 @@ func ConfigProcess() {
 	var err error
 	schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
-		log.Fatal(4, "can't read schemas file %q: %s", schemasFile, err.Error())
+		log.Fatal(4, "carbon-in: can't read schemas file %q: %s", schemasFile, err.Error())
 	}
 	var defaultFound bool
 	for _, schema := range schemas {
@@ -69,7 +102,7 @@ func ConfigProcess() {
 	if !defaultFound {
 		// good graphite health (not sure what graphite does if there's no .*)
 		// but we definitely need to always be able to determine which interval to use
-		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
+		log.Fatal(4, "carbon-in: storage-conf does not have a default '.*' pattern")
 	}
 
 }
@@ -80,10 +113,12 @@ func New(stats met.Backend) *Carbon {
 		log.Fatal(4, err.Error())
 	}
 	return &Carbon{
-		addrStr: addr,
-		addr:    addrT,
-		schemas: schemas,
-		stats:   stats,
+		addrStr:   addr,
+		addr:      addrT,
+		schemas:   schemas,
+		stats:     stats,
+		quit:      make(chan struct{}),
+		connTrack: NewConnTrack(),
 	}
 }
 
@@ -102,21 +137,34 @@ func (c *Carbon) accept() {
 	for {
 		conn, err := c.listener.AcceptTCP()
 		if nil != err {
-			log.Error(4, err.Error())
-			break
+			select {
+			case <-c.quit:
+				// we are shutting down.
+				return
+			default:
+			}
+			log.Error(4, "carbon-in: Accept Error: %s", err.Error())
+			return
 		}
 		c.handlerWaitGroup.Add(1)
+		c.connTrack.Add(conn)
 		go c.handle(conn)
 	}
 }
 
 func (c *Carbon) Stop() {
+	log.Info("carbon-in: shutting down.")
+	close(c.quit)
 	c.listener.Close()
+	c.connTrack.CloseAll()
 	c.handlerWaitGroup.Wait()
 }
 
 func (c *Carbon) handle(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		c.connTrack.Remove(conn)
+	}()
 	// TODO c.SetTimeout(60e9)
 	r := bufio.NewReaderSize(conn, 4096)
 	for {
@@ -124,8 +172,14 @@ func (c *Carbon) handle(conn net.Conn) {
 		buf, _, err := r.ReadLine()
 
 		if nil != err {
+			select {
+			case <-c.quit:
+				// we are shutting down.
+				break
+			default:
+			}
 			if io.EOF != err {
-				log.Error(4, err.Error())
+				log.Error(4, "carbon-in: Recv error: %s", err.Error())
 			}
 			break
 		}
