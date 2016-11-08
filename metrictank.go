@@ -32,19 +32,19 @@ import (
 	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
-	clKafka "github.com/raintank/metrictank/mdata/clkafka"
-	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
+	"github.com/raintank/metrictank/mdata/notifierKafka"
+	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
 var (
-	inCarbonInst    *inCarbon.Carbon
-	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
-	inKafkaMdamInst *inKafkaMdam.KafkaMdam
-	clKafkaInst     *mdata.ClKafka
-	clNSQInst       *mdata.ClNSQ
+	inCarbonInst      *inCarbon.Carbon
+	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
+	inKafkaMdamInst   *inKafkaMdam.KafkaMdam
+	notifierKafkaInst *notifierKafka.NotifierKafka
+	notifierNsqInst   *notifierNsq.NotifierNSQ
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -183,8 +183,8 @@ func main() {
 	inKafkaMdam.ConfigSetup()
 
 	// load config for cluster handlers
-	clNSQ.ConfigSetup()
-	clKafka.ConfigSetup()
+	notifierNsq.ConfigSetup()
+	notifierKafka.ConfigSetup()
 
 	// load config for metricIndexers
 	memory.ConfigSetup()
@@ -228,8 +228,8 @@ func main() {
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	inKafkaMdam.ConfigProcess(*instance)
-	clNSQ.ConfigProcess()
-	clKafka.ConfigProcess(*instance)
+	notifierNsq.ConfigProcess()
+	notifierKafka.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -376,13 +376,13 @@ func main() {
 
 	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
 
-	handlers := make([]mdata.ClusterHandler, 0)
-	if clKafka.Enabled {
-		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
-		handlers = append(handlers, clKafkaInst)
+	handlers := make([]mdata.NotifierHandler, 0)
+	if notifierKafka.Enabled {
+		notifierKafkaInst = notifierKafka.NewNotifierKafka(*instance, metrics, stats)
+		handlers = append(handlers, notifierKafkaInst)
 	}
 
-	mdata.InitCluster(stats, handlers...)
+	mdata.InitPersistNotifier(stats, handlers...)
 
 	/***********************************
 		Start our receivers

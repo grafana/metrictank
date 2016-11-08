@@ -4,7 +4,7 @@
 // and refer to the config variables (clNSQ.Enabled etc), so we currently have this hybrid approach
 // with config handling in this package, but the rest of clNSQ is in the mdata package
 
-package clnsq
+package notifierNsq
 
 import (
 	"flag"
@@ -12,23 +12,26 @@ import (
 	"strings"
 
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/met"
 	"github.com/raintank/misc/app"
 	"github.com/rakyll/globalconf"
 )
 
 var (
-	Enabled          bool
-	NsqdTCPAddrs     string
-	LookupdHTTPAddrs string
-	NsqdAdds         []string
-	LookupdAdds      []string
-	Topic            string
-	Channel          string
-	MaxInFlight      int
-	ProducerOpts     string
-	ConsumerOpts     string
-	PCfg             *nsq.Config
-	CCfg             *nsq.Config
+	Enabled           bool
+	NsqdTCPAddrs      string
+	LookupdHTTPAddrs  string
+	NsqdAdds          []string
+	LookupdAdds       []string
+	Topic             string
+	Channel           string
+	MaxInFlight       int
+	ProducerOpts      string
+	ConsumerOpts      string
+	PCfg              *nsq.Config
+	CCfg              *nsq.Config
+	messagesPublished met.Count
+	messagesSize      met.Meter
 )
 
 func ConfigSetup() {

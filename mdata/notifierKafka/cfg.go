@@ -1,4 +1,4 @@
-package clkafka
+package notifierKafka
 
 import (
 	"flag"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/raintank/met"
 	"github.com/rakyll/globalconf"
 )
 
@@ -19,6 +20,9 @@ var DataDir string
 var Config *sarama.Config
 var OffsetDuration time.Duration
 var OffsetCommitInterval time.Duration
+
+var messagesPublished met.Count
+var messagesSize met.Meter
 
 func ConfigSetup() {
 	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
