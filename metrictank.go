@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -316,18 +317,26 @@ func main() {
 	}
 	store.InitMetrics(stats)
 
+	/***********************************
+		Initialize our Receivers
+	***********************************/
+	receivers := make([]in.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
-
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
+		receivers = append(receivers, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdmInst = inKafkaMdm.New(stats)
+		receivers = append(receivers, inKafkaMdmInst)
 	}
 
 	if inKafkaMdam.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdamInst = inKafkaMdam.New(stats)
+		receivers = append(receivers, inKafkaMdamInst)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -375,17 +384,11 @@ func main() {
 
 	mdata.InitCluster(stats, handlers...)
 
-	if inCarbon.Enabled {
-		inCarbonInst.Start(metrics, metricIndex, usg)
-	}
-
-	if inKafkaMdm.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdmInst.Start(metrics, metricIndex, usg)
-	}
-	if inKafkaMdam.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdamInst.Start(metrics, metricIndex, usg)
+	/***********************************
+		Start our receivers
+	***********************************/
+	for _, plugin := range receivers {
+		plugin.Start(metrics, metricIndex, usg)
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
@@ -406,39 +409,36 @@ func main() {
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
-	type waiter struct {
-		key    string
-		plugin in.Plugin
-		ch     chan int
-	}
-
-	waiters := make([]waiter, 0)
-
-	if inKafkaMdm.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdm",
-			inKafkaMdmInst,
-			inKafkaMdmInst.StopChan,
-		})
-	}
-	if inKafkaMdam.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdam",
-			inKafkaMdamInst,
-			inKafkaMdamInst.StopChan,
-		})
-	}
+	/***********************************
+		Wait for Shutdown
+	***********************************/
 	<-sigChan
-	for _, w := range waiters {
-		log.Info("Shutting down %s consumer", w.key)
-		w.plugin.Stop()
+
+	// shutdown our reciever plugins.  These may take a while as we allow them
+	// to finish processing any metrics that have already been ingested.
+	timer := time.NewTimer(time.Second * 10)
+	var wg sync.WaitGroup
+	for _, plugin := range receivers {
+		wg.Add(1)
+		go func(plugin in.Plugin) {
+			log.Info("Shutting down %s consumer", plugin.Name())
+			plugin.Stop()
+			log.Info("%s consumer finished shutdown", plugin.Name())
+			wg.Done()
+		}(plugin)
 	}
-	for _, w := range waiters {
-		// the order here is arbitrary, they could stop in either order, but it doesn't really matter
-		log.Info("waiting for %s consumer to finish shutdown", w.key)
-		<-w.ch
-		log.Info("%s consumer finished shutdown", w.key)
+	pluginsStopped := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(pluginsStopped)
+	}()
+	select {
+	case <-timer.C:
+		log.Warn("Plugins taking too long to shutdown, not waiting any longer.")
+	case <-pluginsStopped:
+		timer.Stop()
 	}
+
 	log.Info("closing store")
 	store.Stop()
 	metricIndex.Stop()

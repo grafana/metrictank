@@ -27,6 +27,10 @@ type KafkaMdam struct {
 	StopChan chan int
 }
 
+func (k *KafkaMdam) Name() string {
+	return "kafkaMdam"
+}
+
 var Enabled bool
 var brokerStr string
 var brokers []string
@@ -124,14 +128,9 @@ func (k *KafkaMdam) notifications() {
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)
-//
-// NOTE: receive on StopChan to block until this process completes
+// and block until it is stopped.
 func (k *KafkaMdam) Stop() {
 	// closes notifications and messages channels, amongst others
 	k.consumer.Close()
-
-	go func() {
-		k.wg.Wait()
-		close(k.StopChan)
-	}()
+	k.wg.Wait()
 }

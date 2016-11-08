@@ -7,6 +7,7 @@ import (
 )
 
 type Plugin interface {
+	Name() string
 	Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage)
-	Stop()
+	Stop() // Should block until shutdown is complete.
 }
