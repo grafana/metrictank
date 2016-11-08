@@ -27,8 +27,8 @@ type NotifierNSQ struct {
 }
 
 func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ {
-	messagesPublished = stats.NewCount("cluster.messages-published")
-	messagesSize = stats.NewMeter("cluster.message_size", 0)
+	messagesPublished = stats.NewCount("notifier.nsq.messages-published")
+	messagesSize = stats.NewMeter("notifier.nsq.message_size", 0)
 	// producers
 	hostPool = hostpool.NewEpsilonGreedy(NsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
