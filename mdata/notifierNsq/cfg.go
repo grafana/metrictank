@@ -19,17 +19,17 @@ import (
 
 var (
 	Enabled           bool
-	NsqdTCPAddrs      string
-	LookupdHTTPAddrs  string
-	NsqdAdds          []string
-	LookupdAdds       []string
-	Topic             string
-	Channel           string
-	MaxInFlight       int
-	ProducerOpts      string
-	ConsumerOpts      string
-	PCfg              *nsq.Config
-	CCfg              *nsq.Config
+	nsqdTCPAddrs      string
+	lookupdHTTPAddrs  string
+	nsqdAdds          []string
+	lookupdAdds       []string
+	topic             string
+	channel           string
+	maxInFlight       int
+	producerOpts      string
+	consumerOpts      string
+	pCfg              *nsq.Config
+	cCfg              *nsq.Config
 	messagesPublished met.Count
 	messagesSize      met.Meter
 )
@@ -37,13 +37,13 @@ var (
 func ConfigSetup() {
 	fs := flag.NewFlagSet("nsq-cluster", flag.ExitOnError)
 	fs.BoolVar(&Enabled, "enabled", false, "")
-	fs.StringVar(&NsqdTCPAddrs, "nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
-	fs.StringVar(&LookupdHTTPAddrs, "lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
-	fs.StringVar(&Topic, "topic", "metricpersist", "NSQ topic for persist messages")
-	fs.StringVar(&Channel, "channel", "tank", "NSQ channel for persist messages")
-	fs.StringVar(&ProducerOpts, "producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	fs.StringVar(&ConsumerOpts, "consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
-	fs.IntVar(&MaxInFlight, "max-in-flight", 200, "max number of messages to allow in flight for consumer")
+	fs.StringVar(&nsqdTCPAddrs, "nsqd-tcp-address", "", "nsqd TCP address (may be given multiple times as comma-separated list)")
+	fs.StringVar(&lookupdHTTPAddrs, "lookupd-http-address", "", "lookupd HTTP address (may be given multiple times as comma-separated list)")
+	fs.StringVar(&topic, "topic", "metricpersist", "NSQ topic for persist messages")
+	fs.StringVar(&channel, "channel", "tank", "NSQ channel for persist messages")
+	fs.StringVar(&producerOpts, "producer-opt", "", "option to passthrough to nsq.Producer (may be given multiple times as comma-separated list, see http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	fs.StringVar(&consumerOpts, "consumer-opt", "", "option to passthrough to nsq.Consumer (may be given multiple times as comma-separated list, http://godoc.org/github.com/nsqio/go-nsq#Config)")
+	fs.IntVar(&maxInFlight, "max-in-flight", 200, "max number of messages to allow in flight for consumer")
 	globalconf.Register("nsq-cluster", fs)
 }
 
@@ -51,34 +51,34 @@ func ConfigProcess() {
 	if !Enabled {
 		return
 	}
-	if Topic == "" {
+	if topic == "" {
 		log.Fatal(4, "topic for nsq-cluster cannot be empty")
 	}
 
-	NsqdAdds = strings.Split(NsqdTCPAddrs, ",")
-	if len(NsqdAdds) == 1 && NsqdAdds[0] == "" {
-		NsqdAdds = []string{}
+	nsqdAdds = strings.Split(nsqdTCPAddrs, ",")
+	if len(nsqdAdds) == 1 && nsqdAdds[0] == "" {
+		nsqdAdds = []string{}
 	}
 
-	LookupdAdds = strings.Split(LookupdHTTPAddrs, ",")
-	if len(LookupdAdds) == 1 && LookupdAdds[0] == "" {
-		LookupdAdds = []string{}
+	lookupdAdds = strings.Split(lookupdHTTPAddrs, ",")
+	if len(lookupdAdds) == 1 && lookupdAdds[0] == "" {
+		lookupdAdds = []string{}
 	}
 
 	// producers
-	PCfg = nsq.NewConfig()
-	PCfg.UserAgent = "metrictank-cluster"
-	err := app.ParseOpts(PCfg, ProducerOpts)
+	pCfg = nsq.NewConfig()
+	pCfg.UserAgent = "metrictank-cluster"
+	err := app.ParseOpts(pCfg, producerOpts)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster: failed to parse nsq producer options. %s", err)
 	}
 
 	// consumer
-	CCfg = nsq.NewConfig()
-	CCfg.UserAgent = "metrictank-cluster"
-	err = app.ParseOpts(CCfg, ConsumerOpts)
+	cCfg = nsq.NewConfig()
+	cCfg.UserAgent = "metrictank-cluster"
+	err = app.ParseOpts(cCfg, consumerOpts)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster: failed to parse nsq consumer options. %s", err)
 	}
-	CCfg.MaxInFlight = MaxInFlight
+	cCfg.MaxInFlight = maxInFlight
 }

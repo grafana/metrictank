@@ -30,11 +30,11 @@ func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *Notifier
 	messagesPublished = stats.NewCount("notifier.nsq.messages-published")
 	messagesSize = stats.NewMeter("notifier.nsq.message_size", 0)
 	// producers
-	hostPool = hostpool.NewEpsilonGreedy(NsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
+	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
 
-	for _, addr := range NsqdAdds {
-		producer, err := nsq.NewProducer(addr, PCfg)
+	for _, addr := range nsqdAdds {
+		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
 			log.Fatal(4, "nsq-cluster failed creating producer %s", err.Error())
 		}
@@ -42,7 +42,7 @@ func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *Notifier
 	}
 
 	// consumers
-	consumer, err := insq.NewConsumer(Topic, Channel, CCfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(topic, channel, cCfg, "metric_persist.%s", stats)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
@@ -56,13 +56,13 @@ func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *Notifier
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
-	err = consumer.ConnectToNSQDs(NsqdAdds)
+	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to connect to NSQDs. %s", err)
 	}
 	log.Info("nsq-cluster persist consumer connected to nsqd")
 
-	err = consumer.ConnectToNSQLookupds(LookupdAdds)
+	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to connect to NSQLookupds. %s", err)
 	}
@@ -123,7 +123,7 @@ func (c *NotifierNSQ) flush() {
 			// will result in this loop repeating forever until we successfully publish our msg.
 			hostPoolResponse := hostPool.Get()
 			prod := producers[hostPoolResponse.Host()]
-			err = prod.Publish(Topic, buf.Bytes())
+			err = prod.Publish(topic, buf.Bytes())
 			// Hosts that are marked as dead will be retried after 30seconds.  If we published
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)

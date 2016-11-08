@@ -33,7 +33,7 @@ func NewNotifierKafka(instance string, metrics mdata.Metrics, stats met.Backend)
 	messagesPublished = stats.NewCount("notifier.kafka.messages-published")
 	messagesSize = stats.NewMeter("notifier.kafka.message_size", 0)
 
-	client, err := sarama.NewClient(Brokers, Config)
+	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
 		log.Fatal(2, "kafka-notifier failed to start client: %s", err)
 	}
@@ -48,7 +48,7 @@ func NewNotifierKafka(instance string, metrics mdata.Metrics, stats met.Backend)
 		log.Fatal(2, "kafka-notifier failed to initialize producer: %s", err)
 	}
 
-	offsetMgr, err := kafka.NewOffsetMgr(DataDir)
+	offsetMgr, err := kafka.NewOffsetMgr(dataDir)
 	if err != nil {
 		log.Fatal(2, "kafka-notifier couldnt create offsetMgr. %s", err)
 	}
@@ -75,14 +75,13 @@ func NewNotifierKafka(instance string, metrics mdata.Metrics, stats met.Backend)
 
 func (c *NotifierKafka) start() {
 	// get partitions.
-	topic := Topic
 	partitions, err := c.consumer.Partitions(topic)
 	if err != nil {
 		log.Fatal(4, "kafka-notifier: Faild to get partitions for topic %s. %s", topic, err)
 	}
 	for _, partition := range partitions {
 		var offset int64
-		switch OffsetStr {
+		switch offsetStr {
 		case "oldest":
 			offset = -2
 		case "newest":
@@ -90,10 +89,10 @@ func (c *NotifierKafka) start() {
 		case "last":
 			offset, err = c.offsetMgr.Last(topic, partition)
 		default:
-			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*OffsetDuration).UnixNano()/int64(time.Millisecond))
+			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 		}
 		if err != nil {
-			log.Fatal(4, "kafka-notifier: failed to get %q offset for %s:%d.  %q", OffsetStr, topic, partition, err)
+			log.Fatal(4, "kafka-notifier: failed to get %q offset for %s:%d.  %q", offsetStr, topic, partition, err)
 		}
 		go c.consumePartition(topic, partition, offset)
 	}
@@ -110,7 +109,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 	log.Info("kafka-notifier: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
 	currentOffset := partitionOffset
 	messages := pc.Messages()
-	ticker := time.NewTicker(OffsetCommitInterval)
+	ticker := time.NewTicker(offsetCommitInterval)
 	for {
 		select {
 		case msg := <-messages:
@@ -190,7 +189,7 @@ func (c *NotifierKafka) flush() {
 		buf.Write(data)
 		messagesSize.Value(int64(buf.Len()))
 		payload := &sarama.ProducerMessage{
-			Topic: Topic,
+			Topic: topic,
 			Value: sarama.ByteEncoder(buf.Bytes()),
 		}
 
