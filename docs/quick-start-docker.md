@@ -71,8 +71,8 @@ If you're running Docker engine natively, you can connect using `localhost`. If 
 ```
 $ curl http://localhost:6060
 OK
-$ curl http://localhost:6060/cluster
-{"instance":"default","primary":true,"lastChange":"2016-08-02T17:12:25.339785926Z"}
+$ curl http://localhost:6060/node
+{"name":"default","version":"0.5.7-67-g3be576c","primary":true,"primaryChange":"2016-11-15T08:13:12.819435983Z","state":"NodeReady","started":"0001-01-01T00:00:00Z","stateChange":"2016-11-15T08:13:16.591748594Z"}
 ```
 
 ## Working with Grafana and metrictank

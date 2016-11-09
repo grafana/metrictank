@@ -65,41 +65,25 @@ POST /render
 * from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 
-## Low-level data query api
-
-This query API is for applications that already know the UUID's of the metrics they're looking for.
-It currently is primarily used by [graphite-metrictank](https://github.com/raintank/graphite-metrictank)
-It returns JSON output in the same format as the graphite query api.
-
-```
-GET /get
-POST /get
-```
-
-* header `X-Org-Id` required
-* maxDataPoints: int (default: 800)
-* target: mandatory. one or more UUID's of metrics. You can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
-  [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
-* from: see [timespec format](#tspec)(default: 24 ago) (inclusive)
-* to/until : see [timespec format](#tspec)(default: now) (exclusive)
-
-
 ## Cluster status
 
 ```
-GET /cluster
+GET /node
 ```
 
 returns a json document with the following fields:
 
-* instance name
-* primary status
-* primary status last change timestamp
+* "name": the node name
+* "primary": whether the node is a primary node or not
+* "primaryChange": timestamp of when the primary state last changed
+* "version": metrictank version
+* "state": whether the node is ready to handle requests or not
+* "stateChange": timestamp of when the state last changed
+* "started": timestamp of when the node started up
 
-## Change primary role
 
 ```
-POST /cluster
+POST /node
 ```
 
 parameter values :

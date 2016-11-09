@@ -1,16 +1,18 @@
-package main
+package api
 
 import (
 	"fmt"
+	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/mdata"
+	"gopkg.in/raintank/schema.v1"
 	"math"
 	"math/rand"
 	"reflect"
 	"testing"
-
-	"github.com/raintank/met/helper"
-	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/mdata"
-	"gopkg.in/raintank/schema.v1"
+	"time"
 )
 
 type testCase struct {
@@ -18,6 +20,10 @@ type testCase struct {
 	consol consolidation.Consolidator
 	num    uint32
 	out    []schema.Point
+}
+
+func init() {
+	cluster.Init("default", "test", false, time.Now())
 }
 
 func validate(cases []testCase, t *testing.T) {
@@ -424,14 +430,17 @@ func TestPrevBoundary(t *testing.T) {
 
 // TestGetSeries assures that series data is returned in proper form.
 func TestGetSeries(t *testing.T) {
+	cluster.Init("default", "test", false, time.Now())
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
-
-	metrics = mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
-	defer metrics.Stop()
-	mdata.CluStatus = mdata.NewClusterStatus("default", false)
+	metrics := mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
 	mdata.InitMetrics(stats)
-	initMetrics(stats)
+	addr = "localhost:6060"
+	srv, _ := NewServer(stats)
+	srv.BindBackendStore(store)
+	srv.BindMemoryStore(metrics)
+
+	defer metrics.Stop()
 
 	// the tests below cycles through every possible combination of:
 	// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
@@ -448,14 +457,16 @@ func TestGetSeries(t *testing.T) {
 		for from := uint32(11); from <= 20; from++ { // should always yield result with first point at 20 (because from is inclusive)
 			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
 				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
+
 				metric := metrics.GetOrCreate(name)
 				metric.Add(offset, 10)    // this point will always be quantized to 10
 				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-
-				points := getSeries(store, name, consolidation.None, 10, from, to)
+				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg)
+				req.ArchInterval = 10
+				points := srv.getSeries(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
 					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
 				}
@@ -465,22 +476,22 @@ func TestGetSeries(t *testing.T) {
 }
 
 type alignCase struct {
-	reqs        []Req
+	reqs        []models.Req
 	aggSettings []mdata.AggSetting
-	outReqs     []Req
+	outReqs     []models.Req
 	outErr      error
 }
 
-func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) Req {
-	req := NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
 	return req
 }
-func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) Req {
-	req := NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
-	req.archive = archive
-	req.archInterval = archInterval
-	req.outInterval = outInterval
-	req.aggNum = aggNum
+func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+	req.Archive = archive
+	req.ArchInterval = archInterval
+	req.OutInterval = outInterval
+	req.AggNum = aggNum
 	return req
 }
 
@@ -488,12 +499,12 @@ func TestAlignRequests(t *testing.T) {
 	input := []alignCase{
 		{
 			// real example seen with alerting queries
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
 				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
 			},
@@ -502,7 +513,7 @@ func TestAlignRequests(t *testing.T) {
 		{
 			// raw would be 3600/10=360 points, agg1 3600/60=60. raw is best cause it provides most points
 			// and still under the max points limit.
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600, 800, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600, 800, 10, consolidation.Avg),
 				reqRaw("c", 0, 3600, 800, 10, consolidation.Avg),
@@ -512,7 +523,7 @@ func TestAlignRequests(t *testing.T) {
 				{60, 600, 2, 0, true},
 				{120, 600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
 				reqOut("b", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
 				reqOut("c", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -521,7 +532,7 @@ func TestAlignRequests(t *testing.T) {
 		},
 		{
 			// same as before, but agg1 disabled. just to make sure it still behaves the same.
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600, 800, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600, 800, 10, consolidation.Avg),
 				reqRaw("c", 0, 3600, 800, 10, consolidation.Avg),
@@ -531,7 +542,7 @@ func TestAlignRequests(t *testing.T) {
 				{60, 600, 2, 0, false},
 				{120, 600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
 				reqOut("b", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
 				reqOut("c", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -544,7 +555,7 @@ func TestAlignRequests(t *testing.T) {
 			// agg1: 2400/60 -> 40 pts, good candidate,
 			// though 40pts is 2.5x smaller than the maxPoints target (100 points)
 			// raw's 240 pts is only 2.4x larger then 100pts, so it is selected.
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 10, consolidation.Avg),
@@ -553,7 +564,7 @@ func TestAlignRequests(t *testing.T) {
 				{60, 600, 2, 0, true},
 				{120, 600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 30, 3),
 				reqOut("b", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 30, 3),
 				reqOut("c", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 30, 3),
@@ -565,7 +576,7 @@ func TestAlignRequests(t *testing.T) {
 		// agg1 2400/120 -> 20 pts is only 1.95x smaller then our target 39pts so it is
 		// selected.
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
@@ -574,7 +585,7 @@ func TestAlignRequests(t *testing.T) {
 				{120, 600, 2, 0, true},
 				{600, 600, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 39, 10, consolidation.Avg, 1, 120, 120, 1),
 				reqOut("b", 0, 2400, 39, 10, consolidation.Avg, 1, 120, 120, 1),
 				reqOut("c", 0, 2400, 39, 10, consolidation.Avg, 1, 120, 120, 1),
@@ -585,7 +596,7 @@ func TestAlignRequests(t *testing.T) {
 		// raw: 2400/10 -> 240 pts is 6.15x our target of 39pts
 		// agg1 2400/600 -> 4 pts is about 10x smaller so we prefer raw again
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
@@ -595,7 +606,7 @@ func TestAlignRequests(t *testing.T) {
 				{600, 600, 2, 0, true},
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 39, 10, consolidation.Avg, 0, 10, 70, 7),
 				reqOut("b", 0, 2400, 39, 10, consolidation.Avg, 0, 10, 70, 7),
 				reqOut("c", 0, 2400, 39, 10, consolidation.Avg, 0, 10, 70, 7),
@@ -607,7 +618,7 @@ func TestAlignRequests(t *testing.T) {
 		// agg2 24000/600 -> 40 pts is just too large, but we can make it work with runtime
 		// consolidation
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 24000, 39, 10, consolidation.Avg),
 				reqRaw("b", 0, 24000, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 24000, 39, 10, consolidation.Avg),
@@ -617,7 +628,7 @@ func TestAlignRequests(t *testing.T) {
 				{600, 600, 2, 0, true},
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 24000, 39, 10, consolidation.Avg, 2, 600, 1200, 2),
 				reqOut("b", 0, 24000, 39, 10, consolidation.Avg, 2, 600, 1200, 2),
 				reqOut("c", 0, 24000, 39, 10, consolidation.Avg, 2, 600, 1200, 2),
@@ -628,7 +639,7 @@ func TestAlignRequests(t *testing.T) {
 		// raw is here best again but all series need to be at a step of 60
 		// so runtime consolidation is needed, we'll get 40 points for each metric
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 30, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
@@ -637,7 +648,7 @@ func TestAlignRequests(t *testing.T) {
 				{120, 600, 2, 0, true},
 				{600, 600, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 2400, 100, 30, consolidation.Avg, 0, 30, 60, 2),
 				reqOut("c", 0, 2400, 100, 60, consolidation.Avg, 0, 60, 60, 1),
@@ -650,7 +661,7 @@ func TestAlignRequests(t *testing.T) {
 		// because the minimum interval that they all fit into (300) is greater then the
 		// 120second rollup data, the rollups is a better choice.
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
@@ -659,7 +670,7 @@ func TestAlignRequests(t *testing.T) {
 				{120, 600, 2, 0, true},
 				{600, 600, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 120, 120, 1),
 				reqOut("b", 0, 2400, 100, 50, consolidation.Avg, 1, 120, 120, 1),
 				reqOut("c", 0, 2400, 100, 60, consolidation.Avg, 1, 120, 120, 1),
@@ -670,7 +681,7 @@ func TestAlignRequests(t *testing.T) {
 		// With this test, our common raw interval matches our first rollup. Runtime consolidation is expensive
 		// so we preference the rollup data.
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
@@ -679,7 +690,7 @@ func TestAlignRequests(t *testing.T) {
 				{300, 600, 2, 0, true},
 				{600, 600, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 300, 300, 1),
 				reqOut("b", 0, 2400, 100, 50, consolidation.Avg, 1, 300, 300, 1),
 				reqOut("c", 0, 2400, 100, 60, consolidation.Avg, 1, 300, 300, 1),
@@ -692,7 +703,7 @@ func TestAlignRequests(t *testing.T) {
 		// best use raw despite the needed consolidation
 
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
@@ -701,7 +712,7 @@ func TestAlignRequests(t *testing.T) {
 				{300, 600, 2, 0, false},
 				{600, 600, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
 				reqOut("b", 0, 2400, 100, 50, consolidation.Avg, 0, 50, 300, 6),
 				reqOut("c", 0, 2400, 100, 60, consolidation.Avg, 0, 60, 300, 5),
@@ -711,7 +722,7 @@ func TestAlignRequests(t *testing.T) {
 		// again with 3 different raw intervals that have a large common interval.
 		// With this test, our common raw interval is less then our first rollup so is selected.
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
@@ -720,7 +731,7 @@ func TestAlignRequests(t *testing.T) {
 				{600, 600, 2, 0, true},
 				{1200, 1200, 2, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
 				reqOut("b", 0, 2400, 100, 50, consolidation.Avg, 0, 50, 300, 6),
 				reqOut("c", 0, 2400, 100, 60, consolidation.Avg, 0, 60, 300, 5),
@@ -733,7 +744,7 @@ func TestAlignRequests(t *testing.T) {
 		// clearly this fits well within the max points, and it's the highest res,
 		// so it's returned.
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*3, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*3, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*3, 1000, 60, consolidation.Avg),
@@ -743,7 +754,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*3, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 3600*3, 1000, 30, consolidation.Avg, 0, 30, 60, 2),
 				reqOut("c", 0, 3600*3, 1000, 60, consolidation.Avg, 0, 60, 60, 1),
@@ -753,7 +764,7 @@ func TestAlignRequests(t *testing.T) {
 		// same but request 6h worth of data
 		// raw 21600/60 -> 360. chosen for same reason
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*6, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*6, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*6, 1000, 60, consolidation.Avg),
@@ -763,7 +774,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*6, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 3600*6, 1000, 30, consolidation.Avg, 0, 30, 60, 2),
 				reqOut("c", 0, 3600*6, 1000, 60, consolidation.Avg, 0, 60, 60, 1),
@@ -773,7 +784,7 @@ func TestAlignRequests(t *testing.T) {
 		// same but request 9h worth of data
 		// raw 32400/60 -> 540. chosen for same reason
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*9, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*9, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*9, 1000, 60, consolidation.Avg),
@@ -783,7 +794,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*9, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 3600*9, 1000, 30, consolidation.Avg, 0, 30, 60, 2),
 				reqOut("c", 0, 3600*9, 1000, 60, consolidation.Avg, 0, 60, 60, 1),
@@ -794,7 +805,7 @@ func TestAlignRequests(t *testing.T) {
 		// raw 86400/60 -> 1440
 		// agg1 86400/600 -> 144 points -> best choice
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*24, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24, 1000, 60, consolidation.Avg),
@@ -804,7 +815,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24, 1000, 10, consolidation.Avg, 1, 600, 600, 1),
 				reqOut("b", 0, 3600*24, 1000, 30, consolidation.Avg, 1, 600, 600, 1),
 				reqOut("c", 0, 3600*24, 1000, 60, consolidation.Avg, 1, 600, 600, 1),
@@ -816,7 +827,7 @@ func TestAlignRequests(t *testing.T) {
 		// agg1 3600*24*7 / 600 = 1008 points, which is too many, so must also do runtime consolidation and bring it back to 504
 		// agg2 3600*24*7 / 7200 = 84 points -> too far below maxdatapoints, better to do agg1 with runtime consol
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
@@ -826,7 +837,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24*7, 1000, 10, consolidation.Avg, 1, 600, 1200, 2),
 				reqOut("b", 0, 3600*24*7, 1000, 30, consolidation.Avg, 1, 600, 1200, 2),
 				reqOut("c", 0, 3600*24*7, 1000, 60, consolidation.Avg, 1, 600, 1200, 2),
@@ -840,7 +851,7 @@ func TestAlignRequests(t *testing.T) {
 		// agg3 3600*24*365/21600 -> 1460
 		// clearly agg3 is the best, and we have to runtime consolidate with aggNum 2
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24*365, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
@@ -850,7 +861,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, true},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 3, 21600, 43200, 2),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 3, 21600, 43200, 2),
 				reqOut("c", 0, 3600*24*365, 1000, 60, consolidation.Avg, 3, 21600, 43200, 2),
@@ -860,7 +871,7 @@ func TestAlignRequests(t *testing.T) {
 		// ditto but disable agg3
 		// so we have to use agg2 with aggNum of 5
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24*365, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
@@ -870,7 +881,7 @@ func TestAlignRequests(t *testing.T) {
 				{7200, 21600, 1, 0, true},
 				{21600, 21600, 1, 0, false},
 			},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 2, 7200, 36000, 5),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 2, 7200, 36000, 5),
 				reqOut("c", 0, 3600*24*365, 1000, 60, consolidation.Avg, 2, 7200, 36000, 5),
@@ -881,13 +892,13 @@ func TestAlignRequests(t *testing.T) {
 		// raw 3600*24*365/60 -> 525600
 		// we need an aggNum of 526 to keep this under 1000 points
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24*365, 1000, 10, consolidation.Avg),
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 0, 10, 31560, 526*6),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
 				reqOut("c", 0, 3600*24*365, 1000, 60, consolidation.Avg, 0, 60, 31560, 526),
@@ -898,13 +909,13 @@ func TestAlignRequests(t *testing.T) {
 		// raw 3600*24*365/60 -> 525600
 		// we need an aggNum of 526 to keep this under 1000 points
 		{
-			[]Req{
+			[]models.Req{
 				reqRaw("a", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 			},
 			[]mdata.AggSetting{},
-			[]Req{
+			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
 				reqOut("c", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
@@ -930,9 +941,9 @@ func TestAlignRequests(t *testing.T) {
 }
 
 func TestMergeSeries(t *testing.T) {
-	out := make([]Series, 0)
+	out := make([]models.Series, 0)
 	for i := 0; i < 5; i++ {
-		out = append(out, Series{
+		out = append(out, models.Series{
 			Target: fmt.Sprintf("some.series.foo%d", i),
 			Datapoints: []schema.Point{
 				{math.NaN(), 1449178131},
@@ -943,7 +954,7 @@ func TestMergeSeries(t *testing.T) {
 			Interval: 10,
 		})
 	}
-	out = append(out, Series{
+	out = append(out, models.Series{
 		Target: "some.series.foo1",
 		Datapoints: []schema.Point{
 			{1, 1449178131},
@@ -1150,11 +1161,11 @@ func BenchmarkDivide1M(b *testing.B) {
 	b.SetBytes(int64(l * 12))
 }
 
-var result []Req
+var result []models.Req
 
 func BenchmarkAlignRequests(b *testing.B) {
-	var res []Req
-	reqs := []Req{
+	var res []models.Req
+	reqs := []models.Req{
 		reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg),
 		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg),
 		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),

@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/Dieterbe/profiletrigger/heap"
@@ -22,6 +21,8 @@ import (
 	"github.com/raintank/dur"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/api"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/elasticsearch"
@@ -35,6 +36,7 @@ import (
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/usage"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -51,7 +53,6 @@ var (
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
-	listenAddr  = flag.String("listen", ":6060", "http listener address.")
 	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
 
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
@@ -70,11 +71,6 @@ var (
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
 
 	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
-
-	// http:
-
-	maxPointsPerReq = flag.Int("max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
-	maxDaysPerReq   = flag.Int("max-days-per-req", 365000, "max amount of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
 
 	// Cassandra:
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -110,21 +106,13 @@ var (
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
 
-	logMinDurStr = flag.String("log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
-
-	reqSpanMem  met.Meter
-	reqSpanBoth met.Meter
-
 	cassWriteQueueSize    met.Gauge
 	cassWriters           met.Gauge
 	getTargetDuration     met.Timer
 	itersToPointsDuration met.Timer
 	messagesSize          met.Meter
-	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
-	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-	reqHandleDuration met.Timer
-	inItems           met.Meter
-	points            met.Gauge
+	inItems               met.Meter
+	points                met.Gauge
 
 	// metric bytes_alloc.not_freed is a gauge of currently allocated (within the runtime) memory.
 	// it does not include freed data so it drops at every GC run.
@@ -185,6 +173,9 @@ func main() {
 	elasticsearch.ConfigSetup()
 	cassandra.ConfigSetup()
 
+	// load config for API
+	api.ConfigSetup()
+
 	conf.ParseAll()
 
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
@@ -219,11 +210,14 @@ func main() {
 
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
+	cluster.Init(*instance, GitHash, *primaryNode, startupTime)
+
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	inKafkaMdam.ConfigProcess(*instance)
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
+	api.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -247,13 +241,9 @@ func main() {
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
-	// set our cluster state before we start consuming messages.
-	mdata.CluStatus = mdata.NewClusterStatus(*instance, *primaryNode)
-
 	promotionReadyAtChan = make(chan uint32)
 	initMetrics(stats)
 
-	logMinDur := dur.MustParseUsec("log-min-dur", *logMinDurStr)
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
@@ -282,7 +272,7 @@ func main() {
 		if (mdata.Month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
 		}
-		highestChunkSpan = max(highestChunkSpan, aggChunkSpan)
+		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true
 		if len(fields) == 5 {
 			ready, err = strconv.ParseBool(fields[4])
@@ -387,21 +377,27 @@ func main() {
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
 
-	go func() {
-		http.HandleFunc("/", appStatus)
-		http.Handle("/get", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                        // metrictank native api which deals with ID's, not target strings
-		http.Handle("/get/", RecoveryHandler(get(store, metricIndex, finalSettings, logMinDur)))                       // metrictank native api which deals with ID's, not target strings
-		http.Handle("/render", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur))))  // traditional graphite api, still lacking a lot of the api
-		http.Handle("/render/", RecoveryHandler(corsHandler(getLegacy(store, metricIndex, finalSettings, logMinDur)))) // traditional graphite api, still lacking a lot of the api
-		http.Handle("/metrics/index.json", RecoveryHandler(corsHandler(IndexJson(metricIndex))))
-		http.Handle("/metrics/find", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metrics/find/", RecoveryHandler(corsHandler(Find(metricIndex))))
-		http.Handle("/metrics/delete", RecoveryHandler(corsHandler(Delete(metricIndex))))
-		http.HandleFunc("/cluster", mdata.CluStatus.HttpHandler)
-		http.HandleFunc("/cluster/", mdata.CluStatus.HttpHandler)
-		log.Info("starting listener for metrics and http/debug on %s", *listenAddr)
-		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
-	}()
+	/***********************************
+		Initialize our API server
+	***********************************/
+	apiServer, err := api.NewServer(stats)
+	if err != nil {
+		log.Fatal(4, "Failed to start API. %s", err.Error())
+	}
+
+	apiServer.BindMetricIndex(metricIndex)
+	apiServer.BindMemoryStore(metrics)
+	apiServer.BindBackendStore(store)
+	go apiServer.Run()
+	/***********************************
+		Set our status so we can accept
+		requests from users.
+	***********************************/
+	if cluster.ThisNode.IsPrimary() {
+		cluster.ThisNode.SetReady()
+	} else {
+		cluster.ThisNode.SetReadyIn(warmupPeriod)
+	}
 
 	/***********************************
 		Wait for Shutdown
@@ -442,14 +438,11 @@ func main() {
 }
 
 func initMetrics(stats met.Backend) {
-	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
-	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
 	getTargetDuration = stats.NewTimer("get_target_duration", 0)
 	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
 	messagesSize = stats.NewMeter("message_size", 0)
-	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
 	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
@@ -481,7 +474,7 @@ func initMetrics(stats met.Backend) {
 				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
 				heapObjects.Value(int64(m.HeapObjects))
 				var px int64
-				if mdata.CluStatus.IsPrimary() {
+				if cluster.ThisNode.IsPrimary() {
 					px = 1
 				} else {
 					px = 0

@@ -3,9 +3,11 @@ package kafkamdm
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
@@ -16,7 +18,7 @@ import (
 
 func Test_HandleMessage(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("test", false)
+	cluster.Init("default", "test", false, time.Now())
 	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))

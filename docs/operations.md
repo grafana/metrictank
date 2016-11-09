@@ -77,10 +77,10 @@ Please include the following information:
 
 ## Primary failover
 
-* stop the primary: `curl -X POST -d primary=false http://<node>:6060/cluster`
+* stop the primary: `curl -X POST -d primary=false http://<node>:6060/node`
 * make sure it's finished saving metricpersist messages (see its dashboard)
-* promote the candidate to primary: `curl -X POST -d primary=true http://<node>:6060/cluster`
-* you can verify the cluster status through `curl http://<node>:6060/cluster` or on the Grafana dashboard (see above)
+* promote the candidate to primary: `curl -X POST -d primary=true http://<node>:6060/node`
+* you can verify the cluster status through `curl http://<node>:6060/node` or on the Grafana dashboard (see above)
 
 For more information see [Clustering: Promoting a secondary to primary](https://github.com/raintank/metrictank/blob/master/docs/clustering.md#promoting-a-secondary-to-primary)
 
