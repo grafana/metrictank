@@ -79,6 +79,16 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
 * [Roadmap](https://github.com/raintank/metrictank/blob/master/docs/roadmap.md)
 
+## Releases and versioning
+
+* [releases and changelog](https://github.com/raintank/metrictank/releases)
+* we aim to keep `master` stable and vet code before merging to master
+* We're pre-1.0 but adopt semver for our `0.MAJOR.MINOR` format. The rules are simple:
+  * MAJOR version for incompatible API or functionality changes
+  * MINOR version when you add functionality in a backwards-compatible manner, and
+
+  We don't do patch level releases since minor releases are frequent enough.
+
 
 License
 =======
