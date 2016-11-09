@@ -105,14 +105,14 @@ func (k *KafkaMdam) handleMsg(data []byte, tmp *schemaMsg.MetricData) {
 	err := tmp.InitFromMsg(data)
 	if err != nil {
 		k.Input.MetricsDecodeErr.Inc(1)
-		log.Error(3, "skipping message. %s", err)
+		log.Error(3, "kafka-mdam skipping message. %s", err)
 		return
 	}
 	k.Input.MsgsAge.Value(time.Now().Sub(tmp.Produced).Nanoseconds() / 1000)
 	err = tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
 	if err != nil {
 		k.Input.MetricsDecodeErr.Inc(1)
-		log.Error(3, "skipping message. %s", err)
+		log.Error(3, "kafka-mdam skipping message. %s", err)
 		return
 	}
 	k.Input.MetricsPerMessage.Value(int64(len(tmp.Metrics)))

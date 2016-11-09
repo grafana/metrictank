@@ -110,7 +110,7 @@ func ConfigProcess() {
 func New(stats met.Backend) *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
 	return &Carbon{
 		addrStr:   addr,
@@ -126,7 +126,7 @@ func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *
 	c.Input = input.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
 	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)

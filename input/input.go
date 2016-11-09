@@ -51,11 +51,11 @@ func (in Input) Process(metric *schema.MetricData) {
 	err := metric.Validate()
 	if err != nil {
 		in.MetricInvalid.Inc(1)
-		log.Debug("Invalid metric %s %v", err, metric)
+		log.Debug("in: Invalid metric %s %v", err, metric)
 		return
 	}
 	if metric.Time == 0 {
-		log.Warn("invalid metric. metric.Time is 0. %s", metric.Id)
+		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
 		in.metricIndex.Add(metric)
 		m := in.metrics.GetOrCreate(metric.Id)
