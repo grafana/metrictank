@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -25,25 +26,25 @@ import (
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/elasticsearch"
 	"github.com/raintank/metrictank/idx/memory"
-	"github.com/raintank/metrictank/in"
-	inCarbon "github.com/raintank/metrictank/in/carbon"
-	inKafkaMdam "github.com/raintank/metrictank/in/kafkamdam"
-	inKafkaMdm "github.com/raintank/metrictank/in/kafkamdm"
+	"github.com/raintank/metrictank/input"
+	inCarbon "github.com/raintank/metrictank/input/carbon"
+	inKafkaMdam "github.com/raintank/metrictank/input/kafkamdam"
+	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
-	clKafka "github.com/raintank/metrictank/mdata/clkafka"
-	clNSQ "github.com/raintank/metrictank/mdata/clnsq"
+	"github.com/raintank/metrictank/mdata/notifierKafka"
+	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
 var (
-	inCarbonInst    *inCarbon.Carbon
-	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
-	inKafkaMdamInst *inKafkaMdam.KafkaMdam
-	clKafkaInst     *mdata.ClKafka
-	clNSQInst       *mdata.ClNSQ
+	inCarbonInst      *inCarbon.Carbon
+	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
+	inKafkaMdamInst   *inKafkaMdam.KafkaMdam
+	notifierKafkaInst *notifierKafka.NotifierKafka
+	notifierNsqInst   *notifierNsq.NotifierNSQ
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -182,8 +183,8 @@ func main() {
 	inKafkaMdam.ConfigSetup()
 
 	// load config for cluster handlers
-	clNSQ.ConfigSetup()
-	clKafka.ConfigSetup()
+	notifierNsq.ConfigSetup()
+	notifierKafka.ConfigSetup()
 
 	// load config for metricIndexers
 	memory.ConfigSetup()
@@ -227,8 +228,8 @@ func main() {
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	inKafkaMdam.ConfigProcess(*instance)
-	clNSQ.ConfigProcess()
-	clKafka.ConfigProcess(*instance)
+	notifierNsq.ConfigProcess()
+	notifierKafka.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -316,18 +317,26 @@ func main() {
 	}
 	store.InitMetrics(stats)
 
+	/***********************************
+		Initialize our Inputs
+	***********************************/
+	inputs := make([]input.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
-
 	if inCarbon.Enabled {
 		inCarbonInst = inCarbon.New(stats)
+		inputs = append(inputs, inCarbonInst)
 	}
 
 	if inKafkaMdm.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdmInst = inKafkaMdm.New(stats)
+		inputs = append(inputs, inKafkaMdmInst)
 	}
 
 	if inKafkaMdam.Enabled {
+		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inKafkaMdamInst = inKafkaMdam.New(stats)
+		inputs = append(inputs, inKafkaMdamInst)
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -367,25 +376,19 @@ func main() {
 
 	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
 
-	handlers := make([]mdata.ClusterHandler, 0)
-	if clKafka.Enabled {
-		clKafkaInst = mdata.NewKafka(*instance, metrics, stats)
-		handlers = append(handlers, clKafkaInst)
+	handlers := make([]mdata.NotifierHandler, 0)
+	if notifierKafka.Enabled {
+		notifierKafkaInst = notifierKafka.NewNotifierKafka(*instance, metrics, stats)
+		handlers = append(handlers, notifierKafkaInst)
 	}
 
-	mdata.InitCluster(stats, handlers...)
+	mdata.InitPersistNotifier(stats, handlers...)
 
-	if inCarbon.Enabled {
-		inCarbonInst.Start(metrics, metricIndex, usg)
-	}
-
-	if inKafkaMdm.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdmInst.Start(metrics, metricIndex, usg)
-	}
-	if inKafkaMdam.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdamInst.Start(metrics, metricIndex, usg)
+	/***********************************
+		Start our inputs
+	***********************************/
+	for _, plugin := range inputs {
+		plugin.Start(metrics, metricIndex, usg)
 	}
 
 	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
@@ -406,39 +409,36 @@ func main() {
 		log.Info("%s", http.ListenAndServe(*listenAddr, nil))
 	}()
 
-	type waiter struct {
-		key    string
-		plugin in.Plugin
-		ch     chan int
-	}
-
-	waiters := make([]waiter, 0)
-
-	if inKafkaMdm.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdm",
-			inKafkaMdmInst,
-			inKafkaMdmInst.StopChan,
-		})
-	}
-	if inKafkaMdam.Enabled {
-		waiters = append(waiters, waiter{
-			"kafka-mdam",
-			inKafkaMdamInst,
-			inKafkaMdamInst.StopChan,
-		})
-	}
+	/***********************************
+		Wait for Shutdown
+	***********************************/
 	<-sigChan
-	for _, w := range waiters {
-		log.Info("Shutting down %s consumer", w.key)
-		w.plugin.Stop()
+
+	// shutdown our input plugins.  These may take a while as we allow them
+	// to finish processing any metrics that have already been ingested.
+	timer := time.NewTimer(time.Second * 10)
+	var wg sync.WaitGroup
+	for _, plugin := range inputs {
+		wg.Add(1)
+		go func(plugin input.Plugin) {
+			log.Info("Shutting down %s consumer", plugin.Name())
+			plugin.Stop()
+			log.Info("%s consumer finished shutdown", plugin.Name())
+			wg.Done()
+		}(plugin)
 	}
-	for _, w := range waiters {
-		// the order here is arbitrary, they could stop in either order, but it doesn't really matter
-		log.Info("waiting for %s consumer to finish shutdown", w.key)
-		<-w.ch
-		log.Info("%s consumer finished shutdown", w.key)
+	pluginsStopped := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(pluginsStopped)
+	}()
+	select {
+	case <-timer.C:
+		log.Warn("Plugins taking too long to shutdown, not waiting any longer.")
+	case <-pluginsStopped:
+		timer.Stop()
 	}
+
 	log.Info("closing store")
 	store.Stop()
 	metricIndex.Stop()

@@ -7,24 +7,65 @@ import (
 	"flag"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type Carbon struct {
-	in.In
-	addrStr string
-	addr    *net.TCPAddr
-	schemas persister.WhisperSchemas
-	stats   met.Backend
+	input.Input
+	addrStr          string
+	addr             *net.TCPAddr
+	schemas          persister.WhisperSchemas
+	stats            met.Backend
+	listener         *net.TCPListener
+	handlerWaitGroup sync.WaitGroup
+	quit             chan struct{}
+	connTrack        *ConnTrack
+}
+
+type ConnTrack struct {
+	sync.Mutex
+	conns map[string]net.Conn
+}
+
+func NewConnTrack() *ConnTrack {
+	return &ConnTrack{
+		conns: make(map[string]net.Conn),
+	}
+}
+
+func (c *ConnTrack) Add(conn net.Conn) {
+	c.Lock()
+	c.conns[conn.RemoteAddr().String()] = conn
+	c.Unlock()
+}
+
+func (c *ConnTrack) Remove(conn net.Conn) {
+	c.Lock()
+	delete(c.conns, conn.RemoteAddr().String())
+	c.Unlock()
+}
+
+func (c *ConnTrack) CloseAll() {
+	c.Lock()
+	for _, conn := range c.conns {
+		conn.Close()
+	}
+	c.Unlock()
+}
+
+func (c *Carbon) Name() string {
+	return "carbon"
 }
 
 var Enabled bool
@@ -47,7 +88,7 @@ func ConfigProcess() {
 	var err error
 	schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
-		log.Fatal(4, "can't read schemas file %q: %s", schemasFile, err.Error())
+		log.Fatal(4, "carbon-in: can't read schemas file %q: %s", schemasFile, err.Error())
 	}
 	var defaultFound bool
 	for _, schema := range schemas {
@@ -61,7 +102,7 @@ func ConfigProcess() {
 	if !defaultFound {
 		// good graphite health (not sure what graphite does if there's no .*)
 		// but we definitely need to always be able to determine which interval to use
-		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
+		log.Fatal(4, "carbon-in: storage-conf does not have a default '.*' pattern")
 	}
 
 }
@@ -69,39 +110,61 @@ func ConfigProcess() {
 func New(stats met.Backend) *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
 	return &Carbon{
-		addrStr: addr,
-		addr:    addrT,
-		schemas: schemas,
-		stats:   stats,
+		addrStr:   addr,
+		addr:      addrT,
+		schemas:   schemas,
+		stats:     stats,
+		quit:      make(chan struct{}),
+		connTrack: NewConnTrack(),
 	}
 }
 
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	c.In = in.New(metrics, metricIndex, usg, "carbon", c.stats)
+	c.Input = input.New(metrics, metricIndex, usg, "carbon", c.stats)
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
+	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
-	go c.accept(l)
+	go c.accept()
 }
 
-func (c *Carbon) accept(l *net.TCPListener) {
+func (c *Carbon) accept() {
 	for {
-		conn, err := l.AcceptTCP()
+		conn, err := c.listener.AcceptTCP()
 		if nil != err {
-			log.Error(4, err.Error())
-			break
+			select {
+			case <-c.quit:
+				// we are shutting down.
+				return
+			default:
+			}
+			log.Error(4, "carbon-in: Accept Error: %s", err.Error())
+			return
 		}
+		c.handlerWaitGroup.Add(1)
+		c.connTrack.Add(conn)
 		go c.handle(conn)
 	}
 }
 
+func (c *Carbon) Stop() {
+	log.Info("carbon-in: shutting down.")
+	close(c.quit)
+	c.listener.Close()
+	c.connTrack.CloseAll()
+	c.handlerWaitGroup.Wait()
+}
+
 func (c *Carbon) handle(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		c.connTrack.Remove(conn)
+	}()
 	// TODO c.SetTimeout(60e9)
 	r := bufio.NewReaderSize(conn, 4096)
 	for {
@@ -109,15 +172,21 @@ func (c *Carbon) handle(conn net.Conn) {
 		buf, _, err := r.ReadLine()
 
 		if nil != err {
+			select {
+			case <-c.quit:
+				// we are shutting down.
+				break
+			default:
+			}
 			if io.EOF != err {
-				log.Error(4, err.Error())
+				log.Error(4, "carbon-in: Recv error: %s", err.Error())
 			}
 			break
 		}
 
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.Medium)
 		if err != nil {
-			c.In.MetricsDecodeErr.Inc(1)
+			c.Input.MetricsDecodeErr.Inc(1)
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
@@ -127,6 +196,20 @@ func (c *Carbon) handle(conn net.Conn) {
 			log.Fatal(4, "carbon-in: couldn't find a schema for %q - this is impossible since we asserted there was a default with patt .*", name)
 		}
 		interval := s.Retentions[0].SecondsPerPoint()
-		c.HandleLegacy(string(key), val, ts, interval)
+		md := &schema.MetricData{
+			Name:     name,
+			Metric:   name,
+			Interval: interval,
+			Value:    val,
+			Unit:     "unknown",
+			Time:     int64(ts),
+			Mtype:    "gauge",
+			Tags:     []string{},
+			OrgId:    1, // admin org
+		}
+		md.SetId()
+		c.Input.MetricsPerMessage.Value(int64(1))
+		c.Input.Process(md)
 	}
+	c.handlerWaitGroup.Done()
 }

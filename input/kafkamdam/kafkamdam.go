@@ -4,6 +4,7 @@ import (
 	"flag"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -12,19 +13,23 @@ import (
 	"github.com/bsm/sarama-cluster"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
+	"gopkg.in/raintank/schema.v1"
+	schemaMsg "gopkg.in/raintank/schema.v1/msg"
 )
 
 type KafkaMdam struct {
-	in.In
+	input.Input
 	consumer *cluster.Consumer
 	stats    met.Backend
 
 	wg sync.WaitGroup
-	// read from this channel to block until consumer is cleanly stopped
-	StopChan chan int
+}
+
+func (k *KafkaMdam) Name() string {
+	return "kafkaMdam"
 }
 
 var Enabled bool
@@ -72,14 +77,13 @@ func New(stats met.Backend) *KafkaMdam {
 	k := KafkaMdam{
 		consumer: consumer,
 		stats:    stats,
-		StopChan: make(chan int),
 	}
 
 	return &k
 }
 
 func (k *KafkaMdam) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.In = in.New(metrics, metricIndex, usg, "kafka-mdam", k.stats)
+	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdam", k.stats)
 	go k.notifications()
 	go k.consume()
 }
@@ -87,13 +91,34 @@ func (k *KafkaMdam) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, us
 func (k *KafkaMdam) consume() {
 	k.wg.Add(1)
 	messageChan := k.consumer.Messages()
+	tmp := schemaMsg.MetricData{Metrics: make([]*schema.MetricData, 1)}
 	for msg := range messageChan {
 		log.Debug("kafka-mdam received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-		k.In.HandleArray(msg.Value)
+		k.handleMsg(msg.Value, &tmp)
 		k.consumer.MarkOffset(msg, "")
 	}
 	log.Info("kafka-mdam consumer ended.")
 	k.wg.Done()
+}
+
+func (k *KafkaMdam) handleMsg(data []byte, tmp *schemaMsg.MetricData) {
+	err := tmp.InitFromMsg(data)
+	if err != nil {
+		k.Input.MetricsDecodeErr.Inc(1)
+		log.Error(3, "kafka-mdam skipping message. %s", err)
+		return
+	}
+	k.Input.MsgsAge.Value(time.Now().Sub(tmp.Produced).Nanoseconds() / 1000)
+	err = tmp.DecodeMetricData() // reads metrics from in.tmp.Msg and unsets it
+	if err != nil {
+		k.Input.MetricsDecodeErr.Inc(1)
+		log.Error(3, "kafka-mdam skipping message. %s", err)
+		return
+	}
+	k.Input.MetricsPerMessage.Value(int64(len(tmp.Metrics)))
+	for _, metric := range tmp.Metrics {
+		k.Input.Process(metric)
+	}
 }
 
 func (k *KafkaMdam) notifications() {
@@ -124,14 +149,9 @@ func (k *KafkaMdam) notifications() {
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)
-//
-// NOTE: receive on StopChan to block until this process completes
+// and block until it is stopped.
 func (k *KafkaMdam) Stop() {
 	// closes notifications and messages channels, amongst others
 	k.consumer.Close()
-
-	go func() {
-		k.wg.Wait()
-		close(k.StopChan)
-	}()
+	k.wg.Wait()
 }

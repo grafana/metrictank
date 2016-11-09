@@ -1,4 +1,4 @@
-package mdata
+package notifierNsq
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/bitly/go-hostpool"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
-	cfg "github.com/raintank/metrictank/mdata/clnsq"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/misc/instrumented_nsq"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -19,20 +19,22 @@ var (
 	producers map[string]*nsq.Producer
 )
 
-type ClNSQ struct {
-	in       chan SavedChunk
-	buf      []SavedChunk
+type NotifierNSQ struct {
+	in       chan mdata.SavedChunk
+	buf      []mdata.SavedChunk
 	instance string
-	Cl
+	mdata.Notifier
 }
 
-func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
+func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ {
+	messagesPublished = stats.NewCount("notifier.nsq.messages-published")
+	messagesSize = stats.NewMeter("notifier.nsq.message_size", 0)
 	// producers
-	hostPool = hostpool.NewEpsilonGreedy(cfg.NsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
+	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
 
-	for _, addr := range cfg.NsqdAdds {
-		producer, err := nsq.NewProducer(addr, cfg.PCfg)
+	for _, addr := range nsqdAdds {
+		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
 			log.Fatal(4, "nsq-cluster failed creating producer %s", err.Error())
 		}
@@ -40,27 +42,27 @@ func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
 	}
 
 	// consumers
-	consumer, err := insq.NewConsumer(cfg.Topic, cfg.Channel, cfg.CCfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(topic, channel, cCfg, "metric_persist.%s", stats)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
-	c := &ClNSQ{
-		in:       make(chan SavedChunk),
+	c := &NotifierNSQ{
+		in:       make(chan mdata.SavedChunk),
 		instance: instance,
-		Cl: Cl{
-			instance: instance,
-			metrics:  metrics,
+		Notifier: mdata.Notifier{
+			Instance: instance,
+			Metrics:  metrics,
 		},
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
-	err = consumer.ConnectToNSQDs(cfg.NsqdAdds)
+	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to connect to NSQDs. %s", err)
 	}
 	log.Info("nsq-cluster persist consumer connected to nsqd")
 
-	err = consumer.ConnectToNSQLookupds(cfg.LookupdAdds)
+	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to connect to NSQLookupds. %s", err)
 	}
@@ -68,16 +70,16 @@ func NewNSQ(instance string, metrics Metrics, stats met.Backend) *ClNSQ {
 	return c
 }
 
-func (c *ClNSQ) HandleMessage(m *nsq.Message) error {
+func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
 	c.Handle(m.Body)
 	return nil
 }
 
-func (c *ClNSQ) Send(sc SavedChunk) {
+func (c *NotifierNSQ) Send(sc mdata.SavedChunk) {
 	c.in <- sc
 }
 
-func (c *ClNSQ) run() {
+func (c *NotifierNSQ) run() {
 	ticker := time.NewTicker(time.Second)
 	max := 5000
 	for {
@@ -94,12 +96,12 @@ func (c *ClNSQ) run() {
 }
 
 // flush makes sure the batch gets sent, asynchronously.
-func (c *ClNSQ) flush() {
+func (c *NotifierNSQ) flush() {
 	if len(c.buf) == 0 {
 		return
 	}
 
-	msg := PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
+	msg := mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
 	c.buf = nil
 
 	go func() {
@@ -110,7 +112,7 @@ func (c *ClNSQ) flush() {
 			log.Fatal(4, "CLU nsq-cluster failed to marshal persistMessage to json.")
 		}
 		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.LittleEndian, uint8(PersistMessageBatchV1))
+		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		buf.Write(data)
 		messagesSize.Value(int64(buf.Len()))
 
@@ -121,7 +123,7 @@ func (c *ClNSQ) flush() {
 			// will result in this loop repeating forever until we successfully publish our msg.
 			hostPoolResponse := hostPool.Get()
 			prod := producers[hostPoolResponse.Host()]
-			err = prod.Publish(cfg.Topic, buf.Bytes())
+			err = prod.Publish(topic, buf.Bytes())
 			// Hosts that are marked as dead will be retried after 30seconds.  If we published
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)

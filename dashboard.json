@@ -1247,11 +1247,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.cluster.message_size.{mean,upper}, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.notifier.*.message_size.{mean,upper}, 5, 6, 7)"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.metrictank.$instance.cluster.messages-published, 'msg published')"
+              "target": "aliasByNode(stats.$environment.metrictank.$instance.notifier.*.messages-published, 5, 6)"
             }
           ],
           "timeFrom": null,

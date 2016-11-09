@@ -12,24 +12,27 @@ import (
 
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/in"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type KafkaMdm struct {
-	in.In
+	input.Input
 	consumer sarama.Consumer
 	client   sarama.Client
 	stats    met.Backend
 
 	wg sync.WaitGroup
-	// read from this channel to block until consumer is cleanly stopped
-	StopChan chan int
 
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
+}
+
+func (k *KafkaMdm) Name() string {
+	return "kafkaMdm"
 }
 
 var LogLevel int
@@ -131,7 +134,6 @@ func New(stats met.Backend) *KafkaMdm {
 		consumer:      consumer,
 		client:        client,
 		stats:         stats,
-		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
 	}
 
@@ -139,7 +141,7 @@ func New(stats met.Backend) *KafkaMdm {
 }
 
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.In = in.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
+	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
 	for _, topic := range topics {
 		// get partitions.
 		partitions, err := k.consumer.Partitions(topic)
@@ -185,7 +187,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 			if LogLevel < 2 {
 				log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
-			k.In.Handle(msg.Value)
+			k.handleMsg(msg.Value)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
@@ -202,15 +204,23 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 	}
 }
 
+func (k *KafkaMdm) handleMsg(data []byte) {
+	md := schema.MetricData{}
+	_, err := md.UnmarshalMsg(data)
+	if err != nil {
+		k.Input.MetricsDecodeErr.Inc(1)
+		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+		return
+	}
+	k.Input.MetricsPerMessage.Value(int64(1))
+	k.Input.Process(&md)
+}
+
 // Stop will initiate a graceful stop of the Consumer (permanent)
-//
-// NOTE: receive on StopChan to block until this process completes
+// and block until it stopped.
 func (k *KafkaMdm) Stop() {
 	// closes notifications and messages channels, amongst others
 	close(k.stopConsuming)
-	go func() {
-		k.wg.Wait()
-		offsetMgr.Close()
-		close(k.StopChan)
-	}()
+	k.wg.Wait()
+	offsetMgr.Close()
 }
