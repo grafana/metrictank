@@ -378,7 +378,7 @@ func main() {
 
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
-		notifierKafkaInst = notifierKafka.NewNotifierKafka(*instance, metrics, stats)
+		notifierKafkaInst = notifierKafka.New(*instance, metrics, stats)
 		handlers = append(handlers, notifierKafkaInst)
 	}
 

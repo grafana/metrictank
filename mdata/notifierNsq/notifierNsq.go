@@ -26,7 +26,7 @@ type NotifierNSQ struct {
 	mdata.Notifier
 }
 
-func NewNSQ(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ {
+func New(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ {
 	messagesPublished = stats.NewCount("notifier.nsq.messages-published")
 	messagesSize = stats.NewMeter("notifier.nsq.message_size", 0)
 	// producers

@@ -29,7 +29,7 @@ type NotifierKafka struct {
 	mdata.Notifier
 }
 
-func NewNotifierKafka(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierKafka {
+func New(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierKafka {
 	messagesPublished = stats.NewCount("notifier.kafka.messages-published")
 	messagesSize = stats.NewMeter("notifier.kafka.message_size", 0)
 
