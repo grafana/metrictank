@@ -40,11 +40,9 @@ import (
 )
 
 var (
-	inCarbonInst      *inCarbon.Carbon
-	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
-	inKafkaMdamInst   *inKafkaMdam.KafkaMdam
-	notifierKafkaInst *notifierKafka.NotifierKafka
-	notifierNsqInst   *notifierNsq.NotifierNSQ
+	inCarbonInst    *inCarbon.Carbon
+	inKafkaMdmInst  *inKafkaMdm.KafkaMdm
+	inKafkaMdamInst *inKafkaMdam.KafkaMdam
 
 	logLevel     int
 	warmupPeriod time.Duration
@@ -378,13 +376,11 @@ func main() {
 
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
-		notifierKafkaInst = notifierKafka.New(*instance, metrics, stats)
-		handlers = append(handlers, notifierKafkaInst)
+		handlers = append(handlers, notifierKafka.New(*instance, metrics, stats))
 	}
 
 	if notifierNsq.Enabled {
-		notifierNsqInst = notifierNsq.New(*instance, metrics, stats)
-		handlers = append(handlers, notifierNsqInst)
+		handlers = append(handlers, notifierNsq.New(*instance, metrics, stats))
 	}
 
 	mdata.InitPersistNotifier(stats, handlers...)
