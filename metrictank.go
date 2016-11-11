@@ -382,6 +382,11 @@ func main() {
 		handlers = append(handlers, notifierKafkaInst)
 	}
 
+	if notifierNsq.Enabled {
+		notifierNsqInst = notifierNsq.New(*instance, metrics, stats)
+		handlers = append(handlers, notifierNsqInst)
+	}
+
 	mdata.InitPersistNotifier(stats, handlers...)
 
 	/***********************************
