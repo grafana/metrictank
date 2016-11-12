@@ -40,12 +40,6 @@ import (
 )
 
 var (
-	inCarbonInst      *inCarbon.Carbon
-	inKafkaMdmInst    *inKafkaMdm.KafkaMdm
-	inKafkaMdamInst   *inKafkaMdam.KafkaMdam
-	notifierKafkaInst *notifierKafka.NotifierKafka
-	notifierNsqInst   *notifierNsq.NotifierNSQ
-
 	logLevel     int
 	warmupPeriod time.Duration
 	startupTime  time.Time
@@ -323,20 +317,17 @@ func main() {
 	inputs := make([]input.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
-		inCarbonInst = inCarbon.New(stats)
-		inputs = append(inputs, inCarbonInst)
+		inputs = append(inputs, inCarbon.New(stats))
 	}
 
 	if inKafkaMdm.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdmInst = inKafkaMdm.New(stats)
-		inputs = append(inputs, inKafkaMdmInst)
+		inputs = append(inputs, inKafkaMdm.New(stats))
 	}
 
 	if inKafkaMdam.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inKafkaMdamInst = inKafkaMdam.New(stats)
-		inputs = append(inputs, inKafkaMdamInst)
+		inputs = append(inputs, inKafkaMdam.New(stats))
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
@@ -378,8 +369,11 @@ func main() {
 
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
-		notifierKafkaInst = notifierKafka.NewNotifierKafka(*instance, metrics, stats)
-		handlers = append(handlers, notifierKafkaInst)
+		handlers = append(handlers, notifierKafka.New(*instance, metrics, stats))
+	}
+
+	if notifierNsq.Enabled {
+		handlers = append(handlers, notifierNsq.New(*instance, metrics, stats))
 	}
 
 	mdata.InitPersistNotifier(stats, handlers...)
