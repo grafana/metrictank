@@ -40,8 +40,8 @@ result = requests.post(**request_parameters)
 
 if result.status_code != 200:
     error(
-        'received bad response status code: {code}'
-        .format(code=result.status_code)
+        'received bad response status code: {code} - reason: {reason}'
+        .format(code=result.status_code, reason=result.text)
     )
 
 try:
