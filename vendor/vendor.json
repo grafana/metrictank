@@ -3,6 +3,18 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "vPAHn6NQfXwZmzal7YBN93Fnd6I=",
+			"path": "github.com/Dieterbe/artisanalhistogram/hist12h",
+			"revision": "91cfed5bb965b5797e2e452023c431f017599dba",
+			"revisionTime": "2016-11-27T15:30:35Z"
+		},
+		{
+			"checksumSHA1": "3f8ivK6IiacIw+mE3uOqoyJu/Mg=",
+			"path": "github.com/Dieterbe/artisanalhistogram/hist15s",
+			"revision": "91cfed5bb965b5797e2e452023c431f017599dba",
+			"revisionTime": "2016-11-27T15:30:35Z"
+		},
+		{
 			"checksumSHA1": "P8h2SWEK3NsJleSPe+mVNNpLG6Y=",
 			"path": "github.com/Dieterbe/profiletrigger/heap",
 			"revision": "d90c4b0cfeed756381675e85cc6e6b8a02cb01a6",
@@ -61,6 +73,12 @@
 			"path": "github.com/dgryski/go-bits",
 			"revision": "2c7641e7dfe3945a0fe755f58c85ab306624956d",
 			"revisionTime": "2015-09-21T07:33:52Z"
+		},
+		{
+			"checksumSHA1": "e4U50WUz2ycziirb3+JAVz3t49w=",
+			"path": "github.com/dgryski/go-linlog",
+			"revision": "f18bb8a4e7bcd60fd4fb99f3e8752f5da20f70a2",
+			"revisionTime": "2016-05-05T06:20:16Z"
 		},
 		{
 			"checksumSHA1": "bJkM/x02zeuwA6avbGn2yvqjp20=",
