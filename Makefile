@@ -2,13 +2,13 @@
 default:
 	$(MAKE) all
 test:
-	bash -c "./scripts/test.sh $(TEST)"
+	./scripts/test.sh
 check:
 	$(MAKE) test
 bin:
-	bash -c "./scripts/build.sh"
+	./scripts/build.sh
 docker:
-	bash -c "./scripts/build_docker.sh"
+	./scripts/build_docker.sh
 all:
 	$(MAKE) bin
 	$(MAKE) docker
