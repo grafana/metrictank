@@ -3,6 +3,7 @@ package mdata
 import (
 	"fmt"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"testing"
 )
 
@@ -174,6 +175,10 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	go func() {
+		for range chunk.TotalPoints {
+		}
+	}()
 	defer metrics.Stop()
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
@@ -211,6 +216,10 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	go func() {
+		for range chunk.TotalPoints {
+		}
+	}()
 	defer metrics.Stop()
 
 	maxT := uint32(1200)
@@ -248,6 +257,10 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	go func() {
+		for range chunk.TotalPoints {
+		}
+	}()
 	defer metrics.Stop()
 
 	maxT := uint32(1200)
@@ -285,6 +298,10 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	go func() {
+		for range chunk.TotalPoints {
+		}
+	}()
 	defer metrics.Stop()
 
 	maxT := uint32(1200)
