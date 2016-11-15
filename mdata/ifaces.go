@@ -6,6 +6,7 @@ import "github.com/raintank/metrictank/iter"
 type Metrics interface {
 	Get(key string) (Metric, bool)
 	GetOrCreate(key string) Metric
+	AggSettings() []AggSetting
 }
 
 type Metric interface {

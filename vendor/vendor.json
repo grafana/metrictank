@@ -10,7 +10,6 @@
 		},
 		{
 			"checksumSHA1": "P8h2SWEK3NsJleSPe+mVNNpLG6Y=",
-			"origin": "github.com/raintank/metrictank/vendor/github.com/Dieterbe/profiletrigger/heap",
 			"path": "github.com/Dieterbe/profiletrigger/heap",
 			"revision": "d90c4b0cfeed756381675e85cc6e6b8a02cb01a6",
 			"revisionTime": "2016-10-07T15:24:48Z"
@@ -26,6 +25,12 @@
 			"path": "github.com/Sirupsen/logrus",
 			"revision": "55eb11d21d2a31a3cc93838241d04800f52e823d",
 			"revisionTime": "2015-04-09T23:08:25Z"
+		},
+		{
+			"checksumSHA1": "ly9VLPE9GKo2U7mnbZyjb2LDQ3w=",
+			"path": "github.com/Unknwon/com",
+			"revision": "28b053d5a2923b87ce8c5a08f3af779894a72758",
+			"revisionTime": "2015-10-08T13:54:07Z"
 		},
 		{
 			"checksumSHA1": "0x0Ry5ZsFJAXeXieCP40WycRNFs=",
@@ -112,8 +117,19 @@
 			"revisionTime": "2015-06-06T11:53:03Z"
 		},
 		{
+			"checksumSHA1": "OkqfwXeTVoiIxNMDA7HKvmrCDw8=",
+			"path": "github.com/go-macaron/binding",
+			"revision": "a453235199f8898e01647db8820f937a184fbd09",
+			"revisionTime": "2016-11-15T07:09:50Z"
+		},
+		{
+			"checksumSHA1": "y0olVbiMQ6/UOa/eh52XYnies90=",
+			"path": "github.com/go-macaron/inject",
+			"revision": "d8a0b8677191f4380287cfebd08e462217bac7ad",
+			"revisionTime": "2016-06-27T17:00:12Z"
+		},
+		{
 			"checksumSHA1": "X3aO3d9K9ALtg4/XI4I9L57FPkM=",
-			"origin": "github.com/raintank/metrictank/vendor/github.com/gocql/gocql",
 			"path": "github.com/gocql/gocql",
 			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
 			"revisionTime": "2016-09-27T08:26:32Z"
@@ -299,6 +315,18 @@
 			"revisionTime": "2014-01-12T23:31:26Z"
 		},
 		{
+			"checksumSHA1": "LjPdvMphElL0GOVNQCsmZMVgWIw=",
+			"path": "github.com/rs/cors",
+			"revision": "a62a804a8a009876ca59105f7899938a1349f4b3",
+			"revisionTime": "2016-06-17T23:19:35Z"
+		},
+		{
+			"checksumSHA1": "hCRfPlNpqv8tvVivLzmXsoUOf1c=",
+			"path": "github.com/rs/xhandler",
+			"revision": "ed27b6fd65218132ee50cd95f38474a3d8a2cd12",
+			"revisionTime": "2016-06-18T19:32:21Z"
+		},
+		{
 			"checksumSHA1": "r8yq1UeCPjRb4GO2NyHqEyFxb1w=",
 			"path": "github.com/smartystreets/assertions",
 			"revision": "443d812296a84445c202c085f19e18fc238f8250",
@@ -423,6 +451,18 @@
 			"path": "gopkg.in/inf.v0",
 			"revision": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4",
 			"revisionTime": "2015-09-11T12:57:57Z"
+		},
+		{
+			"checksumSHA1": "YRD335tkMvgHzkfbfveMUpsE3Bw=",
+			"path": "gopkg.in/ini.v1",
+			"revision": "6e4869b434bd001f6983749881c7ead3545887d8",
+			"revisionTime": "2016-08-27T06:11:18Z"
+		},
+		{
+			"checksumSHA1": "wzuoHPA/Ccoe1CFnDL35rnL0JoI=",
+			"path": "gopkg.in/macaron.v1",
+			"revision": "4974334b10dbb6f5c0e17f4c10555ff050a16329",
+			"revisionTime": "2016-08-26T18:07:28Z"
 		}
 	],
 	"rootPath": "github.com/raintank/metrictank"

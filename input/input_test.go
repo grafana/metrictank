@@ -3,9 +3,11 @@ package input
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/usage"
@@ -14,7 +16,7 @@ import (
 
 func Test_Process(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("test", false)
+	cluster.Init("default", "test", false, time.Now())
 	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
@@ -86,7 +88,7 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 
 func BenchmarkProcess(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.CluStatus = mdata.NewClusterStatus("default", false)
+	cluster.Init("default", "test", false, time.Now())
 	mdata.InitMetrics(stats)
 
 	store := mdata.NewDevnullStore()

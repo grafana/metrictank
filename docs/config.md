@@ -27,8 +27,6 @@ the defaults here match the default behavior.
 ```
 # instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics.
 instance = default
-# tcp address for metrictank to bind to for its HTTP interface
-listen = :6060
 # accounting period to track per-org usage metrics
 accounting-period = 5min
 ```
@@ -69,14 +67,7 @@ warm-up-period = 1h
 agg-settings =
 ```
 
-## http api ##
 
-```
-# limit on how many points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)
-max-points-per-req = 1000000
-# limit on what kind of time range can be requested in one request. the default allows 500 series of 2 years. (0 disables limit)
-max-days-per-req = 365000
-```
 
 ## metric data storage in cassandra ##
 
@@ -146,10 +137,28 @@ proftrigger-min-diff = 1h
 # if process consumes this many bytes (see bytes_sys in dashboard), trigger a heap profile for developer diagnosis
 # set it higher than your typical memory usage, but lower than how much RAM the process can take before its get killed
 proftrigger-heap-thresh = 25000000000
-# only log incoming requests if their timerange is at least this duration. Use 0 to disable
-log-min-dur = 5min
 # only log log-level and higher. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL
 log-level = 2
+```
+
+## http api ##
+
+```
+[http]
+# tcp address for metrictank to bind to for its HTTP interface
+listen = :6060
+# use HTTPS
+ssl = false
+# SSL certificate file
+cert-file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+# SSL key file
+key-file = /etc/ssl/private/ssl-cert-snakeoil.key
+# limit on how many points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)
+max-points-per-req = 1000000
+# limit on what kind of time range can be requested in one request. the default allows 500 series of 2 years. (0 disables limit)
+max-days-per-req = 365000
+# only log incoming requests if their timerange is at least this duration. Use 0 to disable
+log-min-dur = 5min
 ```
 
 ## metric data inputs ##

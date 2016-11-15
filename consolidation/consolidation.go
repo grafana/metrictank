@@ -104,3 +104,10 @@ func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, e
 	}
 	return consolidator, nil
 }
+
+func Validate(fn string) error {
+	if fn == "avg" || fn == "average" || fn == "min" || fn == "max" || fn == "sum" {
+		return nil
+	}
+	return errUnknownConsolidationFunction
+}
