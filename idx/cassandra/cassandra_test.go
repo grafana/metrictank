@@ -218,13 +218,13 @@ func BenchmarkIndexing(b *testing.B) {
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
-		b.Fatalf("can't connect to cassandra: %s", err)
+		b.Skipf("can't connect to cassandra: %s", err)
 	}
 	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
 	tmpSession.Close()
 	stats, err := helper.New(false, "", "standard", "metrictank", "")
 	if err != nil {
-		b.Fatalf("can't connect to cassandra: %s", err)
+		b.Skipf("can't connect to cassandra: %s", err)
 	}
 	ix.Init(stats)
 
@@ -263,13 +263,13 @@ func BenchmarkLoad(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
-		b.Fatalf("can't connect to cassandra: %s", err)
+		b.Skipf("can't connect to cassandra: %s", err)
 	}
 	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
 	tmpSession.Close()
 	err = ix.Init(stats)
 	if err != nil {
-		b.Fatalf("can't initialize cassandra: %s", err)
+		b.Skipf("can't initialize cassandra: %s", err)
 	}
 	insertDefs(ix, b.N)
 	ix.Stop()

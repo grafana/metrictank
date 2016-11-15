@@ -392,7 +392,7 @@ func BenchmarkIndexing(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	err := ix.Init(stats)
 	if err != nil {
-		b.Fatalf("can't connect to ES: %s", err)
+		b.Skipf("can't connect to ES: %s", err)
 	}
 
 	var series string

@@ -11,7 +11,7 @@ test:
     - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && go vet $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && scripts/end2end_test.sh
-    - cd $IMPORTPATH && go test -run='^$' -bench=. $(go list ./... | grep -v /vendor/)
+    - cd $IMPORTPATH && go test -v -run='^$' -bench=. $(go list ./... | grep -v /vendor/)
   post:
     - scripts/package.sh
 dependencies:
