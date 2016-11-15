@@ -8,7 +8,6 @@ import (
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -116,10 +115,6 @@ func BenchmarkProcess(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	go func() {
-		for range chunk.TotalPoints {
-		}
-	}()
 	for i := 0; i < b.N; i++ {
 		in.Process(datas[i])
 	}

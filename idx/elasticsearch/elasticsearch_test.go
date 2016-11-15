@@ -390,7 +390,10 @@ func BenchmarkIndexing(b *testing.B) {
 	ix := New()
 	ix.Conn.DeleteIndex(esIndex)
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	err := ix.Init(stats)
+	if err != nil {
+		b.Skipf("can't connect to ES: %s", err)
+	}
 
 	var series string
 	var data *schema.MetricData
