@@ -102,13 +102,9 @@ var (
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
 
-	cassWriteQueueSize    met.Gauge
-	cassWriters           met.Gauge
-	getTargetDuration     met.Timer
-	itersToPointsDuration met.Timer
-	messagesSize          met.Meter
-	inItems               met.Meter
-	points                met.Gauge
+	cassWriteQueueSize met.Gauge
+	cassWriters        met.Gauge
+	points             met.Gauge
 
 	// metric bytes_alloc.not_freed is a gauge of currently allocated (within the runtime) memory.
 	// it does not include freed data so it drops at every GC run.
@@ -498,10 +494,6 @@ func main() {
 func initMetrics(stats met.Backend) {
 	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
 	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	messagesSize = stats.NewMeter("message_size", 0)
-	inItems = stats.NewMeter("in.items", 0)
 	points = stats.NewGauge("total_points", 0)
 	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
 	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
