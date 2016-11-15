@@ -2,17 +2,13 @@ package chunk
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/dgryski/go-tsz"
 )
 
-var TotalPoints chan int
-
-func init() {
-	// measurements can lag a bit, that's ok
-	TotalPoints = make(chan int, 1000)
-}
+var totalPoints uint64
 
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
@@ -42,9 +38,13 @@ func (c *Chunk) Push(t uint32, v float64) error {
 	c.NumPoints += 1
 	c.LastTs = t
 	c.LastWrite = uint32(time.Now().Unix())
-	TotalPoints <- 1
+	atomic.AddUint64(&totalPoints, 1)
 	return nil
 }
 func (c *Chunk) Clear() {
-	TotalPoints <- -1 * int(c.NumPoints)
+	atomic.AddUint64(&totalPoints, ^uint64(c.NumPoints-1))
+}
+
+func TotalPoints() uint64 {
+	return atomic.LoadUint64(&totalPoints)
 }

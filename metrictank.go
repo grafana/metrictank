@@ -464,7 +464,6 @@ func initMetrics(stats met.Backend) {
 
 	// run a collector for some global stats
 	go func() {
-		currentPoints := 0
 		var m runtime.MemStats
 		var promotionReadyAtTs uint32
 
@@ -472,7 +471,7 @@ func initMetrics(stats met.Backend) {
 		for {
 			select {
 			case now := <-ticker:
-				points.Value(int64(currentPoints))
+				points.Value(int64(chunk.TotalPoints()))
 				runtime.ReadMemStats(&m)
 				alloc.Value(int64(m.Alloc))
 				totalAlloc.Value(int64(m.TotalAlloc))
@@ -501,8 +500,6 @@ func initMetrics(stats met.Backend) {
 				} else {
 					clusterPromoWait.Value(int64(promotionReadyAtTs - unix))
 				}
-			case update := <-chunk.TotalPoints:
-				currentPoints += update
 			case promotionReadyAtTs = <-promotionReadyAtChan:
 			}
 		}
