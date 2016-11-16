@@ -56,9 +56,6 @@ var (
 
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
-	// Clustering:
-	primaryNode = flag.Bool("primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
-
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
 	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
@@ -143,7 +140,17 @@ func init() {
 
 func main() {
 	startupTime = time.Now()
+
+	/***********************************
+		Initialize Configuration
+	***********************************/
 	flag.Parse()
+
+	// if the user just wants the version, give it and exit
+	if *showVersion {
+		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		return
+	}
 
 	// Only try and parse the conf file if it exists
 	path := ""
@@ -174,11 +181,18 @@ func main() {
 	// load config for API
 	api.ConfigSetup()
 
+	// load config for cluster
+	cluster.ConfigSetup()
+
 	conf.ParseAll()
 
+	/***********************************
+		Initialize Logging
+	***********************************/
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
+	api.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
 	switch logLevel {
 	case 0:
@@ -197,49 +211,38 @@ func main() {
 		log.Level(log.FATAL)
 	}
 
-	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
-		return
-	}
-
+	/***********************************
+		Validate  settings needed for clustering
+	***********************************/
 	if *instance == "" {
 		log.Fatal(4, "instance can't be empty")
 	}
 
 	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
 
-	cluster.Init(*instance, GitHash, *primaryNode, startupTime)
+	/***********************************
+		Initialize our Cluster
+	***********************************/
+	cluster.Init(*instance, GitHash, startupTime)
 
+	/***********************************
+		Validate remaining settings
+	***********************************/
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	api.ConfigProcess()
+	cluster.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
-	if !*statsdEnabled {
-		log.Warn("running metrictank without statsd instrumentation.")
-	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
-	if err != nil {
-		log.Fatal(4, "failed to initialize statsd. %s", err)
-	}
-
-	runtime.SetBlockProfileRate(*blockProfileRate)
-	runtime.MemProfileRate = *memProfileRate
-	mdata.InitMetrics(stats)
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
 	promotionReadyAtChan = make(chan uint32)
-	initMetrics(stats)
 
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
@@ -292,11 +295,51 @@ func main() {
 		go trigger.Run()
 	}
 
+	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
+
+	/***********************************
+		configure Profiling
+	***********************************/
+	runtime.SetBlockProfileRate(*blockProfileRate)
+	runtime.MemProfileRate = *memProfileRate
+
+	/************************************
+	    handle interupt signals
+	************************************/
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	/***********************************
+		configure StatsD
+	***********************************/
+	if !*statsdEnabled {
+		log.Warn("running metrictank without statsd instrumentation.")
+	}
+	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
+	if err != nil {
+		log.Fatal(4, "failed to initialize statsd. %s", err)
+	}
+	initMetrics(stats)
+
+	/*************************************
+	  Start polling our Cluster Peers
+	**************************************/
+	cluster.Start()
+
+	/***********************************
+		Initialize our backendStore
+	***********************************/
 	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 	store.InitMetrics(stats)
+
+	/***********************************
+		Initialize our MemoryStore
+	***********************************/
+	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
+	mdata.InitMetrics(stats)
 
 	/***********************************
 		Initialize our Inputs
@@ -312,9 +355,27 @@ func main() {
 		inputs = append(inputs, inKafkaMdm.New(stats))
 	}
 
-	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
+	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
+		log.Warn("It is not recommended to run a mulitnode cluster with more then 1 input plugin.")
+	}
 
-	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
+	/***********************************
+		Initialize MetricPerrist notifiers
+	***********************************/
+	handlers := make([]mdata.NotifierHandler, 0)
+	if notifierKafka.Enabled {
+		handlers = append(handlers, notifierKafka.New(*instance, metrics, stats))
+	}
+
+	if notifierNsq.Enabled {
+		handlers = append(handlers, notifierNsq.New(*instance, metrics, stats))
+	}
+
+	mdata.InitPersistNotifier(stats, handlers...)
+
+	/***********************************
+		Initialize our MetricIdx
+	***********************************/
 	pre := time.Now()
 
 	if memory.Enabled {
@@ -344,21 +405,12 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
 	}
-
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
+	/***********************************
+		Initialize usage Reporting
+	***********************************/
 	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
-
-	handlers := make([]mdata.NotifierHandler, 0)
-	if notifierKafka.Enabled {
-		handlers = append(handlers, notifierKafka.New(*instance, metrics, stats))
-	}
-
-	if notifierNsq.Enabled {
-		handlers = append(handlers, notifierNsq.New(*instance, metrics, stats))
-	}
-
-	mdata.InitPersistNotifier(stats, handlers...)
 
 	/***********************************
 		Start our inputs
@@ -381,6 +433,7 @@ func main() {
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
 	go apiServer.Run()
+
 	/***********************************
 		Set our status so we can accept
 		requests from users.
@@ -395,6 +448,11 @@ func main() {
 		Wait for Shutdown
 	***********************************/
 	<-sigChan
+
+	// stop API
+	apiServer.Stop()
+	// stop polling peer nodes
+	cluster.Stop()
 
 	// shutdown our input plugins.  These may take a while as we allow them
 	// to finish processing any metrics that have already been ingested.

@@ -11,6 +11,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -19,11 +20,14 @@ import (
 )
 
 const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_def_idx (
-    id text PRIMARY KEY,
+const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
+    id text,
     def blob,
+    partition int,
+    PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
+const metric_idx_index = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
 	idxCasOk             met.Count // metric idx.cassadra.ok is how many metrics are successfully being indexed
@@ -145,6 +149,11 @@ func (c *CasIdx) Init(stats met.Backend) error {
 		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
 		return err
 	}
+	err = tmpSession.Query(fmt.Sprintf(metric_idx_index, keyspace)).Exec()
+	if err != nil {
+		log.Error(3, "cassandra-idx failed to initialize cassandra index. %s", err)
+		return err
+	}
 	tmpSession.Close()
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()
@@ -185,7 +194,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) Add(data *schema.MetricData) error {
+func (c *CasIdx) Add(data *schema.MetricData, partition int32) error {
 	existing, err := c.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -196,17 +205,20 @@ func (c *CasIdx) Add(data *schema.MetricData) error {
 			return err
 		}
 	}
-	if inMemory {
+
+	if inMemory && existing.Partition == partition {
 		oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
 		if existing.LastUpdate < oldest.Unix() {
 			log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
-			existing.LastUpdate = data.Time
-			c.MemoryIdx.AddDef(&existing)
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: &existing}
+			def := schema.MetricDefinitionFromMetricData(data)
+			def.Partition = partition
+			c.MemoryIdx.AddDef(def)
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		}
 		return nil
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
+	def.Partition = partition
 	err = c.MemoryIdx.AddDef(def)
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
@@ -218,17 +230,19 @@ func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	defs := make([]schema.MetricDefinition, 0)
-	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
+	for _, partition := range cluster.ThisNode.GetPartitions() {
+		iter := c.session.Query("SELECT def from metric_idx where partition=?", partition).Iter()
 
-	var data []byte
-	mdef := schema.MetricDefinition{}
-	for iter.Scan(&data) {
-		_, err := mdef.UnmarshalMsg(data)
-		if err != nil {
-			log.Error(3, "cassandra-idx Bad definition in index. %s - %s", data, err)
-			continue
+		var data []byte
+		mdef := schema.MetricDefinition{}
+		for iter.Scan(&data) {
+			_, err := mdef.UnmarshalMsg(data)
+			if err != nil {
+				log.Error(3, "cassandra-idx Bad definition in index. %s - %s", data, err)
+				continue
+			}
+			defs = append(defs, mdef)
 		}
-		defs = append(defs, mdef)
 	}
 	c.MemoryIdx.Load(defs)
 	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
@@ -251,7 +265,7 @@ func (c *CasIdx) processWriteQueue() {
 		success = false
 		attempts = 0
 		for !success {
-			if err := c.session.Query(`INSERT INTO metric_def_idx (id, def) VALUES (?, ?)`, req.def.Id, data).Exec(); err != nil {
+			if err := c.session.Query(`INSERT INTO metric_idx (partition, id, def) VALUES (?, ?, ?)`, req.def.Partition, req.def.Id, data).Exec(); err != nil {
 				idxCasFail.Inc(1)
 				metrics.Inc(err)
 				if (attempts % 20) == 0 {
@@ -285,7 +299,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 		deleted := false
 		for !deleted && attempts < 5 {
 			attempts++
-			cErr := c.session.Query("DELETE FROM metric_def_idx where id=?", def.Id).Exec()
+			cErr := c.session.Query("DELETE FROM metric_idx where id=?", def.Id).Exec()
 			if cErr != nil {
 				metrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)

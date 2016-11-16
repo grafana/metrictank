@@ -73,7 +73,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 
 func TestAggMetric(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	InitMetrics(stats)
 
 	c := NewChecker(t, NewAggMetric(dnstore, "foo", 100, 5, 1, []AggSetting{}...))
@@ -155,7 +155,7 @@ func TestAggMetric(t *testing.T) {
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	InitMetrics(stats)
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
 	chunkSpan := uint32(2 * 3600)
@@ -197,7 +197,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 
 	ttl := uint32(84600)
 	aggSettings := []AggSetting{
@@ -234,7 +234,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 
 	ttl := uint32(84600)
 	aggSettings := []AggSetting{
@@ -271,7 +271,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 
 	ttl := uint32(84600)
 	aggSettings := []AggSetting{

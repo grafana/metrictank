@@ -43,7 +43,7 @@ func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage,
 // process makes sure the data is stored and the metadata is in the index,
 // and the usage is tracked, if enabled.
 // concurrency-safe.
-func (in Input) Process(metric *schema.MetricData) {
+func (in Input) Process(metric *schema.MetricData, partition int32) {
 	if metric == nil {
 		return
 	}
@@ -57,7 +57,7 @@ func (in Input) Process(metric *schema.MetricData) {
 	if metric.Time == 0 {
 		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
-		in.metricIndex.Add(metric)
+		in.metricIndex.Add(metric, partition)
 		m := in.metrics.GetOrCreate(metric.Id)
 		m.Add(uint32(metric.Time), metric.Value)
 		if in.usage != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/util"
@@ -166,8 +167,108 @@ func aggEvery(numPoints, maxPoints uint32) uint32 {
 	return (numPoints + maxPoints - 1) / maxPoints
 }
 
-// error is the error of the first failing target request
 func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
+	// split reqs into local and remote.
+	localReqs := make([]models.Req, 0)
+	remoteReqs := make(map[*cluster.Node][]models.Req)
+	for _, req := range reqs {
+		if req.Node == cluster.ThisNode {
+			localReqs = append(localReqs, req)
+		} else {
+			remoteReqs[req.Node] = append(remoteReqs[req.Node], req)
+		}
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	out := make([]models.Series, 0)
+	errs := make([]error, 0)
+
+	if len(localReqs) > 0 {
+		wg.Add(1)
+		go func() {
+			series, err := s.getTargetsLocal(localReqs)
+			mu.Lock()
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if len(series) > 0 {
+				out = append(out, series...)
+			}
+			mu.Unlock()
+			wg.Done()
+		}()
+	}
+	if len(remoteReqs) > 0 {
+		wg.Add(1)
+		go func() {
+			series, err := s.getTargetsRemote(remoteReqs)
+			mu.Lock()
+			if err != nil {
+				errs = append(errs, err)
+			}
+			if len(series) > 0 {
+				out = append(out, series...)
+			}
+			mu.Unlock()
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	var err error
+	if len(errs) > 0 {
+		err = errs[0]
+	}
+	log.Debug("HTTP getTargets: %d series found on cluster", len(out))
+	return out, err
+}
+
+func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]models.Series, error) {
+	seriesChan := make(chan []models.Series, len(remoteReqs))
+	errorsChan := make(chan error, len(remoteReqs))
+	wg := sync.WaitGroup{}
+	wg.Add(len(remoteReqs))
+	for node, nodeReqs := range remoteReqs {
+		log.Debug("HTTP getTargets: handling %d reqs from %s", len(nodeReqs), node.GetName())
+		go func(reqs []models.Req, node *cluster.Node) {
+			defer wg.Done()
+			buf, err := node.Post("/cluster/getdata", models.GetData{Requests: reqs})
+			if err != nil {
+				errorsChan <- err
+				return
+			}
+			var resp models.GetDataResp
+			buf, err = resp.UnmarshalMsg(buf)
+			if err != nil {
+				errorsChan <- errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err))
+				return
+			}
+			log.Debug("HTTP getTargets: %s returned %d series", node.GetName(), len(resp.Series))
+			seriesChan <- resp.Series
+		}(nodeReqs, node)
+	}
+	go func() {
+		wg.Wait()
+		close(seriesChan)
+		close(errorsChan)
+	}()
+	out := make([]models.Series, 0)
+	var err error
+	for series := range seriesChan {
+		out = append(out, series...)
+	}
+	log.Debug("HTTP getTargets: total of %d series found on peers", len(out))
+	for e := range errorsChan {
+		err = e
+		break
+	}
+	return out, err
+}
+
+// error is the error of the first failing target request
+func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
+	log.Debug("HTTP getTargets: handling %d reqs locally", len(reqs))
 	seriesChan := make(chan models.Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
@@ -200,6 +301,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	for series := range seriesChan {
 		out = append(out, series)
 	}
+	log.Debug("HTTP getTargets: %d series found locally", len(out))
 	for e := range errorsChan {
 		err = e
 		break

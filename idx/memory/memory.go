@@ -82,7 +82,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) Add(data *schema.MetricData) error {
+func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -130,9 +130,9 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	if existing, ok := m.DefById[def.Id]; ok {
+	if _, ok := m.DefById[def.Id]; ok {
 		log.Debug("memory-idx: metricDef with id %s already in index.", def.Id)
-		existing.LastUpdate = def.LastUpdate
+		m.DefById[def.Id] = def
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))
 		return nil

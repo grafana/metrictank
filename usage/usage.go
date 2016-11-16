@@ -103,7 +103,8 @@ func (u *Usage) Report() {
 
 		m := metrics.GetOrCreate(met.Id)
 		m.Add(uint32(met.Time), met.Value)
-		metricIndex.Add(met)
+		//TODO: how to set the partition of the metric?  We probably just need to publish the metric to our Input Plugin
+		metricIndex.Add(met, 0)
 	}
 	for {
 		ticker := tick()

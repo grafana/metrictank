@@ -16,7 +16,7 @@ import (
 
 func Test_Process(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
@@ -81,14 +81,14 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 		}
 		metric.SetId()
 		metrics[metric.Id] = id
-		in.Process(metric)
+		in.Process(metric, 1)
 	}
 	return metrics
 }
 
 func BenchmarkProcess(b *testing.B) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	mdata.InitMetrics(stats)
 
 	store := mdata.NewDevnullStore()
@@ -118,6 +118,6 @@ func BenchmarkProcess(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		in.Process(datas[i])
+		in.Process(datas[i], 1)
 	}
 }

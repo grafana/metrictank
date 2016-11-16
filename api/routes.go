@@ -19,6 +19,14 @@ func (s *Server) RegisterRoutes() {
 	r.Get("/", s.appStatus)
 	r.Get("/node", s.getNodeStatus)
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
+	// Internal api endpoints used for inter cluster communication
+	r.Group("/cluster", func() {
+		r.Get("/", s.getClusterStatus)
+		r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
+		r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
+		r.Combo("/index/get", bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
+		r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
+	})
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)

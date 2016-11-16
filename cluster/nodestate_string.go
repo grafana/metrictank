@@ -4,9 +4,9 @@ package cluster
 
 import "fmt"
 
-const _NodeState_name = "NodeNotReadyNodeReady"
+const _NodeState_name = "NodeNotReadyNodeReadyNodeUnreachable"
 
-var _NodeState_index = [...]uint8{0, 12, 21}
+var _NodeState_index = [...]uint8{0, 12, 21, 36}
 
 func (i NodeState) String() string {
 	if i < 0 || i >= NodeState(len(_NodeState_index)-1) {

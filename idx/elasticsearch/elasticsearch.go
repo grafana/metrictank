@@ -12,6 +12,7 @@ import (
 
 	"github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/met"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -214,7 +215,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	return nil
 }
 
-func (e *EsIdx) Add(data *schema.MetricData) error {
+func (e *EsIdx) Add(data *schema.MetricData, partition int32) error {
 	existing, err := e.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -225,13 +226,14 @@ func (e *EsIdx) Add(data *schema.MetricData) error {
 			return err
 		}
 	}
-	if inMemory {
+	def := schema.MetricDefinitionFromMetricData(data)
+	def.Partition = partition
+	if inMemory && existing.Partition != def.Partition {
 		log.Debug("def already seen before. Just updating memory Index")
-		existing.LastUpdate = data.Time
-		e.MemoryIdx.AddDef(&existing)
+		e.MemoryIdx.AddDef(def)
 		return nil
 	}
-	def := schema.MetricDefinitionFromMetricData(data)
+
 	err = e.MemoryIdx.AddDef(def)
 	if err == nil {
 		if err = e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
@@ -323,28 +325,36 @@ func (e *EsIdx) rebuildIndex() {
 	defs := make([]schema.MetricDefinition, 0)
 	var err error
 	var out elastigo.SearchResult
-	loading := true
-	scroll_id := ""
-	for loading {
-		if scroll_id == "" {
-			out, err = e.Conn.Search(esIndex, "metric_index", map[string]interface{}{"scroll": "1m", "size": 1000}, nil)
-		} else {
-			out, err = e.Conn.Scroll(map[string]interface{}{"scroll": "1m"}, scroll_id)
-		}
-		if err != nil {
-			log.Fatal(4, "Failed to load metric definitions from ES. %s", err)
-		}
-		for _, h := range out.Hits.Hits {
-			mdef, err := schema.MetricDefinitionFromJSON(*h.Source)
-			if err != nil {
-				log.Error(3, "Bad definition in index. %s - %s", h.Source, err)
+	qry := map[string]map[string]map[string]int32{
+		"query": map[string]map[string]int32{
+			"term": map[string]int32{"partition": 0},
+		},
+	}
+	for _, partition := range cluster.ThisNode.GetPartitions() {
+		qry["query"]["term"]["partition"] = partition
+		loading := true
+		scroll_id := ""
+		for loading {
+			if scroll_id == "" {
+				out, err = e.Conn.Search(esIndex, "metric_index", map[string]interface{}{"scroll": "1m", "size": 1000}, qry)
+			} else {
+				out, err = e.Conn.Scroll(map[string]interface{}{"scroll": "1m"}, scroll_id)
 			}
-			defs = append(defs, *mdef)
-		}
+			if err != nil {
+				log.Fatal(4, "Failed to load metric definitions from ES. %s", err)
+			}
+			for _, h := range out.Hits.Hits {
+				mdef, err := schema.MetricDefinitionFromJSON(*h.Source)
+				if err != nil {
+					log.Error(3, "Bad definition in index. %s - %s", h.Source, err)
+				}
+				defs = append(defs, *mdef)
+			}
 
-		scroll_id = out.ScrollId
-		if out.Hits.Len() == 0 {
-			loading = false
+			scroll_id = out.ScrollId
+			if out.Hits.Len() == 0 {
+				loading = false
+			}
 		}
 	}
 	e.MemoryIdx.Load(defs)
