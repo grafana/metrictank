@@ -203,19 +203,6 @@ consumer-max-processing-time = 1s
 net-max-open-requests = 100
 ```
 
-### kafka-mdam input (optional, discouraged)
-
-```
-[kafka-mdam-in]
-enabled = false
-# tcp address (may be given multiple times as a comma-separated list)
-brokers = kafka:9092
-# kafka topic (may be given multiple times as a comma-separated list)
-topics = mdam
-# consumer group name
-group = group1
-```
-
 ## clustering transports ##
 ### kafka as transport for clustering messages (recommended)
 
