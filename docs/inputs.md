@@ -10,7 +10,7 @@ see fakemetrics, tsdb-gw, carbon
 
 
 ## Carbon
-useful for traditional graphite plaintext protocol.
+useful for traditional graphite plaintext protocol.  Does not support pickle format.
 
 ** Important: this input requires a
 [carbon storage-schemas.conf](http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf) file.
