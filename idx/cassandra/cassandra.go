@@ -185,7 +185,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) Add(data *schema.MetricData) {
+func (c *CasIdx) Add(data *schema.MetricData) error {
 	existing, err := c.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 			inMemory = false
 		} else {
 			log.Error(3, "cassandra-idx Failed to query Memory Index for %s. %s", data.Id, err)
-			return
+			return err
 		}
 	}
 	if inMemory {
@@ -204,11 +204,14 @@ func (c *CasIdx) Add(data *schema.MetricData) {
 			c.MemoryIdx.AddDef(&existing)
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: &existing}
 		}
-		return
+		return nil
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
-	c.MemoryIdx.AddDef(def)
-	c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+	err = c.MemoryIdx.AddDef(def)
+	if err == nil {
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+	}
+	return err
 }
 
 func (c *CasIdx) rebuildIndex() {

@@ -80,7 +80,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) Add(data *schema.MetricData) {
+func (m *MemoryIdx) Add(data *schema.MetricData) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -90,12 +90,13 @@ func (m *MemoryIdx) Add(data *schema.MetricData) {
 		existing.LastUpdate = data.Time
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))
-		return
+		return nil
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	m.add(def)
+	err := m.add(def)
 	idxAddDuration.Value(time.Since(pre))
+	return err
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -114,7 +115,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 	m.Unlock()
 }
 
-func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) {
+func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -123,13 +124,14 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) {
 		existing.LastUpdate = def.LastUpdate
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))
-		return
+		return nil
 	}
-	m.add(def)
+	err := m.add(def)
 	idxAddDuration.Value(time.Since(pre))
+	return err
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) {
+func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 	m.DefById[def.Id] = def
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
@@ -154,12 +156,12 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 				//bad data. A path cant be both a leaf and a branch.
 				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
 				idxFail.Inc(1)
-				return
+				return idx.BothBranchAndLeaf
 			}
 			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
 			node.Children = append(node.Children, def.Id)
 			idxOk.Inc(1)
-			return
+			return nil
 		}
 	}
 	// now walk backwards through the node path to find the first branch which exists that
@@ -174,7 +176,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 				if n.Leaf {
 					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
 					idxFail.Inc(1)
-					return
+					return idx.BranchUnderLeaf
 				}
 				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
 				startNode = n
@@ -212,7 +214,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 		Children: []string{def.Id},
 	}
 	idxOk.Inc(1)
-	return
+	return nil
 }
 
 func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
