@@ -49,7 +49,7 @@ var topics []string
 var partitionStr string
 var partitions []int32
 var offsetStr string
-var dataDir string
+var DataDir string
 var config *sarama.Config
 var channelBufferSize int
 var consumerFetchMin int
@@ -72,7 +72,7 @@ func ConfigSetup() {
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's")
 	inKafkaMdm.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
-	inKafkaMdm.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
+	inKafkaMdm.StringVar(&DataDir, "data-dir", "", "Directory to store partition offsets index")
 	inKafkaMdm.IntVar(&channelBufferSize, "channel-buffer-size", 1000000, "The number of metrics to buffer in internal and external channels")
 	inKafkaMdm.IntVar(&consumerFetchMin, "consumer-fetch-min", 1, "The minimum number of message bytes to fetch in a request")
 	inKafkaMdm.IntVar(&consumerFetchDefault, "consumer-fetch-default", 32768, "The default number of message bytes to fetch in a request")
@@ -108,7 +108,7 @@ func ConfigProcess(instance string) {
 		}
 	}
 
-	offsetMgr, err = kafka.NewOffsetMgr(dataDir)
+	offsetMgr, err = kafka.NewOffsetMgr(DataDir)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm couldnt create offsetMgr. %s", err)
 	}
@@ -158,7 +158,10 @@ func ConfigProcess(instance string) {
 		}
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
-	cluster.Manager.SetPartitions(partitions)
+	// but only if the manager has been created (e.g. in metrictank), not when this input plugin is used in other contexts
+	if cluster.Manager != nil {
+		cluster.Manager.SetPartitions(partitions)
+	}
 
 	// initialize our offset metrics
 	partitionOffset = make(map[int32]*stats.Gauge64)
