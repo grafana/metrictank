@@ -34,7 +34,7 @@ func ConfigSetup() {
 }
 
 type Tree struct {
-	Items map[string]*Node
+	Items map[string]*Node // key is the full path of the node.
 }
 
 type Node struct {
@@ -179,7 +179,12 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
 	nodes := strings.Split(path, ".")
-	startPos := 0
+
+	// if we're trying to insert foo.bar.baz.quux then we see if we can insert it under (in this order):
+	// - foo.bar.baz (if found, startPos is 3)
+	// - foo.bar (if found, startPos is 2)
+	// - foo (if found, startPos is 1)
+	startPos := 0 // the index of the first word that is not part of the prefix
 	var startNode *Node
 	if len(nodes) > 1 {
 		for i := len(nodes) - 1; i > 0; i-- {
@@ -301,6 +306,11 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	}
 
 	nodes := strings.Split(pattern, ".")
+
+	// pos is the index of the last node we know for sure
+	// for a query like foo.bar.baz, pos is 2
+	// for a query like foo.bar.* or foo.bar, pos is 1
+	// for a query like foo.b*.baz, pos is 0
 	pos := len(nodes) - 1
 	for i := 0; i < len(nodes); i++ {
 		if strings.ContainsAny(nodes[i], "*{}[]?") {
