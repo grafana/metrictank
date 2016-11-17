@@ -54,14 +54,16 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]*schema.MetricDefinition
-	Tree    map[int]*Tree
+	FailedDefs map[string]error
+	DefById    map[string]*schema.MetricDefinition
+	Tree       map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]*schema.MetricDefinition),
-		Tree:    make(map[int]*Tree),
+		FailedDefs: make(map[string]error),
+		DefById:    make(map[string]*schema.MetricDefinition),
+		Tree:       make(map[int]*Tree),
 	}
 }
 
@@ -84,6 +86,15 @@ func (m *MemoryIdx) Add(data *schema.MetricData) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
+	err, ok := m.FailedDefs[data.Id]
+	if ok {
+		// if it failed before, it would fail again.
+		// there's not much point in doing the work of trying over
+		// and over again, and flooding the logs with the same failure.
+		// so just trigger the stats metric as if we tried again
+		idxFail.Inc(1)
+		return err
+	}
 	existing, ok := m.DefById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
@@ -94,7 +105,7 @@ func (m *MemoryIdx) Add(data *schema.MetricData) error {
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	err := m.add(def)
+	err = m.add(def)
 	idxAddDuration.Value(time.Since(pre))
 	return err
 }
@@ -132,7 +143,6 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
-	m.DefById[def.Id] = def
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
@@ -155,11 +165,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 			if !node.Leaf {
 				//bad data. A path cant be both a leaf and a branch.
 				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
+				m.FailedDefs[def.Id] = idx.BothBranchAndLeaf
 				idxFail.Inc(1)
 				return idx.BothBranchAndLeaf
 			}
 			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
 			node.Children = append(node.Children, def.Id)
+			m.DefById[def.Id] = def
 			idxOk.Inc(1)
 			return nil
 		}
@@ -175,6 +187,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 			if n, ok := tree.Items[branch]; ok {
 				if n.Leaf {
 					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
+					m.FailedDefs[def.Id] = idx.BranchUnderLeaf
 					idxFail.Inc(1)
 					return idx.BranchUnderLeaf
 				}
@@ -213,6 +226,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		Path:     path,
 		Children: []string{def.Id},
 	}
+	m.DefById[def.Id] = def
 	idxOk.Inc(1)
 	return nil
 }
@@ -437,6 +451,12 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	if err != nil {
 		return nil, err
 	}
+
+	// by deleting one or more nodes in the tree, any defs that previously failed may now
+	// be able to be added. An easy way to support this is just reset this map and give them
+	// all a chance again
+	m.FailedDefs = make(map[string]error)
+
 	deletedDefs := make([]schema.MetricDefinition, 0)
 	for _, f := range found {
 		deleted, err := m.delete(orgId, f)
