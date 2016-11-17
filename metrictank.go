@@ -29,7 +29,6 @@ import (
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/input"
 	inCarbon "github.com/raintank/metrictank/input/carbon"
-	inKafkaMdam "github.com/raintank/metrictank/input/kafkamdam"
 	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -162,7 +161,6 @@ func main() {
 	// load config for metric ingestors
 	inCarbon.ConfigSetup()
 	inKafkaMdm.ConfigSetup()
-	inKafkaMdam.ConfigSetup()
 
 	// load config for cluster handlers
 	notifierNsq.ConfigSetup()
@@ -214,12 +212,11 @@ func main() {
 
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
-	inKafkaMdam.ConfigProcess(*instance)
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	api.ConfigProcess()
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inKafkaMdam.Enabled {
+	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
@@ -313,11 +310,6 @@ func main() {
 	if inKafkaMdm.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
 		inputs = append(inputs, inKafkaMdm.New(stats))
-	}
-
-	if inKafkaMdam.Enabled {
-		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inputs = append(inputs, inKafkaMdam.New(stats))
 	}
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
