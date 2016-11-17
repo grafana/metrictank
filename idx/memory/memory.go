@@ -501,7 +501,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error
 	deletedDefs := make([]schema.MetricDefinition, len(n.Children))
 	// delete the metricDefs
 	for i, id := range n.Children {
-		log.Debug("memory-idx: deleteing %s from index", id)
+		log.Debug("memory-idx: deleting %s from index", id)
 		deletedDefs[i] = *m.DefById[id]
 		delete(m.DefById, id)
 	}
