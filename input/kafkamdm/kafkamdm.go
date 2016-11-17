@@ -13,17 +13,20 @@ import (
 	"github.com/rakyll/globalconf"
 
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/kafka"
-	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
 
+// metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
+var metricsPerMessage = stats.NewMeter32("input.kafka-mdm.metrics_per_message", false)
+
+// metric input.kafka-mdm.metrics_decode_err is a count of times an input message failed to parse
+var metricsDecodeErr = stats.NewCounter32("input.kafka-mdm.metrics_decode_err")
+
 type KafkaMdm struct {
-	input.Input
+	input.Handler
 	consumer sarama.Consumer
 	client   sarama.Client
 
@@ -34,7 +37,7 @@ type KafkaMdm struct {
 }
 
 func (k *KafkaMdm) Name() string {
-	return "kafkaMdm"
+	return "kafka-mdm"
 }
 
 var LogLevel int
@@ -187,8 +190,8 @@ func New() *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm")
+func (k *KafkaMdm) Start(handler input.Handler) {
+	k.Handler = handler
 	var err error
 	for _, topic := range topics {
 		for _, partition := range partitions {
@@ -274,12 +277,12 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
-		k.Input.MetricsDecodeErr.Inc()
+		metricsDecodeErr.Inc()
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
-	k.Input.MetricsPerMessage.ValueUint32(1)
-	k.Input.Process(&md, partition)
+	metricsPerMessage.ValueUint32(1)
+	k.Handler.Process(&md, partition)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

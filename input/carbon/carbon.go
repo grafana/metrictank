@@ -12,17 +12,21 @@ import (
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/input"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/usage"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
 )
 
+// metric input.carbon.metrics_per_message is how many metrics per message were seen. in carbon's case this is always 1.
+var metricsPerMessage = stats.NewMeter32("input.carbon.metrics_per_message", false)
+
+// metric input.carbon.metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+var metricsDecodeErr = stats.NewCounter32("input.carbon.metrics_decode_err")
+
 type Carbon struct {
-	input.Input
+	input.Handler
 	addrStr          string
 	addr             *net.TCPAddr
 	schemas          persister.WhisperSchemas
@@ -121,10 +125,8 @@ func New() *Carbon {
 	}
 }
 
-func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	if c.Input.MsgsAge == nil {
-		c.Input = input.New(metrics, metricIndex, usg, "carbon")
-	}
+func (c *Carbon) Start(handler input.Handler) {
+	c.Handler = handler
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, "carbon-in: %s", err.Error())
@@ -189,7 +191,7 @@ func (c *Carbon) handle(conn net.Conn) {
 		// no validation for m2.0 to provide a grace period in adopting new clients
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.MediumLegacy, carbon20.NoneM20)
 		if err != nil {
-			c.Input.MetricsDecodeErr.Inc()
+			metricsDecodeErr.Inc()
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
@@ -211,8 +213,8 @@ func (c *Carbon) handle(conn net.Conn) {
 			OrgId:    1, // admin org
 		}
 		md.SetId()
-		c.Input.MetricsPerMessage.ValueUint32(1)
-		c.Input.Process(md, int32(partitionId))
+		metricsPerMessage.ValueUint32(1)
+		c.Handler.Process(md, int32(partitionId))
 	}
 	c.handlerWaitGroup.Done()
 }
