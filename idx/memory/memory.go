@@ -34,7 +34,7 @@ func ConfigSetup() {
 }
 
 type Tree struct {
-	Items map[string]*Node
+	Items map[string]*Node // key is the full path of the node.
 }
 
 type Node struct {
@@ -54,14 +54,16 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]*schema.MetricDefinition
-	Tree    map[int]*Tree
+	FailedDefs map[string]error
+	DefById    map[string]*schema.MetricDefinition
+	Tree       map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]*schema.MetricDefinition),
-		Tree:    make(map[int]*Tree),
+		FailedDefs: make(map[string]error),
+		DefById:    make(map[string]*schema.MetricDefinition),
+		Tree:       make(map[int]*Tree),
 	}
 }
 
@@ -80,22 +82,32 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) Add(data *schema.MetricData) {
+func (m *MemoryIdx) Add(data *schema.MetricData) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
+	err, ok := m.FailedDefs[data.Id]
+	if ok {
+		// if it failed before, it would fail again.
+		// there's not much point in doing the work of trying over
+		// and over again, and flooding the logs with the same failure.
+		// so just trigger the stats metric as if we tried again
+		idxFail.Inc(1)
+		return err
+	}
 	existing, ok := m.DefById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))
-		return
+		return nil
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	m.add(def)
+	err = m.add(def)
 	idxAddDuration.Value(time.Since(pre))
+	return err
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -114,7 +126,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 	m.Unlock()
 }
 
-func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) {
+func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -123,14 +135,14 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) {
 		existing.LastUpdate = def.LastUpdate
 		idxOk.Inc(1)
 		idxAddDuration.Value(time.Since(pre))
-		return
+		return nil
 	}
-	m.add(def)
+	err := m.add(def)
 	idxAddDuration.Value(time.Since(pre))
+	return err
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) {
-	m.DefById[def.Id] = def
+func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
@@ -153,19 +165,26 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 			if !node.Leaf {
 				//bad data. A path cant be both a leaf and a branch.
 				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
+				m.FailedDefs[def.Id] = idx.BothBranchAndLeaf
 				idxFail.Inc(1)
-				return
+				return idx.BothBranchAndLeaf
 			}
 			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
 			node.Children = append(node.Children, def.Id)
+			m.DefById[def.Id] = def
 			idxOk.Inc(1)
-			return
+			return nil
 		}
 	}
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
 	nodes := strings.Split(path, ".")
-	startPos := 0
+
+	// if we're trying to insert foo.bar.baz.quux then we see if we can insert it under (in this order):
+	// - foo.bar.baz (if found, startPos is 3)
+	// - foo.bar (if found, startPos is 2)
+	// - foo (if found, startPos is 1)
+	startPos := 0 // the index of the first word that is not part of the prefix
 	var startNode *Node
 	if len(nodes) > 1 {
 		for i := len(nodes) - 1; i > 0; i-- {
@@ -173,8 +192,9 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 			if n, ok := tree.Items[branch]; ok {
 				if n.Leaf {
 					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
+					m.FailedDefs[def.Id] = idx.BranchUnderLeaf
 					idxFail.Inc(1)
-					return
+					return idx.BranchUnderLeaf
 				}
 				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
 				startNode = n
@@ -211,8 +231,9 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 		Path:     path,
 		Children: []string{def.Id},
 	}
+	m.DefById[def.Id] = def
 	idxOk.Inc(1)
-	return
+	return nil
 }
 
 func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
@@ -285,6 +306,11 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	}
 
 	nodes := strings.Split(pattern, ".")
+
+	// pos is the index of the last node we know for sure
+	// for a query like foo.bar.baz, pos is 2
+	// for a query like foo.bar.* or foo.bar, pos is 1
+	// for a query like foo.b*.baz, pos is 0
 	pos := len(nodes) - 1
 	for i := 0; i < len(nodes); i++ {
 		if strings.ContainsAny(nodes[i], "*{}[]?") {
@@ -435,6 +461,12 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	if err != nil {
 		return nil, err
 	}
+
+	// by deleting one or more nodes in the tree, any defs that previously failed may now
+	// be able to be added. An easy way to support this is just reset this map and give them
+	// all a chance again
+	m.FailedDefs = make(map[string]error)
+
 	deletedDefs := make([]schema.MetricDefinition, 0)
 	for _, f := range found {
 		deleted, err := m.delete(orgId, f)
@@ -469,7 +501,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error
 	deletedDefs := make([]schema.MetricDefinition, len(n.Children))
 	// delete the metricDefs
 	for i, id := range n.Children {
-		log.Debug("memory-idx: deleteing %s from index", id)
+		log.Debug("memory-idx: deleting %s from index", id)
 		deletedDefs[i] = *m.DefById[id]
 		delete(m.DefById, id)
 	}

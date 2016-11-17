@@ -11,7 +11,9 @@ import (
 )
 
 var (
-	DefNotFound = errors.New("MetricDef not found")
+	DefNotFound       = errors.New("MetricDef not found")
+	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
+	BranchUnderLeaf   = errors.New("can't add branch under leaf")
 )
 
 type Node struct {
@@ -46,7 +48,7 @@ Interface
 * Stop():
  This will be called when metrictank is shutting down.
 
-* Add(*schema.MetricData):
+* Add(*schema.MetricData) error:
   Every metric received will result in a call to this method to ensure the
   metric has been added to the index.
 
@@ -83,7 +85,7 @@ Interface
 type MetricIndex interface {
 	Init(met.Backend) error
 	Stop()
-	Add(*schema.MetricData)
+	Add(*schema.MetricData) error
 	Get(string) (schema.MetricDefinition, error)
 	Delete(int, string) ([]schema.MetricDefinition, error)
 	Find(int, string, int64) ([]Node, error)

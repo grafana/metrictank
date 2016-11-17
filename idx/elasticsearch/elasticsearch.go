@@ -214,7 +214,7 @@ func (e *EsIdx) Init(stats met.Backend) error {
 	return nil
 }
 
-func (e *EsIdx) Add(data *schema.MetricData) {
+func (e *EsIdx) Add(data *schema.MetricData) error {
 	existing, err := e.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -222,21 +222,24 @@ func (e *EsIdx) Add(data *schema.MetricData) {
 			inMemory = false
 		} else {
 			log.Error(3, "Failed to query Memory Index for %s. %s", data.Id, err)
-			return
+			return err
 		}
 	}
 	if inMemory {
 		log.Debug("def already seen before. Just updating memory Index")
 		existing.LastUpdate = data.Time
 		e.MemoryIdx.AddDef(&existing)
-		return
+		return nil
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
-	e.MemoryIdx.AddDef(def)
-	if err := e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
-		log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
-		e.retryBuf.Queue(def.Id)
+	err = e.MemoryIdx.AddDef(def)
+	if err == nil {
+		if err = e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
+			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
+			e.retryBuf.Queue(def.Id)
+		}
 	}
+	return err
 }
 
 func (e *EsIdx) bulkSend(buf *bytes.Buffer) error {

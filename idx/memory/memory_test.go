@@ -283,6 +283,133 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestBadAdd(t *testing.T) {
+	ix := New()
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	ix.Init(stats)
+
+	first := &schema.MetricData{
+		Name:     "foo.bar",
+		Metric:   "foo.bar",
+		OrgId:    1,
+		Interval: 10,
+	}
+	bad1 := &schema.MetricData{
+		Name:     "foo.bar.baz",
+		Metric:   "foo.bar.baz",
+		OrgId:    1,
+		Interval: 10,
+	}
+	bad2 := &schema.MetricData{
+		Name:     "foo",
+		Metric:   "foo",
+		OrgId:    1,
+		Interval: 10,
+	}
+	first.SetId()
+	bad1.SetId()
+	bad2.SetId()
+
+	Convey("when adding the first metric", t, func() {
+
+		err := ix.Add(first)
+		So(err, ShouldBeNil)
+		Convey("we should not be able to add a leaf under another leaf", func() {
+
+			err = ix.Add(bad1)
+			So(err, ShouldEqual, idx.BranchUnderLeaf)
+			_, err := ix.Get(bad1.Id)
+			So(err, ShouldEqual, idx.DefNotFound)
+			defs := ix.List(1)
+			So(len(defs), ShouldEqual, 1)
+			So(defs[0].Id, ShouldEqual, first.Id)
+		})
+		Convey("we should not be able to add a leaf that collides with an existing branch", func() {
+
+			err = ix.Add(bad2)
+			So(err, ShouldEqual, idx.BothBranchAndLeaf)
+			_, err := ix.Get(bad2.Id)
+			So(err, ShouldEqual, idx.DefNotFound)
+			defs := ix.List(1)
+			So(len(defs), ShouldEqual, 1)
+			So(defs[0].Id, ShouldEqual, first.Id)
+		})
+	})
+}
+
+// verify that if a leaf blocks a new branch, we can add the branch after deleting the leaf
+func TestDeleteLeafAddBranch(t *testing.T) {
+	ix := New()
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	ix.Init(stats)
+
+	first := &schema.MetricData{
+		Name:     "foo.bar",
+		Metric:   "foo.bar",
+		OrgId:    1,
+		Interval: 10,
+	}
+	second := &schema.MetricData{
+		Name:     "foo.bar.baz",
+		Metric:   "foo.bar.baz",
+		OrgId:    1,
+		Interval: 10,
+	}
+	first.SetId()
+	second.SetId()
+
+	Convey("when adding the first metric", t, func() {
+
+		err := ix.Add(first)
+		So(err, ShouldBeNil)
+		Convey("we should not be able to add a leaf under another leaf", func() {
+
+			err = ix.Add(second)
+			So(err, ShouldEqual, idx.BranchUnderLeaf)
+
+			_, err := ix.Get(second.Id)
+			So(err, ShouldEqual, idx.DefNotFound)
+
+			Convey("when deleting the first metric", func() {
+
+				defs, err := ix.Delete(1, "foo.bar")
+				So(err, ShouldBeNil)
+				So(defs, ShouldHaveLength, 1)
+				So(defs[0].Id, ShouldEqual, first.Id)
+
+				Convey("series should not be present in the metricDef index", func() {
+
+					_, err := ix.Get(first.Id)
+					So(err, ShouldEqual, idx.DefNotFound)
+
+					Convey("we should be able to add a new branch under it", func() {
+
+						ix.Add(second)
+
+						// validate Get
+						s, err := ix.Get(second.Id)
+						So(err, ShouldEqual, nil)
+						So(s.Name, ShouldEqual, "foo.bar.baz")
+
+						// validate Find
+						nodes, err := ix.Find(1, "foo.bar.*", 0)
+						So(err, ShouldBeNil)
+						So(nodes, ShouldHaveLength, 1)
+						So(nodes[0].Path, ShouldEqual, second.Name)
+
+						// validate List
+						defs := ix.List(1)
+						So(defs, ShouldHaveLength, 1)
+						if len(defs) == 1 {
+							So(defs[0].Name, ShouldEqual, "foo.bar.baz")
+						}
+					})
+				})
+			})
+		})
+	})
+}
+
 func TestPrune(t *testing.T) {
 	ix := New()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
