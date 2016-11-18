@@ -1235,7 +1235,7 @@
           "renderer": "flot",
           "seriesOverrides": [
             {
-              "alias": "msg published",
+              "alias": "/messages-published/",
               "fill": 4,
               "linewidth": 0,
               "yaxis": 2
@@ -1247,7 +1247,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.notifier.*.message_size.{mean,upper}, 5, 6, 7)"
+              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.notifier.*.message_size.{mean,upper}, 6, 7, 8)"
             },
             {
               "refId": "B",
