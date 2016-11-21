@@ -130,7 +130,6 @@
 		},
 		{
 			"checksumSHA1": "9dGSivFlYCZvic4tBgE0xtWF0x0=",
-			"origin": "github.com/raintank/metrictank/vendor/github.com/gocql/gocql",
 			"path": "github.com/gocql/gocql",
 			"revision": "47f897f054183a4c891f27b235f11221683982dc",
 			"revisionTime": "2016-11-07T21:46:42Z"
@@ -464,6 +463,12 @@
 			"path": "gopkg.in/macaron.v1",
 			"revision": "4974334b10dbb6f5c0e17f4c10555ff050a16329",
 			"revisionTime": "2016-08-26T18:07:28Z"
+		},
+		{
+			"checksumSHA1": "Fv3Cdgosf28iev/JTFWO6nsPFCA=",
+			"path": "gopkg.in/raintank/schema.v1",
+			"revision": "a2ba0a7af66d6cc470d93bb5725f22f4b3c1ea79",
+			"revisionTime": "2016-07-20T14:31:18Z"
 		}
 	],
 	"rootPath": "github.com/raintank/metrictank"
