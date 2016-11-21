@@ -839,8 +839,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				NewAggSetting(600, 600, 2, 0, true),
-				NewAggSetting(1200, 1200, 2, 0, true),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
+				mdata.NewAggSetting(1200, 1200, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
@@ -863,7 +863,7 @@ func TestAlignRequests(t *testing.T) {
 			[]mdata.AggSetting{
 				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
 				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSettig(21600, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*3, 1000, 10, consolidation.Avg, 0, 10, 60, 6),

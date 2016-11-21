@@ -63,18 +63,6 @@
 			"revisionTime": "2015-03-31T13:04:00Z"
 		},
 		{
-			"checksumSHA1": "rXpccCERmxr9jZciHqG8Uf+1EUE=",
-			"path": "github.com/bsm/sarama-cluster",
-			"revision": "3e840f2f0cd9479e4ce2ae953e41f5545f2bf56e",
-			"revisionTime": "2016-06-25T08:36:37Z"
-		},
-		{
-			"checksumSHA1": "n6WHmaVaxufQthaT1tYnqTmtSsY=",
-			"path": "github.com/codeskyblue/go-uuid",
-			"revision": "952abbca900b023c1a80bc522ff4795db50d9d6c",
-			"revisionTime": "2014-02-08T11:57:53Z"
-		},
-		{
 			"checksumSHA1": "jqSVRDK7dGg6E/NikVq1Kw6gdbA=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "2df174808ee097f90d259e432cc04442cf60be21",
@@ -130,7 +118,6 @@
 		},
 		{
 			"checksumSHA1": "9dGSivFlYCZvic4tBgE0xtWF0x0=",
-			"origin": "github.com/raintank/metrictank/vendor/github.com/gocql/gocql",
 			"path": "github.com/gocql/gocql",
 			"revision": "47f897f054183a4c891f27b235f11221683982dc",
 			"revisionTime": "2016-11-07T21:46:42Z"
@@ -152,12 +139,6 @@
 			"path": "github.com/gocql/gocql/internal/streams",
 			"revision": "ffae44103aa14ada9e2b342329f44ce354f399fd",
 			"revisionTime": "2016-09-27T08:26:32Z"
-		},
-		{
-			"checksumSHA1": "/7y+NZyEEvVbTwtNm+5eWJeQSBs=",
-			"path": "github.com/gocql/gocql/lru",
-			"revision": "7e6c7975187592f32e17e102423b1c3298f6779e",
-			"revisionTime": "2015-11-19T10:57:03Z"
 		},
 		{
 			"checksumSHA1": "OzddgAh0uv3ukKhWW7QFUEFbxow=",
@@ -464,6 +445,12 @@
 			"path": "gopkg.in/macaron.v1",
 			"revision": "4974334b10dbb6f5c0e17f4c10555ff050a16329",
 			"revisionTime": "2016-08-26T18:07:28Z"
+		},
+		{
+			"checksumSHA1": "Fv3Cdgosf28iev/JTFWO6nsPFCA=",
+			"path": "gopkg.in/raintank/schema.v1",
+			"revision": "a2ba0a7af66d6cc470d93bb5725f22f4b3c1ea79",
+			"revisionTime": "2016-07-20T14:31:18Z"
 		}
 	],
 	"rootPath": "github.com/raintank/metrictank"
