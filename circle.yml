@@ -15,6 +15,7 @@ machine:
 
 test:
   override:
+    - cd $IMPORTPATH && scripts/vendor_health.sh
     - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && go vet $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && scripts/end2end_test.sh
