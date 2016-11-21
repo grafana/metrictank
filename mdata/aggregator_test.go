@@ -73,7 +73,7 @@ func TestAggregator(t *testing.T) {
 	agg.Add(110, 5)
 	agg.Add(130, 130)
 	expected = []schema.Point{
-		{5, 120},
+		{Val: 5, Ts: 120},
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
 
@@ -82,7 +82,7 @@ func TestAggregator(t *testing.T) {
 	agg.Add(110, 5)
 	agg.Add(120, 4)
 	expected = []schema.Point{
-		{4, 120},
+		{Val: 4, Ts: 120},
 	}
 	compare("simple-min-one-block-done-cause-last-point-just-right", agg.minMetric, expected)
 
@@ -92,8 +92,8 @@ func TestAggregator(t *testing.T) {
 	agg.Add(150, 1.123)
 	agg.Add(180, 1)
 	expected = []schema.Point{
-		{5, 120},
-		{1, 180},
+		{Val: 5, Ts: 120},
+		{Val: 1, Ts: 180},
 	}
 	compare("simple-min-two-blocks-done-cause-last-point-just-right", agg.minMetric, expected)
 
@@ -105,20 +105,20 @@ func TestAggregator(t *testing.T) {
 	agg.Add(220, 978894.445)
 	agg.Add(250, 1)
 	compare("simple-min-skip-a-block", agg.minMetric, []schema.Point{
-		{5, 120},
-		{1451.123, 240},
+		{Val: 5, Ts: 120},
+		{Val: 1451.123, Ts: 240},
 	})
 	compare("simple-max-skip-a-block", agg.maxMetric, []schema.Point{
-		{123.4, 120},
-		{978894.445, 240},
+		{Val: 123.4, Ts: 120},
+		{Val: 978894.445, Ts: 240},
 	})
 	compare("simple-cnt-skip-a-block", agg.cntMetric, []schema.Point{
-		{2, 120},
-		{3, 240},
+		{Val: 2, Ts: 120},
+		{Val: 3, Ts: 240},
 	})
 	compare("simple-sum-skip-a-block", agg.sumMetric, []schema.Point{
-		{128.4, 120},
-		{2451.123 + 1451.123 + 978894.445, 240},
+		{Val: 128.4, Ts: 120},
+		{Val: 2451.123 + 1451.123 + 978894.445, Ts: 240},
 	})
 
 }

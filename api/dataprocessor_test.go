@@ -46,71 +46,71 @@ func TestOddConsolidationAlignments(t *testing.T) {
 	cases := []testCase{
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Avg,
 			1,
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Avg,
 			3,
 			[]schema.Point{
-				{2, 1449178151},
-				{4, 1449178181}, // see comment below
+				{Val: 2, Ts: 1449178151},
+				{Val: 4, Ts: 1449178181}, // see comment below
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
 			},
 			consolidation.Avg,
 			1,
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
 			},
 			consolidation.Avg,
 			2,
 			[]schema.Point{
-				{1.5, 1449178141},
-				{3, 1449178161}, // note: we choose the next ts here for even spacing (important for further processing/parsing/handing off), even though that point is missing
+				{Val: 1.5, Ts: 1449178141},
+				{Val: 3, Ts: 1449178161}, // note: we choose the next ts here for even spacing (important for further processing/parsing/handing off), even though that point is missing
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
 			},
 			consolidation.Avg,
 			3,
 			[]schema.Point{
-				{2, 1449178151},
+				{Val: 2, Ts: 1449178151},
 			},
 		},
 	}
@@ -120,72 +120,72 @@ func TestConsolidationFunctions(t *testing.T) {
 	cases := []testCase{
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Avg,
 			2,
 			[]schema.Point{
-				{1.5, 1449178141},
-				{3.5, 1449178161},
+				{Val: 1.5, Ts: 1449178141},
+				{Val: 3.5, Ts: 1449178161},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Cnt,
 			2,
 			[]schema.Point{
-				{2, 1449178141},
-				{2, 1449178161},
+				{Val: 2, Ts: 1449178141},
+				{Val: 2, Ts: 1449178161},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Min,
 			2,
 			[]schema.Point{
-				{1, 1449178141},
-				{3, 1449178161},
+				{Val: 1, Ts: 1449178141},
+				{Val: 3, Ts: 1449178161},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Max,
 			2,
 			[]schema.Point{
-				{2, 1449178141},
-				{4, 1449178161},
+				{Val: 2, Ts: 1449178141},
+				{Val: 4, Ts: 1449178161},
 			},
 		},
 		{
 			[]schema.Point{
-				{1, 1449178131},
-				{2, 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: 1, Ts: 1449178131},
+				{Val: 2, Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			consolidation.Sum,
 			2,
 			[]schema.Point{
-				{3, 1449178141},
-				{7, 1449178161},
+				{Val: 3, Ts: 1449178141},
+				{Val: 7, Ts: 1449178161},
 			},
 		},
 	}
@@ -238,14 +238,41 @@ func TestDivide(t *testing.T) {
 		out []schema.Point
 	}{
 		{
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
-			[]schema.Point{{2, 10}, {2, 20}, {1, 30}},
-			[]schema.Point{{0.5, 10}, {1, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
+			[]schema.Point{
+				{Val: 2, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 1, Ts: 30},
+			},
+			[]schema.Point{
+				{Val: 0.5, Ts: 10},
+				{Val: 1, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
-			[]schema.Point{{100, 10}, {5000, 20}, {150.5, 30}, {150.5, 40}},
-			[]schema.Point{{2, 10}, {0.5, 20}, {2, 30}, {0.5, 40}},
-			[]schema.Point{{50, 10}, {10000, 20}, {75.25, 30}, {301, 40}},
+			[]schema.Point{
+				{Val: 100, Ts: 10},
+				{Val: 5000, Ts: 20},
+				{Val: 150.5, Ts: 30},
+				{Val: 150.5, Ts: 40},
+			},
+			[]schema.Point{
+				{Val: 2, Ts: 10},
+				{Val: 0.5, Ts: 20},
+				{Val: 2, Ts: 30},
+				{Val: 0.5, Ts: 40},
+			},
+			[]schema.Point{
+				{Val: 50, Ts: 10},
+				{Val: 10000, Ts: 20},
+				{Val: 75.25, Ts: 30},
+				{Val: 301, Ts: 40},
+			},
 		},
 	}
 	for i, c := range cases {
@@ -285,67 +312,141 @@ func TestFix(t *testing.T) {
 	cases := []fixc{
 		{
 			// the most standard simple case
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 			10,
 			31,
 			10,
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
 			// almost... need Nan in front
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 			1,
 			31,
 			10,
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
 			// need Nan in front
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 			0,
 			31,
 			10,
-			[]schema.Point{{math.NaN(), 0}, {1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: math.NaN(), Ts: 0},
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
 			// almost..need Nan in back
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 			10,
 			40,
 			10,
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
 			// need Nan in back
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 			10,
 			41,
 			10,
-			[]schema.Point{{1, 10}, {2, 20}, {3, 30}, {math.NaN(), 40}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+			},
 		},
 		{
 			// need Nan in middle
-			[]schema.Point{{1, 10}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 3, Ts: 30},
+			},
 			10,
 			31,
 			10,
-			[]schema.Point{{1, 10}, {math.NaN(), 20}, {3, 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: 3, Ts: 30},
+			},
 		},
 		{
 			// need Nan everywhere
-			[]schema.Point{{2, 20}, {4, 40}, {7, 70}},
+			[]schema.Point{
+				{Val: 2, Ts: 20},
+				{Val: 4, Ts: 40},
+				{Val: 7, Ts: 70},
+			},
 			0,
 			90,
 			10,
-			[]schema.Point{{math.NaN(), 0}, {math.NaN(), 10}, {2, 20}, {math.NaN(), 30}, {4, 40}, {math.NaN(), 50}, {math.NaN(), 60}, {7, 70}, {math.NaN(), 80}},
+			[]schema.Point{
+				{Val: math.NaN(), Ts: 0},
+				{Val: math.NaN(), Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: math.NaN(), Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: math.NaN(), Ts: 60},
+				{Val: 7, Ts: 70},
+				{Val: math.NaN(), Ts: 80},
+			},
 		},
 		{
 			// too much data. note that there are multiple satisfactory solutions here. this is just one of them.
-			[]schema.Point{{10, 10}, {14, 14}, {20, 20}, {26, 26}, {35, 35}},
+			[]schema.Point{
+				{Val: 10, Ts: 10},
+				{Val: 14, Ts: 14},
+				{Val: 20, Ts: 20},
+				{Val: 26, Ts: 26},
+				{Val: 35, Ts: 35},
+			},
 			10,
 			41,
 			10,
-			[]schema.Point{{10, 10}, {14, 20}, {26, 30}, {35, 40}},
+			[]schema.Point{
+				{Val: 10, Ts: 10},
+				{Val: 14, Ts: 20},
+				{Val: 26, Ts: 30},
+				{Val: 35, Ts: 40},
+			},
 		},
 		{
 			// no data at all. saw this one for real
@@ -357,11 +458,19 @@ func TestFix(t *testing.T) {
 		},
 		{
 			// don't trip over last.
-			[]schema.Point{{1, 10}, {2, 20}, {2, 19}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 2, Ts: 19},
+			},
 			10,
 			31,
 			10,
-			[]schema.Point{{1, 10}, {2, 20}, {math.NaN(), 30}},
+			[]schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: math.NaN(), Ts: 30},
+			},
 		},
 		{
 			// interval > from-to span with empty input.  saw this one in prod
@@ -380,7 +489,9 @@ func TestFix(t *testing.T) {
 			1458966234,
 			1458966264,
 			60,
-			[]schema.Point{{math.NaN(), 1458966240}},
+			[]schema.Point{
+				{Val: math.NaN(), Ts: 1458966240},
+			},
 		},
 	}
 
@@ -449,8 +560,8 @@ func TestGetSeries(t *testing.T) {
 	// and asserts that we get the appropriate data back in all possible scenarios.
 
 	expected := []schema.Point{
-		{20, 20},
-		{30, 30},
+		{Val: 20, Ts: 20},
+		{Val: 30, Ts: 30},
 	}
 
 	for offset := uint32(1); offset <= 10; offset++ {
@@ -520,8 +631,8 @@ func TestAlignRequests(t *testing.T) {
 			},
 			// span, chunkspan, numchunks, ttl, ready
 			[]mdata.AggSetting{
-				{60, 600, 2, 0, true},
-				{120, 600, 1, 0, true},
+				mdata.NewAggSetting(60, 600, 2, 0, true),
+				mdata.NewAggSetting(120, 600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -539,8 +650,8 @@ func TestAlignRequests(t *testing.T) {
 			},
 			// span, chunkspan, numchunks, ttl, ready
 			[]mdata.AggSetting{
-				{60, 600, 2, 0, false},
-				{120, 600, 1, 0, true},
+				mdata.NewAggSetting(60, 600, 2, 0, false),
+				mdata.NewAggSetting(120, 600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -561,8 +672,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 10, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{60, 600, 2, 0, true},
-				{120, 600, 1, 0, true},
+				mdata.NewAggSetting(60, 600, 2, 0, true),
+				mdata.NewAggSetting(120, 600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 30, 3),
@@ -582,8 +693,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{120, 600, 2, 0, true},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(120, 600, 2, 0, true),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 39, 10, consolidation.Avg, 1, 120, 120, 1),
@@ -602,8 +713,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{120, 600, 2, 0, false},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(120, 600, 2, 0, false),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
 			[]models.Req{
@@ -624,8 +735,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 24000, 39, 10, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{120, 600, 2, 0, false},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(120, 600, 2, 0, false),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
 			[]models.Req{
@@ -645,8 +756,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{120, 600, 2, 0, true},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(120, 600, 2, 0, true),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -667,8 +778,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{120, 600, 2, 0, true},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(120, 600, 2, 0, true),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 120, 120, 1),
@@ -687,8 +798,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{300, 600, 2, 0, true},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(300, 600, 2, 0, true),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 300, 300, 1),
@@ -709,8 +820,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{300, 600, 2, 0, false},
-				{600, 600, 2, 0, true},
+				mdata.NewAggSetting(300, 600, 2, 0, false),
+				mdata.NewAggSetting(600, 600, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
@@ -728,8 +839,8 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 600, 2, 0, true},
-				{1200, 1200, 2, 0, true},
+				NewAggSetting(600, 600, 2, 0, true),
+				NewAggSetting(1200, 1200, 2, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
@@ -750,9 +861,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*3, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSettig(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*3, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -770,9 +881,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*6, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*6, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -790,9 +901,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*9, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*9, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -811,9 +922,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24, 1000, 10, consolidation.Avg, 1, 600, 600, 1),
@@ -833,9 +944,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*7, 1000, 10, consolidation.Avg, 1, 600, 1200, 2),
@@ -857,9 +968,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, true},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, true),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 3, 21600, 43200, 2),
@@ -877,9 +988,9 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
 			[]mdata.AggSetting{
-				{600, 21600, 1, 0, true}, // aggregations stored in 6h chunks
-				{7200, 21600, 1, 0, true},
-				{21600, 21600, 1, 0, false},
+				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+				mdata.NewAggSetting(7200, 21600, 1, 0, true),
+				mdata.NewAggSetting(21600, 21600, 1, 0, false),
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 2, 7200, 36000, 5),
@@ -946,10 +1057,10 @@ func TestMergeSeries(t *testing.T) {
 		out = append(out, models.Series{
 			Target: fmt.Sprintf("some.series.foo%d", i),
 			Datapoints: []schema.Point{
-				{math.NaN(), 1449178131},
-				{math.NaN(), 1449178141},
-				{3, 1449178151},
-				{4, 1449178161},
+				{Val: math.NaN(), Ts: 1449178131},
+				{Val: math.NaN(), Ts: 1449178141},
+				{Val: 3, Ts: 1449178151},
+				{Val: 4, Ts: 1449178161},
 			},
 			Interval: 10,
 		})
@@ -957,10 +1068,10 @@ func TestMergeSeries(t *testing.T) {
 	out = append(out, models.Series{
 		Target: "some.series.foo1",
 		Datapoints: []schema.Point{
-			{1, 1449178131},
-			{2, 1449178141},
-			{math.NaN(), 1449178151},
-			{math.NaN(), 1449178161},
+			{Val: 1, Ts: 1449178131},
+			{Val: 2, Ts: 1449178141},
+			{Val: math.NaN(), Ts: 1449178151},
+			{Val: math.NaN(), Ts: 1449178161},
 		},
 		Interval: 10,
 	})
@@ -1171,9 +1282,9 @@ func BenchmarkAlignRequests(b *testing.B) {
 		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
 	}
 	aggSettings := []mdata.AggSetting{
-		{600, 21600, 1, 0, true},
-		{7200, 21600, 1, 0, true},
-		{21600, 21600, 1, 0, true},
+		mdata.NewAggSetting(600, 21600, 1, 0, true),
+		mdata.NewAggSetting(7200, 21600, 1, 0, true),
+		mdata.NewAggSetting(21600, 21600, 1, 0, true),
 	}
 
 	for n := 0; n < b.N; n++ {
