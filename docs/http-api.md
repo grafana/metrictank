@@ -46,6 +46,20 @@ POST /metrics/find
 the completer format is for completion UI's such as graphite-web.
 json and treejson are the same.
 
+## Deleting metrics
+
+This will delete any metrics (technically metricdefinitions) matching the query from the index.
+Note that the data stays in the datastore until it expires.
+Should the metrics enter the system again with the same metadata, the data will show up again.
+
+```
+POST /metrics/delete
+```
+
+* header `X-Org-Id` required
+* query (required): can be a metric key, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
+
+
 ## Graphite query api
 
 This is the early beginning of a graphite-web/graphite-api replacement. It only returns JSON output
