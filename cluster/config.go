@@ -21,7 +21,7 @@ var (
 
 func ConfigSetup() {
 	clusterCfg := flag.NewFlagSet("cluster", flag.ExitOnError)
-	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per cluster of nodes.")
+	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
 	clusterCfg.StringVar(&peersStr, "peers", "", "http/s addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
 	clusterCfg.StringVar(&probeIntervalStr, "probe-interval", "2s", "Interval to probe peer nodes")
 	clusterCfg.StringVar(&mode, "mode", "single", "Operating mode of cluster. (single|multi)")

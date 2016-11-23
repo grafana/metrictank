@@ -397,7 +397,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 				wg.Done()
 			}()
 		} else {
-			go func() {
+			go func(peer *cluster.Node) {
 				result, err := s.listRemote(ctx.OrgId, peer)
 				mu.Lock()
 				if err != nil {
@@ -411,7 +411,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 				}
 				mu.Unlock()
 				wg.Done()
-			}()
+			}(peer)
 		}
 	}
 	wg.Wait()

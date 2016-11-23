@@ -228,7 +228,7 @@ func (e *EsIdx) Add(data *schema.MetricData, partition int32) error {
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	if inMemory && existing.Partition != def.Partition {
+	if inMemory && existing.Partition == def.Partition {
 		log.Debug("def already seen before. Just updating memory Index")
 		e.MemoryIdx.AddDef(def)
 		return nil
