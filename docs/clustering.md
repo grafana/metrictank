@@ -1,11 +1,30 @@
 # Clustering
 
+There are some different concerns here.  First we describe the clustering of the underlying storage, Cassandra.
+Next is the clustering of metrictank itself, which is really two separate features (partitioning for horizontal scalability, and replication for high availability),
+described separately below, though they can be combined.
+
 ## Underlying storage
-for clustering and HA of the underlying storage, we of course can simply rely on Cassandra. It has built-in replication and data partitioning to assure both HA and load balancing.
 
-## Metrictank redundancy and fault tolerance
+For clustering (in all senses of the word) of the underlying storage, we of course can simply rely on Cassandra. It has built-in replication and data partitioning to assure both HA and load balancing.
 
-For metrictank itself you can achieve redundancy and fault tolerance by running multiple instances which receive identical inputs.
+## Metrictank horizontal scaling (partitioning)
+
+If single nodes are incapable of handling your volume of metrics, you will want to split up your data in shards or partitions, and have multiple metrictank instances each handle a portion of the stream (e.g. one or a select few shards per instance).
+
+* When ingesting data via kafka, you can simply use Kafka partitions.  The partition config setting for the plugin will control which instances consume which partitions.
+* When using carbon, you can route data by setting up the carbon connections manually (possibly using a relay). It is important that you set the configuration of the plugin to reflect how you actually route your traffic.
+
+Any instance can serve reads for data residing anywhere in (and spreadout through) the cluster, as long as the other nodes are referenced in the `peers` setting of the configuration.
+An instance will regularly poll the health of other nodes and involve healthy peers if they host data we might not have locally.
+Note that currently nodes can't dynamically discover new nodes in the cluster: they require a process restart.
+
+Please see "Metrictank horizontal scaling plus high availability" below for a caveat.
+
+
+## Metrictank for high availability (replication)
+
+Metrictank achieves redundancy and fault tolerance by running multiple instances which receive identical inputs.
 One of the instances needs to have the primary role, which means it saves data chunks to Cassandra.   The other instances are secondaries.
 
 Configuration of primary vs secondary:
@@ -40,11 +59,25 @@ The `cluster.promotion_wait` is automatically determined based on the largest ch
 
 3) open the Grafana dashboard and verify that the secondary is able to save chunks 
 
-## Metrictank: Horizontal scaling
+## Combining metrictank's horizontal scaling plus high availability.
 
-As for load balancing / partitioning / scaling horizontally, metrictank has no mechanism built-in to make this easier.
-You should be able to run multiple instances and route a subset of the traffic to each, by using proper
-partitioning in kafka. Instances could either use the same metadata index and cassandra cluster, or different ones, should all work.
-The main problem is combining data together to serve read requests fully.  This is a [work in progress](https://github.com/raintank/metrictank/issues/315)
-Any input is welcomed.
+If you use both the partitioning (for write load sharding) and replication (for fault tolerance) it is important that the replicas consume the same partitions, and hence, contain the same data.
+We call the "set of consumed shards" a shard group.
+
+For example, you could set up your nodes like so:
+
+node       | A   | B   | C   | D   |
+| -------- | --- | --- | --- | --- |
+partitions | 0,1 | 0,1 | 2,3 | 2,3 |
+
+
+Let's say A and C are primaries.  When A fails, B can take over as primary. But note that it will have to process 200% of the read load for data in these partitions.
+
+The counter example is something like:
+node       | A   | B   | C   | D   |
+| -------- | --- | --- | --- | --- |
+partitions | 0,1 | 0,2 | 1,3 | 2,3 |
+
+This would offer better load balancing should node A fail (B and C will each take over a portion of the load), but will require making primary status a per-partition concept.
+Hence, this is currently **not supported**.
 

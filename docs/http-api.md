@@ -1,5 +1,7 @@
 # HTTP api
 
+This documents endpoints aimed to be used by users.
+(for internal clustering http endpoints, which may change, refer to the source)
 Note that some of the endpoints rely on being a fed a proper Org-Id.
 You may not want to expose directly to people if they can control that header.
 Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
