@@ -20,6 +20,38 @@ func TestJson(t *testing.T) {
 	}
 }
 
+func BenchmarkHttpRespJsonEmptySeries(b *testing.B) {
+	data := []models.Series{
+		{
+			Target:     "an.empty.series",
+			Datapoints: make([]schema.Point, 0),
+			Interval:   10,
+		},
+	}
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.SeriesByTarget(data), "")
+		resp.Body()
+		resp.Close()
+	}
+}
+
+func BenchmarkHttpRespJsonEmptySeriesNeedsEscaping(b *testing.B) {
+	data := []models.Series{
+		{
+			Target:     `an.empty\series`,
+			Datapoints: make([]schema.Point, 0),
+			Interval:   10,
+		},
+	}
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.SeriesByTarget(data), "")
+		resp.Body()
+		resp.Close()
+	}
+}
+
 func BenchmarkHttpRespJsonIntegers(b *testing.B) {
 	points := make([]schema.Point, 1000, 1000)
 	baseTs := 1500000000
