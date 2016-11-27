@@ -93,9 +93,11 @@ var (
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
-	statsdEnabled = flag.Bool("statsd-enabled", true, "enable sending statsd messages for instrumentation")
-	statsdAddr    = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
+	statsEnabled    = flag.Bool("stats-enabled", true, "enable sending graphite messages for instrumentation")
+	statsPrefix     = flag.String("stats-prefix", "stats.metrictank.default", "stats prefix (will add trailing dot automatically if needed)")
+	statsAddr       = flag.String("stats-addr", "localhost:2003", "graphite address")
+	statsInterval   = flag.Int("stats-interval", 1, "interval at which to send statistics")
+	statsBufferSize = flag.Int("stats-buffer-size", 1*1000*1000, "how many points to buffer up in case graphite endpoint is unavailable")
 
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
@@ -314,16 +316,14 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	/***********************************
-		configure StatsD
+		configure stats
 	***********************************/
-	if !*statsdEnabled {
-		log.Warn("running metrictank without statsd instrumentation.")
+	if *statsEnabled {
+		stats.NewGraphite(*statsPrefix, *statsAddr, *statsInterval, *statsBufferSize)
+	} else {
+		stats.NewDevnull()
+		log.Warn("running metrictank without instrumentation.")
 	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
-	if err != nil {
-		log.Fatal(4, "failed to initialize statsd. %s", err)
-	}
-	initMetrics(stats)
 
 	/*************************************
 	  Start polling our Cluster Peers

@@ -14,7 +14,6 @@ services:
      WAIT_TIMEOUT: 60
     links:
      - cassandra
-     - statsdaemon
 
   cassandra:
     hostname: cassandra
