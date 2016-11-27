@@ -115,12 +115,16 @@ cassandra-password = cassandra
 block-profile-rate = 0
 # 0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 mem-profile-rate = 524288 # 512*1024
-# enable sending statsd messages for instrumentation
-statsd-enabled = true
-# statsd address
-statsd-addr = localhost:8125
-# standard or datadog
-statsd-type = standard
+# enable sending graphite messages for instrumentation
+stats-enabled = true
+# stats prefix (will add trailing dot automatically if needed)
+stats-prefix = stats.metrictank.default
+# graphite address
+stats-addr = localhost:2003
+# interval at which to send statistics
+stats-interval = 1
+# how many points to buffer up in case graphite endpoint is unavailable
+stats-buffer-size = 1000000
 # inspect status frequency. set to 0 to disable
 proftrigger-freq = 60s
 # path to store triggered profiles
