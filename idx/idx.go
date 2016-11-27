@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/raintank/met"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -42,7 +41,7 @@ Note:
 
 Interface
 
-* Init(met.Backend)
+* Init()
   This is the initialization step performed at startup. This method should
   block until the index is ready to handle searches.
 
@@ -85,7 +84,7 @@ Interface
   error encountered.
 */
 type MetricIndex interface {
-	Init(met.Backend) error
+	Init() error
 	Stop()
 	Add(*schema.MetricData, int32) error
 	Get(string) (schema.MetricDefinition, error)

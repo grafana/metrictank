@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -52,8 +51,7 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 
 func Init() {
 	ix = New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	var data *schema.MetricData
 

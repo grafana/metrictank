@@ -11,21 +11,21 @@ import (
 	"time"
 
 	"github.com/mattbaird/elastigo/lib"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
 )
 
 var (
-	idxEsOk             met.Count
-	idxEsFail           met.Count
-	idxEsAddDuration    met.Timer
-	idxEsDeleteDuration met.Timer
-	retryBufItems       met.Gauge
+	idxEsOk             = stats.NewCounter32("idx.elasticsearch.ok")
+	idxEsFail           = stats.NewCounter32("idx.elasticsearch.fail")
+	idxEsAddDuration    = stats.NewLatencyHistogram15s32("idx.elasticsearch.add_duration")
+	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete_duration")
+	retryBufItems       = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
 
 	Enabled          bool
 	esIndex          string
@@ -92,7 +92,7 @@ func (r *RetryBuffer) Queue(id string) {
 	}
 	r.Lock()
 	r.Defs = append(r.Defs, def)
-	retryBufItems.Value(int64(len(r.Defs)))
+	retryBufItems.Set(len(r.Defs))
 	r.Unlock()
 }
 
@@ -100,7 +100,7 @@ func (r *RetryBuffer) retry() {
 	r.Lock()
 	defs := r.Defs
 	r.Defs = make([]schema.MetricDefinition, 0, len(defs))
-	retryBufItems.Value(0)
+	retryBufItems.Set(0)
 	r.Unlock()
 	if len(defs) == 0 {
 		log.Debug("retry buffer is empty")
@@ -110,7 +110,7 @@ func (r *RetryBuffer) retry() {
 		if err := r.Index.BulkIndexer.Index(esIndex, "metric_index", d.Id, "", "", nil, d); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 			r.Defs = append(r.Defs, d)
-			retryBufItems.Value(int64(len(r.Defs)))
+			retryBufItems.Set(len(r.Defs))
 			return
 		}
 	}
@@ -158,23 +158,16 @@ func New() *EsIdx {
 	}
 }
 
-func (e *EsIdx) Init(stats met.Backend) error {
+func (e *EsIdx) Init() error {
 
 	if esRetryInterval < time.Second {
 		return errors.New("Invalid retry-interval.  Valid units are 's', 'm', 'h'. Must be at least 1 second")
 	}
 
 	log.Info("initializing EsIdx. Hosts=%s", esHosts)
-	if err := e.MemoryIdx.Init(stats); err != nil {
+	if err := e.MemoryIdx.Init(); err != nil {
 		return err
 	}
-
-	idxEsOk = stats.NewCount("idx.elasticsearch.ok")
-	idxEsFail = stats.NewCount("idx.elasticsearch.fail")
-	idxEsAddDuration = stats.NewTimer("idx.elasticsearch.add_duration", 0)
-	idxEsDeleteDuration = stats.NewTimer("idx.elasticsearch.delete_duration", 0)
-	retryBufItems = stats.NewGauge("idx.elasticsearch.retrybuf.items", 0)
-
 	log.Info("Checking if index %s exists in ES", esIndex)
 	if exists, err := e.Conn.ExistsIndex(esIndex, "", nil); err != nil && err.Error() != "record not found" {
 		return err
@@ -287,7 +280,7 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 		for _, m := range response.Items {
 			docCount += len(m)
 		}
-		idxEsOk.Inc(int64(docCount))
+		idxEsOk.Add(docCount)
 		return nil
 	}
 
@@ -298,14 +291,14 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 			if errStr, ok := v["error"].(string); ok {
 				log.Warn("ES: %s failed: %s", id, errStr)
 				e.retryBuf.Queue(id)
-				idxEsFail.Inc(1)
+				idxEsFail.Inc()
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
 				log.Warn("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
 				e.retryBuf.Queue(id)
-				idxEsFail.Inc(1)
+				idxEsFail.Inc()
 			} else {
 				log.Debug("ES: completed %s successfully.", id)
-				idxEsOk.Inc(1)
+				idxEsOk.Inc()
 			}
 		}
 	}

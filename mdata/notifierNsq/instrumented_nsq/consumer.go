@@ -2,50 +2,45 @@ package insq
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/met"
+	"github.com/raintank/metrictank/stats"
 )
 
 type Consumer struct {
 	*nsq.Consumer
-	msgsReceived    met.Gauge
-	msgsFinished    met.Gauge
-	msgsRequeued    met.Gauge
-	msgsConnections met.Gauge
-	numHandlers     int32
-	handlers        met.Gauge
+	msgsReceived    *stats.Counter64
+	msgsFinished    *stats.Counter64
+	msgsRequeued    *stats.Counter64
+	msgsConnections *stats.Gauge32
+	numHandlers     *stats.Gauge32
 }
 
-func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string, metrics met.Backend) (*Consumer, error) {
+func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string) (*Consumer, error) {
 	consumer, err := nsq.NewConsumer(topic, channel, config)
 	c := Consumer{
 		consumer,
-		metrics.NewGauge(fmt.Sprintf(metricsPatt, "received"), 0),
-		metrics.NewGauge(fmt.Sprintf(metricsPatt, "finished"), 0),
-		metrics.NewGauge(fmt.Sprintf(metricsPatt, "requeued"), 0),
-		metrics.NewGauge(fmt.Sprintf(metricsPatt, "connections"), 0),
-		0,
-		metrics.NewGauge(fmt.Sprintf(metricsPatt, "num_handlers"), 0),
+		stats.NewCounter64(fmt.Sprintf(metricsPatt, "received")),
+		stats.NewCounter64(fmt.Sprintf(metricsPatt, "finished")),
+		stats.NewCounter64(fmt.Sprintf(metricsPatt, "requeued")),
+		stats.NewGauge32(fmt.Sprintf(metricsPatt, "connections")),
+		stats.NewGauge32(fmt.Sprintf(metricsPatt, "num_handlers")),
 	}
 	go func() {
 		t := time.Tick(time.Second * time.Duration(1))
 		for range t {
 			s := consumer.Stats()
-			c.msgsReceived.Value(int64(s.MessagesReceived))
-			c.msgsFinished.Value(int64(s.MessagesFinished))
-			c.msgsRequeued.Value(int64(s.MessagesRequeued))
-			c.msgsConnections.Value(int64(s.Connections))
-			h := atomic.LoadInt32(&c.numHandlers)
-			c.handlers.Value(int64(h))
+			c.msgsReceived.SetUint64(s.MessagesReceived)
+			c.msgsFinished.SetUint64(s.MessagesFinished)
+			c.msgsRequeued.SetUint64(s.MessagesRequeued)
+			c.msgsConnections.Set(s.Connections)
 		}
 	}()
 	return &c, err
 }
 
 func (r *Consumer) AddConcurrentHandlers(handler nsq.Handler, concurrency int) {
-	atomic.AddInt32(&r.numHandlers, int32(concurrency))
+	r.numHandlers.Add(concurrency)
 	r.Consumer.AddConcurrentHandlers(handler, concurrency)
 }

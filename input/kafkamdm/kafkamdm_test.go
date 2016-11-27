@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/input"
@@ -17,16 +16,14 @@ import (
 )
 
 func Test_HandleMessage(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	cluster.Init("default", "test", time.Now())
-	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
 	k := KafkaMdm{
-		Input: input.New(aggmetrics, metricIndex, usage, "test", stats),
+		Input: input.New(aggmetrics, metricIndex, usage, "test"),
 	}
 
 	allMetrics := make(map[string]int)

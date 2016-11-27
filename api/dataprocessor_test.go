@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
@@ -542,12 +541,10 @@ func TestPrevBoundary(t *testing.T) {
 // TestGetSeries assures that series data is returned in proper form.
 func TestGetSeries(t *testing.T) {
 	cluster.Init("default", "test", time.Now())
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
 	metrics := mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
-	mdata.InitMetrics(stats)
 	addr = "localhost:6060"
-	srv, _ := NewServer(stats)
+	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
 

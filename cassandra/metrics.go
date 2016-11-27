@@ -5,45 +5,45 @@ import (
 	"strings"
 
 	"github.com/gocql/gocql"
-	"github.com/raintank/met"
+	"github.com/raintank/metrictank/stats"
 )
 
-type Metrics struct {
-	cassErrTimeout                  met.Count
-	cassErrTooManyTimeouts          met.Count
-	cassErrConnClosed               met.Count
-	cassErrNoConns                  met.Count
-	cassErrUnavailable              met.Count
-	cassErrCannotAchieveConsistency met.Count
-	cassErrOther                    met.Count
+type ErrMetrics struct {
+	cassErrTimeout                  *stats.Counter32
+	cassErrTooManyTimeouts          *stats.Counter32
+	cassErrConnClosed               *stats.Counter32
+	cassErrNoConns                  *stats.Counter32
+	cassErrUnavailable              *stats.Counter32
+	cassErrCannotAchieveConsistency *stats.Counter32
+	cassErrOther                    *stats.Counter32
 }
 
-func NewMetrics(component string, stats met.Backend) Metrics {
-	return Metrics{
-		cassErrTimeout:                  stats.NewCount(fmt.Sprintf("%s.error.timeout", component)),
-		cassErrTooManyTimeouts:          stats.NewCount(fmt.Sprintf("%s.error.too-many-timeouts", component)),
-		cassErrConnClosed:               stats.NewCount(fmt.Sprintf("%s.error.conn-closed", component)),
-		cassErrNoConns:                  stats.NewCount(fmt.Sprintf("%s.error.no-connections", component)),
-		cassErrUnavailable:              stats.NewCount(fmt.Sprintf("%s.error.unavailable", component)),
-		cassErrCannotAchieveConsistency: stats.NewCount(fmt.Sprintf("%s.error.cannot-achieve-consistency", component)),
-		cassErrOther:                    stats.NewCount(fmt.Sprintf("%s.error.other", component)),
+func NewErrMetrics(component string) ErrMetrics {
+	return ErrMetrics{
+		cassErrTimeout:                  stats.NewCounter32(fmt.Sprintf("%s.error.timeout", component)),
+		cassErrTooManyTimeouts:          stats.NewCounter32(fmt.Sprintf("%s.error.too-many-timeouts", component)),
+		cassErrConnClosed:               stats.NewCounter32(fmt.Sprintf("%s.error.conn-closed", component)),
+		cassErrNoConns:                  stats.NewCounter32(fmt.Sprintf("%s.error.no-connections", component)),
+		cassErrUnavailable:              stats.NewCounter32(fmt.Sprintf("%s.error.unavailable", component)),
+		cassErrCannotAchieveConsistency: stats.NewCounter32(fmt.Sprintf("%s.error.cannot-achieve-consistency", component)),
+		cassErrOther:                    stats.NewCounter32(fmt.Sprintf("%s.error.other", component)),
 	}
 }
 
-func (m *Metrics) Inc(err error) {
+func (m *ErrMetrics) Inc(err error) {
 	if err == gocql.ErrTimeoutNoResponse {
-		m.cassErrTimeout.Inc(1)
+		m.cassErrTimeout.Inc()
 	} else if err == gocql.ErrTooManyTimeouts {
-		m.cassErrTooManyTimeouts.Inc(1)
+		m.cassErrTooManyTimeouts.Inc()
 	} else if err == gocql.ErrConnectionClosed {
-		m.cassErrConnClosed.Inc(1)
+		m.cassErrConnClosed.Inc()
 	} else if err == gocql.ErrNoConnections {
-		m.cassErrNoConns.Inc(1)
+		m.cassErrNoConns.Inc()
 	} else if err == gocql.ErrUnavailable {
-		m.cassErrUnavailable.Inc(1)
+		m.cassErrUnavailable.Inc()
 	} else if strings.HasPrefix(err.Error(), "Cannot achieve consistency level") {
-		m.cassErrCannotAchieveConsistency.Inc(1)
+		m.cassErrCannotAchieveConsistency.Inc()
 	} else {
-		m.cassErrOther.Inc(1)
+		m.cassErrOther.Inc()
 	}
 }

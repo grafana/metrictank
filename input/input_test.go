@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
@@ -15,15 +14,13 @@ import (
 )
 
 func Test_Process(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	cluster.Init("default", "test", time.Now())
-	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test", stats)
+	in := New(aggmetrics, metricIndex, usage, "test")
 
 	allMetrics := make(map[string]int)
 	for i := 0; i < 5; i++ {
@@ -87,16 +84,14 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 }
 
 func BenchmarkProcess(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	cluster.Init("default", "test", time.Now())
-	mdata.InitMetrics(stats)
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test", stats)
+	in := New(aggmetrics, metricIndex, usage, "test")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
 	datas := make([]*schema.MetricData, b.N)
