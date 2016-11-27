@@ -9,9 +9,9 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/macaron.v1"
 )
@@ -19,13 +19,13 @@ import (
 var LogLevel int
 
 var (
-	getTargetDuration     met.Timer
-	itersToPointsDuration met.Timer
+	getTargetDuration     = stats.NewLatencyHistogram15s32("get_target_duration")
+	itersToPointsDuration = stats.NewLatencyHistogram15s32("iters_to_points_duration")
 	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
 	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-	reqHandleDuration met.Timer
-	reqSpanBoth       met.Meter
-	reqSpanMem        met.Meter
+	reqHandleDuration = stats.NewLatencyHistogram15s32("request_handle_duration")
+	reqSpanBoth       = stats.NewMeter32("requests_span.mem_and_cassandra", false)
+	reqSpanMem        = stats.NewMeter32("requests_span.mem", false)
 )
 
 type Server struct {
@@ -50,13 +50,7 @@ func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
 }
 
-func NewServer(stats met.Backend) (*Server, error) {
-
-	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
-	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
+func NewServer() (*Server, error) {
 
 	m := macaron.New()
 	m.Use(macaron.Logger())

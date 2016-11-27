@@ -408,7 +408,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		}
 	}
 	if oldest > fromUnix {
-		reqSpanBoth.Value(int64(toUnix - fromUnix))
+		reqSpanBoth.ValueUint32(toUnix - fromUnix)
 		if consolidator != consolidation.None {
 			key = aggMetricKey(key, consolidator.Archive(), interval)
 		}
@@ -422,7 +422,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		}
 		iters = append(iters, storeIters...)
 	} else {
-		reqSpanMem.Value(int64(toUnix - fromUnix))
+		reqSpanMem.ValueUint32(toUnix - fromUnix)
 	}
 	pre := time.Now()
 	iters = append(iters, memIters...)

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 )
 
@@ -72,9 +71,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 }
 
 func TestAggMetric(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	cluster.Init("default", "test", time.Now())
-	InitMetrics(stats)
 
 	c := NewChecker(t, NewAggMetric(dnstore, "foo", 100, 5, 1, []AggSetting{}...))
 
@@ -153,8 +150,6 @@ func TestAggMetric(t *testing.T) {
 
 // TODO update once we clean old data, then we should look at numChunks
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	InitMetrics(stats)
 	cluster.Init("default", "test", time.Now())
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
@@ -189,8 +184,6 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 }
 
 func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	InitMetrics(stats)
 
 	chunkSpan := uint32(600)
 	numChunks := uint32(5)
@@ -226,9 +219,6 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 }
 
 func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	InitMetrics(stats)
-
 	chunkSpan := uint32(600)
 	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
@@ -263,9 +253,6 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 }
 
 func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	InitMetrics(stats)
-
 	chunkSpan := uint32(600)
 	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)

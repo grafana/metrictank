@@ -5,9 +5,9 @@ package input
 import (
 	"fmt"
 
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -15,24 +15,24 @@ import (
 
 // In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
 type Input struct {
-	MetricsPerMessage met.Meter
-	metricsReceived   met.Count
-	MetricsDecodeErr  met.Count // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
-	MetricInvalid     met.Count // metric metric_invalid is a count of times a metric did not validate
-	MsgsAge           met.Meter // in ms
+	MetricsPerMessage *stats.Meter32
+	metricsReceived   *stats.Counter32
+	MetricsDecodeErr  *stats.Counter32 // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+	MetricInvalid     *stats.Counter32 // metric metric_invalid is a count of times a metric did not validate
+	MsgsAge           *stats.Meter32   // in ms
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
 	usage       *usage.Usage
 }
 
-func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string, stats met.Backend) Input {
+func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) Input {
 	return Input{
-		MetricsPerMessage: stats.NewMeter(fmt.Sprintf("%s.metrics_per_message", input), 0),
-		metricsReceived:   stats.NewCount(fmt.Sprintf("%s.metrics_received", input)),
-		MetricsDecodeErr:  stats.NewCount(fmt.Sprintf("%s.metrics_decode_err", input)),
-		MetricInvalid:     stats.NewCount(fmt.Sprintf("%s.metric_invalid", input)),
-		MsgsAge:           stats.NewMeter(fmt.Sprintf("%s.message_age", input), 0),
+		MetricsPerMessage: stats.NewMeter32(fmt.Sprintf("%s.metrics_per_message", input), false),
+		metricsReceived:   stats.NewCounter32(fmt.Sprintf("%s.metrics_received", input)),
+		MetricsDecodeErr:  stats.NewCounter32(fmt.Sprintf("%s.metrics_decode_err", input)),
+		MetricInvalid:     stats.NewCounter32(fmt.Sprintf("%s.metric_invalid", input)),
+		MsgsAge:           stats.NewMeter32(fmt.Sprintf("%s.message_age", input), false),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,
@@ -47,10 +47,10 @@ func (in Input) Process(metric *schema.MetricData, partition int32) {
 	if metric == nil {
 		return
 	}
-	in.metricsReceived.Inc(1)
+	in.metricsReceived.Inc()
 	err := metric.Validate()
 	if err != nil {
-		in.MetricInvalid.Inc(1)
+		in.MetricInvalid.Inc()
 		log.Debug("in: Invalid metric %s %v", err, metric)
 		return
 	}

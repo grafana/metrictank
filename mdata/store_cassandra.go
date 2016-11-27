@@ -12,10 +12,10 @@ import (
 	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/hailocab/go-hostpool"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -38,21 +38,23 @@ var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errStartBeforeEnd     = errors.New("start must be before end.")
 
-	cassGetExecDuration met.Timer
-	cassGetWaitDuration met.Timer
-	cassPutExecDuration met.Timer
-	cassPutWaitDuration met.Timer
+	cassGetExecDuration = stats.NewLatencyHistogram15s32("cassandra.get.exec")
+	cassGetWaitDuration = stats.NewLatencyHistogram12h32("cassandra.get.wait")
+	cassPutExecDuration = stats.NewLatencyHistogram15s32("cassandra.put.exec")
+	cassPutWaitDuration = stats.NewLatencyHistogram12h32("cassandra.put.wait")
 
-	cassChunksPerRow      met.Meter
-	cassRowsPerResponse   met.Meter
-	cassGetChunksDuration met.Timer
-	cassToIterDuration    met.Timer
+	cassChunksPerRow      = stats.NewMeter32("cassandra.chunks_per_row", false)
+	cassRowsPerResponse   = stats.NewMeter32("cassandra.rows_per_response", false)
+	cassGetChunksDuration = stats.NewLatencyHistogram15s32("cassandra.get_chunks")
+	cassToIterDuration    = stats.NewLatencyHistogram15s32("cassandra.to_iter")
 
-	chunkSaveOk   met.Count
-	chunkSaveFail met.Count
+	chunkSaveOk   = stats.NewCounter32("chunks.save_ok")
+	chunkSaveFail = stats.NewCounter32("chunks.save_fail")
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
-	chunkSizeAtSave met.Meter
-	chunkSizeAtLoad met.Meter
+	chunkSizeAtSave = stats.NewMeter32("chunk_size.at_save", true)
+	chunkSizeAtLoad = stats.NewMeter32("chunk_size.at_load", true)
+
+	errmetrics = cassandra.NewErrMetrics("cassandra")
 )
 
 /*
@@ -63,14 +65,16 @@ object to interact with the whole Cassandra cluster.
 */
 
 type cassandraStore struct {
-	session          *gocql.Session
-	writeQueues      []chan *ChunkWriteRequest
-	readQueue        chan *ChunkReadRequest
-	writeQueueMeters []met.Meter
-	metrics          cassandra.Metrics
+	session     *gocql.Session
+	writeQueues []chan *ChunkWriteRequest
+	readQueue   chan *ChunkReadRequest
 }
 
-func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int, ssl, auth, hostVerification bool) (*cassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int, ssl, auth, hostVerification bool) (*cassandraStore, error) {
+
+	stats.NewGauge32("cassandra.write_queue.size").Set(writeqsize)
+	stats.NewGauge32("cassandra.num_writers").Set(writers)
+
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	if ssl {
 		cluster.SslOpts = &gocql.SslOptions{
@@ -139,16 +143,15 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, 
 	}
 	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
 	c := &cassandraStore{
-		session:          session,
-		writeQueues:      make([]chan *ChunkWriteRequest, writers),
-		readQueue:        make(chan *ChunkReadRequest, readqsize),
-		writeQueueMeters: make([]met.Meter, writers),
+		session:     session,
+		writeQueues: make([]chan *ChunkWriteRequest, writers),
+		readQueue:   make(chan *ChunkReadRequest, readqsize),
 	}
 
 	for i := 0; i < writers; i++ {
 		c.writeQueues[i] = make(chan *ChunkWriteRequest, writeqsize)
-		c.writeQueueMeters[i] = stats.NewMeter(fmt.Sprintf("cassandra.write_queue.%d.items", i+1), 0)
-		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
+		queueMeter := stats.NewRange32(fmt.Sprintf("cassandra.write_queue.%d.items", i+1))
+		go c.processWriteQueue(c.writeQueues[i], queueMeter)
 	}
 
 	for i := 0; i < readers; i++ {
@@ -157,53 +160,31 @@ func NewCassandraStore(stats met.Backend, addrs, keyspace, consistency, CaPath, 
 
 	return c, err
 }
-
-func (c *cassandraStore) InitMetrics(stats met.Backend) {
-	cassGetExecDuration = stats.NewTimer("cassandra.get.exec", 0)
-	cassGetWaitDuration = stats.NewTimer("cassandra.get.wait", 0)
-	cassPutExecDuration = stats.NewTimer("cassandra.put.exec", 0)
-	cassPutWaitDuration = stats.NewTimer("cassandra.put.wait", 0)
-
-	cassChunksPerRow = stats.NewMeter("cassandra.chunks_per_row", 0)
-	cassRowsPerResponse = stats.NewMeter("cassandra.rows_per_response", 0)
-	cassGetChunksDuration = stats.NewTimer("cassandra.get_chunks", 0)
-	cassToIterDuration = stats.NewTimer("cassandra.to_iter", 0)
-
-	chunkSaveOk = stats.NewCount("chunks.save_ok")
-	chunkSaveFail = stats.NewCount("chunks.save_fail")
-	chunkSizeAtSave = stats.NewMeter("chunk_size.at_save", 0)
-	chunkSizeAtLoad = stats.NewMeter("chunk_size.at_load", 0)
-
-	c.metrics = cassandra.NewMetrics("cassandra", stats)
-}
-
 func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 	sum := 0
 	for _, char := range cwr.key {
 		sum += int(char)
 	}
 	which := sum % len(c.writeQueues)
-	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
 	c.writeQueues[which] <- cwr
-	c.writeQueueMeters[which].Value(int64(len(c.writeQueues[which])))
 }
 
 /* process writeQueue.
  */
-func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter met.Meter) {
+func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter *stats.Range32) {
 	tick := time.Tick(time.Duration(1) * time.Second)
 	for {
 		select {
 		case <-tick:
-			meter.Value(int64(len(queue)))
+			meter.Value(len(queue))
 		case cwr := <-queue:
-			meter.Value(int64(len(queue)))
+			meter.Value(len(queue))
 			log.Debug("CS: starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.timestamp))
 
 			data := cwr.chunk.Series.Bytes()
-			chunkSizeAtSave.Value(int64(len(data)))
+			chunkSizeAtSave.Value(len(data))
 			version := chunk.FormatStandardGoTszWithSpan
 			buf := new(bytes.Buffer)
 			binary.Write(buf, binary.LittleEndian, version)
@@ -224,13 +205,13 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 					cwr.chunk.Saved = true
 					SendPersistMessage(cwr.key, cwr.chunk.T0)
 					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
-					chunkSaveOk.Inc(1)
+					chunkSaveOk.Inc()
 				} else {
-					c.metrics.Inc(err)
+					errmetrics.Inc(err)
 					if (attempts % 20) == 0 {
 						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
 					}
-					chunkSaveFail.Inc(1)
+					chunkSaveFail.Inc()
 					sleepTime := 100 * attempts
 					if sleepTime > 2000 {
 						sleepTime = 2000
@@ -361,7 +342,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		chunks := int64(0)
 		for outcome.i.Scan(&ts, &b) {
 			chunks += 1
-			chunkSizeAtLoad.Value(int64(len(b)))
+			chunkSizeAtLoad.Value(len(b))
 			if len(b) < 2 {
 				log.Error(3, errChunkTooSmall.Error())
 				return iters, errChunkTooSmall
@@ -389,13 +370,13 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 		err := outcome.i.Close()
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
-			c.metrics.Inc(err)
+			errmetrics.Inc(err)
 		} else {
-			cassChunksPerRow.Value(chunks)
+			cassChunksPerRow.Value(int(chunks))
 		}
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
-	cassRowsPerResponse.Value(int64(len(outcomes)))
+	cassRowsPerResponse.Value(len(outcomes))
 	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
 	return iters, nil
 }

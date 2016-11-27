@@ -68,7 +68,7 @@ func (ms *AggMetrics) GC() {
 		}
 		ms.RUnlock()
 		for _, key := range keys {
-			gcMetric.Inc(1)
+			gcMetric.Inc()
 			ms.RLock()
 			a := ms.Metrics[key]
 			ms.RUnlock()
@@ -86,7 +86,7 @@ func (ms *AggMetrics) GC() {
 func (ms *AggMetrics) stats() {
 	for range ms.tickStats.C {
 		ms.RLock()
-		metricsActive.Value(int64(len(ms.Metrics)))
+		metricsActive.Set(len(ms.Metrics))
 		ms.RUnlock()
 	}
 }

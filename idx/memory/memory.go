@@ -8,21 +8,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
 )
 
 var (
-	idxOk             met.Count
-	idxFail           met.Count
-	idxAddDuration    met.Timer
-	idxGetDuration    met.Timer
-	idxListDuration   met.Timer
-	idxFindDuration   met.Timer
-	idxDeleteDuration met.Timer
+	idxOk             = stats.NewCounter32("idx.memory.ok")
+	idxFail           = stats.NewCounter32("idx.memory.fail")
+	idxAddDuration    = stats.NewLatencyHistogram15s32("idx.memory.add_duration")
+	idxGetDuration    = stats.NewLatencyHistogram15s32("idx.memory.get_duration")
+	idxListDuration   = stats.NewLatencyHistogram15s32("idx.memory.list_duration")
+	idxFindDuration   = stats.NewLatencyHistogram15s32("idx.memory.find_duration")
+	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete_duration")
 
 	Enabled bool
 )
@@ -67,14 +67,7 @@ func New() *MemoryIdx {
 	}
 }
 
-func (m *MemoryIdx) Init(stats met.Backend) error {
-	idxOk = stats.NewCount("idx.memory.ok")
-	idxFail = stats.NewCount("idx.memory.fail")
-	idxAddDuration = stats.NewTimer("idx.memory.add_duration", 0)
-	idxGetDuration = stats.NewTimer("idx.memory.get_duration", 0)
-	idxListDuration = stats.NewTimer("idx.memory.list_duration", 0)
-	idxFindDuration = stats.NewTimer("idx.memory.find_duration", 0)
-	idxDeleteDuration = stats.NewTimer("idx.memory.delete_duration", 0)
+func (m *MemoryIdx) Init() error {
 	return nil
 }
 
@@ -92,14 +85,14 @@ func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
 		// there's not much point in doing the work of trying over
 		// and over again, and flooding the logs with the same failure.
 		// so just trigger the stats metric as if we tried again
-		idxFail.Inc(1)
+		idxFail.Inc()
 		return err
 	}
 	existing, ok := m.DefById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
-		idxOk.Inc(1)
+		idxOk.Inc()
 		idxAddDuration.Value(time.Since(pre))
 		return nil
 	}
@@ -133,7 +126,7 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 	if _, ok := m.DefById[def.Id]; ok {
 		log.Debug("memory-idx: metricDef with id %s already in index.", def.Id)
 		m.DefById[def.Id] = def
-		idxOk.Inc(1)
+		idxOk.Inc()
 		idxAddDuration.Value(time.Since(pre))
 		return nil
 	}
@@ -166,13 +159,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 				//bad data. A path cant be both a leaf and a branch.
 				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
 				m.FailedDefs[def.Id] = idx.BothBranchAndLeaf
-				idxFail.Inc(1)
+				idxFail.Inc()
 				return idx.BothBranchAndLeaf
 			}
 			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
 			node.Children = append(node.Children, def.Id)
 			m.DefById[def.Id] = def
-			idxOk.Inc(1)
+			idxOk.Inc()
 			return nil
 		}
 	}
@@ -193,7 +186,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 				if n.Leaf {
 					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
 					m.FailedDefs[def.Id] = idx.BranchUnderLeaf
-					idxFail.Inc(1)
+					idxFail.Inc()
 					return idx.BranchUnderLeaf
 				}
 				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
@@ -232,7 +225,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		Children: []string{def.Id},
 	}
 	m.DefById[def.Id] = def
-	idxOk.Inc(1)
+	idxOk.Inc()
 	return nil
 }
 

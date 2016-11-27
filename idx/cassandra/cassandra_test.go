@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
@@ -72,8 +71,7 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 
 func TestGetAddKey(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
@@ -112,8 +110,7 @@ func TestGetAddKey(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
 		ix.Add(s, 1)
 	}
@@ -228,11 +225,10 @@ func BenchmarkIndexing(b *testing.B) {
 	}
 	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
-	stats, err := helper.New(false, "", "standard", "metrictank", "")
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	ix.Init(stats)
+	ix.Init()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -269,14 +265,13 @@ func BenchmarkLoad(b *testing.B) {
 	updateFuzzyness = 1.0
 	ix := New()
 
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
 	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
-	err = ix.Init(stats)
+	err = ix.Init()
 	if err != nil {
 		b.Skipf("can't initialize cassandra: %s", err)
 	}
@@ -287,6 +282,6 @@ func BenchmarkLoad(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	ix = New()
-	ix.Init(stats)
+	ix.Init()
 	ix.Stop()
 }

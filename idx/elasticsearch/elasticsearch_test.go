@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	//"github.com/raintank/worldping-api/pkg/log"
@@ -49,8 +48,7 @@ func TestES(t *testing.T) {
 			reqChan <- requestTrace{method: method, url: urlStr, body: body}
 		}
 
-		stats, _ := helper.New(false, "", "standard", "metrictank", "")
-		err := ix.Init(stats)
+		err := ix.Init()
 		So(err, ShouldBeNil)
 
 		// we should see a PUT request to create the index mapping
@@ -76,8 +74,7 @@ func TestES(t *testing.T) {
 		ix.Conn.RequestTracer = func(method, urlStr, body string) {
 			reqChan <- requestTrace{method: method, url: urlStr, body: body}
 		}
-		stats, _ := helper.New(false, "", "standard", "metrictank", "")
-		err := ix.Init(stats)
+		err := ix.Init()
 		So(err, ShouldBeNil)
 
 		defs := ix.List(1)
@@ -149,8 +146,7 @@ func TestGetAddKey(t *testing.T) {
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 	defer ix.Stop()
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
@@ -206,8 +202,7 @@ func TestFind(t *testing.T) {
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 	defer ix.Stop()
 
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
@@ -324,8 +319,7 @@ func TestDelete(t *testing.T) {
 	rt.Response["POST http://localhost:9200/_bulk?refresh=true"] = handleBulkOk
 
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 	defer ix.Stop()
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
@@ -395,8 +389,7 @@ func BenchmarkIndexing(b *testing.B) {
 
 	ix := New()
 	ix.Conn.DeleteIndex(esIndex)
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	err := ix.Init(stats)
+	err := ix.Init()
 	if err != nil {
 		b.Skipf("can't connect to ES: %s", err)
 	}
