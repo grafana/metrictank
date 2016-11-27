@@ -3,12 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "IltfP0VyYFIARQsJ3hNMMxHjPvE=",
-			"path": "github.com/DataDog/datadog-go/statsd",
-			"revision": "b050cd8f4d7c394545fd7d966c8e2909ce89d552",
-			"revisionTime": "2015-09-30T14:07:41Z"
-		},
-		{
 			"checksumSHA1": "P8h2SWEK3NsJleSPe+mVNNpLG6Y=",
 			"path": "github.com/Dieterbe/profiletrigger/heap",
 			"revision": "d90c4b0cfeed756381675e85cc6e6b8a02cb01a6",
@@ -31,12 +25,6 @@
 			"path": "github.com/Unknwon/com",
 			"revision": "28b053d5a2923b87ce8c5a08f3af779894a72758",
 			"revisionTime": "2015-10-08T13:54:07Z"
-		},
-		{
-			"checksumSHA1": "0x0Ry5ZsFJAXeXieCP40WycRNFs=",
-			"path": "github.com/alexcesaro/statsd",
-			"revision": "bbc5756ebb41c2ac4c4f6abe584d25eb7cbe2e18",
-			"revisionTime": "2015-12-15T22:11:50Z"
 		},
 		{
 			"checksumSHA1": "acGG5NV9NBtjspVlWZ86Zzg8pW8=",
@@ -241,30 +229,6 @@
 			"path": "github.com/raintank/dur",
 			"revision": "7b06fb4cf9324a785c2dedea9aa4e47769d54b92",
 			"revisionTime": "2016-07-13T16:23:06Z"
-		},
-		{
-			"checksumSHA1": "bgKeW8sz3mMg/3QlazFovSIsjLc=",
-			"path": "github.com/raintank/met",
-			"revision": "daf6d57fc20532f01eb2320040a8054b5618cbf1",
-			"revisionTime": "2016-01-13T08:38:23Z"
-		},
-		{
-			"checksumSHA1": "strvyPp3CIOymoYh9/PrKXs37C0=",
-			"path": "github.com/raintank/met/dogstatsd",
-			"revision": "daf6d57fc20532f01eb2320040a8054b5618cbf1",
-			"revisionTime": "2016-01-13T08:38:23Z"
-		},
-		{
-			"checksumSHA1": "6PsyVJUl7ZJkemp8MEOhDU/iag4=",
-			"path": "github.com/raintank/met/helper",
-			"revision": "daf6d57fc20532f01eb2320040a8054b5618cbf1",
-			"revisionTime": "2016-01-13T08:38:23Z"
-		},
-		{
-			"checksumSHA1": "hCKwS6ZHAUomcH/ukmDo366wSE8=",
-			"path": "github.com/raintank/met/statsd",
-			"revision": "daf6d57fc20532f01eb2320040a8054b5618cbf1",
-			"revisionTime": "2016-01-13T08:38:23Z"
 		},
 		{
 			"checksumSHA1": "G5q2mryb77aa5RqtRSIiIXZpTcA=",
