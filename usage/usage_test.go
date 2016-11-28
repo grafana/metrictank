@@ -1,11 +1,13 @@
 package usage
 
 import (
+	"errors"
+	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx/memory"
@@ -31,11 +33,12 @@ func (f *FakeAggMetrics) Get(key string) (mdata.Metric, bool) {
 	f.Unlock()
 	return m, ok
 }
+
 func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
 	f.Lock()
 	m, ok := f.Metrics[key]
 	if !ok {
-		m = &FakeAggMetric{key, 0, 0}
+		m = &FakeAggMetric{sync.Mutex{}, key, 0, 0}
 		f.Metrics[key] = m
 	}
 	f.Unlock()
@@ -46,14 +49,17 @@ func (f *FakeAggMetrics) AggSettings() []mdata.AggSetting {
 }
 
 type FakeAggMetric struct {
+	sync.Mutex
 	key     string
 	lastTs  uint32
 	lastVal float64
 }
 
 func (f *FakeAggMetric) Add(ts uint32, val float64) {
+	f.Lock()
 	f.lastTs = ts
 	f.lastVal = val
+	f.Unlock()
 }
 
 // we won't use this
@@ -64,119 +70,170 @@ func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, a
 	return 0, make([]iter.Iter, 0)
 }
 
-func idFor(org int, metric, unit, mtype string, tags []string, interval uint32) string {
+func idFor(org int, metric, unit, mtype string, tags []string) string {
 	md := schema.MetricData{
 		OrgId:    org,
 		Metric:   metric,
 		Unit:     unit,
 		Mtype:    mtype,
 		Tags:     tags,
-		Interval: int(interval),
+		Interval: 1,
 	}
 	md.SetId()
 	return md.Id
 }
 
+// wait executes fn which can do various assertions and panics when things aren't right
+// it will recover the panic, and keep retrying up to every millisecond up to max milliseconds.
+// if the error keeps happening until after the deadline, it reports it as a test failure.
+func wait(max int, aggmetrics *FakeAggMetrics, t *testing.T, fn func(aggmetrics *FakeAggMetrics)) {
+	execute := func() (err error) {
+		defer func(errp *error) {
+			e := recover()
+			if e != nil {
+				if _, ok := e.(runtime.Error); ok {
+					panic(e)
+				}
+				if err, ok := e.(error); ok {
+					*errp = err
+				} else if errStr, ok := e.(string); ok {
+					*errp = errors.New(errStr)
+				} else {
+					*errp = fmt.Errorf("%v", e)
+				}
+			}
+			return
+		}(&err)
+		fn(aggmetrics)
+		return err
+	}
+	var err error
+	for i := 1; i <= max; i++ {
+		err = execute()
+		if err == nil {
+			break
+		}
+		//fmt.Printf("sleeping %d/%d\n", i, max)
+		time.Sleep(time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("waited %d ms, then: %s", max, err)
+	}
+}
+
+// set t to nil to trigger a panic, useful for inside wait()
 func assertLen(epoch int, aggmetrics *FakeAggMetrics, l int, t *testing.T) {
 	aggmetrics.Lock()
+	defer aggmetrics.Unlock()
 	if len(aggmetrics.Metrics) != l {
-		t.Fatalf("%d seconds in: there should be %d metrics at this point, not %d", epoch, l, len(aggmetrics.Metrics))
+		e := fmt.Sprintf("%d ms in: there should be %d metrics at this point, not %d", epoch, l, len(aggmetrics.Metrics))
+		if t != nil {
+			t.Fatal(e)
+		} else {
+			panic(e)
+		}
 	}
-	aggmetrics.Unlock()
 }
-func assert(interval uint32, epoch int, aggmetrics *FakeAggMetrics, org int, metric, unit, mtype string, ts uint32, val float64, t *testing.T) {
-	id := idFor(org, metric, unit, mtype, []string{}, interval)
+
+// set t to nil to trigger a panic, useful for inside wait()
+func assert(step int, aggmetrics *FakeAggMetrics, org int, metric, unit, mtype string, val float64, t *testing.T) {
+	id := idFor(org, metric, unit, mtype, []string{})
 	m, ok := aggmetrics.Get(id)
 	if !ok {
-		t.Fatalf("%d seconds in: assert org %d metric %s ts %d val %f -> metric not found", epoch, org, metric, ts, val)
+		e := fmt.Sprintf("step %d: assert org %d metric %s val %f -> metric not found", step, org, metric, val)
+		if t != nil {
+			t.Fatal(e)
+		} else {
+			panic(e)
+		}
 	}
 	n := m.(*FakeAggMetric)
-	if n.lastVal != val || n.lastTs != ts {
-		t.Fatalf("%d seconds in: assert org %d metric %s ts %d val %f -> got ts %d val %f", epoch, org, metric, ts, val, n.lastTs, n.lastVal)
+	n.Lock()
+	defer n.Unlock()
+	if n.lastVal != val {
+		e := fmt.Sprintf("step %d: assert org %d metric %s val %f -> got val %f", step, org, metric, val, n.lastVal)
+		if t != nil {
+			t.Fatal(e)
+		} else {
+			panic(e)
+		}
 	}
 }
 
 func TestUsageBasic(t *testing.T) {
-	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
-	interval := uint32(60)
-	u := New(interval, aggmetrics, metricIndex, mock)
+	interval := 60
+	u := New(time.Duration(interval)*time.Millisecond, 1, aggmetrics, metricIndex)
 
 	assertLen(0, aggmetrics, 0, t)
 
 	u.Add(1, "foo")
 	u.Add(1, "bar")
 	u.Add(2, "foo")
-	mock.Add(30 * time.Second)
-	assertLen(30, aggmetrics, 0, t)
-	mock.Add(29 * time.Second)
-	assertLen(59, aggmetrics, 0, t)
-
 	u.Add(2, "foo")
-	mock.Add(time.Second)
-	assertLen(60, aggmetrics, 4, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 60, 2, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 60, 2, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 2, t)
+	wait(60, aggmetrics, t, func(aggmetrics *FakeAggMetrics) {
+		assertLen(1, aggmetrics, 4, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 2, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 2, nil)
+		assert(1, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(1, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 2, nil)
+	})
 
 	u.Add(1, "foo")
 	u.Add(2, "foo")
-	mock.Add(60 * time.Second)
-
-	assert(interval, 120, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
-	assert(interval, 120, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 120, 3, t)
-	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
-	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 120, 3, t)
+	u.Add(3, "foo")
+	wait(60, aggmetrics, t, func(aggmetrics *FakeAggMetrics) {
+		assertLen(2, aggmetrics, 6, nil)
+		assert(2, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(2, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 3, nil)
+		assert(2, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(2, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 3, nil)
+		assert(2, aggmetrics, 3, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(2, aggmetrics, 3, "metrictank.usage.numPoints", "point", "counter", 1, nil)
+	})
 
 	u.Stop()
 }
-func TestUsageMinusOne(t *testing.T) {
-	mock := clock.NewMock()
+
+func testUsageMinusOne(t *testing.T) {
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
-	interval := uint32(60)
-	u := New(interval, aggmetrics, metricIndex, mock)
+	interval := 60
+	u := New(time.Duration(interval)*time.Millisecond, 1, aggmetrics, metricIndex)
 
 	assertLen(0, aggmetrics, 0, t)
 
 	u.Add(-1, "globally-visible") // but usage only reported to org 1
 	u.Add(1, "foo")
 	u.Add(2, "bar")
-	mock.Add(30 * time.Second)
-	assertLen(30, aggmetrics, 0, t)
-	mock.Add(29 * time.Second)
-	assertLen(59, aggmetrics, 0, t)
-	mock.Add(time.Second)
-	// not very pretty.. but an easy way to assure that the Usage Reporter
-	// goroutine has some time to push the results into our fake aggmetrics
-	time.Sleep(20 * time.Millisecond)
-	assertLen(60, aggmetrics, 6, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage-minus1.numSeries", "serie", "gauge", 60, 1, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage-minus1.numPoints", "point", "counter", 60, 1, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
-	assert(interval, 60, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 60, 1, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 1, t)
+	wait(60, aggmetrics, t, func(aggmetrics *FakeAggMetrics) {
+		assertLen(1, aggmetrics, 6, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage-minus1.numSeries", "serie", "gauge", 1, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage-minus1.numPoints", "point", "counter", 1, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(1, aggmetrics, 1, "metrictank.usage.numPoints", "point", "counter", 1, nil)
+		assert(1, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(1, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 1, nil)
+	})
 
 	u.Stop()
 }
+
 func TestUsageWrap32(t *testing.T) {
-	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
 	metricIndex.Init(stats)
-	interval := uint32(60)
-	u := New(interval, aggmetrics, metricIndex, mock)
+	interval := 60
+	u := New(time.Duration(interval)*time.Millisecond, 1, aggmetrics, metricIndex)
 
 	// max uint32 is 4294967295, let's verify the proper wrapping around that
 	// pretend an insert maxuint32 -900000
@@ -184,22 +241,20 @@ func TestUsageWrap32(t *testing.T) {
 	assertLen(0, aggmetrics, 0, t)
 	u.Add(2, "foo")
 	u.set(2, "foo", 4294067295)
-	mock.Add(30 * time.Second)
-	assertLen(30, aggmetrics, 0, t)
-	mock.Add(29 * time.Second)
-	assertLen(59, aggmetrics, 0, t)
-	mock.Add(time.Second)
-	assertLen(60, aggmetrics, 2, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 60, 1, t)
-	assert(interval, 60, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 60, 4294067295, t)
+	wait(60, aggmetrics, t, func(aggmetrics *FakeAggMetrics) {
+		assertLen(1, aggmetrics, 2, nil)
+		assert(1, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 1, t)
+		assert(1, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 4294067295, t)
+	})
 
 	for i := 0; i < 1000001; i++ {
 		u.Add(2, "foo")
 	}
-	mock.Add(60 * time.Second)
-	assertLen(120, aggmetrics, 2, t)
-	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 120, 1, t)
-	assert(interval, 120, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 120, 100000, t)
+	wait(60, aggmetrics, t, func(aggmetrics *FakeAggMetrics) {
+		assertLen(2, aggmetrics, 2, nil)
+		assert(2, aggmetrics, 2, "metrictank.usage.numSeries", "serie", "gauge", 1, nil)
+		assert(2, aggmetrics, 2, "metrictank.usage.numPoints", "point", "counter", 100000, nil)
+	})
 
 	u.Stop()
 }
