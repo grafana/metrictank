@@ -1,10 +1,12 @@
 package models
 
 import (
+	"sort"
+	"strconv"
+
 	"github.com/go-macaron/binding"
 	"gopkg.in/macaron.v1"
 	"gopkg.in/raintank/schema.v1"
-	"sort"
 )
 
 type GraphiteRender struct {
@@ -66,9 +68,8 @@ func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	sort.Strings(names)
 	b = append(b, '[')
 	for _, name := range names {
-		b = append(b, '"')
-		b = append(b, name...)
-		b = append(b, `",`...)
+		b = strconv.AppendQuoteToASCII(b, name)
+		b = append(b, ',')
 	}
 	if len(defs) != 0 {
 		b = b[:len(b)-1] // cut last comma

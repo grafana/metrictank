@@ -1,6 +1,7 @@
 package response
 
 import (
+	"fmt"
 	"math"
 	"net/http/httptest"
 	"testing"
@@ -17,6 +18,38 @@ func TestJson(t *testing.T) {
 		if c.out != got {
 			t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", c.out, got)
 		}
+	}
+}
+
+func BenchmarkHttpRespJsonEmptySeries(b *testing.B) {
+	data := []models.Series{
+		{
+			Target:     "an.empty.series",
+			Datapoints: make([]schema.Point, 0),
+			Interval:   10,
+		},
+	}
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.SeriesByTarget(data), "")
+		resp.Body()
+		resp.Close()
+	}
+}
+
+func BenchmarkHttpRespJsonEmptySeriesNeedsEscaping(b *testing.B) {
+	data := []models.Series{
+		{
+			Target:     `an.empty\series`,
+			Datapoints: make([]schema.Point, 0),
+			Interval:   10,
+		},
+	}
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.SeriesByTarget(data), "")
+		resp.Body()
+		resp.Close()
 	}
 }
 
@@ -87,6 +120,38 @@ func BenchmarkHttpRespJsonNulls(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
+		resp.Body()
+		resp.Close()
+	}
+}
+
+func BenchmarkHttpRespJson1MMetricNames(b *testing.B) {
+	series := make([]schema.MetricDefinition, 1000000)
+	for i := 0; i < 1000000; i++ {
+		series[i] = schema.MetricDefinition{
+			Name: fmt.Sprintf("this.is.the.name.of.a.random-graphite-series.%d", i),
+		}
+	}
+	b.ResetTimer()
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.MetricNames(series), "")
+		resp.Body()
+		resp.Close()
+	}
+}
+
+func BenchmarkHttpRespJson1MMetricNamesNeedEscaping(b *testing.B) {
+	series := make([]schema.MetricDefinition, 1000000)
+	for i := 0; i < 1000000; i++ {
+		series[i] = schema.MetricDefinition{
+			Name: fmt.Sprintf(`this.is.the.name.of.\.random\graphite\series.%d`, i),
+		}
+	}
+	b.ResetTimer()
+	var resp *Json
+	for n := 0; n < b.N; n++ {
+		resp = NewJson(200, models.MetricNames(series), "")
 		resp.Body()
 		resp.Close()
 	}

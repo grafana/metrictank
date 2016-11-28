@@ -23,9 +23,9 @@ func (g SeriesByTarget) Less(i, j int) bool { return g[i].Target < g[j].Target }
 func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = append(b, '[')
 	for _, s := range series {
-		b = append(b, `{"target":"`...)
-		b = append(b, s.Target...)
-		b = append(b, `","datapoints":[`...)
+		b = append(b, `{"target":`...)
+		b = strconv.AppendQuoteToASCII(b, s.Target)
+		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')
 			if math.IsNaN(p.Val) {
