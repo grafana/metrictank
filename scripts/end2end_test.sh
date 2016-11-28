@@ -4,7 +4,7 @@ set -x # debugging
 
 DOCKER_COMPOSE_VERSION="1.8.1"
 DOCKER_COMPOSE_EXEC="/tmp/docker-compose"
-DOCKER_COMPOSE_FILE="docker/docker-compose.yml"
+DOCKER_COMPOSE_FILE="docker/docker-standard/docker-compose.yml"
 
 # this is only necessary until Circle CI updates their images to provide a recent version
 curl -L "https://github.com/docker/compose/releases/download/$DOCKER_COMPOSE_VERSION/docker-compose-Linux-x86_64" > $DOCKER_COMPOSE_EXEC

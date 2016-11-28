@@ -1,0 +1,142 @@
+version: '2'
+
+services:
+  metrictank0:
+    hostname: metrictank0
+    image: raintank/metrictank
+    ports:
+     - "6060:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/raintank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042
+      WAIT_TIMEOUT: 30
+      MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
+      MT_INSTANCE: metrictank0
+      MT_LOG_LEVEL: 2
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank1:6060,metrictank2:6060,metrictank3:6060
+      MT_CLUSTER_PRIMARY_NODE: "true"
+    links:
+     - cassandra
+     - statsdaemon
+
+  metrictank1:
+    hostname: metrictank1
+    image: raintank/metrictank
+    ports:
+      - "6061:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/raintank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
+      MT_INSTANCE: metrictank1
+      MT_LOG_LEVEL: 2
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0:6060,metrictank2:6060,metrictank3:6060
+    links:
+     - cassandra
+     - statsdaemon
+     - metrictank0
+
+  metrictank2:
+    hostname: metrictank2
+    image: raintank/metrictank
+    ports:
+      - "6062:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/raintank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
+      MT_INSTANCE: metrictank2
+      MT_LOG_LEVEL: 2
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0:6060,metrictank1:6060,metrictank3:6060
+      MT_CLUSTER_PRIMARY_NODE: "true"
+    links:
+     - cassandra
+     - statsdaemon
+     - metrictank0
+
+  metrictank3:
+    hostname: metrictank3
+    image: raintank/metrictank
+    ports:
+      - "6063:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/raintank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
+      MT_INSTANCE: metrictank3
+      MT_LOG_LEVEL: 2
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0:6060,metrictank1:6060,metrictank2:6060
+    links:
+     - cassandra
+     - statsdaemon
+     - metrictank0
+
+  cassandra:
+    hostname: cassandra
+    image: cassandra:3.0.8
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    ports:
+     - "9042:9042"
+
+  graphite-api:
+    hostname: graphite-api
+    image: raintank/graphite-metrictank
+    ports:
+     - "8080:8080"
+    links:
+     - metrictank0
+     - statsdaemon
+    volumes:
+     - "./graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana:master
+    ports:
+      - "3000:3000"
+
+  kafka:
+    hostname: kafka
+    image: raintank/kafka
+    environment:
+      ADVERTISED_HOST: kafka
+      NUM_PARTITIONS: 8
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "9999:9999"
+    volumes:
+      - /tmp/kafka-logs
+
+  statsdaemon:
+    hostname: statsdaemon
+    image: raintank/statsdaemon
+    ports:
+     - "8125:8125/udp"
+    volumes:
+     - "./statsdaemon.ini:/etc/statsdaemon.ini"
+
+  # easiest to just use a separate graphite server for monitoring
+  graphitemon:
+    hostname: graphitemon
+    image:  raintank/graphite
+    ports:
+      - "2003:2003"
+      - "8000:80"
