@@ -114,7 +114,7 @@ func (m *MemoryIdx) Add(data *schema.MetricData) error {
 func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 	m.Lock()
 	var pre time.Time
-	for i, _ := range defs {
+	for i := range defs {
 		def := defs[i]
 		pre = time.Now()
 		if _, ok := m.DefById[def.Id]; ok {

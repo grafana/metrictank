@@ -303,17 +303,19 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
 	iters := make([]iter.Iter, 0, a.NumChunks)
-	for oldestPos != newestPos {
+	for {
 		chunk := a.getChunk(oldestPos)
-		iters = append(iters, iter.New(chunk.Iter(), false))
+		iters = append(iters, iter.New(chunk.Iter(), len(chunk.Bytes())))
+
+		if oldestPos == newestPos {
+			break
+		}
+
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 	}
-	// add the last chunk
-	chunk := a.getChunk(oldestPos)
-	iters = append(iters, iter.New(chunk.Iter(), false))
 
 	memToIterDuration.Value(time.Now().Sub(pre))
 	return oldestChunk.T0, iters

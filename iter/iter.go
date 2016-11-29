@@ -7,12 +7,12 @@ import (
 // Iter is a simple wrapper around a tsz.Iter to make debug logging easier
 type Iter struct {
 	*tsz.Iter
-	Cass bool //true = cass, false = mem
+	Length int
 }
 
-func New(i *tsz.Iter, cass bool) Iter {
+func New(i *tsz.Iter, l int) Iter {
 	return Iter{
 		i,
-		cass,
+		l,
 	}
 }
