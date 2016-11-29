@@ -308,11 +308,18 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		// if to < oldest -> no need to search until oldest, only search until to
 		until := util.Min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
-		storeIters, err := s.BackendStore.Search(key, fromUnix, until)
+		storeIterGens, err := s.BackendStore.Search(key, fromUnix, until)
 		if err != nil {
 			panic(err)
 		}
-		iters = append(iters, storeIters...)
+		for _, itgen := range storeIterGens {
+			it, err := itgen.Get()
+			if err != nil {
+				// TODO(replay) figure out what to do if one piece is corrupt
+				continue
+			}
+			iters = append(iters, *it)
+		}
 	} else {
 		reqSpanMem.Value(int64(toUnix - fromUnix))
 	}
@@ -332,11 +339,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 			}
 		}
 		if LogLevel < 2 {
-			if iter.Cass {
-				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
-			} else {
-				log.Debug("DP getSeries: iter mem %d values good/total %d/%d", iter.T0, good, total)
-			}
+			log.Debug("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
@@ -359,7 +362,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
 			log.Debug("%s has multiple series.", series[0].Target)
-			for i, _ := range series[0].Datapoints {
+			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
 					if !math.IsNaN(series[j].Datapoints[i].Val) {
 						series[0].Datapoints[i].Val = series[j].Datapoints[i].Val
