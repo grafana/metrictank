@@ -13,7 +13,7 @@ func NewDevnullStore() *devnullStore {
 func (c *devnullStore) Add(cwr *ChunkWriteRequest) {
 }
 
-func (c *devnullStore) Search(key string, start, end uint32) ([]iter.Iter, error) {
+func (c *devnullStore) Search(key string, start, end uint32) ([]iter.IterGen, error) {
 	return nil, nil
 }
 
