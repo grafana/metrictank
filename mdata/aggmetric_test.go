@@ -56,7 +56,6 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 		for iter.Next() {
 			index++
 			tt, vv := iter.Values()
-			//c.t.Logf("got (%v,%v).. should be (%v,%v)", tt, vv, c.points[index].ts, c.points[index].val)
 			if index > pj {
 				c.t.Fatalf("Values()=(%v,%v), want end of stream\n", tt, vv)
 			}

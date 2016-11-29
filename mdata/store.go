@@ -6,6 +6,6 @@ import (
 
 type Store interface {
 	Add(cwr *ChunkWriteRequest)
-	Search(key string, start, end uint32) ([]iter.Iter, error)
+	Search(key string, start, end uint32) ([]iter.IterGen, error)
 	Stop()
 }
