@@ -26,6 +26,7 @@ func (s *Server) RegisterRoutes() {
 		r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
 		r.Combo("/index/get", bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
 		r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
+		r.Combo("/index/delete", bind(models.IndexDelete{})).Get(s.indexDelete).Post(s.indexDelete)
 	})
 
 	r.Options("/*", func(ctx *macaron.Context) {

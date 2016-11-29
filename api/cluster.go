@@ -92,3 +92,16 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataResp{Series: series}))
 }
+
+func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
+	defs, err := s.MetricIndex.Delete(req.OrgId, req.Query)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+		return
+	}
+
+	resp := models.MetricsDeleteResp{
+		DeletedDefs: len(defs),
+	}
+	response.Write(ctx, response.NewMsgp(200, &resp))
+}

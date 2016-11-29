@@ -498,14 +498,77 @@ func findTreejson(query string, nodes []idx.Node) (models.SeriesTree, error) {
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {
-	defs, err := s.MetricIndex.Delete(ctx.OrgId, req.Query)
-	if err != nil {
+	peers := cluster.GetPeers()
+	peers = append(peers, cluster.ThisNode)
+	log.Debug("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
+	errors := make([]error, 0)
+	deleted := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		log.Debug("HTTP metricsDelete getting results from %s", peer.GetName())
+		wg.Add(1)
+		if peer == cluster.ThisNode {
+			go func() {
+				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
+				mu.Lock()
+				if err != nil {
+					errors = append(errors, err)
+				}
+				deleted += result
+				mu.Unlock()
+				wg.Done()
+			}()
+		} else {
+			go func(peer *cluster.Node) {
+				result, err := s.metricsDeleteRemote(ctx.OrgId, req.Query, peer)
+				mu.Lock()
+				if err != nil {
+					errors = append(errors, err)
+				}
+				deleted += result
+				mu.Unlock()
+				wg.Done()
+			}(peer)
+		}
+	}
+	wg.Wait()
+	var err error
+	if len(errors) > 0 {
+		if len(errors) == 1 {
+			err = errors[0]
+		} else {
+			err = fmt.Errorf("%d errors: %v", len(errors), errors)
+		}
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
 		return
 	}
 
-	resp := make(map[string]interface{})
-	resp["success"] = true
-	resp["deletedDefs"] = len(defs)
+	resp := models.MetricsDeleteResp{
+		DeletedDefs: deleted,
+	}
+
 	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) metricsDeleteLocal(orgId int, query string) (int, error) {
+	defs, err := s.MetricIndex.Delete(orgId, query)
+	return len(defs), err
+}
+
+func (s *Server) metricsDeleteRemote(orgId int, query string, peer *cluster.Node) (int, error) {
+	log.Debug("HTTP metricDelete calling %s/cluster/index/delete for %d:%q", peer.GetName(), orgId, query)
+	buf, err := peer.Post("/cluster/index/delete", models.IndexDelete{Query: query, OrgId: orgId})
+	if err != nil {
+		log.Error(4, "HTTP metricDelete error querying %s/cluster/index/delete: %q", peer.GetName(), err)
+		return 0, err
+	}
+	resp := models.MetricsDeleteResp{}
+	buf, err = resp.UnmarshalMsg(buf)
+	if err != nil {
+		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/cluster/index/delete: %q", peer.GetName(), err)
+		return 0, err
+	}
+
+	return resp.DeletedDefs, nil
 }

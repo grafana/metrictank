@@ -30,3 +30,8 @@ type IndexFind struct {
 type GetData struct {
 	Requests []Req `json:"requests" binding:"Required"`
 }
+
+type IndexDelete struct {
+	Query string `json:"patterns" form:"query" binding:"Required"`
+	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
+}

@@ -20,3 +20,7 @@ func NewIndexFindResp() *IndexFindResp {
 type GetDataResp struct {
 	Series []Series
 }
+
+type MetricsDeleteResp struct {
+	DeletedDefs int `json:"deletedDefs"`
+}
