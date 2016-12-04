@@ -1,0 +1,690 @@
+{
+  "id": null,
+  "title": "Monitoring stack",
+  "originalTitle": "Monitoring stack",
+  "tags": [],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "hideControls": false,
+  "sharedCrosshair": false,
+  "rows": [
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "datasource": "graphite",
+          "editable": true,
+          "error": false,
+          "fill": 0,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMax": null,
+            "leftMin": null,
+            "rightLogBase": 1,
+            "rightMax": null,
+            "rightMin": null,
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 1,
+          "isNew": true,
+          "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "groupByNode(service_is_statsdaemon.instance_is_$statsdaemon_instance.direction_is_in.*.target_type_is_rate.unit_is_Metricps, 1, 'sum')",
+              "textEditor": false
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "statsdaemon incoming metrics",
+          "tooltip": {
+            "shared": true,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "y-axis": true,
+          "y_formats": [
+            "hertz",
+            "short"
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "datasource": "graphite",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMax": null,
+            "leftMin": null,
+            "rightLogBase": 1,
+            "rightMax": null,
+            "rightMin": null,
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 2,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": false,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "total",
+              "fill": 6,
+              "legend": true,
+              "yaxis": 2,
+              "zindex": -3
+            }
+          ],
+          "span": 6,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "groupByNode(service_is_statsdaemon.instance_is_$statsdaemon_instance.direction_is_out.*.target_type_is_rate.unit_is_Metricps, 1, 'sum')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(sumSeries(service_is_statsdaemon.instance_is_$statsdaemon_instance.direction_is_out.*.target_type_is_rate.unit_is_Metricps), 'total')"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Statsdaemon outgoing metrics (total on 2nd y-axis)",
+          "tooltip": {
+            "shared": true,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "y-axis": true,
+          "y_formats": [
+            "hertz",
+            "short"
+          ]
+        }
+      ],
+      "title": "Row"
+    },
+    {
+      "collapse": false,
+      "editable": true,
+      "height": "250px",
+      "panels": [
+        {
+          "aliasColors": {
+            "sumSeries(carbon.agents.*.blacklistMatches)": "#E24D42",
+            "sumSeries(carbon.agents.*.errors)": "#890F02"
+          },
+          "bars": false,
+          "datasource": "graphite",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {
+            "leftLogBase": 1,
+            "leftMax": null,
+            "leftMin": 0,
+            "rightLogBase": 1,
+            "rightMax": null,
+            "rightMin": 0,
+            "threshold1": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2": null,
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "id": 3,
+          "isNew": true,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "connected",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "sumSeries(carbon.agents.*.blacklistMatches)",
+              "yaxis": 2
+            },
+            {
+              "alias": "sumSeries(carbon.agents.*.errors)",
+              "yaxis": 2
+            }
+          ],
+          "span": 12,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasByNode(carbon.agents.*.metricsReceived, 2)"
+            },
+            {
+              "refId": "B",
+              "target": "sumSeries(carbon.agents.*.blacklistMatches)"
+            },
+            {
+              "refId": "C",
+              "target": "sumSeries(carbon.agents.*.errors)"
+            }
+          ],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Carbon incoming metrics",
+          "tooltip": {
+            "shared": true,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "x-axis": true,
+          "y-axis": true,
+          "y_formats": [
+            "short",
+            "short"
+          ]
+        }
+      ],
+      "title": "New row"
+    }
+  ],
+  "time": {
+    "from": "now-48h",
+    "to": "now"
+  },
+  "timepicker": {
+    "now": true,
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "allFormat": "wildcard",
+        "current": {
+          "text": "All",
+          "value": "*"
+        },
+        "datasource": "graphite",
+        "includeAll": true,
+        "multi": false,
+        "multiFormat": "glob",
+        "name": "statsdaemon_instance",
+        "options": [
+          {
+            "text": "All",
+            "value": "*",
+            "selected": true
+          },
+          {
+            "text": "ams1",
+            "value": "ams1",
+            "selected": false
+          },
+          {
+            "text": "atl1",
+            "value": "atl1",
+            "selected": false
+          },
+          {
+            "text": "cassandra-1",
+            "value": "cassandra-1",
+            "selected": false
+          },
+          {
+            "text": "cassandra-1-prod",
+            "value": "cassandra-1-prod",
+            "selected": false
+          },
+          {
+            "text": "cassandra-2",
+            "value": "cassandra-2",
+            "selected": false
+          },
+          {
+            "text": "cassandra-2-prod",
+            "value": "cassandra-2-prod",
+            "selected": false
+          },
+          {
+            "text": "cassandra-3-prod",
+            "value": "cassandra-3-prod",
+            "selected": false
+          },
+          {
+            "text": "coll-con-1",
+            "value": "coll-con-1",
+            "selected": false
+          },
+          {
+            "text": "coll-con-1-prod",
+            "value": "coll-con-1-prod",
+            "selected": false
+          },
+          {
+            "text": "coll-con-2",
+            "value": "coll-con-2",
+            "selected": false
+          },
+          {
+            "text": "coll-con-2-prod",
+            "value": "coll-con-2-prod",
+            "selected": false
+          },
+          {
+            "text": "coll-con-3",
+            "value": "coll-con-3",
+            "selected": false
+          },
+          {
+            "text": "coll-con-3-prod",
+            "value": "coll-con-3-prod",
+            "selected": false
+          },
+          {
+            "text": "collector-1",
+            "value": "collector-1",
+            "selected": false
+          },
+          {
+            "text": "collector-1-be",
+            "value": "collector-1-be",
+            "selected": false
+          },
+          {
+            "text": "collector-2-be",
+            "value": "collector-2-be",
+            "selected": false
+          },
+          {
+            "text": "collector-2-tw",
+            "value": "collector-2-tw",
+            "selected": false
+          },
+          {
+            "text": "collector-2-us",
+            "value": "collector-2-us",
+            "selected": false
+          },
+          {
+            "text": "collector-3-tw",
+            "value": "collector-3-tw",
+            "selected": false
+          },
+          {
+            "text": "collector-tw-1",
+            "value": "collector-tw-1",
+            "selected": false
+          },
+          {
+            "text": "crl1",
+            "value": "crl1",
+            "selected": false
+          },
+          {
+            "text": "ec2-54-93-202-201",
+            "value": "ec2-54-93-202-201",
+            "selected": false
+          },
+          {
+            "text": "elastic-big-1-prod",
+            "value": "elastic-big-1-prod",
+            "selected": false
+          },
+          {
+            "text": "elastic-big-2-prod",
+            "value": "elastic-big-2-prod",
+            "selected": false
+          },
+          {
+            "text": "elastic-big-3-prod",
+            "value": "elastic-big-3-prod",
+            "selected": false
+          },
+          {
+            "text": "elasticsearch-tmp-1",
+            "value": "elasticsearch-tmp-1",
+            "selected": false
+          },
+          {
+            "text": "ewr1",
+            "value": "ewr1",
+            "selected": false
+          },
+          {
+            "text": "grafana-1",
+            "value": "grafana-1",
+            "selected": false
+          },
+          {
+            "text": "grafana-1-prod",
+            "value": "grafana-1-prod",
+            "selected": false
+          },
+          {
+            "text": "grafana-1-qa",
+            "value": "grafana-1-qa",
+            "selected": false
+          },
+          {
+            "text": "grafana-2",
+            "value": "grafana-2",
+            "selected": false
+          },
+          {
+            "text": "grafana-2-prod",
+            "value": "grafana-2-prod",
+            "selected": false
+          },
+          {
+            "text": "grafana-3-prod",
+            "value": "grafana-3-prod",
+            "selected": false
+          },
+          {
+            "text": "gru1",
+            "value": "gru1",
+            "selected": false
+          },
+          {
+            "text": "haproxy-1",
+            "value": "haproxy-1",
+            "selected": false
+          },
+          {
+            "text": "haproxy-1-prod",
+            "value": "haproxy-1-prod",
+            "selected": false
+          },
+          {
+            "text": "haproxy-2",
+            "value": "haproxy-2",
+            "selected": false
+          },
+          {
+            "text": "haproxy-2-prod",
+            "value": "haproxy-2-prod",
+            "selected": false
+          },
+          {
+            "text": "haproxy-3",
+            "value": "haproxy-3",
+            "selected": false
+          },
+          {
+            "text": "haproxy-3-prod",
+            "value": "haproxy-3-prod",
+            "selected": false
+          },
+          {
+            "text": "hnd1",
+            "value": "hnd1",
+            "selected": false
+          },
+          {
+            "text": "instance-1",
+            "value": "instance-1",
+            "selected": false
+          },
+          {
+            "text": "lon1",
+            "value": "lon1",
+            "selected": false
+          },
+          {
+            "text": "mariadb-1",
+            "value": "mariadb-1",
+            "selected": false
+          },
+          {
+            "text": "mariadb-1-prod",
+            "value": "mariadb-1-prod",
+            "selected": false
+          },
+          {
+            "text": "mariadb-1-qa",
+            "value": "mariadb-1-qa",
+            "selected": false
+          },
+          {
+            "text": "mariadb-2",
+            "value": "mariadb-2",
+            "selected": false
+          },
+          {
+            "text": "mariadb-2-prod",
+            "value": "mariadb-2-prod",
+            "selected": false
+          },
+          {
+            "text": "mariadb-3",
+            "value": "mariadb-3",
+            "selected": false
+          },
+          {
+            "text": "mariadb-3-prod",
+            "value": "mariadb-3-prod",
+            "selected": false
+          },
+          {
+            "text": "mariadb-backup-follower-1",
+            "value": "mariadb-backup-follower-1",
+            "selected": false
+          },
+          {
+            "text": "mariadb-backup-follower-1-prod",
+            "value": "mariadb-backup-follower-1-prod",
+            "selected": false
+          },
+          {
+            "text": "metric-tank-1",
+            "value": "metric-tank-1",
+            "selected": false
+          },
+          {
+            "text": "metric-tank-1-prod",
+            "value": "metric-tank-1-prod",
+            "selected": false
+          },
+          {
+            "text": "metric-tank-2",
+            "value": "metric-tank-2",
+            "selected": false
+          },
+          {
+            "text": "metric-tank-2-prod",
+            "value": "metric-tank-2-prod",
+            "selected": false
+          },
+          {
+            "text": "mia1",
+            "value": "mia1",
+            "selected": false
+          },
+          {
+            "text": "nyc1",
+            "value": "nyc1",
+            "selected": false
+          },
+          {
+            "text": "oma1",
+            "value": "oma1",
+            "selected": false
+          },
+          {
+            "text": "ord1",
+            "value": "ord1",
+            "selected": false
+          },
+          {
+            "text": "par1",
+            "value": "par1",
+            "selected": false
+          },
+          {
+            "text": "pdx1",
+            "value": "pdx1",
+            "selected": false
+          },
+          {
+            "text": "rabbitmq-1",
+            "value": "rabbitmq-1",
+            "selected": false
+          },
+          {
+            "text": "rabbitmq-1-prod",
+            "value": "rabbitmq-1-prod",
+            "selected": false
+          },
+          {
+            "text": "rabbitmq-2",
+            "value": "rabbitmq-2",
+            "selected": false
+          },
+          {
+            "text": "rabbitmq-2-prod",
+            "value": "rabbitmq-2-prod",
+            "selected": false
+          },
+          {
+            "text": "rabbitmq-3-prod",
+            "value": "rabbitmq-3-prod",
+            "selected": false
+          },
+          {
+            "text": "sea1",
+            "value": "sea1",
+            "selected": false
+          },
+          {
+            "text": "sfo1",
+            "value": "sfo1",
+            "selected": false
+          },
+          {
+            "text": "sin1",
+            "value": "sin1",
+            "selected": false
+          },
+          {
+            "text": "sjc1",
+            "value": "sjc1",
+            "selected": false
+          },
+          {
+            "text": "snapshots-origin",
+            "value": "snapshots-origin",
+            "selected": false
+          },
+          {
+            "text": "syd1",
+            "value": "syd1",
+            "selected": false
+          },
+          {
+            "text": "tpe1",
+            "value": "tpe1",
+            "selected": false
+          },
+          {
+            "text": "ziggurat",
+            "value": "ziggurat",
+            "selected": false
+          }
+        ],
+        "query": "service_is_statsdaemon.instance_is_*",
+        "refresh": true,
+        "regex": "/instance_is_(.*)/",
+        "type": "query"
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "schemaVersion": 8,
+  "version": 7,
+  "links": []
+}
