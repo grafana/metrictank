@@ -33,6 +33,7 @@ The stack will listen on the following ports:
 * 6060 tcp (metrictank's internal endpoint)
 * 8080 tcp (the graphite api query endpoint)
 * 8125 udp (statsd endpoint)
+* 9042 tcp (cassandra)
 
 If you already have something else listen to that port (such as a carbon or grafana server), shut it down, as it will conflict.
 
@@ -40,7 +41,7 @@ If you already have something else listen to that port (such as a carbon or graf
 Inside your copy of the repository, you can bring up the stack like so:
 
 ```
-cd docker
+cd docker/docker-standard
 docker-compose up
 ```
 
@@ -51,18 +52,18 @@ A bunch of text will whiz past on your screen, but you should see
 
 ```
 metrictank_1     | waiting for cassandra:9042 to become up...
-statsdaemon_1    | 2016/08/04 12:31:21 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused. will retry
+statsdaemon_1    | 2016/12/04 15:30:21 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused. will retry
 metrictank_1     | waiting for cassandra:9042 to become up...
-statsdaemon_1    | 2016/08/04 12:31:22 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
+statsdaemon_1    | 2016/12/04 15:30:22 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
 ```
 
 And a little bit later you should see that metrictank starts its listener and statsdaemon connects to metrictank:
 
 ```
-metrictank_1       | 2016/08/04 11:28:24 [I] DefCache initialized in 50.40667ms. starting data consumption
-metrictank_1       | 2016/08/04 11:28:24 [I] carbon-in: listening on :2003/tcp
-metrictank_1       | 2016/08/04 11:28:24 [I] starting listener for metrics and http/debug on :6060
-statsdaemon_1      | 2016/08/04 11:28:25 now connected to metrictank:2003
+metrictank_1    | 2016/12/04 15:30:34 [I] metricIndex initialized in 326.379951ms. starting data consumption
+metrictank_1    | 2016/12/04 15:30:34 [I] carbon-in: listening on :2003/tcp
+metrictank_1    | 2016/12/04 15:30:34 [I] API Listening on: http://:6060/
+statsdaemon_1   | 2016/12/04 15:30:35 now connected to metrictank:2003
 ```
 
 Once the stack is up, metrictank should be running on port 6060.  
