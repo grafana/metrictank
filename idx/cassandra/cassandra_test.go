@@ -211,6 +211,7 @@ func TestFind(t *testing.T) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
+	cluster.ThisNode.SetPartitions([]int32{1})
 	keyspace = "raintank"
 	hosts = "localhost:9042"
 	consistency = "one"
@@ -218,12 +219,14 @@ func BenchmarkIndexing(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
+	updateInterval = time.Hour
+	updateFuzzyness = 1.0
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
 	stats, err := helper.New(false, "", "standard", "metrictank", "")
 	if err != nil {
@@ -254,6 +257,7 @@ func insertDefs(ix idx.MetricIndex, i int) {
 }
 
 func BenchmarkLoad(b *testing.B) {
+	cluster.ThisNode.SetPartitions([]int32{1})
 	keyspace = "raintank"
 	hosts = "localhost:9042"
 	consistency = "one"
@@ -261,6 +265,8 @@ func BenchmarkLoad(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
+	updateInterval = time.Hour
+	updateFuzzyness = 1.0
 	ix := New()
 
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
@@ -268,12 +274,13 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
 	err = ix.Init(stats)
 	if err != nil {
 		b.Skipf("can't initialize cassandra: %s", err)
 	}
+
 	insertDefs(ix, b.N)
 	ix.Stop()
 
