@@ -51,12 +51,34 @@ func NodeStateFromString(s string) NodeState {
 	return NodeNotReady
 }
 
+type Error struct {
+	code int
+	err  error
+}
+
+func NewError(code int, err error) *Error {
+	return &Error{
+		code: code,
+		err:  err,
+	}
+}
+
+// implement errors.Error interface
+func (r *Error) Error() string {
+	return r.err.Error()
+}
+
+// implement response.Response
+func (r *Error) Code() int {
+	return r.code
+}
+
 type Node struct {
 	sync.RWMutex
 	name          string
 	version       string
 	started       time.Time
-	remoteAddr    *url.URL
+	remoteAddr    *url.URL //will be Nil for ThisNode
 	primary       bool
 	primaryChange time.Time
 	state         NodeState
@@ -181,7 +203,7 @@ func (n *Node) Get(path string, query interface{}) ([]byte, error) {
 	if query != nil {
 		qstr, err := toQueryString(query)
 		if err != nil {
-			return nil, err
+			return nil, NewError(http.StatusInternalServerError, err)
 		}
 		path = path + "?" + qstr
 	}
@@ -190,11 +212,12 @@ func (n *Node) Get(path string, query interface{}) ([]byte, error) {
 	n.RUnlock()
 	req, err := http.NewRequest("GET", addr, nil)
 	if err != nil {
-		return nil, err
+		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	rsp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		log.Error(3, "Cluster Node: %s unreachable. %s", n.GetName(), err.Error())
+		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)
 }
@@ -202,7 +225,7 @@ func (n *Node) Get(path string, query interface{}) ([]byte, error) {
 func (n *Node) Post(path string, body interface{}) ([]byte, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	var reader *bytes.Reader
 	reader = bytes.NewReader(b)
@@ -211,12 +234,13 @@ func (n *Node) Post(path string, body interface{}) ([]byte, error) {
 	n.RUnlock()
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
-		return nil, err
+		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	rsp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		log.Error(3, "Cluster Node: %s unreachable. %s", n.GetName(), err.Error())
+		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)
 }
@@ -224,7 +248,7 @@ func (n *Node) Post(path string, body interface{}) ([]byte, error) {
 func handleResp(rsp *http.Response) ([]byte, error) {
 	defer rsp.Body.Close()
 	if rsp.StatusCode != 200 {
-		return nil, fmt.Errorf("error encountered. %s", rsp.Status)
+		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
 	}
 	return ioutil.ReadAll(rsp.Body)
 }

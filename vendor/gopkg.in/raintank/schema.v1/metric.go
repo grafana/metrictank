@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 var errInvalidIntervalzero = errors.New("interval cannot be 0")
@@ -77,17 +76,16 @@ type MetricDataArray []*MetricData
 
 // for ES
 type MetricDefinition struct {
-	Id         string            `json:"id"`
-	OrgId      int               `json:"org_id"`
-	Name       string            `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
-	Metric     string            `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
-	Interval   int               `json:"interval"`                                      // minimum 10
-	Unit       string            `json:"unit"`
-	Mtype      string            `json:"mtype"`
-	Tags       []string          `json:"tags" elastic:"type:string,index:not_analyzed"`
-	LastUpdate int64             `json:"lastUpdate"` // unix timestamp
-	Nodes      map[string]string `json:"nodes"`
-	NodeCount  int               `json:"node_count"`
+	Id         string   `json:"id"`
+	OrgId      int      `json:"org_id"`
+	Name       string   `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
+	Metric     string   `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
+	Interval   int      `json:"interval"`                                      // minimum 10
+	Unit       string   `json:"unit"`
+	Mtype      string   `json:"mtype"`
+	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
+	Partition  int32    `json:"partition"`
 }
 
 func (m *MetricDefinition) SetId() {
@@ -138,12 +136,6 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
 // to the original MetricData
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
-	nodesMap := make(map[string]string)
-	nodes := strings.Split(d.Name, ".")
-	for i, n := range nodes {
-		key := fmt.Sprintf("n%d", i)
-		nodesMap[key] = n
-	}
 	tags := make([]string, len(d.Tags))
 	copy(tags, d.Tags)
 	return &MetricDefinition{
@@ -156,7 +148,5 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		LastUpdate: d.Time,
 		Unit:       d.Unit,
 		Tags:       tags,
-		Nodes:      nodesMap,
-		NodeCount:  len(nodes),
 	}
 }
