@@ -81,3 +81,13 @@ partitions | 0,1 | 0,2 | 1,3 | 2,3 |
 This would offer better load balancing should node A fail (B and C will each take over a portion of the load), but will require making primary status a per-partition concept.
 Hence, this is currently **not supported**.
 
+
+## Caveats
+
+If you get the following error:
+```
+2016/11/23 09:27:34 [metrictank.go:334 main()] [E] failed to initialize cassandra. java.lang.RuntimeException: java.util.concurrent.ExecutionException: org.apache.cassandra.exceptions.ConfigurationException: Column family ID mismatch (found 103be8f0-b15f-11e6-92df-7964cb8cd63c; expected 103902c0-b15f-11e6-92df-7964cb8cd63c)
+```
+
+This is because you start multiple metrictanks concurrently and they all try to initialize cassandra.
+You should start one instance, and once it's running, do the others.
