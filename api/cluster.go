@@ -29,7 +29,7 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 		return
 	}
 
-	response.Write(ctx, response.NewError(http.StatusServiceUnavailable, errors.New("node not ready")))
+	response.Write(ctx, response.NewError(http.StatusServiceUnavailable, "node not ready"))
 }
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
@@ -52,7 +52,7 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	for _, pattern := range req.Patterns {
 		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From)
 		if err != nil {
-			response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
 		resp.Nodes[pattern] = nodes
@@ -65,7 +65,7 @@ func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 	def, err := s.MetricIndex.Get(req.Id)
 	if err != nil {
 	} else { // currently this can only be notFound
-		response.Write(ctx, response.NewError(http.StatusNotFound, NotFoundErr))
+		response.Write(ctx, response.NewError(http.StatusNotFound, "Not Found"))
 		return
 	}
 
@@ -86,8 +86,10 @@ func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 	series, err := s.getTargetsLocal(request.Requests)
 	if err != nil {
+		// the only errors returned are from us catching panics, so we should treat them
+		// all as internalServerErrors
 		log.Error(3, "HTTP getData() %s", err.Error())
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataResp{Series: series}))
@@ -96,7 +98,8 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 	defs, err := s.MetricIndex.Delete(req.OrgId, req.Query)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+		// errors can only be caused by bad request.
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 

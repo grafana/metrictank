@@ -188,6 +188,8 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	if len(localReqs) > 0 {
 		wg.Add(1)
 		go func() {
+			// the only errors returned are from us catching panics, so we should treat them
+			// all as internalServerErrors
 			series, err := s.getTargetsLocal(localReqs)
 			mu.Lock()
 			if err != nil {
@@ -203,6 +205,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	if len(remoteReqs) > 0 {
 		wg.Add(1)
 		go func() {
+			// all errors returned returned are *response.Error.
 			series, err := s.getTargetsRemote(remoteReqs)
 			mu.Lock()
 			if err != nil {
@@ -241,7 +244,8 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 			var resp models.GetDataResp
 			buf, err = resp.UnmarshalMsg(buf)
 			if err != nil {
-				errorsChan <- errors.New(fmt.Sprintf("HTTP error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err))
+				log.Error(3, "HTTP error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err)
+				errorsChan <- err
 				return
 			}
 			log.Debug("HTTP getTargets: %s returned %d series", node.GetName(), len(resp.Series))

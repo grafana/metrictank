@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -49,7 +48,7 @@ func parseTarget(target string) (string, string, error) {
 			q1 = strings.Index(t, "\"")
 			q2 = strings.LastIndex(t, "\"")
 		} else {
-			return "", "", errors.New("target parse error")
+			return "", "", response.NewError(http.StatusBadRequest, "target parse error")
 		}
 		consolidateBy = t[q1+1 : q2]
 		err := consolidation.Validate(consolidateBy)
@@ -98,15 +97,7 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 	wg.Wait()
 	var err error
 	if len(errors) > 0 {
-		if len(errors) == 1 {
-			err = errors[0]
-		} else {
-			msg := fmt.Sprintf("%d errors: ", len(errors))
-			for _, e := range errors {
-				msg += e.Error() + ", "
-			}
-			err = fmt.Errorf(msg)
-		}
+		err = errors[0]
 	}
 
 	return series, err
@@ -124,7 +115,7 @@ func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) 
 	for _, pattern := range patterns {
 		nodes, err := s.MetricIndex.Find(orgId, pattern, seenAfter)
 		if err != nil {
-			return nil, err
+			return nil, response.NewError(http.StatusBadRequest, err.Error())
 		}
 		result = append(result, Series{
 			Pattern: pattern,
@@ -166,7 +157,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	targets := request.Targets
 	if maxPointsPerReq != 0 && len(targets)*int(request.MaxDataPoints) > maxPointsPerReq {
-		response.Write(ctx, response.NewError(http.StatusForbidden, MaxPointsPerReqErr))
+		response.Write(ctx, response.NewError(http.StatusForbidden, MaxPointsPerReqErr.Error()))
 		return
 	}
 
@@ -183,13 +174,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 
 	toUnix, err := dur.ParseTSpec(to, now, defaultTo)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 
@@ -200,11 +191,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	toUnix += 1
 
 	if fromUnix >= toUnix {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
 		return
 	}
 	if maxDaysPerReq != 0 && len(targets)*int(toUnix-fromUnix) > maxDaysPerReq*(3600*24) {
-		response.Write(ctx, response.NewError(http.StatusForbidden, MaxDaysPerReqErr))
+		response.Write(ctx, response.NewError(http.StatusForbidden, MaxDaysPerReqErr.Error()))
 		return
 	}
 
@@ -237,7 +228,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	series, err := s.findSeries(ctx.OrgId, patterns, int64(fromUnix))
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 	}
 
 	for _, s := range series {
@@ -253,7 +244,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			def := locdef.def
 			consolidator, err := consolidation.GetConsolidator(&def, consolidatorForPattern[pattern])
 			if err != nil {
-				response.Write(ctx, response.NewError(http.StatusBadRequest, err))
+				response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 				return
 			}
 			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
@@ -278,7 +269,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
@@ -291,7 +282,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, err := s.getTargets(reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render %s", err.Error())
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
@@ -318,7 +309,8 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	nodes := make([]idx.Node, 0)
 	series, err := s.findSeries(ctx.OrgId, []string{request.Query}, request.From)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
+		return
 	}
 	seenPaths := make(map[string]struct{})
 	// different nodes may have overlapping data in their index.
@@ -344,7 +336,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 	response.Write(ctx, response.NewJson(200, b, request.Jsonp))
@@ -417,16 +409,12 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	wg.Wait()
 	var err error
 	if len(errors) > 0 {
-		if len(errors) == 1 {
-			err = errors[0]
-		} else {
-			err = fmt.Errorf("%d errors: %q", len(errors), errors)
-		}
+		err = errors[0]
 	}
 
 	if err != nil {
 		log.Error(3, "HTTP IndexJson() %s", err.Error())
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
@@ -513,7 +501,12 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
 				mu.Lock()
 				if err != nil {
-					errors = append(errors, err)
+					// errors can be due to bad user input or corrupt index.
+					if strings.Contains(err.Error(), "Index is corrupt") {
+						errors = append(errors, response.NewError(http.StatusInternalServerError, err.Error()))
+					} else {
+						errors = append(errors, response.NewError(http.StatusBadRequest, err.Error()))
+					}
 				}
 				deleted += result
 				mu.Unlock()
@@ -535,13 +528,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	wg.Wait()
 	var err error
 	if len(errors) > 0 {
-		if len(errors) == 1 {
-			err = errors[0]
-		} else {
-			err = fmt.Errorf("%d errors: %v", len(errors), errors)
-		}
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err))
-		return
+		response.Write(ctx, response.WrapError(err))
 	}
 
 	resp := models.MetricsDeleteResp{
