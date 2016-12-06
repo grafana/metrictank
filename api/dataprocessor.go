@@ -312,7 +312,11 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		if err != nil {
 			panic(err)
 		}
+
+		var prevts uint32 = 0
 		for _, itgen := range storeIterGens {
+			s.Cache.Add(key, prevts, itgen)
+			prevts = itgen.Ts()
 			it, err := itgen.Get()
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt

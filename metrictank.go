@@ -31,6 +31,7 @@ import (
 	inCarbon "github.com/raintank/metrictank/input/carbon"
 	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
@@ -314,6 +315,7 @@ func main() {
 
 	accountingPeriod := dur.MustParseUNsec("accounting-period", *accountingPeriodStr)
 
+	cache := cache.NewChunkCache()
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 
@@ -380,6 +382,7 @@ func main() {
 	apiServer.BindMetricIndex(metricIndex)
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
+	apiServer.BindCache(cache)
 	go apiServer.Run()
 	/***********************************
 		Set our status so we can accept
