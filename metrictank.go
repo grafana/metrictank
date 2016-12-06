@@ -29,6 +29,7 @@ import (
 	inCarbon "github.com/raintank/metrictank/input/carbon"
 	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
@@ -325,6 +326,7 @@ func main() {
 		log.Warn("It is not recommended to run a mulitnode cluster with more then 1 input plugin.")
 	}
 
+<<<<<<< 567e67a596a63460dc15d81472c56f7eb933d33c
 	/***********************************
 		Initialize MetricPerrist notifiers
 	***********************************/
@@ -342,6 +344,8 @@ func main() {
 	/***********************************
 		Initialize our MetricIdx
 	***********************************/
+	cache := cache.NewChunkCache()
+	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 
 	if memory.Enabled {
@@ -402,6 +406,7 @@ func main() {
 	apiServer.BindMetricIndex(metricIndex)
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
+	apiServer.BindCache(cache)
 	go apiServer.Run()
 
 	/***********************************
