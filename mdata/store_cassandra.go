@@ -368,7 +368,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err
 			}
-			iters = append(iters, iter.New(it, true))
+			iters = append(iters, iter.New(it, len(b)))
 		}
 		err := outcome.i.Close()
 		if err != nil {

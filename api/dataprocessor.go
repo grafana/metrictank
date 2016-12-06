@@ -332,11 +332,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 			}
 		}
 		if LogLevel < 2 {
-			if iter.Cass {
-				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
-			} else {
-				log.Debug("DP getSeries: iter mem %d values good/total %d/%d", iter.T0, good, total)
-			}
+			log.Debug("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
@@ -359,7 +355,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
 			log.Debug("%s has multiple series.", series[0].Target)
-			for i, _ := range series[0].Datapoints {
+			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
 					if !math.IsNaN(series[j].Datapoints[i].Val) {
 						series[0].Datapoints[i].Val = series[j].Datapoints[i].Val
