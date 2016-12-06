@@ -4,21 +4,19 @@ package schema
 // MSGP CODE GENERATION TOOL (github.com/tinylib/msgp)
 // DO NOT EDIT
 
-import (
-	"github.com/tinylib/msgp/msgp"
-)
+import "github.com/tinylib/msgp/msgp"
 
 // DecodeMsg implements msgp.Decodable
 func (z *ProbeEvent) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var isz uint32
-	isz, err = dc.ReadMapHeader()
+	var zbai uint32
+	zbai, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for isz > 0 {
-		isz--
+	for zbai > 0 {
+		zbai--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -60,31 +58,31 @@ func (z *ProbeEvent) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Tags":
-			var msz uint32
-			msz, err = dc.ReadMapHeader()
+			var zcmr uint32
+			zcmr, err = dc.ReadMapHeader()
 			if err != nil {
 				return
 			}
-			if z.Tags == nil && msz > 0 {
-				z.Tags = make(map[string]string, msz)
+			if z.Tags == nil && zcmr > 0 {
+				z.Tags = make(map[string]string, zcmr)
 			} else if len(z.Tags) > 0 {
 				for key, _ := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}
-			for msz > 0 {
-				msz--
-				var xvk string
-				var bzg string
-				xvk, err = dc.ReadString()
+			for zcmr > 0 {
+				zcmr--
+				var zxvk string
+				var zbzg string
+				zxvk, err = dc.ReadString()
 				if err != nil {
 					return
 				}
-				bzg, err = dc.ReadString()
+				zbzg, err = dc.ReadString()
 				if err != nil {
 					return
 				}
-				z.Tags[xvk] = bzg
+				z.Tags[zxvk] = zbzg
 			}
 		default:
 			err = dc.Skip()
@@ -171,12 +169,12 @@ func (z *ProbeEvent) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for xvk, bzg := range z.Tags {
-		err = en.WriteString(xvk)
+	for zxvk, zbzg := range z.Tags {
+		err = en.WriteString(zxvk)
 		if err != nil {
 			return
 		}
-		err = en.WriteString(bzg)
+		err = en.WriteString(zbzg)
 		if err != nil {
 			return
 		}
@@ -212,9 +210,9 @@ func (z *ProbeEvent) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Tags"
 	o = append(o, 0xa4, 0x54, 0x61, 0x67, 0x73)
 	o = msgp.AppendMapHeader(o, uint32(len(z.Tags)))
-	for xvk, bzg := range z.Tags {
-		o = msgp.AppendString(o, xvk)
-		o = msgp.AppendString(o, bzg)
+	for zxvk, zbzg := range z.Tags {
+		o = msgp.AppendString(o, zxvk)
+		o = msgp.AppendString(o, zbzg)
 	}
 	return
 }
@@ -223,13 +221,13 @@ func (z *ProbeEvent) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *ProbeEvent) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var isz uint32
-	isz, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zajw uint32
+	zajw, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for isz > 0 {
-		isz--
+	for zajw > 0 {
+		zajw--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -271,31 +269,31 @@ func (z *ProbeEvent) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Tags":
-			var msz uint32
-			msz, bts, err = msgp.ReadMapHeaderBytes(bts)
+			var zwht uint32
+			zwht, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if z.Tags == nil && msz > 0 {
-				z.Tags = make(map[string]string, msz)
+			if z.Tags == nil && zwht > 0 {
+				z.Tags = make(map[string]string, zwht)
 			} else if len(z.Tags) > 0 {
 				for key, _ := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}
-			for msz > 0 {
-				var xvk string
-				var bzg string
-				msz--
-				xvk, bts, err = msgp.ReadStringBytes(bts)
+			for zwht > 0 {
+				var zxvk string
+				var zbzg string
+				zwht--
+				zxvk, bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
 					return
 				}
-				bzg, bts, err = msgp.ReadStringBytes(bts)
+				zbzg, bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
 					return
 				}
-				z.Tags[xvk] = bzg
+				z.Tags[zxvk] = zbzg
 			}
 		default:
 			bts, err = msgp.Skip(bts)
@@ -308,12 +306,13 @@ func (z *ProbeEvent) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	return
 }
 
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *ProbeEvent) Msgsize() (s int) {
 	s = 1 + 3 + msgp.StringPrefixSize + len(z.Id) + 10 + msgp.StringPrefixSize + len(z.EventType) + 6 + msgp.Int64Size + 9 + msgp.StringPrefixSize + len(z.Severity) + 7 + msgp.StringPrefixSize + len(z.Source) + 10 + msgp.Int64Size + 8 + msgp.StringPrefixSize + len(z.Message) + 5 + msgp.MapHeaderSize
 	if z.Tags != nil {
-		for xvk, bzg := range z.Tags {
-			_ = bzg
-			s += msgp.StringPrefixSize + len(xvk) + msgp.StringPrefixSize + len(bzg)
+		for zxvk, zbzg := range z.Tags {
+			_ = zbzg
+			s += msgp.StringPrefixSize + len(zxvk) + msgp.StringPrefixSize + len(zbzg)
 		}
 	}
 	return

@@ -447,10 +447,10 @@
 			"revisionTime": "2016-08-26T18:07:28Z"
 		},
 		{
-			"checksumSHA1": "Fv3Cdgosf28iev/JTFWO6nsPFCA=",
+			"checksumSHA1": "q1kuLxEK8/xbIpd3YU3kuv90JDQ=",
 			"path": "gopkg.in/raintank/schema.v1",
-			"revision": "a2ba0a7af66d6cc470d93bb5725f22f4b3c1ea79",
-			"revisionTime": "2016-07-20T14:31:18Z"
+			"revision": "d601c94bb87d6de4a46ad73f9d1182cb8b414a5b",
+			"revisionTime": "2016-12-06T17:30:17Z"
 		}
 	],
 	"rootPath": "github.com/raintank/metrictank"
