@@ -12,6 +12,7 @@ import (
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/macaron.v1"
 )
@@ -37,6 +38,7 @@ type Server struct {
 	MetricIndex  idx.MetricIndex
 	MemoryStore  mdata.Metrics
 	BackendStore mdata.Store
+	Cache        cache.Cache
 	shutdown     chan struct{}
 }
 
@@ -48,6 +50,10 @@ func (s *Server) BindMemoryStore(store mdata.Metrics) {
 }
 func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
+}
+
+func (s *Server) BindCache(cache cache.Cache) {
+	s.Cache = cache
 }
 
 func NewServer(stats met.Backend) (*Server, error) {
