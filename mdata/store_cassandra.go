@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/hailocab/go-hostpool"
 	"github.com/raintank/met"
@@ -277,10 +276,10 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, error) {
-	iters := make([]iter.Iter, 0)
+func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, error) {
+	itergens := make([]iter.IterGen, 0)
 	if start > end {
-		return iters, errStartBeforeEnd
+		return itergens, errStartBeforeEnd
 	}
 
 	pre := time.Now()
@@ -357,18 +356,13 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 			chunkSizeAtLoad.Value(int64(len(b)))
 			if len(b) < 2 {
 				log.Error(3, errChunkTooSmall.Error())
-				return iters, errChunkTooSmall
+				return itergens, errChunkTooSmall
 			}
 			if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
 				log.Error(3, errUnknownChunkFormat.Error())
-				return iters, errUnknownChunkFormat
+				return itergens, errUnknownChunkFormat
 			}
-			it, err := tsz.NewIterator(b[1:])
-			if err != nil {
-				log.Error(3, "failed to unpack cassandra payload. %s", err)
-				return iters, err
-			}
-			iters = append(iters, iter.New(it, true))
+			itergens = append(itergens, iter.NewGen(b[1:], uint32(ts), uint64(len(b[1:]))))
 		}
 		err := outcome.i.Close()
 		if err != nil {
@@ -380,8 +374,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(int64(len(outcomes)))
-	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
-	return iters, nil
+	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itergens", len(outcomes), len(itergens))
+	return itergens, nil
 }
 
 func (c *cassandraStore) Stop() {
