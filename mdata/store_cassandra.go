@@ -370,7 +370,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 				log.Error(3, errUnknownChunkFormat.Error())
 				return itergens, errUnknownChunkFormat
 			}
-			itergens = append(itergens, iter.NewGen(b[1:], uint32(ts), uint64(len(b[1:]))))
+			itergens = append(itergens, iter.NewGen(b[1:], uint32(ts)))
 		}
 		err := outcome.i.Close()
 		if err != nil {
