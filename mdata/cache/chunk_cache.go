@@ -26,29 +26,29 @@ type CacheChunk struct {
 	itergen iter.IterGen
 }
 
-type MetricCache struct {
+type CCacheMetric struct {
 	sync.RWMutex
 	chunks map[uint32]CacheChunk
 }
 
-type ChunkCache struct {
+type CCache struct {
 	sync.RWMutex
-	metricCache map[string]MetricCache
+	metricCache map[string]*CCacheMetric
 }
 
-func NewChunkCache() *ChunkCache {
-	return &ChunkCache{
-		metricCache: make(map[string]MetricCache),
+func NewChunkCache() *CCache {
+	return &CCache{
+		metricCache: make(map[string]*CCacheMetric),
 	}
 }
 
-func (c *ChunkCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
+func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
 	c.RLock()
 	if _, ok := c.metricCache[metric]; !ok {
 		c.RUnlock()
 
 		c.Lock()
-		c.metricCache[metric] = MetricCache{
+		c.metricCache[metric] = &CCacheMetric{
 			chunks: make(map[uint32]CacheChunk),
 		}
 		c.Unlock()
@@ -61,7 +61,7 @@ func (c *ChunkCache) Add(metric string, prev uint32, itergen iter.IterGen) error
 	return nil
 }
 
-func (mc MetricCache) Add(prev uint32, iter iter.IterGen) error {
+func (mc *CCacheMetric) Add(prev uint32, iter iter.IterGen) error {
 	ts := iter.Ts()
 
 	mc.RLock()
@@ -83,7 +83,7 @@ func (mc MetricCache) Add(prev uint32, iter iter.IterGen) error {
 	// if the previous chunk is cached, set this one as it's next
 	mc.RLock()
 	if _, ok := mc.chunks[prev]; ok {
-		mc.chunks[prev].SetNext(ts)
+		mc.chunks[prev].setNext(ts)
 	}
 	mc.RUnlock()
 
@@ -91,6 +91,6 @@ func (mc MetricCache) Add(prev uint32, iter iter.IterGen) error {
 }
 
 // this assumes we have a lock
-func (cc CacheChunk) SetNext(next uint32) {
+func (cc CacheChunk) setNext(next uint32) {
 	cc.Next = next
 }
