@@ -33,9 +33,8 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
-	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
-	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
-	errStartBeforeEnd     = errors.New("start must be before end.")
+	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
+	errStartBeforeEnd = errors.New("start must be before end.")
 
 	cassGetExecDuration met.Timer
 	cassGetWaitDuration met.Timer
@@ -284,9 +283,9 @@ func (c *cassandraStore) processReadQueue() {
 // Basic search of cassandra.
 // start inclusive, end exclusive
 func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, error) {
-	itergens := make([]iter.IterGen, 0)
+	itgens := make([]iter.IterGen, 0)
 	if start > end {
-		return itergens, errStartBeforeEnd
+		return itgens, errStartBeforeEnd
 	}
 
 	pre := time.Now()
@@ -363,7 +362,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 			chunkSizeAtLoad.Value(int64(len(b)))
 			if len(b) < 2 {
 				log.Error(3, errChunkTooSmall.Error())
-				return itergens, errChunkTooSmall
+				return itgens, errChunkTooSmall
 			}
 			switch chunk.Format(b[0]) {
 			case chunk.FormatStandardGoTsz:
@@ -378,7 +377,10 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 				log.Error(3, errUnknownChunkFormat.Error())
 				return itergens, errUnknownChunkFormat
 			}
-			itergens = append(itergens, iter.NewGen(b[1:], uint32(ts)))
+			itgen, err := iter.NewGen(b, uint32(ts))
+			if err == nil {
+				itgens = append(itgens, *itgen)
+			}
 		}
 		err := outcome.i.Close()
 		if err != nil {
@@ -390,8 +392,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(int64(len(outcomes)))
-	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itergens", len(outcomes), len(itergens))
-	return itergens, nil
+	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itgens", len(outcomes), len(itgens))
+	return itgens, nil
 }
 
 func (c *cassandraStore) Stop() {

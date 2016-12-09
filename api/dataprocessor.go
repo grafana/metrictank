@@ -414,6 +414,8 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		// if to < oldest -> no need to search until oldest, only search until to
 		until := util.Min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
+
+		_ = s.Cache.Search(key, fromUnix, until)
 		storeIterGens, err := s.BackendStore.Search(key, fromUnix, until)
 		if err != nil {
 			panic(err)
@@ -421,6 +423,8 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 
 		var prevts uint32 = 0
 		for _, itgen := range storeIterGens {
+			// it's important that the itgens get added in chronological order,
+			// currently we rely on cassandra returning results in order
 			s.Cache.Add(key, prevts, itgen)
 			prevts = itgen.Ts()
 			it, err := itgen.Get()

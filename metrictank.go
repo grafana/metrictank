@@ -368,7 +368,6 @@ func main() {
 		log.Warn("It is not recommended to run a mulitnode cluster with more then 1 input plugin.")
 	}
 
-<<<<<<< 567e67a596a63460dc15d81472c56f7eb933d33c
 	/***********************************
 		Initialize MetricPerrist notifiers
 	***********************************/
