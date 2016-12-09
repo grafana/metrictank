@@ -10,7 +10,7 @@ import (
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/misc/instrumented_nsq"
+	"github.com/raintank/metrictank/mdata/notifierNsq/instrumented_nsq"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

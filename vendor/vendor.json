@@ -255,12 +255,6 @@
 			"revisionTime": "2016-07-13T17:23:02Z"
 		},
 		{
-			"checksumSHA1": "0B0oQeTSasAEyG1RgnGvBYK0nRU=",
-			"path": "github.com/raintank/misc/instrumented_nsq",
-			"revision": "cb73203311ae2489b845469f622678f24ff98a16",
-			"revisionTime": "2016-07-13T17:23:02Z"
-		},
-		{
 			"checksumSHA1": "oCMADD0xqElYRIXBgNkBGHXGQyk=",
 			"path": "github.com/raintank/worldping-api/pkg/log",
 			"revision": "66b28f1160d1e0d7d236b5bd96a5d8eee627357c",
