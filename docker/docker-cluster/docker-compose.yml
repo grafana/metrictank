@@ -136,7 +136,10 @@ services:
   # easiest to just use a separate graphite server for monitoring
   graphitemon:
     hostname: graphitemon
-    image:  raintank/graphite
+    image:  raintank/graphite-stack
     ports:
       - "2003:2003"
-      - "8000:80"
+      - "8000:443"
+    volumes:
+     - "./carbon.conf:/opt/graphite/conf/carbon.conf"
+     - "./storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf"
