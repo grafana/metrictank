@@ -25,7 +25,7 @@ for file in $envsdir/docker-$env/datasources/*; do
   echo
 done
 
-for file in $basedir/dashboards/*; do
+for file in $basedir/../../dashboard.json $basedir/dashboards/*; do
   if grep -q "__inputs" $file; then
     echo "> importing dashboard $file"
     curl -u admin:admin \
