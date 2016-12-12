@@ -57,6 +57,7 @@ warm-up-period = 1h
 # with these aggregation rules: 5min:1h:2:3mon,1h:6h:2:1y:false
 # 5 min of data, store in a chunk that lasts 1hour, keep 2 chunks in memory, keep for 3months in cassandra
 # 1hr worth of data, in chunks of 6 hours, 2 chunks in mem, keep for 1 year, but this series is not ready yet for querying.
+# When running multiple instances of metrictank in a cluster, all nodes in the cluster should have the same agg-settings config.
 agg-settings =
 ```
 

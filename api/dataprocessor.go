@@ -223,7 +223,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	if len(errs) > 0 {
 		err = errs[0]
 	}
-	log.Debug("HTTP getTargets: %d series found on cluster", len(out))
+	log.Debug("DP getTargets: %d series found on cluster", len(out))
 	return out, err
 }
 
@@ -233,7 +233,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for node, nodeReqs := range remoteReqs {
-		log.Debug("HTTP getTargets: handling %d reqs from %s", len(nodeReqs), node.GetName())
+		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), node.GetName())
 		go func(reqs []models.Req, node *cluster.Node) {
 			defer wg.Done()
 			buf, err := node.Post("/cluster/getdata", models.GetData{Requests: reqs})
@@ -244,11 +244,11 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 			var resp models.GetDataResp
 			buf, err = resp.UnmarshalMsg(buf)
 			if err != nil {
-				log.Error(3, "HTTP error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err)
+				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err)
 				errorsChan <- err
 				return
 			}
-			log.Debug("HTTP getTargets: %s returned %d series", node.GetName(), len(resp.Series))
+			log.Debug("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
 			seriesChan <- resp.Series
 		}(nodeReqs, node)
 	}
@@ -262,7 +262,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 	for series := range seriesChan {
 		out = append(out, series...)
 	}
-	log.Debug("HTTP getTargets: total of %d series found on peers", len(out))
+	log.Debug("DP getTargetsRemote: total of %d series found on peers", len(out))
 	for e := range errorsChan {
 		err = e
 		break
@@ -272,7 +272,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 
 // error is the error of the first failing target request
 func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
-	log.Debug("HTTP getTargets: handling %d reqs locally", len(reqs))
+	log.Debug("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	seriesChan := make(chan models.Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
 	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
@@ -305,7 +305,7 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 	for series := range seriesChan {
 		out = append(out, series)
 	}
-	log.Debug("HTTP getTargets: %d series found locally", len(out))
+	log.Debug("DP getTargetsLocal: %d series found locally", len(out))
 	for e := range errorsChan {
 		err = e
 		break
@@ -464,7 +464,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			//we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
-			log.Debug("%s has multiple series.", series[0].Target)
+			log.Debug("DP mergeSeries: %s has multiple series.", series[0].Target)
 			for i, _ := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
 					if !math.IsNaN(series[j].Datapoints[i].Val) {

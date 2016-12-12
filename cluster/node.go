@@ -78,7 +78,7 @@ type Node struct {
 	name          string
 	version       string
 	started       time.Time
-	remoteAddr    *url.URL
+	remoteAddr    *url.URL //will be Nil for ThisNode
 	primary       bool
 	primaryChange time.Time
 	state         NodeState
