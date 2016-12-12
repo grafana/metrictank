@@ -139,7 +139,7 @@ services:
     image:  raintank/graphite-stack
     ports:
       - "2003:2003"
-      - "8000:443"
+      - "443:443"
     volumes:
      - "./carbon.conf:/opt/graphite/conf/carbon.conf"
      - "./storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf"

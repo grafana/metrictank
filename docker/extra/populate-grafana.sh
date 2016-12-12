@@ -1,5 +1,17 @@
 #!/bin/bash
 
+basedir=$(dirname "$0")
+envsdir=$basedir/..
+env="$1"
+
+if [ ! -d $envsdir/docker-$env ]; then
+	echo -e "Could not find docker environment $envsdir/docker-$env\n" >&2
+	echo -e "Known environments:\n" >&2
+	cd $envsdir
+	ls -1d docker-* | sed 's#^docker-##' >&2
+	exit 1
+fi
+
 echo "waiting for Grafana to start listening..."
 while true; do
   netstat -nlp | grep -q ':3000' && break
@@ -7,21 +19,13 @@ while true; do
 done
 echo "ok grafana is listening"
 
-echo "> adding datasources graphite"
+for file in $envsdir/docker-$env/datasources/*; do
+  echo "> adding datasources $file"
+  curl -u admin:admin -H "content-type: application/json" 'http://localhost:3000/api/datasources' -X POST --data-binary @$file
+  echo
+done
 
-curl -u admin:admin \
-  -H "content-type: application/json" \
-  'http://localhost:3000/api/datasources' -X POST --data-binary '{"name":"graphite","type":"graphite","url":"http://localhost:8000","access":"direct","isDefault":false}'
-echo
-
-echo "> adding datasources metrictank"
-
-curl -u admin:admin \
-  -H "content-type: application/json" \
-  'http://localhost:3000/api/datasources' -X POST --data-binary '{"name":"metrictank","type":"graphite","url":"http://localhost:8080","access":"direct","isDefault":false}'
-echo
-
-for file in dashboards/*; do
+for file in $basedir/dashboards/*; do
   if grep -q "__inputs" $file; then
     echo "> importing dashboard $file"
     curl -u admin:admin \

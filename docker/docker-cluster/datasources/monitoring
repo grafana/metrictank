@@ -1,0 +1,7 @@
+{
+  "name":"monitoring",
+  "type":"graphite",
+  "url":"https://localhost:443",
+  "access":"direct",
+  "isDefault":false
+}
