@@ -204,9 +204,16 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 
 			data := cwr.chunk.Series.Bytes()
 			chunkSizeAtSave.Value(int64(len(data)))
-			version := chunk.FormatStandardGoTsz
+			version := chunk.FormatStandardGoTszWithSpan
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, uint8(version))
+			binary.Write(buf, binary.LittleEndian, version)
+
+			spanCode, ok := chunk.RevChunkSpans[cwr.span]
+			if !ok {
+				// it's probably better to panic than to persist the chunk with a wrong length
+				panic(fmt.Sprintf("Chunk span invalid: %d", cwr.span))
+			}
+			binary.Write(buf, binary.LittleEndian, spanCode)
 			buf.Write(data)
 			success := false
 			attempts := 0
@@ -359,11 +366,20 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 				log.Error(3, errChunkTooSmall.Error())
 				return iters, errChunkTooSmall
 			}
-			if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
+			switch chunk.Format(b[0]) {
+			case chunk.FormatStandardGoTsz:
+				b = b[1:]
+			case chunk.FormatStandardGoTszWithSpan:
+				if int(b[1]) >= len(chunk.ChunkSpans) {
+					log.Error(3, "corrupt data, chunk span code %d is not known", chunk.SpanCode(b[1]))
+				}
+				// getting the chunk span: _ = chunk.ChunkSpans[chunk.SpanCode(b[1])]
+				b = b[2:]
+			default:
 				log.Error(3, errUnknownChunkFormat.Error())
 				return iters, errUnknownChunkFormat
 			}
-			it, err := tsz.NewIterator(b[1:])
+			it, err := tsz.NewIterator(b)
 			if err != nil {
 				log.Error(3, "failed to unpack cassandra payload. %s", err)
 				return iters, err

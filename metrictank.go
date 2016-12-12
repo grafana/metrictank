@@ -253,6 +253,10 @@ func main() {
 	if (mdata.Month_sec % chunkSpan) != 0 {
 		log.Fatal(4, "chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 	}
+	_, ok := chunk.RevChunkSpans[chunkSpan]
+	if !ok {
+		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *chunkSpanStr)
+	}
 
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]mdata.AggSetting, 0)
@@ -271,6 +275,10 @@ func main() {
 		aggTTL := dur.MustParseUNsec("aggsettings", fields[3])
 		if (mdata.Month_sec % aggChunkSpan) != 0 {
 			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		}
+		_, ok := chunk.RevChunkSpans[aggChunkSpan]
+		if !ok {
+			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", fields[1])
 		}
 		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true

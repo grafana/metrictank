@@ -356,6 +356,7 @@ func (a *AggMetric) persist(pos int) {
 		chunk:     chunk,
 		ttl:       a.ttl,
 		timestamp: time.Now(),
+		span:      a.ChunkSpan,
 	}
 
 	// if we recently became the primary, there may be older chunks
@@ -375,6 +376,7 @@ func (a *AggMetric) persist(pos int) {
 			chunk:     previousChunk,
 			ttl:       a.ttl,
 			timestamp: time.Now(),
+			span:      a.ChunkSpan,
 		})
 		previousPos--
 		if previousPos < 0 {
