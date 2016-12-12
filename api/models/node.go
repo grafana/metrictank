@@ -32,6 +32,6 @@ type GetData struct {
 }
 
 type IndexDelete struct {
-	Query string `json:"patterns" form:"query" binding:"Required"`
+	Query string `json:"query" form:"query" binding:"Required"`
 	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
 }
