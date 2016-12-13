@@ -1,7 +1,7 @@
 {
   "name":"monitoring",
   "type":"graphite",
-  "url":"https://localhost:443",
-  "access":"direct",
+  "url":"https://graphitemon:443",
+  "access":"proxy",
   "isDefault":false
 }
