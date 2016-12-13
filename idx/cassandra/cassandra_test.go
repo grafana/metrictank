@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/met/helper"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
@@ -22,6 +23,8 @@ func init() {
 	numConns = 1
 	writeQueueSize = 1000
 	protoVer = 4
+
+	cluster.Init("default", "test", time.Now())
 }
 
 func getSeriesNames(depth, count int, prefix string) []string {
@@ -80,7 +83,7 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.Add(s)
+				ix.Add(s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -98,7 +101,7 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.Add(series)
+			ix.Add(series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -112,19 +115,19 @@ func TestFind(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	ix.Init(stats)
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
-		ix.Add(s)
+		ix.Add(s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
-		ix.Add(s)
+		ix.Add(s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
-		ix.Add(s)
+		ix.Add(s, 1)
 		s.Interval = 60
 		s.SetId()
-		ix.Add(s)
+		ix.Add(s, 1)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
-		ix.Add(s)
+		ix.Add(s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -208,6 +211,7 @@ func TestFind(t *testing.T) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
+	cluster.ThisNode.SetPartitions([]int32{1})
 	keyspace = "raintank"
 	hosts = "localhost:9042"
 	consistency = "one"
@@ -215,12 +219,14 @@ func BenchmarkIndexing(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
+	updateInterval = time.Hour
+	updateFuzzyness = 1.0
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
 	stats, err := helper.New(false, "", "standard", "metrictank", "")
 	if err != nil {
@@ -246,11 +252,12 @@ func insertDefs(ix idx.MetricIndex, i int) {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.Add(data)
+		ix.Add(data, 1)
 	}
 }
 
 func BenchmarkLoad(b *testing.B) {
+	cluster.ThisNode.SetPartitions([]int32{1})
 	keyspace = "raintank"
 	hosts = "localhost:9042"
 	consistency = "one"
@@ -258,6 +265,8 @@ func BenchmarkLoad(b *testing.B) {
 	numConns = 10
 	writeQueueSize = 10
 	protoVer = 4
+	updateInterval = time.Hour
+	updateFuzzyness = 1.0
 	ix := New()
 
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
@@ -265,12 +274,13 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_def_idx").Exec()
+	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
 	tmpSession.Close()
 	err = ix.Init(stats)
 	if err != nil {
 		b.Skipf("can't initialize cassandra: %s", err)
 	}
+
 	insertDefs(ix, b.N)
 	ix.Stop()
 

@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/util"
 )
@@ -15,6 +16,7 @@ type Req struct {
 	MaxPoints    uint32                     `json:"maxPoints"`
 	RawInterval  uint32                     `json:"rawInterval"` // the interval of the raw metric before any consolidation
 	Consolidator consolidation.Consolidator `json:"consolidator"`
+	Node         *cluster.Node              `json:"-"`
 
 	// these fields need some more coordination and are typically set later
 	Archive      int    `json:"archive"`      // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
@@ -23,7 +25,7 @@ type Req struct {
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key, target string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) Req {
+func NewReq(key, target string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, node *cluster.Node) Req {
 	return Req{
 		key,
 		target,
@@ -32,6 +34,7 @@ func NewReq(key, target string, from, to, maxPoints, rawInterval uint32, consoli
 		maxPoints,
 		rawInterval,
 		consolidator,
+		node,
 		-1, // this is supposed to be updated still!
 		0,  // this is supposed to be updated still
 		0,  // this is supposed to be updated still

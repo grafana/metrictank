@@ -20,6 +20,15 @@ func (s *Server) RegisterRoutes() {
 	r.Get("/node", s.getNodeStatus)
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
 
+	r.Get("/cluster", s.getClusterStatus)
+
+	r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
+
+	r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
+	r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
+	r.Combo("/index/delete", bind(models.IndexDelete{})).Get(s.indexDelete).Post(s.indexDelete)
+	r.Combo("/index/get", bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
+
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
 	})

@@ -7,6 +7,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+//go:generate msgp
 type Series struct {
 	Target     string // will be set to the target attribute of the given request
 	Datapoints []schema.Point

@@ -18,7 +18,7 @@ import (
 
 func Test_HandleMessage(t *testing.T) {
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
@@ -91,7 +91,7 @@ func test_handleMessage(worker int, k *KafkaMdm, t *testing.T) map[string]int {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		k.handleMsg(data)
+		k.handleMsg(data, 1)
 	}
 	return metrics
 }

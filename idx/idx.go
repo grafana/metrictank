@@ -16,6 +16,7 @@ var (
 	BranchUnderLeaf   = errors.New("can't add branch under leaf")
 )
 
+//go:generate msgp
 type Node struct {
 	Path string
 	Leaf bool
@@ -48,9 +49,10 @@ Interface
 * Stop():
  This will be called when metrictank is shutting down.
 
-* Add(*schema.MetricData) error:
+* Add(*schema.MetricData, int32) error:
   Every metric received will result in a call to this method to ensure the
-  metric has been added to the index.
+  metric has been added to the index. The method is passed the metricData
+  payload and the partition id of the metric
 
 * Get(string) (schema.MetricDefinition, error):
   This method should return the  MetricDefintion with the passed Id.
@@ -85,7 +87,7 @@ Interface
 type MetricIndex interface {
 	Init(met.Backend) error
 	Stop()
-	Add(*schema.MetricData) error
+	Add(*schema.MetricData, int32) error
 	Get(string) (schema.MetricDefinition, error)
 	Delete(int, string) ([]schema.MetricDefinition, error)
 	Find(int, string, int64) ([]Node, error)

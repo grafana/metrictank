@@ -23,7 +23,7 @@ type testCase struct {
 }
 
 func init() {
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 }
 
 func validate(cases []testCase, t *testing.T) {
@@ -541,7 +541,7 @@ func TestPrevBoundary(t *testing.T) {
 
 // TestGetSeries assures that series data is returned in proper form.
 func TestGetSeries(t *testing.T) {
-	cluster.Init("default", "test", false, time.Now())
+	cluster.Init("default", "test", time.Now())
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
 	metrics := mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
@@ -575,7 +575,7 @@ func TestGetSeries(t *testing.T) {
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg)
+				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.ThisNode)
 				req.ArchInterval = 10
 				points := srv.getSeries(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
@@ -594,11 +594,11 @@ type alignCase struct {
 }
 
 func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.ThisNode)
 	return req
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator)
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.ThisNode)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.OutInterval = outInterval

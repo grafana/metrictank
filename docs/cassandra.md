@@ -34,11 +34,20 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
 If you are using the [cassandra-idx](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
 
 ```
-CREATE TABLE IF NOT EXISTS raintank.metric_def_idx (
-    id text PRIMARY KEY,
-    def blob,
+CREATE TABLE IF NOT EXISTS raintank.metric_idx (
+    id text,
+    partition int,
+    name text,
+    metric text,
+    interval int,
+    unit text,
+    mtype text,
+    tags set<text>,
+    lastupdate int,
+    PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
+CREATE INDEX IF NOT EXISTS ON raintank.metric_idx(partition);
 ```
 
 These settings are good for development and geared towards Cassandra 3.0
@@ -57,11 +66,20 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 
-CREATE TABLE IF NOT EXISTS raintank.metric_def_idx (
-    id text PRIMARY KEY,
-    def blob,
+CREATE TABLE IF NOT EXISTS raintank.metric_idx (
+    id text,
+    partition int,
+    name text,
+    metric text,
+    interval int,
+    unit text,
+    mtype text,
+    tags set<text>,
+    lastupdate int,
+    PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
+CREATE INDEX IF NOT EXISTS ON raintank.metric_idx(partition);
 ```
 
 If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
