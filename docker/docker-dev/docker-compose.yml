@@ -1,31 +1,32 @@
 version: '2'
+
 services:
   metrictank:
-    hostname: metrictank-1
+    hostname: metrictank
     image: raintank/metrictank
     ports:
      - "6060:6060"
      - "2003:2003"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
     environment:
      WAIT_HOSTS: cassandra:9042
      WAIT_TIMEOUT: 60
     links:
-     - statsdaemon
      - cassandra
+     - statsdaemon
+
   cassandra:
+    hostname: cassandra
     image: cassandra:3.0.8
     environment:
       MAX_HEAP_SIZE: 1G
       HEAP_NEWSIZE: 256M
-  statsdaemon:
-    hostname: statsdaemon-1
-    image: raintank/statsdaemon
     ports:
-     - "8125:8125/udp"
-    volumes:
-     - "./statsdaemon.ini:/etc/statsdaemon.ini"
+     - "9042:9042"
+
   graphite-api:
-    hostname: graphite-api-1
+    hostname: graphite-api
     image: raintank/graphite-metrictank
     ports:
      - "8080:8080"
@@ -33,10 +34,18 @@ services:
      - metrictank
      - statsdaemon
     volumes:
-     - "./graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
+     - "../graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
+
   grafana:
+    hostname: grafana
     image: grafana/grafana
     ports:
       - "3000:3000"
-    links:
-      - graphite-api
+
+  statsdaemon:
+    hostname: statsdaemon
+    image: raintank/statsdaemon
+    ports:
+     - "8125:8125/udp"
+    volumes:
+     - "../statsdaemon.ini:/etc/statsdaemon.ini"
