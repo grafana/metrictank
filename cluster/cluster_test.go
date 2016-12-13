@@ -40,7 +40,7 @@ func TestPeersForQuery(t *testing.T) {
 	Convey("when cluster in multi mode", t, func() {
 		selected := PeersForQuery()
 		So(selected, ShouldHaveLength, 2)
-		So(selected[0], ShouldEqual, ThisNode)
+		So(selected, ShouldContain, ThisNode)
 		Convey("peers should be selected randomly with even distribution", func() {
 			peerCount := make(map[string]int)
 			for i := 0; i < 1000; i++ {
