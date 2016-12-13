@@ -128,16 +128,16 @@ func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) 
 }
 
 func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64, peer *cluster.Node) ([]Series, error) {
-	log.Debug("HTTP Render querying %s/cluster/index/find for %d:%q", peer.GetName(), orgId, patterns)
-	buf, err := peer.Post("/cluster/index/find", models.IndexFind{Patterns: patterns, OrgId: orgId})
+	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.GetName(), orgId, patterns)
+	buf, err := peer.Post("/index/find", models.IndexFind{Patterns: patterns, OrgId: orgId})
 	if err != nil {
-		log.Error(4, "HTTP Render error querying %s/cluster/index/find: %q", peer.GetName(), err)
+		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.GetName(), err)
 		return nil, err
 	}
 	resp := models.NewIndexFindResp()
 	buf, err = resp.UnmarshalMsg(buf)
 	if err != nil {
-		log.Error(4, "HTTP Find() error unmarshaling body from %s/cluster/index/find: %q", peer.GetName(), err)
+		log.Error(4, "HTTP Find() error unmarshaling body from %s/index/find: %q", peer.GetName(), err)
 		return nil, err
 	}
 	result := make([]Series, 0)
@@ -347,10 +347,10 @@ func (s *Server) listLocal(orgId int) []schema.MetricDefinition {
 }
 
 func (s *Server) listRemote(orgId int, peer *cluster.Node) ([]schema.MetricDefinition, error) {
-	log.Debug("HTTP IndexJson() querying %s/cluster/index/list for %d", peer.GetName(), orgId)
-	buf, err := peer.Post("/cluster/index/list", models.IndexList{OrgId: orgId})
+	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.GetName(), orgId)
+	buf, err := peer.Post("/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
-		log.Error(4, "HTTP IndexJson() error querying %s/cluster/index/list: %q", peer.GetName(), err)
+		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.GetName(), err)
 		return nil, err
 	}
 	result := make([]schema.MetricDefinition, 0)
@@ -358,7 +358,7 @@ func (s *Server) listRemote(orgId int, peer *cluster.Node) ([]schema.MetricDefin
 		var def schema.MetricDefinition
 		buf, err = def.UnmarshalMsg(buf)
 		if err != nil {
-			log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/cluster/index/list: %q", peer.GetName(), err)
+			log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/index/list: %q", peer.GetName(), err)
 			return nil, err
 		}
 		result = append(result, def)
@@ -544,16 +544,16 @@ func (s *Server) metricsDeleteLocal(orgId int, query string) (int, error) {
 }
 
 func (s *Server) metricsDeleteRemote(orgId int, query string, peer *cluster.Node) (int, error) {
-	log.Debug("HTTP metricDelete calling %s/cluster/index/delete for %d:%q", peer.GetName(), orgId, query)
-	buf, err := peer.Post("/cluster/index/delete", models.IndexDelete{Query: query, OrgId: orgId})
+	log.Debug("HTTP metricDelete calling %s/index/delete for %d:%q", peer.GetName(), orgId, query)
+	buf, err := peer.Post("/index/delete", models.IndexDelete{Query: query, OrgId: orgId})
 	if err != nil {
-		log.Error(4, "HTTP metricDelete error querying %s/cluster/index/delete: %q", peer.GetName(), err)
+		log.Error(4, "HTTP metricDelete error querying %s/index/delete: %q", peer.GetName(), err)
 		return 0, err
 	}
 	resp := models.MetricsDeleteResp{}
 	buf, err = resp.UnmarshalMsg(buf)
 	if err != nil {
-		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/cluster/index/delete: %q", peer.GetName(), err)
+		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/index/delete: %q", peer.GetName(), err)
 		return 0, err
 	}
 

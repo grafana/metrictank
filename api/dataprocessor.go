@@ -236,7 +236,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), node.GetName())
 		go func(reqs []models.Req, node *cluster.Node) {
 			defer wg.Done()
-			buf, err := node.Post("/cluster/getdata", models.GetData{Requests: reqs})
+			buf, err := node.Post("/getdata", models.GetData{Requests: reqs})
 			if err != nil {
 				errorsChan <- err
 				return
@@ -244,7 +244,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 			var resp models.GetDataResp
 			buf, err = resp.UnmarshalMsg(buf)
 			if err != nil {
-				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/cluster/getdata: %q", node.GetName(), err)
+				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err)
 				errorsChan <- err
 				return
 			}
