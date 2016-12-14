@@ -26,7 +26,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) error {
 	mc.RUnlock()
 
 	// adding the new chunk to the lru
-	mc.lru.touch(ts)
+	go mc.lru.touch(ts)
 
 	mc.Lock()
 	mc.chunks[ts] = &CacheChunk{
@@ -138,7 +138,8 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 		// add all consecutive chunks to search results, starting at the one containing "from"
 		for ; ts <= (*keys)[len(*keys)-1]; ts = mc.chunks[ts].Next {
 			// updating the chunk lru
-			mc.lru.touch(ts)
+			go mc.lru.touch(ts)
+
 			res.Start = append(res.Start, mc.chunks[ts].Itgen)
 			endts := mc.EndTs(ts)
 			res.From = endts
@@ -153,7 +154,8 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	if ok {
 		for ; ts >= 0 && ts >= res.From; ts = mc.chunks[ts].Prev {
 			// updating the chunk lru
-			mc.lru.touch(ts)
+			go mc.lru.touch(ts)
+
 			res.End = append(res.End, mc.chunks[ts].Itgen)
 			fromts := mc.chunks[ts].Ts
 			res.Until = fromts
