@@ -19,29 +19,18 @@ func ConfigSetup() {
 	globalconf.Register("chunk-cache", flags)
 }
 
-type CacheChunk struct {
-	Ts    uint32
-	Next  uint32
-	Prev  uint32
-	Itgen iter.IterGen
-	lru   *LRU
-}
-
-// this assumes we have a lock
-func (cc *CacheChunk) setNext(next uint32) {
-	cc.Next = next
-}
-
 type CCache struct {
 	sync.RWMutex
 	lru         *LRU
 	metricCache map[string]*CCacheMetric
+	accounting  Accounting
 }
 
 func NewChunkCache() *CCache {
 	return &CCache{
 		lru:         NewLRU(),
 		metricCache: make(map[string]*CCacheMetric),
+		accounting:  *NewAccounting(),
 	}
 }
 
@@ -50,8 +39,13 @@ func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
 	if _, ok := c.metricCache[metric]; !ok {
 		ts := itergen.Ts()
 
-		// adding the new metric to the lru
+		// add metric to lru and update accounting
 		c.lru.touch(metric)
+		c.accounting.Add(metric, ts, itergen.Size())
+		if c.accounting.GetTotal() >= maxSize {
+			// evict the least recent used 20% of the current cache content
+			go c.evict(20)
+		}
 
 		// initializing a new linked list with head and tail
 		c.metricCache[metric] = &CCacheMetric{
@@ -94,4 +88,7 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 	} else {
 		return nil
 	}
+}
+
+func (c *CCache) evict(percent uint32) {
 }
