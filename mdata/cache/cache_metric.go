@@ -1,98 +1,18 @@
 package cache
 
 import (
-	"flag"
 	"sort"
 	"sync"
 
 	"github.com/raintank/metrictank/iter"
-	"github.com/rakyll/globalconf"
 )
-
-var (
-	maxSize uint64
-)
-
-func ConfigSetup() {
-	flags := flag.NewFlagSet("chunk-cache", flag.ExitOnError)
-	// (1024 ^ 3) * 4 = 4294967296
-	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes")
-	globalconf.Register("chunk-cache", flags)
-}
-
-type CacheChunk struct {
-	Ts    uint32
-	Next  uint32
-	Prev  uint32
-	Itgen iter.IterGen
-}
-
-// this assumes we have a lock
-func (cc *CacheChunk) setNext(next uint32) {
-	cc.Next = next
-}
 
 type CCacheMetric struct {
 	sync.RWMutex
 	oldest uint32
 	newest uint32
 	chunks map[uint32]*CacheChunk
-}
-
-type CCache struct {
-	sync.RWMutex
-	metricCache map[string]*CCacheMetric
-}
-
-func NewChunkCache() *CCache {
-	return &CCache{
-		metricCache: make(map[string]*CCacheMetric),
-	}
-}
-
-func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
-	c.Lock()
-	if _, ok := c.metricCache[metric]; !ok {
-		ts := itergen.Ts()
-
-		// initializing a new linked list with head and tail
-		c.metricCache[metric] = &CCacheMetric{
-			oldest: ts,
-			newest: ts,
-			chunks: map[uint32]*CacheChunk{
-				ts: &CacheChunk{
-					ts,
-					0,
-					0,
-					itergen,
-				},
-			},
-		}
-	} else {
-		c.metricCache[metric].Add(prev, itergen)
-	}
-	c.Unlock()
-
-	return nil
-}
-
-type CCSearchResult struct {
-	From     uint32
-	Until    uint32
-	Complete bool
-	Start    []iter.IterGen
-	End      []iter.IterGen
-}
-
-func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
-	c.RLock()
-	defer c.RUnlock()
-
-	if cm, ok := c.metricCache[metric]; ok {
-		return cm.Search(from, until)
-	} else {
-		return nil
-	}
+	lru    *LRU
 }
 
 func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) error {
@@ -105,12 +25,16 @@ func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) error {
 	}
 	mc.RUnlock()
 
+	// adding the new chunk to the lru
+	mc.lru.touch(ts)
+
 	mc.Lock()
 	mc.chunks[ts] = &CacheChunk{
 		ts,
 		0,
 		prev,
 		itergen,
+		NewLRU(),
 	}
 
 	// if the previous chunk is cached, set this one as it's next
@@ -213,6 +137,8 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	if ok {
 		// add all consecutive chunks to search results, starting at the one containing "from"
 		for ; ts <= (*keys)[len(*keys)-1]; ts = mc.chunks[ts].Next {
+			// updating the chunk lru
+			mc.lru.touch(ts)
 			res.Start = append(res.Start, mc.chunks[ts].Itgen)
 			endts := mc.EndTs(ts)
 			res.From = endts
@@ -226,6 +152,8 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	ts, ok = mc.seek(until, keys, false)
 	if ok {
 		for ; ts >= 0 && ts >= res.From; ts = mc.chunks[ts].Prev {
+			// updating the chunk lru
+			mc.lru.touch(ts)
 			res.End = append(res.End, mc.chunks[ts].Itgen)
 			fromts := mc.chunks[ts].Ts
 			res.Until = fromts
