@@ -10,4 +10,5 @@ type Format uint8
 // identifier of message format
 const (
 	FormatStandardGoTsz Format = iota
+	FormatStandardGoTszWithSpan
 )

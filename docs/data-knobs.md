@@ -19,7 +19,7 @@ For more details, see the [go-tsz eval program](https://github.com/dgryski/go-ts
 
 ### Basic guideline
 
-`chunkspan` is how long of a timeframe should be covered by your chunks. E.g. you could store anywhere between 10 minutes to 24 hours worth of data in a chunk (chunks for each raw metric).
+`chunkspan` is how long of a timeframe should be covered by your chunks. E.g. you could store anywhere between 1 second to 24 hours worth of data in a chunk (chunks for each raw metric).
 `numchunks` is simply how many chunks should be retained in RAM. (for each raw metric)
 
 figuring out optimal configuration for the `chunkspan` and `numchunks` is not trivial.
@@ -44,7 +44,17 @@ Note:
 
 Several factors come into play that may affect the above recommendation:
 
+#### Valid chunk spans
+
+Chunkspans can be set to one of the following:
+```
+1sec, 5sec, 10sec, 15sec, 20sec, 30sec, 60sec, 90sec, 2min, 3min, 5min, 10min, 15min, 20min,
+30min, 45min, 1h, 90min, 2h, 150min, 3h, 4h, 5h, 6h, 7h, 8h, 9h, 10h, 12h, 15h, 18h, 24h
+```
+This list can be extended in the future.
+
 #### Rollups remove the need to keep large number of higher resolution chunks
+
 If you roll-up data for archival storage, those chunks will also be in memory as per your configuration.
 Querying for large timeframes may use the consolidated chunks in RAM, and keeping
 extra raw (or higher-resolution) data in RAM becomes pointless, putting an upper bound on how many chunks to keep.  

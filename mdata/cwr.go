@@ -20,4 +20,5 @@ type ChunkWriteRequest struct {
 	chunk     *chunk.Chunk
 	ttl       uint32
 	timestamp time.Time
+	span      uint32
 }
