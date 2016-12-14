@@ -35,12 +35,13 @@ func NewChunkCache() *CCache {
 }
 
 func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
+	// add metric to lru and update accounting
+	go c.lru.touch(metric)
+
 	c.Lock()
 	if _, ok := c.metricCache[metric]; !ok {
 		ts := itergen.Ts()
 
-		// add metric to lru and update accounting
-		c.lru.touch(metric)
 		c.accounting.Add(metric, ts, itergen.Size())
 		if c.accounting.GetTotal() >= maxSize {
 			// evict the least recent used 20% of the current cache content
@@ -60,6 +61,7 @@ func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
 					NewLRU(),
 				},
 			},
+			lru: NewLRU(),
 		}
 	} else {
 		c.metricCache[metric].Add(prev, itergen)
@@ -83,7 +85,8 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 
 	if cm, ok := c.metricCache[metric]; ok {
 		// updating the metrics lru
-		c.lru.touch(metric)
+		go c.lru.touch(metric)
+
 		return cm.Search(from, until)
 	} else {
 		return nil
