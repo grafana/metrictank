@@ -13,23 +13,26 @@ machine:
     - sudo rm -rf /usr/local/go
     - sudo tar -C /usr/local -xzf download/$GODIST
 
+dependencies:
+  override:
+    - scripts/depends.sh
+    - cd $IMPORTPATH && scripts/vendor_health.sh
+    - scripts/build.sh
+    - scripts/build_docker.sh
+
 test:
   override:
-    - cd $IMPORTPATH && scripts/vendor_health.sh
     - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && go vet $(go list ./... | grep -v /vendor/)
     - cd $IMPORTPATH && scripts/end2end_test.sh
     - cd $IMPORTPATH && go test -v -run='^$' -bench=. $(go list ./... | grep -v /vendor/)
   post:
     - scripts/package.sh
-dependencies:
-  override:
-    - scripts/depends.sh
-    - scripts/build.sh
-    - scripts/build_docker.sh
+
 general:
   artifacts:
     - build
+
 deployment:
   production:
     branch: master
