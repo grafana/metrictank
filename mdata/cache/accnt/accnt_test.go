@@ -4,102 +4,62 @@ import (
 	"testing"
 )
 
-// some test data
-var metric1 string = "metric1"
-var metric2 string = "metric2"
-var ts1 uint32 = 1
-var ts2 uint32 = 2
-var sizes []uint64 = []uint64{1, 2, 3, 4}
-
-func addTestData(a *Accounting) bool {
-	var res [4]bool
-
-	res[0] = a.Add(metric1, ts1, sizes[0])
-	res[1] = a.Add(metric1, ts2, sizes[1])
-	res[2] = a.Add(metric2, ts1, sizes[2])
-	res[3] = a.Add(metric2, ts2, sizes[3])
-
-	if !(res[0] && res[1] && res[2] && res[3]) {
-		return false
-	}
-	return true
-}
-
 func TestAdding(t *testing.T) {
-	var expected uint64 = 0
-	var val uint64
-	var res bool
+	a := &FlatAccnt{
+		total:   0,
+		metrics: make(map[string]*FlatAccntMet),
+		maxSize: 10,
+		lru:     NewLRU(),
+		evictQ:  make(chan *EvictTarget),
+	}
+	a.init()
+	evictQ := a.GetEvictQ()
 
-	a := NewAccounting()
-	res = addTestData(a)
-	if res != true {
-		t.Fatalf("Expected result to be true")
+	// some test data
+	var et *EvictTarget
+	var metric1 string = "metric1"
+	var metric2 string = "metric2"
+	var ts1 uint32 = 1
+	var ts2 uint32 = 2
+
+	a.Add(metric1, ts1, 3)
+	a.Add(metric1, ts2, 3)
+	a.Add(metric2, ts1, 3)
+	a.Add(metric2, ts2, 5)
+
+	et = <-evictQ
+	if et.Metric != metric1 || et.Ts != ts1 {
+		t.Fatalf("Returned evict target is not as expected, got %s", et)
+	}
+	et = <-evictQ
+	if et.Metric != metric1 || et.Ts != ts2 {
+		t.Fatalf("Returned evict target is not as expected, got %s", et)
 	}
 
-	for _, val = range sizes {
-		expected = expected + val
+	select {
+	case et := <-evictQ:
+		t.Fatalf("Expected the EvictQ to be empty, got %s", et)
+	default:
 	}
 
-	total := a.GetTotal()
-	if total != expected {
-		t.Fatalf("Expected a total of %d, but got %d", expected, total)
+	// hitting metric2 ts1 to reverse order in LRU
+	a.Hit(metric2, ts1)
+
+	// evict everything else, because 10 is max size
+	a.Add(metric1, ts1, 10)
+
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != ts2 {
+		t.Fatalf("Returned evict target is not as expected, got %s", et)
 	}
-}
-
-func TestDeleting(t *testing.T) {
-	var res bool
-
-	a := NewAccounting()
-	res = addTestData(a)
-	if res != true {
-		t.Fatalf("Expected result to be true")
-	}
-
-	res = a.Del(metric1, ts2)
-	if res != true {
-		t.Fatalf("Expected result to be true")
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != ts1 {
+		t.Fatalf("Returned evict target is not as expected, got %s", et)
 	}
 
-	var expected uint64 = sizes[0] + sizes[2] + sizes[3]
-
-	total := a.GetTotal()
-	if total != expected {
-		t.Fatalf("Expected a total of %d, but got %d", expected, total)
-	}
-}
-
-func TestDeletingInvalidValues(t *testing.T) {
-	var res bool
-
-	a := NewAccounting()
-	res = addTestData(a)
-	if res != true {
-		t.Fatalf("Expected result to be true")
-	}
-
-	res = a.Del(metric1, ts2+1)
-	if res != false {
-		t.Fatalf("Expected result to be false")
-	}
-
-	res = a.Del("nonexistent", ts1)
-	if res != false {
-		t.Fatalf("Expected result to be false")
-	}
-}
-
-func TestAddingInvalidValues(t *testing.T) {
-	var res bool
-
-	a := NewAccounting()
-	res = addTestData(a)
-	if res != true {
-		t.Fatalf("Expected result to be true")
-	}
-
-	// already present
-	res = a.Add(metric1, ts1, sizes[0])
-	if res != false {
-		t.Fatalf("Expected result to be false")
+	select {
+	case et := <-evictQ:
+		t.Fatalf("Expected the EvictQ to be empty, got %s", et)
+	default:
 	}
 }

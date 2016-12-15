@@ -365,23 +365,11 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 				log.Error(3, errChunkTooSmall.Error())
 				return itgens, errChunkTooSmall
 			}
-			switch chunk.Format(b[0]) {
-			case chunk.FormatStandardGoTsz:
-				b = b[1:]
-			case chunk.FormatStandardGoTszWithSpan:
-				if int(b[1]) >= len(chunk.ChunkSpans) {
-					log.Error(3, "corrupt data, chunk span code %d is not known", chunk.SpanCode(b[1]))
-				}
-				// getting the chunk span: _ = chunk.ChunkSpans[chunk.SpanCode(b[1])]
-				b = b[2:]
-			default:
-				log.Error(3, errUnknownChunkFormat.Error())
-				return itgens, errUnknownChunkFormat
-			}
 			itgen, err := iter.NewGen(b, uint32(ts))
-			if err == nil {
-				itgens = append(itgens, *itgen)
+			if err != nil {
+				return itgens, err
 			}
+			itgens = append(itgens, *itgen)
 		}
 		err := outcome.i.Close()
 		if err != nil {

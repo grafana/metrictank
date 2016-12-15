@@ -8,7 +8,7 @@ type FlatAccnt struct {
 	maxSize uint64
 	lru     *LRU
 	evictQ  chan *EvictTarget
-	actionQ chan *FlatAccntAction
+	eventQ  chan *FlatAccntEvent
 }
 
 type FlatAccntMet struct {
@@ -16,69 +16,57 @@ type FlatAccntMet struct {
 	chunks map[uint32]uint64
 }
 
-const (
-	// action types to be used in FlatAccntAction
-	hrc_add = iota
-	hrc_hit = iota
-)
+// event types to be used in FlatAccntEvent
+const evnt_add uint8 = 0
+const evnt_hit uint8 = 1
 
-type FlatAccntAction struct {
-	t      int // type
+type FlatAccntEvent struct {
+	t      uint8 // event type
 	metric string
 	ts     uint32
 	size   uint64
 }
 
-func NewAccnt(maxSize uint64) Accnt {
-	accnt := &FlatAccnt{
-		total:   0,
-		metrics: make(map[string]*FlatAccntMet),
-		maxSize: maxSize,
-		lru:     NewLRU(),
-		evictQ:  make(chan *EvictTarget),
-	}
-	accnt.init()
-	return accnt
-}
-
 func (a *FlatAccnt) init() {
-	a.actionQ = make(chan *FlatAccntAction)
-	go a.actionLoop()
+	a.eventQ = make(chan *FlatAccntEvent)
+	go a.eventLoop()
 }
 
 func (a *FlatAccnt) Add(metric string, ts uint32, size uint64) {
-	a.act(hrc_add, metric, ts, size)
+	a.act(evnt_add, metric, ts, size)
 }
 
 func (a *FlatAccnt) Hit(metric string, ts uint32) {
-	a.act(hrc_hit, metric, ts, 0)
+	a.act(evnt_hit, metric, ts, 0)
 }
 
-func (a *FlatAccnt) act(t int, metric string, ts uint32, size uint64) {
-	a.actionQ <- &FlatAccntAction{
+func (a *FlatAccnt) act(t uint8, metric string, ts uint32, size uint64) {
+	a.eventQ <- &FlatAccntEvent{
 		t:      t,
 		metric: metric,
 		ts:     ts,
-		size:   0,
+		size:   size,
 	}
 }
 
-func (a *FlatAccnt) actionLoop() {
-	for action := range a.actionQ {
-		if action.t == hrc_add {
-			a.add(action.metric, action.ts, action.size)
+func (a *FlatAccnt) eventLoop() {
+	for {
+		event := <-a.eventQ
+		if event.t == evnt_add {
+			a.add(event.metric, event.ts, event.size)
+		} else {
 		}
 
 		a.lru.touch(
-			&EvictTarget{
-				Metric: action.metric,
-				Ts:     action.ts,
+			EvictTarget{
+				Metric: event.metric,
+				Ts:     event.ts,
 			},
 		)
 
 		// evict until we're below the max
 		for {
-			if a.total < a.maxSize {
+			if a.total <= a.maxSize {
 				break
 			}
 			a.evict()
@@ -109,8 +97,8 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 }
 
 func (a *FlatAccnt) evict() {
-	target := a.lru.pop().(*EvictTarget)
-	a.evictQ <- target
+	target := a.lru.pop().(EvictTarget)
+	a.evictQ <- &target
 	a.del(target.Metric, target.Ts)
 }
 
@@ -130,9 +118,10 @@ func (a *FlatAccnt) del(metric string, ts uint32) {
 	}
 
 	delete(met.chunks, ts)
+	met.total = met.total - size
 	a.total = a.total - size
 
-	if len(met.chunks) == 0 {
+	if met.total <= 0 {
 		delete(a.metrics, metric)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/raintank/metrictank/iter"
-	accnt "github.com/raintank/metrictank/mdata/cache/accnt"
 )
 
 type CCacheMetric struct {
@@ -13,14 +12,10 @@ type CCacheMetric struct {
 	oldest uint32
 	newest uint32
 	chunks map[uint32]*CacheChunk
-	metric string
-	accnt  accnt.Accnt
 }
 
-func NewCCacheMetric(metric string, accnt accnt.Accnt) *CCacheMetric {
+func NewCCacheMetric() *CCacheMetric {
 	return &CCacheMetric{
-		metric: metric,
-		accnt:  accnt,
 		chunks: make(map[uint32]*CacheChunk),
 	}
 }
@@ -36,15 +31,14 @@ func (mc *CCacheMetric) Init(prev uint32, itergen iter.IterGen) bool {
 }
 
 func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
-	ts := itergen.Ts()
+	var ts, endTs uint32
+	ts = itergen.Ts()
 
 	mc.Lock()
 	defer mc.Unlock()
 	if _, ok := mc.chunks[ts]; ok {
 		return false
 	}
-
-	mc.accnt.Add(mc.metric, ts, itergen.Size())
 
 	mc.chunks[ts] = &CacheChunk{
 		ts,
@@ -55,7 +49,16 @@ func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
 
 	// if the previous chunk is cached, set this one as it's next
 	if _, ok := mc.chunks[prev]; ok {
-		mc.chunks[prev].setNext(ts)
+		mc.chunks[prev].Next = ts
+	}
+
+	endTs = mc.EndTs(ts)
+
+	// if EndTs() can't figure out the end date it returns ts
+	if endTs != ts {
+		if _, ok := mc.chunks[endTs]; ok {
+			mc.chunks[endTs].Prev = ts
+		}
 	}
 
 	// update list head/tail if necessary
@@ -79,9 +82,15 @@ func (mc *CCacheMetric) sortedTs() *[]uint32 {
 	return &keys
 }
 
-// takes a chunk's ts and returns the length (guessing if necessary)
+// takes a chunk's ts and returns the end ts (guessing if necessary)
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) EndTs(ts uint32) uint32 {
+	span := (*mc.chunks[ts]).Itgen.Span()
+	if span > 0 {
+		// if the chunk is span-aware we don't need anything else
+		return (*mc.chunks[ts]).Ts + span
+	}
+
 	if (*mc.chunks[ts]).Next == 0 {
 		if (*mc.chunks[ts]).Prev == 0 {
 			// if a chunk has no next and no previous chunk we have to assume it's length is 0
@@ -131,6 +140,20 @@ func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool)
 	return 0, false
 }
 
+// the idea of this method is that we first look for the chunks where the
+// "from" and "until" ts are in. then we seek from the "from" towards "until"
+// and add as many cunks as possible to the result, if this did not result
+// in all chunks necessary to serve the request we do the same in the reverse
+// order from "until" to "from"
+// if the first seek in chronological direction already ends up with all the
+// chunks we need to serve the request, the second one can be skipped.
+
+// EXAMPLE:
+// from ts:                    |
+// until ts:                                                   |
+// cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
+// chunks returned:          |---|                   |---|---|---|
+//
 func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	mc.RLock()
 	defer mc.RUnlock()
@@ -152,8 +175,6 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	if ok {
 		// add all consecutive chunks to search results, starting at the one containing "from"
 		for ; ts <= (*keys)[len(*keys)-1]; ts = mc.chunks[ts].Next {
-			mc.accnt.Hit(mc.metric, ts)
-
 			res.Start = append(res.Start, mc.chunks[ts].Itgen)
 			endts := mc.EndTs(ts)
 			res.From = endts
@@ -167,8 +188,6 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	ts, ok = mc.seek(until, keys, false)
 	if ok {
 		for ; ts >= 0 && ts >= res.From; ts = mc.chunks[ts].Prev {
-			mc.accnt.Hit(mc.metric, ts)
-
 			res.End = append(res.End, mc.chunks[ts].Itgen)
 			fromts := mc.chunks[ts].Ts
 			res.Until = fromts
