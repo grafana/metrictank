@@ -9,21 +9,35 @@ import (
 
 var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
+	errUnknownSpanCode    = errors.New("corrupt data, chunk span code is not known")
 )
 
 type IterGen struct {
-	b  []byte
-	ts uint32
+	b    []byte
+	ts   uint32
+	span uint32
 }
 
 func NewGen(b []byte, ts uint32) (*IterGen, error) {
-	if chunk.Format(b[0]) != chunk.FormatStandardGoTsz {
+	var span uint32 = 0
+
+	switch chunk.Format(b[0]) {
+	case chunk.FormatStandardGoTsz:
+		b = b[1:]
+	case chunk.FormatStandardGoTszWithSpan:
+		if int(b[1]) >= len(chunk.ChunkSpans) {
+			return nil, errUnknownSpanCode
+		}
+		span = chunk.ChunkSpans[chunk.SpanCode(b[1])]
+		b = b[2:]
+	default:
 		return nil, errUnknownChunkFormat
 	}
 
 	return &IterGen{
 		b,
 		ts,
+		span,
 	}, nil
 }
 
@@ -43,4 +57,8 @@ func (ig *IterGen) Size() uint64 {
 
 func (ig IterGen) Ts() uint32 {
 	return ig.ts
+}
+
+func (ig IterGen) Span() uint32 {
+	return ig.span
 }

@@ -32,29 +32,12 @@ func (l *LRU) touch(key interface{}) {
 
 func (l *LRU) pop() interface{} {
 	ent := l.list.Back()
-	if ent != nil {
-		l.list.Remove(ent)
-		e := ent.Value.(*entry)
-		delete(l.items, e.v)
-		return e.v
+	if ent == nil {
+		return nil
 	}
-	return nil
-}
 
-func (l *LRU) get() interface{} {
-	ent := l.list.Back()
-	if ent != nil {
-		e := ent.Value.(*entry)
-		return e.v
-	}
-	return nil
-}
-
-func (l *LRU) getMostRecent() interface{} {
-	ent := l.list.Front()
-	if ent != nil {
-		e := ent.Value.(*entry)
-		return e.v
-	}
-	return nil
+	l.list.Remove(ent)
+	e := ent.Value.(*entry)
+	delete(l.items, e.v)
+	return e.v
 }
