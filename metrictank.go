@@ -343,7 +343,7 @@ func main() {
 	/***********************************
 		Initialize our MetricIdx
 	***********************************/
-	cache := cache.NewChunkCache()
+	cache := cache.NewCCache()
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
 	pre := time.Now()
 

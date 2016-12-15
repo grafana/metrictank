@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/raintank/metrictank/iter"
+	accnt "github.com/raintank/metrictank/mdata/cache/accnt"
 )
 
 type CCacheMetric struct {
@@ -12,29 +13,44 @@ type CCacheMetric struct {
 	oldest uint32
 	newest uint32
 	chunks map[uint32]*CacheChunk
-	lru    *LRU
+	metric string
+	accnt  accnt.Accnt
 }
 
-func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) error {
+func NewCCacheMetric(metric string, accnt accnt.Accnt) *CCacheMetric {
+	return &CCacheMetric{
+		metric: metric,
+		accnt:  accnt,
+		chunks: make(map[uint32]*CacheChunk),
+	}
+}
+
+func (mc *CCacheMetric) Init(prev uint32, itergen iter.IterGen) bool {
+	res := mc.Add(prev, itergen)
+	if !res {
+		return false
+	}
+	mc.oldest = itergen.Ts()
+	mc.newest = itergen.Ts()
+	return true
+}
+
+func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
 	ts := itergen.Ts()
 
-	mc.RLock()
-	if _, ok := mc.chunks[ts]; ok {
-		mc.RUnlock()
-		return nil
-	}
-	mc.RUnlock()
-
-	// adding the new chunk to the lru
-	go mc.lru.touch(ts)
-
 	mc.Lock()
+	defer mc.Unlock()
+	if _, ok := mc.chunks[ts]; ok {
+		return false
+	}
+
+	mc.accnt.Add(mc.metric, ts, itergen.Size())
+
 	mc.chunks[ts] = &CacheChunk{
 		ts,
 		0,
 		prev,
 		itergen,
-		NewLRU(),
 	}
 
 	// if the previous chunk is cached, set this one as it's next
@@ -49,8 +65,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) error {
 		mc.oldest = ts
 	}
 
-	mc.Unlock()
-	return nil
+	return true
 }
 
 // get sorted slice of all chunk timestamps
@@ -137,8 +152,7 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	if ok {
 		// add all consecutive chunks to search results, starting at the one containing "from"
 		for ; ts <= (*keys)[len(*keys)-1]; ts = mc.chunks[ts].Next {
-			// updating the chunk lru
-			go mc.lru.touch(ts)
+			mc.accnt.Hit(mc.metric, ts)
 
 			res.Start = append(res.Start, mc.chunks[ts].Itgen)
 			endts := mc.EndTs(ts)
@@ -153,8 +167,7 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	ts, ok = mc.seek(until, keys, false)
 	if ok {
 		for ; ts >= 0 && ts >= res.From; ts = mc.chunks[ts].Prev {
-			// updating the chunk lru
-			go mc.lru.touch(ts)
+			mc.accnt.Hit(mc.metric, ts)
 
 			res.End = append(res.End, mc.chunks[ts].Itgen)
 			fromts := mc.chunks[ts].Ts

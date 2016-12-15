@@ -427,7 +427,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		for _, itgen := range storeIterGens {
 			// it's important that the itgens get added in chronological order,
 			// currently we rely on cassandra returning results in order
-			s.Cache.Add(key, prevts, itgen)
+			go s.Cache.Add(key, prevts, itgen)
 			prevts = itgen.Ts()
 			it, err := itgen.Get()
 			if err != nil {
