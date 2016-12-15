@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/raintank/metrictank/iter"
+	accnt "github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/rakyll/globalconf"
 )
 
@@ -21,54 +22,36 @@ func ConfigSetup() {
 
 type CCache struct {
 	sync.RWMutex
-	lru         *LRU
+	evictMutex  sync.Mutex
 	metricCache map[string]*CCacheMetric
-	accounting  Accounting
+	accnt       accnt.Accnt
 }
 
-func NewChunkCache() *CCache {
-	return &CCache{
-		lru:         NewLRU(),
+func NewCCache() *CCache {
+	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
-		accounting:  *NewAccounting(),
+		accnt:       accnt.NewAccnt(maxSize),
 	}
+	go cc.evictLoop()
+	return cc
 }
 
-func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) error {
-	// add metric to lru and update accounting
-	go c.lru.touch(metric)
-
+func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) bool {
 	c.Lock()
+	defer c.Unlock()
+
 	if _, ok := c.metricCache[metric]; !ok {
-		ts := itergen.Ts()
-
-		c.accounting.Add(metric, ts, itergen.Size())
-		if c.accounting.GetTotal() >= maxSize {
-			// evict the least recent used 20% of the current cache content
-			go c.evict(20)
+		ccm := NewCCacheMetric(metric, c.accnt)
+		res := ccm.Init(prev, itergen)
+		if !res {
+			return false
 		}
-
-		// initializing a new linked list with head and tail
-		c.metricCache[metric] = &CCacheMetric{
-			oldest: ts,
-			newest: ts,
-			chunks: map[uint32]*CacheChunk{
-				ts: &CacheChunk{
-					ts,
-					0,
-					0,
-					itergen,
-					NewLRU(),
-				},
-			},
-			lru: NewLRU(),
-		}
+		c.metricCache[metric] = ccm
 	} else {
 		c.metricCache[metric].Add(prev, itergen)
 	}
-	c.Unlock()
 
-	return nil
+	return true
 }
 
 type CCSearchResult struct {
@@ -84,14 +67,24 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 	defer c.RUnlock()
 
 	if cm, ok := c.metricCache[metric]; ok {
-		// updating the metrics lru
-		go c.lru.touch(metric)
-
 		return cm.Search(from, until)
 	} else {
 		return nil
 	}
 }
 
-func (c *CCache) evict(percent uint32) {
+func (c *CCache) evictLoop() {
+	evictQ := c.accnt.GetEvictQ()
+
+	for target := range evictQ {
+		c.Lock()
+		if met, ok := c.metricCache[target.Metric]; ok {
+			// in both of these cases we just drop the whole metric
+			delete(met.chunks, target.Ts)
+			if len(met.chunks) == 0 {
+				delete(c.metricCache, target.Metric)
+			}
+		}
+		c.Unlock()
+	}
 }

@@ -33,8 +33,9 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
-	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
-	errStartBeforeEnd = errors.New("start must be before end.")
+	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
+	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
+	errStartBeforeEnd     = errors.New("start must be before end.")
 
 	cassGetExecDuration met.Timer
 	cassGetWaitDuration met.Timer
@@ -375,7 +376,7 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 				b = b[2:]
 			default:
 				log.Error(3, errUnknownChunkFormat.Error())
-				return itergens, errUnknownChunkFormat
+				return itgens, errUnknownChunkFormat
 			}
 			itgen, err := iter.NewGen(b, uint32(ts))
 			if err == nil {
