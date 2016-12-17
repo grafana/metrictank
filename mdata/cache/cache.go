@@ -13,7 +13,7 @@ var (
 	maxSize uint64
 )
 
-func ConfigSetup() {
+func init() {
 	flags := flag.NewFlagSet("chunk-cache", flag.ExitOnError)
 	// (1024 ^ 3) * 4 = 4294967296 = 4G
 	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes")
