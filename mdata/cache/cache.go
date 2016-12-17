@@ -97,8 +97,8 @@ func (c *CCache) evictLoop() {
 		// many short ones should impact the response times less than a few long ones
 		c.Lock()
 		if met, ok := c.metricCache[target.Metric]; ok {
-			delete(met.chunks, target.Ts)
-			if len(met.chunks) == 0 {
+			length := met.Del(target.Ts)
+			if length == 0 {
 				delete(c.metricCache, target.Metric)
 			}
 		}

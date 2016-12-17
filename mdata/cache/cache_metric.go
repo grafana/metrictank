@@ -30,6 +30,27 @@ func (mc *CCacheMetric) Init(prev uint32, itergen iter.IterGen) bool {
 	return true
 }
 
+func (mc *CCacheMetric) Del(ts uint32) int {
+	mc.Lock()
+	defer mc.Unlock()
+
+	if _, ok := mc.chunks[ts]; !ok {
+		return len(mc.chunks)
+	}
+
+	prev := mc.chunks[ts].Prev
+	next := mc.chunks[ts].Next
+
+	if prev != 0 {
+		mc.chunks[prev].Next = mc.chunks[ts].Next
+	}
+	if next != 0 {
+		mc.chunks[next].Prev = mc.chunks[ts].Prev
+	}
+
+	return len(mc.chunks)
+}
+
 func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
 	var ts, endTs uint32
 	ts = itergen.Ts()
