@@ -73,7 +73,7 @@ func TestConsecutiveAdding(t *testing.T) {
 	}
 }
 
-/*func TestSearchFromBeginning(t *testing.T) {
+func TestSearchFromBeginning(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
 	res := cc.Search(metric, 2500, 6000)
@@ -89,9 +89,9 @@ func TestConsecutiveAdding(t *testing.T) {
 	if res.Start[0].Ts() != 2000 || res.Start[len(res.Start)-1].Ts() != 5000 {
 		t.Fatalf("result set is wrong")
 	}
-}*/
+}
 
-/*func TestSearchFromEnd(t *testing.T) {
+func TestSearchFromEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
 	res := cc.Search(metric, 500, 5999)
@@ -115,4 +115,4 @@ func TestConsecutiveAdding(t *testing.T) {
 	if res.End[0].Ts() != 5000 || res.End[len(res.End)-1].Ts() != 1000 {
 		t.Fatalf("result set is wrong")
 	}
-}*/
+}

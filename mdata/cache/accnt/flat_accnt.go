@@ -54,7 +54,6 @@ func (a *FlatAccnt) eventLoop() {
 		event := <-a.eventQ
 		if event.t == evnt_add {
 			a.add(event.metric, event.ts, event.size)
-		} else {
 		}
 
 		a.lru.touch(
