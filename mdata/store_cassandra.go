@@ -373,8 +373,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(len(outcomes))
-	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itergens", len(outcomes), len(itergens))
-	return itergens, nil
+	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itgens", len(outcomes), len(itgens))
+	return itgens, nil
 }
 
 func (c *cassandraStore) Stop() {

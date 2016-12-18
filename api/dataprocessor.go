@@ -375,6 +375,7 @@ func prevBoundary(ts uint32, span uint32) uint32 {
 func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
 	iters := make([]iter.Iter, 0)
 	memIters := make([]iter.Iter, 0)
+	storeIterGens := make([]iter.Iter, 0)
 	oldest := req.To
 	toUnix := req.To
 	fromUnix := req.From
@@ -417,8 +418,8 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		until := util.Min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
 
-		_ = s.Cache.Search(key, fromUnix, until)
-		storeIterGens, err := s.BackendStore.Search(key, fromUnix, until)
+		cacheRes := s.Cache.Search(key, fromUnix, until)
+		storeIterGens, err = s.BackendStore.Search(key, fromUnix, until)
 		if err != nil {
 			panic(err)
 		}

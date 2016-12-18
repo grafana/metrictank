@@ -26,7 +26,7 @@ func TestLRU(t *testing.T) {
 
 	val = lru.pop()
 	if val != nil {
-		t.Fatalf("expected %s, got %s", nil, val)
+		t.Fatalf("expected nil, got %s", val)
 	}
 
 	lru.touch(key1)
@@ -60,6 +60,6 @@ func TestLRUNumeric(t *testing.T) {
 
 	val = lru.pop()
 	if val != nil {
-		t.Fatalf("expected %d, got %d", nil, val)
+		t.Fatalf("expected nil, got %d", val)
 	}
 }

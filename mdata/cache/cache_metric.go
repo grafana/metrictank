@@ -133,9 +133,11 @@ func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool)
 	var shiftby int
 
 	if asc {
+		// if ascending start searching at the first
 		seekpos = 0
 		shiftby = 1
 	} else {
+		// if descending start searching at the last
 		seekpos = len(*keys) - 1
 		shiftby = -1
 	}
@@ -159,6 +161,40 @@ func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool)
 	}
 
 	return 0, false
+}
+
+func (mc *CCacheMetric) SearchForward(from uint32, until uint32, keys *[]uint32, res *CCSearchResult) {
+	ts, ok := mc.seek(from, keys, true)
+	if !ok {
+		return
+	}
+
+	// add all consecutive chunks to search results, starting at the one containing "from"
+	for ; ts != 0; ts = mc.chunks[ts].Next {
+		res.Start = append(res.Start, mc.chunks[ts].Itgen)
+		endts := mc.EndTs(ts)
+		res.From = endts
+		if endts > until {
+			res.Complete = true
+			break
+		}
+	}
+}
+
+func (mc *CCacheMetric) SearchBackward(from uint32, until uint32, keys *[]uint32, res *CCSearchResult) {
+	ts, ok := mc.seek(until, keys, false)
+	if !ok {
+		return
+	}
+
+	for ; ts != 0; ts = mc.chunks[ts].Prev {
+		res.End = append(res.End, mc.chunks[ts].Itgen)
+		fromts := mc.chunks[ts].Ts
+		res.Until = fromts
+		if fromts <= from {
+			break
+		}
+	}
 }
 
 // the idea of this method is that we first look for the chunks where the
@@ -192,31 +228,9 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	}
 	keys := mc.sortedTs()
 
-	ts, ok := mc.seek(from, keys, true)
-	if ok {
-		// add all consecutive chunks to search results, starting at the one containing "from"
-		for ; ts <= (*keys)[len(*keys)-1]; ts = mc.chunks[ts].Next {
-			res.Start = append(res.Start, mc.chunks[ts].Itgen)
-			endts := mc.EndTs(ts)
-			res.From = endts
-			if endts >= until {
-				res.Complete = true
-				return &res
-			}
-		}
-	}
-
-	ts, ok = mc.seek(until, keys, false)
-	if ok {
-		for ; ts >= 0 && ts >= res.From; ts = mc.chunks[ts].Prev {
-			res.End = append(res.End, mc.chunks[ts].Itgen)
-			fromts := mc.chunks[ts].Ts
-			res.Until = fromts
-			if fromts < from {
-				res.Complete = true
-				return &res
-			}
-		}
+	mc.SearchForward(from, until, keys, &res)
+	if !res.Complete {
+		mc.SearchBackward(from, until, keys, &res)
 	}
 
 	return &res
