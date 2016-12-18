@@ -29,16 +29,16 @@ func TestAdding(t *testing.T) {
 
 	et = <-evictQ
 	if et.Metric != metric1 || et.Ts != ts1 {
-		t.Fatalf("Returned evict target is not as expected, got %s", et)
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 	et = <-evictQ
 	if et.Metric != metric1 || et.Ts != ts2 {
-		t.Fatalf("Returned evict target is not as expected, got %s", et)
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 
 	select {
 	case et := <-evictQ:
-		t.Fatalf("Expected the EvictQ to be empty, got %s", et)
+		t.Fatalf("Expected the EvictQ to be empty, got %+v", et)
 	default:
 	}
 
@@ -50,16 +50,16 @@ func TestAdding(t *testing.T) {
 
 	et = <-evictQ
 	if et.Metric != metric2 || et.Ts != ts2 {
-		t.Fatalf("Returned evict target is not as expected, got %s", et)
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 	et = <-evictQ
 	if et.Metric != metric2 || et.Ts != ts1 {
-		t.Fatalf("Returned evict target is not as expected, got %s", et)
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 
 	select {
 	case et := <-evictQ:
-		t.Fatalf("Expected the EvictQ to be empty, got %s", et)
+		t.Fatalf("Expected the EvictQ to be empty, got %+v", et)
 	default:
 	}
 }
