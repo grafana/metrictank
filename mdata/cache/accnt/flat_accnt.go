@@ -1,6 +1,16 @@
-package cache
+package accnt
+
+import (
+	"sort"
+)
 
 // Flat accounting
+//
+// Keeps track of the chunk cache size and in which order the contained
+// chunks have been used to last time. If it detects that the total cache
+// size is above the given limit, it feeds the least recently used
+// cache chunks into the evict queue, which will get consumed by the
+// evict loop.
 
 type FlatAccnt struct {
 	total   uint64
@@ -27,9 +37,17 @@ type FlatAccntEvent struct {
 	size   uint64
 }
 
-func (a *FlatAccnt) init() {
-	a.eventQ = make(chan *FlatAccntEvent)
-	go a.eventLoop()
+func NewFlatAccnt(maxSize uint64) Accnt {
+	accnt := &FlatAccnt{
+		total:   0,
+		metrics: make(map[string]*FlatAccntMet),
+		maxSize: maxSize,
+		lru:     NewLRU(),
+		evictQ:  make(chan *EvictTarget),
+	}
+	accnt.eventQ = make(chan *FlatAccntEvent)
+	go accnt.eventLoop()
+	return accnt
 }
 
 func (a *FlatAccnt) Add(metric string, ts uint32, size uint64) {
@@ -96,33 +114,42 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 }
 
 func (a *FlatAccnt) evict() {
-	target := a.lru.pop().(EvictTarget)
-	a.evictQ <- &target
-	a.del(target.Metric, target.Ts)
-}
-
-func (a *FlatAccnt) del(metric string, ts uint32) {
 	var met *FlatAccntMet
-	var ok bool
+	var targets []uint32
+	var ts uint32
 	var size uint64
+	var ok bool
 
-	if met, ok = a.metrics[metric]; !ok {
-		// we don't have this metric
+	target := a.lru.pop().(EvictTarget)
+	if met, ok = a.metrics[target.Metric]; !ok {
 		return
 	}
 
-	if size, ok = met.chunks[ts]; !ok {
-		// we don't have that chunk
-		return
+	for ts, _ = range met.chunks {
+		// if we have chronologically older chunks we add them
+		// to the evict targets to avoid fragmentation
+		if ts <= target.Ts {
+			targets = append(targets, ts)
+		}
 	}
 
-	delete(met.chunks, ts)
-	met.total = met.total - size
-	a.total = a.total - size
+	sort.Sort(Uint32Asc(targets))
+
+	for _, ts = range targets {
+		size = met.chunks[ts]
+		met.total = met.total - size
+		a.total = a.total - size
+		a.evictQ <- &EvictTarget{
+			Metric: target.Metric,
+			Ts:     ts,
+		}
+		delete(met.chunks, ts)
+	}
 
 	if met.total <= 0 {
-		delete(a.metrics, metric)
+		delete(a.metrics, target.Metric)
 	}
+
 }
 
 func (a *FlatAccnt) GetEvictQ() chan *EvictTarget {

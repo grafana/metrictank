@@ -4,7 +4,7 @@ import (
 	"flag"
 	"sync"
 
-	accnt "github.com/raintank/metrictank/mdata/cache/accnt"
+	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/rakyll/globalconf"
 )
@@ -29,7 +29,7 @@ type CCache struct {
 func NewCCache() *CCache {
 	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
-		accnt:       accnt.NewAccnt(maxSize),
+		accnt:       accnt.NewFlatAccnt(maxSize),
 	}
 	go cc.evictLoop()
 	return cc
