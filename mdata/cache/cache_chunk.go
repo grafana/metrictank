@@ -6,7 +6,7 @@ import (
 
 type CacheChunk struct {
 	Ts    uint32
-	Next  uint32
 	Prev  uint32
+	Next  uint32
 	Itgen chunk.IterGen
 }

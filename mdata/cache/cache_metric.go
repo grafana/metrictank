@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
@@ -64,6 +65,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 	mc.chunks[ts] = &CacheChunk{
 		Ts:    ts,
 		Prev:  prev,
+		Next:  0,
 		Itgen: itergen,
 	}
 
@@ -98,7 +100,7 @@ func (mc *CCacheMetric) sortedTs() *[]uint32 {
 	for k := range mc.chunks {
 		keys = append(keys, k)
 	}
-	sort.Sort(uint32Asc(keys))
+	sort.Sort(accnt.Uint32Asc(keys))
 	return &keys
 }
 
