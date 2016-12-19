@@ -4,8 +4,8 @@ import (
 	"flag"
 	"sync"
 
-	"github.com/raintank/metrictank/iter"
 	accnt "github.com/raintank/metrictank/mdata/cache/accnt"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/rakyll/globalconf"
 )
 
@@ -35,7 +35,7 @@ func NewCCache() *CCache {
 	return cc
 }
 
-func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) bool {
+func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
 	var res bool
 
 	c.Lock()
@@ -61,16 +61,26 @@ func (c *CCache) Add(metric string, prev uint32, itergen iter.IterGen) bool {
 }
 
 type CCSearchResult struct {
-	From     uint32
-	Until    uint32
+	// if this result is Complete == false, then the following cassandra query
+	// will need to use this value as from to fill in the missing data
+	From uint32
+	// just as with the above From, this will need to be used as the new until
+	Until uint32
+	// if Complete is true then the whole request can be served from cache
 	Complete bool
-	Start    []iter.IterGen
-	End      []iter.IterGen
+	// if the cache contained the chunk containing the original "from" ts then
+	// this slice will hold it as the first element, plus all the subsequent
+	// cached chunks. If Complete is true then all chunks are in this slice.
+	Start []chunk.IterGen
+	// if complete is not true and the original "until" ts is in a cached chunk
+	// then this slice will hold it as the first element, plus all the previous
+	// ones in reverse order (because the search is seeking in reverse)
+	End []chunk.IterGen
 }
 
 func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
 	var res *CCSearchResult
-	var hit iter.IterGen
+	var hit chunk.IterGen
 
 	c.RLock()
 	defer c.RUnlock()

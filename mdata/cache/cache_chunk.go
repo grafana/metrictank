@@ -1,12 +1,12 @@
 package cache
 
 import (
-	"github.com/raintank/metrictank/iter"
+	"github.com/raintank/metrictank/mdata/chunk"
 )
 
 type CacheChunk struct {
 	Ts    uint32
 	Next  uint32
 	Prev  uint32
-	Itgen iter.IterGen
+	Itgen chunk.IterGen
 }

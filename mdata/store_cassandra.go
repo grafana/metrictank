@@ -13,7 +13,6 @@ import (
 	"github.com/hailocab/go-hostpool"
 	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -283,8 +282,8 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, error) {
-	itgens := make([]iter.IterGen, 0)
+func (c *cassandraStore) Search(key string, start, end uint32) ([]chunk.IterGen, error) {
+	itgens := make([]chunk.IterGen, 0)
 	if start > end {
 		return itgens, errStartBeforeEnd
 	}
@@ -365,8 +364,9 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.IterGen, 
 				log.Error(3, errChunkTooSmall.Error())
 				return itgens, errChunkTooSmall
 			}
-			itgen, err := iter.NewGen(b, uint32(ts))
+			itgen, err := chunk.NewGen(b, uint32(ts))
 			if err != nil {
+				log.Error(3, err.Error())
 				return itgens, err
 			}
 			itgens = append(itgens, *itgen)

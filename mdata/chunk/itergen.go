@@ -1,10 +1,9 @@
-package iter
+package chunk
 
 import (
 	"errors"
 
 	"github.com/dgryski/go-tsz"
-	"github.com/raintank/metrictank/mdata/chunk"
 )
 
 var (
@@ -21,14 +20,14 @@ type IterGen struct {
 func NewGen(b []byte, ts uint32) (*IterGen, error) {
 	var span uint32 = 0
 
-	switch chunk.Format(b[0]) {
-	case chunk.FormatStandardGoTsz:
+	switch Format(b[0]) {
+	case FormatStandardGoTsz:
 		b = b[1:]
-	case chunk.FormatStandardGoTszWithSpan:
-		if int(b[1]) >= len(chunk.ChunkSpans) {
+	case FormatStandardGoTszWithSpan:
+		if int(b[1]) >= len(ChunkSpans) {
 			return nil, errUnknownSpanCode
 		}
-		span = chunk.ChunkSpans[chunk.SpanCode(b[1])]
+		span = ChunkSpans[SpanCode(b[1])]
 		b = b[2:]
 	default:
 		return nil, errUnknownChunkFormat
