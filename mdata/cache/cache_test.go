@@ -5,18 +5,17 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
-func getItgen(value uint32, ts uint32) *iter.IterGen {
+func getItgen(value uint32, ts uint32) *chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTsz))
 	binary.Write(buf, binary.LittleEndian, uint32(value))
 	buf.Write(b)
 
-	itgen, _ := iter.NewGen(buf.Bytes(), ts)
+	itgen, _ := chunk.NewGen(buf.Bytes(), ts)
 
 	return itgen
 }
@@ -73,13 +72,30 @@ func TestConsecutiveAdding(t *testing.T) {
 	}
 }
 
-func TestSearchFromBeginning(t *testing.T) {
+func TestSearchFromBeginningComplete(t *testing.T) {
+	metric := "metric1"
+	cc := getConnectedChunks(metric)
+	res := cc.Search(metric, 2500, 5999)
+
+	if !res.Complete {
+		t.Fatalf("complete is expected to be true")
+	}
+
+	if len(res.Start) != 4 {
+		t.Fatalf("expected to get 4 itergens, got %d", len(res.Start))
+	}
+
+	if res.Start[0].Ts() != 2000 || res.Start[len(res.Start)-1].Ts() != 5000 {
+		t.Fatalf("result set is wrong")
+	}
+}
+
+func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
 	res := cc.Search(metric, 2500, 6000)
-
-	if res.Complete != true {
-		t.Fatalf("complete is expected to be true")
+	if res.Complete {
+		t.Fatalf("complete is expected to be false")
 	}
 
 	if len(res.Start) != 4 {
@@ -96,7 +112,7 @@ func TestSearchFromEnd(t *testing.T) {
 	cc := getConnectedChunks(metric)
 	res := cc.Search(metric, 500, 5999)
 
-	if res.Complete == true {
+	if res.Complete {
 		t.Fatalf("complete is expected to not be true")
 	}
 

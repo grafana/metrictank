@@ -8,8 +8,8 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx/memory"
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -56,11 +56,11 @@ func (f *FakeAggMetric) Add(ts uint32, val float64) {
 }
 
 // we won't use this
-func (f *FakeAggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
-	return 0, make([]iter.Iter, 0)
+func (f *FakeAggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
+	return 0, make([]chunk.Iter, 0)
 }
-func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []iter.Iter) {
-	return 0, make([]iter.Iter, 0)
+func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []chunk.Iter) {
+	return 0, make([]chunk.Iter, 0)
 }
 
 func idFor(org int, metric, unit, mtype string, tags []string, interval uint32) string {

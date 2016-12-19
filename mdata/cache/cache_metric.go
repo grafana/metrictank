@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/raintank/metrictank/iter"
+	"github.com/raintank/metrictank/mdata/chunk"
 )
 
 type CCacheMetric struct {
@@ -20,7 +20,7 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(prev uint32, itergen iter.IterGen) bool {
+func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) bool {
 	res := mc.Add(prev, itergen)
 	if !res {
 		return false
@@ -51,7 +51,7 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	return len(mc.chunks)
 }
 
-func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
+func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 	var ts, endTs uint32
 	ts = itergen.Ts()
 
@@ -62,10 +62,9 @@ func (mc *CCacheMetric) Add(prev uint32, itergen iter.IterGen) bool {
 	}
 
 	mc.chunks[ts] = &CacheChunk{
-		ts,
-		0,
-		prev,
-		itergen,
+		Ts:    ts,
+		Prev:  prev,
+		Itgen: itergen,
 	}
 
 	// if the previous chunk is cached, set this one as it's next
@@ -99,7 +98,7 @@ func (mc *CCacheMetric) sortedTs() *[]uint32 {
 	for k := range mc.chunks {
 		keys = append(keys, k)
 	}
-	sort.Sort(sortableUint32(keys))
+	sort.Sort(uint32Asc(keys))
 	return &keys
 }
 
@@ -189,9 +188,9 @@ func (mc *CCacheMetric) SearchBackward(from uint32, until uint32, keys *[]uint32
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
 		res.End = append(res.End, mc.chunks[ts].Itgen)
-		fromts := mc.chunks[ts].Ts
-		res.Until = fromts
-		if fromts <= from {
+		startts := mc.chunks[ts].Ts
+		res.Until = startts
+		if startts <= from {
 			break
 		}
 	}
@@ -222,8 +221,8 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	res := CCSearchResult{
 		From:     from,
 		Until:    until,
-		Start:    make([]iter.IterGen, 0),
-		End:      make([]iter.IterGen, 0),
+		Start:    make([]chunk.IterGen, 0),
+		End:      make([]chunk.IterGen, 0),
 		Complete: false,
 	}
 	keys := mc.sortedTs()

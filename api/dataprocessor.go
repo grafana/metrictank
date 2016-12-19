@@ -11,7 +11,7 @@ import (
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/iter"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -373,16 +373,15 @@ func prevBoundary(ts uint32, span uint32) uint32 {
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
 func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	iters := make([]iter.Iter, 0)
-	memIters := make([]iter.Iter, 0)
-	storeIterGens := make([]iter.Iter, 0)
+	iters := make([]chunk.Iter, 0)
+	memIters := make([]chunk.Iter, 0)
 	oldest := req.To
 	toUnix := req.To
 	fromUnix := req.From
 	interval := req.ArchInterval
 	key := req.Key
 	// while aggregated archives are quantized, raw intervals are not.  quantizing happens at the end of this function, **after* this step.
-	// So we have to be adjust the range to get the right data.
+	// So we have to adjust the range to get the right data.
 	// (ranges described as a..b include both and b)
 	// REQ           0[---FROM---60]----------120-----------180[----TO----240]  any request from 1..60 to 181..240 should ...
 	// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules) ..
@@ -419,23 +418,43 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		logLoad("cassan", key, fromUnix, until)
 
 		cacheRes := s.Cache.Search(key, fromUnix, until)
-		storeIterGens, err = s.BackendStore.Search(key, fromUnix, until)
-		if err != nil {
-			panic(err)
-		}
-
-		var prevts uint32 = 0
-		for _, itgen := range storeIterGens {
-			// it's important that the itgens get added in chronological order,
-			// currently we rely on cassandra returning results in order
-			go s.Cache.Add(key, prevts, itgen)
-			prevts = itgen.Ts()
-			it, err := itgen.Get()
+		// the request cannot completely be served from cache, it will require cassandra involvement
+		if !cacheRes.Complete {
+			storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				// TODO(replay) figure out what to do if one piece is corrupt
-				continue
+				panic(err)
 			}
-			iters = append(iters, *it)
+
+			var prevts uint32 = 0
+			for _, itgen := range cacheRes.Start {
+				prevts = itgen.Ts()
+				it, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					continue
+				}
+				iters = append(iters, *it)
+			}
+			for _, itgen := range storeIterGens {
+				// it's important that the itgens get added in chronological order,
+				// currently we rely on cassandra returning results in order
+				go s.Cache.Add(key, prevts, itgen)
+				prevts = itgen.Ts()
+				it, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					continue
+				}
+				iters = append(iters, *it)
+			}
+			for i := len(cacheRes.End) - 1; i >= 0; i-- {
+				it, err := cacheRes.End[i].Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					continue
+				}
+				iters = append(iters, *it)
+			}
 		}
 	} else {
 		reqSpanMem.ValueUint32(toUnix - fromUnix)
