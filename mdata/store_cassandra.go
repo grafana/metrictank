@@ -48,11 +48,11 @@ var (
 	cassGetChunksDuration = stats.NewLatencyHistogram15s32("cassandra.get_chunks")
 	cassToIterDuration    = stats.NewLatencyHistogram15s32("cassandra.to_iter")
 
-	chunkSaveOk   = stats.NewCounter32("chunks.save_ok")
-	chunkSaveFail = stats.NewCounter32("chunks.save_fail")
+	chunkSaveOk   = stats.NewCounter32("cassandra.chunk_operations.save_ok")
+	chunkSaveFail = stats.NewCounter32("cassandra.chunk_operations.save_fail")
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
-	chunkSizeAtSave = stats.NewMeter32("chunk_size.at_save", true)
-	chunkSizeAtLoad = stats.NewMeter32("chunk_size.at_load", true)
+	chunkSizeAtSave = stats.NewMeter32("cassandra.chunk_size.at_save", true)
+	chunkSizeAtLoad = stats.NewMeter32("cassandra.chunk_size.at_load", true)
 
 	errmetrics = cassandra.NewErrMetrics("cassandra")
 )

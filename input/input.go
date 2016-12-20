@@ -28,11 +28,11 @@ type Input struct {
 
 func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) Input {
 	return Input{
-		MetricsPerMessage: stats.NewMeter32(fmt.Sprintf("%s.metrics_per_message", input), false),
-		metricsReceived:   stats.NewCounter32(fmt.Sprintf("%s.metrics_received", input)),
-		MetricsDecodeErr:  stats.NewCounter32(fmt.Sprintf("%s.metrics_decode_err", input)),
-		MetricInvalid:     stats.NewCounter32(fmt.Sprintf("%s.metric_invalid", input)),
-		MsgsAge:           stats.NewMeter32(fmt.Sprintf("%s.message_age", input), false),
+		MetricsPerMessage: stats.NewMeter32(fmt.Sprintf("input.%s.metrics_per_message", input), false),
+		metricsReceived:   stats.NewCounter32(fmt.Sprintf("input.%s.metrics_received", input)),
+		MetricsDecodeErr:  stats.NewCounter32(fmt.Sprintf("input.%s.metrics_decode_err", input)),
+		MetricInvalid:     stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
+		MsgsAge:           stats.NewMeter32(fmt.Sprintf("input.%s.message_age", input), false),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,

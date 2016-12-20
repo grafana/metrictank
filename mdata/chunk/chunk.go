@@ -8,7 +8,7 @@ import (
 	"github.com/raintank/metrictank/stats"
 )
 
-var totalPoints = stats.NewGauge64("total_points")
+var totalPoints = stats.NewGauge64("tank.total_points")
 
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
