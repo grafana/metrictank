@@ -33,6 +33,7 @@ import (
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/stats"
+	statsConfig "github.com/raintank/metrictank/stats/config"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -92,12 +93,6 @@ var (
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
-	statsEnabled    = flag.Bool("stats-enabled", true, "enable sending graphite messages for instrumentation")
-	statsPrefix     = flag.String("stats-prefix", "metrictank.stats.default", "stats prefix (will add trailing dot automatically if needed)")
-	statsAddr       = flag.String("stats-addr", "localhost:2003", "graphite address")
-	statsInterval   = flag.Int("stats-interval", 1, "interval at which to send statistics")
-	statsBufferSize = flag.Int("stats-buffer-size", 1*1000*1000, "how many points to buffer up in case graphite endpoint is unavailable")
-
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
@@ -154,6 +149,9 @@ func main() {
 	// load config for cluster
 	cluster.ConfigSetup()
 
+	// stats
+	statsConfig.ConfigSetup()
+
 	conf.ParseAll()
 
 	/***********************************
@@ -204,6 +202,7 @@ func main() {
 	notifierKafka.ConfigProcess(*instance)
 	api.ConfigProcess()
 	cluster.ConfigProcess()
+	statsConfig.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -286,15 +285,9 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	/***********************************
-		configure stats
+		collect stats
 	***********************************/
-	if *statsEnabled {
-		stats.NewMemoryReporter()
-		stats.NewGraphite(*statsPrefix, *statsAddr, *statsInterval, *statsBufferSize)
-	} else {
-		stats.NewDevnull()
-		log.Warn("running metrictank without instrumentation.")
-	}
+	statsConfig.Start()
 
 	/*************************************
 	  Start polling our Cluster Peers
