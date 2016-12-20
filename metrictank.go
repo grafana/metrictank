@@ -93,7 +93,7 @@ var (
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
 	statsEnabled    = flag.Bool("stats-enabled", true, "enable sending graphite messages for instrumentation")
-	statsPrefix     = flag.String("stats-prefix", "stats.metrictank.default", "stats prefix (will add trailing dot automatically if needed)")
+	statsPrefix     = flag.String("stats-prefix", "metrictank.stats.default", "stats prefix (will add trailing dot automatically if needed)")
 	statsAddr       = flag.String("stats-addr", "localhost:2003", "graphite address")
 	statsInterval   = flag.Int("stats-interval", 1, "interval at which to send statistics")
 	statsBufferSize = flag.Int("stats-buffer-size", 1*1000*1000, "how many points to buffer up in case graphite endpoint is unavailable")
