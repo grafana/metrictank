@@ -9,6 +9,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/gocql/gocql"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -33,10 +34,8 @@ var (
 	logLevel      = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	cassAddr      = flag.String("cass-addr", "localhost", "Address of cassandra host.")
 	keyspace      = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
-	partitioner   = flag.String("partitioner", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
+	partitionBy   = flag.String("partition-by", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
 	numPartitions = flag.Int("num-partitions", 1, "number of partitions in cluster")
-
-	Partitioner = sarama.NewHashPartitioner("default")
 )
 
 func main() {
@@ -131,7 +130,10 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg 
 	log.Info("starting read thread")
 	defer wg.Done()
 	defer close(defsChan)
-
+	partitioner, err := cluster.NewKafkaPartitioner(*partitionBy)
+	if err != nil {
+		log.Fatal(4, "failed to initialize partitioner. %s", err)
+	}
 	iter := session.Query("SELECT def from metric_def_idx").Iter()
 
 	var data []byte
@@ -143,36 +145,17 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg 
 			continue
 		}
 		log.Debug("retrieved %s from old index.", mdef.Id)
+		if *numPartitions == 1 {
+			def.Partition = 0
+		} else {
+			p, err := partitioner.Partition(&mdef, *numPartitions)
+			if err != nil {
+				log.Error(3, "failed to get partition id of metric. %s", err)
+				mdef.Partition = 0
+			} else {
+				mdef.Partition = p
+			}
+		}
 		defsChan <- &mdef
 	}
-}
-
-func setPartition(def *schema.MetricDefinition) {
-	if *numPartitions == 1 {
-		def.Partition = 1
-		return
-	}
-	switch *partitioner {
-	case "byOrg":
-		partitionByOrg(def)
-	default:
-		def.Partition = 1
-	}
-}
-
-func partitionByOrg(def *schema.MetricDefinition) {
-	key := make([]byte, 8)
-	binary.LittleEndian.PutUint32(key, uint32(def.OrgId))
-	partition, err := Partition(key, int32(*numPartitions))
-	if err != nil {
-		log.Error(3, "Failed to get partition for metric %s: %s", def.Id, err)
-		partition = 1
-	}
-	def.Partition = partition
-}
-
-func Partition(key []byte, numPartitions int32) (int32, error) {
-	// wrap the key in a ProducerMessage struct so we can use the exact same
-	// code used for setting the partition by tsdb-gw
-	return Partitioner.Partition(&sarama.ProducerMessage{Key: sarama.ByteEncoder(key)}, numPartitions)
 }
