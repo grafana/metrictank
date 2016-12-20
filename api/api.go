@@ -19,13 +19,13 @@ import (
 var LogLevel int
 
 var (
-	getTargetDuration     = stats.NewLatencyHistogram15s32("get_target_duration")
-	itersToPointsDuration = stats.NewLatencyHistogram15s32("iters_to_points_duration")
+	getTargetDuration     = stats.NewLatencyHistogram15s32("api.get_target_duration")
+	itersToPointsDuration = stats.NewLatencyHistogram15s32("api.iters_to_points_duration")
 	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
 	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-	reqHandleDuration = stats.NewLatencyHistogram15s32("request_handle_duration")
-	reqSpanBoth       = stats.NewMeter32("requests_span.mem_and_cassandra", false)
-	reqSpanMem        = stats.NewMeter32("requests_span.mem", false)
+	reqHandleDuration = stats.NewLatencyHistogram15s32("api.request_handle_duration")
+	reqSpanBoth       = stats.NewMeter32("api.requests_span.mem_and_cassandra", false)
+	reqSpanMem        = stats.NewMeter32("api.requests_span.mem", false)
 )
 
 type Server struct {
