@@ -98,8 +98,8 @@ Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph p
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
 * `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* TODO new namespace of metrictank
-* `metrictank`: usage metrics reported by metrictank.  See
+* `metrictank.stats`: internal stats reported by metrictank
+* `metrictank.usage`: usage metrics reported by metrictank.  See
 [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
 It may take a few minutes for the usage metrics to show up.
 * `stats`: these are metrics coming from graphite-api, aggregated by statsdaemon and sent back to metrictank every second.
