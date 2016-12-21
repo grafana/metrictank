@@ -1,6 +1,9 @@
 package stats
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type Counter32 struct {
 	val uint32
@@ -28,7 +31,7 @@ func (c *Counter32) AddUint32(val uint32) {
 	atomic.AddUint32(&c.val, val)
 }
 
-func (c *Counter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
+func (c *Counter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
 	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
 	return buf

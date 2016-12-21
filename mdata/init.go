@@ -27,8 +27,8 @@ var (
 	// has already been saved by a primary.  A secondary can add this data to its chunks.
 	addToSavedChunk = stats.NewCounter32("tank.add_to_saved_chunk")
 
-	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter_duration")
-	persistDuration   = stats.NewLatencyHistogram15s32("tank.persist_duration")
+	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")
+	persistDuration   = stats.NewLatencyHistogram15s32("tank.persist")
 
 	// metric metrics_active is the amount of currently known metrics (excl rollup series), measured every second
 	metricsActive = stats.NewGauge32("tank.metrics_active")

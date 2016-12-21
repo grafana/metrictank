@@ -12,7 +12,7 @@ import (
 
 type GraphiteMetric interface {
 	// Report the measurements in graphite format and reset measurements for the next interval if needed
-	ReportGraphite(prefix []byte, buf []byte, now int64) []byte
+	ReportGraphite(prefix []byte, buf []byte, now time.Time) []byte
 }
 
 type Graphite struct {
@@ -49,7 +49,6 @@ func (g *Graphite) reporter(interval int) {
 			continue
 		}
 
-		nowUnix := now.Unix()
 		buf := make([]byte, 0)
 
 		var fullPrefix bytes.Buffer
@@ -58,7 +57,7 @@ func (g *Graphite) reporter(interval int) {
 			fullPrefix.Write(g.prefix)
 			fullPrefix.WriteString(name)
 			fullPrefix.WriteRune('.')
-			buf = metric.ReportGraphite(fullPrefix.Bytes(), buf, nowUnix)
+			buf = metric.ReportGraphite(fullPrefix.Bytes(), buf, now)
 		}
 		g.toGraphite <- buf
 	}

@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/dgryski/go-linlog"
 )
@@ -21,6 +22,7 @@ type Meter32 struct {
 	min   uint32
 	max   uint32
 	count uint32
+	since time.Time
 }
 
 func NewMeter32(name string, approx bool) *Meter32 {
@@ -29,6 +31,7 @@ func NewMeter32(name string, approx bool) *Meter32 {
 			approx: approx,
 			hist:   make(map[uint32]uint32),
 			min:    math.MaxUint32,
+			since:  time.Now(),
 		}
 	}).(*Meter32)
 }
@@ -66,7 +69,7 @@ func (m *Meter32) ValueUint32(val uint32) {
 	m.Unlock()
 }
 
-func (m *Meter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
+func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	m.Lock()
 	if m.count == 0 {
 		m.Unlock()
@@ -106,6 +109,8 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
 	buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
 	buf = WriteUint32(buf, prefix, []byte("max.gauge32"), m.max, now)
 	buf = WriteUint32(buf, prefix, []byte("values.count32"), m.count, now)
+	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(m.count)/now.Sub(m.since).Seconds(), now)
+	m.since = now
 
 	m.clear()
 	m.Unlock()

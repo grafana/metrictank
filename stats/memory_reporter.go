@@ -2,6 +2,7 @@ package stats
 
 import (
 	"runtime"
+	"time"
 )
 
 // MemoryReporter sources memory stats from the runtime and reports them
@@ -16,7 +17,7 @@ func NewMemoryReporter() *MemoryReporter {
 	}).(*MemoryReporter)
 }
 
-func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now int64) []byte {
+func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	runtime.ReadMemStats(&m.mem)
 
 	// metric total_bytes_allocated is a counter of total amount of bytes allocated during process lifetime
