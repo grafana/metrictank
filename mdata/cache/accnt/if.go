@@ -5,9 +5,14 @@ package accnt
 // replaced with alternative eviction algorithms in the future if
 // they just implement this interface
 type Accnt interface {
-	Add(string, uint32, uint64)
-	Hit(string, uint32)
+	AddChunk(string, uint32, uint64)
+	HitChunk(string, uint32)
 	GetEvictQ() chan *EvictTarget
+
+	// these methods are for stats only
+	MissMetric()
+	PartialMetric()
+	CompleteMetric()
 }
 
 // used by accounting to tell the chunk cache what to evict

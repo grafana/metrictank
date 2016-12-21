@@ -82,7 +82,7 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
 			return false
 		}
 	}
-	c.accnt.Add(metric, itergen.Ts(), itergen.Size())
+	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
 
 	return true
 }
@@ -90,22 +90,42 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
 func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
 	var res *CCSearchResult
 	var hit chunk.IterGen
+	var cm *CCacheMetric
+	var ok bool
 
 	c.RLock()
 	defer c.RUnlock()
 
-	if cm, ok := c.metricCache[metric]; ok {
-		res = cm.Search(from, until)
-		for _, hit = range res.Start {
-			c.accnt.Hit(metric, hit.Ts())
-		}
-		for _, hit = range res.End {
-			c.accnt.Hit(metric, hit.Ts())
-		}
-		return res
-	} else {
+	if cm, ok = c.metricCache[metric]; !ok {
+		// for stats only
+		c.accnt.MissMetric()
 		return nil
 	}
+
+	res = cm.Search(from, until)
+	if res == nil {
+		// for stats only
+		c.accnt.MissMetric()
+		return nil
+	}
+
+	for _, hit = range res.Start {
+		c.accnt.HitChunk(metric, hit.Ts())
+	}
+	for _, hit = range res.End {
+		c.accnt.HitChunk(metric, hit.Ts())
+	}
+
+	// for stats only
+	if res.Complete {
+		c.accnt.CompleteMetric()
+	} else if len(res.Start) == 0 && len(res.End) == 0 {
+		c.accnt.MissMetric()
+	} else {
+		c.accnt.PartialMetric()
+	}
+
+	return res
 }
 
 func (c *CCache) evictLoop() {
