@@ -331,12 +331,6 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
-func (a *AggMetric) getLastPersistedT0() uint32 {
-	a.Lock()
-	defer a.Unlock()
-	return a.lastPersistedT0
-}
-
 // write a chunk to persistent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
 	a.lastPersistedT0 = a.Chunks[pos].T0

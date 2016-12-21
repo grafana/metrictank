@@ -13,12 +13,29 @@ import (
 // evict loop.
 
 type FlatAccnt struct {
-	total   uint64
+	// total size of cache we're accounting for
+	total uint64
+
+	// metric accounting per metric key
 	metrics map[string]*FlatAccntMet
+
+	// the size limit, once this is reached we'll start evicting data
 	maxSize uint64
-	lru     *LRU
-	evictQ  chan *EvictTarget
-	eventQ  chan *FlatAccntEvent
+
+	// a last-recently-used implementation that keeps track of all chunks
+	// and which hasn't been used for the longest time. the eviction
+	// function relies on this to know what to evict.
+	lru *LRU
+
+	// whenever a chunk gets evicted a job gets added to this queue. it is
+	// consumed by the chunk cache, which will evict whatever the jobs in
+	// evictQ tell it to
+	evictQ chan *EvictTarget
+
+	// a queue of add and hit events to be processed by the accounting.
+	// each add means data got added to the cache, each hit means data
+	// has been accessed and hence the LRU needs to be updated.
+	eventQ chan *FlatAccntEvent
 }
 
 type FlatAccntMet struct {
@@ -82,10 +99,7 @@ func (a *FlatAccnt) eventLoop() {
 		)
 
 		// evict until we're below the max
-		for {
-			if a.total <= a.maxSize {
-				break
-			}
+		for a.total > a.maxSize {
 			a.evict()
 		}
 	}
@@ -119,8 +133,19 @@ func (a *FlatAccnt) evict() {
 	var ts uint32
 	var size uint64
 	var ok bool
+	var e interface{}
+	var target EvictTarget
 
-	target := a.lru.pop().(EvictTarget)
+	e = a.lru.pop()
+
+	// got nothing to evict
+	if e == nil {
+		return
+	}
+
+	// convert to EvictTarget otherwise
+	target = e.(EvictTarget)
+
 	if met, ok = a.metrics[target.Metric]; !ok {
 		return
 	}
