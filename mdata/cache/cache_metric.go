@@ -10,14 +10,22 @@ import (
 
 type CCacheMetric struct {
 	sync.RWMutex
-	oldest uint32
+
+	// points to the timestamp of the newest cache chunk currently held
+	// the head of the linked list that containes the cache chunks
 	newest uint32
-	chunks map[uint32]*CacheChunk
+
+	// points to the timestamp of the oldest cache chunk currently held
+	// the tail of the linked list that containes the cache chunks
+	oldest uint32
+
+	// points at cached data chunks, indexed by their according time stamp
+	chunks map[uint32]*CCacheChunk
 }
 
 func NewCCacheMetric() *CCacheMetric {
 	return &CCacheMetric{
-		chunks: make(map[uint32]*CacheChunk),
+		chunks: make(map[uint32]*CCacheChunk),
 	}
 }
 
@@ -62,21 +70,21 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 		return false
 	}
 
-	mc.chunks[ts] = &CacheChunk{
+	mc.chunks[ts] = &CCacheChunk{
 		Ts:    ts,
 		Prev:  prev,
 		Next:  0,
 		Itgen: itergen,
 	}
 
-	// if the previous chunk is cached, set this one as it's next
+	// if the previous chunk is cached, set this one as its next
 	if _, ok := mc.chunks[prev]; ok {
 		mc.chunks[prev].Next = ts
 	}
 
-	endTs = mc.EndTs(ts)
+	endTs = mc.endTs(ts)
 
-	// if EndTs() can't figure out the end date it returns ts
+	// if endTs() can't figure out the end date it returns ts
 	if endTs != ts {
 		if _, ok := mc.chunks[endTs]; ok {
 			mc.chunks[endTs].Prev = ts
@@ -95,18 +103,18 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 
 // get sorted slice of all chunk timestamps
 // assumes we have at least read lock
-func (mc *CCacheMetric) sortedTs() *[]uint32 {
+func (mc *CCacheMetric) sortedTs() []uint32 {
 	keys := make([]uint32, 0, len(mc.chunks))
 	for k := range mc.chunks {
 		keys = append(keys, k)
 	}
 	sort.Sort(accnt.Uint32Asc(keys))
-	return &keys
+	return keys
 }
 
 // takes a chunk's ts and returns the end ts (guessing if necessary)
 // assumes we already have at least a read lock
-func (mc *CCacheMetric) EndTs(ts uint32) uint32 {
+func (mc *CCacheMetric) endTs(ts uint32) uint32 {
 	span := (*mc.chunks[ts]).Itgen.Span()
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
@@ -129,7 +137,7 @@ func (mc *CCacheMetric) EndTs(ts uint32) uint32 {
 
 // assumes we already have at least a read lock
 // asc determines the direction of the search, ascending or descending
-func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool) {
+func (mc *CCacheMetric) seek(ts uint32, keys []uint32, asc bool) (uint32, bool) {
 	var seekpos int
 	var shiftby int
 
@@ -139,23 +147,23 @@ func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool)
 		shiftby = 1
 	} else {
 		// if descending start searching at the last
-		seekpos = len(*keys) - 1
+		seekpos = len(keys) - 1
 		shiftby = -1
 	}
 
 	for {
 		if asc {
-			if seekpos >= len(*keys) || (*keys)[seekpos] > ts {
+			if seekpos >= len(keys) || keys[seekpos] > ts {
 				break
 			}
 		} else {
-			if seekpos < 0 || mc.EndTs((*keys)[seekpos]) < ts {
+			if seekpos < 0 || mc.endTs(keys[seekpos]) < ts {
 				break
 			}
 		}
 
-		if (*keys)[seekpos] <= ts && mc.EndTs((*keys)[seekpos]) > ts {
-			return (*keys)[seekpos], true
+		if keys[seekpos] <= ts && mc.endTs(keys[seekpos]) > ts {
+			return keys[seekpos], true
 		}
 
 		seekpos = seekpos + shiftby
@@ -164,7 +172,7 @@ func (mc *CCacheMetric) seek(ts uint32, keys *[]uint32, asc bool) (uint32, bool)
 	return 0, false
 }
 
-func (mc *CCacheMetric) SearchForward(from uint32, until uint32, keys *[]uint32, res *CCSearchResult) {
+func (mc *CCacheMetric) searchForward(from uint32, until uint32, keys []uint32, res *CCSearchResult) {
 	ts, ok := mc.seek(from, keys, true)
 	if !ok {
 		return
@@ -173,7 +181,7 @@ func (mc *CCacheMetric) SearchForward(from uint32, until uint32, keys *[]uint32,
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
-		endts := mc.EndTs(ts)
+		endts := mc.endTs(ts)
 		res.From = endts
 		if endts > until {
 			res.Complete = true
@@ -182,7 +190,7 @@ func (mc *CCacheMetric) SearchForward(from uint32, until uint32, keys *[]uint32,
 	}
 }
 
-func (mc *CCacheMetric) SearchBackward(from uint32, until uint32, keys *[]uint32, res *CCSearchResult) {
+func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32, res *CCSearchResult) {
 	ts, ok := mc.seek(until, keys, false)
 	if !ok {
 		return
@@ -229,9 +237,9 @@ func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
 	}
 	keys := mc.sortedTs()
 
-	mc.SearchForward(from, until, keys, &res)
+	mc.searchForward(from, until, keys, &res)
 	if !res.Complete {
-		mc.SearchBackward(from, until, keys, &res)
+		mc.searchBackward(from, until, keys, &res)
 	}
 
 	return &res

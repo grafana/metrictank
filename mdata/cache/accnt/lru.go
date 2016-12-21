@@ -24,9 +24,7 @@ func (l *LRU) touch(key interface{}) {
 	if ent, ok := l.items[key]; ok {
 		l.list.MoveToFront(ent)
 	} else {
-		e := &entry{key}
-		ent := l.list.PushFront(e)
-		l.items[key] = ent
+		l.items[key] = l.list.PushFront(key)
 	}
 }
 
@@ -37,7 +35,7 @@ func (l *LRU) pop() interface{} {
 	}
 
 	l.list.Remove(ent)
-	e := ent.Value.(*entry)
-	delete(l.items, e.v)
-	return e.v
+	e := ent.Value
+	delete(l.items, e)
+	return e
 }
