@@ -1,7 +1,9 @@
 package accnt
 
 import (
+	"fmt"
 	"sort"
+	"time"
 )
 
 // Flat accounting
@@ -36,6 +38,10 @@ type FlatAccnt struct {
 	// each add means data got added to the cache, each hit means data
 	// has been accessed and hence the LRU needs to be updated.
 	eventQ chan *FlatAccntEvent
+
+	stats       *Stats
+	statsTicker *time.Ticker
+	lastPrint   int64
 }
 
 type FlatAccntMet struct {
@@ -44,8 +50,14 @@ type FlatAccntMet struct {
 }
 
 // event types to be used in FlatAccntEvent
-const evnt_add uint8 = 0
-const evnt_hit uint8 = 1
+const evnt_hit_chnk uint8 = 0
+const evnt_add_chnk uint8 = 1
+const evnt_evict_chnk uint8 = 2
+const evnt_miss_met uint8 = 3
+const evnt_part_met uint8 = 4
+const evnt_add_met uint8 = 5
+const evnt_evict_met uint8 = 6
+const evnt_complt_met uint8 = 7
 
 type FlatAccntEvent struct {
 	t      uint8 // event type
@@ -54,25 +66,52 @@ type FlatAccntEvent struct {
 	size   uint64
 }
 
+type Stats struct {
+	hit_chnk   uint32
+	add_chnk   uint32
+	evict_chnk uint32
+	miss_met   uint32
+	part_met   uint32
+	add_met    uint32
+	evict_met  uint32
+	complt_met uint32
+}
+
 func NewFlatAccnt(maxSize uint64) Accnt {
 	accnt := &FlatAccnt{
-		total:   0,
-		metrics: make(map[string]*FlatAccntMet),
-		maxSize: maxSize,
-		lru:     NewLRU(),
-		evictQ:  make(chan *EvictTarget),
+		total:       0,
+		metrics:     make(map[string]*FlatAccntMet),
+		maxSize:     maxSize,
+		lru:         NewLRU(),
+		evictQ:      make(chan *EvictTarget),
+		stats:       &Stats{0, 0, 0, 0, 0, 0, 0, 0},
+		lastPrint:   time.Now().UnixNano(),
+		statsTicker: time.NewTicker(time.Second * 10),
 	}
 	accnt.eventQ = make(chan *FlatAccntEvent)
+
 	go accnt.eventLoop()
 	return accnt
 }
 
-func (a *FlatAccnt) Add(metric string, ts uint32, size uint64) {
-	a.act(evnt_add, metric, ts, size)
+func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
+	a.act(evnt_add_chnk, metric, ts, size)
 }
 
-func (a *FlatAccnt) Hit(metric string, ts uint32) {
-	a.act(evnt_hit, metric, ts, 0)
+func (a *FlatAccnt) HitChunk(metric string, ts uint32) {
+	a.act(evnt_hit_chnk, metric, ts, 0)
+}
+
+func (a *FlatAccnt) MissMetric() {
+	a.act(evnt_miss_met, "", 0, 0)
+}
+
+func (a *FlatAccnt) PartialMetric() {
+	a.act(evnt_part_met, "", 0, 0)
+}
+
+func (a *FlatAccnt) CompleteMetric() {
+	a.act(evnt_complt_met, "", 0, 0)
 }
 
 func (a *FlatAccnt) act(t uint8, metric string, ts uint32, size uint64) {
@@ -84,23 +123,63 @@ func (a *FlatAccnt) act(t uint8, metric string, ts uint32, size uint64) {
 	}
 }
 
+func (a *FlatAccnt) statPrintReset() {
+	now := time.Now().UnixNano()
+	duration := now - a.lastPrint
+	a.lastPrint = now
+
+	fmt.Printf("Stats for the past %d ns:\n", duration)
+	fmt.Printf("complete metric %d\n", a.stats.complt_met)
+	fmt.Printf("misses metric   %d\n", a.stats.miss_met)
+	fmt.Printf("partial metric  %d\n", a.stats.part_met)
+	fmt.Printf("adds metric     %d\n", a.stats.add_met)
+	fmt.Printf("adds chunk      %d\n", a.stats.add_chnk)
+	fmt.Printf("evicts chunk    %d\n", a.stats.evict_chnk)
+
+	a.stats.complt_met = 0
+	a.stats.miss_met = 0
+	a.stats.part_met = 0
+	a.stats.add_met = 0
+	a.stats.add_chnk = 0
+	a.stats.evict_chnk = 0
+}
+
 func (a *FlatAccnt) eventLoop() {
 	for {
-		event := <-a.eventQ
-		if event.t == evnt_add {
-			a.add(event.metric, event.ts, event.size)
-		}
+		select {
+		case <-a.statsTicker.C:
+			a.statPrintReset()
+		case event := <-a.eventQ:
+			switch event.t {
+			case evnt_add_chnk:
+				a.add(event.metric, event.ts, event.size)
+				a.stats.add_chnk++
+				a.lru.touch(
+					EvictTarget{
+						Metric: event.metric,
+						Ts:     event.ts,
+					},
+				)
+			case evnt_hit_chnk:
+				a.stats.hit_chnk++
+				a.lru.touch(
+					EvictTarget{
+						Metric: event.metric,
+						Ts:     event.ts,
+					},
+				)
+			case evnt_miss_met:
+				a.stats.miss_met++
+			case evnt_part_met:
+				a.stats.part_met++
+			case evnt_complt_met:
+				a.stats.complt_met++
+			}
 
-		a.lru.touch(
-			EvictTarget{
-				Metric: event.metric,
-				Ts:     event.ts,
-			},
-		)
-
-		// evict until we're below the max
-		for a.total > a.maxSize {
-			a.evict()
+			// evict until we're below the max
+			for a.total > a.maxSize {
+				a.evict()
+			}
 		}
 	}
 }
@@ -164,6 +243,7 @@ func (a *FlatAccnt) evict() {
 		size = met.chunks[ts]
 		met.total = met.total - size
 		a.total = a.total - size
+		a.stats.evict_chnk++
 		a.evictQ <- &EvictTarget{
 			Metric: target.Metric,
 			Ts:     ts,
