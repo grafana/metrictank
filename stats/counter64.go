@@ -26,6 +26,6 @@ func (c *Counter64) AddUint64(val uint64) {
 
 func (c *Counter64) ReportGraphite(prefix, buf []byte, now int64) []byte {
 	val := atomic.LoadUint64(&c.val)
-	buf = WriteUint64(buf, prefix, nil, val, now)
+	buf = WriteUint64(buf, prefix, []byte("counter64"), val, now)
 	return buf
 }

@@ -30,6 +30,6 @@ func (c *Counter32) AddUint32(val uint32) {
 
 func (c *Counter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
 	val := atomic.LoadUint32(&c.val)
-	buf = WriteUint32(buf, prefix, nil, val, now)
+	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
 	return buf
 }

@@ -82,9 +82,9 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
 		p   float64
 		str string
 	}{
-		{0.50, "median"},
-		{0.75, "p75"},
-		{0.90, "p90"},
+		{0.50, "median.gauge32"},
+		{0.75, "p75.gauge32"},
+		{0.90, "p90.gauge32"},
 	}
 
 	pidx := 0
@@ -102,10 +102,10 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now int64) []byte {
 		}
 	}
 
-	buf = WriteUint32(buf, prefix, []byte("min"), m.min, now)
-	buf = WriteUint32(buf, prefix, []byte("mean"), uint32(runningsum/uint64(m.count)), now)
-	buf = WriteUint32(buf, prefix, []byte("max"), m.max, now)
-	buf = WriteUint32(buf, prefix, []byte("count"), m.count, now)
+	buf = WriteUint32(buf, prefix, []byte("min.gauge32"), m.min, now)
+	buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
+	buf = WriteUint32(buf, prefix, []byte("max.gauge32"), m.max, now)
+	buf = WriteUint32(buf, prefix, []byte("values.count32"), m.count, now)
 
 	m.clear()
 	m.Unlock()
