@@ -9,9 +9,8 @@ func NewDevnull() {
 		ticker := tick(time.Second)
 		buf := make([]byte, 0)
 		for now := range ticker {
-			nowUnix := now.Unix()
 			for _, metric := range registry.list() {
-				metric.ReportGraphite(nil, buf[:], nowUnix)
+				metric.ReportGraphite(nil, buf[:], now)
 			}
 		}
 	}()

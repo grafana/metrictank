@@ -1,6 +1,9 @@
 package stats
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type Bool struct {
 	val uint32
@@ -28,7 +31,7 @@ func (b *Bool) Set(val bool) {
 	}
 }
 
-func (b *Bool) ReportGraphite(prefix, buf []byte, now int64) []byte {
+func (b *Bool) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&b.val)
 	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)
 	return buf

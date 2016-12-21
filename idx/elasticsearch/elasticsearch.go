@@ -23,8 +23,8 @@ import (
 var (
 	idxEsOk             = stats.NewCounter32("idx.elasticsearch.ok")
 	idxEsFail           = stats.NewCounter32("idx.elasticsearch.fail")
-	idxEsAddDuration    = stats.NewLatencyHistogram15s32("idx.elasticsearch.add_duration")
-	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete_duration")
+	idxEsAddDuration    = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
+	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete")
 	retryBufItems       = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
 
 	Enabled          bool

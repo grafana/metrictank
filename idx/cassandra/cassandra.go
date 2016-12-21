@@ -41,8 +41,8 @@ var (
 	idxCasOk = stats.NewCounter32("idx.cassandra.ok")
 	// metric idx.cassandra.fail is how failures encountered while trying to index metrics
 	idxCasFail           = stats.NewCounter32("idx.cassandra.fail")
-	idxCasAddDuration    = stats.NewLatencyHistogram15s32("idx.cassandra.add_duration")
-	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete_duration")
+	idxCasAddDuration    = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
 	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")
 
 	Enabled          bool

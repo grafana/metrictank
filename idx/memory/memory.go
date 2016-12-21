@@ -18,11 +18,11 @@ import (
 var (
 	idxOk             = stats.NewCounter32("idx.memory.ok")
 	idxFail           = stats.NewCounter32("idx.memory.fail")
-	idxAddDuration    = stats.NewLatencyHistogram15s32("idx.memory.add_duration")
-	idxGetDuration    = stats.NewLatencyHistogram15s32("idx.memory.get_duration")
-	idxListDuration   = stats.NewLatencyHistogram15s32("idx.memory.list_duration")
-	idxFindDuration   = stats.NewLatencyHistogram15s32("idx.memory.find_duration")
-	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete_duration")
+	idxAddDuration    = stats.NewLatencyHistogram15s32("idx.memory.add")
+	idxGetDuration    = stats.NewLatencyHistogram15s32("idx.memory.get")
+	idxListDuration   = stats.NewLatencyHistogram15s32("idx.memory.list")
+	idxFindDuration   = stats.NewLatencyHistogram15s32("idx.memory.find")
+	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
 
 	Enabled bool
 )
