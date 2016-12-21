@@ -45,8 +45,8 @@ func (r *Range32) ReportGraphite(prefix, buf []byte, now int64) []byte {
 	r.Lock()
 	// if no values were seen, don't report anything to graphite
 	if r.valid {
-		buf = WriteUint32(buf, prefix, []byte("min"), r.min, now)
-		buf = WriteUint32(buf, prefix, []byte("max"), r.max, now)
+		buf = WriteUint32(buf, prefix, []byte("min.gauge32"), r.min, now)
+		buf = WriteUint32(buf, prefix, []byte("max.gauge32"), r.max, now)
 		r.min = math.MaxUint32
 		r.max = 0
 		r.valid = false

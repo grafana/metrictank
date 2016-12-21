@@ -29,13 +29,13 @@ func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now int64) []
 	// for now, only report the summaries :(
 	r, ok := l.hist.Report(snap)
 	if ok {
-		buf = WriteUint32(buf, prefix, []byte("min"), r.Min/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("mean"), r.Mean/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("median"), r.Median/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("p75"), r.P75/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("p90"), r.P90/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("max"), r.Max/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("count"), r.Count, now)
+		buf = WriteUint32(buf, prefix, []byte("min.gauge32"), r.Min/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), r.Mean/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("median.gauge32"), r.Median/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("p75.gauge32"), r.P75/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("p90.gauge32"), r.P90/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("max.gauge32"), r.Max/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("values.count32"), r.Count, now)
 	}
 	return buf
 }

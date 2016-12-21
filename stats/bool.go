@@ -30,6 +30,6 @@ func (b *Bool) Set(val bool) {
 
 func (b *Bool) ReportGraphite(prefix, buf []byte, now int64) []byte {
 	val := atomic.LoadUint32(&b.val)
-	buf = WriteUint32(buf, prefix, nil, val, now)
+	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)
 	return buf
 }
