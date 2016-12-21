@@ -38,9 +38,9 @@ const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(par
 
 var (
 	// metric idx.cassadra.ok is how many metrics are successfully being indexed
-	idxCasOk = stats.NewCounter32("idx.cassandra.ok")
+	idxCasOk = stats.NewCounter32("idx.cassandra.add.ok")
 	// metric idx.cassandra.fail is how failures encountered while trying to index metrics
-	idxCasFail           = stats.NewCounter32("idx.cassandra.fail")
+	idxCasFail           = stats.NewCounter32("idx.cassandra.add.fail")
 	idxCasAddDuration    = stats.NewLatencyHistogram15s32("idx.cassandra.add")
 	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
 	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")

@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	idxOk             = stats.NewCounter32("idx.memory.ok")
-	idxFail           = stats.NewCounter32("idx.memory.fail")
+	idxOk             = stats.NewCounter32("idx.memory.add.ok")
+	idxFail           = stats.NewCounter32("idx.memory.add.fail")
 	idxAddDuration    = stats.NewLatencyHistogram15s32("idx.memory.add")
 	idxGetDuration    = stats.NewLatencyHistogram15s32("idx.memory.get")
 	idxListDuration   = stats.NewLatencyHistogram15s32("idx.memory.list")
