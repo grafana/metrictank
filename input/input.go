@@ -4,6 +4,7 @@ package input
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
@@ -20,6 +21,8 @@ type Input struct {
 	MetricsDecodeErr  *stats.Counter32 // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
 	MetricInvalid     *stats.Counter32 // metric metric_invalid is a count of times a metric did not validate
 	MsgsAge           *stats.Meter32   // in ms
+	pressureIdx       *stats.Counter32
+	pressureTank      *stats.Counter32
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
@@ -33,6 +36,8 @@ func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage,
 		MetricsDecodeErr:  stats.NewCounter32(fmt.Sprintf("input.%s.metrics_decode_err", input)),
 		MetricInvalid:     stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
 		MsgsAge:           stats.NewMeter32(fmt.Sprintf("input.%s.message_age", input), false),
+		pressureIdx:       stats.NewCounter32(fmt.Sprintf("input.%s.pressure.idx", input)),
+		pressureTank:      stats.NewCounter32(fmt.Sprintf("input.%s.pressure.tank", input)),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,
@@ -57,11 +62,16 @@ func (in Input) Process(metric *schema.MetricData, partition int32) {
 	if metric.Time == 0 {
 		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
+		pre := time.Now()
 		in.metricIndex.Add(metric, partition)
+		in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
+
+		pre = time.Now()
 		m := in.metrics.GetOrCreate(metric.Id)
 		m.Add(uint32(metric.Time), metric.Value)
 		if in.usage != nil {
 			in.usage.Add(metric.OrgId, metric.Id)
 		}
+		in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 	}
 }
