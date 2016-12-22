@@ -63,24 +63,16 @@ func NewCCache() *CCache {
 }
 
 func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
-	var res bool
-
 	c.Lock()
 	defer c.Unlock()
 
 	if ccm, ok := c.metricCache[metric]; !ok {
 		var ccm *CCacheMetric
 		ccm = NewCCacheMetric()
-		res = ccm.Init(prev, itergen)
-		if !res {
-			return false
-		}
+		ccm.Init(prev, itergen)
 		c.metricCache[metric] = ccm
 	} else {
-		res = ccm.Add(prev, itergen)
-		if !res {
-			return false
-		}
+		ccm.Add(prev, itergen)
 	}
 	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
 
@@ -88,10 +80,16 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
 }
 
 func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
-	var res *CCSearchResult
 	var hit chunk.IterGen
 	var cm *CCacheMetric
 	var ok bool
+	var res *CCSearchResult = &CCSearchResult{
+		From:     from,
+		Until:    until,
+		Start:    make([]chunk.IterGen, 0),
+		End:      make([]chunk.IterGen, 0),
+		Complete: false,
+	}
 
 	c.RLock()
 	defer c.RUnlock()
@@ -99,30 +97,29 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 	if cm, ok = c.metricCache[metric]; !ok {
 		// for stats only
 		c.accnt.MissMetric()
-		return nil
+		return res
 	}
 
-	res = cm.Search(from, until)
-	if res == nil {
-		// for stats only
-		c.accnt.MissMetric()
-		return nil
-	}
-
-	for _, hit = range res.Start {
-		c.accnt.HitChunk(metric, hit.Ts())
-	}
-	for _, hit = range res.End {
-		c.accnt.HitChunk(metric, hit.Ts())
-	}
-
-	// for stats only
-	if res.Complete {
-		c.accnt.CompleteMetric()
-	} else if len(res.Start) == 0 && len(res.End) == 0 {
+	cm.Search(res, from, until)
+	if len(res.Start) == 0 && len(res.End) == 0 {
+		// for stats only, record a complete miss
 		c.accnt.MissMetric()
 	} else {
-		c.accnt.PartialMetric()
+		for _, hit = range res.Start {
+			c.accnt.HitChunk(metric, hit.Ts())
+		}
+		for _, hit = range res.End {
+			c.accnt.HitChunk(metric, hit.Ts())
+		}
+
+		// for stats only
+		if res.Complete {
+			// record a complete hit
+			c.accnt.CompleteMetric()
+		} else {
+			// record a partial hit
+			c.accnt.PartialMetric()
+		}
 	}
 
 	return res

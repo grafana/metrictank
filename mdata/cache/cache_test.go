@@ -94,7 +94,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
 	res := cc.Search(metric, 2500, 6000)
-	if res.Complete {
+	if !res.Complete {
 		t.Fatalf("complete is expected to be false")
 	}
 

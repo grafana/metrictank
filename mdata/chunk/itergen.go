@@ -41,8 +41,9 @@ func NewGen(b []byte, ts uint32) (*IterGen, error) {
 }
 
 func (ig *IterGen) Get() (*Iter, error) {
-
-	it, err := tsz.NewIterator(ig.b[1:])
+	b := make([]byte, len(ig.b), len(ig.b))
+	copy(b, ig.b)
+	it, err := tsz.NewIterator(b)
 	if err != nil {
 		return nil, err
 	}

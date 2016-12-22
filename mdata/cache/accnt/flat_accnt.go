@@ -52,29 +52,52 @@ type FlatAccntMet struct {
 // event types to be used in FlatAccntEvent
 const evnt_hit_chnk uint8 = 0
 const evnt_add_chnk uint8 = 1
-const evnt_evict_chnk uint8 = 2
-const evnt_miss_met uint8 = 3
-const evnt_part_met uint8 = 4
-const evnt_add_met uint8 = 5
-const evnt_evict_met uint8 = 6
-const evnt_complt_met uint8 = 7
+const evnt_miss_met uint8 = 2
+const evnt_part_met uint8 = 3
+const evnt_complt_met uint8 = 4
 
 type FlatAccntEvent struct {
-	t      uint8 // event type
+	t  uint8       // event type
+	pl interface{} // payload
+}
+
+type Stats struct {
+	// chunk hits
+	hit_chnk uint32
+
+	// chunk adds
+	add_chnk uint32
+
+	// chunk evictions
+	evict_chnk uint32
+
+	// metric complete misses, not a single chunk of the request was cached
+	miss_met uint32
+
+	// metric partial hits, some of the requested chunks were cached
+	part_met uint32
+
+	// new metrics added
+	add_met uint32
+
+	// metrics completely evicted
+	evict_met uint32
+
+	// metric full hits, all requested chunks were cached
+	complt_met uint32
+}
+
+// payload to be sent with an add event
+type AddPayload struct {
 	metric string
 	ts     uint32
 	size   uint64
 }
 
-type Stats struct {
-	hit_chnk   uint32
-	add_chnk   uint32
-	evict_chnk uint32
-	miss_met   uint32
-	part_met   uint32
-	add_met    uint32
-	evict_met  uint32
-	complt_met uint32
+// payload to be sent with a hit event
+type HitPayload struct {
+	metric string
+	ts     uint32
 }
 
 func NewFlatAccnt(maxSize uint64) Accnt {
@@ -95,31 +118,29 @@ func NewFlatAccnt(maxSize uint64) Accnt {
 }
 
 func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
-	a.act(evnt_add_chnk, metric, ts, size)
+	a.act(evnt_add_chnk, &AddPayload{metric, ts, size})
 }
 
 func (a *FlatAccnt) HitChunk(metric string, ts uint32) {
-	a.act(evnt_hit_chnk, metric, ts, 0)
+	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
 }
 
 func (a *FlatAccnt) MissMetric() {
-	a.act(evnt_miss_met, "", 0, 0)
+	a.act(evnt_miss_met, nil)
 }
 
 func (a *FlatAccnt) PartialMetric() {
-	a.act(evnt_part_met, "", 0, 0)
+	a.act(evnt_part_met, nil)
 }
 
 func (a *FlatAccnt) CompleteMetric() {
-	a.act(evnt_complt_met, "", 0, 0)
+	a.act(evnt_complt_met, nil)
 }
 
-func (a *FlatAccnt) act(t uint8, metric string, ts uint32, size uint64) {
+func (a *FlatAccnt) act(t uint8, payload interface{}) {
 	a.eventQ <- &FlatAccntEvent{
-		t:      t,
-		metric: metric,
-		ts:     ts,
-		size:   size,
+		t:  t,
+		pl: payload,
 	}
 }
 
@@ -129,12 +150,13 @@ func (a *FlatAccnt) statPrintReset() {
 	a.lastPrint = now
 
 	fmt.Printf("Stats for the past %d ns:\n", duration)
-	fmt.Printf("complete metric %d\n", a.stats.complt_met)
-	fmt.Printf("misses metric   %d\n", a.stats.miss_met)
-	fmt.Printf("partial metric  %d\n", a.stats.part_met)
-	fmt.Printf("adds metric     %d\n", a.stats.add_met)
-	fmt.Printf("adds chunk      %d\n", a.stats.add_chnk)
-	fmt.Printf("evicts chunk    %d\n", a.stats.evict_chnk)
+	fmt.Printf("metric complete %d\n", a.stats.complt_met)
+	fmt.Printf("metric misses   %d\n", a.stats.miss_met)
+	fmt.Printf("metric partials %d\n", a.stats.part_met)
+	fmt.Printf("metric adds     %d\n", a.stats.add_met)
+	fmt.Printf("chunk hits      %d\n", a.stats.hit_chnk)
+	fmt.Printf("chunk adds      %d\n", a.stats.add_chnk)
+	fmt.Printf("chunk evicts    %d\n", a.stats.evict_chnk)
 
 	a.stats.complt_met = 0
 	a.stats.miss_met = 0
@@ -152,20 +174,22 @@ func (a *FlatAccnt) eventLoop() {
 		case event := <-a.eventQ:
 			switch event.t {
 			case evnt_add_chnk:
-				a.add(event.metric, event.ts, event.size)
+				payload := event.pl.(*AddPayload)
+				a.add(payload.metric, payload.ts, payload.size)
 				a.stats.add_chnk++
 				a.lru.touch(
 					EvictTarget{
-						Metric: event.metric,
-						Ts:     event.ts,
+						Metric: payload.metric,
+						Ts:     payload.ts,
 					},
 				)
 			case evnt_hit_chnk:
+				payload := event.pl.(*HitPayload)
 				a.stats.hit_chnk++
 				a.lru.touch(
 					EvictTarget{
-						Metric: event.metric,
-						Ts:     event.ts,
+						Metric: payload.metric,
+						Ts:     payload.ts,
 					},
 				)
 			case evnt_miss_met:
@@ -194,6 +218,7 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 			chunks: make(map[uint32]uint64),
 		}
 		a.metrics[metric] = met
+		a.stats.add_met++
 	}
 
 	if _, ok = met.chunks[ts]; ok {
