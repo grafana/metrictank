@@ -6,12 +6,12 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/raintank/dur"
-	"github.com/raintank/inspect/idx/cass"
-	"github.com/raintank/inspect/inspect-idx/out"
+	"github.com/raintank/metrictank/cmd/mt-index-cat/out"
+	"github.com/raintank/metrictank/idx/cassandra"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -23,43 +23,80 @@ func perror(err error) {
 
 func main() {
 
-	var (
-		addr   string
-		from   string
-		maxAge string
-		count  bool
-		old    bool
+	var addr string
+	var from string
+	var maxAge string
+	var count bool
 
-		total int
-	)
+	var total int
 
-	flag.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
-	flag.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
-	flag.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
-	flag.BoolVar(&count, "count", false, "print number of metrics loaded to stderr")
-	flag.BoolVar(&old, "old", false, "use old cassandra table, metric_def_idx. (prior to clustering)")
+	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
+	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
+	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
+	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
+	globalFlags.BoolVar(&count, "count", false, "print number of metrics loaded to stderr")
+
+	cassFlags := cassandra.ConfigSetup()
+
+	outputs := []string{"dump", "list", "vegeta-render", "vegeta-render-patterns"}
 
 	flag.Usage = func() {
-		fmt.Printf("%s by Dieter_be\n", os.Args[0])
-		fmt.Println("Usage:")
-		fmt.Printf("  inspect-idx [flags] idxtype host keyspace/index output \n")
-		fmt.Printf("  idxtype cass: \n")
-		fmt.Printf("    host: comma separated list of cassandra addresses in host:port form\n")
-		fmt.Printf("    keyspace: cassandra keyspace\n")
-		fmt.Printf("  idxtype es: not supported at this point\n")
-		fmt.Printf("  output: dump|list|vegeta-render|vegeta-render-patterns\n")
-		fmt.Println("Flags:")
-		flag.PrintDefaults()
+		fmt.Println(os.Args[0])
+		fmt.Printf("Usage:\n\n")
+		fmt.Printf("  inspect-idx [global config flags] <idxtype> [idx config flags] output \n\n")
+		fmt.Printf("global config flags:\n\n")
+		globalFlags.PrintDefaults()
+		fmt.Println()
+		fmt.Printf("idxtype: only 'cass' supported for now\n\n")
+		fmt.Printf("cass config flags:\n\n")
+		cassFlags.PrintDefaults()
+		fmt.Println()
+		fmt.Printf("output: %v\n\n\n", strings.Join(outputs, "|"))
+		fmt.Println("EXAMPLES:")
+		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 -keyspace raintank list")
 	}
-	flag.Parse()
-	if flag.NArg() != 4 {
+
+	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if len(os.Args) < 3 {
 		flag.Usage()
 		os.Exit(-1)
 	}
-	args := flag.Args()
+
 	var show func(d schema.MetricDefinition)
 
-	switch args[3] {
+	last := os.Args[len(os.Args)-1]
+	var found bool
+	for _, output := range outputs {
+		if last == output {
+			found = true
+		}
+	}
+	if !found {
+		log.Printf("invalid output %q", last)
+		flag.Usage()
+		os.Exit(-1)
+	}
+	var cassI int
+	for i, v := range os.Args {
+		if v == "cass" {
+			cassI = i
+		}
+	}
+	if cassI == 0 {
+		log.Println("only indextype 'cass' supported")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	globalFlags.Parse(os.Args[1:cassI])
+	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
+	cassandra.Enabled = true
+
+	switch os.Args[len(os.Args)-1] {
 	case "dump":
 		show = out.Dump
 	case "list":
@@ -69,11 +106,15 @@ func main() {
 	case "vegeta-render-patterns":
 		show = out.GetVegetaRenderPattern(addr, from)
 	default:
-		log.Fatal("invalid output")
+		panic("this should never happen. we already validated the output type")
 	}
 
-	// from should either a unix timestamp, or a specification that graphite/metrictank will recognize.
-	_, err := strconv.Atoi(from)
+	idx := cassandra.New()
+	err := idx.InitBare()
+	perror(err)
+
+	// from should either be a unix timestamp, or a specification that graphite/metrictank will recognize.
+	_, err = strconv.Atoi(from)
 	if err != nil {
 		_, err = dur.ParseUNsec(from)
 		perror(err)
@@ -87,21 +128,8 @@ func main() {
 		maxAgeInt = int64(i)
 	}
 
-	if args[0] != "cass" {
-		fmt.Fprintf(os.Stderr, "only cass supported at this point")
-		flag.Usage()
-		os.Exit(-1)
-	}
-
-	table := "metric_idx"
-	if old {
-		table = "metric_def_idx"
-	}
-	idx := cass.New(args[1], args[2], table)
-
-	defs, err := idx.Get()
-	perror(err)
-	spew.Dump(defs)
+	var defs []schema.MetricDefinition
+	defs = idx.Load(defs)
 
 	for _, d := range defs {
 		if maxAgeInt != 0 && d.LastUpdate > time.Now().Unix()-maxAgeInt {
