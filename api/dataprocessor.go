@@ -417,54 +417,58 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		until := util.Min(oldest, toUnix)
 		logLoad("cassan", key, fromUnix, until)
 
+		log.Debug("cache: searching query key %s, from %d, until %d", key, fromUnix, until)
 		cacheRes := s.Cache.Search(key, fromUnix, until)
-		// nil means the chunk cache does not know this metric
-		if cacheRes != nil {
-			// the request cannot completely be served from cache, it will require cassandra involvement
-			if !cacheRes.Complete {
-				storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
-				if err != nil {
-					panic(err)
-				}
+		log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+		// the request cannot completely be served from cache, it will require cassandra involvement
+		if !cacheRes.Complete {
+			storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
+			if err != nil {
+				panic(err)
+			}
 
-				var prevts uint32 = 0
-				for _, itgen := range cacheRes.Start {
-					prevts = itgen.Ts()
-					it, err := itgen.Get()
-					if err != nil {
-						// TODO(replay) figure out what to do if one piece is corrupt
-						continue
-					}
-					iters = append(iters, *it)
+			var prevts uint32 = 0
+			for _, itgen := range cacheRes.Start {
+				prevts = itgen.Ts()
+				it, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					log.Error(3, "itergen: error getting iter from cache result start slice %+v", err)
+					continue
 				}
-				for _, itgen := range storeIterGens {
-					// it's important that the itgens get added in chronological order,
-					// currently we rely on cassandra returning results in order
-					go s.Cache.Add(key, prevts, itgen)
-					prevts = itgen.Ts()
-					it, err := itgen.Get()
-					if err != nil {
-						// TODO(replay) figure out what to do if one piece is corrupt
-						continue
-					}
-					iters = append(iters, *it)
+				iters = append(iters, *it)
+			}
+			for _, itgen := range storeIterGens {
+				// it's important that the itgens get added in chronological order,
+				// currently we rely on cassandra returning results in order
+				go s.Cache.Add(key, prevts, itgen)
+				prevts = itgen.Ts()
+				it, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
+					continue
 				}
-				for i := len(cacheRes.End) - 1; i >= 0; i-- {
-					it, err := cacheRes.End[i].Get()
-					if err != nil {
-						// TODO(replay) figure out what to do if one piece is corrupt
-						continue
-					}
-					iters = append(iters, *it)
+				iters = append(iters, *it)
+			}
+			for i := len(cacheRes.End) - 1; i >= 0; i-- {
+				it, err := cacheRes.End[i].Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					log.Error(3, "itergen: error getting iter from cache result end slice %+v", err)
+					continue
 				}
-			} else {
-				for _, itgen := range cacheRes.Start {
-					iter, err := itgen.Get()
-					if err != nil {
-						continue
-					}
-					iters = append(iters, *iter)
+				iters = append(iters, *it)
+			}
+		} else {
+			for _, itgen := range cacheRes.Start {
+				iter, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					log.Error(3, "itergen: error getting iter from Start list %+v", err)
+					continue
 				}
+				iters = append(iters, *iter)
 			}
 		}
 	} else {

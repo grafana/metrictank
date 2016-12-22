@@ -6,6 +6,7 @@ import (
 
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type CCacheMetric struct {
@@ -29,14 +30,10 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) bool {
-	res := mc.Add(prev, itergen)
-	if !res {
-		return false
-	}
+func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) {
+	mc.Add(prev, itergen)
 	mc.oldest = itergen.Ts()
 	mc.newest = itergen.Ts()
-	return true
 }
 
 func (mc *CCacheMetric) Del(ts uint32) int {
@@ -60,14 +57,15 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	return len(mc.chunks)
 }
 
-func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
+func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	var ts, endTs uint32
 	ts = itergen.Ts()
 
 	mc.Lock()
 	defer mc.Unlock()
 	if _, ok := mc.chunks[ts]; ok {
-		return false
+		// chunk is already present. no need to error on that, just ignore it
+		return
 	}
 
 	mc.chunks[ts] = &CCacheChunk{
@@ -83,11 +81,13 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 	}
 
 	endTs = mc.endTs(ts)
+	log.Debug("cache: caching chunk ts %d, endTs %d", ts, endTs)
 
 	// if endTs() can't figure out the end date it returns ts
 	if endTs != ts {
 		if _, ok := mc.chunks[endTs]; ok {
 			mc.chunks[endTs].Prev = ts
+			mc.chunks[ts].Next = endTs
 		}
 	}
 
@@ -98,7 +98,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) bool {
 		mc.oldest = ts
 	}
 
-	return true
+	return
 }
 
 // get sorted slice of all chunk timestamps
@@ -141,6 +141,7 @@ func (mc *CCacheMetric) seek(ts uint32, keys []uint32, asc bool) (uint32, bool) 
 	var seekpos int
 	var shiftby int
 
+	log.Debug("cache: seeking for %d in the keys %+d", ts, keys)
 	if asc {
 		// if ascending start searching at the first
 		seekpos = 0
@@ -163,12 +164,14 @@ func (mc *CCacheMetric) seek(ts uint32, keys []uint32, asc bool) (uint32, bool) 
 		}
 
 		if keys[seekpos] <= ts && mc.endTs(keys[seekpos]) > ts {
+			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[seekpos], mc.endTs(keys[seekpos]))
 			return keys[seekpos], true
 		}
 
 		seekpos = seekpos + shiftby
 	}
 
+	log.Debug("cache: seek unsuccessful")
 	return 0, false
 }
 
@@ -180,10 +183,12 @@ func (mc *CCacheMetric) searchForward(from uint32, until uint32, keys []uint32, 
 
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
+		log.Debug("cache: forward search adds chunk ts %d to start", ts)
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
 		endts := mc.endTs(ts)
 		res.From = endts
-		if endts > until {
+
+		if endts >= until {
 			res.Complete = true
 			break
 		}
@@ -197,10 +202,12 @@ func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32,
 	}
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
+		log.Debug("cache: backward search adds chunk ts %d to start", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
-		startts := mc.chunks[ts].Ts
-		res.Until = startts
-		if startts <= from {
+		startTs := mc.chunks[ts].Ts
+		res.Until = startTs
+
+		if startTs <= from {
 			break
 		}
 	}
@@ -220,27 +227,18 @@ func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32,
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
 //
-func (mc *CCacheMetric) Search(from uint32, until uint32) *CCSearchResult {
+func (mc *CCacheMetric) Search(res *CCSearchResult, from uint32, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
 	if len(mc.chunks) < 1 {
-		return nil
+		return
 	}
 
-	res := CCSearchResult{
-		From:     from,
-		Until:    until,
-		Start:    make([]chunk.IterGen, 0),
-		End:      make([]chunk.IterGen, 0),
-		Complete: false,
-	}
 	keys := mc.sortedTs()
 
-	mc.searchForward(from, until, keys, &res)
+	mc.searchForward(from, until-1, keys, res)
 	if !res.Complete {
-		mc.searchBackward(from, until, keys, &res)
+		mc.searchBackward(from, until-1, keys, res)
 	}
-
-	return &res
 }
