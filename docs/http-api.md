@@ -111,7 +111,7 @@ POST /render
 curl -H "X-Org-Id: 12345" "http://localhost:6060/render?target=statsd.fakesite.counters.session_start.*.count&from=3h&to=2h"
 ```
 
-## Cluster status
+## Get Cluster Status
 
 ```
 GET /node
@@ -132,6 +132,8 @@ returns a json document with the following fields:
 ```bash
 curl "http://localhost:6060/node"
 ```
+
+## Set Cluster Status
 
 ```
 POST /node
