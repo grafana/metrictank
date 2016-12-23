@@ -5,7 +5,8 @@ RUN mkdir -p /etc/raintank
 COPY config/metrictank-docker.ini /etc/raintank/metrictank.ini
 COPY config/storage-schemas.conf /etc/raintank/storage-schemas.conf
 
-COPY build/metrictank /usr/bin/metrictank
+COPY build/* /usr/bin/
+
 COPY wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
 
 EXPOSE 6060

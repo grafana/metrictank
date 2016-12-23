@@ -7,6 +7,7 @@ check:
 	$(MAKE) test
 bin:
 	./scripts/build.sh
+	./scripts/build_tools.sh
 docker:
 	./scripts/build_docker.sh
 all:
