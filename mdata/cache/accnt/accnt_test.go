@@ -11,13 +11,13 @@ func getNew(maxSize int) *FlatAccnt {
 		metrics:     make(map[string]*FlatAccntMet),
 		maxSize:     uint64(maxSize),
 		lru:         NewLRU(),
-		evictQ:      make(chan *EvictTarget),
+		evictQ:      make(chan *EvictTarget, 10),
+		eventQ:      make(chan *FlatAccntEvent, 10),
 		stats:       &Stats{0, 0, 0, 0, 0, 0, 0, 0},
 		lastPrint:   time.Now().UnixNano(),
 		statsTicker: time.NewTicker(time.Second * 10),
 	}
 	a.statsTicker.Stop()
-	a.eventQ = make(chan *FlatAccntEvent)
 	go a.eventLoop()
 	return a
 }
