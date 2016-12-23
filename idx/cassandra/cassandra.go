@@ -22,6 +22,7 @@ import (
 const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
 const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     id text,
+    orgid int,
     partition int,
     name text,
     metric text,
@@ -237,16 +238,19 @@ func (c *CasIdx) rebuildIndex() {
 	pre := time.Now()
 	defs := make([]schema.MetricDefinition, 0)
 	for _, partition := range cluster.ThisNode.GetPartitions() {
-		iter := c.session.Query("SELECT id, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
+		iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
 
 		mdef := schema.MetricDefinition{}
 		var id, name, metric, unit, mtype string
+		var orgId int
 		var partition int32
 		var lastupdate int64
 		var interval int
 		var tags []string
-		for iter.Scan(&id, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+
+		for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
 			mdef.Id = id
+			mdef.OrgId = orgId
 			mdef.Partition = partition
 			mdef.Name = name
 			mdef.Metric = metric
@@ -271,7 +275,7 @@ func (c *CasIdx) processWriteQueue() {
 	var attempts int
 	var err error
 	var req writeReq
-	qry := `INSERT INTO metric_idx (id, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
@@ -284,6 +288,7 @@ func (c *CasIdx) processWriteQueue() {
 			if err := c.session.Query(
 				qry,
 				req.def.Id,
+				req.def.OrgId,
 				req.def.Partition,
 				req.def.Name,
 				req.def.Metric,
