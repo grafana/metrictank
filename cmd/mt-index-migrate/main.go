@@ -8,25 +8,10 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
-
-const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
-    id text,
-    orgId int,
-    partition int,
-    name text,
-    metric text,
-    interval int,
-    unit text,
-    mtype text,
-    tags set<text>,
-    lastupdate int,
-    PRIMARY KEY (id, partition)
-) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
-const metric_idx_index = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
 	dryRun        = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
@@ -57,11 +42,11 @@ func main() {
 	}
 
 	// ensure the new table exists.
-	err = session.Query(fmt.Sprintf(table_schema, *keyspace)).Exec()
+	err = session.Query(fmt.Sprintf(cassandra.TableSchema, *keyspace)).Exec()
 	if err != nil {
 		log.Fatal(4, "cassandra-idx failed to initialize cassandra table. %s", err)
 	}
-	err = session.Query(fmt.Sprintf(metric_idx_index, *keyspace)).Exec()
+	err = session.Query(fmt.Sprintf(cassandra.MetricIdxPartitionIndex, *keyspace)).Exec()
 	if err != nil {
 		log.Fatal(4, "cassandra-idx failed to initialize cassandra index. %s", err)
 	}
@@ -156,8 +141,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 		} else {
 			p, err := partitioner.Partition(&mdef, int32(*numPartitions))
 			if err != nil {
-				log.Error(3, "failed to get partition id of metric. %s", err)
-				mdef.Partition = 0
+				log.Fatal(4, "failed to get partition id of metric. %s", err)
 			} else {
 				mdef.Partition = p
 			}

@@ -19,8 +19,8 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
+const KeyspaceSchema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
+const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     id text,
     partition int,
     name text,
@@ -33,7 +33,7 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
-const metric_idx_index = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
+const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
 	idxCasOk             met.Count // metric idx.cassadra.ok is how many metrics are successfully being indexed
@@ -145,17 +145,17 @@ func (c *CasIdx) Init(stats met.Backend) error {
 	}
 
 	// ensure the keyspace and table exist.
-	err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
+	err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
 	if err != nil {
 		log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
 		return err
 	}
-	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
+	err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
 	if err != nil {
 		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
 		return err
 	}
-	err = tmpSession.Query(fmt.Sprintf(metric_idx_index, keyspace)).Exec()
+	err = tmpSession.Query(fmt.Sprintf(MetricIdxPartitionIndex, keyspace)).Exec()
 	if err != nil {
 		log.Error(3, "cassandra-idx failed to initialize cassandra index. %s", err)
 		return err
