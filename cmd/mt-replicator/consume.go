@@ -42,30 +42,44 @@ func NewConsumer(brokers []string, group, topic string) (*Consumer, error) {
 
 func (c *Consumer) Consume(publisher *Publisher) {
 	buf := make([]*schema.MetricData, 0)
-	for m := range c.consumer.Messages() {
-		md := &schema.MetricData{}
-		_, err := md.UnmarshalMsg(m.Value)
-		if err != nil {
-			log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
-			continue
-		}
-		buf = append(buf, md)
-		if len(buf) > 1000 {
-			complete := false
-			for !complete {
-				if err = publisher.Send(buf); err != nil {
-					log.Error(3, "failed to publish %d metrics. trying again in 1second", len(buf))
-					time.Sleep(time.Second)
-				} else {
-					complete = true
-				}
+	ticker := time.NewTicker(time.Second * 10)
+	counter := 0
+	msgChan := c.consumer.Messages()
+	defer close(c.Done)
+	for {
+		select {
+		case m, ok := <-msgChan:
+			if !ok {
+				return
 			}
-			buf = buf[:0]
-			c.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
+			md := &schema.MetricData{}
+			_, err := md.UnmarshalMsg(m.Value)
+			if err != nil {
+				log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+				continue
+			}
+			counter++
+			buf = append(buf, md)
+			if len(buf) > 1000 {
+				log.Debug("flushing metricData buffer to kafka.")
+				complete := false
+				for !complete {
+					if err = publisher.Send(buf); err != nil {
+						log.Error(3, "failed to publish %d metrics. trying again in 1second", len(buf))
+						time.Sleep(time.Second)
+					} else {
+						complete = true
+					}
+				}
+				buf = buf[:0]
+				c.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
+			}
+		case <-ticker.C:
+			log.Info("%d metrics procesed in last 10seconds.", counter)
+			counter = 0
 		}
-
 	}
-	close(c.Done)
+
 }
 
 func (c *Consumer) Stop() {
