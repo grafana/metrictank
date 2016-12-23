@@ -16,6 +16,7 @@ import (
 
 const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     id text,
+    orgId int,
     partition int,
     name text,
     metric text,
@@ -79,11 +80,12 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, w
 	log.Info("starting write thread")
 	defer wg.Done()
 	for def := range defsChan {
-		qry := `INSERT INTO metric_idx (id, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		if *dryRun {
 			fmt.Printf(
-				"INSERT INTO metric_idx (id, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d','%s', '%s','%d', '%s','%s', '%v', '%d')\n",
+				"INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d', '%d','%s', '%s','%d', '%s','%s', '%v', '%d')\n",
 				def.Id,
+				def.OrgId,
 				def.Partition,
 				def.Name,
 				def.Metric,
@@ -100,6 +102,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, w
 			if err := session.Query(
 				qry,
 				def.Id,
+				def.OrgId,
 				def.Partition,
 				def.Name,
 				def.Metric,
