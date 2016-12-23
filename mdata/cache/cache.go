@@ -6,6 +6,7 @@ import (
 
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
@@ -62,7 +63,14 @@ func NewCCache() *CCache {
 	return cc
 }
 
-func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
+func (c *CCache) evictLoop() {
+	evictQ := c.accnt.GetEvictQ()
+	for target := range evictQ {
+		c.evict(target)
+	}
+}
+
+func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -74,9 +82,21 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) bool {
 	} else {
 		ccm.Add(prev, itergen)
 	}
-	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
 
-	return true
+	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
+}
+
+func (c *CCache) evict(target *accnt.EvictTarget) {
+	c.Lock()
+	defer c.Unlock()
+
+	if _, ok := c.metricCache[target.Metric]; ok {
+		log.Debug("cache: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
+		length := c.metricCache[target.Metric].Del(target.Ts)
+		if length == 0 {
+			delete(c.metricCache, target.Metric)
+		}
+	}
 }
 
 func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
@@ -105,12 +125,15 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 		// for stats only, record a complete miss
 		c.accnt.MissMetric()
 	} else {
-		for _, hit = range res.Start {
-			c.accnt.HitChunk(metric, hit.Ts())
-		}
-		for _, hit = range res.End {
-			c.accnt.HitChunk(metric, hit.Ts())
-		}
+
+		go func() {
+			for _, hit = range res.Start {
+				c.accnt.HitChunk(metric, hit.Ts())
+			}
+			for _, hit = range res.End {
+				c.accnt.HitChunk(metric, hit.Ts())
+			}
+		}()
 
 		// for stats only
 		if res.Complete {
@@ -123,21 +146,4 @@ func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResul
 	}
 
 	return res
-}
-
-func (c *CCache) evictLoop() {
-	evictQ := c.accnt.GetEvictQ()
-
-	for target := range evictQ {
-		// keeping these locks as short as possible to not slow down request handling
-		// many short ones should impact the response times less than a few long ones
-		c.Lock()
-		if met, ok := c.metricCache[target.Metric]; ok {
-			length := met.Del(target.Ts)
-			if length == 0 {
-				delete(c.metricCache, target.Metric)
-			}
-		}
-		c.Unlock()
-	}
 }

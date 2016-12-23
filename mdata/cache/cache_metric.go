@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -47,22 +48,24 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	prev := mc.chunks[ts].Prev
 	next := mc.chunks[ts].Next
 
-	if prev != 0 {
-		mc.chunks[prev].Next = mc.chunks[ts].Next
+	if _, ok := mc.chunks[prev]; prev != 0 && ok {
+		mc.chunks[prev].Next = 0
 	}
-	if next != 0 {
-		mc.chunks[next].Prev = mc.chunks[ts].Prev
+	if _, ok := mc.chunks[next]; next != 0 && ok {
+		mc.chunks[next].Prev = 0
 	}
+
+	delete(mc.chunks, ts)
 
 	return len(mc.chunks)
 }
 
 func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
-	var ts, endTs uint32
-	ts = itergen.Ts()
+	ts := itergen.Ts()
 
 	mc.Lock()
 	defer mc.Unlock()
+
 	if _, ok := mc.chunks[ts]; ok {
 		// chunk is already present. no need to error on that, just ignore it
 		return
@@ -70,21 +73,24 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 
 	mc.chunks[ts] = &CCacheChunk{
 		Ts:    ts,
-		Prev:  prev,
+		Prev:  0,
 		Next:  0,
 		Itgen: itergen,
 	}
 
-	// if the previous chunk is cached, set this one as its next
-	if _, ok := mc.chunks[prev]; ok {
-		mc.chunks[prev].Next = ts
-	}
+	endTs := mc.endTs(ts)
 
-	endTs = mc.endTs(ts)
 	log.Debug("cache: caching chunk ts %d, endTs %d", ts, endTs)
 
+	// if the previous chunk is cached, link in both directions
+	if _, ok := mc.chunks[prev]; ok {
+		mc.chunks[prev].Next = ts
+		mc.chunks[ts].Prev = prev
+	}
+
 	// if endTs() can't figure out the end date it returns ts
-	if endTs != ts {
+	if endTs > ts {
+		// if the next chunk is cached, link in both directions
 		if _, ok := mc.chunks[endTs]; ok {
 			mc.chunks[endTs].Prev = ts
 			mc.chunks[ts].Next = endTs
@@ -115,23 +121,24 @@ func (mc *CCacheMetric) sortedTs() []uint32 {
 // takes a chunk's ts and returns the end ts (guessing if necessary)
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) endTs(ts uint32) uint32 {
-	span := (*mc.chunks[ts]).Itgen.Span()
+	chunk := mc.chunks[ts]
+	span := chunk.Itgen.Span()
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
-		return (*mc.chunks[ts]).Ts + span
+		return chunk.Ts + span
 	}
 
-	if (*mc.chunks[ts]).Next == 0 {
-		if (*mc.chunks[ts]).Prev == 0 {
+	if chunk.Next == 0 {
+		if chunk.Prev == 0 {
 			// if a chunk has no next and no previous chunk we have to assume it's length is 0
-			return (*mc.chunks[ts]).Ts
+			return chunk.Ts
 		} else {
 			// if chunk has no next chunk, but has a previous one, we assume the length of this one is same as the previous one
-			return (*mc.chunks[ts]).Ts + ((*mc.chunks[ts]).Ts - (*mc.chunks[(*mc.chunks[ts]).Prev]).Ts)
+			return chunk.Ts + (chunk.Ts - chunk.Prev)
 		}
 	} else {
 		// if chunk has a next chunk, then the end ts of this chunk is the start ts of the next one
-		return (*mc.chunks[(*mc.chunks[ts]).Next]).Ts
+		return chunk.Next
 	}
 }
 
@@ -185,10 +192,10 @@ func (mc *CCacheMetric) searchForward(from uint32, until uint32, keys []uint32, 
 	for ; ts != 0; ts = mc.chunks[ts].Next {
 		log.Debug("cache: forward search adds chunk ts %d to start", ts)
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
-		endts := mc.endTs(ts)
-		res.From = endts
+		endTs := mc.endTs(ts)
+		res.From = endTs
 
-		if endts >= until {
+		if endTs >= until {
 			res.Complete = true
 			break
 		}
@@ -202,7 +209,7 @@ func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32,
 	}
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
-		log.Debug("cache: backward search adds chunk ts %d to start", ts)
+		log.Debug("cache: backward search adds chunk ts %d to end", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		startTs := mc.chunks[ts].Ts
 		res.Until = startTs
@@ -241,4 +248,19 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from uint32, until uint32) {
 	if !res.Complete {
 		mc.searchBackward(from, until-1, keys, res)
 	}
+
+	if !res.Complete && res.From > res.Until {
+		fmt.Printf("found from > until (%d/%d), printing chunks\n", res.From, res.Until)
+		mc.debugMetric()
+	}
+}
+
+func (mc *CCacheMetric) debugMetric() {
+	keys := mc.sortedTs()
+	fmt.Printf("--- debugging metric ---\n")
+	fmt.Printf("chunk debug: oldest %d; newest %d\n", mc.oldest, mc.newest)
+	for _, key := range keys {
+		fmt.Printf("chunk debug: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+	}
+	fmt.Printf("------------------------\n")
 }

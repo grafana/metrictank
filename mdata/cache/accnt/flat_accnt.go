@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+const evictQSize = 1000
+
+// it's easily possible for many events to happen in one request,
+// we never want this to fill up because otherwise events get dropped
+const eventQSize = 100000
+
 // Flat accounting
 //
 // Keeps track of the chunk cache size and in which order the contained
@@ -50,11 +56,11 @@ type FlatAccntMet struct {
 }
 
 // event types to be used in FlatAccntEvent
-const evnt_hit_chnk uint8 = 0
-const evnt_add_chnk uint8 = 1
+const evnt_complt_met uint8 = 1
 const evnt_miss_met uint8 = 2
 const evnt_part_met uint8 = 3
-const evnt_complt_met uint8 = 4
+const evnt_hit_chnk uint8 = 4
+const evnt_add_chnk uint8 = 5
 
 type FlatAccntEvent struct {
 	t  uint8       // event type
@@ -62,14 +68,8 @@ type FlatAccntEvent struct {
 }
 
 type Stats struct {
-	// chunk hits
-	hit_chnk uint32
-
-	// chunk adds
-	add_chnk uint32
-
-	// chunk evictions
-	evict_chnk uint32
+	// metric full hits, all requested chunks were cached
+	complt_met uint32
 
 	// metric complete misses, not a single chunk of the request was cached
 	miss_met uint32
@@ -83,8 +83,14 @@ type Stats struct {
 	// metrics completely evicted
 	evict_met uint32
 
-	// metric full hits, all requested chunks were cached
-	complt_met uint32
+	// chunk hits
+	hit_chnk uint32
+
+	// chunk adds
+	add_chnk uint32
+
+	// chunk evictions
+	evict_chnk uint32
 }
 
 // payload to be sent with an add event
@@ -101,20 +107,20 @@ type HitPayload struct {
 }
 
 func NewFlatAccnt(maxSize uint64) Accnt {
-	accnt := &FlatAccnt{
+	accnt := FlatAccnt{
 		total:       0,
 		metrics:     make(map[string]*FlatAccntMet),
 		maxSize:     maxSize,
 		lru:         NewLRU(),
-		evictQ:      make(chan *EvictTarget),
+		evictQ:      make(chan *EvictTarget, evictQSize),
+		eventQ:      make(chan *FlatAccntEvent, eventQSize),
 		stats:       &Stats{0, 0, 0, 0, 0, 0, 0, 0},
 		lastPrint:   time.Now().UnixNano(),
 		statsTicker: time.NewTicker(time.Second * 10),
 	}
-	accnt.eventQ = make(chan *FlatAccntEvent)
 
 	go accnt.eventLoop()
-	return accnt
+	return &accnt
 }
 
 func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
@@ -138,22 +144,38 @@ func (a *FlatAccnt) CompleteMetric() {
 }
 
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
-	a.eventQ <- &FlatAccntEvent{
+	var event *FlatAccntEvent
+
+	event = &FlatAccntEvent{
 		t:  t,
 		pl: payload,
+	}
+
+	select {
+		// we never want to block for accounting, rather just let it miss some events and print an error
+		case a.eventQ <- event:
+		default:
+			log.Error(3, "Failed to submit event to accounting, channel was blocked")
 	}
 }
 
 func (a *FlatAccnt) statPrintReset() {
 	now := time.Now().UnixNano()
 	duration := now - a.lastPrint
+	var usg uint64 = 0
 	a.lastPrint = now
 
-	log.Info("Stats for the past %dns", duration)
+	if a.total != 0 {
+		usg = 100 * a.total / a.maxSize
+	}
+
+	log.Info("--- Chunk Cache stats for the past %dns ---", duration)
+	log.Info("current size/max size %d/%d (%d%%)", a.total, a.maxSize, usg)
 	log.Info("metric complete %d", a.stats.complt_met)
 	log.Info("metric misses   %d", a.stats.miss_met)
 	log.Info("metric partials %d", a.stats.part_met)
 	log.Info("metric adds     %d", a.stats.add_met)
+	log.Info("metric evicts   %d", a.stats.evict_met)
 	log.Info("chunk hits      %d", a.stats.hit_chnk)
 	log.Info("chunk adds      %d", a.stats.add_chnk)
 	log.Info("chunk evicts    %d", a.stats.evict_chnk)
@@ -162,6 +184,7 @@ func (a *FlatAccnt) statPrintReset() {
 	a.stats.miss_met = 0
 	a.stats.part_met = 0
 	a.stats.add_met = 0
+	a.stats.evict_met = 0
 	a.stats.hit_chnk = 0
 	a.stats.add_chnk = 0
 	a.stats.evict_chnk = 0
@@ -278,6 +301,7 @@ func (a *FlatAccnt) evict() {
 	}
 
 	if met.total <= 0 {
+		a.stats.evict_met++
 		delete(a.metrics, target.Metric)
 	}
 
