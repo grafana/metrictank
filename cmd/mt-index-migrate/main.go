@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -37,6 +35,8 @@ var (
 	keyspace      = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
 	partitionBy   = flag.String("partition-by", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
 	numPartitions = flag.Int("num-partitions", 1, "number of partitions in cluster")
+
+	wg sync.WaitGroup
 )
 
 func main() {
@@ -44,7 +44,6 @@ func main() {
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, *logLevel))
 
 	defsChan := make(chan *schema.MetricDefinition, 100)
-	var wg sync.WaitGroup
 
 	cluster := gocql.NewCluster(*cassAddr)
 	cluster.Consistency = gocql.ParseConsistency("one")
@@ -68,15 +67,15 @@ func main() {
 	}
 
 	wg.Add(1)
-	go writeDefs(session, defsChan, wg)
+	go writeDefs(session, defsChan)
 	wg.Add(1)
-	go getDefs(session, defsChan, wg)
+	go getDefs(session, defsChan)
 
 	wg.Wait()
 
 }
 
-func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg sync.WaitGroup) {
+func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Info("starting write thread")
 	defer wg.Done()
 	for def := range defsChan {
@@ -129,7 +128,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, w
 	}
 }
 
-func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg sync.WaitGroup) {
+func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Info("starting read thread")
 	defer wg.Done()
 	defer close(defsChan)
@@ -149,9 +148,9 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg 
 		}
 		log.Debug("retrieved %s from old index.", mdef.Id)
 		if *numPartitions == 1 {
-			def.Partition = 0
+			mdef.Partition = 0
 		} else {
-			p, err := partitioner.Partition(&mdef, *numPartitions)
+			p, err := partitioner.Partition(&mdef, int32(*numPartitions))
 			if err != nil {
 				log.Error(3, "failed to get partition id of metric. %s", err)
 				mdef.Partition = 0
