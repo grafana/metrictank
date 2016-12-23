@@ -78,6 +78,8 @@ func main() {
 func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Info("starting write thread")
 	defer wg.Done()
+	counter := 0
+	pre := time.Now()
 	for def := range defsChan {
 		qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		if *dryRun {
@@ -123,9 +125,11 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 			} else {
 				success = true
 				log.Debug("cassandra-idx metricDef saved to cassandra. %s", def.Id)
+				counter++
 			}
 		}
 	}
+	log.Info("Inserted %d metricDefs in %s", counter, time.Since(pre).String())
 }
 
 func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
