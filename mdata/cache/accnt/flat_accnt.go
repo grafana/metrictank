@@ -1,7 +1,7 @@
 package accnt
 
 import (
-	"fmt"
+	"github.com/raintank/worldping-api/pkg/log"
 	"sort"
 	"time"
 )
@@ -149,19 +149,20 @@ func (a *FlatAccnt) statPrintReset() {
 	duration := now - a.lastPrint
 	a.lastPrint = now
 
-	fmt.Printf("Stats for the past %d ns:\n", duration)
-	fmt.Printf("metric complete %d\n", a.stats.complt_met)
-	fmt.Printf("metric misses   %d\n", a.stats.miss_met)
-	fmt.Printf("metric partials %d\n", a.stats.part_met)
-	fmt.Printf("metric adds     %d\n", a.stats.add_met)
-	fmt.Printf("chunk hits      %d\n", a.stats.hit_chnk)
-	fmt.Printf("chunk adds      %d\n", a.stats.add_chnk)
-	fmt.Printf("chunk evicts    %d\n", a.stats.evict_chnk)
+	log.Info("Stats for the past %dns", duration)
+	log.Info("metric complete %d", a.stats.complt_met)
+	log.Info("metric misses   %d", a.stats.miss_met)
+	log.Info("metric partials %d", a.stats.part_met)
+	log.Info("metric adds     %d", a.stats.add_met)
+	log.Info("chunk hits      %d", a.stats.hit_chnk)
+	log.Info("chunk adds      %d", a.stats.add_chnk)
+	log.Info("chunk evicts    %d", a.stats.evict_chnk)
 
 	a.stats.complt_met = 0
 	a.stats.miss_met = 0
 	a.stats.part_met = 0
 	a.stats.add_met = 0
+	a.stats.hit_chnk = 0
 	a.stats.add_chnk = 0
 	a.stats.evict_chnk = 0
 }
