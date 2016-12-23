@@ -3,6 +3,7 @@ package schema
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,19 @@ var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var errInvalidEmptyName = errors.New("name cannot be empty")
 var errInvalidEmptyMetric = errors.New("metric cannot be empty")
 var errInvalidMtype = errors.New("invalid mtype")
+
+type PartitionedMetric interface {
+	Validate() error
+	SetId()
+	// return a []byte key comprised of the metric's OrgId
+	// accepts an input []byte to allow callers to re-use
+	// buffers to reduce memory allocations
+	KeyByOrgId([]byte) []byte
+	// return a []byte key comprised of the metric's Name
+	// accepts an input []byte to allow callers to re-use
+	// buffers to reduce memory allocations
+	KeyBySeries([]byte) []byte
+}
 
 //go:generate msgp
 
@@ -48,6 +62,19 @@ func (m *MetricData) Validate() error {
 		return errInvalidMtype
 	}
 	return nil
+}
+
+func (m *MetricData) KeyByOrgId(b []byte) []byte {
+	if len(b) < 4 {
+		b = append(b, make([]byte, 4-len(b))...)
+	}
+	binary.LittleEndian.PutUint32(b, uint32(m.OrgId))
+	return b
+}
+
+func (m *MetricData) KeyBySeries(b []byte) []byte {
+	b = append(b, []byte(m.Name)...)
+	return b
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
@@ -123,6 +150,19 @@ func (m *MetricDefinition) Validate() error {
 		return errInvalidMtype
 	}
 	return nil
+}
+
+func (m *MetricDefinition) KeyByOrgId(b []byte) []byte {
+	if len(b) < 4 {
+		b = append(b, make([]byte, 4-len(b))...)
+	}
+	binary.LittleEndian.PutUint32(b, uint32(m.OrgId))
+	return b
+}
+
+func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
+	b = append(b, []byte(m.Name)...)
+	return b
 }
 
 func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
