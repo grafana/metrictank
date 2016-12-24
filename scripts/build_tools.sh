@@ -19,4 +19,5 @@ cd $GOPATH/src/github.com/raintank/metrictank/cmd
 for tool in *; do
   cd $tool
   go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/$tool
+  cd ..
 done
