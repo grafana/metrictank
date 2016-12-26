@@ -1,11 +1,11 @@
 # HTTP api
 
-This documents endpoints aimed to be used by users.
-(for internal clustering http endpoints, which may change, refer to the source)
-Note that some of the endpoints rely on being a fed a proper Org-Id.
-You may not want to expose directly to people if they can control that header.
-Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
+This documents endpoints aimed to be used by users. For internal clustering http endpoints, which may change, refer to the source.
+
+- Note that some of the endpoints rely on being a fed a proper Org-Id. You may not want to expose directly to people if they can control that header. Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
 which will authenticate the request and set the proper header, assuring security.
+
+- For GET requests, any parameters not specified as a header can be passed as an HTTP query string parameter.
 
 ## Get app status
 
@@ -19,6 +19,12 @@ returns:
 * `200 OK` if the node is primary or a warmed up secondary (`warmupPeriod` has elapsed)
 * `503 Service not ready` if the node is secondary and not yet warmed up.
 
+#### Example
+
+
+```bash
+curl "http://localhost:6060"
+```
 
 
 ## Walk the metrics tree and return every metric found as a sorted JSON array, for the given org (or public)
@@ -32,6 +38,13 @@ POST /metrics/index.json
 
 If orgId is -1, returns the metrics for all orgs. (but you can't neccessarily distinguish which org they're from)
 If it is not, returns metrics for the given org, as well as org -1.
+
+#### Example
+
+
+```bash
+curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/index.json"
+```
 
 ## Find all metrics visible to the given org (or public)
 
@@ -48,6 +61,12 @@ POST /metrics/find
 the completer format is for completion UI's such as graphite-web.
 json and treejson are the same.
 
+#### Example
+
+```bash
+curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/find?query=statsd.fakesite.counters.session_start.*.count"
+```
+
 ## Deleting metrics
 
 This will delete any metrics (technically metricdefinitions) matching the query from the index.
@@ -61,6 +80,11 @@ POST /metrics/delete
 * header `X-Org-Id` required
 * query (required): can be a metric key, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
 
+#### Example
+
+```bash
+curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.count "http://localhost:6060/metrics/delete"
+```
 
 ## Graphite query api
 
@@ -81,7 +105,13 @@ POST /render
 * from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 
-## Cluster status
+#### Example
+
+```bash
+curl -H "X-Org-Id: 12345" "http://localhost:6060/render?target=statsd.fakesite.counters.session_start.*.count&from=3h&to=2h"
+```
+
+## Get Cluster Status
 
 ```
 GET /node
@@ -97,6 +127,13 @@ returns a json document with the following fields:
 * "stateChange": timestamp of when the state last changed
 * "started": timestamp of when the node started up
 
+#### Example
+
+```bash
+curl "http://localhost:6060/node"
+```
+
+## Set Cluster Status
 
 ```
 POST /node
@@ -108,12 +145,17 @@ parameter values :
 
 Sets the primary status to this node to true or false.
 
+#### Example
+
+```bash
+curl --data primary=true "http://localhost:6060/node"
+```
+
 ## Misc
 
 ### Tspec
 
-time specification used throughout the http api:
-can be any of these forms:
+The time specification is used throughout the http api and it can be any of these forms:
 
 * now: current time on server
 * any integer: unix timestamp
