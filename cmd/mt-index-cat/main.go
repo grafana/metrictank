@@ -26,13 +26,13 @@ func main() {
 	var addr string
 	var from string
 	var maxAge string
-	var count bool
+	var verbose bool
 
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
-	globalFlags.BoolVar(&count, "count", false, "print number of metrics loaded to stderr")
+	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
 
 	cassFlags := cassandra.ConfigSetup()
 
@@ -126,24 +126,26 @@ func main() {
 	}
 
 	defs := idx.Load(nil)
-	total := 0
+	total := len(defs)
+	shown := 0
 
 	if maxAgeInt == 0 {
 		for _, d := range defs {
-			total += 1
 			show(d)
 		}
+		shown = total
 	} else {
 		cutoff := time.Now().Unix() - int64(maxAgeInt)
 		for _, d := range defs {
 			if d.LastUpdate > cutoff {
-				total += 1
 				show(d)
+				shown += 1
 			}
 		}
 	}
 
-	if count {
-		fmt.Fprintf(os.Stderr, "listed %d metrics\n", total)
+	if verbose {
+		fmt.Fprintf(os.Stderr, "total: %d\n", total)
+		fmt.Fprintf(os.Stderr, "shown: %d\n", shown)
 	}
 }
