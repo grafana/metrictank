@@ -3,6 +3,7 @@ package cache
 import (
 	"flag"
 	"sync"
+	"runtime"
 
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -89,6 +90,7 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 func (c *CCache) evict(target *accnt.EvictTarget) {
 	c.Lock()
 	defer c.Unlock()
+	defer runtime.Gosched()
 
 	if _, ok := c.metricCache[target.Metric]; ok {
 		log.Debug("cache: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
