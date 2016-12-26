@@ -2,7 +2,6 @@ package stats
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -43,7 +42,7 @@ func NewGraphite(prefix, addr string, interval int, bufferSize int) {
 func (g *Graphite) reporter(interval int) {
 	ticker := tick(time.Duration(interval) * time.Second)
 	for now := range ticker {
-		fmt.Println("flushing for", now)
+		log.Debug("stats flushing for", now, "to graphite")
 		if cap(g.toGraphite) != 0 && len(g.toGraphite) == cap(g.toGraphite) {
 			// no space in buffer, no use in doing any work
 			continue
