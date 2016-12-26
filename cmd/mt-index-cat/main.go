@@ -119,12 +119,10 @@ func main() {
 		perror(err)
 	}
 
-	maxAgeInt := int64(0)
+	maxAgeInt := uint32(0)
 	if maxAge != "0" {
-		var i uint32
-		i, err = dur.ParseUNsec(maxAge)
+		maxAgeInt, err = dur.ParseUNsec(maxAge)
 		perror(err)
-		maxAgeInt = int64(i)
 	}
 
 	defs := idx.Load(nil)
@@ -136,7 +134,7 @@ func main() {
 			show(d)
 		}
 	} else {
-		cutoff := time.Now().Unix() - maxAgeInt
+		cutoff := time.Now().Unix() - int64(maxAgeInt)
 		for _, d := range defs {
 			if d.LastUpdate > cutoff {
 				total += 1
