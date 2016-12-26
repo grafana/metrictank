@@ -28,8 +28,6 @@ func main() {
 	var maxAge string
 	var count bool
 
-	var total int
-
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
@@ -43,7 +41,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println(os.Args[0])
 		fmt.Printf("Usage:\n\n")
-		fmt.Printf("  inspect-idx [global config flags] <idxtype> [idx config flags] output \n\n")
+		fmt.Printf("  mt-index-cat [global config flags] <idxtype> [idx config flags] output \n\n")
 		fmt.Printf("global config flags:\n\n")
 		globalFlags.PrintDefaults()
 		fmt.Println()
@@ -66,13 +64,12 @@ func main() {
 		os.Exit(-1)
 	}
 
-	var show func(d schema.MetricDefinition)
-
 	last := os.Args[len(os.Args)-1]
 	var found bool
 	for _, output := range outputs {
 		if last == output {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -95,6 +92,8 @@ func main() {
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
 	cassandra.Enabled = true
+
+	var show func(d schema.MetricDefinition)
 
 	switch os.Args[len(os.Args)-1] {
 	case "dump":
@@ -128,13 +127,21 @@ func main() {
 		maxAgeInt = int64(i)
 	}
 
-	var defs []schema.MetricDefinition
-	defs = idx.Load(defs)
+	defs := idx.Load(nil)
+	total := 0
 
-	for _, d := range defs {
-		if maxAgeInt != 0 && d.LastUpdate > time.Now().Unix()-maxAgeInt {
+	if maxAgeInt == 0 {
+		for _, d := range defs {
 			total += 1
 			show(d)
+		}
+	} else {
+		cutoff := time.Now().Unix() - maxAgeInt
+		for _, d := range defs {
+			if d.LastUpdate > cutoff {
+				total += 1
+				show(d)
+			}
 		}
 	}
 

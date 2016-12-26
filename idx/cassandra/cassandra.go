@@ -270,10 +270,9 @@ func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) 
 func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema.MetricDefinition {
 	mdef := schema.MetricDefinition{}
 	var id, name, metric, unit, mtype string
-	var orgId int
+	var orgId, interval int
 	var partition int32
 	var lastupdate int64
-	var interval int
 	var tags []string
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mdef.Id = id
