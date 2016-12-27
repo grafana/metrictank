@@ -3,23 +3,22 @@
 basedir=$(dirname "$0")
 envsdir=$basedir/..
 env="$1"
-
-if [ ! -d $envsdir/docker-$env ]; then
-	echo -e "Could not find docker environment $envsdir/docker-$env\n" >&2
-	echo -e "Known environments:\n" >&2
-	cd $envsdir
-	ls -1d docker-* | sed 's#^docker-##' >&2
+if [[ ! "$env" =~ ^docker- ]]; then
+	echo "env must start with docker-" >&2
 	exit 1
 fi
 
-echo "waiting for Grafana to start listening..."
-while true; do
-  netstat -nlp | grep -q ':3000' && break
-  sleep 0.5
-done
-echo "ok grafana is listening"
+if [ ! -d "$envsdir/$env" ]; then
+	echo -e "Could not find docker environment $envsdir/$env\n" >&2
+	echo -e "Known environments:\n" >&2
+	cd $envsdir
+	ls -1d docker-* >&2
+	exit 1
+fi
 
-for file in $envsdir/docker-$env/datasources/*; do
+WAIT_HOSTS=localhost:3000 ../../scripts/wait_for_endpoint.sh
+
+for file in $envsdir/$env/datasources/*; do
   echo "> adding datasources $file"
   curl -u admin:admin -H "content-type: application/json" 'http://localhost:3000/api/datasources' -X POST --data-binary @$file
   echo
