@@ -9,6 +9,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -20,7 +21,7 @@ func Test_Process(t *testing.T) {
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test")
+	in := New(aggmetrics, metricIndex, usage, "TestProcess")
 
 	allMetrics := make(map[string]int)
 	for i := 0; i < 5; i++ {
@@ -84,6 +85,7 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 }
 
 func BenchmarkProcess(b *testing.B) {
+	stats.Clear()
 	cluster.Init("default", "test", time.Now())
 
 	store := mdata.NewDevnullStore()
@@ -91,7 +93,7 @@ func BenchmarkProcess(b *testing.B) {
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "test")
+	in := New(aggmetrics, metricIndex, usage, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
 	datas := make([]*schema.MetricData, b.N)
