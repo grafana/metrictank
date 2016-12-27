@@ -60,6 +60,7 @@ func (in Input) Process(metric *schema.MetricData, partition int32) {
 		return
 	}
 	if metric.Time == 0 {
+		in.MetricInvalid.Inc()
 		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
 		pre := time.Now()
