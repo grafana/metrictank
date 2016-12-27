@@ -24,14 +24,18 @@ func perror(err error) {
 func main() {
 
 	var addr string
+	var prefix string
 	var from string
 	var maxAge string
 	var verbose bool
+	var limit int
 
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
+	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
+	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
 
 	cassFlags := cassandra.ConfigSetup()
@@ -131,15 +135,25 @@ func main() {
 
 	if maxAgeInt == 0 {
 		for _, d := range defs {
-			show(d)
+			if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
+				show(d)
+				shown += 1
+				if shown == limit {
+					break
+				}
+			}
 		}
-		shown = total
 	} else {
 		cutoff := time.Now().Unix() - int64(maxAgeInt)
 		for _, d := range defs {
 			if d.LastUpdate > cutoff {
-				show(d)
-				shown += 1
+				if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
+					show(d)
+					shown += 1
+					if shown == limit {
+						break
+					}
+				}
 			}
 		}
 	}
