@@ -956,11 +956,11 @@
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.get_chunks.latency.mean.gauge32, 'cassandra get chunks')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get_chunks.latency.mean.gauge32, 'cassandra get chunks')"
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.to_iter.latency.mean.gauge32, 'cassandra to iter')",
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.to_iter.latency.mean.gauge32, 'cassandra to iter')",
               "textEditor": false
             },
             {
@@ -1081,17 +1081,17 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.cassandra.write_queue.*.items.max.gauge32, 6, 7, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.max.gauge32, 6, 7, 8)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.write_queue.size.gauge32, 'write queue items limit (each)')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.write_queue.size.gauge32, 'write queue items limit (each)')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.num_writers.gauge32, 'num write-workers')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.num_writers.gauge32, 'num write-workers')"
             },
             {
               "hide": false,
@@ -1178,11 +1178,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.notifier.*.message_size.{mean,max}.gauge32, 6, 7, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.cluster.notifier.*.message_size.{mean,max}.gauge32, 6, 7, 8)"
             },
             {
               "refId": "B",
-              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.notifier.*.messages-published.counter32), 5, 6)"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.cluster.notifier.*.messages-published.counter32), 5, 6)"
             }
           ],
           "timeFrom": null,
@@ -1266,11 +1266,11 @@
           "targets": [
             {
               "refId": "E",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.get.wait.latency.p90.gauge32, 'get p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.wait.latency.p90.gauge32, 'get p90')"
             },
             {
               "refId": "F",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.put.wait.latency.p90.gauge32, 'put p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.wait.latency.p90.gauge32, 'put p90')"
             }
           ],
           "timeFrom": null,
@@ -1356,27 +1356,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_load.median.gauge32, 'size at load median')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.median.gauge32, 'size at load median')"
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_load.p90.gauge32, 'size at load p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.p90.gauge32, 'size at load p90')"
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_load.max.gauge32, 'size at load max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.max.gauge32, 'size at load max')"
             },
             {
               "refId": "D",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_save.median.gauge32, 'size at save median')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.median.gauge32, 'size at save median')"
             },
             {
               "refId": "E",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_save.p90.gauge32, 'size at save p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.p90.gauge32, 'size at save p90')"
             },
             {
               "refId": "F",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunk_size.at_save.max.gauge32, 'size at save max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.max.gauge32, 'size at save max')"
             }
           ],
           "timeFrom": null,
@@ -1455,11 +1455,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.put.exec.values.rate32, 'put/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.values.rate32, 'put/s')"
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.get.exec.values.rate32, 'get/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.values.rate32, 'get/s')"
             }
           ],
           "timeFrom": null,
@@ -1540,19 +1540,19 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.put.exec.latency.p90.gauge32, 'put p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.p90.gauge32, 'put p90')"
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.put.exec.latency.mean.gauge32, 'put mean')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.mean.gauge32, 'put mean')"
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.get.exec.latency.p90.gauge32, 'get p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.p90.gauge32, 'get p90')"
             },
             {
               "refId": "D",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.get.exec.latency.mean.gauge32, 'get mean')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.mean.gauge32, 'get mean')"
             }
           ],
           "timeFrom": null,
@@ -1649,27 +1649,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunks_per_row.median.gauge32, 'chunks per row med')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.median.gauge32, 'chunks per row med')"
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunks_per_row.min.gauge32, 'chunks per row min')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.min.gauge32, 'chunks per row min')"
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunks_per_row.max.gauge32, 'chunks per row max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.max.gauge32, 'chunks per row max')"
             },
             {
               "refId": "D",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.chunks_per_row.median.gauge32, 'rows per resp med')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.median.gauge32, 'rows per resp med')"
             },
             {
               "refId": "E",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.rows_per_response.min.gauge32, 'rows per resp min')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.min.gauge32, 'rows per resp min')"
             },
             {
               "refId": "F",
-              "target": "alias(metrictank.stats.$environment.$instance.cassandra.rows_per_response.max.gauge32, 'rows per resp max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.max.gauge32, 'rows per resp max')"
             }
           ],
           "timeFrom": null,
@@ -1713,7 +1713,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.cassandra.error.*.counter32), 6)"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.store.cassandra.error.*.counter32), 6)"
             }
           ],
           "datasource": "$datasource",

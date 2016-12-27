@@ -27,8 +27,8 @@ type NotifierNSQ struct {
 }
 
 func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
-	messagesPublished = stats.NewCounter32("notifier.nsq.messages-published")
-	messagesSize = stats.NewMeter32("notifier.nsq.message_size", false)
+	messagesPublished = stats.NewCounter32("cluster.notifier.nsq.messages-published")
+	messagesSize = stats.NewMeter32("cluster.notifier.nsq.message_size", false)
 	// producers
 	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
@@ -42,7 +42,7 @@ func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
 	}
 
 	// consumers
-	consumer, err := insq.NewConsumer(topic, channel, cCfg, "notifier.nsq.metric_persist.%s")
+	consumer, err := insq.NewConsumer(topic, channel, cCfg, "cluster.notifier.nsq.metric_persist.%s")
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
