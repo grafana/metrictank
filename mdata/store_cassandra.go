@@ -38,23 +38,23 @@ var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errStartBeforeEnd     = errors.New("start must be before end.")
 
-	cassGetExecDuration = stats.NewLatencyHistogram15s32("cassandra.get.exec")
-	cassGetWaitDuration = stats.NewLatencyHistogram12h32("cassandra.get.wait")
-	cassPutExecDuration = stats.NewLatencyHistogram15s32("cassandra.put.exec")
-	cassPutWaitDuration = stats.NewLatencyHistogram12h32("cassandra.put.wait")
+	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
+	cassGetWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.get.wait")
+	cassPutExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.put.exec")
+	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
 
-	cassChunksPerRow      = stats.NewMeter32("cassandra.chunks_per_row", false)
-	cassRowsPerResponse   = stats.NewMeter32("cassandra.rows_per_response", false)
-	cassGetChunksDuration = stats.NewLatencyHistogram15s32("cassandra.get_chunks")
-	cassToIterDuration    = stats.NewLatencyHistogram15s32("cassandra.to_iter")
+	cassChunksPerRow      = stats.NewMeter32("store.cassandra.chunks_per_row", false)
+	cassRowsPerResponse   = stats.NewMeter32("store.cassandra.rows_per_response", false)
+	cassGetChunksDuration = stats.NewLatencyHistogram15s32("store.cassandra.get_chunks")
+	cassToIterDuration    = stats.NewLatencyHistogram15s32("store.cassandra.to_iter")
 
-	chunkSaveOk   = stats.NewCounter32("cassandra.chunk_operations.save_ok")
-	chunkSaveFail = stats.NewCounter32("cassandra.chunk_operations.save_fail")
+	chunkSaveOk   = stats.NewCounter32("store.cassandra.chunk_operations.save_ok")
+	chunkSaveFail = stats.NewCounter32("store.cassandra.chunk_operations.save_fail")
 	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
-	chunkSizeAtSave = stats.NewMeter32("cassandra.chunk_size.at_save", true)
-	chunkSizeAtLoad = stats.NewMeter32("cassandra.chunk_size.at_load", true)
+	chunkSizeAtSave = stats.NewMeter32("store.cassandra.chunk_size.at_save", true)
+	chunkSizeAtLoad = stats.NewMeter32("store.cassandra.chunk_size.at_load", true)
 
-	errmetrics = cassandra.NewErrMetrics("cassandra")
+	errmetrics = cassandra.NewErrMetrics("store.cassandra")
 )
 
 /*
@@ -72,8 +72,8 @@ type cassandraStore struct {
 
 func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int, ssl, auth, hostVerification bool) (*cassandraStore, error) {
 
-	stats.NewGauge32("cassandra.write_queue.size").Set(writeqsize)
-	stats.NewGauge32("cassandra.num_writers").Set(writers)
+	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
+	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
 
 	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
 	if ssl {
@@ -150,7 +150,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 
 	for i := 0; i < writers; i++ {
 		c.writeQueues[i] = make(chan *ChunkWriteRequest, writeqsize)
-		queueMeter := stats.NewRange32(fmt.Sprintf("cassandra.write_queue.%d.items", i+1))
+		queueMeter := stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
 		go c.processWriteQueue(c.writeQueues[i], queueMeter)
 	}
 
