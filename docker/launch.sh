@@ -29,5 +29,6 @@ function ctrl_c() {
     docker-compose down
 }
 
+docker-compose down
 ../extra/populate-grafana.sh $PWD &
 docker-compose up --force-recreate
