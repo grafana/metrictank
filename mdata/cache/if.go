@@ -5,6 +5,6 @@ import (
 )
 
 type Cache interface {
-	Add(string, uint32, chunk.IterGen) error
+	Add(string, uint32, chunk.IterGen)
 	Search(string, uint32, uint32) *CCSearchResult
 }
