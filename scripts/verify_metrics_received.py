@@ -29,7 +29,7 @@ request_parameters = {
     },
     'data': {
         'target':
-            'stats.docker-env.metrictank.default.carbon.metrics_received',
+            'perSecond(metrictank.stats.docker-env.default.input.carbon.metrics_received.counter32)',
     },
 }
 
@@ -53,13 +53,14 @@ except Exception:
     )
 
 # verify the format and content of the response is as we expect it
+# note : since we got a perSecond(), the first value is always null, we only use points 2 and onwards
 if (
         len(parsed_result) < 1 or
         'datapoints' not in parsed_result[0] or
         not all([len(x) >= 2 for x in parsed_result[0]['datapoints']]) or
         not all([
             isinstance(x[0], (int, float))
-            for x in parsed_result[0]['datapoints']
+            for x in parsed_result[0]['datapoints'][1:]
         ])
 ):
     error(
@@ -67,7 +68,7 @@ if (
         .format(response=result.text)
     )
 
-datapoints = [float(x[0]) for x in parsed_result[0]['datapoints']]
+datapoints = [float(x[0]) for x in parsed_result[0]['datapoints'][1:]]
 datapoints_avg = sum(datapoints)/len(datapoints)
 expected = float(sys.argv[4])
 
