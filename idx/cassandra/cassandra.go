@@ -52,7 +52,7 @@ var (
 	updateFuzzyness  float64
 )
 
-func ConfigSetup() {
+func ConfigSetup() *flag.FlagSet {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
 
 	casIdx.BoolVar(&Enabled, "enabled", false, "")
@@ -77,6 +77,7 @@ func ConfigSetup() {
 	casIdx.StringVar(&password, "password", "cassandra", "password for authentication")
 
 	globalconf.Register("cassandra-idx", casIdx)
+	return casIdx
 }
 
 type writeReq struct {
@@ -121,12 +122,8 @@ func New() *CasIdx {
 	}
 }
 
-func (c *CasIdx) Init(stats met.Backend) error {
-	log.Info("initializing cassandra-idx. Hosts=%s", hosts)
-	if err := c.MemoryIdx.Init(stats); err != nil {
-		return err
-	}
-
+// InitBare makes sure the keyspace, tables, and index exists in cassandra and creates a session
+func (c *CasIdx) InitBare() error {
 	var err error
 	tmpSession, err := c.cluster.CreateSession()
 	if err != nil {
@@ -155,19 +152,35 @@ func (c *CasIdx) Init(stats met.Backend) error {
 
 	c.session = session
 
+	return nil
+}
+
+// Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
+// rebuilds the in-memory index, sets up write queues, metrics and pruning routines
+func (c *CasIdx) Init(stats met.Backend) error {
+	log.Info("initializing cassandra-idx. Hosts=%s", hosts)
+	if err := c.MemoryIdx.Init(stats); err != nil {
+		return err
+	}
+
 	idxCasOk = stats.NewCount("idx.cassandra.ok")
 	idxCasFail = stats.NewCount("idx.cassandra.fail")
 	idxCasAddDuration = stats.NewTimer("idx.cassandra.add_duration", 0)
 	idxCasDeleteDuration = stats.NewTimer("idx.cassandra.delete_duration", 0)
 	metrics = cassandra.NewMetrics("idx.cassandra", stats)
 
+	if err := c.InitBare(); err != nil {
+		return err
+	}
+
 	for i := 0; i < numConns; i++ {
 		c.wg.Add(1)
 		go c.processWriteQueue()
 	}
-	//Rebuild the in-memory index.
 
+	//Rebuild the in-memory index.
 	c.rebuildIndex()
+
 	if maxStale > 0 {
 		if pruneInterval == 0 {
 			return fmt.Errorf("pruneInterval must be greater then 0")
@@ -217,9 +230,18 @@ func (c *CasIdx) Add(data *schema.MetricData) error {
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	defs := make([]schema.MetricDefinition, 0)
-	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
 
+	c.MemoryIdx.Load(c.Load(nil))
+
+	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
+}
+
+func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
+	iter := c.session.Query("SELECT def from metric_def_idx").Iter()
+	return c.load(defs, iter)
+}
+
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema.MetricDefinition {
 	var data []byte
 	mdef := schema.MetricDefinition{}
 	for iter.Scan(&data) {
@@ -230,8 +252,10 @@ func (c *CasIdx) rebuildIndex() {
 		}
 		defs = append(defs, mdef)
 	}
-	c.MemoryIdx.Load(defs)
-	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
+	if err := iter.Close(); err != nil {
+		log.Fatal(4, "Could not close iterator: %s", err.Error())
+	}
+	return defs
 }
 
 func (c *CasIdx) processWriteQueue() {
