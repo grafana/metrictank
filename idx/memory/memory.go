@@ -16,12 +16,19 @@ import (
 )
 
 var (
-	idxOk             = stats.NewCounter32("idx.memory.add.ok")
-	idxFail           = stats.NewCounter32("idx.memory.add.fail")
-	idxAddDuration    = stats.NewLatencyHistogram15s32("idx.memory.add")
-	idxGetDuration    = stats.NewLatencyHistogram15s32("idx.memory.get")
-	idxListDuration   = stats.NewLatencyHistogram15s32("idx.memory.list")
-	idxFindDuration   = stats.NewLatencyHistogram15s32("idx.memory.find")
+	// metric idx.memory.add.ok is the number of successful additions to the memory idx
+	idxOk = stats.NewCounter32("idx.memory.add.ok")
+	// metric idx.memory.add.fail is the number of failed additions to the memory idx
+	idxFail = stats.NewCounter32("idx.memory.add.fail")
+	// metric idx.memory.add is the duration of (successfull) memory idx additions
+	idxAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")
+	// metric idx.memory.get is the duration of memory idx gets
+	idxGetDuration = stats.NewLatencyHistogram15s32("idx.memory.get")
+	// metric idx.memory.list is the duration of memory idx listings
+	idxListDuration = stats.NewLatencyHistogram15s32("idx.memory.list")
+	// metric idx.memory.find is the duration of memory idx find
+	idxFindDuration = stats.NewLatencyHistogram15s32("idx.memory.find")
+	// metric idx.memory.delete is the duration of memory idx deletes
 	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
 
 	Enabled bool

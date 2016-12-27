@@ -8,6 +8,7 @@ import (
 	"github.com/raintank/metrictank/stats"
 )
 
+// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
 var totalPoints = stats.NewGauge64("tank.total_points")
 
 // Chunk is a chunk of data. not concurrency safe.

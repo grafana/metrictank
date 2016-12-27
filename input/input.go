@@ -14,6 +14,8 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+// TODO: clever way to document all metrics for all different inputs
+
 // In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
 type Input struct {
 	MetricsPerMessage *stats.Meter32

@@ -38,20 +38,31 @@ var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errStartBeforeEnd     = errors.New("start must be before end.")
 
+	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
+	// metric store.cassandra.get.wait is the duration of the get spent in the queue
 	cassGetWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.get.wait")
+	// metric store.cassandra.put.exec is the duration of putting in cassandra store
 	cassPutExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.put.exec")
+	// metric store.cassandra.put.wait is the duration of a put in the wait queue
 	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
 
-	cassChunksPerRow      = stats.NewMeter32("store.cassandra.chunks_per_row", false)
-	cassRowsPerResponse   = stats.NewMeter32("store.cassandra.rows_per_response", false)
+	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
+	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
+	// metric store.cassandra.rows_per_response is how many rows come per get response
+	cassRowsPerResponse = stats.NewMeter32("store.cassandra.rows_per_response", false)
+	// metric store.cassandra.get_chunks is the duration of how long it takes to get chunks
 	cassGetChunksDuration = stats.NewLatencyHistogram15s32("store.cassandra.get_chunks")
-	cassToIterDuration    = stats.NewLatencyHistogram15s32("store.cassandra.to_iter")
+	// metric store.cassandra.to_iter is the duration of converting chunks to iterators
+	cassToIterDuration = stats.NewLatencyHistogram15s32("store.cassandra.to_iter")
 
-	chunkSaveOk   = stats.NewCounter32("store.cassandra.chunk_operations.save_ok")
+	// metric store.cassandra.chunk_operations.save_ok is counter of successfull saves
+	chunkSaveOk = stats.NewCounter32("store.cassandra.chunk_operations.save_ok")
+	// metric store.cassandra.chunk_operations.save_fail is counter of failed saves
 	chunkSaveFail = stats.NewCounter32("store.cassandra.chunk_operations.save_fail")
-	// it's pretty expensive/impossible to do chunk size in mem vs in cassandra etc, but we can more easily measure chunk sizes when we operate on them
+	// metric store.cassandra.chunk_size.at_save is the sizes of chunks seen when saving them
 	chunkSizeAtSave = stats.NewMeter32("store.cassandra.chunk_size.at_save", true)
+	// metric store.cassandra.chunk_size.at_load is the sizes of chunks seen when loading them
 	chunkSizeAtLoad = stats.NewMeter32("store.cassandra.chunk_size.at_load", true)
 
 	errmetrics = cassandra.NewErrMetrics("store.cassandra")
