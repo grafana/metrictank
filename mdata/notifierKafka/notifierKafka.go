@@ -30,7 +30,9 @@ type NotifierKafka struct {
 }
 
 func New(instance string, metrics mdata.Metrics) *NotifierKafka {
+	// metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
 	messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
+	// metric cluster.notifier.kafka.message_size is the sizes seen of messages through the kafka cluster notifier
 	messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", false)
 
 	client, err := sarama.NewClient(brokers, config)

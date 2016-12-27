@@ -37,11 +37,13 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
 const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
-	// metric idx.cassadra.ok is how many metrics are successfully being indexed
+	// metric idx.cassadra.add.ok is how many metrics are successfully being indexed
 	idxCasOk = stats.NewCounter32("idx.cassandra.add.ok")
-	// metric idx.cassandra.fail is how failures encountered while trying to index metrics
-	idxCasFail           = stats.NewCounter32("idx.cassandra.add.fail")
-	idxCasAddDuration    = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	// metric idx.cassandra.add.fail is how many failures were encountered while trying to index metrics
+	idxCasFail = stats.NewCounter32("idx.cassandra.add.fail")
+	// metric idx.cassandra.add is the duration of addititons to the cassandra idx
+	idxCasAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	// metric idx.cassandra.delete is the duration of deletions from the cassandra idx
 	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
 	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")
 

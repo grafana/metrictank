@@ -27,7 +27,9 @@ type NotifierNSQ struct {
 }
 
 func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
+	// metric cluster.notifier.nsq.messages-published is a counter of messages published to the nsq cluster notifier
 	messagesPublished = stats.NewCounter32("cluster.notifier.nsq.messages-published")
+	// metric cluster.notifier.nsq.message_size is the sizes seen of messages through the nsq cluster notifier
 	messagesSize = stats.NewMeter32("cluster.notifier.nsq.message_size", false)
 	// producers
 	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})

@@ -21,11 +21,16 @@ import (
 )
 
 var (
-	idxEsOk             = stats.NewCounter32("idx.elasticsearch.add.ok")
-	idxEsFail           = stats.NewCounter32("idx.elasticsearch.add.fail")
-	idxEsAddDuration    = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
+	// metric idx.elasticsearch.add.ok is the number of successfull additions to the ES idx
+	idxEsOk = stats.NewCounter32("idx.elasticsearch.add.ok")
+	// metric idx.elasticsearch.add.fail is the number of failed additions to the ES idx
+	idxEsFail = stats.NewCounter32("idx.elasticsearch.add.fail")
+	// metric idx.elasticsearch.add is the duration of additions to the ES idx
+	idxEsAddDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
+	// metric idx.elasticsearch.delete is the duration of deletes from the ES idx
 	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete")
-	retryBufItems       = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
+	// metric idx.elasticsearch.retrybuf.items is the amount of items currently in the retry buffer
+	retryBufItems = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
 
 	Enabled          bool
 	esIndex          string

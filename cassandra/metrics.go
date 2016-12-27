@@ -20,13 +20,41 @@ type ErrMetrics struct {
 
 func NewErrMetrics(component string) ErrMetrics {
 	return ErrMetrics{
-		cassErrTimeout:                  stats.NewCounter32(fmt.Sprintf("%s.error.timeout", component)),
-		cassErrTooManyTimeouts:          stats.NewCounter32(fmt.Sprintf("%s.error.too-many-timeouts", component)),
-		cassErrConnClosed:               stats.NewCounter32(fmt.Sprintf("%s.error.conn-closed", component)),
-		cassErrNoConns:                  stats.NewCounter32(fmt.Sprintf("%s.error.no-connections", component)),
-		cassErrUnavailable:              stats.NewCounter32(fmt.Sprintf("%s.error.unavailable", component)),
+
+		// metric idx.cassandra.error.timeout is a counter of timeouts seen to the cassandra idx
+
+		// metric store.cassandra.error.timeout is a counter of timeouts seen to the cassandra store
+		cassErrTimeout: stats.NewCounter32(fmt.Sprintf("%s.error.timeout", component)),
+
+		// metric idx.cassandra.error.too-many-timeouts is a counter of how many times we saw to many timeouts and closed the connection to the cassandra idx
+
+		// metric store.cassandra.error.too-many-timeouts is a counter of how many times we saw to many timeouts and closed the connection to the cassandra store
+		cassErrTooManyTimeouts: stats.NewCounter32(fmt.Sprintf("%s.error.too-many-timeouts", component)),
+
+		// metric idx.cassandra.error.conn-closed is a counter of how many times we saw a connection closed to the cassandra idx
+
+		// metric store.cassandra.error.conn-closed is a counter of how many times we saw a connection closed to the cassandra store
+		cassErrConnClosed: stats.NewCounter32(fmt.Sprintf("%s.error.conn-closed", component)),
+
+		// metric idx.cassandra.error.no-connections is a counter of how many times we had no connections remaining to the cassandra idx
+
+		// metric store.cassandra.error.no-connections is a counter of how many times we had no connections remaining to the cassandra store
+		cassErrNoConns: stats.NewCounter32(fmt.Sprintf("%s.error.no-connections", component)),
+
+		// metric idx.cassandra.error.unavailable is a counter of how many times the cassandra idx was unavailable
+
+		// metric store.cassandra.error.unavailable is a counter of how many times the cassandra store was unavailable
+		cassErrUnavailable: stats.NewCounter32(fmt.Sprintf("%s.error.unavailable", component)),
+
+		// metric idx.cassandra.error.cannot-achieve-consistency is a counter of the cassandra idx not being able to achieve consistency for a given query
+
+		// metric store.cassandra.error.cannot-achieve-consistency is a counter of the cassandra store not being able to achieve consistency for a given query
 		cassErrCannotAchieveConsistency: stats.NewCounter32(fmt.Sprintf("%s.error.cannot-achieve-consistency", component)),
-		cassErrOther:                    stats.NewCounter32(fmt.Sprintf("%s.error.other", component)),
+
+		// metric idx.cassandra.error.other is a counter of other errors talking to the cassandra idx
+
+		// metric store.cassandra.error.other is a counter of other errors talking to the cassandra store
+		cassErrOther: stats.NewCounter32(fmt.Sprintf("%s.error.other", component)),
 	}
 }
 
