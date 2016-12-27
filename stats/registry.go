@@ -43,3 +43,9 @@ func (r *Registry) list() map[string]GraphiteMetric {
 	r.Unlock()
 	return metrics
 }
+
+func (r *Registry) Clear() {
+	r.Lock()
+	r.metrics = make(map[string]GraphiteMetric)
+	r.Unlock()
+}

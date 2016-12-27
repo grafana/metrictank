@@ -14,3 +14,7 @@ var registry *Registry
 func init() {
 	registry = NewRegistry()
 }
+
+func Clear() {
+	registry.Clear()
+}
