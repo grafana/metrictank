@@ -45,7 +45,7 @@ type Server struct {
 	MetricIndex  idx.MetricIndex
 	MemoryStore  mdata.Metrics
 	BackendStore mdata.Store
-	Cache        *cache.CCache
+	Cache        cache.Cache
 	shutdown     chan struct{}
 }
 
