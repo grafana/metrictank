@@ -52,7 +52,7 @@ func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
 }
 
-func (s *Server) BindCache(cache *cache.CCache) {
+func (s *Server) BindCache(cache cache.Cache) {
 	s.Cache = cache
 }
 
