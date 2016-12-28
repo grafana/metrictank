@@ -55,7 +55,7 @@ type CCSearchResult struct {
 	End []chunk.IterGen
 }
 
-func NewCCache() *CCache {
+func NewCCache() Cache {
 	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
 		accnt:       accnt.NewFlatAccnt(maxSize),
