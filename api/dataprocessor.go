@@ -11,6 +11,7 @@ import (
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -328,28 +329,28 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
-		return s.getSeries(req, consolidation.None), req.OutInterval, nil
+		return s.getSeriesFixed(req, consolidation.None), req.OutInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
-		return consolidate(s.getSeries(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
+		return consolidate(s.getSeriesFixed(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				s.getSeries(req, consolidation.Sum),
-				s.getSeries(req, consolidation.Cnt),
+				s.getSeriesFixed(req, consolidation.Sum),
+				s.getSeriesFixed(req, consolidation.Cnt),
 			), req.OutInterval, nil
 		} else {
-			return s.getSeries(req, req.Consolidator), req.OutInterval, nil
+			return s.getSeriesFixed(req, req.Consolidator), req.OutInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				consolidate(s.getSeries(req, consolidation.Sum), req.AggNum, consolidation.Sum),
-				consolidate(s.getSeries(req, consolidation.Cnt), req.AggNum, consolidation.Sum),
+				consolidate(s.getSeriesFixed(req, consolidation.Sum), req.AggNum, consolidation.Sum),
+				consolidate(s.getSeriesFixed(req, consolidation.Cnt), req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
 		} else {
 			return consolidate(
-				s.getSeries(req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
+				s.getSeriesFixed(req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -364,22 +365,11 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
-func prevBoundary(ts uint32, span uint32) uint32 {
-	return ts - ((ts-1)%span + 1)
-}
-
 // getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
-func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	iters := make([]chunk.Iter, 0)
-	memIters := make([]chunk.Iter, 0)
-	oldest := req.To
-	toUnix := req.To
-	fromUnix := req.From
-	interval := req.ArchInterval
-	key := req.Key
+func (s *Server) quantizePoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
 	// while aggregated archives are quantized, raw intervals are not.  quantizing happens at the end of this function, **after* this step.
 	// So we have to adjust the range to get the right data.
 	// (ranges described as a..b include both and b)
@@ -390,90 +380,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 	// so to make sure that the data after quantization (fix()) is correct, we have to make the following adjustment:
 	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
 	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
-
-	if consolidator == consolidation.None {
-		fromUnix = prevBoundary(req.From, interval) + 1
-		toUnix = prevBoundary(req.To, interval) + 1
-	}
-
-	if metric, ok := s.MemoryStore.Get(key); ok {
-		if consolidator != consolidation.None {
-			logLoad("memory", aggMetricKey(key, consolidator.Archive(), interval), fromUnix, toUnix)
-			oldest, memIters = metric.GetAggregated(consolidator, interval, fromUnix, toUnix)
-		} else {
-			logLoad("memory", key, fromUnix, toUnix)
-			oldest, memIters = metric.Get(fromUnix, toUnix)
-		}
-	}
-	if oldest > fromUnix {
-		reqSpanBoth.Value(int64(toUnix - fromUnix))
-		if consolidator != consolidation.None {
-			key = aggMetricKey(key, consolidator.Archive(), interval)
-		}
-		// if oldest < to -> search until oldest, we already have the rest from mem
-		// if to < oldest -> no need to search until oldest, only search until to
-		until := util.Min(oldest, toUnix)
-		logLoad("cassan", key, fromUnix, until)
-
-		log.Debug("DP getSeries: searching query key %s, from %d, until %d", key, fromUnix, until)
-		cacheRes := s.Cache.Search(key, fromUnix, until)
-		log.Debug("DP getSeries: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
-		// the request cannot completely be served from cache, it will require cassandra involvement
-		if !cacheRes.Complete {
-			storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
-			if err != nil {
-				panic(err)
-			}
-
-			var prevts uint32 = 0
-			for _, itgen := range cacheRes.Start {
-				prevts = itgen.Ts()
-				it, err := itgen.Get()
-				if err != nil {
-					// TODO(replay) figure out what to do if one piece is corrupt
-					log.Error(3, "DP getSeries: error getting iter from cache result start slice %+v", err)
-					continue
-				}
-				iters = append(iters, *it)
-			}
-			for _, itgen := range storeIterGens {
-				it, err := itgen.Get()
-				if err != nil {
-					// TODO(replay) figure out what to do if one piece is corrupt
-					log.Error(3, "DP getSeries: error getting iter from cassandra slice %+v", err)
-					continue
-				}
-				// it's important that the itgens get added in chronological order,
-				// currently we rely on cassandra returning results in order
-				go s.Cache.Add(key, prevts, itgen)
-				prevts = itgen.Ts()
-				iters = append(iters, *it)
-			}
-			for i := len(cacheRes.End) - 1; i >= 0; i-- {
-				it, err := cacheRes.End[i].Get()
-				if err != nil {
-					// TODO(replay) figure out what to do if one piece is corrupt
-					log.Error(3, "DP getSeries: error getting iter from cache result end slice %+v", err)
-					continue
-				}
-				iters = append(iters, *it)
-			}
-		} else {
-			for _, itgen := range cacheRes.Start {
-				iter, err := itgen.Get()
-				if err != nil {
-					// TODO(replay) figure out what to do if one piece is corrupt
-					log.Error(3, "DP getSeries: error getting iter from Start list %+v", err)
-					continue
-				}
-				iters = append(iters, *iter)
-			}
-		}
-	} else {
-		reqSpanMem.Value(int64(toUnix - fromUnix))
-	}
 	pre := time.Now()
-	iters = append(iters, memIters...)
 
 	points := pointSlicePool.Get().([]schema.Point)
 	for _, iter := range iters {
@@ -482,7 +389,7 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		for iter.Next() {
 			total += 1
 			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
+			if ts >= ctx.From && ts < ctx.To {
 				good += 1
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
@@ -492,7 +399,113 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
-	return fix(points, fromUnix, toUnix, interval)
+	return points
+}
+
+func (s *Server) getAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
+	var metric mdata.Metric
+	var ok bool
+	var oldest uint32 = ctx.Req.To
+	memIters := make([]chunk.Iter, 0)
+
+	if metric, ok = s.MemoryStore.Get(ctx.Req.Key); !ok {
+		return oldest, memIters
+	}
+
+	if ctx.Cons != consolidation.None {
+		logLoad("memory", aggMetricKey(ctx.Req.Key, ctx.Cons.Archive(), ctx.Req.ArchInterval), ctx.From, ctx.To)
+		oldest, memIters = metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
+	} else {
+		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
+		oldest, memIters = metric.Get(ctx.From, ctx.To)
+	}
+
+	return oldest, memIters
+}
+
+func (s *Server) queryCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
+	iters := make([]chunk.Iter, 0)
+	var prevts uint32 = 0
+
+	reqSpanBoth.Value(int64(ctx.To - ctx.From))
+	logLoad("cassan", ctx.Key, ctx.From, ctx.To)
+
+	log.Debug("cache: searching query key %s, from %d, until %d", ctx.Key, ctx.From, ctx.To)
+	cacheRes := s.Cache.Search(ctx.Key, ctx.From, until)
+	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+
+	for _, itgen := range cacheRes.Start {
+		iter, err := itgen.Get()
+		prevts = itgen.Ts()
+		if err != nil {
+			// TODO(replay) figure out what to do if one piece is corrupt
+			log.Error(3, "itergen: error getting iter from Start list %+v", err)
+			continue
+		}
+		iters = append(iters, *iter)
+	}
+
+	// the request cannot completely be served from cache, it will require cassandra involvement
+	if !cacheRes.Complete {
+		storeIterGens, err := s.BackendStore.Search(ctx.Key, cacheRes.From, cacheRes.Until)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, itgen := range storeIterGens {
+			// it's important that the itgens get added in chronological order,
+			// currently we rely on cassandra returning results in order
+			go s.Cache.Add(ctx.Key, prevts, itgen)
+			prevts = itgen.Ts()
+			it, err := itgen.Get()
+			if err != nil {
+				// TODO(replay) figure out what to do if one piece is corrupt
+				log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
+				continue
+			}
+			iters = append(iters, *it)
+		}
+
+		// the End slice is in reverse order
+		for i := len(cacheRes.End) - 1; i >= 0; i-- {
+			it, err := cacheRes.End[i].Get()
+			if err != nil {
+				// TODO(replay) figure out what to do if one piece is corrupt
+				log.Error(3, "itergen: error getting iter from cache result end slice %+v", err)
+				continue
+			}
+			iters = append(iters, *it)
+		}
+	}
+
+	return iters
+}
+
+func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
+	var memIters, iters []chunk.Iter
+	var oldest uint32
+
+	oldest, memIters = s.getAggMetrics(ctx)
+	log.Info("oldest from aggmetrics is %d\n", oldest)
+
+	// if oldest < to -> search until oldest, we already have the rest from mem
+	// if to < oldest -> no need to search until oldest, only search until to
+	if oldest <= ctx.From {
+		reqSpanMem.Value(int64(ctx.To - ctx.From))
+		return memIters
+	}
+
+	until := util.Min(oldest, ctx.To)
+	iters = append(s.queryCachedStore(ctx, until), memIters...)
+
+	return iters
+}
+
+func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
+	ctx := newRequestContext(&req, consolidator)
+	iters := s.getSeries(ctx, consolidator)
+	points := s.quantizePoints(ctx, iters)
+	return fix(points, req.From, req.To, req.ArchInterval)
 }
 
 // check for duplicate series names. If found merge the results.
@@ -524,4 +537,39 @@ func mergeSeries(in []models.Series) []models.Series {
 		i++
 	}
 	return merged
+}
+
+type requestContext struct {
+	Req  *models.Req
+	Cons consolidation.Consolidator
+	From uint32
+	To   uint32
+	Key  string
+}
+
+func prevBoundary(ts uint32, span uint32) uint32 {
+	return ts - ((ts-1)%span + 1)
+}
+
+func newRequestContext(req *models.Req, consolidator consolidation.Consolidator) *requestContext {
+	var fromUnix, toUnix uint32
+	var key string
+
+	if consolidator == consolidation.None {
+		fromUnix = prevBoundary(req.From, req.ArchInterval) + 1
+		toUnix = prevBoundary(req.To, req.ArchInterval) + 1
+		key = req.Key
+	} else {
+		fromUnix = req.From
+		toUnix = req.To
+		key = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+	}
+
+	return &requestContext{
+		Req:  req,
+		Cons: consolidator,
+		From: fromUnix,
+		To:   toUnix,
+		Key:  key,
+	}
 }
