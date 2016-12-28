@@ -33,17 +33,17 @@ func TestAddingEvicting(t *testing.T) {
 	var ts1 uint32 = 1
 	var ts2 uint32 = 2
 
-	a.AddChunk(metric1, ts1, 3)
-	a.AddChunk(metric1, ts2, 3)
-	a.AddChunk(metric2, ts1, 3)
-	a.AddChunk(metric2, ts2, 5)
+	a.AddChunk(metric1, ts1, 3) // total size now 3
+	a.AddChunk(metric1, ts2, 3) // total size now 6
+	a.AddChunk(metric2, ts1, 3) // total size now 9
+	a.AddChunk(metric2, ts2, 5) // total size now 14
 
-	et = <-evictQ
+	et = <-evictQ // total size now 11
 	if et.Metric != metric1 || et.Ts != ts1 {
 		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 
-	et = <-evictQ
+	et = <-evictQ // total size now 8
 	if et.Metric != metric1 || et.Ts != ts2 {
 		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
@@ -57,16 +57,16 @@ func TestAddingEvicting(t *testing.T) {
 	// hitting metric2 ts1 to reverse order in LRU
 	a.HitChunk(metric2, ts1)
 
-	// evict everything else, because 10 is max size
+	// total size now 18. evict everything else, because 10 is max size
 	a.AddChunk(metric1, ts1, 10)
 
-	et = <-evictQ
+	et = <-evictQ // total size now 15
 	// Despite reversed order in LRU, the chronologically older ts should be first
 	if et.Metric != metric2 || et.Ts != ts1 {
 		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
 
-	et = <-evictQ
+	et = <-evictQ // total size now 10
 	// Next comes the original target ts
 	if et.Metric != metric2 || et.Ts != ts2 {
 		t.Fatalf("Returned evict target is not as expected, got %+v", et)
@@ -102,14 +102,14 @@ func TestLRUOrdering(t *testing.T) {
 	var metric3 string = "metric3"
 	var ts1 uint32 = 1
 
-	a.AddChunk(metric1, ts1, 3)
-	a.AddChunk(metric2, ts1, 3)
+	a.AddChunk(metric1, ts1, 3) // total size now 3
+	a.AddChunk(metric2, ts1, 3) // total size now 6
 
 	// this should reverse the order in the LRU
 	a.HitChunk(metric1, ts1)
 
-	a.AddChunk(metric3, ts1, 3)
-	et = <-evictQ
+	a.AddChunk(metric3, ts1, 3) // total size now 9
+	et = <-evictQ               // total size now 6
 	if et.Metric != metric2 || et.Ts != ts1 {
 		t.Fatalf("Returned evict target is not as expected, got %+v", et)
 	}
