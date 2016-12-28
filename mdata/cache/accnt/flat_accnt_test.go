@@ -2,26 +2,10 @@ package accnt
 
 import (
 	"testing"
-	"time"
 )
 
-func getNew(maxSize int) *FlatAccnt {
-	a := &FlatAccnt{
-		metrics:     make(map[string]*FlatAccntMet),
-		maxSize:     uint64(maxSize),
-		lru:         NewLRU(),
-		evictQ:      make(chan *EvictTarget, 10),
-		eventQ:      make(chan *FlatAccntEvent, 10),
-		lastPrint:   time.Now().UnixNano(),
-		statsTicker: *(time.NewTicker(time.Second * 10)),
-	}
-	a.statsTicker.Stop()
-	go a.eventLoop()
-	return a
-}
-
 func TestAddingEvicting(t *testing.T) {
-	a := getNew(10)
+	a := NewFlatAccnt(10)
 	evictQ := a.GetEvictQ()
 
 	// some test data
@@ -90,7 +74,7 @@ func TestAddingEvicting(t *testing.T) {
 }
 
 func TestLRUOrdering(t *testing.T) {
-	a := getNew(6)
+	a := NewFlatAccnt(6)
 	evictQ := a.GetEvictQ()
 
 	// some test data

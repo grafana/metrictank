@@ -20,7 +20,7 @@ func getItgen(value uint32, ts uint32) *chunk.IterGen {
 	return itgen
 }
 
-func getConnectedChunks(metric string) *CCache {
+func getConnectedChunks(metric string) Cache {
 	cc := NewCCache()
 
 	itgen1 := getItgen(1111111, 1000)

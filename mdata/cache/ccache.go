@@ -55,10 +55,10 @@ type CCSearchResult struct {
 	End []chunk.IterGen
 }
 
-func NewCCache() Cache {
+func NewCCache() *CCache {
 	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
-		accnt:       accnt.NewFlatAccnt(maxSize),
+		accnt:       accnt.NewAccnt(maxSize),
 	}
 	go cc.evictLoop()
 	return cc

@@ -385,7 +385,7 @@ func main() {
 	/***********************************
 		Initialize our MetricIdx
 	***********************************/
-	ccache := cache.NewCCache()
+	ccache := cache.NewCache()
 	pre := time.Now()
 
 	if memory.Enabled {

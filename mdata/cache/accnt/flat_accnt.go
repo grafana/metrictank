@@ -106,7 +106,7 @@ type HitPayload struct {
 	ts     uint32
 }
 
-func NewFlatAccnt(maxSize uint64) Accnt {
+func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 	accnt := FlatAccnt{
 		metrics:     make(map[string]*FlatAccntMet),
 		maxSize:     maxSize,
