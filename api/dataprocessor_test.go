@@ -548,8 +548,6 @@ func TestGetSeries(t *testing.T) {
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
 
-	defer metrics.Stop()
-
 	// the tests below cycles through every possible combination of:
 	// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
 	// * every possible `from` offset (against its quantized query results) e.g. offset between 0 and interval-1
