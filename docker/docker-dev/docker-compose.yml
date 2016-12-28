@@ -9,6 +9,7 @@ services:
      - "2003:2003"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
+      - ../../scripts/config/metrictank-docker.ini:/etc/raintank/metrictank.ini
     environment:
      WAIT_HOSTS: cassandra:9042
      WAIT_TIMEOUT: 60
