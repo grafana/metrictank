@@ -143,47 +143,37 @@ func (mc *CCacheMetric) endTs(ts uint32) uint32 {
 }
 
 // assumes we already have at least a read lock
-// asc determines the direction of the search, ascending or descending
-func (mc *CCacheMetric) seek(ts uint32, keys []uint32, asc bool) (uint32, bool) {
-	var seekpos int
-	var shiftby int
-
+func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
 	log.Debug("cache: seeking for %d in the keys %+d", ts, keys)
-	if asc {
-		// if ascending start searching at the first
-		seekpos = 0
-		shiftby = 1
-	} else {
-		// if descending start searching at the last
-		seekpos = len(keys) - 1
-		shiftby = -1
+
+	for i := 0; i < len(keys) && keys[i] <= ts; i++ {
+		if mc.endTs(keys[i]) > ts {
+			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
+			return keys[i], true
+		}
 	}
 
-	for {
-		if asc {
-			if seekpos >= len(keys) || keys[seekpos] > ts {
-				break
-			}
-		} else {
-			if seekpos < 0 || mc.endTs(keys[seekpos]) < ts {
-				break
-			}
-		}
-
-		if keys[seekpos] <= ts && mc.endTs(keys[seekpos]) > ts {
-			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[seekpos], mc.endTs(keys[seekpos]))
-			return keys[seekpos], true
-		}
-
-		seekpos = seekpos + shiftby
-	}
-
-	log.Debug("cache: seek unsuccessful")
+	log.Debug("cache: seekAsc unsuccessful")
 	return 0, false
 }
 
-func (mc *CCacheMetric) searchForward(from uint32, until uint32, keys []uint32, res *CCSearchResult) {
-	ts, ok := mc.seek(from, keys, true)
+// assumes we already have at least a read lock
+func (mc *CCacheMetric) seekDesc(ts uint32, keys []uint32) (uint32, bool) {
+	log.Debug("cache: seeking for %d in the keys %+d", ts, keys)
+
+	for i := len(keys) - 1; i >= 0 && mc.endTs(keys[i]) > ts; i-- {
+		if keys[i] <= ts {
+			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
+			return keys[i], true
+		}
+	}
+
+	log.Debug("cache: seekDesc unsuccessful")
+	return 0, false
+}
+
+func (mc *CCacheMetric) searchForward(from, until uint32, keys []uint32, res *CCSearchResult) {
+	ts, ok := mc.seekAsc(from, keys)
 	if !ok {
 		return
 	}
@@ -202,8 +192,8 @@ func (mc *CCacheMetric) searchForward(from uint32, until uint32, keys []uint32, 
 	}
 }
 
-func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32, res *CCSearchResult) {
-	ts, ok := mc.seek(until, keys, false)
+func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *CCSearchResult) {
+	ts, ok := mc.seekDesc(until, keys)
 	if !ok {
 		return
 	}
