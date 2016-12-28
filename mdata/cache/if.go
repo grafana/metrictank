@@ -8,3 +8,8 @@ type Cache interface {
 	Add(string, uint32, chunk.IterGen)
 	Search(string, uint32, uint32) *CCSearchResult
 }
+
+func NewCache() Cache {
+	// currently we only know CCache
+	return NewCCache()
+}

@@ -20,3 +20,8 @@ type EvictTarget struct {
 	Metric string
 	Ts     uint32
 }
+
+func NewAccnt(maxSize uint64) Accnt {
+	// currently we only know NewFlatAccnt
+	return NewFlatAccnt(maxSize)
+}
