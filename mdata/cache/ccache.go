@@ -92,7 +92,7 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	defer runtime.Gosched()
 
 	if _, ok := c.metricCache[target.Metric]; ok {
-		log.Debug("cache: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
+		log.Debug("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
 		length := c.metricCache[target.Metric].Del(target.Ts)
 		if length == 0 {
 			delete(c.metricCache, target.Metric)
