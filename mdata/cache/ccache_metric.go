@@ -80,7 +80,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 
 	endTs := mc.endTs(ts)
 
-	log.Debug("cache: caching chunk ts %d, endTs %d", ts, endTs)
+	log.Debug("CCacheMetric Add: caching chunk ts %d, endTs %d", ts, endTs)
 
 	// if the previous chunk is cached, link in both directions
 	if _, ok := mc.chunks[prev]; ok {
@@ -144,31 +144,31 @@ func (mc *CCacheMetric) endTs(ts uint32) uint32 {
 
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
-	log.Debug("cache: seeking for %d in the keys %+d", ts, keys)
+	log.Debug("CCacheMetric seekAsc: seeking for %d in the keys %+d", ts, keys)
 
 	for i := 0; i < len(keys) && keys[i] <= ts; i++ {
 		if mc.endTs(keys[i]) > ts {
-			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
+			log.Debug("CCacheMetric seekAsc: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
 			return keys[i], true
 		}
 	}
 
-	log.Debug("cache: seekAsc unsuccessful")
+	log.Debug("CCacheMetric seekAsc: seekAsc unsuccessful")
 	return 0, false
 }
 
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekDesc(ts uint32, keys []uint32) (uint32, bool) {
-	log.Debug("cache: seeking for %d in the keys %+d", ts, keys)
+	log.Debug("CCacheMetric seekDesc: seeking for %d in the keys %+d", ts, keys)
 
 	for i := len(keys) - 1; i >= 0 && mc.endTs(keys[i]) > ts; i-- {
 		if keys[i] <= ts {
-			log.Debug("cache: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
+			log.Debug("CCacheMetric seekDesc: seek found ts %d is between %d and %d", ts, keys[i], mc.endTs(keys[i]))
 			return keys[i], true
 		}
 	}
 
-	log.Debug("cache: seekDesc unsuccessful")
+	log.Debug("CCacheMetric seekDesc: seekDesc unsuccessful")
 	return 0, false
 }
 
@@ -180,7 +180,7 @@ func (mc *CCacheMetric) searchForward(from, until uint32, keys []uint32, res *CC
 
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
-		log.Debug("cache: forward search adds chunk ts %d to start", ts)
+		log.Debug("CCacheMetric searchForward: forward search adds chunk ts %d to start", ts)
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
 		endTs := mc.endTs(ts)
 		res.From = endTs
@@ -199,7 +199,7 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *C
 	}
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
-		log.Debug("cache: backward search adds chunk ts %d to end", ts)
+		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		startTs := mc.chunks[ts].Ts
 		res.Until = startTs
