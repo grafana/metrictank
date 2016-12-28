@@ -30,7 +30,6 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	firstChunkT0    uint32
 	ttl             uint32
-	lastPersistedT0 uint32
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -333,8 +332,6 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 // write a chunk to persistent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
-	a.lastPersistedT0 = a.Chunks[pos].T0
-
 	if !cluster.ThisNode.IsPrimary() {
 		if LogLevel < 2 {
 			log.Debug("AM persist(): node is not primary, not saving chunk.")
