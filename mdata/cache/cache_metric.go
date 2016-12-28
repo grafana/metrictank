@@ -234,7 +234,7 @@ func (mc *CCacheMetric) searchBackward(from uint32, until uint32, keys []uint32,
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
 //
-func (mc *CCacheMetric) Search(res *CCSearchResult, from uint32, until uint32) {
+func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 

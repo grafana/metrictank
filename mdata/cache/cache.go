@@ -2,8 +2,8 @@ package cache
 
 import (
 	"flag"
-	"sync"
 	"runtime"
+	"sync"
 
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -76,7 +76,6 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	defer c.Unlock()
 
 	if ccm, ok := c.metricCache[metric]; !ok {
-		var ccm *CCacheMetric
 		ccm = NewCCacheMetric()
 		ccm.Init(prev, itergen)
 		c.metricCache[metric] = ccm
@@ -101,16 +100,13 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	}
 }
 
-func (c *CCache) Search(metric string, from uint32, until uint32) *CCSearchResult {
+func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 	var hit chunk.IterGen
 	var cm *CCacheMetric
 	var ok bool
-	var res *CCSearchResult = &CCSearchResult{
-		From:     from,
-		Until:    until,
-		Start:    make([]chunk.IterGen, 0),
-		End:      make([]chunk.IterGen, 0),
-		Complete: false,
+	res := &CCSearchResult{
+		From:  from,
+		Until: until,
 	}
 
 	c.RLock()
