@@ -43,7 +43,7 @@ type FlatAccnt struct {
 	// a queue of add and hit events to be processed by the accounting.
 	// each add means data got added to the cache, each hit means data
 	// has been accessed and hence the LRU needs to be updated.
-	eventQ chan *FlatAccntEvent
+	eventQ chan FlatAccntEvent
 
 	stats       Stats
 	statsTicker time.Ticker
@@ -112,7 +112,7 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 		maxSize:     maxSize,
 		lru:         NewLRU(),
 		evictQ:      make(chan *EvictTarget, evictQSize),
-		eventQ:      make(chan *FlatAccntEvent, eventQSize),
+		eventQ:      make(chan FlatAccntEvent, eventQSize),
 		lastPrint:   time.Now().UnixNano(),
 		statsTicker: *(time.NewTicker(time.Second * 10)),
 	}
@@ -142,7 +142,7 @@ func (a *FlatAccnt) CompleteMetric() {
 }
 
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
-	event := &FlatAccntEvent{
+	event := FlatAccntEvent{
 		t:  t,
 		pl: payload,
 	}
