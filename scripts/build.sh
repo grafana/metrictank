@@ -19,9 +19,12 @@ export CGO_ENABLED=0
 
 # Build binary
 cd $GOPATH/src/github.com/raintank/metrictank
-if [ "$1" == "race" ]
+
+OUTPUT=$BUILDDIR/metrictank
+
+if [ "$METRICTANK_BUILD" == "race" ]
 then
-  CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metrictank.race
+  CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $OUTPUT
 else
-  go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/metrictank
+  go build -ldflags "-X main.GitHash=$GITVERSION" -o $OUTPUT
 fi
