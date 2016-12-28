@@ -45,8 +45,8 @@ type FlatAccnt struct {
 	// has been accessed and hence the LRU needs to be updated.
 	eventQ chan *FlatAccntEvent
 
-	stats       *Stats
-	statsTicker *time.Ticker
+	stats       Stats
+	statsTicker time.Ticker
 	lastPrint   int64
 }
 
@@ -108,15 +108,13 @@ type HitPayload struct {
 
 func NewFlatAccnt(maxSize uint64) Accnt {
 	accnt := FlatAccnt{
-		total:       0,
 		metrics:     make(map[string]*FlatAccntMet),
 		maxSize:     maxSize,
 		lru:         NewLRU(),
 		evictQ:      make(chan *EvictTarget, evictQSize),
 		eventQ:      make(chan *FlatAccntEvent, eventQSize),
-		stats:       &Stats{0, 0, 0, 0, 0, 0, 0, 0},
 		lastPrint:   time.Now().UnixNano(),
-		statsTicker: time.NewTicker(time.Second * 10),
+		statsTicker: *(time.NewTicker(time.Second * 10)),
 	}
 
 	go accnt.eventLoop()
