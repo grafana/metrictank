@@ -172,7 +172,6 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
-	defer metrics.Stop()
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
@@ -207,7 +206,6 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
-	defer metrics.Stop()
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -241,7 +239,6 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
-	defer metrics.Stop()
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -275,7 +272,6 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	}
 
 	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
-	defer metrics.Stop()
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
