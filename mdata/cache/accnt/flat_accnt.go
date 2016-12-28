@@ -144,18 +144,16 @@ func (a *FlatAccnt) CompleteMetric() {
 }
 
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
-	var event *FlatAccntEvent
-
-	event = &FlatAccntEvent{
+	event := &FlatAccntEvent{
 		t:  t,
 		pl: payload,
 	}
 
 	select {
-		// we never want to block for accounting, rather just let it miss some events and print an error
-		case a.eventQ <- event:
-		default:
-			log.Error(3, "Failed to submit event to accounting, channel was blocked")
+	// we never want to block for accounting, rather just let it miss some events and print an error
+	case a.eventQ <- event:
+	default:
+		log.Error(3, "Failed to submit event to accounting, channel was blocked")
 	}
 }
 
@@ -278,7 +276,7 @@ func (a *FlatAccnt) evict() {
 		return
 	}
 
-	for ts, _ = range met.chunks {
+	for ts = range met.chunks {
 		// if we have chronologically older chunks we add them
 		// to the evict targets to avoid fragmentation
 		if ts <= target.Ts {
