@@ -4,10 +4,6 @@ import (
 	"container/list"
 )
 
-type entry struct {
-	v interface{}
-}
-
 type LRU struct {
 	list  *list.List
 	items map[interface{}]*list.Element
