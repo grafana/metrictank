@@ -12,11 +12,10 @@ type TimeDiffReporter32 struct {
 }
 
 func NewTimeDiffReporter32(name string, target uint32) *TimeDiffReporter32 {
-	return registry.add(name, func() GraphiteMetric {
-		return &TimeDiffReporter32{
-			target: target,
-		}
-	}).(*TimeDiffReporter32)
+	return registry.add(name, &TimeDiffReporter32{
+		target: target,
+	},
+	).(*TimeDiffReporter32)
 }
 
 func (g *TimeDiffReporter32) Set(target uint32) {

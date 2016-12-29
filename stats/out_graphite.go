@@ -62,8 +62,8 @@ func (g *Graphite) reporter(interval int) {
 	}
 }
 
-// graphiteWriter is the background workers that connects to graphite and submits all pending data to it
-// TODO: conn.Write() returns no error for a while when the remote endpoint is down, the reconnect happens with a delay
+// writer connects to graphite and submits all pending data to it
+// TODO: conn.Write() returns no error for a while when the remote endpoint is down, the reconnect happens with a delay. this can also cause lost data for a second or two.
 func (g *Graphite) writer() {
 	connectTicker := time.Tick(time.Second)
 

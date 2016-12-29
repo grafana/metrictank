@@ -13,12 +13,11 @@ type LatencyHistogram12h32 struct {
 }
 
 func NewLatencyHistogram12h32(name string) *LatencyHistogram12h32 {
-	return registry.add(name, func() GraphiteMetric {
-		return &LatencyHistogram12h32{
-			hist:  hist12h.New(),
-			since: time.Now(),
-		}
-	}).(*LatencyHistogram12h32)
+	return registry.add(name, &LatencyHistogram12h32{
+		hist:  hist12h.New(),
+		since: time.Now(),
+	},
+	).(*LatencyHistogram12h32)
 }
 
 func (l *LatencyHistogram12h32) Value(t time.Duration) {

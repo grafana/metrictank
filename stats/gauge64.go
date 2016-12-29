@@ -10,9 +10,7 @@ type Gauge64 struct {
 }
 
 func NewGauge64(name string) *Gauge64 {
-	return registry.add(name, func() GraphiteMetric {
-		return &Gauge64{}
-	}).(*Gauge64)
+	return registry.add(name, &Gauge64{}).(*Gauge64)
 }
 
 func (g *Gauge64) Inc() {
