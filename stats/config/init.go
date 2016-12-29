@@ -21,7 +21,7 @@ func ConfigSetup() {
 	inStats.StringVar(&prefix, "prefix", "metrictank.stats.default.$instance", "stats prefix (will add trailing dot automatically if needed)")
 	inStats.StringVar(&addr, "addr", "localhost:2003", "graphite address")
 	inStats.IntVar(&interval, "interval", 1, "interval at which to send statistics")
-	inStats.IntVar(&bufferSize, "buffer-size", 1*1000*1000, "how many points to buffer up in case graphite endpoint is unavailable")
+	inStats.IntVar(&bufferSize, "buffer-size", 20000, "how many messages (holding all measurements from one interval. rule of thumb: a message is ~25kB) to buffer up in case graphite endpoint is unavailable. With the default of 20k you will use max about 500MB and bridge 5 hours of downtime when needed")
 	globalconf.Register("stats", inStats)
 }
 
