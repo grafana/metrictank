@@ -101,9 +101,10 @@
             },
             {
               "alias": "/pressure\\./",
-              "fill": 4,
+              "fill": 0,
               "lines": true,
-              "nullPointMode": "null",
+              "linewidth": 1,
+              "nullPointMode": "connected",
               "points": false,
               "yaxis": 2
             }
