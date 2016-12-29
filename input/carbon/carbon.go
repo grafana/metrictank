@@ -117,19 +117,21 @@ func New() *Carbon {
 		addrStr:   addr,
 		addr:      addrT,
 		schemas:   schemas,
-		quit:      make(chan struct{}),
 		connTrack: NewConnTrack(),
 	}
 }
 
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	c.Input = input.New(metrics, metricIndex, usg, "carbon")
+	if c.Input.MsgsAge == nil {
+		c.Input = input.New(metrics, metricIndex, usg, "carbon")
+	}
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
 	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
+	c.quit = make(chan struct{})
 	go c.accept()
 }
 
