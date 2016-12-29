@@ -389,7 +389,9 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 	// to retrieve the stored data, we also use from inclusive and to exclusive,
 	// so to make sure that the data after quantization (fix()) is correct, we have to make the following adjustment:
 	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
+	// note: fix() will set first to a clean boundary >= from (here 60), for which it accepts all points with ts <= 60 but > 60-60=0, e.g. our 1..60 range
 	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
+	// note: fix() will set last to a clean boundary < to (here 180), for which it accepts all points with ts <=180, eg our 121..180 range
 
 	if consolidator == consolidation.None {
 		fromUnix = prevBoundary(req.From, interval) + 1
