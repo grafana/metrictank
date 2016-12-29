@@ -34,8 +34,8 @@ func (r *Registry) add(name string, metric GraphiteMetric) GraphiteMetric {
 }
 
 func (r *Registry) list() map[string]GraphiteMetric {
-	r.Lock()
 	metrics := make(map[string]GraphiteMetric)
+	r.Lock()
 	for name, metric := range r.metrics {
 		metrics[name] = metric
 	}
