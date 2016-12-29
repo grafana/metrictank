@@ -365,11 +365,38 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
+func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
+	ctx := newRequestContext(&req, consolidator)
+	iters := s.getSeries(ctx, consolidator)
+	points := s.itersToPoints(ctx, iters)
+	return fix(points, req.From, req.To, req.ArchInterval)
+}
+
+func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
+	var memIters, iters []chunk.Iter
+	var oldest uint32
+
+	oldest, memIters = s.getSeriesAggMetrics(ctx)
+	log.Info("oldest from aggmetrics is %d\n", oldest)
+
+	// if oldest < to -> search until oldest, we already have the rest from mem
+	// if to < oldest -> no need to search until oldest, only search until to
+	if oldest <= ctx.From {
+		reqSpanMem.Value(int64(ctx.To - ctx.From))
+		return memIters
+	}
+
+	until := util.Min(oldest, ctx.To)
+	iters = append(s.getSeriesCachedStore(ctx, until), memIters...)
+
+	return iters
+}
+
 // getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
-func (s *Server) quantizePoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
+func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
 	// while aggregated archives are quantized, raw intervals are not.  quantizing happens at the end of this function, **after* this step.
 	// So we have to adjust the range to get the right data.
 	// (ranges described as a..b include both and b)
@@ -402,7 +429,7 @@ func (s *Server) quantizePoints(ctx *requestContext, iters []chunk.Iter) []schem
 	return points
 }
 
-func (s *Server) getAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
 	var metric mdata.Metric
 	var ok bool
 	var oldest uint32 = ctx.Req.To
@@ -423,7 +450,7 @@ func (s *Server) getAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
 	return oldest, memIters
 }
 
-func (s *Server) queryCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
+func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
 	iters := make([]chunk.Iter, 0)
 	var prevts uint32 = 0
 
@@ -481,33 +508,6 @@ func (s *Server) queryCachedStore(ctx *requestContext, until uint32) []chunk.Ite
 	return iters
 }
 
-func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
-	var memIters, iters []chunk.Iter
-	var oldest uint32
-
-	oldest, memIters = s.getAggMetrics(ctx)
-	log.Info("oldest from aggmetrics is %d\n", oldest)
-
-	// if oldest < to -> search until oldest, we already have the rest from mem
-	// if to < oldest -> no need to search until oldest, only search until to
-	if oldest <= ctx.From {
-		reqSpanMem.Value(int64(ctx.To - ctx.From))
-		return memIters
-	}
-
-	until := util.Min(oldest, ctx.To)
-	iters = append(s.queryCachedStore(ctx, until), memIters...)
-
-	return iters
-}
-
-func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	ctx := newRequestContext(&req, consolidator)
-	iters := s.getSeries(ctx, consolidator)
-	points := s.quantizePoints(ctx, iters)
-	return fix(points, req.From, req.To, req.ArchInterval)
-}
-
 // check for duplicate series names. If found merge the results.
 func mergeSeries(in []models.Series) []models.Series {
 	seriesByTarget := make(map[string][]models.Series)
@@ -552,24 +552,21 @@ func prevBoundary(ts uint32, span uint32) uint32 {
 }
 
 func newRequestContext(req *models.Req, consolidator consolidation.Consolidator) *requestContext {
-	var fromUnix, toUnix uint32
-	var key string
 
-	if consolidator == consolidation.None {
-		fromUnix = prevBoundary(req.From, req.ArchInterval) + 1
-		toUnix = prevBoundary(req.To, req.ArchInterval) + 1
-		key = req.Key
-	} else {
-		fromUnix = req.From
-		toUnix = req.To
-		key = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
-	}
-
-	return &requestContext{
+	rc := requestContext{
 		Req:  req,
 		Cons: consolidator,
-		From: fromUnix,
-		To:   toUnix,
-		Key:  key,
+		Key:  req.Key,
 	}
+
+	if consolidator == consolidation.None {
+		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
+		rc.To = prevBoundary(req.To, req.ArchInterval) + 1
+	} else {
+		rc.From = req.From
+		rc.To = req.To
+		rc.Key = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+	}
+
+	return &rc
 }
