@@ -1090,6 +1090,123 @@ func TestMergeSeries(t *testing.T) {
 	}
 }
 
+func TestRequestContextWithoutConsolidator(t *testing.T) {
+	metric := "metric1"
+	archInterval := uint32(10)
+	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None)
+	req.ArchInterval = archInterval
+	ctx := newRequestContext(&req, consolidation.None)
+
+	expectFrom := uint32(41)
+	if ctx.From != expectFrom {
+		t.Errorf("requestContext.From is not at boundary as expected, expected/got %d/%d", expectFrom, ctx.From)
+	}
+
+	expectTo := uint32(81)
+	if ctx.To != expectTo {
+		t.Errorf("requestContext.To is not at boundary as expected, expected/got %d/%d", expectTo, ctx.To)
+	}
+
+	expectedAggKey := ""
+	if ctx.AggKey != expectedAggKey {
+		t.Errorf("requestContext.AggKey is not empty as expected, expected/got \"%s\"/\"%s\"", expectedAggKey, ctx.AggKey)
+	}
+}
+
+func TestRequestContextWithConsolidator(t *testing.T) {
+	metric := "metric1"
+	archInterval := uint32(10)
+	from := uint32(44)
+	to := uint32(88)
+	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum)
+	req.ArchInterval = archInterval
+	ctx := newRequestContext(&req, consolidation.Sum)
+
+	expectFrom := from
+	if ctx.From != expectFrom {
+		t.Errorf("requestContext.From is not original value as expected, expected/got %d/%d", expectFrom, ctx.From)
+	}
+
+	expectTo := to
+	if ctx.To != expectTo {
+		t.Errorf("requestContext.To is not original value as expected, expected/got %d/%d", expectTo, ctx.To)
+	}
+
+	expectedAggKey := fmt.Sprintf("%s_%s_%d", metric, "sum", archInterval)
+	if ctx.AggKey != expectedAggKey {
+		t.Errorf("requestContext.AggKey is not as expected, expected/got \"%s\"/\"%s\"", expectedAggKey, ctx.AggKey)
+	}
+}
+
+func TestGetSeriesAggMetrics(t *testing.T) {
+	cluster.Init("default", "test", time.Now())
+	stats, _ := helper.New(false, "", "standard", "metrictank", "")
+	store := mdata.NewMockStore()
+	chunkSpan := uint32(600)
+	numChunks := uint32(10)
+	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
+	mdata.InitMetrics(stats)
+	addr = "localhost:6060"
+	srv, _ := NewServer(stats)
+	srv.BindBackendStore(store)
+	srv.BindMemoryStore(metrics)
+	from := uint32(1744)
+	to := uint32(1888)
+	metricKey := "metric1"
+	archInterval := uint32(10)
+	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None)
+	req.ArchInterval = archInterval
+	ctx := newRequestContext(&req, consolidation.None)
+
+	metric := metrics.GetOrCreate(metricKey)
+	for i := uint32(50); i < 3000; i++ {
+		metric.Add(i, float64(i^2))
+	}
+
+	oldest, iters := srv.getSeriesAggMetrics(ctx)
+	timestamps := make([]uint32, 0)
+	values := make([]float64, 0)
+
+	for _, it := range iters {
+		for it.Next() {
+			ts, val := it.Values()
+			timestamps = append(timestamps, ts)
+			values = append(values, val)
+		}
+	}
+
+	// should be the T0 of the chunk from (1744) is in
+	// 1744 - (1744 % 600) = 1200
+	expected := uint32(1200)
+	if oldest != expected {
+		t.Errorf("Expected oldest to be %d but got %d", expected, oldest)
+	}
+
+	// number of returned ts should be the number of chunks the searched range spans across * chunkspan
+	// (1888 + (600 - 1888 % 600)) - (1744 - (1744 % 600)) = 1200
+	expected = uint32(1200)
+	if uint32(len(timestamps)) != expected {
+		t.Errorf("Returned timestamps are not right, should have %d but got %d",
+			to-from,
+			len(timestamps),
+		)
+	}
+
+	// should be the beginning of the chunk containing from
+	// 1744 - (1744 % 600)
+	expected = 1200
+	if timestamps[0] != expected {
+		t.Errorf("First timestamp is not right, expected %d but got %d", expected, timestamps[0])
+	}
+
+	// should be the beginning of chunk containing to plus chunk span - 1 (exclusive)
+	// 1888 - (1888 % 600) + 600 - 1 = 1799
+	expected = uint32(2399)
+	if timestamps[len(timestamps)-1] != expected {
+		t.Errorf("Last timestamp is not right, expected %d but got %d", expected, timestamps[len(timestamps)-1])
+	}
+}
+
 // these serve as a "cache" of clean points we can use instead of regenerating all the time
 var randFloatsWithNullsBuf []schema.Point
 var randFloatsBuf []schema.Point
