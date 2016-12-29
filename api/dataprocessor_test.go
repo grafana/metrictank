@@ -539,8 +539,8 @@ func TestPrevBoundary(t *testing.T) {
 	}
 }
 
-// TestGetSeries assures that series data is returned in proper form.
-func TestGetSeries(t *testing.T) {
+// TestGetSeriesFixed assures that series data is returned in proper form.
+func TestGetSeriesFixed(t *testing.T) {
 	cluster.Init("default", "test", time.Now())
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewDevnullStore()
@@ -577,7 +577,7 @@ func TestGetSeries(t *testing.T) {
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
 				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.ThisNode)
 				req.ArchInterval = 10
-				points := srv.getSeries(req, consolidation.None)
+				points := srv.getSeriesFixed(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
 					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
 				}
