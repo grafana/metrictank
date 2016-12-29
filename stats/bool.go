@@ -10,9 +10,7 @@ type Bool struct {
 }
 
 func NewBool(name string) *Bool {
-	return registry.add(name, func() GraphiteMetric {
-		return &Bool{}
-	}).(*Bool)
+	return registry.add(name, &Bool{}).(*Bool)
 }
 
 func (b *Bool) SetTrue() {

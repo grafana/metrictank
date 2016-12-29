@@ -26,14 +26,13 @@ type Meter32 struct {
 }
 
 func NewMeter32(name string, approx bool) *Meter32 {
-	return registry.add(name, func() GraphiteMetric {
-		return &Meter32{
-			approx: approx,
-			hist:   make(map[uint32]uint32),
-			min:    math.MaxUint32,
-			since:  time.Now(),
-		}
-	}).(*Meter32)
+	return registry.add(name, &Meter32{
+		approx: approx,
+		hist:   make(map[uint32]uint32),
+		min:    math.MaxUint32,
+		since:  time.Now(),
+	},
+	).(*Meter32)
 }
 
 func (m *Meter32) clear() {

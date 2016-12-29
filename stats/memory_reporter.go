@@ -12,9 +12,7 @@ type MemoryReporter struct {
 }
 
 func NewMemoryReporter() *MemoryReporter {
-	return registry.add("memory", func() GraphiteMetric {
-		return &MemoryReporter{}
-	}).(*MemoryReporter)
+	return registry.add("memory", &MemoryReporter{}).(*MemoryReporter)
 }
 
 func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {

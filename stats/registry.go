@@ -23,15 +23,14 @@ func NewRegistry() *Registry {
 	}
 }
 
-func (r *Registry) add(name string, getMetric func() GraphiteMetric) GraphiteMetric {
+func (r *Registry) add(name string, metric GraphiteMetric) GraphiteMetric {
 	r.Lock()
 	if _, ok := r.metrics[name]; ok {
 		panic(fmt.Sprintf(errFmtMetricExists, name))
 	}
-	m := getMetric()
-	r.metrics[name] = m
+	r.metrics[name] = metric
 	r.Unlock()
-	return m
+	return metric
 }
 
 func (r *Registry) list() map[string]GraphiteMetric {
