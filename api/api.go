@@ -45,7 +45,7 @@ type Server struct {
 	MetricIndex  idx.MetricIndex
 	MemoryStore  mdata.Metrics
 	BackendStore mdata.Store
-	Cache        cache.Cache
+	Cache        *cache.CCache
 	shutdown     chan struct{}
 }
 
@@ -59,7 +59,7 @@ func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
 }
 
-func (s *Server) BindCache(cache cache.Cache) {
+func (s *Server) BindCache(cache *cache.CCache) {
 	s.Cache = cache
 }
 
