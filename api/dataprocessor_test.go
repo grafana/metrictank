@@ -1140,6 +1140,15 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	}
 }
 
+// the essential idea of this test is that we want to put some chunks into the
+// cache and some into the backend store.
+// then we call getSeriesCachedStore and check if it has stitched the pieces
+// from the different sources together correctly.
+//
+// cache:           |-----|-----|-----|
+// store:                             |-----|
+// query:              |---------------|
+// expected result: |-----|-----|-----|-----|
 func TestGetSeriesCachedStore(t *testing.T) {
 	chunkSpan := uint32(600)
 	numChunks := uint32(10)
@@ -1152,7 +1161,9 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	srv.BindCache(c)
 	metricKey := "metric1"
 
-	// generating 4 chunks
+	// generating 4 chunks, 3 will go into the cache and 1 into the backend store.
+	// this simulates a scenario where the latest chunk has been persisted but not
+	// queried (and cached) yet.
 	chunks := make([]*chunk.Chunk, 0)
 	for i := chunkSpan; i < chunkSpan*5; i++ {
 		if i%chunkSpan == 0 {
@@ -1172,11 +1183,18 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	}
 
 	// preparing the next itgen as store mock result (to simulate one that has just been added and not cached yet)
-	itgens := make([]chunk.IterGen, 0)
 	chunks[i].Series.Finish()
-	itgens = append(itgens, *chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan))
+	itgens := []chunk.IterGen{*chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan)}
 
+	// save some electrons by skipping steps that are no edge cases
 	steps := chunkSpan / 10
+
+	// we want to have:
+	// - queries that only query chunks in the cache
+	// - queries that only query chunks in cassandra
+	// - queries that query across multiple chunks in the cache
+	// - queries that query across chunks in the cache and cassandra
+	// so we can be sure that getSeriesCachedStore correctly stitches the returned results from different sources together
 	for from := uint32(chunkSpan + chunkSpan/2); from < uint32(chunkSpan*4); from += steps {
 		for to := from + 1; to <= from+chunkSpan+1; to += steps {
 			// resetting mock at the beginning of each iteration
@@ -1188,15 +1206,28 @@ func TestGetSeriesCachedStore(t *testing.T) {
 			ctx := newRequestContext(&req, consolidation.None)
 			iters := srv.getSeriesCachedStore(ctx, to)
 
+			// expecting the first returned timestamp to be the T0 of the chunk containing "from"
 			expectResFrom := from - (from % chunkSpan)
+
+			// expecting the last returned timestamp to be the last point in the chunk containing "to"
 			expectResTo := (to - 1) + (chunkSpan - (to-1)%chunkSpan) - 1
+
+			// for each timestamp in the returned iterators we compare if it has the expected value
+			// we use the valueTracker to increase together with the iterators and compare at each step
+			valueTracker := expectResFrom
+
 			ts := make([]uint32, 0)
 			for _, it := range iters {
 				for it.Next() {
-					t, _ := it.Values()
-					ts = append(ts, t)
+					val, _ := it.Values()
+					if val != valueTracker {
+						t.Fatalf("From %d To %d; expected value is %d, but got %d", from, to, valueTracker, val)
+					}
+					valueTracker++
+					ts = append(ts, val)
 				}
 			}
+
 			if ts[0] != expectResFrom {
 				t.Fatalf("From %d To %d; Expected first to be %d but got %d", from, to, expectResFrom, ts[0])
 			}
@@ -1250,7 +1281,9 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	}
 
 	// number of returned ts should be the number of chunks the searched range spans across * chunkspan
-	// (1888 + (600 - 1888 % 600)) - (1744 - (1744 % 600)) = 1200
+	// chunk that contains from starts at (1744 - (1744 % 600)) = 1200
+	// chunk that contains to starts at (1888 + (600 - 1888 % 600)) = 1800
+	// so we expect two chunks, which means 2*chunkspan = 1200
 	expected = uint32(1200)
 	if uint32(len(timestamps)) != expected {
 		t.Errorf("Returned timestamps are not right, should have %d but got %d",
