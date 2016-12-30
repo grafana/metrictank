@@ -88,8 +88,11 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 
 func (c *CCache) evict(target *accnt.EvictTarget) {
 	c.Lock()
-	defer c.Unlock()
+	// evict() might get called many times in a loop, but we don't want it to block
+	// cache reads with the write lock, so we yield right after unlocking to allow
+	// reads to go first.
 	defer runtime.Gosched()
+	defer c.Unlock()
 
 	if _, ok := c.metricCache[target.Metric]; ok {
 		log.Debug("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
