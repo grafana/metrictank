@@ -19,6 +19,9 @@ type Consumer struct {
 
 func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string) (*Consumer, error) {
 	consumer, err := nsq.NewConsumer(topic, channel, config)
+	if err != nil {
+		return nil, err
+	}
 	c := Consumer{
 		consumer,
 		stats.NewCounter64(fmt.Sprintf(metricsPatt, "received")),
@@ -28,8 +31,7 @@ func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string) 
 		stats.NewGauge32(fmt.Sprintf(metricsPatt, "num_handlers")),
 	}
 	go func() {
-		t := time.Tick(time.Second * time.Duration(1))
-		for range t {
+		for range time.Tick(time.Second) {
 			s := consumer.Stats()
 			c.msgsReceived.SetUint64(s.MessagesReceived)
 			c.msgsFinished.SetUint64(s.MessagesFinished)
@@ -37,7 +39,7 @@ func NewConsumer(topic, channel string, config *nsq.Config, metricsPatt string) 
 			c.msgsConnections.Set(s.Connections)
 		}
 	}()
-	return &c, err
+	return &c, nil
 }
 
 func (r *Consumer) AddConcurrentHandlers(handler nsq.Handler, concurrency int) {
