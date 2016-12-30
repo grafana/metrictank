@@ -12,8 +12,7 @@ const evictQSize = 1000
 // we never want this to fill up because otherwise events get dropped
 const eventQSize = 100000
 
-// Flat accounting
-//
+// FlatAccnt implements Flat accounting.
 // Keeps track of the chunk cache size and in which order the contained
 // chunks have been used to last time. If it detects that the total cache
 // size is above the given limit, it feeds the least recently used
