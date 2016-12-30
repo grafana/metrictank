@@ -40,6 +40,10 @@ func NewGen(b []byte, ts uint32) (*IterGen, error) {
 	}, nil
 }
 
+func NewBareIterGen(b []byte, ts uint32, span uint32) *IterGen {
+	return &IterGen{b, ts, span}
+}
+
 func (ig *IterGen) Get() (*Iter, error) {
 	b := make([]byte, len(ig.b), len(ig.b))
 	copy(b, ig.b)

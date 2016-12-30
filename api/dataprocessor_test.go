@@ -6,6 +6,8 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 	"math"
 	"math/rand"
@@ -1138,16 +1140,81 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	}
 }
 
+func TestGetSeriesCachedStore(t *testing.T) {
+	chunkSpan := uint32(600)
+	numChunks := uint32(10)
+	srv, _ := NewServer()
+	store := mdata.NewMockStore()
+	srv.BindBackendStore(store)
+	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
+	srv.BindMemoryStore(metrics)
+	c := cache.NewCCache()
+	srv.BindCache(c)
+	metricKey := "metric1"
+
+	// generating 4 chunks
+	chunks := make([]*chunk.Chunk, 0)
+	for i := chunkSpan; i < chunkSpan*5; i++ {
+		if i%chunkSpan == 0 {
+			chunks = append(chunks, chunk.New(i))
+		}
+		chunks[len(chunks)-1].Push(i, float64(i*2))
+	}
+
+	prevts := uint32(0)
+	// adding 3 itgens to cache
+	var i int
+	for i = 0; i < 3; i++ {
+		chunks[i].Series.Finish()
+		itgen := chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan)
+		srv.Cache.Add(metricKey, prevts, *itgen)
+		prevts = itgen.Ts()
+	}
+
+	// preparing the next itgen as store mock result (to simulate one that has just been added and not cached yet)
+	itgens := make([]chunk.IterGen, 0)
+	chunks[i].Series.Finish()
+	itgens = append(itgens, *chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan))
+
+	steps := chunkSpan / 10
+	for from := uint32(chunkSpan + chunkSpan/2); from < uint32(chunkSpan*4); from += steps {
+		for to := from + 1; to <= from+chunkSpan+1; to += steps {
+			// resetting mock at the beginning of each iteration
+			store.ResetMock()
+			store.AddMockResult(itgens, nil)
+
+			req := reqRaw(metricKey, from, to, chunkSpan, 1, consolidation.None)
+			req.ArchInterval = 1
+			ctx := newRequestContext(&req, consolidation.None)
+			iters := srv.getSeriesCachedStore(ctx, to)
+
+			expectResFrom := from - (from % chunkSpan)
+			expectResTo := (to - 1) + (chunkSpan - (to-1)%chunkSpan) - 1
+			ts := make([]uint32, 0)
+			for _, it := range iters {
+				for it.Next() {
+					t, _ := it.Values()
+					ts = append(ts, t)
+				}
+			}
+			if ts[0] != expectResFrom {
+				t.Fatalf("From %d To %d; Expected first to be %d but got %d", from, to, expectResFrom, ts[0])
+			}
+			if ts[len(ts)-1] != expectResTo {
+				t.Fatalf("From %d To %d; Expected last to be %d but got %d", from, to, expectResTo, ts[len(ts)-1])
+			}
+		}
+	}
+}
+
 func TestGetSeriesAggMetrics(t *testing.T) {
 	cluster.Init("default", "test", time.Now())
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	store := mdata.NewMockStore()
 	chunkSpan := uint32(600)
 	numChunks := uint32(10)
 	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
-	mdata.InitMetrics(stats)
 	addr = "localhost:6060"
-	srv, _ := NewServer(stats)
+	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
 	from := uint32(1744)

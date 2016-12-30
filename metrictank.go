@@ -343,7 +343,7 @@ func main() {
 	/***********************************
 		Initialize our MetricIdx
 	***********************************/
-	ccache := cache.NewCache()
+	cache := cache.NewCache()
 	pre := time.Now()
 
 	if memory.Enabled {
@@ -404,7 +404,7 @@ func main() {
 	apiServer.BindMetricIndex(metricIndex)
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
-	apiServer.BindCache(ccache)
+	apiServer.BindCache(cache)
 	go apiServer.Run()
 
 	/***********************************

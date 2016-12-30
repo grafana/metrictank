@@ -21,7 +21,10 @@ func NewMockStore() *mockStore {
 }
 
 func (c *mockStore) AddMockResult(chunks []chunk.IterGen, err error) {
-	c.Results = append(c.Results, mockSearchResult{chunks, err})
+	// copy chunks because we don't want to modify the source
+	chunksCopy := make([]chunk.IterGen, len(chunks))
+	copy(chunksCopy, chunks)
+	c.Results = append(c.Results, mockSearchResult{chunksCopy, err})
 }
 
 func (c *mockStore) ResetMock() {

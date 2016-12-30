@@ -234,9 +234,9 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 
 	keys := mc.sortedTs()
 
-	mc.searchForward(from, until-1, keys, res)
+	mc.searchForward(from, until, keys, res)
 	if !res.Complete {
-		mc.searchBackward(from, until-1, keys, res)
+		mc.searchBackward(from, until, keys, res)
 	}
 
 	if !res.Complete && res.From > res.Until {
