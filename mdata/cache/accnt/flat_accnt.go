@@ -18,7 +18,6 @@ const eventQSize = 100000
 // size is above the given limit, it feeds the least recently used
 // cache chunks into the evict queue, which will get consumed by the
 // evict loop.
-
 type FlatAccnt struct {
 	// total size of cache we're accounting for
 	total uint64
@@ -47,6 +46,12 @@ type FlatAccnt struct {
 	stats       Stats
 	statsTicker time.Ticker
 	lastPrint   int64
+}
+
+// EvictTarget is the definition of a chunk that should be evicted.
+type EvictTarget struct {
+	Metric string
+	Ts     uint32
 }
 
 type FlatAccntMet struct {

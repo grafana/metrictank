@@ -30,7 +30,7 @@ type CCache struct {
 
 	// accounting for the cache. keeps track of when data needs to be evicted
 	// and what should be evicted
-	accnt accnt.Accnt
+	accnt *accnt.FlatAccnt
 }
 
 type CCSearchResult struct {
@@ -58,7 +58,7 @@ type CCSearchResult struct {
 func NewCCache() *CCache {
 	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
-		accnt:       accnt.NewAccnt(maxSize),
+		accnt:       accnt.NewFlatAccnt(maxSize),
 	}
 	go cc.evictLoop()
 	return cc
