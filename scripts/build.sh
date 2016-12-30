@@ -22,7 +22,7 @@ cd $GOPATH/src/github.com/raintank/metrictank
 
 OUTPUT=$BUILDDIR/metrictank
 
-if [ "$METRICTANK_BUILD" == "race" ]
+if [ "$1" == "-race" ]
 then
   CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $OUTPUT
 else

@@ -8,6 +8,9 @@ check:
 bin:
 	./scripts/build.sh
 	./scripts/build_tools.sh
+bin-race:
+	./scripts/build.sh -race
+	./scripts/build_tools.sh -race
 docker:
 	./scripts/build_docker.sh
 all:
