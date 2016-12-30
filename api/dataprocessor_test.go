@@ -1213,26 +1213,26 @@ func TestGetSeriesCachedStore(t *testing.T) {
 			expectResTo := (to - 1) + (chunkSpan - (to-1)%chunkSpan) - 1
 
 			// for each timestamp in the returned iterators we compare if it has the expected value
-			// we use the valueTracker to increase together with the iterators and compare at each step
-			valueTracker := expectResFrom
+			// we use the tsTracker to increase together with the iterators and compare at each step
+			tsTracker := expectResFrom
 
-			ts := make([]uint32, 0)
+			tsSlice := make([]uint32, 0)
 			for _, it := range iters {
 				for it.Next() {
-					val, _ := it.Values()
-					if val != valueTracker {
-						t.Fatalf("From %d To %d; expected value is %d, but got %d", from, to, valueTracker, val)
+					ts, _ := it.Values()
+					if ts != tsTracker {
+						t.Fatalf("From %d To %d; expected value is %d, but got %d", from, to, tsTracker, ts)
 					}
-					valueTracker++
-					ts = append(ts, val)
+					tsTracker++
+					tsSlice = append(tsSlice, ts)
 				}
 			}
 
-			if ts[0] != expectResFrom {
-				t.Fatalf("From %d To %d; Expected first to be %d but got %d", from, to, expectResFrom, ts[0])
+			if tsSlice[0] != expectResFrom {
+				t.Fatalf("From %d To %d; Expected first to be %d but got %d", from, to, expectResFrom, tsSlice[0])
 			}
-			if ts[len(ts)-1] != expectResTo {
-				t.Fatalf("From %d To %d; Expected last to be %d but got %d", from, to, expectResTo, ts[len(ts)-1])
+			if tsSlice[len(tsSlice)-1] != expectResTo {
+				t.Fatalf("From %d To %d; Expected last to be %d but got %d", from, to, expectResTo, tsSlice[len(tsSlice)-1])
 			}
 		}
 	}
