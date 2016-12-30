@@ -87,7 +87,6 @@ func (g *Graphite) reporter(interval int) {
 // writer connects to graphite and submits all pending data to it
 // TODO: conn.Write() returns no error for a while when the remote endpoint is down, the reconnect happens with a delay. this can also cause lost data for a second or two.
 func (g *Graphite) writer() {
-	connectTicker := time.Tick(time.Second)
 	var conn net.Conn
 	var err error
 
@@ -106,25 +105,20 @@ func (g *Graphite) writer() {
 		return conn
 	}
 
-	for {
-		select {
-		case <-connectTicker:
+	for buf := range g.toGraphite {
+		queueItems.Value(len(g.toGraphite))
+		var ok bool
+		for !ok {
 			conn = assureConn()
-		case buf := <-g.toGraphite:
-			queueItems.Value(len(g.toGraphite))
-			var ok bool
-			for !ok {
-				conn = assureConn()
-				pre := time.Now()
-				_, err = conn.Write(buf)
-				if err == nil {
-					ok = true
-					flushDuration.Value(time.Since(pre))
-				} else {
-					log.Warn("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
-					conn.Close()
-					conn = nil
-				}
+			pre := time.Now()
+			_, err = conn.Write(buf)
+			if err == nil {
+				ok = true
+				flushDuration.Value(time.Since(pre))
+			} else {
+				log.Warn("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
+				conn.Close()
+				conn = nil
 			}
 		}
 	}

@@ -62,8 +62,7 @@ func (m *Meter32) ValueUint32(val uint32) {
 	if val > m.max {
 		m.max = val
 	}
-	c := m.hist[bin] + 1
-	m.hist[bin] = c
+	m.hist[bin]++
 	m.count += 1
 	m.Unlock()
 }
