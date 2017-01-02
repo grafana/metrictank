@@ -496,7 +496,7 @@ func TestFix(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		got := fix(c.in, c.from, c.to, c.interval)
+		got := Fix(c.in, c.from, c.to, c.interval)
 
 		if len(c.out) != len(got) {
 			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.out, got)
@@ -1252,7 +1252,7 @@ func BenchmarkFix1M(b *testing.B) {
 		in := randFloats()
 		l = len(in)
 		b.StartTimer()
-		out := fix(in, 0, 1000001, 1)
+		out := Fix(in, 0, 1000001, 1)
 		dummy = out
 	}
 	b.SetBytes(int64(l * 12))
