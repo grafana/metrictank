@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/iter"
@@ -99,10 +98,8 @@ func assert(interval uint32, epoch int, aggmetrics *FakeAggMetrics, org int, met
 func DisabledTestUsageBasic(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	interval := uint32(60)
 	u := New(interval, aggmetrics, metricIndex, mock)
 
@@ -138,10 +135,8 @@ func DisabledTestUsageBasic(t *testing.T) {
 func DisabledTestUsageMinusOne(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	interval := uint32(60)
 	u := New(interval, aggmetrics, metricIndex, mock)
 
@@ -171,10 +166,8 @@ func DisabledTestUsageMinusOne(t *testing.T) {
 func DisabledTestUsageWrap32(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	mdata.InitMetrics(stats)
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	interval := uint32(60)
 	u := New(interval, aggmetrics, metricIndex, mock)
 

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
@@ -37,11 +37,15 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
 const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
-	idxCasOk             met.Count // metric idx.cassadra.ok is how many metrics are successfully being indexed
-	idxCasFail           met.Count // metric idx.cassandra.fail is how failures encountered while trying to index metrics
-	idxCasAddDuration    met.Timer
-	idxCasDeleteDuration met.Timer
-	metrics              cassandra.Metrics
+	// metric idx.cassadra.add.ok is how many metrics are successfully being indexed
+	idxCasOk = stats.NewCounter32("idx.cassandra.add.ok")
+	// metric idx.cassandra.add.fail is how many failures were encountered while trying to index metrics
+	idxCasFail = stats.NewCounter32("idx.cassandra.add.fail")
+	// metric idx.cassandra.add is the duration of addititons to the cassandra idx
+	idxCasAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	// metric idx.cassandra.delete is the duration of deletions from the cassandra idx
+	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
+	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")
 
 	Enabled          bool
 	ssl              bool
@@ -173,17 +177,11 @@ func (c *CasIdx) InitBare() error {
 
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
-func (c *CasIdx) Init(stats met.Backend) error {
+func (c *CasIdx) Init() error {
 	log.Info("initializing cassandra-idx. Hosts=%s", hosts)
-	if err := c.MemoryIdx.Init(stats); err != nil {
+	if err := c.MemoryIdx.Init(); err != nil {
 		return err
 	}
-
-	idxCasOk = stats.NewCount("idx.cassandra.ok")
-	idxCasFail = stats.NewCount("idx.cassandra.fail")
-	idxCasAddDuration = stats.NewTimer("idx.cassandra.add_duration", 0)
-	idxCasDeleteDuration = stats.NewTimer("idx.cassandra.delete_duration", 0)
-	metrics = cassandra.NewMetrics("idx.cassandra", stats)
 
 	if err := c.InitBare(); err != nil {
 		return err
@@ -322,8 +320,8 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Tags,
 				req.def.LastUpdate).Exec(); err != nil {
 
-				idxCasFail.Inc(1)
-				metrics.Inc(err)
+				idxCasFail.Inc()
+				errmetrics.Inc(err)
 				if (attempts % 20) == 0 {
 					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
 				}
@@ -336,7 +334,7 @@ func (c *CasIdx) processWriteQueue() {
 			} else {
 				success = true
 				idxCasAddDuration.Value(time.Since(req.recvTime))
-				idxCasOk.Inc(1)
+				idxCasOk.Inc()
 				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
 			}
 		}
@@ -357,7 +355,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 			attempts++
 			cErr := c.session.Query("DELETE FROM metric_idx where id=?", def.Id).Exec()
 			if cErr != nil {
-				metrics.Inc(err)
+				errmetrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 				time.Sleep(time.Second)
 			} else {
@@ -380,7 +378,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 			attempts++
 			cErr := c.session.Query("DELETE FROM metric_idx where id=?", def.Id).Exec()
 			if cErr != nil {
-				metrics.Inc(err)
+				errmetrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 				time.Sleep(time.Second)
 			} else {

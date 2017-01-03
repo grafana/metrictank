@@ -97,13 +97,12 @@ Note: it also works with `proxy` mode but then you have to enter `http://graphit
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
-* `stats`: these are metrics coming from metrictank and graphite-api.  
-  i.e. they send their own instrumentation into statsd (statsdaemon actually is the version we use here),  
-  and statsdaemon sends aggregated metrics into metrictank's carbon port.  Statsdaemon flushes every second.
 * `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* `metrictank`: usage metrics reported by metrictank.  See
+* `metrictank.stats`: internal stats reported by metrictank
+* `metrictank.usage`: usage metrics reported by metrictank.  See
 [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
 It may take a few minutes for the usage metrics to show up.
+* `stats`: these are metrics coming from graphite-api, aggregated by statsdaemon and sent back to metrictank every second.
 
 
 Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,
@@ -130,7 +129,7 @@ There is an extensive [dashboard on grafana.net](https://grafana.net/dashboards/
 So go to the dashboard dropdown -> import -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
 It will show a dialog with a choice of which graphite datasource to use, for which you can enter `metrictank`.
 
-You should now have a functioning dashboard showing all metrictank's internal metrics, which it reports via statsdaemon, back into itself.
+You should now have a functioning dashboard showing all metrictank's internal metrics which it reports into itself.
 
 Another dashboard you can import for instant gratification is the [statsdaemon](https://grafana.net/dashboards/297) dashboard, which shows you
 metrics about the metrics.  Very meta.

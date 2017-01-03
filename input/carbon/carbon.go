@@ -11,7 +11,6 @@ import (
 
 	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/input"
@@ -27,7 +26,6 @@ type Carbon struct {
 	addrStr          string
 	addr             *net.TCPAddr
 	schemas          persister.WhisperSchemas
-	stats            met.Backend
 	listener         *net.TCPListener
 	handlerWaitGroup sync.WaitGroup
 	quit             chan struct{}
@@ -110,7 +108,7 @@ func ConfigProcess() {
 	cluster.ThisNode.SetPartitions([]int32{int32(partitionId)})
 }
 
-func New(stats met.Backend) *Carbon {
+func New() *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		log.Fatal(4, "carbon-in: %s", err.Error())
@@ -119,20 +117,21 @@ func New(stats met.Backend) *Carbon {
 		addrStr:   addr,
 		addr:      addrT,
 		schemas:   schemas,
-		stats:     stats,
-		quit:      make(chan struct{}),
 		connTrack: NewConnTrack(),
 	}
 }
 
 func (c *Carbon) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	c.Input = input.New(metrics, metricIndex, usg, "carbon", c.stats)
+	if c.Input.MsgsAge == nil {
+		c.Input = input.New(metrics, metricIndex, usg, "carbon")
+	}
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
 		log.Fatal(4, "carbon-in: %s", err.Error())
 	}
 	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
+	c.quit = make(chan struct{})
 	go c.accept()
 }
 
@@ -189,7 +188,7 @@ func (c *Carbon) handle(conn net.Conn) {
 
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.Medium)
 		if err != nil {
-			c.Input.MetricsDecodeErr.Inc(1)
+			c.Input.MetricsDecodeErr.Inc()
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
@@ -211,7 +210,7 @@ func (c *Carbon) handle(conn net.Conn) {
 			OrgId:    1, // admin org
 		}
 		md.SetId()
-		c.Input.MetricsPerMessage.Value(int64(1))
+		c.Input.MetricsPerMessage.ValueUint32(1)
 		c.Input.Process(md, int32(partitionId))
 	}
 	c.handlerWaitGroup.Done()

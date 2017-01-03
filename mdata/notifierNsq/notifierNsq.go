@@ -8,9 +8,9 @@ import (
 
 	"github.com/bitly/go-hostpool"
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/misc/instrumented_nsq"
+	"github.com/raintank/metrictank/mdata/notifierNsq/instrumented_nsq"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -26,9 +26,11 @@ type NotifierNSQ struct {
 	mdata.Notifier
 }
 
-func New(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ {
-	messagesPublished = stats.NewCount("notifier.nsq.messages-published")
-	messagesSize = stats.NewMeter("notifier.nsq.message_size", 0)
+func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
+	// metric cluster.notifier.nsq.messages-published is a counter of messages published to the nsq cluster notifier
+	messagesPublished = stats.NewCounter32("cluster.notifier.nsq.messages-published")
+	// metric cluster.notifier.nsq.message_size is the sizes seen of messages through the nsq cluster notifier
+	messagesSize = stats.NewMeter32("cluster.notifier.nsq.message_size", false)
 	// producers
 	hostPool = hostpool.NewEpsilonGreedy(nsqdAdds, 0, &hostpool.LinearEpsilonValueCalculator{})
 	producers = make(map[string]*nsq.Producer)
@@ -42,7 +44,7 @@ func New(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierNSQ
 	}
 
 	// consumers
-	consumer, err := insq.NewConsumer(topic, channel, cCfg, "metric_persist.%s", stats)
+	consumer, err := insq.NewConsumer(topic, channel, cCfg, "cluster.notifier.nsq.metric_persist.%s")
 	if err != nil {
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
@@ -114,7 +116,7 @@ func (c *NotifierNSQ) flush() {
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		buf.Write(data)
-		messagesSize.Value(int64(buf.Len()))
+		messagesSize.Value(buf.Len())
 
 		sent := false
 		for !sent {
@@ -134,6 +136,6 @@ func (c *NotifierNSQ) flush() {
 			}
 			time.Sleep(time.Second)
 		}
-		messagesPublished.Inc(1)
+		messagesPublished.Inc()
 	}()
 }

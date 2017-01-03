@@ -9,7 +9,7 @@ We'll go over these in more detail below.
 * Our [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
   and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
   We're working toward simplifying this much more.
-* Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation
+* Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite-api.
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
   [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
 * (you can optionally use Elasticsearch for persistence of metrics metadata.  We recommend Cassandra instead, much better and easier. So that's what we'll use here)
@@ -154,23 +154,16 @@ The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
 
 ## Set up statsd
 
-While optional, we highly recommend installing statsd or a statsd-compatible agent for instrumentation, so you can get insights into what's going on.
-To disable, you will have to set `statsd-enabled` to false in `/etc/raintank/metrictank.ini`.
-Metrictank will refuse to start if `statsd-enabled` is true and nothing listens on the configured `statsd-addr`.
+You can optionally statsd or a statsd-compatible agent for instrumentation of graphite-api.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
 or an alternative. We recommend [raintank/statsdaemon](https://github.com/raintank/statsdaemon).
-
-For the [metrictank dashboard](https://grafana.net/dashboards/279) to work properly, you need the right statsd/statsdaemon settings.
 
 Below are instructions for statsd and statsdaemon.
 
 Note:
  * `<environment>` is however you choose to call your environment. (test, production, dev, ...).
- * we recommend installing statsd/statsdaemon on the same host as metrictank.
- * Note, statsd/statsdaemon will write to metrictank's carbon port on localhost:2003, while metrictank will send its own performance metrics to statsd/statsdaemon on localhost:8125.
-   This is a circular dependency, we typically just bring up statsdaemon first, and metrictank a bit later.  This means you will see some "unable to flush" errors from statsdaemon
-   or statsd during the timeframe where metrictank is not up yet.
+ * Note, statsd/statsdaemon will write to metrictank's carbon port on localhost:2003.
 
 ### Statsdaemon
 

@@ -19,8 +19,6 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/benbjohnson/clock"
 	"github.com/raintank/dur"
-	"github.com/raintank/met"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
@@ -34,6 +32,8 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
+	"github.com/raintank/metrictank/stats"
+	statsConfig "github.com/raintank/metrictank/stats/config"
 	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -93,45 +93,10 @@ var (
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
-	statsdEnabled = flag.Bool("statsd-enabled", true, "enable sending statsd messages for instrumentation")
-	statsdAddr    = flag.String("statsd-addr", "localhost:8125", "statsd address")
-	statsdType    = flag.String("statsd-type", "standard", "statsd type: standard or datadog")
-
 	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
-
-	cassWriteQueueSize    met.Gauge
-	cassWriters           met.Gauge
-	getTargetDuration     met.Timer
-	itersToPointsDuration met.Timer
-	messagesSize          met.Meter
-	inItems               met.Meter
-	points                met.Gauge
-
-	// metric bytes_alloc.not_freed is a gauge of currently allocated (within the runtime) memory.
-	// it does not include freed data so it drops at every GC run.
-	alloc met.Gauge
-	// metric bytes_alloc.incl_freed is a counter of total amount of bytes allocated during process lifetime. (incl freed data)
-	totalAlloc met.Gauge
-	// metric bytes_sys is the amount of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
-	sysBytes       met.Gauge
-	clusterPrimary met.Gauge
-
-	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
-	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
-	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
-	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
-	clusterPromoWait met.Gauge
-	gcNum            met.Gauge // go GC
-	gcDur            met.Gauge // go GC
-	gcCpuFraction    met.Gauge // go GC
-
-	// metric gc.heap_objects is how many objects are allocated on the heap, it's a key indicator for GC workload
-	heapObjects met.Gauge
-
-	promotionReadyAtChan chan uint32
 )
 
 func init() {
@@ -184,6 +149,9 @@ func main() {
 	// load config for cluster
 	cluster.ConfigSetup()
 
+	// stats
+	statsConfig.ConfigSetup()
+
 	conf.ParseAll()
 
 	/***********************************
@@ -234,6 +202,7 @@ func main() {
 	notifierKafka.ConfigProcess(*instance)
 	api.ConfigProcess()
 	cluster.ConfigProcess()
+	statsConfig.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -241,8 +210,6 @@ func main() {
 
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
-
-	promotionReadyAtChan = make(chan uint32)
 
 	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
 	numChunks := uint32(*numChunksInt)
@@ -318,16 +285,9 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	/***********************************
-		configure StatsD
+		collect stats
 	***********************************/
-	if !*statsdEnabled {
-		log.Warn("running metrictank without statsd instrumentation.")
-	}
-	stats, err := helper.New(*statsdEnabled, *statsdAddr, *statsdType, "metrictank", *instance)
-	if err != nil {
-		log.Fatal(4, "failed to initialize statsd. %s", err)
-	}
-	initMetrics(stats)
+	statsConfig.Start()
 
 	/*************************************
 	  Start polling our Cluster Peers
@@ -337,17 +297,15 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
-	store.InitMetrics(stats)
 
 	/***********************************
 		Initialize our MemoryStore
 	***********************************/
 	metrics = mdata.NewAggMetrics(store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
-	mdata.InitMetrics(stats)
 
 	/***********************************
 		Initialize our Inputs
@@ -355,12 +313,12 @@ func main() {
 	inputs := make([]input.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
-		inputs = append(inputs, inCarbon.New(stats))
+		inputs = append(inputs, inCarbon.New())
 	}
 
 	if inKafkaMdm.Enabled {
 		sarama.Logger = l.New(os.Stdout, "[Sarama] ", l.LstdFlags)
-		inputs = append(inputs, inKafkaMdm.New(stats))
+		inputs = append(inputs, inKafkaMdm.New())
 	}
 
 	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
@@ -372,14 +330,14 @@ func main() {
 	***********************************/
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
-		handlers = append(handlers, notifierKafka.New(*instance, metrics, stats))
+		handlers = append(handlers, notifierKafka.New(*instance, metrics))
 	}
 
 	if notifierNsq.Enabled {
-		handlers = append(handlers, notifierNsq.New(*instance, metrics, stats))
+		handlers = append(handlers, notifierNsq.New(*instance, metrics))
 	}
 
-	mdata.InitPersistNotifier(stats, handlers...)
+	mdata.InitPersistNotifier(handlers...)
 
 	/***********************************
 		Initialize our MetricIdx
@@ -409,7 +367,7 @@ func main() {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
 
-	err = metricIndex.Init(stats)
+	err = metricIndex.Init()
 	if err != nil {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
 	}
@@ -427,12 +385,16 @@ func main() {
 		plugin.Start(metrics, metricIndex, usg)
 	}
 
-	promotionReadyAtChan <- (uint32(time.Now().Unix())/highestChunkSpan + 1) * highestChunkSpan
+	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
+	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
+	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
+	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+	stats.NewTimeDiffReporter32("cluster.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
 
 	/***********************************
 		Initialize our API server
 	***********************************/
-	apiServer, err := api.NewServer(stats)
+	apiServer, err := api.NewServer()
 	if err != nil {
 		log.Fatal(4, "Failed to start API. %s", err.Error())
 	}
@@ -493,66 +455,4 @@ func main() {
 	log.Info("terminating.")
 	log.Close()
 
-}
-
-func initMetrics(stats met.Backend) {
-	cassWriteQueueSize = stats.NewGauge("cassandra.write_queue.size", int64(*cassandraWriteQueueSize))
-	cassWriters = stats.NewGauge("cassandra.num_writers", int64(*cassandraWriteConcurrency))
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	messagesSize = stats.NewMeter("message_size", 0)
-	inItems = stats.NewMeter("in.items", 0)
-	points = stats.NewGauge("total_points", 0)
-	alloc = stats.NewGauge("bytes_alloc.not_freed", 0)
-	totalAlloc = stats.NewGauge("bytes_alloc.incl_freed", 0)
-	sysBytes = stats.NewGauge("bytes_sys", 0)
-	clusterPrimary = stats.NewGauge("cluster.primary", 0)
-	clusterPromoWait = stats.NewGauge("cluster.promotion_wait", 1)
-	gcNum = stats.NewGauge("gc.num", 0)
-	gcDur = stats.NewGauge("gc.dur", 0)                 // in nanoseconds. last known duration.
-	gcCpuFraction = stats.NewGauge("gc.cpufraction", 0) // reported as pro-mille
-	heapObjects = stats.NewGauge("gc.heap_objects", 0)
-
-	// run a collector for some global stats
-	go func() {
-		var m runtime.MemStats
-		var promotionReadyAtTs uint32
-
-		ticker := time.Tick(time.Duration(1) * time.Second)
-		for {
-			select {
-			case now := <-ticker:
-				points.Value(int64(chunk.TotalPoints()))
-				runtime.ReadMemStats(&m)
-				alloc.Value(int64(m.Alloc))
-				totalAlloc.Value(int64(m.TotalAlloc))
-				sysBytes.Value(int64(m.Sys))
-				gcNum.Value(int64(m.NumGC))
-				gcDur.Value(int64(m.PauseNs[(m.NumGC+255)%256]))
-				gcCpuFraction.Value(int64(1000 * m.GCCPUFraction))
-				heapObjects.Value(int64(m.HeapObjects))
-				var px int64
-				if cluster.ThisNode.IsPrimary() {
-					px = 1
-				} else {
-					px = 0
-				}
-				clusterPrimary.Value(px)
-				cassWriters.Value(int64(*cassandraWriteConcurrency))
-				cassWriteQueueSize.Value(int64(*cassandraWriteQueueSize))
-				unix := uint32(now.Unix())
-				if unix >= promotionReadyAtTs {
-					if promotionReadyAtTs == 0 {
-						// not set yet. operator should hold off
-						clusterPromoWait.Value(1)
-					} else {
-						clusterPromoWait.Value(0)
-					}
-				} else {
-					clusterPromoWait.Value(int64(promotionReadyAtTs - unix))
-				}
-			case promotionReadyAtTs = <-promotionReadyAtChan:
-			}
-		}
-	}()
 }
