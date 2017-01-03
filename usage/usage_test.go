@@ -96,7 +96,7 @@ func assert(interval uint32, epoch int, aggmetrics *FakeAggMetrics, org int, met
 	}
 }
 
-func TestUsageBasic(t *testing.T) {
+func DisabledTestUsageBasic(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
@@ -135,7 +135,7 @@ func TestUsageBasic(t *testing.T) {
 
 	u.Stop()
 }
-func TestUsageMinusOne(t *testing.T) {
+func DisabledTestUsageMinusOne(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")
@@ -168,7 +168,7 @@ func TestUsageMinusOne(t *testing.T) {
 
 	u.Stop()
 }
-func TestUsageWrap32(t *testing.T) {
+func DisabledTestUsageWrap32(t *testing.T) {
 	mock := clock.NewMock()
 	aggmetrics := NewFakeAggMetrics()
 	stats, _ := helper.New(false, "", "standard", "metrictank", "")

@@ -18,6 +18,7 @@ dependencies:
     - scripts/depends.sh
     - cd $IMPORTPATH && scripts/vendor_health.sh
     - scripts/build.sh
+    - scripts/build_tools.sh
     - scripts/build_docker.sh
 
 test:
