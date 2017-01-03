@@ -10,7 +10,6 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/lomik/go-carbon/persister"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
@@ -19,13 +18,11 @@ import (
 )
 
 func Test_HandleMessage(t *testing.T) {
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
 	cluster.Init("default", "test", time.Now())
-	mdata.InitMetrics(stats)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
-	metricIndex.Init(stats)
+	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
 	Enabled = true
 	addr = "localhost:2003"
@@ -41,7 +38,7 @@ func Test_HandleMessage(t *testing.T) {
 	}
 
 	schemas = persister.WhisperSchemas{s}
-	c := New(stats)
+	c := New()
 	c.Start(aggmetrics, metricIndex, usage)
 
 	allMetrics := make(map[string]int)

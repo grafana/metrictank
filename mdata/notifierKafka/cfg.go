@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/raintank/met"
+	"github.com/raintank/metrictank/stats"
 	"github.com/rakyll/globalconf"
 )
 
@@ -21,8 +21,8 @@ var config *sarama.Config
 var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
 
-var messagesPublished met.Count
-var messagesSize met.Meter
+var messagesPublished *stats.Counter32
+var messagesSize *stats.Meter32
 
 func ConfigSetup() {
 	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)

@@ -3,7 +3,6 @@ package mdata
 import (
 	"encoding/json"
 
-	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -42,7 +41,7 @@ func SendPersistMessage(key string, t0 uint32) {
 	}
 }
 
-func InitPersistNotifier(stats met.Backend, handlers ...NotifierHandler) {
+func InitPersistNotifier(handlers ...NotifierHandler) {
 	notifierHandlers = handlers
 }
 

@@ -9,9 +9,9 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/macaron.v1"
 )
@@ -19,13 +19,20 @@ import (
 var LogLevel int
 
 var (
-	getTargetDuration     met.Timer
-	itersToPointsDuration met.Timer
-	// just 1 global timer of request handling time. includes mem/cassandra gets, chunk decode/iters, json building etc
-	// there is such a thing as too many metrics.  we have this, and cassandra timings, that should be enough for realtime profiling
-	reqHandleDuration met.Timer
-	reqSpanBoth       met.Meter
-	reqSpanMem        met.Meter
+	// metric api.get_target is how long it takes to get a target
+	getTargetDuration = stats.NewLatencyHistogram15s32("api.get_target")
+
+	// metric api.iters_to_points is how long it takes to decode points from a chunk iterator
+	itersToPointsDuration = stats.NewLatencyHistogram15s32("api.iters_to_points")
+
+	// metric api.request_handle is how long it takes to handle a render request
+	reqHandleDuration = stats.NewLatencyHistogram15s32("api.request_handle")
+
+	// metric api.requests_span.mem_and_cassandra is the timerange of requests hitting both in-memory and cassandra
+	reqSpanBoth = stats.NewMeter32("api.requests_span.mem_and_cassandra", false)
+
+	// metric api.requests_span.mem is the timerange of requests hitting only the ringbuffer
+	reqSpanMem = stats.NewMeter32("api.requests_span.mem", false)
 )
 
 type Server struct {
@@ -50,13 +57,7 @@ func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
 }
 
-func NewServer(stats met.Backend) (*Server, error) {
-
-	reqSpanMem = stats.NewMeter("requests_span.mem", 0)
-	reqSpanBoth = stats.NewMeter("requests_span.mem_and_cassandra", 0)
-	getTargetDuration = stats.NewTimer("get_target_duration", 0)
-	itersToPointsDuration = stats.NewTimer("iters_to_points_duration", 0)
-	reqHandleDuration = stats.NewTimer("request_handle_duration", 0)
+func NewServer() (*Server, error) {
 
 	m := macaron.New()
 	m.Use(macaron.Logger())

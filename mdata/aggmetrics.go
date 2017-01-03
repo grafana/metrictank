@@ -19,7 +19,6 @@ type AggMetrics struct {
 	metricMaxStale uint32
 	ttl            uint32
 	gcInterval     time.Duration
-	tickStats      *time.Ticker
 }
 
 func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
@@ -33,10 +32,8 @@ func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxSt
 		metricMaxStale: metricMaxStale,
 		ttl:            ttl,
 		gcInterval:     gcInterval,
-		tickStats:      time.NewTicker(time.Duration(1) * time.Second),
 	}
 
-	go ms.stats()
 	// gcInterval = 0 can be useful in tests
 	if gcInterval > 0 {
 		go ms.GC()
@@ -68,7 +65,7 @@ func (ms *AggMetrics) GC() {
 		}
 		ms.RUnlock()
 		for _, key := range keys {
-			gcMetric.Inc(1)
+			gcMetric.Inc()
 			ms.RLock()
 			a := ms.Metrics[key]
 			ms.RUnlock()
@@ -76,18 +73,11 @@ func (ms *AggMetrics) GC() {
 				log.Info("metric %s is stale. Purging data from memory.", key)
 				ms.Lock()
 				delete(ms.Metrics, key)
+				metricsActive.Set(len(ms.Metrics))
 				ms.Unlock()
 			}
 		}
 
-	}
-}
-
-func (ms *AggMetrics) stats() {
-	for range ms.tickStats.C {
-		ms.RLock()
-		metricsActive.Value(int64(len(ms.Metrics)))
-		ms.RUnlock()
 	}
 }
 
@@ -98,19 +88,13 @@ func (ms *AggMetrics) Get(key string) (Metric, bool) {
 	return m, ok
 }
 
-// closes the stats reporting. Not the GC.
-// this is meant to be used by unit tests, which don't even start the GC
-// we can adjust this later as needed
-func (ms *AggMetrics) Stop() {
-	ms.tickStats.Stop()
-}
-
 func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
 		m = NewAggMetric(ms.store, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
 		ms.Metrics[key] = m
+		metricsActive.Set(len(ms.Metrics))
 	}
 	ms.Unlock()
 	return m

@@ -11,7 +11,6 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/input"
@@ -25,7 +24,6 @@ type KafkaMdm struct {
 	input.Input
 	consumer sarama.Consumer
 	client   sarama.Client
-	stats    met.Backend
 
 	wg sync.WaitGroup
 
@@ -186,7 +184,7 @@ Iter:
 	return diff
 }
 
-func New(stats met.Backend) *KafkaMdm {
+func New() *KafkaMdm {
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm failed to create client. %s", err)
@@ -199,7 +197,6 @@ func New(stats met.Backend) *KafkaMdm {
 	k := KafkaMdm{
 		consumer:      consumer,
 		client:        client,
-		stats:         stats,
 		stopConsuming: make(chan struct{}),
 	}
 
@@ -207,7 +204,7 @@ func New(stats met.Backend) *KafkaMdm {
 }
 
 func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm", k.stats)
+	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm")
 	var err error
 	for _, topic := range topics {
 		for _, partition := range partitions {
@@ -270,11 +267,11 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
-		k.Input.MetricsDecodeErr.Inc(1)
+		k.Input.MetricsDecodeErr.Inc()
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
-	k.Input.MetricsPerMessage.Value(int64(1))
+	k.Input.MetricsPerMessage.ValueUint32(1)
 	k.Input.Process(&md, partition)
 }
 

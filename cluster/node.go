@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
+
+var clusterPrimary = stats.NewBool("cluster.primary")
 
 //go:generate stringer -type=NodeState
 type NodeState int
@@ -125,11 +128,14 @@ func (n *Node) SetReadyIn(t time.Duration) {
 	}()
 }
 
+// SetPrimary sets the primary status.
+// Note: since we set the primary metric here, this should only be called on ThisNode !
 func (n *Node) SetPrimary(p bool) {
 	n.Lock()
 	n.primary = p
 	n.primaryChange = time.Now()
 	n.Unlock()
+	clusterPrimary.Set(p)
 }
 
 func (n *Node) SetState(s NodeState) {

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
@@ -59,8 +58,7 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 
 func TestGetAddKey(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
@@ -99,8 +97,7 @@ func TestGetAddKey(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
 		s.Time = 10 * 86400
 		ix.Add(s, 1)
@@ -223,8 +220,7 @@ func TestFind(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
@@ -285,8 +281,7 @@ func TestDelete(t *testing.T) {
 
 func TestBadAdd(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	first := &schema.MetricData{
 		Name:     "foo.bar",
@@ -340,8 +335,7 @@ func TestBadAdd(t *testing.T) {
 // verify that if a leaf blocks a new branch, we can add the branch after deleting the leaf
 func TestDeleteLeafAddBranch(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	first := &schema.MetricData{
 		Name:     "foo.bar",
@@ -412,8 +406,7 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 
 func TestPrune(t *testing.T) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	// add old series
 	for _, s := range getSeriesNames(2, 5, "metric.bah") {
@@ -477,8 +470,7 @@ func TestPrune(t *testing.T) {
 
 func BenchmarkIndexing(b *testing.B) {
 	ix := New()
-	stats, _ := helper.New(false, "", "standard", "metrictank", "")
-	ix.Init(stats)
+	ix.Init()
 
 	var series string
 	var data *schema.MetricData

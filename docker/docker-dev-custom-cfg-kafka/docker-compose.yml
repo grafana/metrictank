@@ -1,0 +1,64 @@
+version: '2'
+
+services:
+  metrictank:
+    hostname: metrictank
+    image: raintank/metrictank
+    ports:
+     - "6060:6060"
+     - "2003:2003"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/raintank/metrictank.ini
+    environment:
+     WAIT_HOSTS: cassandra:9042,kafka:9092
+     WAIT_TIMEOUT: 60
+    links:
+     - cassandra
+
+  kafka:
+    hostname: kafka
+    image: raintank/kafka
+    environment:
+      ADVERTISED_HOST: kafka
+      NUM_PARTITIONS: 8
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "9999:9999"
+    volumes:
+      - /tmp/kafka-logs
+
+  cassandra:
+    hostname: cassandra
+    image: cassandra:3.0.8
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    ports:
+     - "9042:9042"
+
+  graphite-api:
+    hostname: graphite-api
+    image: raintank/graphite-metrictank
+    ports:
+     - "8080:8080"
+    links:
+     - metrictank
+     - statsdaemon
+    volumes:
+     - "../graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+  statsdaemon:
+    hostname: statsdaemon
+    image: raintank/statsdaemon
+    ports:
+     - "8125:8125/udp"
+    volumes:
+     - "../statsdaemon.ini:/etc/statsdaemon.ini"

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/raintank/met"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -29,9 +29,11 @@ type NotifierKafka struct {
 	mdata.Notifier
 }
 
-func New(instance string, metrics mdata.Metrics, stats met.Backend) *NotifierKafka {
-	messagesPublished = stats.NewCount("notifier.kafka.messages-published")
-	messagesSize = stats.NewMeter("notifier.kafka.message_size", 0)
+func New(instance string, metrics mdata.Metrics) *NotifierKafka {
+	// metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
+	messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
+	// metric cluster.notifier.kafka.message_size is the sizes seen of messages through the kafka cluster notifier
+	messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", false)
 
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
@@ -187,7 +189,7 @@ func (c *NotifierKafka) flush() {
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		buf.Write(data)
-		messagesSize.Value(int64(buf.Len()))
+		messagesSize.Value(buf.Len())
 		payload := &sarama.ProducerMessage{
 			Topic: topic,
 			Value: sarama.ByteEncoder(buf.Bytes()),
@@ -204,6 +206,6 @@ func (c *NotifierKafka) flush() {
 			}
 			time.Sleep(time.Second)
 		}
-		messagesPublished.Inc(1)
+		messagesPublished.Inc()
 	}()
 }

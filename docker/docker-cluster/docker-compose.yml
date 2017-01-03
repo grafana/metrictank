@@ -20,7 +20,6 @@ services:
       MT_CLUSTER_PRIMARY_NODE: "true"
     links:
      - cassandra
-     - statsdaemon
 
   metrictank1:
     hostname: metrictank1
@@ -40,7 +39,6 @@ services:
       MT_CLUSTER_PEERS: metrictank0:6060,metrictank2:6060,metrictank3:6060
     links:
      - cassandra
-     - statsdaemon
      - metrictank0
 
   metrictank2:
@@ -62,7 +60,6 @@ services:
       MT_CLUSTER_PRIMARY_NODE: "true"
     links:
      - cassandra
-     - statsdaemon
      - metrictank0
 
   metrictank3:
@@ -83,7 +80,6 @@ services:
       MT_CLUSTER_PEERS: metrictank0:6060,metrictank1:6060,metrictank2:6060
     links:
      - cassandra
-     - statsdaemon
      - metrictank0
 
   cassandra:

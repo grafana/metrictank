@@ -2,13 +2,14 @@ package chunk
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/dgryski/go-tsz"
+	"github.com/raintank/metrictank/stats"
 )
 
-var totalPoints uint64
+// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
+var totalPoints = stats.NewGauge64("tank.total_points")
 
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
@@ -38,13 +39,10 @@ func (c *Chunk) Push(t uint32, v float64) error {
 	c.NumPoints += 1
 	c.LastTs = t
 	c.LastWrite = uint32(time.Now().Unix())
-	atomic.AddUint64(&totalPoints, 1)
+	totalPoints.Inc()
 	return nil
 }
-func (c *Chunk) Clear() {
-	atomic.AddUint64(&totalPoints, ^uint64(c.NumPoints-1))
-}
 
-func TotalPoints() uint64 {
-	return atomic.LoadUint64(&totalPoints)
+func (c *Chunk) Clear() {
+	totalPoints.DecUint64(uint64(c.NumPoints))
 }

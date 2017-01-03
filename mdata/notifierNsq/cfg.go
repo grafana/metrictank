@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/met"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/misc/app"
 	"github.com/rakyll/globalconf"
 )
@@ -30,8 +30,8 @@ var (
 	consumerOpts      string
 	pCfg              *nsq.Config
 	cCfg              *nsq.Config
-	messagesPublished met.Count
-	messagesSize      met.Meter
+	messagesPublished *stats.Counter32
+	messagesSize      *stats.Meter32
 )
 
 func ConfigSetup() {

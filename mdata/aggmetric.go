@@ -419,7 +419,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	t0 := ts - (ts % a.ChunkSpan)
 
 	if len(a.Chunks) == 0 {
-		chunkCreate.Inc(1)
+		chunkCreate.Inc()
 		// no data has been added to this metric at all.
 		a.Chunks = append(a.Chunks, chunk.New(t0))
 
@@ -443,7 +443,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		if currentChunk.Saving {
 			// if we're already saving the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
-			addToSavingChunk.Inc(1)
+			addToSavingChunk.Inc()
 			return
 		}
 
@@ -453,17 +453,17 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 				// typically this happens when non-primaries receive metrics that the primary already saved (maybe cause their metrics consumer is laggy)
 				// we allow adding data to such chunks in that case, though this open the possibility for data to be rejected by the primary, to be
 				// visible on secondaries.
-				addToSavedChunk.Inc(1)
+				addToSavedChunk.Inc()
 			}
 		} else {
 			log.Debug("AM failed to add metric to chunk for %s. %s", a.Key, err)
-			metricsTooOld.Inc(1)
+			metricsTooOld.Inc()
 			return
 		}
 		log.Debug("AM %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
 		log.Debug("AM Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
-		metricsTooOld.Inc(1)
+		metricsTooOld.Inc()
 		return
 	} else {
 		// persist the chunk. If the writeQueue is full, then this will block.
@@ -474,7 +474,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			a.CurrentChunkPos = 0
 		}
 
-		chunkCreate.Inc(1)
+		chunkCreate.Inc()
 		if len(a.Chunks) < int(a.NumChunks) {
 			a.Chunks = append(a.Chunks, chunk.New(t0))
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
@@ -482,7 +482,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			}
 			log.Debug("AM %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
 		} else {
-			chunkClear.Inc(1)
+			chunkClear.Inc()
 			a.Chunks[a.CurrentChunkPos].Clear()
 			a.Chunks[a.CurrentChunkPos] = chunk.New(t0)
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {

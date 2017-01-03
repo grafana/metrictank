@@ -100,10 +100,11 @@
               "color": "#890F02"
             },
             {
-              "alias": "/backpressure/",
-              "fill": 4,
+              "alias": "/pressure\\./",
+              "fill": 0,
               "lines": true,
-              "nullPointMode": "null",
+              "linewidth": 1,
+              "nullPointMode": "connected",
               "points": false,
               "yaxis": 2
             }
@@ -114,88 +115,32 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metrics_received, '.*\\.([^\\.]+)\\.metrics_received', '\\1 in')",
+              "target": "aliasSub(perSecond(metrictank.stats.$environment.$instance.input.*.metrics_received.counter32), '.*\\.([^\\.]+)\\.metrics_received.*', '\\1 in')",
               "textEditor": false
             },
             {
-              "hide": true,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.primary, 'primary')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32), 'too old')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$instance.metrics_too_old, 'too old')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.add_to_saved_chunk.counter32), 'add-to-saved')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$instance.add_to_saved_chunk, 'add-to-saved')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.add_to_saving_chunk.counter32), 'add-to-saving')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.metrictank.$instance.add_to_saving_chunk, 'add-to-saving')"
+              "target": "aliasSub(perSecond(metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32), '.*\\.([^\\.]+)\\.metrics_decode_err.*', '\\1 decode err')"
             },
             {
               "refId": "F",
-              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metrics_decode_err, '.*\\.([^\\.]+)\\.metrics_decode_err', '\\1 decode err')",
-              "textEditor": false
+              "target": "aliasSub(perSecond(metrictank.stats.$environment.$instance.input.*.metric_invalid.counter32), '.*\\.([^\\.]+)\\.metric_invalid.*', '\\1 metric invalid')"
             },
             {
               "refId": "G",
-              "target": "aliasSub(stats.$environment.metrictank.$instance.*.metric_invalid, '.*\\.([^\\.]+)\\.metric_invalid', '\\1 metric invalid')",
-              "textEditor": false
-            },
-            {
-              "refId": "H",
-              "target": "alias(movingAverage(multiplySeries(stats.$environment.timers.metrictank.$instance.idx.elasticsearch.add_duration.mean, stats.$environment.timers.metrictank.$instance.idx.elasticsearch.add_duration.count_ps), 5), 'ES backpressure')",
-              "textEditor": true
-            },
-            {
-              "hide": true,
-              "refId": "I",
-              "target": "stats.$environment.gauges.metrictank.$instance.cassandra.write_queue.size",
-              "textEditor": false
-            },
-            {
-              "hide": true,
-              "refId": "J",
-              "target": "stats.$environment.gauges.metrictank.$instance.cassandra.num_writers",
-              "textEditor": false
-            },
-            {
-              "hide": true,
-              "refId": "K",
-              "target": "multiplySeries(#I,#J)",
-              "textEditor": false
-            },
-            {
-              "hide": true,
-              "refId": "L",
-              "target": "maxSeries(stats.$environment.timers.metrictank.$instance.cassandra.write_queue.*.items.upper)",
-              "textEditor": false
-            },
-            {
-              "hide": true,
-              "refId": "M",
-              "target": "alias(diffSeries(#K, multiplySeries(#L,#J)),'remaining capacity')",
-              "textEditor": true
-            },
-            {
-              "hide": true,
-              "refId": "N",
-              "target": "sumSeries(stats.$environment.metrictank.$instance.*.metrics_received)",
-              "textEditor": false
-            },
-            {
-              "hide": true,
-              "refId": "O",
-              "target": "alias(offset(transformNull(removeAboveValue(#M,1),-1),1),'blocked')",
-              "textEditor": true
-            },
-            {
-              "hide": false,
-              "refId": "P",
-              "target": "alias(scale(multiplySeries(#O, #N), 0.1), 'store backpressure')",
-              "textEditor": true
+              "target": "aliasByNode(scale(perSecond(metrictank.stats.$environment.$instance.input.carbon.pressure.*.counter32), 0.000000001), 6, 7)"
             }
           ],
           "timeFrom": null,
@@ -220,7 +165,7 @@
               "show": true
             },
             {
-              "format": "short",
+              "format": "percentunit",
               "logBase": 1,
               "max": null,
               "min": 0,
@@ -277,7 +222,7 @@
             {
               "alias": "GCd metrics/s",
               "lines": false,
-              "pointradius": 2,
+              "pointradius": 1,
               "points": true
             },
             {
@@ -293,20 +238,20 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.gauges.metrictank.$instance.total_points, 5)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.total_points.gauge64, 5)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "aliasByNode(stats.$environment.gauges.metrictank.$instance.metrics_active, 5)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.metrics_active.gauge32, 5)"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$instance.gc_metric, 'GCd metrics/s')",
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.gc_metric.counter32), 'GCd metrics/s')",
               "textEditor": false
             },
             {
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.heap_objects, 'heap objects')",
+              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.heap_objects.gauge64, 'heap objects')",
               "refId": "D"
             }
           ],
@@ -391,11 +336,11 @@
           "targets": [
             {
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.primary, 'primary')"
+              "target": "alias(metrictank.stats.$environment.$instance.cluster.primary.gauge1, 'primary')"
             },
             {
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.cluster.promotion_wait, 'promotion wait')"
+              "target": "alias(metrictank.stats.$environment.$instance.cluster.promotion_wait.gauge32, 'promotion wait')"
             }
           ],
           "timeFrom": null,
@@ -491,29 +436,29 @@
           "steppedLine": false,
           "targets": [
             {
-              "hide": true,
+              "hide": false,
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_alloc.incl_freed, 'alloc incl freed')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.memory.total_bytes_allocated.counter64), 'alloc rate')"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_alloc.not_freed, 'alloc not freed')"
+              "target": "alias(metrictank.stats.$environment.$instance.memory.bytes.allocated_in_heap.gauge64, 'allocated in heap')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.bytes_sys, 'bytes_sys')"
+              "target": "alias(metrictank.stats.$environment.$instance.memory.bytes.obtained_from_sys.gauge64, 'bytes_sys')"
             },
             {
               "hide": true,
               "refId": "D",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.metrics_active, 'metrics_active')"
+              "target": "alias(metrictank.stats.$environment.$instance.tank.metrics_active.gauge32, 'metrics_active')"
             },
             {
               "hide": true,
               "refId": "E",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.total_points, 'total_points')"
+              "target": "alias(metrictank.stats.$environment.$instance.tank.total_points.gauge64, 'total_points')"
             },
             {
               "hide": false,
@@ -523,13 +468,8 @@
             },
             {
               "hide": false,
-              "refId": "G",
-              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$instance.bytes_alloc.not_freed), 'alloc speed')"
-            },
-            {
-              "hide": false,
               "refId": "H",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.cpufraction, 'GC cpu fraction - promille')"
+              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.cpu_fraction.gauge32, 'GC cpu fraction - promille')"
             }
           ],
           "timeFrom": null,
@@ -587,13 +527,13 @@
             "total": false,
             "values": false
           },
-          "lines": true,
+          "lines": false,
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
           "percentage": false,
-          "pointradius": 5,
-          "points": false,
+          "pointradius": 1,
+          "points": true,
           "renderer": "flot",
           "seriesOverrides": [
             {
@@ -610,11 +550,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(perSecond(stats.$environment.gauges.metrictank.$instance.gc.num), 'collections')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64), 'collections')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.gc.dur, 'duration')"
+              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64, 'duration')"
             }
           ],
           "timeFrom": null,
@@ -708,23 +648,23 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.median, 'median')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.median.gauge32, 'median')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.upper_90, 'p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.p90.gauge32, 'p90')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.upper, 'max')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.max.gauge32, 'max')"
             },
             {
               "refId": "D",
-              "target": "aliasByNode(perSecond(collectd.$environment.metrictank.$instance.cpu.*.cpu.idle), 5, 7)"
+              "target": "aliasByNode(perSecond(collectd.$environment.$instance.cpu.*.cpu.idle), 5, 7)"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.count_ps, 'reqs')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.values.rate32, 'reqs')"
             }
           ],
           "timeFrom": null,
@@ -814,42 +754,42 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.lower, 'mem-cass min')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem_and_cassandra.min.gauge32, 'mem-cass min')"
             },
             {
               "hide": true,
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.upper_90, 'mem-cass p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem_and_cassandra.p90.gauge32, 'mem-cass p90')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.median, 'mem-cass med')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem_and_cassandra.median.gauge32, 'mem-cass med')"
             },
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.upper, 'mem-cass max')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem_and_cassandra.max.gauge32, 'mem-cass max')"
             },
             {
               "hide": false,
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.lower, 'mem min')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem.min.gauge32, 'mem min')"
             },
             {
               "hide": false,
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.median, 'mem med')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem.median.gauge32, 'mem med')"
             },
             {
               "hide": true,
               "refId": "G",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.upper_90, 'mem p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem.p90.gauge32, 'mem p90')"
             },
             {
               "hide": false,
               "refId": "H",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.upper, 'mem max')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem.max.gauge32, 'mem max')"
             }
           ],
           "timeFrom": null,
@@ -930,12 +870,12 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem_and_cassandra.count_ps, 'mem-cass req/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem_and_cassandra.values.count32, 'mem-cass req/s')"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.requests_span.mem.count_ps, 'mem req/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.requests_span.mem.values.count32, 'mem req/s')"
             }
           ],
           "timeFrom": null,
@@ -1013,30 +953,30 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.request_handle_duration.mean, 'total request handle')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.mean.gauge32, 'total request handle')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get_chunks.mean, 'cassandra get chunks')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get_chunks.latency.mean.gauge32, 'cassandra get chunks')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.to_iter.mean, 'cassandra to iter')",
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.to_iter.latency.mean.gauge32, 'cassandra to iter')",
               "textEditor": false
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.get_target_duration.mean, 'total getTarget')",
+              "target": "alias(metrictank.stats.$environment.$instance.api.get_target.latency.mean.gauge32, 'total getTarget')",
               "textEditor": false
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.iters_to_points_duration.mean, 'iters to points')",
+              "target": "alias(metrictank.stats.$environment.$instance.api.iters_to_points.latency.mean.gauge32, 'iters to points')",
               "textEditor": false
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.mem.to_iter_duration.mean, 'mem to iter')",
+              "target": "alias(metrictank.stats.$environment.$instance.api.mem.to_iter.latency.mean.gauge32, 'mem to iter')",
               "textEditor": false
             }
           ],
@@ -1131,7 +1071,7 @@
               "linewidth": 1
             },
             {
-              "alias": "stats.production.timers.metrictank.metric-tank-3-prod.persist_duration.upper",
+              "alias": "stats.production.timers.metrictank.metric-tank-3-prod.persist.latency.max",
               "yaxis": 2
             }
           ],
@@ -1142,22 +1082,22 @@
             {
               "hide": false,
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.cassandra.write_queue.*.items.upper, 6, 7, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.max.gauge32, 6, 7, 8)"
             },
             {
               "hide": false,
               "refId": "B",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.cassandra.write_queue.size, 'write queue items limit (each)')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.write_queue.size.gauge32, 'write queue items limit (each)')"
             },
             {
               "hide": false,
               "refId": "C",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.cassandra.num_writers, 'num write-workers')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.num_writers.gauge32, 'num write-workers')"
             },
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(consolidateBy(stats.$environment.timers.metrictank.$instance.persist_duration.upper_75, 'sum'), 'persist-duration p75')"
+              "target": "alias(consolidateBy(metrictank.stats.$environment.$instance.persist.latency.max.gauge32, 'sum'), 'persist-duration max')"
             }
           ],
           "timeFrom": null,
@@ -1193,7 +1133,7 @@
         {
           "aliasColors": {
             "message_size.mean": "#2F575E",
-            "message_size.upper": "#EF843C"
+            "message_size.max": "#EF843C"
           },
           "bars": false,
           "datasource": "$datasource",
@@ -1239,11 +1179,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.notifier.*.message_size.{mean,upper}, 6, 7, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.cluster.notifier.*.message_size.{mean,max}.gauge32, 6, 7, 8)"
             },
             {
               "refId": "B",
-              "target": "aliasByNode(stats.$environment.metrictank.$instance.notifier.*.messages-published, 5, 6)"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.cluster.notifier.*.messages-published.counter32), 5, 6)"
             }
           ],
           "timeFrom": null,
@@ -1327,11 +1267,11 @@
           "targets": [
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.wait.upper_90, 'get p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.wait.latency.p90.gauge32, 'get p90')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.wait.upper_90, 'put p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.wait.latency.p90.gauge32, 'put p90')"
             }
           ],
           "timeFrom": null,
@@ -1417,27 +1357,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.median, 'size at load median')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.median.gauge32, 'size at load median')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.upper_90, 'size at load p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.p90.gauge32, 'size at load p90')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_load.upper, 'size at load max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.max.gauge32, 'size at load max')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.median, 'size at save median')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.median.gauge32, 'size at save median')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.upper_90, 'size at save p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.p90.gauge32, 'size at save p90')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.chunk_size.at_save.upper, 'size at save max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.max.gauge32, 'size at save max')"
             }
           ],
           "timeFrom": null,
@@ -1516,11 +1456,11 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.count_ps, 'put/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.values.rate32, 'put/s')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.count_ps, 'get/s')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.values.rate32, 'get/s')"
             }
           ],
           "timeFrom": null,
@@ -1601,19 +1541,19 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.upper_90, 'put p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.p90.gauge32, 'put p90')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.put.exec.mean, 'put mean')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.mean.gauge32, 'put mean')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.upper_90, 'get p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.p90.gauge32, 'get p90')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.get.exec.mean, 'get mean')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.mean.gauge32, 'get mean')"
             }
           ],
           "timeFrom": null,
@@ -1710,27 +1650,27 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.median, 'chunks per row med')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.median.gauge32, 'chunks per row med')"
             },
             {
               "refId": "B",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.lower, 'chunks per row min')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.min.gauge32, 'chunks per row min')"
             },
             {
               "refId": "C",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.upper, 'chunks per row max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.max.gauge32, 'chunks per row max')"
             },
             {
               "refId": "D",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.chunks_per_row.median, 'rows per resp med')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.median.gauge32, 'rows per resp med')"
             },
             {
               "refId": "E",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.rows_per_response.lower, 'rows per resp min')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.min.gauge32, 'rows per resp min')"
             },
             {
               "refId": "F",
-              "target": "alias(stats.$environment.timers.metrictank.$instance.cassandra.rows_per_response.upper, 'rows per resp max')"
+              "target": "alias(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.max.gauge32, 'rows per resp max')"
             }
           ],
           "timeFrom": null,
@@ -1774,7 +1714,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.metrictank.$instance.cassandra.error.*, 6)"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.store.cassandra.error.*.counter32), 6)"
             }
           ],
           "datasource": "$datasource",
@@ -1786,7 +1726,7 @@
               "logBase": 1,
               "min": null,
               "max": null,
-              "format": "short"
+              "format": "hertz"
             },
             {
               "label": null,
@@ -1886,19 +1826,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.metrictank.$instance.chunks.create, 'create/s')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(stats.$environment.metrictank.$instance.chunks.clear, 'clear/s')"
-            },
-            {
-              "refId": "C",
-              "target": "alias(stats.$environment.metrictank.$instance.chunks.save_ok, 'save_ok/s')"
-            },
-            {
-              "refId": "D",
-              "target": "alias(stats.$environment.metrictank.$instance.chunks.save_fail, 'save_fail/s')"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.*.chunk_operations.*.counter32), 6)"
             }
           ],
           "timeFrom": null,
@@ -1916,7 +1844,7 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "format": "hertz",
               "logBase": 1,
               "max": null,
               "min": null,
@@ -1954,9 +1882,9 @@
             "memory.ok": "#7EB26D",
             "metrics_to_es.fail": "#BF1B00",
             "metrics_to_es.ok": "#629E51",
-            "upper": "#DEDAF7",
-            "upper_75": "#0A50A1",
-            "upper_90": "#806EB7"
+            "max": "#DEDAF7",
+            "p75": "#0A50A1",
+            "p90": "#806EB7"
           },
           "bars": false,
           "datasource": "$datasource",
@@ -2011,12 +1939,12 @@
           "targets": [
             {
               "refId": "C",
-              "target": "aliasByNode(stats.$environment.metrictank.$instance.idx.*.*, 5, 6)",
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.add.{ok,fail}.counter32), 5, 7)",
               "textEditor": false
             },
             {
               "refId": "A",
-              "target": "alias(stats.$environment.gauges.metrictank.$instance.idx.elasticsearch.retrybuf.items, 'es-retrybuf-items')",
+              "target": "alias(metrictank.stats.$environment.$instance.idx.elasticsearch.retrybuf.items.gauge32, 'es-retrybuf-items')",
               "textEditor": false
             }
           ],
@@ -2063,7 +1991,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.metrictank.$instance.idx.cassandra.error.*, 7)"
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.cassandra.error.*.counter32), 7)"
             }
           ],
           "datasource": "$datasource",
@@ -2075,7 +2003,7 @@
               "logBase": 1,
               "min": null,
               "max": null,
-              "format": "short"
+              "format": "hertz"
             },
             {
               "label": null,
@@ -2137,9 +2065,9 @@
           "aliasColors": {
             "cache hit": "#3F6833",
             "duration median": "#BA43A9",
-            "duration upper_90": "#511749",
+            "duration p90": "#511749",
             "metricdef lookup duration median": "#E0752D",
-            "metricdef lookup duration upper_90": "#BF1B00"
+            "metricdef lookup duration p90": "#BF1B00"
           },
           "bars": false,
           "datasource": "$datasource",
@@ -2175,7 +2103,7 @@
           "renderer": "flot",
           "seriesOverrides": [
             {
-              "alias": "/upper/",
+              "alias": "/max/",
               "fill": 1,
               "lines": true,
               "linewidth": 0,
@@ -2188,7 +2116,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(stats.$environment.timers.metrictank.$instance.idx.*.*.{mean,upper_90,upper}, 6, 7, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.latency.{mean,p90,max}.gauge32, 5, 6, 8)"
             }
           ],
           "timeFrom": null,
@@ -2223,10 +2151,265 @@
         }
       ],
       "title": "New row"
+    },
+    {
+      "title": "stats",
+      "height": "250px",
+      "editable": true,
+      "collapse": false,
+      "panels": [
+        {
+          "title": "message size",
+          "error": false,
+          "span": 4,
+          "editable": true,
+          "type": "graph",
+          "isNew": true,
+          "id": 24,
+          "targets": [
+            {
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.stats.message_size.gauge32, 5)",
+              "refId": "A"
+            }
+          ],
+          "datasource": "$datasource",
+          "renderer": "flot",
+          "yaxes": [
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "bytes"
+            },
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "short"
+            }
+          ],
+          "xaxis": {
+            "show": true
+          },
+          "grid": {
+            "threshold1": null,
+            "threshold2": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "lines": true,
+          "fill": 1,
+          "linewidth": 2,
+          "points": false,
+          "pointradius": 5,
+          "bars": false,
+          "stack": false,
+          "percentage": false,
+          "legend": {
+            "show": true,
+            "values": false,
+            "min": false,
+            "max": false,
+            "current": false,
+            "total": false,
+            "avg": false
+          },
+          "nullPointMode": "connected",
+          "steppedLine": false,
+          "tooltip": {
+            "value_type": "cumulative",
+            "shared": true,
+            "sort": 0,
+            "msResolution": false
+          },
+          "timeFrom": null,
+          "timeShift": null,
+          "aliasColors": {},
+          "seriesOverrides": [],
+          "links": []
+        },
+        {
+          "title": "conn to graphite",
+          "error": false,
+          "span": 4,
+          "editable": true,
+          "type": "graph",
+          "isNew": true,
+          "id": 25,
+          "targets": [
+            {
+              "target": "alias(metrictank.stats.$environment.$instance.stats.graphite.connected.gauge1, 'connected')",
+              "refId": "A"
+            },
+            {
+              "target": "alias(metrictank.stats.$environment.$instance.stats.graphite.flush.latency.p90.gauge32, 'flush latency')",
+              "refId": "B"
+            },
+	    {
+              "refId": "C",
+              "target": "alias(metrictank.stats.$environment.$instance.stats.graphite.flush.values.rate32, 'flush rate')"
+            }
+          ],
+          "datasource": "$datasource",
+          "renderer": "flot",
+          "yaxes": [
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "short"
+            },
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "short"
+            }
+          ],
+          "xaxis": {
+            "show": true
+          },
+          "grid": {
+            "threshold1": null,
+            "threshold2": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "lines": true,
+          "fill": 1,
+          "linewidth": 2,
+          "points": false,
+          "pointradius": 5,
+          "bars": false,
+          "stack": false,
+          "percentage": false,
+          "legend": {
+            "show": true,
+            "values": false,
+            "min": false,
+            "max": false,
+            "current": false,
+            "total": false,
+            "avg": false
+          },
+          "nullPointMode": "null",
+          "steppedLine": false,
+          "tooltip": {
+            "value_type": "cumulative",
+            "shared": true,
+            "sort": 0,
+            "msResolution": false
+          },
+          "timeFrom": null,
+          "timeShift": null,
+          "aliasColors": {
+            "queue-limit": "#BF1B00",
+            "queue-items": "#7EB26D"
+          },
+          "seriesOverrides": [
+            {
+              "alias": "connected",
+              "yaxis": 2,
+              "fill": 4,
+              "linewidth": 0
+            }
+          ],
+          "links": []
+        },
+        {
+          "title": "queue to graphite",
+          "error": false,
+          "span": 4,
+          "editable": true,
+          "type": "graph",
+          "isNew": true,
+          "id": 26,
+          "targets": [
+            {
+              "target": "alias(metrictank.stats.$environment.$instance.stats.graphite.write_queue.size.gauge32, 'queue-limit')",
+              "refId": "A"
+            },
+            {
+              "target": "alias(metrictank.stats.$environment.$instance.stats.graphite.write_queue.items.max.gauge32, 'queue-items')",
+              "refId": "B"
+            }
+          ],
+          "datasource": "$datasource",
+          "renderer": "flot",
+          "yaxes": [
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "short"
+            },
+            {
+              "label": null,
+              "show": true,
+              "logBase": 1,
+              "min": null,
+              "max": null,
+              "format": "short"
+            }
+          ],
+          "xaxis": {
+            "show": true
+          },
+          "grid": {
+            "threshold1": null,
+            "threshold2": null,
+            "threshold1Color": "rgba(216, 200, 27, 0.27)",
+            "threshold2Color": "rgba(234, 112, 112, 0.22)"
+          },
+          "lines": false,
+          "fill": 1,
+          "linewidth": 2,
+          "points": true,
+          "pointradius": 1,
+          "bars": false,
+          "stack": false,
+          "percentage": false,
+          "legend": {
+            "show": true,
+            "values": false,
+            "min": false,
+            "max": false,
+            "current": false,
+            "total": false,
+            "avg": false
+          },
+          "nullPointMode": "connected",
+          "steppedLine": false,
+          "tooltip": {
+            "value_type": "cumulative",
+            "shared": true,
+            "sort": 0,
+            "msResolution": false
+          },
+          "timeFrom": null,
+          "timeShift": null,
+          "aliasColors": {
+            "queue-limit": "#BF1B00",
+            "queue-items": "#7EB26D"
+          },
+          "seriesOverrides": [],
+          "links": []
+        }
+      ]
     }
   ],
   "time": {
-    "from": "now-1h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {
@@ -2285,7 +2468,7 @@
         "multiFormat": "glob",
         "name": "environment",
         "options": [],
-        "query": "stats.*",
+        "query": "metrictank.stats.*",
         "refresh": 1,
         "refresh_on_load": false,
         "regex": "",
@@ -2301,7 +2484,7 @@
         "multiFormat": "glob",
         "name": "instance",
         "options": [],
-        "query": "stats.$environment.metrictank.*",
+        "query": "metrictank.stats.$environment.*",
         "refresh": 1,
         "refresh_on_load": false,
         "regex": "",
