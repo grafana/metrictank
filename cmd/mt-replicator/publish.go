@@ -27,7 +27,7 @@ func GetCompression(codec string) sarama.CompressionCodec {
 	}
 }
 
-func NewPublisher(brokers []string, topic string, compression string, partitionBy string) (*Publisher, error) {
+func NewPublisher(brokers []string, topic string, compression string, partitionScheme string) (*Publisher, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -44,7 +44,7 @@ func NewPublisher(brokers []string, topic string, compression string, partitionB
 	if err != nil {
 		return nil, err
 	}
-	partitioner, err := cluster.NewKafkaPartitioner(partitionBy)
+	partitioner, err := cluster.NewKafkaPartitioner(partitionScheme)
 	if err != nil {
 		return nil, err
 	}

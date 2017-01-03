@@ -18,13 +18,13 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	logLevel    = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
-	partitionBy  = flag.String("partition-by", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
-	compression  = flag.String("compression", "none", "compression: none|gzip|snappy")
-	group        = flag.String("group", "mt-replicator", "Kafka consumer group")
-	srcTopic     = flag.String("src-topic", "mdm", "topic name on source cluster")
-	dstTopic     = flag.String("dst-topic", "mdm", "topic name on destination cluster")
-	srcBrokerStr = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
-	dstBrokerStr = flag.String("dst-brokers", "localhost:9092", "tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list)")
+	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
+	compression     = flag.String("compression", "none", "compression: none|gzip|snappy")
+	group           = flag.String("group", "mt-replicator", "Kafka consumer group")
+	srcTopic        = flag.String("src-topic", "mdm", "topic name on source cluster")
+	dstTopic        = flag.String("dst-topic", "mdm", "topic name on destination cluster")
+	srcBrokerStr    = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
+	dstBrokerStr    = flag.String("dst-brokers", "localhost:9092", "tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list)")
 
 	wg sync.WaitGroup
 )
@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, err.Error())
 	}
-	publisher, err := NewPublisher(dstBrokers, *dstTopic, *compression, *partitionBy)
+	publisher, err := NewPublisher(dstBrokers, *dstTopic, *compression, *partitionScheme)
 	if err != nil {
 		log.Fatal(4, err.Error())
 	}
