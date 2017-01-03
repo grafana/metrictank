@@ -2,10 +2,11 @@ package stats
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 )
 
-var errFmtMetricExists = "fatal: metric %q already exists"
+var errFmtMetricExists = "fatal: metric %q already exists as type %T"
 
 // Registry tracks metrics and reporters
 type Registry struct {
@@ -23,10 +24,14 @@ func NewRegistry() *Registry {
 	}
 }
 
-func (r *Registry) add(name string, metric GraphiteMetric) GraphiteMetric {
+func (r *Registry) getOrAdd(name string, metric GraphiteMetric) GraphiteMetric {
 	r.Lock()
-	if _, ok := r.metrics[name]; ok {
-		panic(fmt.Sprintf(errFmtMetricExists, name))
+	if existing, ok := r.metrics[name]; ok {
+		if reflect.TypeOf(existing) == reflect.TypeOf(metric) {
+			r.Unlock()
+			return existing
+		}
+		panic(fmt.Sprintf(errFmtMetricExists, name, existing))
 	}
 	r.metrics[name] = metric
 	r.Unlock()

@@ -10,7 +10,7 @@ type Counter32 struct {
 }
 
 func NewCounter32(name string) *Counter32 {
-	return registry.add(name, &Counter32{}).(*Counter32)
+	return registry.getOrAdd(name, &Counter32{}).(*Counter32)
 }
 
 func (c *Counter32) SetUint32(val uint32) {

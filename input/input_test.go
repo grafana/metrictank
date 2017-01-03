@@ -9,7 +9,6 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -85,7 +84,6 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 }
 
 func BenchmarkProcess(b *testing.B) {
-	stats.Clear()
 	cluster.Init("default", "test", time.Now())
 
 	store := mdata.NewDevnullStore()

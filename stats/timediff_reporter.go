@@ -12,7 +12,7 @@ type TimeDiffReporter32 struct {
 }
 
 func NewTimeDiffReporter32(name string, target uint32) *TimeDiffReporter32 {
-	return registry.add(name, &TimeDiffReporter32{
+	return registry.getOrAdd(name, &TimeDiffReporter32{
 		target: target,
 	},
 	).(*TimeDiffReporter32)

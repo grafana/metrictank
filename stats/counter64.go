@@ -10,7 +10,7 @@ type Counter64 struct {
 }
 
 func NewCounter64(name string) *Counter64 {
-	return registry.add(name, &Counter64{}).(*Counter64)
+	return registry.getOrAdd(name, &Counter64{}).(*Counter64)
 }
 
 func (c *Counter64) SetUint64(val uint64) {
