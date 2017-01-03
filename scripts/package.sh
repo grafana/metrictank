@@ -17,7 +17,7 @@ mkdir -p ${BUILD}/etc/raintank
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
-cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
