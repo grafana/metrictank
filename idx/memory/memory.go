@@ -241,11 +241,10 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
 	m.RLock()
 	defer m.RUnlock()
 	def, ok := m.DefById[id]
+	idxGetDuration.Value(time.Since(pre))
 	if ok {
-		idxGetDuration.Value(time.Since(pre))
 		return *def, nil
 	}
-	idxGetDuration.Value(time.Since(pre))
 	return schema.MetricDefinition{}, idx.DefNotFound
 }
 

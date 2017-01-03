@@ -344,6 +344,7 @@ func (c *CasIdx) processWriteQueue() {
 }
 
 func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	pre := time.Now()
 	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
 		return defs, err
@@ -363,6 +364,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 			}
 		}
 	}
+	idxCasDeleteDuration.Value(time.Since(pre))
 	return defs, nil
 }
 

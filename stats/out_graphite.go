@@ -22,13 +22,8 @@ type GraphiteMetric interface {
 }
 
 type Graphite struct {
-	prefix                   []byte
-	addr                     string
-	prefixCounter32          string
-	prefixGauge32            string
-	prefixGauge64            string
-	prefixRange32            string
-	prefixLatencyHistogram32 string
+	prefix []byte
+	addr   string
 
 	toGraphite chan []byte
 }

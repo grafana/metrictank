@@ -360,6 +360,7 @@ func (e *EsIdx) rebuildIndex() {
 }
 
 func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	pre := time.Now()
 	defs, err := e.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
 		return defs, err
@@ -367,6 +368,7 @@ func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, er
 	for _, def := range defs {
 		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
 	}
+	idxEsDeleteDuration.Value(time.Since(pre))
 	return defs, nil
 }
 
