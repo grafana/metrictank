@@ -43,12 +43,6 @@ type FlatAccnt struct {
 	eventQ chan FlatAccntEvent
 }
 
-// EvictTarget is the definition of a chunk that should be evicted.
-type EvictTarget struct {
-	Metric string
-	Ts     uint32
-}
-
 type FlatAccntMet struct {
 	total  uint64
 	chunks map[uint32]uint64
@@ -57,6 +51,7 @@ type FlatAccntMet struct {
 // event types to be used in FlatAccntEvent
 const evnt_hit_chnk uint8 = 4
 const evnt_add_chnk uint8 = 5
+const evnt_stop uint8 = 100
 
 type FlatAccntEvent struct {
 	t  uint8       // event type
@@ -98,6 +93,10 @@ func (a *FlatAccnt) HitChunk(metric string, ts uint32) {
 	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
 }
 
+func (a *FlatAccnt) Stop() {
+	a.act(evnt_stop, nil)
+}
+
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
 	event := FlatAccntEvent{
 		t:  t,
@@ -136,6 +135,8 @@ func (a *FlatAccnt) eventLoop() {
 						Ts:     payload.ts,
 					},
 				)
+			case evnt_stop:
+				return
 			}
 
 			// evict until we're below the max

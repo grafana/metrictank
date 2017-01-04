@@ -197,7 +197,7 @@ func (mc *CCacheMetric) searchForward(from, until uint32, keys []uint32, res *CC
 }
 
 func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *CCSearchResult) {
-	ts, ok := mc.seekDesc(until, keys)
+	ts, ok := mc.seekDesc(until-1, keys)
 	if !ok {
 		return
 	}
@@ -232,7 +232,7 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
-	if len(mc.chunks) < 1 {
+	if len(mc.chunks) < 1 || from == until {
 		return
 	}
 

@@ -66,3 +66,8 @@ func (ig IterGen) Ts() uint32 {
 func (ig IterGen) Span() uint32 {
 	return ig.span
 }
+
+// end of itergen (exclusive)
+func (ig IterGen) EndTs() uint32 {
+	return ig.ts + ig.span
+}

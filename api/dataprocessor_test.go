@@ -1140,99 +1140,162 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	}
 }
 
-// the essential idea of this test is that we want to put some chunks into the
-// cache and some into the backend store.
+// generates and returns a slice of chunks according to specified specs
+func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
+	var c *chunk.Chunk
+
+	chunks := make([]chunk.Chunk, 0)
+
+	c = chunk.New(start)
+	for i := start; i < end; i++ {
+		c.Push(i, float64((i-start)*2))
+		if (i+1)%span == 0 {
+			// Mark the chunk that just got finished as finished
+			c.Finish()
+			chunks = append(chunks, *c)
+			if i < end {
+				c = chunk.New(i + 1)
+			}
+		}
+	}
+	return chunks
+}
+
+// the idea of this test is that we want to put some chunks into the
+// cache and some into the backend store and some into both,
 // then we call getSeriesCachedStore and check if it has stitched the pieces
 // from the different sources together correctly.
+// additionally we check the chunk cache's hit statistics to verify that it
+// has been used correctly.
 //
-// cache:           |-----|-----|-----|
-// store:                             |-----|
+// cache:                             |-----|-----|
+// store:           |-----|-----|-----|-----|
+//
 // query:              |---------------|
-// expected result: |-----|-----|-----|-----|
+// result:          |-----|-----|-----|-----|
+//
+// query:                                |--------|
+// result:                            |-----|-----|
+//
 func TestGetSeriesCachedStore(t *testing.T) {
-	chunkSpan := uint32(600)
-	numChunks := uint32(10)
+	span := uint32(600)
+	// save some electrons by skipping steps that are no edge cases
+	steps := span / 10
+	start := span
+	// we want 6 chunks
+	end := span * 7
+	chunks := generateChunks(span, start, end)
+
 	srv, _ := NewServer()
 	store := mdata.NewMockStore()
 	srv.BindBackendStore(store)
-	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
+	metrics := mdata.NewAggMetrics(store, 1, 1, 0, 0, 0, 0, []mdata.AggSetting{})
 	srv.BindMemoryStore(metrics)
-	c := cache.NewCCache()
-	srv.BindCache(c)
-	metricKey := "metric1"
+	metric := "metric1"
+	var c *cache.CCache
+	var itgen *chunk.IterGen
+	var prevts uint32
 
-	// generating 4 chunks, 3 will go into the cache and 1 into the backend store.
-	// this simulates a scenario where the latest chunk has been persisted but not
-	// queried (and cached) yet.
-	chunks := make([]*chunk.Chunk, 0)
-	for i := chunkSpan; i < chunkSpan*5; i++ {
-		if i%chunkSpan == 0 {
-			chunks = append(chunks, chunk.New(i))
-		}
-		chunks[len(chunks)-1].Push(i, float64(i*2))
+	type testcase struct {
+		// the pattern of chunks in store, cache or both
+		Pattern string
+
+		// expected number of cache hits on query over all chunks
+		// used to verify that cache is used when it should be used
+		Hits int
 	}
 
-	prevts := uint32(0)
-	// adding 3 itgens to cache
-	var i int
-	for i = 0; i < 3; i++ {
-		chunks[i].Series.Finish()
-		itgen := chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan)
-		srv.Cache.Add(metricKey, prevts, *itgen)
-		prevts = itgen.Ts()
+	testcases := []testcase{
+		testcase{"sscc", 2},
+		testcase{"ssbb", 2},
+		testcase{"ccss", 2},
+		testcase{"bbss", 2},
+		testcase{"ccsscc", 4},
+		testcase{"bbssbb", 4},
+		testcase{"ssbbss", 0}, // cannot use cache in the middle of the queried range
 	}
 
-	// preparing the next itgen as store mock result (to simulate one that has just been added and not cached yet)
-	chunks[i].Series.Finish()
-	itgens := []chunk.IterGen{*chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, chunkSpan)}
+	// going through all testcases
+	for _, tc := range testcases {
+		pattern := tc.Pattern
 
-	// save some electrons by skipping steps that are no edge cases
-	steps := chunkSpan / 10
+		// last ts is start ts plus the number of spans the pattern defines
+		lastTs := start + span*uint32(len(pattern))
 
-	// we want to have:
-	// - queries that only query chunks in the cache
-	// - queries that only query chunks in cassandra
-	// - queries that query across multiple chunks in the cache
-	// - queries that query across chunks in the cache and cassandra
-	// so we can be sure that getSeriesCachedStore correctly stitches the returned results from different sources together
-	for from := uint32(chunkSpan + chunkSpan/2); from < uint32(chunkSpan*4); from += steps {
-		for to := from + 1; to <= from+chunkSpan+1; to += steps {
-			// resetting mock at the beginning of each iteration
-			store.ResetMock()
-			store.AddMockResult(itgens, nil)
+		// we want to query through various ranges, including:
+		// - from first ts to first ts
+		// - from first ts to last ts
+		// - from last ts to last ts
+		// and various ranges between
+		for from := start; from <= lastTs; from += steps {
+			for to := from; to <= lastTs; to += steps {
+				// reinstantiate the cache at the beginning of each run
+				c = cache.NewCCache()
+				srv.BindCache(c)
 
-			req := reqRaw(metricKey, from, to, chunkSpan, 1, consolidation.None)
-			req.ArchInterval = 1
-			ctx := newRequestContext(&req, consolidation.None)
-			iters := srv.getSeriesCachedStore(ctx, to)
-
-			// expecting the first returned timestamp to be the T0 of the chunk containing "from"
-			expectResFrom := from - (from % chunkSpan)
-
-			// expecting the last returned timestamp to be the last point in the chunk containing "to"
-			expectResTo := (to - 1) + (chunkSpan - (to-1)%chunkSpan) - 1
-
-			// for each timestamp in the returned iterators we compare if it has the expected value
-			// we use the tsTracker to increase together with the iterators and compare at each step
-			tsTracker := expectResFrom
-
-			tsSlice := make([]uint32, 0)
-			for _, it := range iters {
-				for it.Next() {
-					ts, _ := it.Values()
-					if ts != tsTracker {
-						t.Fatalf("From %d To %d; expected value is %d, but got %d", from, to, tsTracker, ts)
+				// populate cache and store according to pattern definition
+				prevts = 0
+				for i := 0; i < len(tc.Pattern); i++ {
+					itgen = chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
+					if pattern[i] == 'c' || pattern[i] == 'b' {
+						c.Add(metric, prevts, *itgen)
 					}
-					tsTracker++
-					tsSlice = append(tsSlice, ts)
+					if pattern[i] == 's' || pattern[i] == 'b' {
+						store.AddMockResult(metric, *itgen)
+					}
+					prevts = chunks[i].T0
 				}
-			}
 
-			if tsSlice[0] != expectResFrom {
-				t.Fatalf("From %d To %d; Expected first to be %d but got %d", from, to, expectResFrom, tsSlice[0])
-			}
-			if tsSlice[len(tsSlice)-1] != expectResTo {
-				t.Fatalf("From %d To %d; Expected last to be %d but got %d", from, to, expectResTo, tsSlice[len(tsSlice)-1])
+				// create a request for the current range
+				req := reqRaw(metric, from, to, span, 1, consolidation.None)
+				req.ArchInterval = 1
+				ctx := newRequestContext(&req, consolidation.None)
+				iters := srv.getSeriesCachedStore(ctx, to)
+
+				// expecting the first returned timestamp to be the T0 of the chunk containing "from"
+				expectResFrom := from - (from % span)
+
+				// expecting the last returned timestamp to be the last point in the chunk containing "to"
+				expectResTo := (to - 1) + (span - (to-1)%span) - 1
+
+				// for each timestamp in the returned iterators we compare if it has the expected value
+				// we use the tsTracker to increase together with the iterators and compare at each step
+				tsTracker := expectResFrom
+
+				tsSlice := make([]uint32, 0)
+				for _, it := range iters {
+					for it.Next() {
+						ts, _ := it.Values()
+						if ts != tsTracker {
+							t.Fatalf("Pattern %s From %d To %d; expected value is %d, but got %d", pattern, from, to, tsTracker, ts)
+						}
+						tsTracker++
+						tsSlice = append(tsSlice, ts)
+					}
+				}
+
+				if to-from > 0 {
+					if len(tsSlice) == 0 {
+						t.Fatalf("Pattern %s From %d To %d; Should have >0 results but got 0", pattern, from, to)
+					}
+					if tsSlice[0] != expectResFrom {
+						t.Fatalf("Pattern %s From %d To %d; Expected first to be %d but got %d", pattern, from, to, expectResFrom, tsSlice[0])
+					}
+					if tsSlice[len(tsSlice)-1] != expectResTo {
+						t.Fatalf("Pattern %s From %d To %d; Expected last to be %d but got %d", pattern, from, to, expectResTo, tsSlice[len(tsSlice)-1])
+					}
+				} else if len(tsSlice) > 0 {
+					t.Fatalf("Pattern %s From %d To %d; Expected results to have len 0 but got %d", pattern, from, to, len(tsSlice))
+				}
+
+				// if current query is the maximum range we check the cache stats to
+				// verify it got all the hits it should have
+				/*if from == start && to == lastTs {
+				}*/
+
+				// stop cache go routines before reinstantiating it at the top of the loop
+				c.Stop()
+				store.ResetMock()
 			}
 		}
 	}

@@ -1,11 +1,9 @@
 package mdata
 
-import "github.com/raintank/metrictank/mdata/chunk"
-
-type mockSearchResult struct {
-	chunks []chunk.IterGen
-	err    error
-}
+import (
+	"errors"
+	"github.com/raintank/metrictank/mdata/chunk"
+)
 
 // a data store that satisfies the interface `mdata.Store`.
 //
@@ -17,50 +15,53 @@ type mockSearchResult struct {
 // this can be extended if future unit tests require the mock
 // store to be smarter, or for example if they require it to
 // keep what has been passed into Add().
-type mockStore struct {
-	// index for the search results, pointing to which result will
-	// be returned next
-	CurrCall int
-	// a list of results that will be returned by the Search() method
-	Results []mockSearchResult
+type MockStore struct {
+	// the itgens to be searched and returned, indexed by metric
+	results map[string][]chunk.IterGen
 }
 
-func NewMockStore() *mockStore {
-	d := &mockStore{
-		CurrCall: 0,
-		Results:  make([]mockSearchResult, 0),
+func NewMockStore() *MockStore {
+	return &MockStore{make(map[string][]chunk.IterGen)}
+}
+
+// add a chunk to be returned on Search()
+func (c *MockStore) AddMockResult(metric string, itgen chunk.IterGen) {
+	if itgens, ok := c.results[metric]; !ok {
+		itgens = make([]chunk.IterGen, 0)
+		c.results[metric] = itgens
 	}
-	return d
+
+	c.results[metric] = append(c.results[metric], itgen)
 }
 
-// add a result to be returned on Search()
-func (c *mockStore) AddMockResult(chunks []chunk.IterGen, err error) {
-	// copy chunks because we don't want to modify the source
-	chunksCopy := make([]chunk.IterGen, len(chunks))
-	copy(chunksCopy, chunks)
-	c.Results = append(c.Results, mockSearchResult{chunksCopy, err})
-}
-
-// flush and reset the mock
-func (c *mockStore) ResetMock() {
-	c.Results = c.Results[:0]
-	c.CurrCall = 0
+func (c *MockStore) ResetMock() {
+	c.results = make(map[string][]chunk.IterGen)
 }
 
 // currently that only exists to satisfy the interface
 // might be extended to be useful in the future
-func (c *mockStore) Add(cwr *ChunkWriteRequest) {
+func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 }
 
-// returns the mock results, ignoring the search parameters
-func (c *mockStore) Search(key string, start, end uint32) ([]chunk.IterGen, error) {
-	if c.CurrCall < len(c.Results) {
-		res := c.Results[c.CurrCall]
-		c.CurrCall++
-		return res.chunks, res.err
+// searches through the mock results and returns the right ones according to start / end
+func (c *MockStore) Search(metric string, start, end uint32) ([]chunk.IterGen, error) {
+	var itgens []chunk.IterGen
+	var ok bool
+	res := make([]chunk.IterGen, 0)
+
+	if itgens, ok = c.results[metric]; !ok {
+		return res, errors.New("metric not found")
 	}
-	return make([]chunk.IterGen, 0), nil
+
+	for _, itgen := range itgens {
+		// start is inclusive, end is exclusive
+		if itgen.Ts() < end && itgen.EndTs() > start && start < end {
+			res = append(res, itgen)
+		}
+	}
+
+	return res, nil
 }
 
-func (c *mockStore) Stop() {
+func (c *MockStore) Stop() {
 }

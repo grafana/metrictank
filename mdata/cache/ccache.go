@@ -30,35 +30,17 @@ type CCache struct {
 
 	// accounting for the cache. keeps track of when data needs to be evicted
 	// and what should be evicted
-	accnt *accnt.FlatAccnt
-}
+	accnt accnt.Accnt
 
-type CCSearchResult struct {
-	// if this result is Complete == false, then the following cassandra query
-	// will need to use this value as from to fill in the missing data
-	From uint32
-
-	// just as with the above From, this will need to be used as the new until
-	Until uint32
-
-	// if Complete is true then the whole request can be served from cache
-	Complete bool
-
-	// if the cache contained the chunk containing the original "from" ts then
-	// this slice will hold it as the first element, plus all the subsequent
-	// cached chunks. If Complete is true then all chunks are in this slice.
-	Start []chunk.IterGen
-
-	// if complete is not true and the original "until" ts is in a cached chunk
-	// then this slice will hold it as the first element, plus all the previous
-	// ones in reverse order (because the search is seeking in reverse)
-	End []chunk.IterGen
+	// channel that's only used to signal go routines to stop
+	stop chan interface{}
 }
 
 func NewCCache() *CCache {
 	cc := &CCache{
 		metricCache: make(map[string]*CCacheMetric),
 		accnt:       accnt.NewFlatAccnt(maxSize),
+		stop:        make(chan interface{}),
 	}
 	go cc.evictLoop()
 	return cc
@@ -66,8 +48,13 @@ func NewCCache() *CCache {
 
 func (c *CCache) evictLoop() {
 	evictQ := c.accnt.GetEvictQ()
-	for target := range evictQ {
-		c.evict(target)
+	for {
+		select {
+		case target := <-evictQ:
+			c.evict(target)
+		case _ = <-c.stop:
+			return
+		}
 	}
 }
 
@@ -84,6 +71,14 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	}
 
 	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
+}
+
+func (c *CCache) GetStats() {
+}
+
+func (c *CCache) Stop() {
+	c.accnt.Stop()
+	c.stop <- nil
 }
 
 func (c *CCache) evict(target *accnt.EvictTarget) {
