@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 
@@ -244,17 +243,17 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 	}
 
 	if !res.Complete && res.From > res.Until {
-		fmt.Printf("found from > until (%d/%d), printing chunks\n", res.From, res.Until)
+		log.Debug("CCacheMetric Search: Found from > until (%d/%d), printing chunks\n", res.From, res.Until)
 		mc.debugMetric()
 	}
 }
 
 func (mc *CCacheMetric) debugMetric() {
 	keys := mc.sortedTs()
-	fmt.Printf("--- debugging metric ---\n")
-	fmt.Printf("chunk debug: oldest %d; newest %d\n", mc.oldest, mc.newest)
+	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
+	log.Debug("CCacheMetric debugMetric: oldest %d; newest %d\n", mc.oldest, mc.newest)
 	for _, key := range keys {
-		fmt.Printf("chunk debug: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+		log.Debug("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
 	}
-	fmt.Printf("------------------------\n")
+	log.Debug("CCacheMetric debugMetric: ------------------------\n")
 }
