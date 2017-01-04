@@ -1181,8 +1181,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	// save some electrons by skipping steps that are no edge cases
 	steps := span / 10
 	start := span
-	// we want 6 chunks
-	end := span * 7
+	// we want 10 chunks to serve the largest testcase
+	end := span * 11
 	chunks := generateChunks(span, start, end)
 
 	srv, _ := NewServer()
@@ -1211,7 +1211,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		testcase{"bbss", 2},
 		testcase{"ccsscc", 4},
 		testcase{"bbssbb", 4},
-		testcase{"ssbbss", 0}, // cannot use cache in the middle of the queried range
+		testcase{"ssbbss", 0},     // cannot use cache in the middle of the queried range
+		testcase{"ssbbssbbss", 0}, // cannot use cache in the middle of the queried range. this one mimics what happens when somebody has a dashboard showing the first week of the last few months
 	}
 
 	// going through all testcases
@@ -1262,11 +1263,11 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				tsTracker := expectResFrom
 
 				tsSlice := make([]uint32, 0)
-				for _, it := range iters {
+				for i, it := range iters {
 					for it.Next() {
 						ts, _ := it.Values()
 						if ts != tsTracker {
-							t.Fatalf("Pattern %s From %d To %d; expected value is %d, but got %d", pattern, from, to, tsTracker, ts)
+							t.Fatalf("Pattern %s From %d To %d; expected value %d is %d, but got %d", pattern, from, to, i, tsTracker, ts)
 						}
 						tsTracker++
 						tsSlice = append(tsSlice, ts)
