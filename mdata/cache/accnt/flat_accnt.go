@@ -128,7 +128,6 @@ func (a *FlatAccnt) eventLoop() {
 				)
 			case evnt_hit_chnk:
 				payload := event.pl.(*HitPayload)
-				cacheChunkHit.Inc()
 				a.lru.touch(
 					EvictTarget{
 						Metric: payload.metric,

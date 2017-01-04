@@ -7,7 +7,6 @@ import (
 func TestAddingEvicting(t *testing.T) {
 	a := NewFlatAccnt(10)
 	cacheChunkAdd.SetUint32(0)
-	cacheChunkHit.SetUint32(0)
 	cacheChunkEvict.SetUint32(0)
 	evictQ := a.GetEvictQ()
 
@@ -67,10 +66,6 @@ func TestAddingEvicting(t *testing.T) {
 		t.Fatalf("Expected add counter to be at 5, got %d", peek)
 	}
 
-	if peek := cacheChunkHit.Peek(); peek != 1 {
-		t.Fatalf("Expected hit counter to be at 1, got %d", peek)
-	}
-
 	if peek := cacheChunkEvict.Peek(); peek != 4 {
 		t.Fatalf("Expected evict counter to be at 4, got %d", peek)
 	}
@@ -79,7 +74,6 @@ func TestAddingEvicting(t *testing.T) {
 func TestLRUOrdering(t *testing.T) {
 	a := NewFlatAccnt(6)
 	cacheChunkAdd.SetUint32(0)
-	cacheChunkHit.SetUint32(0)
 	cacheChunkEvict.SetUint32(0)
 	evictQ := a.GetEvictQ()
 
@@ -104,10 +98,6 @@ func TestLRUOrdering(t *testing.T) {
 
 	if peek := cacheChunkAdd.Peek(); peek != 3 {
 		t.Fatalf("Expected add counter to be at 3, got %d", peek)
-	}
-
-	if peek := cacheChunkHit.Peek(); peek != 1 {
-		t.Fatalf("Expected hit counter to be at 1, got %d", peek)
 	}
 
 	if peek := cacheChunkEvict.Peek(); peek != 1 {

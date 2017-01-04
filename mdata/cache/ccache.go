@@ -117,6 +117,7 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 		accnt.CacheMetricMiss.Inc()
 	} else {
 
+		accnt.CacheChunkHit.Add(len(res.Start) + len(res.End))
 		go func() {
 			for _, hit = range res.Start {
 				c.accnt.HitChunk(metric, hit.Ts())

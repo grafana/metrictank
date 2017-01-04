@@ -7,6 +7,7 @@ import (
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
+	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 	"math"
@@ -1202,7 +1203,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 		// expected number of cache hits on query over all chunks
 		// used to verify that cache is used when it should be used
-		Hits int
+		Hits uint32
 	}
 
 	testcases := []testcase{
@@ -1290,8 +1291,13 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 				// if current query is the maximum range we check the cache stats to
 				// verify it got all the hits it should have
-				/*if from == start && to == lastTs {
-				}*/
+				if from == start && to == lastTs {
+					hits := accnt.CacheChunkHit.Peek()
+					if tc.Hits != hits {
+						t.Fatalf("Pattern %s From %d To %d; Expected %d hits but got %d", pattern, from, to, tc.Hits, hits)
+					}
+				}
+				accnt.CacheChunkHit.SetUint32(0)
 
 				// stop cache go routines before reinstantiating it at the top of the loop
 				c.Stop()

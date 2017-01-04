@@ -20,7 +20,7 @@ var (
 	cacheMetricEvict = stats.NewCounter32("cache.ops.metric.evict")
 
 	// metric cache.ops.chunk.hit is how many chunks were hit
-	cacheChunkHit = stats.NewCounter32("cache.ops.chunk.hit")
+	CacheChunkHit = stats.NewCounter32("cache.ops.chunk.hit")
 
 	// metric cache.ops.chunk.add is how many chunks were added to the cache
 	cacheChunkAdd = stats.NewCounter32("cache.ops.chunk.add")
