@@ -11,7 +11,7 @@ import (
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/iter"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -328,28 +328,28 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 	}
 
 	if !readConsolidated && !runtimeConsolidation {
-		return s.getSeries(req, consolidation.None), req.OutInterval, nil
+		return s.getSeriesFixed(req, consolidation.None), req.OutInterval, nil
 	} else if !readConsolidated && runtimeConsolidation {
-		return consolidate(s.getSeries(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
+		return consolidate(s.getSeriesFixed(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readConsolidated && !runtimeConsolidation {
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				s.getSeries(req, consolidation.Sum),
-				s.getSeries(req, consolidation.Cnt),
+				s.getSeriesFixed(req, consolidation.Sum),
+				s.getSeriesFixed(req, consolidation.Cnt),
 			), req.OutInterval, nil
 		} else {
-			return s.getSeries(req, req.Consolidator), req.OutInterval, nil
+			return s.getSeriesFixed(req, req.Consolidator), req.OutInterval, nil
 		}
 	} else {
 		// readConsolidated && runtimeConsolidation
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				consolidate(s.getSeries(req, consolidation.Sum), req.AggNum, consolidation.Sum),
-				consolidate(s.getSeries(req, consolidation.Cnt), req.AggNum, consolidation.Sum),
+				consolidate(s.getSeriesFixed(req, consolidation.Sum), req.AggNum, consolidation.Sum),
+				consolidate(s.getSeriesFixed(req, consolidation.Cnt), req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
 		} else {
 			return consolidate(
-				s.getSeries(req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
+				s.getSeriesFixed(req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -364,68 +364,36 @@ func aggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
-func prevBoundary(ts uint32, span uint32) uint32 {
-	return ts - ((ts-1)%span + 1)
+func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
+	ctx := newRequestContext(&req, consolidator)
+	iters := s.getSeries(ctx, consolidator)
+	points := s.itersToPoints(ctx, iters)
+	return fix(points, req.From, req.To, req.ArchInterval)
+}
+
+func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
+
+	oldest, memIters := s.getSeriesAggMetrics(ctx)
+	log.Info("oldest from aggmetrics is %d\n", oldest)
+
+	if oldest <= ctx.From {
+		reqSpanMem.ValueUint32(ctx.To - ctx.From)
+		return memIters
+	}
+
+	// if oldest < to -> search until oldest, we already have the rest from mem
+	// if to < oldest -> no need to search until oldest, only search until to
+	until := util.Min(oldest, ctx.To)
+
+	return append(s.getSeriesCachedStore(ctx, until), memIters...)
 }
 
 // getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
-func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	iters := make([]iter.Iter, 0)
-	memIters := make([]iter.Iter, 0)
-	oldest := req.To
-	toUnix := req.To
-	fromUnix := req.From
-	interval := req.ArchInterval
-	key := req.Key
-	// while aggregated archives are quantized, raw intervals are not.  quantizing happens at the end of this function, **after* this step.
-	// So we have to be adjust the range to get the right data.
-	// (ranges described as a..b include both and b)
-	// REQ           0[---FROM---60]----------120-----------180[----TO----240]  any request from 1..60 to 181..240 should ...
-	// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules) ..
-	// STORED DATA   0[----------60][---------120][---------180][---------240]  but data for 60 may be at 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
-	// to retrieve the stored data, we also use from inclusive and to exclusive,
-	// so to make sure that the data after quantization (fix()) is correct, we have to make the following adjustment:
-	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
-	// note: fix() will set first to a clean boundary >= from (here 60), for which it accepts all points with ts <= 60 but > 60-60=0, e.g. our 1..60 range
-	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
-	// note: fix() will set last to a clean boundary < to (here 180), for which it accepts all points with ts <=180, eg our 121..180 range
-
-	if consolidator == consolidation.None {
-		fromUnix = prevBoundary(req.From, interval) + 1
-		toUnix = prevBoundary(req.To, interval) + 1
-	}
-
-	if metric, ok := s.MemoryStore.Get(key); ok {
-		if consolidator != consolidation.None {
-			logLoad("memory", aggMetricKey(key, consolidator.Archive(), interval), fromUnix, toUnix)
-			oldest, memIters = metric.GetAggregated(consolidator, interval, fromUnix, toUnix)
-		} else {
-			logLoad("memory", key, fromUnix, toUnix)
-			oldest, memIters = metric.Get(fromUnix, toUnix)
-		}
-	}
-	if oldest > fromUnix {
-		reqSpanBoth.ValueUint32(toUnix - fromUnix)
-		if consolidator != consolidation.None {
-			key = aggMetricKey(key, consolidator.Archive(), interval)
-		}
-		// if oldest < to -> search until oldest, we already have the rest from mem
-		// if to < oldest -> no need to search until oldest, only search until to
-		until := util.Min(oldest, toUnix)
-		logLoad("cassan", key, fromUnix, until)
-		storeIters, err := s.BackendStore.Search(key, fromUnix, until)
-		if err != nil {
-			panic(err)
-		}
-		iters = append(iters, storeIters...)
-	} else {
-		reqSpanMem.ValueUint32(toUnix - fromUnix)
-	}
+func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
 	pre := time.Now()
-	iters = append(iters, memIters...)
 
 	points := pointSlicePool.Get().([]schema.Point)
 	for _, iter := range iters {
@@ -434,21 +402,100 @@ func (s *Server) getSeries(req models.Req, consolidator consolidation.Consolidat
 		for iter.Next() {
 			total += 1
 			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
+			if ts >= ctx.From && ts < ctx.To {
 				good += 1
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
 		if LogLevel < 2 {
-			if iter.Cass {
-				log.Debug("DP getSeries: iter cass %d values good/total %d/%d", iter.T0, good, total)
-			} else {
-				log.Debug("DP getSeries: iter mem %d values good/total %d/%d", iter.T0, good, total)
-			}
+			log.Debug("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
 		}
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
-	return fix(points, fromUnix, toUnix, interval)
+	return points
+}
+
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
+	oldest := ctx.Req.To
+	var memIters []chunk.Iter
+
+	metric, ok := s.MemoryStore.Get(ctx.Key)
+	if !ok {
+		return oldest, memIters
+	}
+
+	if ctx.Cons != consolidation.None {
+		logLoad("memory", ctx.AggKey, ctx.From, ctx.To)
+		oldest, memIters = metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
+	} else {
+		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
+		oldest, memIters = metric.Get(ctx.From, ctx.To)
+	}
+
+	return oldest, memIters
+}
+
+// will only fetch until until, but uses ctx.To for debug logging
+func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
+	var iters []chunk.Iter
+	var prevts uint32
+	key := ctx.Key
+	if ctx.Cons != consolidation.None {
+		key = ctx.AggKey
+	}
+
+	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
+	logLoad("cassan", ctx.Key, ctx.From, ctx.To)
+
+	log.Debug("cache: searching query key %s, from %d, until %d", key, ctx.From, until)
+	cacheRes := s.Cache.Search(key, ctx.From, until)
+	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+
+	for _, itgen := range cacheRes.Start {
+		iter, err := itgen.Get()
+		prevts = itgen.Ts()
+		if err != nil {
+			// TODO(replay) figure out what to do if one piece is corrupt
+			log.Error(3, "itergen: error getting iter from Start list %+v", err)
+			continue
+		}
+		iters = append(iters, *iter)
+	}
+
+	// the request cannot completely be served from cache, it will require cassandra involvement
+	if !cacheRes.Complete {
+		storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, itgen := range storeIterGens {
+			it, err := itgen.Get()
+			if err != nil {
+				// TODO(replay) figure out what to do if one piece is corrupt
+				log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
+				continue
+			}
+			// it's important that the itgens get added in chronological order,
+			// currently we rely on cassandra returning results in order
+			go s.Cache.Add(key, prevts, itgen)
+			prevts = itgen.Ts()
+			iters = append(iters, *it)
+		}
+
+		// the End slice is in reverse order
+		for i := len(cacheRes.End) - 1; i >= 0; i-- {
+			it, err := cacheRes.End[i].Get()
+			if err != nil {
+				// TODO(replay) figure out what to do if one piece is corrupt
+				log.Error(3, "itergen: error getting iter from cache result end slice %+v", err)
+				continue
+			}
+			iters = append(iters, *it)
+		}
+	}
+
+	return iters
 }
 
 // check for duplicate series names. If found merge the results.
@@ -467,7 +514,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
 			log.Debug("DP mergeSeries: %s has multiple series.", series[0].Target)
-			for i, _ := range series[0].Datapoints {
+			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
 					if !math.IsNaN(series[j].Datapoints[i].Val) {
 						series[0].Datapoints[i].Val = series[j].Datapoints[i].Val
@@ -480,4 +527,51 @@ func mergeSeries(in []models.Series) []models.Series {
 		i++
 	}
 	return merged
+}
+
+type requestContext struct {
+	// request by external user.
+	Req *models.Req
+
+	// internal request needed to satisfy user request.
+	Cons   consolidation.Consolidator // to satisfy avg request from user, this would be sum or cnt
+	From   uint32                     // may be different than user request, see below
+	To     uint32                     // may be different than user request, see below
+	Key    string                     // key to query
+	AggKey string                     // aggkey to query (if needed)
+}
+
+func prevBoundary(ts uint32, span uint32) uint32 {
+	return ts - ((ts-1)%span + 1)
+}
+
+func newRequestContext(req *models.Req, consolidator consolidation.Consolidator) *requestContext {
+
+	rc := requestContext{
+		Req:  req,
+		Cons: consolidator,
+		Key:  req.Key,
+	}
+
+	// while aggregated archives are quantized, raw intervals are not.  quantizing happens after fetching the data,
+	// So we have to adjust the range to get the right data.
+	// (ranges described as a..b include both and b)
+	// REQ           0[---FROM---60]----------120-----------180[----TO----240]  any request from 1..60 to 181..240 should ...
+	// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules) ..
+	// STORED DATA   0[----------60][---------120][---------180][---------240]  but data for 60 may be at 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
+	// to retrieve the stored data, we also use from inclusive and to exclusive,
+	// so to make sure that the data after quantization (fix()) is correct, we have to make the following adjustment:
+	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
+	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
+
+	if consolidator == consolidation.None {
+		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
+		rc.To = prevBoundary(req.To, req.ArchInterval) + 1
+	} else {
+		rc.From = req.From
+		rc.To = req.To
+		rc.AggKey = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+	}
+
+	return &rc
 }

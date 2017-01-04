@@ -8,7 +8,6 @@ import (
 
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -157,7 +156,7 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []iter.Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []chunk.Iter) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -184,7 +183,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
+func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 	pre := time.Now()
 	if LogLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
@@ -200,7 +199,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return math.MaxInt32, make([]iter.Iter, 0)
+		return math.MaxInt32, make([]chunk.Iter, 0)
 	}
 
 	newestChunk := a.getChunk(a.CurrentChunkPos)
@@ -220,7 +219,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return from, make([]iter.Iter, 0)
+		return from, make([]chunk.Iter, 0)
 	}
 
 	// get the oldest chunk we have.
@@ -242,7 +241,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return math.MaxInt32, make([]iter.Iter, 0)
+		return math.MaxInt32, make([]chunk.Iter, 0)
 	}
 
 	// The first chunk is likely only a partial chunk. If we are not the primary node
@@ -256,7 +255,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return math.MaxInt32, make([]iter.Iter, 0)
+			return math.MaxInt32, make([]chunk.Iter, 0)
 		}
 	}
 
@@ -265,7 +264,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
-		return oldestChunk.T0, make([]iter.Iter, 0)
+		return oldestChunk.T0, make([]chunk.Iter, 0)
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -278,7 +277,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]iter.Iter, 0)
+			return to, make([]chunk.Iter, 0)
 		}
 	}
 
@@ -297,23 +296,25 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []iter.Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]iter.Iter, 0)
+			return to, make([]chunk.Iter, 0)
 		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]iter.Iter, 0, a.NumChunks)
-	for oldestPos != newestPos {
-		chunk := a.getChunk(oldestPos)
-		iters = append(iters, iter.New(chunk.Iter(), false))
+	iters := make([]chunk.Iter, 0, a.NumChunks)
+	for {
+		c := a.getChunk(oldestPos)
+		iters = append(iters, chunk.NewIter(c.Iter()))
+
+		if oldestPos == newestPos {
+			break
+		}
+
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
 	}
-	// add the last chunk
-	chunk := a.getChunk(oldestPos)
-	iters = append(iters, iter.New(chunk.Iter(), false))
 
 	memToIterDuration.Value(time.Now().Sub(pre))
 	return oldestChunk.T0, iters
@@ -331,7 +332,6 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 // write a chunk to persistent storage. This should only be called while holding a.Lock()
 func (a *AggMetric) persist(pos int) {
-
 	if !cluster.ThisNode.IsPrimary() {
 		if LogLevel < 2 {
 			log.Debug("AM persist(): node is not primary, not saving chunk.")

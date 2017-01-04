@@ -29,6 +29,7 @@ import (
 	inCarbon "github.com/raintank/metrictank/input/carbon"
 	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
@@ -342,6 +343,7 @@ func main() {
 	/***********************************
 		Initialize our MetricIdx
 	***********************************/
+	ccache := cache.NewCCache()
 	pre := time.Now()
 
 	if memory.Enabled {
@@ -402,6 +404,7 @@ func main() {
 	apiServer.BindMetricIndex(metricIndex)
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
+	apiServer.BindCache(ccache)
 	go apiServer.Run()
 
 	/***********************************

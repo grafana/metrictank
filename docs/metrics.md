@@ -11,6 +11,22 @@ how long it takes to handle a render request
 the timerange of requests hitting only the ringbuffer
 * `api.requests_span.mem_and_cassandra`:  
 the timerange of requests hitting both in-memory and cassandra
+* `cache.ops.chunk.add`:  
+how many chunks were added to the cache
+* `cache.ops.chunk.evict`:  
+how many chunks were evicted from the cache
+* `cache.ops.chunk.hit`:  
+how many chunks were hit
+* `cache.ops.metric.add`:  
+how many metrics were added to the cache
+* `cache.ops.metric.evict`:  
+how many metrics were evicted from the cache
+* `cache.ops.metric.hit-full`:  
+how many metrics were hit fully (all needed chunks in cache)
+* `cache.ops.metric.hit-partial`:  
+how many metrics were hit partially (some of the needed chunks in cache, but not all)
+* `cache.ops.metric.miss`:  
+how many metrics were missed completely (none of the needed chunks in cache)
 * `cluster.notifier.kafka.message_size`:  
 the sizes seen of messages through the kafka cluster notifier
 * `cluster.notifier.kafka.messages-published`:  

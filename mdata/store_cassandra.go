@@ -9,11 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/hailocab/go-hostpool"
 	"github.com/raintank/metrictank/cassandra"
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -276,10 +274,10 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, error) {
-	iters := make([]iter.Iter, 0)
+func (c *cassandraStore) Search(key string, start, end uint32) ([]chunk.IterGen, error) {
+	itgens := make([]chunk.IterGen, 0)
 	if start > end {
-		return iters, errStartBeforeEnd
+		return itgens, errStartBeforeEnd
 	}
 
 	pre := time.Now()
@@ -356,27 +354,14 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 			chunkSizeAtLoad.Value(len(b))
 			if len(b) < 2 {
 				log.Error(3, errChunkTooSmall.Error())
-				return iters, errChunkTooSmall
+				return itgens, errChunkTooSmall
 			}
-			switch chunk.Format(b[0]) {
-			case chunk.FormatStandardGoTsz:
-				b = b[1:]
-			case chunk.FormatStandardGoTszWithSpan:
-				if int(b[1]) >= len(chunk.ChunkSpans) {
-					log.Error(3, "corrupt data, chunk span code %d is not known", chunk.SpanCode(b[1]))
-				}
-				// getting the chunk span: _ = chunk.ChunkSpans[chunk.SpanCode(b[1])]
-				b = b[2:]
-			default:
-				log.Error(3, errUnknownChunkFormat.Error())
-				return iters, errUnknownChunkFormat
-			}
-			it, err := tsz.NewIterator(b)
+			itgen, err := chunk.NewGen(b, uint32(ts))
 			if err != nil {
-				log.Error(3, "failed to unpack cassandra payload. %s", err)
-				return iters, err
+				log.Error(3, err.Error())
+				return itgens, err
 			}
-			iters = append(iters, iter.New(it, true))
+			itgens = append(itgens, *itgen)
 		}
 		err := outcome.i.Close()
 		if err != nil {
@@ -388,8 +373,8 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]iter.Iter, err
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(len(outcomes))
-	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total iters", len(outcomes), len(iters))
-	return iters, nil
+	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itgens", len(outcomes), len(itgens))
+	return itgens, nil
 }
 
 func (c *cassandraStore) Stop() {
