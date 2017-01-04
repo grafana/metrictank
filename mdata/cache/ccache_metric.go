@@ -142,6 +142,8 @@ func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	}
 }
 
+// seekAsc finds the t0 of the chunk that contains ts, by searching from old to recent
+// if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
 	log.Debug("CCacheMetric seekAsc: seeking for %d in the keys %+d", ts, keys)
@@ -157,6 +159,8 @@ func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
 	return 0, false
 }
 
+// seekDesc finds the t0 of the chunk that contains ts, by searching from recent to old
+// if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekDesc(ts uint32, keys []uint32) (uint32, bool) {
 	log.Debug("CCacheMetric seekDesc: seeking for %d in the keys %+d", ts, keys)
