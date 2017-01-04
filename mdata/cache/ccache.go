@@ -116,15 +116,13 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 	defer c.RUnlock()
 
 	if cm, ok = c.metricCache[metric]; !ok {
-		// for stats only
-		c.accnt.MissMetric()
+		accnt.CacheMetricMiss.Inc()
 		return res
 	}
 
 	cm.Search(res, from, until)
 	if len(res.Start) == 0 && len(res.End) == 0 {
-		// for stats only, record a complete miss
-		c.accnt.MissMetric()
+		accnt.CacheMetricMiss.Inc()
 	} else {
 
 		go func() {
@@ -136,13 +134,10 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 			}
 		}()
 
-		// for stats only
 		if res.Complete {
-			// record a complete hit
-			c.accnt.CompleteMetric()
+			accnt.CacheMetricHitFull.Inc()
 		} else {
-			// record a partial hit
-			c.accnt.PartialMetric()
+			accnt.CacheMetricHitPartial.Inc()
 		}
 	}
 

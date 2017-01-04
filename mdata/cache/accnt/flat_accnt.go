@@ -3,7 +3,6 @@ package accnt
 import (
 	"github.com/raintank/worldping-api/pkg/log"
 	"sort"
-	"time"
 )
 
 const evictQSize = 1000
@@ -42,10 +41,6 @@ type FlatAccnt struct {
 	// each add means data got added to the cache, each hit means data
 	// has been accessed and hence the LRU needs to be updated.
 	eventQ chan FlatAccntEvent
-
-	stats       Stats
-	statsTicker time.Ticker
-	lastPrint   int64
 }
 
 // EvictTarget is the definition of a chunk that should be evicted.
@@ -60,41 +55,12 @@ type FlatAccntMet struct {
 }
 
 // event types to be used in FlatAccntEvent
-const evnt_complt_met uint8 = 1
-const evnt_miss_met uint8 = 2
-const evnt_part_met uint8 = 3
 const evnt_hit_chnk uint8 = 4
 const evnt_add_chnk uint8 = 5
 
 type FlatAccntEvent struct {
 	t  uint8       // event type
 	pl interface{} // payload
-}
-
-type Stats struct {
-	// metric full hits, all requested chunks were cached
-	complt_met uint32
-
-	// metric complete misses, not a single chunk of the request was cached
-	miss_met uint32
-
-	// metric partial hits, some of the requested chunks were cached
-	part_met uint32
-
-	// new metrics added
-	add_met uint32
-
-	// metrics completely evicted
-	evict_met uint32
-
-	// chunk hits
-	hit_chnk uint32
-
-	// chunk adds
-	add_chnk uint32
-
-	// chunk evictions
-	evict_chnk uint32
 }
 
 // payload to be sent with an add event
@@ -112,14 +78,13 @@ type HitPayload struct {
 
 func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 	accnt := FlatAccnt{
-		metrics:     make(map[string]*FlatAccntMet),
-		maxSize:     maxSize,
-		lru:         NewLRU(),
-		evictQ:      make(chan *EvictTarget, evictQSize),
-		eventQ:      make(chan FlatAccntEvent, eventQSize),
-		lastPrint:   time.Now().UnixNano(),
-		statsTicker: *(time.NewTicker(time.Second * 10)),
+		metrics: make(map[string]*FlatAccntMet),
+		maxSize: maxSize,
+		lru:     NewLRU(),
+		evictQ:  make(chan *EvictTarget, evictQSize),
+		eventQ:  make(chan FlatAccntEvent, eventQSize),
 	}
+	cacheSizeMax.SetUint64(maxSize)
 
 	go accnt.eventLoop()
 	return &accnt
@@ -131,18 +96,6 @@ func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
 
 func (a *FlatAccnt) HitChunk(metric string, ts uint32) {
 	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
-}
-
-func (a *FlatAccnt) MissMetric() {
-	a.act(evnt_miss_met, nil)
-}
-
-func (a *FlatAccnt) PartialMetric() {
-	a.act(evnt_part_met, nil)
-}
-
-func (a *FlatAccnt) CompleteMetric() {
-	a.act(evnt_complt_met, nil)
 }
 
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
@@ -159,48 +112,15 @@ func (a *FlatAccnt) act(t uint8, payload interface{}) {
 	}
 }
 
-func (a *FlatAccnt) statPrintReset() {
-	now := time.Now().UnixNano()
-	duration := now - a.lastPrint
-	var usg uint64 = 0
-	a.lastPrint = now
-
-	if a.total != 0 {
-		usg = 100 * a.total / a.maxSize
-	}
-
-	log.Info("--- Chunk Cache stats for the past %dns ---", duration)
-	log.Info("current size/max size %d/%d (%d%%)", a.total, a.maxSize, usg)
-	log.Info("metric complete %d", a.stats.complt_met)
-	log.Info("metric misses   %d", a.stats.miss_met)
-	log.Info("metric partials %d", a.stats.part_met)
-	log.Info("metric adds     %d", a.stats.add_met)
-	log.Info("metric evicts   %d", a.stats.evict_met)
-	log.Info("chunk hits      %d", a.stats.hit_chnk)
-	log.Info("chunk adds      %d", a.stats.add_chnk)
-	log.Info("chunk evicts    %d", a.stats.evict_chnk)
-
-	a.stats.complt_met = 0
-	a.stats.miss_met = 0
-	a.stats.part_met = 0
-	a.stats.add_met = 0
-	a.stats.evict_met = 0
-	a.stats.hit_chnk = 0
-	a.stats.add_chnk = 0
-	a.stats.evict_chnk = 0
-}
-
 func (a *FlatAccnt) eventLoop() {
 	for {
 		select {
-		case <-a.statsTicker.C:
-			a.statPrintReset()
 		case event := <-a.eventQ:
 			switch event.t {
 			case evnt_add_chnk:
 				payload := event.pl.(*AddPayload)
 				a.add(payload.metric, payload.ts, payload.size)
-				a.stats.add_chnk++
+				cacheChunkAdd.Inc()
 				a.lru.touch(
 					EvictTarget{
 						Metric: payload.metric,
@@ -209,19 +129,13 @@ func (a *FlatAccnt) eventLoop() {
 				)
 			case evnt_hit_chnk:
 				payload := event.pl.(*HitPayload)
-				a.stats.hit_chnk++
+				cacheChunkHit.Inc()
 				a.lru.touch(
 					EvictTarget{
 						Metric: payload.metric,
 						Ts:     payload.ts,
 					},
 				)
-			case evnt_miss_met:
-				a.stats.miss_met++
-			case evnt_part_met:
-				a.stats.part_met++
-			case evnt_complt_met:
-				a.stats.complt_met++
 			}
 
 			// evict until we're below the max
@@ -242,7 +156,7 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 			chunks: make(map[uint32]uint64),
 		}
 		a.metrics[metric] = met
-		a.stats.add_met++
+		cacheMetricAdd.Inc()
 	}
 
 	if _, ok = met.chunks[ts]; ok {
@@ -253,6 +167,7 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 	met.chunks[ts] = size
 	met.total = met.total + size
 	a.total = a.total + size
+	cacheSizeUsed.SetUint64(a.total)
 }
 
 func (a *FlatAccnt) evict() {
@@ -292,7 +207,8 @@ func (a *FlatAccnt) evict() {
 		size = met.chunks[ts]
 		met.total = met.total - size
 		a.total = a.total - size
-		a.stats.evict_chnk++
+		cacheSizeUsed.SetUint64(a.total)
+		cacheChunkEvict.Inc()
 		a.evictQ <- &EvictTarget{
 			Metric: target.Metric,
 			Ts:     ts,
@@ -301,7 +217,7 @@ func (a *FlatAccnt) evict() {
 	}
 
 	if met.total <= 0 {
-		a.stats.evict_met++
+		cacheMetricEvict.Inc()
 		delete(a.metrics, target.Metric)
 	}
 

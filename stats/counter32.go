@@ -29,6 +29,10 @@ func (c *Counter32) AddUint32(val uint32) {
 	atomic.AddUint32(&c.val, val)
 }
 
+func (c *Counter32) Peek() uint32 {
+	return atomic.LoadUint32(&c.val)
+}
+
 func (c *Counter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
 	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
