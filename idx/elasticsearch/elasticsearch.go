@@ -324,8 +324,8 @@ func (e *EsIdx) rebuildIndex() {
 	var err error
 	var out elastigo.SearchResult
 	qry := map[string]map[string]map[string]int32{
-		"query": map[string]map[string]int32{
-			"term": map[string]int32{"partition": 0},
+		"query": {
+			"term": {"partition": 0},
 		},
 	}
 	for _, partition := range cluster.ThisNode.GetPartitions() {

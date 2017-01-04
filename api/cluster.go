@@ -76,7 +76,7 @@ func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 	defs := s.MetricIndex.List(req.OrgId)
 	resp := make([]msgp.Marshaler, len(defs))
-	for i, _ := range defs {
+	for i := range defs {
 		d := defs[i]
 		resp[i] = &d
 	}

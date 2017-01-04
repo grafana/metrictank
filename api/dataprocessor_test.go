@@ -1205,14 +1205,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	}
 
 	testcases := []testcase{
-		testcase{"sscc", 2},
-		testcase{"ssbb", 2},
-		testcase{"ccss", 2},
-		testcase{"bbss", 2},
-		testcase{"ccsscc", 4},
-		testcase{"bbssbb", 4},
-		testcase{"ssbbss", 0},     // cannot use cache in the middle of the queried range
-		testcase{"ssbbssbbss", 0}, // cannot use cache in the middle of the queried range. this one mimics what happens when somebody has a dashboard showing the first week of the last few months
+		{"sscc", 2},
+		{"ssbb", 2},
+		{"ccss", 2},
+		{"bbss", 2},
+		{"ccsscc", 4},
+		{"bbssbb", 4},
+		{"ssbbss", 0},     // cannot use cache in the middle of the queried range
+		{"ssbbssbbss", 0}, // cannot use cache in the middle of the queried range. this one mimics what happens when somebody has a dashboard showing the first week of the last few months
 	}
 
 	// going through all testcases
