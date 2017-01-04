@@ -73,9 +73,6 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
 }
 
-func (c *CCache) GetStats() {
-}
-
 func (c *CCache) Stop() {
 	c.accnt.Stop()
 	c.stop <- nil
