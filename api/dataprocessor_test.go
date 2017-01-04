@@ -1143,11 +1143,9 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 
 // generates and returns a slice of chunks according to specified specs
 func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
-	var c *chunk.Chunk
+	var chunks []chunk.Chunk
 
-	chunks := make([]chunk.Chunk, 0)
-
-	c = chunk.New(start)
+	c := chunk.New(start)
 	for i := start; i < end; i++ {
 		c.Push(i, float64((i-start)*2))
 		if (i+1)%span == 0 {
