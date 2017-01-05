@@ -281,18 +281,11 @@ max-in-flight = 200
 ```
 
 ## metric metadata index ##
-### in-memory
-
-```
-[memory-idx]
-enabled = true
-```
-
 ### in memory, cassandra-backed
 
 ```
 [cassandra-idx]
-enabled = false
+enabled = true
 # Cassandra keyspace to store metricDefinitions in.
 keyspace = metrictank
 # comma separated list of cassandra addresses in host:port form
@@ -327,4 +320,11 @@ auth = false
 username = cassandra
 # password for authentication
 password = cassandra
+```
+
+### in-memory only
+
+```
+[memory-idx]
+enabled = false
 ```

@@ -84,7 +84,7 @@ var (
 func ConfigSetup() *flag.FlagSet {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
 
-	casIdx.BoolVar(&Enabled, "enabled", false, "")
+	casIdx.BoolVar(&Enabled, "enabled", true, "")
 	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
 	casIdx.StringVar(&keyspace, "keyspace", "metrictank", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
