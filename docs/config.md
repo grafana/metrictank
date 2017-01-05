@@ -37,8 +37,9 @@ accounting-period = 5min
 # see https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md for more details
 # duration of raw chunks. e.g. 10min, 30min, 1h, 90min...
 chunkspan = 2h
-# number of raw chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules
-numchunks = 5
+# number of raw chunks to keep in ring buffer. should be at least 1 more than what's needed to satisfy aggregation rules
+# note that the chunk-cache (settings further down) is a better method to cache data and alleviate workload for cassandra.
+numchunks = 1
 # minimum wait before raw metrics are removed from storage
 ttl = 35d
 # max age for a chunk before to be considered stale and to be persisted to Cassandra
@@ -144,6 +145,14 @@ interval = 1
 buffer-size = 20000
 ```
 
+## chunk cache ##
+
+```
+[chunk-cache]
+# maximum size of chunk cache in bytes. (1024 ^ 3) * 4 = 4294967296 = 4G
+max-size = 4294967296
+```
+
 ## http api ##
 
 ```
@@ -239,7 +248,7 @@ brokers = kafka:9092
 topic = metricpersist
 # kafka partitions to consume. use '*' or a comma separated list of id's. Should match kafka-mdm-in's partitions.
 partitions = *
-# method used for partitioning metrics. This should match the settings of tsdb-gw. One of byOrg|bySeries
+# method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)
 partition-scheme = bySeries
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
 offset = last

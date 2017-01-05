@@ -28,7 +28,7 @@ The standard recommendation is 120 points per chunk and keep at least as much in
 E.g. if your most common interval is 10s and most of your dashboards query for 2h worth of data, then the recommendation is:
 ```
 chunkspan = 20min
-numchunks = 7
+numchunks = 1
 ```
 
 20min because 120 points per chunk every 10 seconds is 1200 seconds or 20 minutes.

@@ -58,7 +58,7 @@ var (
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
-	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	numChunksInt = flag.Int("numchunks", 1, "number of raw chunks to keep in ring buffer. should be at least 1 more than what's needed to satisfy aggregation rules. note that the chunk-cache is a better method to cache data and alleviate workload for cassandra")
 	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
