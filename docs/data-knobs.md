@@ -20,21 +20,20 @@ For more details, see the [go-tsz eval program](https://github.com/dgryski/go-ts
 ### Basic guideline
 
 `chunkspan` is how long of a timeframe should be covered by your chunks. E.g. you could store anywhere between 1 second to 24 hours worth of data in a chunk (chunks for each raw metric).
-`numchunks` is simply how many chunks should be retained in RAM. (for each raw metric)
+`numchunks` is simply how many chunks should be retained in RAM (for each raw metric).
 
-figuring out optimal configuration for the `chunkspan` and `numchunks` is not trivial.
-The standard recommendation is 120 points per chunk and keep at least as much in RAM as what your commonly query for (+1 extra chunk, see below)
+Figuring out the optimal configuration for the `chunkspan` and `numchunks` is not trivial.
+The standard recommendation is at least 120 points per chunk and at least 1 chunk. Once data is older than `chunkspan * numchunks` it will be retained in memory by the
+[chunk-cache](#chunk-cache) if it is queried frequently.
 
-E.g. if your most common interval is 10s and most of your dashboards query for 2h worth of data, then the recommendation is:
+E.g. if your most common interval is 10s and your dashboards repeatedly query the same metrics, then the recommendation is:
 ```
 chunkspan = 20min
 numchunks = 1
 ```
 
 20min because 120 points per chunk every 10 seconds is 1200 seconds or 20 minutes.
-If you expected 6 chunks (20min * 6 = 2h), the answer is that you always need 1 extra chunk,
-because the current chunk is typically incomplete and only covers a fraction of the ongoing 20min timeslot,
-so you should always make sure to cover the requirements of one extra chunkspan.
+If you your dashboards repeatedly query the same metrics then it is safe to assume that the hot data which is older than `20min` will be served by the [chunk-cache](#chunk-cache) most of the time.
 
 Note:
 * `chunkspan` and `numchunks` are currently global variables, which can't be finetuned on a per-metric or per-category level.
@@ -52,6 +51,17 @@ Chunkspans can be set to one of the following:
 30min, 45min, 1h, 90min, 2h, 150min, 3h, 4h, 5h, 6h, 7h, 8h, 9h, 10h, 12h, 15h, 18h, 24h
 ```
 This list can be extended in the future.
+
+#### Chunk Cache
+
+If data is fetched from Cassandra it gets added into an internal caching layer that we call the `chunk-cache`, as the name implies this caches chunk by chunk.
+The chunk cache has a configurable [maximum size](https://github.com/raintank/metrictank/blob/master/docs/config.md#chunk-cache),
+within that size it tries to always keep the most often queried data by using an LRU mechanism that evicts the Least Recently Used chunks once the
+total size of the chunk cache reaches the defined maximum.
+The efficiency of the chunk cache largely depends on the common query patterns and the configured `max-size` value.
+If a small number of metrics gets queried often, then the efficiency of the chunk cache will be rather high because it can serve most requests out of it's memory.
+On the other hand, if most queries involve metrics that have not been queried for a long time and if they are only queried a small number of times,
+then Metrictank will need to fallback to Cassandra often and the chunk cache efficiency will decrease.
 
 #### Rollups remove the need to keep large number of higher resolution chunks
 
