@@ -57,8 +57,8 @@ var (
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Data:
-	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
-	numChunksInt = flag.Int("numchunks", 1, "number of raw chunks to keep in ring buffer. should be at least 1 more than what's needed to satisfy aggregation rules. note that the chunk-cache is a better method to cache data and alleviate workload for cassandra")
+	chunkSpanStr = flag.String("chunkspan", "10min", "duration of raw chunks")
+	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in in-memory ring buffer. note that the chunk-cache is a more effective method to cache data and alleviate workload for cassandra. but this allows secondary nodes to keep serving data in case the primary is not able to save data upto chunkspan*numchunks")
 	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
