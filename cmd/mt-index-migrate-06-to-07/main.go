@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -14,17 +15,27 @@ import (
 )
 
 var (
-	dryRun        = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
-	logLevel      = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	cassAddr      = flag.String("cass-addr", "localhost", "Address of cassandra host.")
-	keyspace      = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
-	partitionBy   = flag.String("partition-by", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
-	numPartitions = flag.Int("num-partitions", 1, "number of partitions in cluster")
+	dryRun          = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
+	logLevel        = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	cassAddr        = flag.String("cass-addr", "localhost", "Address of cassandra host.")
+	keyspace        = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
+	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
+	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
 
 	wg sync.WaitGroup
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "mt-index-migrate-06-to-07")
+		fmt.Fprintln(os.Stderr, "This tool converts a metrictank v0.6 index to the v0.7 format")
+		fmt.Fprintln(os.Stderr, "differences:")
+		fmt.Fprintln(os.Stderr, " * cassandra table: metric_def_idx -> metric_idx")
+		fmt.Fprintln(os.Stderr, " * data is stored as individual fields, not as messagepack encoded blob")
+		fmt.Fprintln(os.Stderr, " * support for partitioning. the partition field in cassandra will be set based on num-partitions and partition-schema")
+		fmt.Fprintf(os.Stderr, "\n\nFlags:\n\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, *logLevel))
 
@@ -117,7 +128,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Info("starting read thread")
 	defer wg.Done()
 	defer close(defsChan)
-	partitioner, err := cluster.NewKafkaPartitioner(*partitionBy)
+	partitioner, err := cluster.NewKafkaPartitioner(*partitionScheme)
 	if err != nil {
 		log.Fatal(4, "failed to initialize partitioner. %s", err)
 	}
