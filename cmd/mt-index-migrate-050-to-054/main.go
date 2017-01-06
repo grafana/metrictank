@@ -50,18 +50,18 @@ func main() {
 		log.Fatalf("failed to create cql session. %s", err)
 	}
 	wg.Add(1)
-	go writeDefs(session, defsChan, wg)
+	go writeDefs(session, defsChan, &wg)
 
 	conn := elastigo.NewConn()
 	conn.SetHosts([]string{*esAddr})
 	wg.Add(1)
-	go getDefs(conn, defsChan, wg)
+	go getDefs(conn, defsChan, &wg)
 
 	wg.Wait()
 
 }
 
-func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg sync.WaitGroup) {
+func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg *sync.WaitGroup) {
 	defer wg.Done()
 	data := make([]byte, 0)
 	for def := range defsChan {
@@ -96,7 +96,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, w
 	log.Printf("defsWriter exiting.")
 }
 
-func getDefs(conn *elastigo.Conn, defsChan chan *schema.MetricDefinition, wg sync.WaitGroup) {
+func getDefs(conn *elastigo.Conn, defsChan chan *schema.MetricDefinition, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer close(defsChan)
 	var err error
@@ -115,7 +115,7 @@ func getDefs(conn *elastigo.Conn, defsChan chan *schema.MetricDefinition, wg syn
 		for _, h := range out.Hits.Hits {
 			mdef, err := schemaV0.MetricDefinitionFromJSON(*h.Source)
 			if err != nil {
-				log.Printf("Error: Bad definition in index. %s - %s", h.Source, err)
+				log.Printf("Error: Bad definition in index. %v - %s", h.Source, err)
 				continue
 			}
 			newDef := &schema.MetricDefinition{
