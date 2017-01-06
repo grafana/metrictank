@@ -108,7 +108,7 @@ must cleanly multiply between one another (why again?)
 try to minimize storage overhead of each band
 
 SPAN CHOICE
-As described in the page [Data knobs](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans), only a finite set of values are valid chunk spans. This applies to rolled up chunks as well.
+As described in the page [Memory server](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans), only a finite set of values are valid chunk spans. This applies to rolled up chunks as well.
 
 RETENTION:
 should at the minimum be maxT otherwise what's the point

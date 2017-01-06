@@ -57,7 +57,7 @@ Metrictank crashed. What to do?
 #### If you run multiple instances
 
 * If the crashed instance was a secondary, you can just restart it and after it warmed up, it will ready to serve requests.  Verify that you have other instances who can serve requests, otherwise you may want to start it with a much shorter warm up time.  It will be ready to serve requests sooner, but may have to reach out to Cassandra more to load data.
-* If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#basic-guideline), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
+* If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
 
 
 #### If you only run once instance
@@ -97,7 +97,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
    See the `pressure.idx` metric in the 'metrics in' graph of the metrictank dashboard.
    For more details, look at the various index stats further down the dashboard.
 
-2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md) (10 minutes in the default docker image)
+2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
    [based on the configuration of your write queues and how many series you have](https://github.com/raintank/metrictank/issues/125) the queues may run full and
    provide ingestion backpressure, also lowering ingestion speed.  

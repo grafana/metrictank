@@ -229,7 +229,7 @@ func main() {
 	}
 	_, ok := chunk.RevChunkSpans[chunkSpan]
 	if !ok {
-		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *chunkSpanStr)
+		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", *chunkSpanStr)
 	}
 
 	set := strings.Split(*aggSettings, ",")
@@ -252,7 +252,7 @@ func main() {
 		}
 		_, ok := chunk.RevChunkSpans[aggChunkSpan]
 		if !ok {
-			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", fields[1])
+			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", fields[1])
 		}
 		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true
