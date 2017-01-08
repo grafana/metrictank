@@ -439,6 +439,7 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) (uint32, []chunk.Iter)
 func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
 	var iters []chunk.Iter
 	var prevts uint32
+
 	key := ctx.Key
 	if ctx.Cons != consolidation.None {
 		key = ctx.AggKey
@@ -464,23 +465,25 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 
 	// the request cannot completely be served from cache, it will require cassandra involvement
 	if !cacheRes.Complete {
-		storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, itgen := range storeIterGens {
-			it, err := itgen.Get()
+		if cacheRes.From != cacheRes.Until {
+			storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				// TODO(replay) figure out what to do if one piece is corrupt
-				log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
-				continue
+				panic(err)
 			}
-			// it's important that the itgens get added in chronological order,
-			// currently we rely on cassandra returning results in order
-			go s.Cache.Add(key, prevts, itgen)
-			prevts = itgen.Ts()
-			iters = append(iters, *it)
+
+			for _, itgen := range storeIterGens {
+				it, err := itgen.Get()
+				if err != nil {
+					// TODO(replay) figure out what to do if one piece is corrupt
+					log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
+					continue
+				}
+				// it's important that the itgens get added in chronological order,
+				// currently we rely on cassandra returning results in order
+				go s.Cache.Add(key, prevts, itgen)
+				prevts = itgen.Ts()
+				iters = append(iters, *it)
+			}
 		}
 
 		// the End slice is in reverse order
