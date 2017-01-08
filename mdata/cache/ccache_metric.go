@@ -231,7 +231,7 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
-	if len(mc.chunks) < 1 || from == until {
+	if len(mc.chunks) < 1 {
 		return
 	}
 
