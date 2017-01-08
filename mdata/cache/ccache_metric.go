@@ -204,10 +204,9 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *C
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
 		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
-		startTs := mc.chunks[ts].Ts
-		res.Until = startTs
+		res.Until = ts
 
-		if startTs <= from {
+		if ts <= from {
 			break
 		}
 	}
