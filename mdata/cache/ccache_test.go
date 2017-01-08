@@ -8,11 +8,24 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
-func getItgen(value uint32, ts uint32) *chunk.IterGen {
+func getItgen(values []uint32, ts uint32, span bool) *chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTsz))
-	binary.Write(buf, binary.LittleEndian, uint32(value))
+	if span {
+		binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTszWithSpan))
+		spanCode, ok := chunk.RevChunkSpans[uint32(len(values))]
+		if !ok {
+			return nil
+		}
+		binary.Write(buf, binary.LittleEndian, spanCode)
+	} else {
+		binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTsz))
+	}
+
+	for _, value := range values {
+		binary.Write(buf, binary.LittleEndian, uint32(value))
+	}
+
 	buf.Write(b)
 
 	itgen, _ := chunk.NewGen(buf.Bytes(), ts)
@@ -23,17 +36,18 @@ func getItgen(value uint32, ts uint32) *chunk.IterGen {
 func getConnectedChunks(metric string) *CCache {
 	cc := NewCCache()
 
-	itgen1 := getItgen(1111111, 1000)
-	itgen2 := getItgen(1111111, 2000)
-	itgen3 := getItgen(1111111, 3000)
-	itgen4 := getItgen(1111111, 4000)
-	itgen5 := getItgen(1111111, 5000)
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(values, 1000, false)
+	itgen2 := getItgen(values, 1005, false)
+	itgen3 := getItgen(values, 1010, false)
+	itgen4 := getItgen(values, 1015, false)
+	itgen5 := getItgen(values, 1020, false)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 1000, *itgen2)
-	cc.Add(metric, 2000, *itgen3)
-	cc.Add(metric, 3000, *itgen4)
-	cc.Add(metric, 4000, *itgen5)
+	cc.Add(metric, 1005, *itgen3)
+	cc.Add(metric, 1010, *itgen4)
+	cc.Add(metric, 1015, *itgen5)
 
 	return cc
 }
@@ -42,8 +56,9 @@ func TestConsecutiveAdding(t *testing.T) {
 	metric := "metric1"
 	cc := NewCCache()
 
-	itgen1 := getItgen(1111111, 1000)
-	itgen2 := getItgen(1111111, 2000)
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(values, 1000, false)
+	itgen2 := getItgen(values, 1005, false)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 1000, *itgen2)
@@ -53,7 +68,7 @@ func TestConsecutiveAdding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected cache chunk 1000 not found")
 	}
-	chunk2, ok := mc.chunks[2000]
+	chunk2, ok := mc.chunks[1005]
 	if !ok {
 		t.Fatalf("expected cache chunk 2000 not found")
 	}
@@ -61,7 +76,7 @@ func TestConsecutiveAdding(t *testing.T) {
 	if chunk1.Prev != 0 {
 		t.Fatalf("Expected previous chunk to be 0, got %d", chunk1.Prev)
 	}
-	if chunk1.Next != 2000 {
+	if chunk1.Next != 1005 {
 		t.Fatalf("Expected next chunk to be 2000, got %d", chunk1.Next)
 	}
 	if chunk2.Prev != 1000 {
@@ -72,10 +87,91 @@ func TestConsecutiveAdding(t *testing.T) {
 	}
 }
 
+// tests if chunks get connected to previous even if it is is not specified, based on span
+func TestDisconnectedAdding(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(values, 1000, true)
+	itgen2 := getItgen(values, 1005, true)
+	itgen3 := getItgen(values, 1010, true)
+
+	cc.Add(metric, 0, *itgen1)
+	cc.Add(metric, 0, *itgen2)
+	cc.Add(metric, 0, *itgen3)
+
+	res := cc.Search(metric, 900, 1015)
+
+	if res.Complete {
+		t.Fatalf("complete is expected to be false")
+	}
+
+	if len(res.Start) != 0 {
+		t.Fatalf("expected to get 0 itergens in Start, got %d", len(res.Start))
+	}
+
+	if len(res.End) != 3 {
+		t.Fatalf("expected to get 3 itergens in End, got %d", len(res.End))
+	}
+
+	if res.End[0].Ts() != 1010 || res.End[len(res.End)-1].Ts() != 1000 {
+		t.Fatalf("result set is wrong")
+	}
+}
+
+// tests if chunks get connected to previous even if it is is not specified,
+// basesd on a span which is the result of a guess that's based on the distance to the previous chunk
+func TestDisconnectedAddingByGuessing(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(values, 1000, false)
+	itgen2 := getItgen(values, 1005, false)
+	itgen3 := getItgen(values, 1010, false)
+
+	cc.Add(metric, 0, *itgen1)
+	cc.Add(metric, 1000, *itgen2)
+	cc.Add(metric, 0, *itgen3)
+
+	res := cc.Search(metric, 900, 1015)
+
+	if res.Complete {
+		t.Fatalf("complete is expected to be false")
+	}
+
+	if len(res.Start) != 0 {
+		t.Fatalf("expected to get 0 itergens in Start, got %d", len(res.Start))
+	}
+
+	if len(res.End) != 3 {
+		t.Fatalf("expected to get 3 itergens in End, got %d", len(res.End))
+	}
+
+	if res.End[0].Ts() != 1010 || res.End[len(res.End)-1].Ts() != 1000 {
+		t.Fatalf("result set is wrong")
+	}
+
+	mc, ok := cc.metricCache[metric]
+	if !ok {
+		t.Fatalf("cannot find metric that should be present")
+	}
+
+	lastChunk, ok := mc.chunks[1010]
+	if !ok {
+		t.Fatalf("cannot find chunk that should be present")
+	}
+
+	if lastChunk.Prev != 1005 {
+		t.Fatalf("Add() method failed to correctly guess previous chunk")
+	}
+}
+
 func TestSearchFromBeginningComplete(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
-	res := cc.Search(metric, 2500, 5999)
+	res := cc.Search(metric, 1006, 1025)
 
 	if !res.Complete {
 		t.Fatalf("complete is expected to be true")
@@ -85,7 +181,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 		t.Fatalf("expected to get 4 itergens, got %d", len(res.Start))
 	}
 
-	if res.Start[0].Ts() != 2000 || res.Start[len(res.Start)-1].Ts() != 5000 {
+	if res.Start[0].Ts() != 1005 || res.Start[len(res.Start)-1].Ts() != 1020 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -93,8 +189,8 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
-	res := cc.Search(metric, 2500, 6000)
-	if !res.Complete {
+	res := cc.Search(metric, 1006, 1030)
+	if res.Complete {
 		t.Fatalf("complete is expected to be false")
 	}
 
@@ -102,7 +198,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 		t.Fatalf("expected to get 4 itergens, got %d", len(res.Start))
 	}
 
-	if res.Start[0].Ts() != 2000 || res.Start[len(res.Start)-1].Ts() != 5000 {
+	if res.Start[0].Ts() != 1005 || res.Start[len(res.Start)-1].Ts() != 1020 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -110,7 +206,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 func TestSearchFromEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(metric)
-	res := cc.Search(metric, 500, 5999)
+	res := cc.Search(metric, 500, 1025)
 
 	if res.Complete {
 		t.Fatalf("complete is expected to not be true")
@@ -128,7 +224,7 @@ func TestSearchFromEnd(t *testing.T) {
 		t.Fatalf("Until is expected to be 1000, got %d", res.Until)
 	}
 
-	if res.End[0].Ts() != 5000 || res.End[len(res.End)-1].Ts() != 1000 {
+	if res.End[0].Ts() != 1020 || res.End[len(res.End)-1].Ts() != 1000 {
 		t.Fatalf("result set is wrong")
 	}
 }
