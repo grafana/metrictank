@@ -64,12 +64,11 @@ func (p *Publisher) Send(metrics []*schema.MetricData) error {
 	if len(metrics) == 0 {
 		return nil
 	}
-	var data []byte
 
 	payload := make([]*sarama.ProducerMessage, len(metrics))
 
 	for i, metric := range metrics {
-		data, err := metric.MarshalMsg(data[:0])
+		data, err := metric.MarshalMsg(nil)
 		if err != nil {
 			return err
 		}
