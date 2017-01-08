@@ -81,6 +81,16 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 
 	log.Debug("CCacheMetric Add: caching chunk ts %d, nextTs %d", ts, nextTs)
 
+	// if previous chunk has not been passed we try to be smart and figure it out.
+	// this is common in a scenario where a metric continuously gets queried
+	// for a range that starts less than one chunkspan before now().
+	if prev == 0 {
+		ts, ok := mc.seekDesc(ts-1, mc.sortedTs())
+		if ok {
+			prev = ts
+		}
+	}
+
 	// if the previous chunk is cached, link in both directions
 	if _, ok := mc.chunks[prev]; ok {
 		mc.chunks[prev].Next = ts
@@ -202,13 +212,13 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *C
 	}
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
+		if ts < from {
+			break
+		}
+
 		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		res.Until = ts
-
-		if ts <= from {
-			break
-		}
 	}
 }
 
