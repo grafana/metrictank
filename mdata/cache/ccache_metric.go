@@ -244,12 +244,11 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 
 	if !res.Complete && res.From > res.Until {
 		log.Debug("CCacheMetric Search: Found from > until (%d/%d), printing chunks\n", res.From, res.Until)
-		mc.debugMetric()
+		mc.debugMetric(keys)
 	}
 }
 
-func (mc *CCacheMetric) debugMetric() {
-	keys := mc.sortedTs()
+func (mc *CCacheMetric) debugMetric(keys []uint32) {
 	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
 	log.Debug("CCacheMetric debugMetric: oldest %d; newest %d\n", mc.oldest, mc.newest)
 	for _, key := range keys {
