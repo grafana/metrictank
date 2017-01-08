@@ -12,14 +12,6 @@ import (
 type CCacheMetric struct {
 	sync.RWMutex
 
-	// points to the timestamp of the newest cache chunk currently held
-	// the head of the linked list that containes the cache chunks
-	newest uint32
-
-	// points to the timestamp of the oldest cache chunk currently held
-	// the tail of the linked list that containes the cache chunks
-	oldest uint32
-
 	// points at cached data chunks, indexed by their according time stamp
 	chunks map[uint32]*CCacheChunk
 }
@@ -32,8 +24,6 @@ func NewCCacheMetric() *CCacheMetric {
 
 func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) {
 	mc.Add(prev, itergen)
-	mc.oldest = itergen.Ts()
-	mc.newest = itergen.Ts()
 }
 
 func (mc *CCacheMetric) Del(ts uint32) int {
@@ -104,13 +94,6 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 			mc.chunks[nextTs].Prev = ts
 			mc.chunks[ts].Next = nextTs
 		}
-	}
-
-	// update list head/tail if necessary
-	if ts > mc.newest {
-		mc.newest = ts
-	} else if ts < mc.oldest {
-		mc.oldest = ts
 	}
 
 	return
@@ -259,7 +242,6 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 
 func (mc *CCacheMetric) debugMetric(keys []uint32) {
 	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
-	log.Debug("CCacheMetric debugMetric: oldest %d; newest %d\n", mc.oldest, mc.newest)
 	for _, key := range keys {
 		log.Debug("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
 	}
