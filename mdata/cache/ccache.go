@@ -58,6 +58,33 @@ func (c *CCache) evictLoop() {
 	}
 }
 
+// adds the given chunk to the cache, but only if the metric is sufficiently hot
+func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+	c.RLock()
+
+	var met *CCacheMetric
+	var ok bool
+
+	// if this metric is not cached at all it is not hot
+	if met, ok = c.metricCache[metric]; !ok {
+		c.RUnlock()
+		return
+	}
+
+	// if the previous chunk is not cached we consider the metric not hot enough to cache this chunk
+	// only works reliably if the last chunk of that metric is span aware, otherwise lastTs() will be guessed
+	// conservatively which means that the returned value will probably be lower than the real last ts
+	if met.lastTs() < itergen.Ts() {
+		c.RUnlock()
+		return
+	}
+
+	accnt.CacheChunkPushHot.Inc()
+
+	c.RUnlock()
+	c.Add(metric, prev, itergen)
+}
+
 func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	c.Lock()
 	defer c.Unlock()
