@@ -11,10 +11,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/raintank/dur"
-	"github.com/raintank/met/helper"
 	"github.com/raintank/metrictank/api"
-	"github.com/raintank/metrictank/iter"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -56,10 +55,15 @@ var (
 	fix  = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization")
 )
 
-func printNormal(iters []iter.Iter, from, to uint32) {
-	fmt.Println("number of chunks:", len(iters))
-	for i, iter := range iters {
+func printNormal(igens []chunk.IterGen, from, to uint32) {
+	fmt.Println("number of chunks:", len(igens))
+	for i, ig := range igens {
 		fmt.Println("## chunk", i)
+		iter, err := ig.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
+			continue
+		}
 		for iter.Next() {
 			ts, val := iter.Values()
 			printRecord(ts, val, ts >= from && ts < to, math.IsNaN(val))
@@ -90,7 +94,7 @@ func printRecord(ts uint32, val float64, in, nan bool) {
 	}
 }
 
-func printSummary(iters []iter.Iter, from, to uint32) {
+func printSummary(igens []chunk.IterGen, from, to uint32) {
 
 	var count int
 	first := true
@@ -102,7 +106,12 @@ func printSummary(iters []iter.Iter, from, to uint32) {
 		fmt.Printf("... and %d more of in_range=%t nan=%t ...\n", count, in, nan)
 	}
 
-	for _, iter := range iters {
+	for i, ig := range igens {
+		iter, err := ig.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
+			continue
+		}
 		for iter.Next() {
 			ts, val = iter.Values()
 
@@ -248,13 +257,10 @@ func main() {
 		return
 	}
 
-	stats, err := helper.New(false, "", "standard", "mt-store-cat", "default")
-
-	store, err := mdata.NewCassandraStore(stats, *cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
-	store.InitMetrics(stats)
 
 	// if we're gonna mimic MT, then it would be:
 	/*
@@ -285,16 +291,16 @@ func main() {
 		}
 	} else {
 
-		iters, err := store.Search(id, fromUnix, toUnix)
+		igens, err := store.Search(id, fromUnix, toUnix)
 		if err != nil {
 			panic(err)
 		}
 
 		switch mode {
 		case "normal":
-			printNormal(iters, fromUnix, toUnix)
+			printNormal(igens, fromUnix, toUnix)
 		case "summary":
-			printSummary(iters, fromUnix, toUnix)
+			printSummary(igens, fromUnix, toUnix)
 		default:
 			panic("unsupported mode")
 		}
@@ -303,14 +309,19 @@ func main() {
 }
 
 func getSeries(id string, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
-	iters, err := store.Search(id, fromUnix, toUnix)
+	itgens, err := store.Search(id, fromUnix, toUnix)
 	if err != nil {
 		panic(err)
 	}
 
 	var points []schema.Point
 
-	for _, iter := range iters {
+	for i, itgen := range itgens {
+		iter, err := itgen.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
+			continue
+		}
 		for iter.Next() {
 			ts, val := iter.Values()
 			if ts >= fromUnix && ts < toUnix {
