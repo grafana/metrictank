@@ -143,6 +143,14 @@ func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	}
 }
 
+// returns the last Ts of this metric cache
+// since ranges are exclusive at the end this is actually the first Ts that is not cached
+func (mc *CCacheMetric) lastTs() uint32 {
+	mc.RLock()
+	defer mc.RUnlock()
+	return mc.nextTs(mc.keys[len(mc.keys)-1])
+}
+
 // seekAsc finds the t0 of the chunk that contains ts, by searching from old to recent
 // if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock

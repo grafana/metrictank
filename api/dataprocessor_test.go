@@ -545,8 +545,7 @@ func TestPrevBoundary(t *testing.T) {
 func TestGetSeriesFixed(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewDevnullStore()
-	metrics := mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
-	Addr = "localhost:6060"
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
@@ -1231,7 +1230,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	srv, _ := NewServer()
 	store := mdata.NewMockStore()
 	srv.BindBackendStore(store)
-	metrics := mdata.NewAggMetrics(store, 1, 1, 0, 0, 0, 0, []mdata.AggSetting{})
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 1, 1, 0, 0, 0, 0, []mdata.AggSetting{})
 	srv.BindMemoryStore(metrics)
 	metric := "metric1"
 	var c *cache.CCache
@@ -1407,8 +1406,7 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	store := mdata.NewMockStore()
 	chunkSpan := uint32(600)
 	numChunks := uint32(10)
-	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
-	Addr = "localhost:6060"
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
