@@ -140,7 +140,7 @@
             },
             {
               "refId": "G",
-              "target": "aliasByNode(scale(perSecond(metrictank.stats.$environment.$instance.input.carbon.pressure.*.counter32), 0.000000001), 6, 7)"
+              "target": "aliasByNode(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.*.counter32), 0.000000001), 6, 7)"
             }
           ],
           "timeFrom": null,
