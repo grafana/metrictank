@@ -12,16 +12,11 @@ import (
 type CCacheMetric struct {
 	sync.RWMutex
 
-	// points to the timestamp of the newest cache chunk currently held
-	// the head of the linked list that containes the cache chunks
-	newest uint32
-
-	// points to the timestamp of the oldest cache chunk currently held
-	// the tail of the linked list that containes the cache chunks
-	oldest uint32
-
 	// points at cached data chunks, indexed by their according time stamp
 	chunks map[uint32]*CCacheChunk
+
+	// the list of chunk time stamps in ascending order
+	keys []uint32
 }
 
 func NewCCacheMetric() *CCacheMetric {
@@ -32,8 +27,6 @@ func NewCCacheMetric() *CCacheMetric {
 
 func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) {
 	mc.Add(prev, itergen)
-	mc.oldest = itergen.Ts()
-	mc.newest = itergen.Ts()
 }
 
 func (mc *CCacheMetric) Del(ts uint32) int {
@@ -55,6 +48,9 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	}
 
 	delete(mc.chunks, ts)
+
+	// regenerate the list of sorted keys after deleting a chunk
+	mc.generateKeys()
 
 	return len(mc.chunks)
 }
@@ -81,6 +77,16 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 
 	log.Debug("CCacheMetric Add: caching chunk ts %d, nextTs %d", ts, nextTs)
 
+	// if previous chunk has not been passed we try to be smart and figure it out.
+	// this is common in a scenario where a metric continuously gets queried
+	// for a range that starts less than one chunkspan before now().
+	if prev == 0 {
+		ts, ok := mc.seekDesc(ts - 1)
+		if ok {
+			prev = ts
+		}
+	}
+
 	// if the previous chunk is cached, link in both directions
 	if _, ok := mc.chunks[prev]; ok {
 		mc.chunks[prev].Next = ts
@@ -96,25 +102,21 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 		}
 	}
 
-	// update list head/tail if necessary
-	if ts > mc.newest {
-		mc.newest = ts
-	} else if ts < mc.oldest {
-		mc.oldest = ts
-	}
+	// regenerate the list of sorted keys after adding a chunk
+	mc.generateKeys()
 
 	return
 }
 
-// get sorted slice of all chunk timestamps
+// generate sorted slice of all chunk timestamps
 // assumes we have at least read lock
-func (mc *CCacheMetric) sortedTs() []uint32 {
+func (mc *CCacheMetric) generateKeys() {
 	keys := make([]uint32, 0, len(mc.chunks))
 	for k := range mc.chunks {
 		keys = append(keys, k)
 	}
 	sort.Sort(accnt.Uint32Asc(keys))
-	return keys
+	mc.keys = keys
 }
 
 // nextTs takes a chunk's ts and returns the ts of the next chunk. (guessing if necessary)
@@ -144,13 +146,13 @@ func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 // seekAsc finds the t0 of the chunk that contains ts, by searching from old to recent
 // if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
-func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
-	log.Debug("CCacheMetric seekAsc: seeking for %d in the keys %+d", ts, keys)
+func (mc *CCacheMetric) seekAsc(ts uint32) (uint32, bool) {
+	log.Debug("CCacheMetric seekAsc: seeking for %d in the keys %+d", ts, mc.keys)
 
-	for i := 0; i < len(keys) && keys[i] <= ts; i++ {
-		if mc.nextTs(keys[i]) > ts {
-			log.Debug("CCacheMetric seekAsc: seek found ts %d is between %d and %d", ts, keys[i], mc.nextTs(keys[i]))
-			return keys[i], true
+	for i := 0; i < len(mc.keys) && mc.keys[i] <= ts; i++ {
+		if mc.nextTs(mc.keys[i]) > ts {
+			log.Debug("CCacheMetric seekAsc: seek found ts %d is between %d and %d", ts, mc.keys[i], mc.nextTs(mc.keys[i]))
+			return mc.keys[i], true
 		}
 	}
 
@@ -161,13 +163,13 @@ func (mc *CCacheMetric) seekAsc(ts uint32, keys []uint32) (uint32, bool) {
 // seekDesc finds the t0 of the chunk that contains ts, by searching from recent to old
 // if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
-func (mc *CCacheMetric) seekDesc(ts uint32, keys []uint32) (uint32, bool) {
-	log.Debug("CCacheMetric seekDesc: seeking for %d in the keys %+d", ts, keys)
+func (mc *CCacheMetric) seekDesc(ts uint32) (uint32, bool) {
+	log.Debug("CCacheMetric seekDesc: seeking for %d in the keys %+d", ts, mc.keys)
 
-	for i := len(keys) - 1; i >= 0 && mc.nextTs(keys[i]) > ts; i-- {
-		if keys[i] <= ts {
-			log.Debug("CCacheMetric seekDesc: seek found ts %d is between %d and %d", ts, keys[i], mc.nextTs(keys[i]))
-			return keys[i], true
+	for i := len(mc.keys) - 1; i >= 0 && mc.nextTs(mc.keys[i]) > ts; i-- {
+		if mc.keys[i] <= ts {
+			log.Debug("CCacheMetric seekDesc: seek found ts %d is between %d and %d", ts, mc.keys[i], mc.nextTs(mc.keys[i]))
+			return mc.keys[i], true
 		}
 	}
 
@@ -175,8 +177,8 @@ func (mc *CCacheMetric) seekDesc(ts uint32, keys []uint32) (uint32, bool) {
 	return 0, false
 }
 
-func (mc *CCacheMetric) searchForward(from, until uint32, keys []uint32, res *CCSearchResult) {
-	ts, ok := mc.seekAsc(from, keys)
+func (mc *CCacheMetric) searchForward(from, until uint32, res *CCSearchResult) {
+	ts, ok := mc.seekAsc(from)
 	if !ok {
 		return
 	}
@@ -195,21 +197,20 @@ func (mc *CCacheMetric) searchForward(from, until uint32, keys []uint32, res *CC
 	}
 }
 
-func (mc *CCacheMetric) searchBackward(from, until uint32, keys []uint32, res *CCSearchResult) {
-	ts, ok := mc.seekDesc(until-1, keys)
+func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) {
+	ts, ok := mc.seekDesc(until - 1)
 	if !ok {
 		return
 	}
 
 	for ; ts != 0; ts = mc.chunks[ts].Prev {
-		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
-		res.End = append(res.End, mc.chunks[ts].Itgen)
-		startTs := mc.chunks[ts].Ts
-		res.Until = startTs
-
-		if startTs <= from {
+		if ts < from {
 			break
 		}
+
+		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
+		res.End = append(res.End, mc.chunks[ts].Itgen)
+		res.Until = ts
 	}
 }
 
@@ -231,15 +232,13 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
-	if len(mc.chunks) < 1 || from == until {
+	if len(mc.chunks) < 1 {
 		return
 	}
 
-	keys := mc.sortedTs()
-
-	mc.searchForward(from, until, keys, res)
+	mc.searchForward(from, until, res)
 	if !res.Complete {
-		mc.searchBackward(from, until, keys, res)
+		mc.searchBackward(from, until, res)
 	}
 
 	if !res.Complete && res.From > res.Until {
@@ -249,10 +248,8 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 }
 
 func (mc *CCacheMetric) debugMetric() {
-	keys := mc.sortedTs()
 	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
-	log.Debug("CCacheMetric debugMetric: oldest %d; newest %d\n", mc.oldest, mc.newest)
-	for _, key := range keys {
+	for _, key := range mc.keys {
 		log.Debug("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
 	}
 	log.Debug("CCacheMetric debugMetric: ------------------------\n")

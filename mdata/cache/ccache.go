@@ -104,6 +104,10 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 		Until: until,
 	}
 
+	if from == until {
+		return res
+	}
+
 	c.RLock()
 	defer c.RUnlock()
 
