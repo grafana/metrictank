@@ -190,6 +190,11 @@ func main() {
 	}
 	flag.Parse()
 
+	if *showVersion {
+		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		return
+	}
+
 	if flag.NArg() < 3 {
 		flag.Usage()
 		os.Exit(-1)
