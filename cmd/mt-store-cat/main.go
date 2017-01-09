@@ -187,6 +187,8 @@ func main() {
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
+		fmt.Println("Notes:")
+		fmt.Println(" * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`")
 	}
 	flag.Parse()
 
