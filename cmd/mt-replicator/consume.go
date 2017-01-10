@@ -44,6 +44,7 @@ func (c *Consumer) Consume(publisher *Publisher) {
 	buf := make([]*schema.MetricData, 0)
 	ticker := time.NewTicker(time.Second * 10)
 	counter := 0
+	counterTs := time.Now()
 	msgChan := c.consumer.Messages()
 	defer close(c.Done)
 	for {
@@ -74,9 +75,10 @@ func (c *Consumer) Consume(publisher *Publisher) {
 				buf = buf[:0]
 				c.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
 			}
-		case <-ticker.C:
-			log.Info("%d metrics procesed in last 10seconds.", counter)
+		case t := <-ticker.C:
+			log.Info("%d metrics procesed in last %.1fseconds.", counter, t.Sub(counterTs).Seconds())
 			counter = 0
+			counterTs = t
 		}
 	}
 
