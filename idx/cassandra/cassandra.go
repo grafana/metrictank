@@ -248,7 +248,7 @@ func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	var defs []schema.MetricDefinition
-	for _, partition := range cluster.ThisNode.GetPartitions() {
+	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = c.LoadPartition(partition, defs)
 	}
 	c.MemoryIdx.Load(defs)

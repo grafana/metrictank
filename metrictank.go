@@ -192,7 +192,19 @@ func main() {
 	/***********************************
 		Initialize our Cluster
 	***********************************/
-	cluster.Init(*instance, GitHash, startupTime)
+	api.ConfigProcess()
+	cluster.ConfigProcess()
+	scheme := "http"
+	if api.UseSSL {
+		scheme = "https"
+	}
+	addrParts := strings.Split(api.Addr, ":")
+	port, err := strconv.ParseInt(addrParts[len(addrParts)-1], 10, 64)
+	if err != nil {
+		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
+	}
+	cluster.Init(*instance, GitHash, startupTime, scheme, int(port))
+	cluster.Start()
 
 	/***********************************
 		Validate remaining settings
@@ -201,8 +213,6 @@ func main() {
 	inKafkaMdm.ConfigProcess(*instance)
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
-	api.ConfigProcess()
-	cluster.ConfigProcess()
 	statsConfig.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
@@ -290,11 +300,6 @@ func main() {
 	***********************************/
 	statsConfig.Start()
 
-	/*************************************
-	  Start polling our Cluster Peers
-	**************************************/
-	cluster.Start()
-
 	/***********************************
 		Initialize our backendStore
 	***********************************/
@@ -369,6 +374,23 @@ func main() {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
 
+	/***********************************
+		Initialize our API server
+	***********************************/
+	apiServer, err := api.NewServer()
+	if err != nil {
+		log.Fatal(4, "Failed to start API. %s", err.Error())
+	}
+
+	apiServer.BindMetricIndex(metricIndex)
+	apiServer.BindMemoryStore(metrics)
+	apiServer.BindBackendStore(store)
+	apiServer.BindCache(ccache)
+	go apiServer.Run()
+
+	/***********************************
+		Load index entries from the backend store.
+	***********************************/
 	err = metricIndex.Init()
 	if err != nil {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
@@ -394,27 +416,13 @@ func main() {
 	stats.NewTimeDiffReporter32("cluster.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
 
 	/***********************************
-		Initialize our API server
-	***********************************/
-	apiServer, err := api.NewServer()
-	if err != nil {
-		log.Fatal(4, "Failed to start API. %s", err.Error())
-	}
-
-	apiServer.BindMetricIndex(metricIndex)
-	apiServer.BindMemoryStore(metrics)
-	apiServer.BindBackendStore(store)
-	apiServer.BindCache(ccache)
-	go apiServer.Run()
-
-	/***********************************
 		Set our status so we can accept
 		requests from users.
 	***********************************/
-	if cluster.ThisNode.IsPrimary() {
-		cluster.ThisNode.SetReady()
+	if cluster.Manager.IsPrimary() {
+		cluster.Manager.SetReady()
 	} else {
-		cluster.ThisNode.SetReadyIn(warmupPeriod)
+		cluster.Manager.SetReadyIn(warmupPeriod)
 	}
 
 	/***********************************

@@ -15,16 +15,16 @@ import (
 var NotFoundErr = errors.New("not found")
 
 func (s *Server) getNodeStatus(ctx *middleware.Context) {
-	response.Write(ctx, response.NewJson(200, cluster.ThisNode, ""))
+	response.Write(ctx, response.NewJson(200, cluster.Manager.ThisNode(), ""))
 }
 
 func (s *Server) setNodeStatus(ctx *middleware.Context, status models.NodeStatus) {
-	cluster.ThisNode.SetPrimary(status.Primary)
+	cluster.Manager.SetPrimary(status.Primary)
 	ctx.PlainText(200, []byte("OK"))
 }
 
 func (s *Server) appStatus(ctx *middleware.Context) {
-	if cluster.ThisNode.IsReady() {
+	if cluster.Manager.IsReady() {
 		ctx.PlainText(200, []byte("OK"))
 		return
 	}
@@ -34,8 +34,8 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
-		Node:  cluster.ThisNode,
-		Peers: cluster.GetPeers(),
+		Node:  cluster.Manager.ThisNode(),
+		Peers: cluster.Manager.PeersList(),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
 }

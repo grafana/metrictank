@@ -47,7 +47,7 @@ func (ms *AggMetrics) GC() {
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
-		if !cluster.ThisNode.IsPrimary() {
+		if !cluster.Manager.IsPrimary() {
 			continue
 		}
 		log.Info("checking for stale chunks that need persisting.")

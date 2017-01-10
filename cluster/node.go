@@ -8,16 +8,11 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
-	"sync"
 	"time"
 
 	"github.com/google/go-querystring/query"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
-
-var clusterPrimary = stats.NewBool("cluster.primary")
 
 //go:generate stringer -type=NodeState
 type NodeState int
@@ -77,135 +72,34 @@ func (r *Error) Code() int {
 }
 
 type Node struct {
-	sync.RWMutex
-	name          string
-	version       string
-	started       time.Time
-	remoteAddr    *url.URL //will be Nil for ThisNode
-	primary       bool
-	primaryChange time.Time
-	state         NodeState
-	stateChange   time.Time
-	partitions    []int32
-	probing       bool
+	Name          string    `json:"name"`
+	Version       string    `json:"version"`
+	Primary       bool      `json:"primary"`
+	PrimaryChange time.Time `json:"primaryChange"`
+	State         NodeState `json:"state"`
+	Started       time.Time `json:"started"`
+	StateChange   time.Time `json:"stateChange"`
+	Partitions    []int32   `json:"partitions"`
+	ListenPort    int       `json:"listenPort"`
+	ListenScheme  string    `json:"listenScheme"`
+	Updated       time.Time `json:"updated"`
+	RemoteAddr    string    `json:"remoteAddr"`
+	local         bool
 }
 
-func (n *Node) GetName() string {
-	n.RLock()
-	name := n.name
-	n.RUnlock()
-	return name
+func (n Node) RemoteURL() string {
+	return fmt.Sprintf("%s://%s:%d", n.ListenScheme, n.RemoteAddr, n.ListenPort)
 }
 
-// Returns True if the node is a Primary node which
-// perists data to the Backend Store (cassandra)
-func (n *Node) IsPrimary() bool {
-	n.RLock()
-	p := n.primary
-	n.RUnlock()
-	return p
+func (n Node) IsReady() bool {
+	return n.State == NodeReady
 }
 
-// Returns true if the node is a ready to accept requests
-// from users.
-func (n *Node) IsReady() bool {
-	n.RLock()
-	p := n.state == NodeReady
-	n.RUnlock()
-	return p
+func (n Node) IsLocal() bool {
+	return n.local
 }
 
-func (n *Node) SetReady() {
-	n.SetState(NodeReady)
-}
-
-func (n *Node) SetReadyIn(t time.Duration) {
-	go func() {
-		// wait for warmupPeriod before marking ourselves
-		// as ready.
-		time.Sleep(t)
-		n.SetReady()
-	}()
-}
-
-// SetPrimary sets the primary status.
-// Note: since we set the primary metric here, this should only be called on ThisNode !
-func (n *Node) SetPrimary(p bool) {
-	n.Lock()
-	n.primary = p
-	n.primaryChange = time.Now()
-	n.Unlock()
-	clusterPrimary.Set(p)
-}
-
-func (n *Node) SetState(s NodeState) {
-	n.Lock()
-	n.state = s
-	n.stateChange = time.Now()
-	n.Unlock()
-}
-
-func (n *Node) SetPartitions(part []int32) {
-	n.Lock()
-	n.partitions = part
-	n.Unlock()
-}
-func (n *Node) GetPartitions() []int32 {
-	n.RLock()
-	part := n.partitions
-	n.RUnlock()
-	return part
-}
-
-func (n *Node) Probe() {
-	n.Lock()
-	if n.probing {
-		n.Unlock()
-		return
-	}
-	n.probing = true
-	n.Unlock()
-	update := nodeJS{}
-	resp, err := n.Get("/node", nil)
-	n.Lock()
-	defer func() {
-		n.probing = false
-		n.Unlock()
-	}()
-	if err != nil {
-		log.Warn("cluster: failed to get status of peer %s. %s", n.name, err)
-		if n.state != NodeUnreachable {
-			n.state = NodeUnreachable
-			n.stateChange = time.Now()
-		}
-		return
-	}
-
-	err = json.Unmarshal(resp, &update)
-	if err != nil {
-		log.Warn("cluster: failed to decode response from peer at address %s: %s\n\n%s", n.remoteAddr.String(), err, resp)
-		if n.state != NodeNotReady {
-			n.state = NodeNotReady
-			n.stateChange = time.Now()
-		}
-		return
-	}
-
-	if n.state.String() != update.State {
-		log.Info("cluster: node %s in new state: %s", update.Name, update.State)
-	}
-
-	n.name = update.Name
-	n.version = update.Version
-	n.started = update.Started
-	n.primary = update.Primary
-	n.primaryChange = update.PrimaryChange
-	n.state = NodeStateFromString(update.State)
-	n.stateChange = update.StateChange
-	n.partitions = update.Partitions
-}
-
-func (n *Node) Get(path string, query interface{}) ([]byte, error) {
+func (n Node) Get(path string, query interface{}) ([]byte, error) {
 	if query != nil {
 		qstr, err := toQueryString(query)
 		if err != nil {
@@ -213,31 +107,28 @@ func (n *Node) Get(path string, query interface{}) ([]byte, error) {
 		}
 		path = path + "?" + qstr
 	}
-	n.RLock()
-	addr := n.remoteAddr.String() + path
-	n.RUnlock()
+
+	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("GET", addr, nil)
 	if err != nil {
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	rsp, err := client.Do(req)
 	if err != nil {
-		log.Error(3, "Cluster Node: %s unreachable. %s", n.GetName(), err.Error())
+		log.Error(3, "Cluster Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)
 }
 
-func (n *Node) Post(path string, body interface{}) ([]byte, error) {
+func (n Node) Post(path string, body interface{}) ([]byte, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	var reader *bytes.Reader
 	reader = bytes.NewReader(b)
-	n.RLock()
-	addr := n.remoteAddr.String() + path
-	n.RUnlock()
+	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
 		return nil, NewError(http.StatusInternalServerError, err)
@@ -245,7 +136,7 @@ func (n *Node) Post(path string, body interface{}) ([]byte, error) {
 	req.Header.Add("Content-Type", "application/json")
 	rsp, err := client.Do(req)
 	if err != nil {
-		log.Error(3, "Cluster Node: %s unreachable. %s", n.GetName(), err.Error())
+		log.Error(3, "Cluster Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)
@@ -266,42 +157,4 @@ func toQueryString(q interface{}) (string, error) {
 		return "", err
 	}
 	return v.Encode(), nil
-}
-
-func (n *Node) toNodeJS() nodeJS {
-	n.RLock()
-	addr := ""
-	if n.remoteAddr != nil {
-		addr = n.remoteAddr.String()
-	}
-	njs := nodeJS{
-		Name:          n.name,
-		Version:       n.version,
-		Primary:       n.primary,
-		PrimaryChange: n.primaryChange,
-		State:         n.state.String(),
-		StateChange:   n.stateChange,
-		Partitions:    n.partitions,
-		RemoteAddress: addr,
-	}
-	n.RUnlock()
-	return njs
-}
-
-// provide thread safe json Marshaling
-func (n *Node) MarshalJSON() ([]byte, error) {
-	return json.Marshal(n.toNodeJS())
-}
-
-// intermediary struct to enable thread safe json marshaling
-type nodeJS struct {
-	Name          string    `json:"name"`
-	Version       string    `json:"version"`
-	Primary       bool      `json:"primary"`
-	PrimaryChange time.Time `json:"primaryChange"`
-	State         string    `json:"state"`
-	Started       time.Time `json:"started"`
-	StateChange   time.Time `json:"stateChange"`
-	Partitions    []int32   `json:"partitions"`
-	RemoteAddress string    `json:"remoteAddress"`
 }

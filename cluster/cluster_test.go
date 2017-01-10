@@ -7,46 +7,56 @@ import (
 )
 
 func TestPeersForQuery(t *testing.T) {
-	Init("node1", "test", time.Now())
-	ThisNode.SetPrimary(true)
-	ThisNode.SetPartitions([]int32{1, 2})
-	ThisNode.SetReady()
+	Init("node1", "test", time.Now(), "http", 6060)
+	Manager.SetPrimary(true)
+	Manager.SetPartitions([]int32{1, 2})
+	Manager.SetReady()
 	Convey("when cluster in single mode", t, func() {
 		selected := PeersForQuery()
 		So(selected, ShouldHaveLength, 1)
-		So(selected[0], ShouldEqual, ThisNode)
+		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
-	mu.Lock()
+	Manager.Lock()
 	Mode = ModeMulti
-	peers = append(peers, &Node{
-		name:       "node2",
-		primary:    true,
-		partitions: []int32{1, 2},
-		state:      NodeReady,
-	})
-	peers = append(peers, &Node{
-		name:       "node3",
-		primary:    true,
-		partitions: []int32{3, 4},
-		state:      NodeReady,
-	})
-	peers = append(peers, &Node{
-		name:       "node4",
-		primary:    true,
-		partitions: []int32{3, 4},
-		state:      NodeReady,
-	})
-	mu.Unlock()
+	Manager.Peers = map[string]Node{
+		"node2": Node{
+			Name:       "node2",
+			Primary:    true,
+			Partitions: []int32{1, 2},
+			State:      NodeReady,
+		},
+		"node3": Node{
+			Name:       "node3",
+			Primary:    true,
+			Partitions: []int32{3, 4},
+			State:      NodeReady,
+		},
+		"node4": Node{
+			Name:       "node4",
+			Primary:    true,
+			Partitions: []int32{3, 4},
+			State:      NodeReady,
+		},
+	}
+	Manager.Unlock()
 	Convey("when cluster in multi mode", t, func() {
 		selected := PeersForQuery()
 		So(selected, ShouldHaveLength, 2)
-		So(selected, ShouldContain, ThisNode)
+		nodeNames := []string{}
+		for _, n := range selected {
+			nodeNames = append(nodeNames, n.Name)
+			if n.Name == Manager.ThisNode().Name {
+				So(n, ShouldResemble, Manager.ThisNode())
+			}
+		}
+
+		So(nodeNames, ShouldContain, Manager.ThisNode().Name)
 		Convey("peers should be selected randomly with even distribution", func() {
 			peerCount := make(map[string]int)
 			for i := 0; i < 1000; i++ {
 				selected = PeersForQuery()
 				for _, p := range selected {
-					peerCount[p.GetName()]++
+					peerCount[p.Name]++
 				}
 			}
 			So(peerCount["node1"], ShouldEqual, 1000)

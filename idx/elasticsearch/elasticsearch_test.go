@@ -16,8 +16,8 @@ import (
 )
 
 func init() {
-	cluster.Init("default", "test", time.Now())
-	cluster.ThisNode.SetPartitions([]int32{1})
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPartitions([]int32{1})
 }
 
 func TestES(t *testing.T) {
