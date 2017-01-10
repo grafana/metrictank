@@ -172,6 +172,10 @@ func (c *ClusterManager) IsReady() bool {
 
 func (c *ClusterManager) SetReady() {
 	c.Lock()
+	if c.node.State == NodeReady {
+		c.Unlock()
+		return
+	}
 	c.node.State = NodeReady
 	c.node.Updated = time.Now()
 	c.Unlock()
@@ -198,6 +202,10 @@ func (c *ClusterManager) IsPrimary() bool {
 // Note: since we set the primary metric here, this should only be called on ThisNode !
 func (c *ClusterManager) SetPrimary(p bool) {
 	c.Lock()
+	if c.node.Primary == p {
+		c.Unlock()
+		return
+	}
 	c.node.Primary = p
 	c.node.PrimaryChange = time.Now()
 	c.node.Updated = time.Now()
