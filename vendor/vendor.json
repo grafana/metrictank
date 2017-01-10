@@ -51,6 +51,12 @@
 			"revisionTime": "2015-04-25T18:03:51Z"
 		},
 		{
+			"checksumSHA1": "x2JXwE0SXPAnBRJTcP/z920hfLY=",
+			"path": "github.com/armon/go-metrics",
+			"revision": "06b60999766278efd6d2b5d8418a58c3d5b99e87",
+			"revisionTime": "2015-12-07T02:54:52Z"
+		},
+		{
 			"checksumSHA1": "ek48rtBCnHMbp7CK+63djVf+9bY=",
 			"path": "github.com/benbjohnson/clock",
 			"revision": "a620c1cc9866f84a2550ad53f4f353ec030fa26b",
@@ -171,6 +177,30 @@
 			"revisionTime": "2015-11-17T00:06:41Z"
 		},
 		{
+			"checksumSHA1": "cdOCt0Yb+hdErz8NAQqayxPmRsY=",
+			"path": "github.com/hashicorp/errwrap",
+			"revision": "7554cd9344cec97297fa6649b055a8c98c2a1e55",
+			"revisionTime": "2014-10-28T05:47:10Z"
+		},
+		{
+			"checksumSHA1": "TNlVzNR1OaajcNi3CbQ3bGbaLGU=",
+			"path": "github.com/hashicorp/go-msgpack/codec",
+			"revision": "fa3f63826f7c23912c15263591e65d54d080b458",
+			"revisionTime": "2015-05-18T23:42:57Z"
+		},
+		{
+			"checksumSHA1": "lrSl49G23l6NhfilxPM0XFs5rZo=",
+			"path": "github.com/hashicorp/go-multierror",
+			"revision": "d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5",
+			"revisionTime": "2015-09-16T20:57:42Z"
+		},
+		{
+			"checksumSHA1": "hSoH77pX3FyU6kkYqOOYmf3r55Y=",
+			"path": "github.com/hashicorp/memberlist",
+			"revision": "9800c50ab79c002353852a9b1095e9591b161513",
+			"revisionTime": "2016-12-13T23:44:46Z"
+		},
+		{
 			"checksumSHA1": "IJBXyoVO+uyqCrCYiNO/djnlcNk=",
 			"path": "github.com/hydrogen18/stalecucumber",
 			"revision": "9b38526d4bdf8e197c31344777fc28f7f48d250d",
@@ -223,6 +253,12 @@
 			"path": "github.com/metrics20/go-metrics20/carbon20",
 			"revision": "5c819ce50581292ee8614848fd235b2b282231f2",
 			"revisionTime": "2016-07-10T14:51:21Z"
+		},
+		{
+			"checksumSHA1": "WKGTGMb40ppaVUJa6AXc+/6ghUk=",
+			"path": "github.com/miekg/dns",
+			"revision": "48c8acaf0c2dc19fbb4f1b2776c1cee4e6f65aa0",
+			"revisionTime": "2016-06-08T16:10:03Z"
 		},
 		{
 			"checksumSHA1": "IwuaGWkq9sh9hzmmgkyHvCEMGzM=",
