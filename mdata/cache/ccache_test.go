@@ -8,7 +8,7 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
-func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) *chunk.IterGen {
+func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
 	if spanaware {
@@ -28,7 +28,7 @@ func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) *chunk.I
 
 	itgen, _ := chunk.NewGen(buf.Bytes(), ts)
 
-	return itgen
+	return *itgen
 }
 
 func getConnectedChunks(t *testing.T, metric string) *CCache {
@@ -41,13 +41,133 @@ func getConnectedChunks(t *testing.T, metric string) *CCache {
 	itgen4 := getItgen(t, values, 1015, false)
 	itgen5 := getItgen(t, values, 1020, false)
 
-	cc.Add(metric, 0, *itgen1)
-	cc.Add(metric, 1000, *itgen2)
-	cc.Add(metric, 1005, *itgen3)
-	cc.Add(metric, 1010, *itgen4)
-	cc.Add(metric, 1015, *itgen5)
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 1000, itgen2)
+	cc.Add(metric, 1005, itgen3)
+	cc.Add(metric, 1010, itgen4)
+	cc.Add(metric, 1015, itgen5)
 
 	return cc
+}
+
+// test AddIfHot method without passing a previous timestamp on a hot metric
+func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen2 := getItgen(t, values, 1005, false)
+	itgen3 := getItgen(t, values, 1010, false)
+
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 1000, itgen2)
+
+	cc.CacheIfHot(metric, 0, itgen3)
+
+	mc := cc.metricCache[metric]
+
+	chunk, ok := mc.chunks[1010]
+	if !ok {
+		t.Fatalf("expected cache chunk to have been cached")
+	}
+
+	if itgen3.Ts() != chunk.Ts {
+		t.Fatalf("cached chunk wasn't the expected one")
+	}
+
+	if chunk.Prev != 1005 {
+		t.Fatalf("expected cache chunk's previous ts to be 1005, but got %d", chunk.Prev)
+	}
+
+	if mc.chunks[chunk.Prev].Next != chunk.Ts {
+		t.Fatalf("previous cache chunk didn't point at this one as it's next, got %d", mc.chunks[chunk.Prev].Next)
+	}
+}
+
+// test AddIfHot method without passing a previous timestamp on a cold metric
+func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen3 := getItgen(t, values, 1010, false)
+
+	cc.Add(metric, 0, itgen1)
+
+	cc.CacheIfHot(metric, 0, itgen3)
+
+	mc := cc.metricCache[metric]
+
+	_, ok := mc.chunks[1010]
+	if ok {
+		t.Fatalf("expected cache chunk to not have been cached")
+	}
+
+	if mc.chunks[1000].Next != 0 {
+		t.Fatalf("previous cache chunk got wrongly connected with a following one, got %d", mc.chunks[1000].Next)
+	}
+}
+
+// test AddIfHot method on a hot metric
+func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen2 := getItgen(t, values, 1005, false)
+	itgen3 := getItgen(t, values, 1010, false)
+
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 1000, itgen2)
+
+	cc.CacheIfHot(metric, 1005, itgen3)
+
+	mc := cc.metricCache[metric]
+
+	chunk, ok := mc.chunks[1010]
+	if !ok {
+		t.Fatalf("expected cache chunk to have been cached")
+	}
+
+	if itgen3.Ts() != chunk.Ts {
+		t.Fatalf("cached chunk wasn't the expected one")
+	}
+
+	if chunk.Prev != 1005 {
+		t.Fatalf("expected cache chunk's previous ts to be 1005, but got %d", chunk.Prev)
+	}
+
+	if mc.chunks[chunk.Prev].Next != chunk.Ts {
+		t.Fatalf("previous cache chunk didn't point at this one as it's next, got %d", mc.chunks[chunk.Prev].Next)
+	}
+}
+
+// test AddIfHot method on a cold metric
+func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
+	metric := "metric1"
+	cc := NewCCache()
+
+	values := []uint32{1, 2, 3, 4, 5}
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen3 := getItgen(t, values, 1010, false)
+
+	cc.Add(metric, 0, itgen1)
+
+	cc.CacheIfHot(metric, 1005, itgen3)
+
+	mc := cc.metricCache[metric]
+
+	_, ok := mc.chunks[1010]
+	if ok {
+		t.Fatalf("expected cache chunk to not have been cached")
+	}
+
+	if mc.chunks[1000].Next != 0 {
+		t.Fatalf("previous cache chunk got wrongly connected with a following one, got %d", mc.chunks[1000].Next)
+	}
 }
 
 func TestConsecutiveAdding(t *testing.T) {
@@ -58,8 +178,8 @@ func TestConsecutiveAdding(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen2 := getItgen(t, values, 1005, false)
 
-	cc.Add(metric, 0, *itgen1)
-	cc.Add(metric, 1000, *itgen2)
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 1000, itgen2)
 
 	mc := cc.metricCache[metric]
 	chunk1, ok := mc.chunks[1000]
@@ -95,9 +215,9 @@ func TestDisconnectedAdding(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, true)
 	itgen3 := getItgen(t, values, 1010, true)
 
-	cc.Add(metric, 0, *itgen1)
-	cc.Add(metric, 0, *itgen2)
-	cc.Add(metric, 0, *itgen3)
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 0, itgen2)
+	cc.Add(metric, 0, itgen3)
 
 	res := cc.Search(metric, 900, 1015)
 
@@ -129,9 +249,9 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, *itgen1)
-	cc.Add(metric, 1000, *itgen2)
-	cc.Add(metric, 0, *itgen3)
+	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, 1000, itgen2)
+	cc.Add(metric, 0, itgen3)
 
 	res := cc.Search(metric, 900, 1015)
 
@@ -259,19 +379,19 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 			cc.Reset()
 
 			if ascending {
-				cc.Add(metric, 0, *itgen1)
-				cc.Add(metric, 1000, *itgen2)
-				cc.Add(metric, 1010, *itgen3)
-				cc.Add(metric, 0, *itgen4)
-				cc.Add(metric, 1030, *itgen5)
-				cc.Add(metric, 1040, *itgen6)
+				cc.Add(metric, 0, itgen1)
+				cc.Add(metric, 1000, itgen2)
+				cc.Add(metric, 1010, itgen3)
+				cc.Add(metric, 0, itgen4)
+				cc.Add(metric, 1030, itgen5)
+				cc.Add(metric, 1040, itgen6)
 			} else {
-				cc.Add(metric, 0, *itgen6)
-				cc.Add(metric, 0, *itgen5)
-				cc.Add(metric, 0, *itgen4)
-				cc.Add(metric, 0, *itgen3)
-				cc.Add(metric, 0, *itgen2)
-				cc.Add(metric, 0, *itgen1)
+				cc.Add(metric, 0, itgen6)
+				cc.Add(metric, 0, itgen5)
+				cc.Add(metric, 0, itgen4)
+				cc.Add(metric, 0, itgen3)
+				cc.Add(metric, 0, itgen2)
+				cc.Add(metric, 0, itgen1)
 			}
 
 			res = cc.Search(metric, from, until)
@@ -335,19 +455,19 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 			cc.Reset()
 
 			if ascending {
-				cc.Add(metric, 0, *itgen1)
-				cc.Add(metric, 1000, *itgen2)
-				cc.Add(metric, 1010, *itgen3)
-				cc.Add(metric, 0, *itgen4)
-				cc.Add(metric, 1040, *itgen5)
-				cc.Add(metric, 1050, *itgen6)
+				cc.Add(metric, 0, itgen1)
+				cc.Add(metric, 1000, itgen2)
+				cc.Add(metric, 1010, itgen3)
+				cc.Add(metric, 0, itgen4)
+				cc.Add(metric, 1040, itgen5)
+				cc.Add(metric, 1050, itgen6)
 			} else {
-				cc.Add(metric, 0, *itgen6)
-				cc.Add(metric, 0, *itgen5)
-				cc.Add(metric, 0, *itgen4)
-				cc.Add(metric, 0, *itgen3)
-				cc.Add(metric, 0, *itgen2)
-				cc.Add(metric, 0, *itgen1)
+				cc.Add(metric, 0, itgen6)
+				cc.Add(metric, 0, itgen5)
+				cc.Add(metric, 0, itgen4)
+				cc.Add(metric, 0, itgen3)
+				cc.Add(metric, 0, itgen2)
+				cc.Add(metric, 0, itgen1)
 			}
 
 			res = cc.Search(metric, from, until)
