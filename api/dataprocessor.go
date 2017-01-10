@@ -43,12 +43,12 @@ func doRecover(errp *error) {
 	return
 }
 
-// fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
+// Fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
 // graphite does this quantization before storing, we may want to do that as well at some point
 // note: values are quantized to the right because we can't lie about the future:
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
-func fix(in []schema.Point, from, to, interval uint32) []schema.Point {
+func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 	// first point should have the first timestamp >= from that divides by interval
 	first := from
 	remain := from % interval
@@ -368,7 +368,7 @@ func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Conso
 	ctx := newRequestContext(&req, consolidator)
 	iters := s.getSeries(ctx, consolidator)
 	points := s.itersToPoints(ctx, iters)
-	return fix(points, req.From, req.To, req.ArchInterval)
+	return Fix(points, req.From, req.To, req.ArchInterval)
 }
 
 func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
@@ -563,7 +563,7 @@ func newRequestContext(req *models.Req, consolidator consolidation.Consolidator)
 	// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules) ..
 	// STORED DATA   0[----------60][---------120][---------180][---------240]  but data for 60 may be at 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
 	// to retrieve the stored data, we also use from inclusive and to exclusive,
-	// so to make sure that the data after quantization (fix()) is correct, we have to make the following adjustment:
+	// so to make sure that the data after quantization (Fix()) is correct, we have to make the following adjustment:
 	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
 	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
 

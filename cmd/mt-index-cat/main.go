@@ -25,6 +25,7 @@ func main() {
 
 	var addr string
 	var prefix string
+	var substr string
 	var from string
 	var maxAge string
 	var verbose bool
@@ -33,6 +34,7 @@ func main() {
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
+	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
@@ -136,10 +138,12 @@ func main() {
 	if maxAgeInt == 0 {
 		for _, d := range defs {
 			if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-				show(d)
-				shown += 1
-				if shown == limit {
-					break
+				if substr == "" || strings.Contains(d.Metric, substr) {
+					show(d)
+					shown += 1
+					if shown == limit {
+						break
+					}
 				}
 			}
 		}
@@ -148,10 +152,12 @@ func main() {
 		for _, d := range defs {
 			if d.LastUpdate > cutoff {
 				if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-					show(d)
-					shown += 1
-					if shown == limit {
-						break
+					if substr == "" || strings.Contains(d.Metric, substr) {
+						show(d)
+						shown += 1
+						if shown == limit {
+							break
+						}
 					}
 				}
 			}
