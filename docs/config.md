@@ -69,7 +69,7 @@ agg-settings =
 # comma-separated list of hostnames to connect to
 cassandra-addrs =
 # keyspace to use for storing the metric data table
-cassandra-keyspace = raintank
+cassandra-keyspace = metrictank
 # desired write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
 cassandra-consistency = one
 # how to select which hosts to query
@@ -300,7 +300,7 @@ buffer-delay-max = 10s
 [cassandra-idx]
 enabled = false
 # Cassandra keyspace to store metricDefinitions in.
-keyspace = raintank
+keyspace = metrictank
 # comma separated list of cassandra addresses in host:port form
 hosts = localhost:9042
 #cql protocol version to use
