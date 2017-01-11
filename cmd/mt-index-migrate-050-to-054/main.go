@@ -20,6 +20,8 @@ var (
 	cassKeyspace = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
 	esAddr       = flag.String("es-addr", "localhost", "address of elasticsearch host.")
 	esIndex      = flag.String("index", "metric", "elasticsearch index that contains current metric index values.")
+
+	wg sync.WaitGroup
 )
 
 func main() {
@@ -37,7 +39,6 @@ func main() {
 	flag.Parse()
 
 	defsChan := make(chan *schema.MetricDefinition, 100)
-	var wg sync.WaitGroup
 
 	cluster := gocql.NewCluster(*cassAddr)
 	cluster.Consistency = gocql.ParseConsistency("one")
@@ -50,18 +51,18 @@ func main() {
 		log.Fatalf("failed to create cql session. %s", err)
 	}
 	wg.Add(1)
-	go writeDefs(session, defsChan, &wg)
+	go writeDefs(session, defsChan)
 
 	conn := elastigo.NewConn()
 	conn.SetHosts([]string{*esAddr})
 	wg.Add(1)
-	go getDefs(conn, defsChan, &wg)
+	go getDefs(conn, defsChan)
 
 	wg.Wait()
 
 }
 
-func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, wg *sync.WaitGroup) {
+func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	defer wg.Done()
 	data := make([]byte, 0)
 	for def := range defsChan {
@@ -96,7 +97,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, w
 	log.Printf("defsWriter exiting.")
 }
 
-func getDefs(conn *elastigo.Conn, defsChan chan *schema.MetricDefinition, wg *sync.WaitGroup) {
+func getDefs(conn *elastigo.Conn, defsChan chan *schema.MetricDefinition) {
 	defer wg.Done()
 	defer close(defsChan)
 	var err error
