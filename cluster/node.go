@@ -80,15 +80,15 @@ type Node struct {
 	Started       time.Time `json:"started"`
 	StateChange   time.Time `json:"stateChange"`
 	Partitions    []int32   `json:"partitions"`
-	ListenPort    int       `json:"listenPort"`
-	ListenScheme  string    `json:"listenScheme"`
+	ApiPort       int       `json:"apiPort"`
+	ApiScheme     string    `json:"apiScheme"`
 	Updated       time.Time `json:"updated"`
 	RemoteAddr    string    `json:"remoteAddr"`
 	local         bool
 }
 
 func (n Node) RemoteURL() string {
-	return fmt.Sprintf("%s://%s:%d", n.ListenScheme, n.RemoteAddr, n.ListenPort)
+	return fmt.Sprintf("%s://%s:%d", n.ApiScheme, n.RemoteAddr, n.ApiPort)
 }
 
 func (n Node) IsReady() bool {

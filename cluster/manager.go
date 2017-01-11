@@ -16,7 +16,7 @@ type ClusterManager struct {
 	list  *memberlist.Memberlist
 }
 
-func (c *ClusterManager) SetList(list *memberlist.Memberlist) {
+func (c *ClusterManager) setList(list *memberlist.Memberlist) {
 	c.Lock()
 	c.list = list
 	c.Unlock()
@@ -30,10 +30,10 @@ func (c *ClusterManager) ThisNode() Node {
 
 func (c *ClusterManager) PeersList() []Node {
 	c.RLock()
-	list := make([]Node, len(c.Peers))
+	list := make([]Node, len(c.Peers), len(c.Peers))
 	i := 0
-	for _, n := range c.Peers {
-		list[i] = n
+	for _, p := range c.Peers {
+		list[i] = p
 		i++
 	}
 	c.RUnlock()
@@ -50,7 +50,8 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 	peer := Node{}
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
-		panic(err)
+		log.Error(3, "Failed to decode node meta from %s. %s", node.Name, err.Error())
+		return
 	}
 	peer.RemoteAddr = node.Addr.String()
 	if peer.Name == c.node.Name {
@@ -75,7 +76,16 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 	peer := Node{}
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
-		panic(err)
+		log.Error(3, "Failed to decode node meta from %s. %s", node.Name, err.Error())
+		// if the node is known, lets mark it as notReady until it starts sending valid data again.
+		if p, ok := c.Peers[node.Name]; ok {
+			p.State = NodeNotReady
+			p.StateChange = time.Now()
+			// we dont set Updated as we dont want the NotReady state to propagate incase we are the only node
+			// that got bad data.
+			c.Peers[node.Name] = p
+		}
+		return
 	}
 	peer.RemoteAddr = node.Addr.String()
 	if peer.Name == c.node.Name {
@@ -95,9 +105,9 @@ func (c *ClusterManager) BroadcastUpdate() {
 // when broadcasting an alive message. It's length is limited to
 // the given byte size. This metadata is available in the Node structure.
 func (c *ClusterManager) NodeMeta(limit int) []byte {
-	c.Lock()
+	c.RLock()
 	meta, err := json.Marshal(c.node)
-	c.Unlock()
+	c.RUnlock()
 	if err != nil {
 		log.Fatal(4, err.Error())
 	}
@@ -145,7 +155,8 @@ func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
 	knownPeers := make(map[string]Node)
 	err := json.Unmarshal(buf, &knownPeers)
 	if err != nil {
-		log.Fatal(4, err.Error())
+		log.Error(3, "Unabled to decode remoteState message. %s", err.Error())
+		return
 	}
 	c.Lock()
 	for name, meta := range knownPeers {
@@ -162,7 +173,7 @@ func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
 	c.Unlock()
 }
 
-// Returns true if the node is a ready to accept requests
+// Returns true if this node is a ready to accept requests
 // from users.
 func (c *ClusterManager) IsReady() bool {
 	c.RLock()
@@ -170,6 +181,7 @@ func (c *ClusterManager) IsReady() bool {
 	return c.node.IsReady()
 }
 
+// mark this node as ready to accept requests from users.
 func (c *ClusterManager) SetReady() {
 	c.Lock()
 	if c.node.State == NodeReady {
@@ -182,6 +194,7 @@ func (c *ClusterManager) SetReady() {
 	c.BroadcastUpdate()
 }
 
+// mark this node as ready after the specified duration.
 func (c *ClusterManager) SetReadyIn(t time.Duration) {
 	go func() {
 		// wait for warmupPeriod before marking ourselves
@@ -191,15 +204,14 @@ func (c *ClusterManager) SetReadyIn(t time.Duration) {
 	}()
 }
 
-// Returns true if the node is a set as a primary node that should write data to cassandra.
+// Returns true if the this node is a set as a primary node that should write data to cassandra.
 func (c *ClusterManager) IsPrimary() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.node.Primary
 }
 
-// SetPrimary sets the primary status.
-// Note: since we set the primary metric here, this should only be called on ThisNode !
+// SetPrimary sets the primary status of this node
 func (c *ClusterManager) SetPrimary(p bool) {
 	c.Lock()
 	if c.node.Primary == p {
@@ -214,6 +226,7 @@ func (c *ClusterManager) SetPrimary(p bool) {
 	c.BroadcastUpdate()
 }
 
+// set the partitions that this node is handling.
 func (c *ClusterManager) SetPartitions(part []int32) {
 	c.Lock()
 	c.node.Partitions = part
@@ -222,6 +235,7 @@ func (c *ClusterManager) SetPartitions(part []int32) {
 	c.BroadcastUpdate()
 }
 
+// get the partitions that this node is handling.
 func (c *ClusterManager) GetPartitions() []int32 {
 	c.RLock()
 	defer c.RUnlock()

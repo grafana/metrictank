@@ -33,7 +33,7 @@ func ConfigProcess() {
 
 	addr, err := net.ResolveTCPAddr("tcp", clusterBindAddr)
 	if err != nil {
-		log.Fatal(4, "cluster-bind-addres is not a valid TCP address.")
+		log.Fatal(4, "cluster-bind-addres is not a valid TCP address. %s", err.Error())
 	}
 
 	clusterHost = addr.IP

@@ -1049,6 +1049,9 @@ func TestAlignRequests(t *testing.T) {
 	}
 }
 
+// return true if a and b are equal. Equal means that all of the struct
+// fields are equal.  For the req.Node, we just compare the node.Name rather
+// then doing a deep comparision.
 func compareReqEqual(a, b models.Req) bool {
 	if a.Key != b.Key {
 		return false

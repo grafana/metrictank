@@ -430,10 +430,12 @@ func main() {
 	***********************************/
 	<-sigChan
 
+	// Leave the cluster. All other nodes will be notified we have left
+	// and so will stop sending us requests.
+	cluster.Stop()
+
 	// stop API
 	apiServer.Stop()
-	// stop polling peer nodes
-	cluster.Stop()
 
 	// shutdown our input plugins.  These may take a while as we allow them
 	// to finish processing any metrics that have already been ingested.
