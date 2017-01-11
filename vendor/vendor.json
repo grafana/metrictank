@@ -429,6 +429,12 @@
 			"revisionTime": "2016-08-26T18:07:28Z"
 		},
 		{
+			"checksumSHA1": "DohC0RpI4MSaPCG+Zhwvk/qCTYE=",
+			"path": "gopkg.in/raintank/schema.v0",
+			"revision": "b5eb018b887ddff47b9152f28f6f1513be9b2141",
+			"revisionTime": "2016-07-14T10:00:31Z"
+		},
+		{
 			"checksumSHA1": "coHpC7KbWRXTjC0JM/bwnBn8zmY=",
 			"path": "gopkg.in/raintank/schema.v1",
 			"revision": "a323316458b5df84827551e9b6b5f61cb2de423b",
