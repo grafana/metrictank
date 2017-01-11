@@ -61,14 +61,14 @@ func Stop() {
 }
 
 func Start() {
-	log.Info("Starting cluster on %s:%d", cfg.BindAddr, cfg.BindPort)
+	log.Info("CLU Start: Starting cluster on %s:%d", cfg.BindAddr, cfg.BindPort)
 	list, err := memberlist.Create(cfg)
 	if err != nil {
-		log.Fatal(4, "Failed to create memberlist: "+err.Error())
+		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
 	}
 	data, err := json.Marshal(Manager.ThisNode())
 	if err != nil {
-		log.Fatal(4, "Failed to marshal ThisNode metadata to json. %s", err.Error())
+		log.Fatal(4, "CLU Start: Failed to marshal ThisNode metadata to json: %s", err.Error())
 	}
 	list.LocalNode().Meta = data
 
@@ -79,9 +79,9 @@ func Start() {
 	}
 	n, err := list.Join(strings.Split(peersStr, ","))
 	if err != nil {
-		log.Fatal(4, "Failed to join cluster: "+err.Error())
+		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
 	}
-	log.Info("joined to %d nodes in cluster\n", n)
+	log.Info("CLU Start: joined to %d nodes in cluster", n)
 }
 
 // return the list of nodes to broadcast requests to

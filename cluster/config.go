@@ -28,12 +28,12 @@ func ConfigSetup() {
 
 func ConfigProcess() {
 	if !validMode(mode) {
-		log.Fatal(4, "invalid cluster operating mode")
+		log.Fatal(4, "CLU Config: invalid cluster operating mode")
 	}
 
 	addr, err := net.ResolveTCPAddr("tcp", clusterBindAddr)
 	if err != nil {
-		log.Fatal(4, "cluster-bind-addres is not a valid TCP address. %s", err.Error())
+		log.Fatal(4, "CLU Config: cluster-bind-addres is not a valid TCP address: %s", err.Error())
 	}
 
 	clusterHost = addr.IP

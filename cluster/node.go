@@ -115,7 +115,7 @@ func (n Node) Get(path string, query interface{}) ([]byte, error) {
 	}
 	rsp, err := client.Do(req)
 	if err != nil {
-		log.Error(3, "Cluster Node: %s unreachable. %s", n.Name, err.Error())
+		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)
@@ -136,7 +136,7 @@ func (n Node) Post(path string, body interface{}) ([]byte, error) {
 	req.Header.Add("Content-Type", "application/json")
 	rsp, err := client.Do(req)
 	if err != nil {
-		log.Error(3, "Cluster Node: %s unreachable. %s", n.Name, err.Error())
+		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
 	return handleResp(rsp)

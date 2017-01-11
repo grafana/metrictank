@@ -46,11 +46,11 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 	if len(node.Meta) == 0 {
 		return
 	}
-	log.Info("Node %s with address %s has joined the cluster\n", node.Name, node.Addr.String())
+	log.Info("CLU manager: Node %s with address %s has joined the cluster", node.Name, node.Addr.String())
 	peer := Node{}
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
-		log.Error(3, "Failed to decode node meta from %s. %s", node.Name, err.Error())
+		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
 		return
 	}
 	peer.RemoteAddr = node.Addr.String()
@@ -63,7 +63,7 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
 	c.Lock()
 	defer c.Unlock()
-	log.Info("Node %s has left the cluster\n", node.Name)
+	log.Info("CLU manager: Node %s has left the cluster", node.Name)
 	delete(c.Peers, node.Name)
 }
 
@@ -76,7 +76,7 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 	peer := Node{}
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
-		log.Error(3, "Failed to decode node meta from %s. %s", node.Name, err.Error())
+		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
 		// if the node is known, lets mark it as notReady until it starts sending valid data again.
 		if p, ok := c.Peers[node.Name]; ok {
 			p.State = NodeNotReady
@@ -92,7 +92,7 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 		peer.local = true
 	}
 	c.Peers[node.Name] = peer
-	log.Info("Node %s at %s has been updated - %s\n", node.Name, node.Addr.String(), node.Meta)
+	log.Info("CLU manager: Node %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
 }
 
 func (c *ClusterManager) BroadcastUpdate() {
@@ -109,7 +109,7 @@ func (c *ClusterManager) NodeMeta(limit int) []byte {
 	meta, err := json.Marshal(c.node)
 	c.RUnlock()
 	if err != nil {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "CLU manager: %s", err.Error())
 	}
 	return meta
 }
@@ -146,7 +146,7 @@ func (c *ClusterManager) LocalState(join bool) []byte {
 	meta, err := json.Marshal(c.Peers)
 	c.Unlock()
 	if err != nil {
-		log.Fatal(4, err.Error())
+		log.Fatal(4, "CLU manager: %s", err.Error())
 	}
 	return meta
 }
@@ -155,18 +155,18 @@ func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
 	knownPeers := make(map[string]Node)
 	err := json.Unmarshal(buf, &knownPeers)
 	if err != nil {
-		log.Error(3, "Unabled to decode remoteState message. %s", err.Error())
+		log.Error(3, "CLU manager: Unable to decode remoteState message: %s", err.Error())
 		return
 	}
 	c.Lock()
 	for name, meta := range knownPeers {
 		if existing, ok := c.Peers[name]; ok {
 			if meta.Updated.After(existing.Updated) {
-				log.Info("updated node meta found in state update for %s", meta.Name)
+				log.Info("CLU manager: updated node meta found in state update for %s", meta.Name)
 				c.Peers[name] = meta
 			}
 		} else {
-			log.Info("new node found in state update. %s", meta.Name)
+			log.Info("CLU manager: new node found in state update. %s", meta.Name)
 			c.Peers[name] = meta
 		}
 	}
