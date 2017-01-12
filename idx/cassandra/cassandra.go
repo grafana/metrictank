@@ -31,7 +31,7 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     mtype text,
     tags set<text>,
     lastupdate int,
-    PRIMARY KEY (id, partition)
+    PRIMARY KEY (partition, id)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
@@ -378,7 +378,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 		deleted := false
 		for !deleted && attempts < 5 {
 			attempts++
-			cErr := c.session.Query("DELETE FROM metric_idx where id=?", def.Id).Exec()
+			cErr := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
 			if cErr != nil {
 				errmetrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
