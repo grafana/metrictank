@@ -65,10 +65,16 @@ func (m *MetricData) Validate() error {
 }
 
 func (m *MetricData) KeyByOrgId(b []byte) []byte {
-	if len(b) < 4 {
-		b = append(b, make([]byte, 4-len(b))...)
+	if cap(b)-len(b) < 4 {
+		// not enough unused space in the slice so we need to grow it.
+		newBuf := make([]byte, len(b), len(b)+4)
+		copy(newBuf, b)
+		b = newBuf
 	}
-	binary.LittleEndian.PutUint32(b, uint32(m.OrgId))
+	// PutUint32 writes directly to the slice rather then appending.
+	// so we need to set the length to 4 more bytes then it currently is.
+	b = b[:len(b)+4]
+	binary.LittleEndian.PutUint32(b[len(b)-4:], uint32(m.OrgId))
 	return b
 }
 
@@ -153,10 +159,16 @@ func (m *MetricDefinition) Validate() error {
 }
 
 func (m *MetricDefinition) KeyByOrgId(b []byte) []byte {
-	if len(b) < 4 {
-		b = append(b, make([]byte, 4-len(b))...)
+	if cap(b)-len(b) < 4 {
+		// not enough unused space in the slice so we need to grow it.
+		newBuf := make([]byte, len(b), len(b)+4)
+		copy(newBuf, b)
+		b = newBuf
 	}
-	binary.LittleEndian.PutUint32(b, uint32(m.OrgId))
+	// PutUint32 writes directly to the slice rather then appending.
+	// so we need to set the length to 4 more bytes then it currently is.
+	b = b[:len(b)+4]
+	binary.LittleEndian.PutUint32(b[len(b)-4:], uint32(m.OrgId))
 	return b
 }
 
