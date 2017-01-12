@@ -348,7 +348,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 		deleted := false
 		for !deleted && attempts < 5 {
 			attempts++
-			cErr := c.session.Query("DELETE FROM metric_idx where id=?", def.Id).Exec()
+			cErr := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
 			if cErr != nil {
 				errmetrics.Inc(err)
 				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
