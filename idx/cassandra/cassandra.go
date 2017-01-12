@@ -72,7 +72,7 @@ func ConfigSetup() *flag.FlagSet {
 
 	casIdx.BoolVar(&Enabled, "enabled", false, "")
 	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
-	casIdx.StringVar(&keyspace, "keyspace", "metric", "Cassandra keyspace to store metricDefinitions in.")
+	casIdx.StringVar(&keyspace, "keyspace", "metrictank", "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")

@@ -57,7 +57,7 @@ func main() {
 		fmt.Println()
 		fmt.Printf("output: %v\n\n\n", strings.Join(outputs, "|"))
 		fmt.Println("EXAMPLES:")
-		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 -keyspace raintank list")
+		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 list")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {

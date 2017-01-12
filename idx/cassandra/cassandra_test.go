@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	keyspace = "raintank"
+	keyspace = "metrictank"
 	hosts = ""
 	consistency = "one"
 	timeout = time.Second
@@ -209,7 +209,7 @@ func TestFind(t *testing.T) {
 
 func BenchmarkIndexing(b *testing.B) {
 	cluster.ThisNode.SetPartitions([]int32{1})
-	keyspace = "raintank"
+	keyspace = "metrictank"
 	hosts = "localhost:9042"
 	consistency = "one"
 	timeout = time.Second
@@ -223,7 +223,7 @@ func BenchmarkIndexing(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
+	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
 	tmpSession.Close()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
@@ -254,7 +254,7 @@ func insertDefs(ix idx.MetricIndex, i int) {
 
 func BenchmarkLoad(b *testing.B) {
 	cluster.ThisNode.SetPartitions([]int32{1})
-	keyspace = "raintank"
+	keyspace = "metrictank"
 	hosts = "localhost:9042"
 	consistency = "one"
 	timeout = time.Second
@@ -269,7 +269,7 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE raintank.metric_idx").Exec()
+	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
 	tmpSession.Close()
 	err = ix.Init()
 	if err != nil {

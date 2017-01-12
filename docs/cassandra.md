@@ -16,12 +16,12 @@ Here are some settings that are worth elaborating on:
 
 ## Schema
 
-By default, metrictank will initialize Cassandra with the following keyspace and table schema.  The keyspace to use can be set in the configuration using the "cassandra-keyspace" option:
+By default, metrictank will initialize Cassandra with the following keyspace and table schema.  The keyspace to use can be set in the configuration using the "cassandra-keyspace" option, the default is "metrictank":
 
 ```
-CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
+CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
 
-CREATE TABLE IF NOT EXISTS raintank.metric (
+CREATE TABLE IF NOT EXISTS metrictank.metric (
     key ascii,
     ts int,
     data blob,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
 If you are using the [cassandra-idx](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
 
 ```
-CREATE TABLE IF NOT EXISTS raintank.metric_idx (
+CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
     id text,
     partition int,
     name text,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS raintank.metric_idx (
     PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-CREATE INDEX IF NOT EXISTS ON raintank.metric_idx(partition);
+CREATE INDEX IF NOT EXISTS ON metrictank.metric_idx(partition);
 ```
 
 These settings are good for development and geared towards Cassandra 3.0
@@ -55,9 +55,9 @@ These settings are good for development and geared towards Cassandra 3.0
 For clustered scenarios, you may want to initialize Cassandra yourself with a schema like:
 
 ```
-CREATE KEYSPACE IF NOT EXISTS raintank WITH replication = {'class': 'NetworkTopologyStrategy', 'us-central1': '3'}  AND durable_writes = true;
+CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'NetworkTopologyStrategy', 'us-central1': '3'}  AND durable_writes = true;
 
-CREATE TABLE IF NOT EXISTS raintank.metric (
+CREATE TABLE IF NOT EXISTS metrictank.metric (
     key ascii,
     ts int,
     data blob,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS raintank.metric (
     AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 
-CREATE TABLE IF NOT EXISTS raintank.metric_idx (
+CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
     id text,
     partition int,
     name text,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS raintank.metric_idx (
     PRIMARY KEY (id, partition)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-CREATE INDEX IF NOT EXISTS ON raintank.metric_idx(partition);
+CREATE INDEX IF NOT EXISTS ON metrictank.metric_idx(partition);
 ```
 
 If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
