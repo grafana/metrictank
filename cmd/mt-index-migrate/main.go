@@ -46,10 +46,6 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "cassandra-idx failed to initialize cassandra table. %s", err)
 	}
-	err = session.Query(fmt.Sprintf(cassandra.MetricIdxPartitionIndex, *keyspace)).Exec()
-	if err != nil {
-		log.Fatal(4, "cassandra-idx failed to initialize cassandra index. %s", err)
-	}
 
 	wg.Add(1)
 	go writeDefs(session, defsChan)

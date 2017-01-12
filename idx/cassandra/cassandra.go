@@ -34,7 +34,6 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     PRIMARY KEY (partition, id)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
-const MetricIdxPartitionIndex = `CREATE INDEX IF NOT EXISTS ON %s.metric_idx(partition)`
 
 var (
 	// metric idx.cassadra.add.ok is how many metrics are successfully being indexed
@@ -155,11 +154,6 @@ func (c *CasIdx) InitBare() error {
 	err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
 	if err != nil {
 		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
-		return err
-	}
-	err = tmpSession.Query(fmt.Sprintf(MetricIdxPartitionIndex, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "cassandra-idx failed to initialize cassandra index. %s", err)
 		return err
 	}
 	tmpSession.Close()

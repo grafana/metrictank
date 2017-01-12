@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
     PRIMARY KEY (partition, id)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-CREATE INDEX IF NOT EXISTS ON metrictank.metric_idx(partition);
 ```
 
 These settings are good for development and geared towards Cassandra 3.0
@@ -79,7 +78,6 @@ CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
     PRIMARY KEY (partition, id)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-CREATE INDEX IF NOT EXISTS ON metrictank.metric_idx(partition);
 ```
 
 If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
