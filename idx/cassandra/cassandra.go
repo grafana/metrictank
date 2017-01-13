@@ -218,16 +218,27 @@ func (c *CasIdx) Add(data *schema.MetricData, partition int32) error {
 		}
 	}
 
-	if inMemory && existing.Partition == partition {
-		oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
-		if existing.LastUpdate < oldest.Unix() {
-			log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
-			def := schema.MetricDefinitionFromMetricData(data)
-			def.Partition = partition
-			c.MemoryIdx.AddDef(def)
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+	if inMemory {
+		if existing.Partition == partition {
+			oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
+			if existing.LastUpdate < oldest.Unix() {
+				log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
+				def := schema.MetricDefinitionFromMetricData(data)
+				def.Partition = partition
+				c.MemoryIdx.AddDef(def)
+				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+			}
+			return nil
+		} else {
+			// the partition of the metric has changed. So we need to delete
+			// the current metricDef from cassandra.  We do this is a separate
+			// goroutine as we dont want to block waiting for the delete to succeed.
+			go func() {
+				if err := c.deleteDef(&existing); err != nil {
+					log.Error(3, err.Error())
+				}
+			}()
 		}
-		return nil
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
@@ -344,22 +355,29 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 		return defs, err
 	}
 	for _, def := range defs {
-		attempts := 0
-		deleted := false
-		for !deleted && attempts < 5 {
-			attempts++
-			cErr := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
-			if cErr != nil {
-				errmetrics.Inc(err)
-				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
-				time.Sleep(time.Second)
-			} else {
-				deleted = true
-			}
+		err = c.deleteDef(&def)
+		if err != nil {
+			log.Error(3, "cassandra-idx: %s", err.Error())
 		}
 	}
 	idxCasDeleteDuration.Value(time.Since(pre))
-	return defs, nil
+	return defs, err
+}
+
+func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
+	attempts := 0
+	for attempts < 5 {
+		attempts++
+		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
+		if err != nil {
+			errmetrics.Inc(err)
+			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+			time.Sleep(time.Second)
+		} else {
+			return nil
+		}
+	}
+	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
 }
 
 func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
@@ -368,18 +386,9 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 	// deleted, so lets still try and delete these from Cassandra.
 	for _, def := range pruned {
 		log.Debug("cassandra-idx: metricDef %s pruned from the index.", def.Id)
-		attempts := 0
-		deleted := false
-		for !deleted && attempts < 5 {
-			attempts++
-			cErr := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
-			if cErr != nil {
-				errmetrics.Inc(err)
-				log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
-				time.Sleep(time.Second)
-			} else {
-				deleted = true
-			}
+		err := c.deleteDef(&def)
+		if err != nil {
+			log.Error(3, "cassandra-idx: %s", err.Error())
 		}
 	}
 	return pruned, err
