@@ -137,7 +137,6 @@ func main() {
 
 	// load config for cluster handlers
 	notifierNsq.ConfigSetup()
-	notifierKafka.ConfigSetup()
 
 	// load config for metricIndexers
 	memory.ConfigSetup()
@@ -331,20 +330,6 @@ func main() {
 	}
 
 	/***********************************
-		Initialize MetricPerrist notifiers
-	***********************************/
-	handlers := make([]mdata.NotifierHandler, 0)
-	if notifierKafka.Enabled {
-		handlers = append(handlers, notifierKafka.New(*instance, metrics))
-	}
-
-	if notifierNsq.Enabled {
-		handlers = append(handlers, notifierNsq.New(*instance, metrics))
-	}
-
-	mdata.InitPersistNotifier(handlers...)
-
-	/***********************************
 	    Start the ClusterManager
 	***********************************/
 	cluster.Start()
@@ -400,6 +385,20 @@ func main() {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
 	}
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
+
+	/***********************************
+		Initialize MetricPerrist notifiers
+	***********************************/
+	handlers := make([]mdata.NotifierHandler, 0)
+	if notifierKafka.Enabled {
+		handlers = append(handlers, notifierKafka.New(*instance, metrics, metricIndex))
+	}
+
+	if notifierNsq.Enabled {
+		handlers = append(handlers, notifierNsq.New(*instance, metrics))
+	}
+
+	mdata.InitPersistNotifier(handlers...)
 
 	/***********************************
 		Initialize usage Reporting

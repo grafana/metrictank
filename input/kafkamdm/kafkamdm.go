@@ -107,17 +107,6 @@ func ConfigProcess(instance string) {
 	brokers = strings.Split(brokerStr, ",")
 	topics = strings.Split(topicStr, ",")
 
-	if partitionStr != "*" {
-		parts := strings.Split(partitionStr, ",")
-		for _, part := range parts {
-			i, err := strconv.Atoi(part)
-			if err != nil {
-				log.Fatal(4, "could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
-			}
-			partitions = append(partitions, int32(i))
-		}
-	}
-
 	config = sarama.NewConfig()
 
 	config.ClientID = instance + "-mdm"
@@ -139,49 +128,29 @@ func ConfigProcess(instance string) {
 	}
 	defer client.Close()
 
-	partitionCount := 0
-	for i, topic := range topics {
-		availParts, err := client.Partitions(topic)
-		if err != nil {
-			log.Fatal(4, "kafka-mdm: Faild to get partitions for topic %s. %s", topic, err)
-		}
-		if len(availParts) == 0 {
-			log.Fatal(4, "kafka-mdm: No partitions returned for topic %s", topic)
-		}
-		log.Info("kafka-mdm: available partitions: %v", availParts)
-		if i > 0 {
-			if len(availParts) != partitionCount {
-				log.Fatal(4, "kafka-mdm: configured topics have different partition counts, this is not supported")
+	availParts, err := kafka.GetPartitions(client, topics)
+	if err != nil {
+		log.Fatal(4, "kafka-mdm: %s", err.Error())
+	}
+	log.Info("kafka-mdm: available partitions %v", availParts)
+	if partitionStr == "*" {
+		partitions = availParts
+	} else {
+		parts := strings.Split(partitionStr, ",")
+		for _, part := range parts {
+			i, err := strconv.Atoi(part)
+			if err != nil {
+				log.Fatal(4, "could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
 			}
-			continue
+			partitions = append(partitions, int32(i))
 		}
-		partitionCount = len(availParts)
-		if partitionStr == "*" {
-			partitions = availParts
-		} else {
-			missing := diffPartitions(partitions, availParts)
-			if len(missing) > 0 {
-				log.Fatal(4, "kafka-mdm: configured partitions not in list of available partitions. missing %v", missing)
-			}
+		missing := kafka.DiffPartitions(partitions, availParts)
+		if len(missing) > 0 {
+			log.Fatal(4, "kafka-mdm: configured partitions not in list of available partitions. missing %v", missing)
 		}
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
 	cluster.Manager.SetPartitions(partitions)
-}
-
-// setDiff returns elements that are in a but not in b
-func diffPartitions(a []int32, b []int32) []int32 {
-	var diff []int32
-Iter:
-	for _, eA := range a {
-		for _, eB := range b {
-			if eA == eB {
-				continue Iter
-			}
-		}
-		diff = append(diff, eA)
-	}
-	return diff
 }
 
 func New() *KafkaMdm {

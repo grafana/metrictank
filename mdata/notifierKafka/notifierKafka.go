@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -27,32 +29,29 @@ type NotifierKafka struct {
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
 	mdata.Notifier
+	idx   idx.MetricIndex
+	bPool *util.BufferPool
 }
 
-func New(instance string, metrics mdata.Metrics) *NotifierKafka {
-	// metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
-	messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
-	// metric cluster.notifier.kafka.message_size is the sizes seen of messages through the kafka cluster notifier
-	messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", false)
-
+func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
-		log.Fatal(2, "kafka-notifier failed to start client: %s", err)
+		log.Fatal(2, "kafka-cluster failed to start client: %s", err)
 	}
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-notifier failed to initialize consumer: %s", err)
+		log.Fatal(2, "kafka-cluster failed to initialize consumer: %s", err)
 	}
-	log.Info("kafka-notifier consumer initialized without error")
+	log.Info("kafka-cluster consumer initialized without error")
 
 	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-notifier failed to initialize producer: %s", err)
+		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
 	}
 
 	offsetMgr, err := kafka.NewOffsetMgr(dataDir)
 	if err != nil {
-		log.Fatal(2, "kafka-notifier couldnt create offsetMgr. %s", err)
+		log.Fatal(2, "kafka-cluster couldnt create offsetMgr. %s", err)
 	}
 
 	c := NotifierKafka{
@@ -68,6 +67,8 @@ func New(instance string, metrics mdata.Metrics) *NotifierKafka {
 		},
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
+		idx:           idx,
+		bPool:         util.NewBufferPool(),
 	}
 	c.start()
 	go c.produce()
@@ -76,11 +77,7 @@ func New(instance string, metrics mdata.Metrics) *NotifierKafka {
 }
 
 func (c *NotifierKafka) start() {
-	// get partitions.
-	partitions, err := c.consumer.Partitions(topic)
-	if err != nil {
-		log.Fatal(4, "kafka-notifier: Faild to get partitions for topic %s. %s", topic, err)
-	}
+	var err error
 	for _, partition := range partitions {
 		var offset int64
 		switch offsetStr {
@@ -94,7 +91,7 @@ func (c *NotifierKafka) start() {
 			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 		}
 		if err != nil {
-			log.Fatal(4, "kafka-notifier: failed to get %q offset for %s:%d.  %q", offsetStr, topic, partition, err)
+			log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
 		}
 		go c.consumePartition(topic, partition, offset)
 	}
@@ -106,9 +103,9 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 
 	pc, err := c.consumer.ConsumePartition(topic, partition, partitionOffset)
 	if err != nil {
-		log.Fatal(4, "kafka-notifier: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+		log.Fatal(4, "kafka-cluster: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
 	}
-	log.Info("kafka-notifier: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
+	log.Info("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
 	currentOffset := partitionOffset
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
@@ -116,20 +113,20 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 		select {
 		case msg := <-messages:
 			if mdata.LogLevel < 2 {
-				log.Debug("kafka-notifier received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
+				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
 			c.Handle(msg.Value)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-notifier failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
 			}
 		case <-c.stopConsuming:
 			pc.Close()
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-notifier failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
 			}
-			log.Info("kafka-notifier consumer for %s:%d ended.", topic, partition)
+			log.Info("kafka-cluster consumer for %s:%d ended.", topic, partition)
 			return
 		}
 	}
@@ -176,36 +173,57 @@ func (c *NotifierKafka) flush() {
 		return
 	}
 
-	msg := mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
+	// In order to correctly route the saveMessages to the correct partition,
+	// we cant send them in batches anymore.
+	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
+	var pMsg mdata.PersistMessageBatch
+	for i, msg := range c.buf {
+		def, err := c.idx.Get(strings.SplitN(msg.Key, "_", 2)[0])
+		if err != nil {
+			log.Error(3, "kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
+			continue
+		}
+		buf := bytes.NewBuffer(c.bPool.Get())
+		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
+		encoder := json.NewEncoder(buf)
+		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
+		err = encoder.Encode(&pMsg)
+		if err != nil {
+			log.Fatal(4, "kafka-cluster failed to marshal persistMessage to json.")
+		}
+		messagesSize.Value(buf.Len())
+		key := c.bPool.Get()
+		key, err = partitioner.GetPartitionKey(&def, key)
+		if err != nil {
+			log.Fatal(4, "Unable to get partitionKey for metricDef with id %s. %s", def.Id, err)
+		}
+		kafkaMsg := &sarama.ProducerMessage{
+			Topic: topic,
+			Value: sarama.ByteEncoder(buf.Bytes()),
+			Key:   sarama.ByteEncoder(key),
+		}
+		payload = append(payload, kafkaMsg)
+	}
+
 	c.buf = nil
 
 	go func() {
-		log.Debug("kafka-notifier sending %d batch metricPersist messages", len(msg.SavedChunks))
-
-		data, err := json.Marshal(&msg)
-		if err != nil {
-			log.Fatal(4, "kafka-notifier failed to marshal persistMessage to json.")
-		}
-		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
-		buf.Write(data)
-		messagesSize.Value(buf.Len())
-		payload := &sarama.ProducerMessage{
-			Topic: topic,
-			Value: sarama.ByteEncoder(buf.Bytes()),
-		}
-
+		log.Debug("kafka-cluster sending %d batch metricPersist messages", len(payload))
 		sent := false
 		for !sent {
-			// note: currently we don't do partitioning yet for cluster msgs, so no key needed
-			_, _, err := c.producer.SendMessage(payload)
+			err := c.producer.SendMessages(payload)
 			if err != nil {
-				log.Warn("kafka-notifier publisher %s", err)
+				log.Warn("kafka-cluster publisher %s", err)
 			} else {
 				sent = true
 			}
 			time.Sleep(time.Second)
 		}
-		messagesPublished.Inc()
+		messagesPublished.Add(len(payload))
+		// put our buffers back in the bufferPool
+		for _, msg := range payload {
+			c.bPool.Put([]byte(msg.Key.(sarama.ByteEncoder)))
+			c.bPool.Put([]byte(msg.Value.(sarama.ByteEncoder)))
+		}
 	}()
 }
