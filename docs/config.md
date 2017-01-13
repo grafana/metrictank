@@ -308,7 +308,7 @@ protocol-version = 4
 # write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
 consistency = one
 # cassandra request timeout
-timout = 1s
+timeout = 1s
 # number of concurrent connections to cassandra
 num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra
