@@ -170,3 +170,23 @@ how long it takes to persist a chunk (and chunks preceeding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
+* `cluster.node_count`:  
+total number of nodes this instance thinks are in the cluster.
+* `cluster.node_partition_count`:  
+number of partitions this node is consuming from
+* `cluster.cluster_partition_count`:  
+number of partitions in the cluster which this node is aware of.
+* `cluster.join_events`:  
+count of cluster join events processed
+* `cluster.update_events`:  
+count of cluster update events processed
+* `cluster.leave_events`:  
+count of cluster leave events processed
+* `cluster.ready`:  
+flag of whether the node is ready to accept queries or not.
+* `cluster.primary`:  
+flag of whether the node is a primary node who writes to cassandra.
+* `cluster.ready_nodes`:  
+number of nodes in the cluster that are currently in the ready stat
+* `cluster.primary_node`:  
+number of nodes int the cluster that are currently a primary

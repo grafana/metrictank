@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/memberlist"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -26,10 +25,9 @@ func validMode(m string) bool {
 }
 
 var (
-	Mode           ModeType
-	Manager        *ClusterManager
-	cfg            *memberlist.Config
-	clusterPrimary = stats.NewBool("cluster.primary")
+	Mode    ModeType
+	Manager *ClusterManager
+	cfg     *memberlist.Config
 )
 
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
