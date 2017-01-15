@@ -1288,13 +1288,66 @@ func TestGetSeriesCachedStore(t *testing.T) {
 					t.Fatalf("Pattern %s From %d To %d; Expected results to have len 0 but got %d", pattern, from, to, len(tsSlice))
 				}
 
-				// if current query is the maximum range we check the cache stats to
-				// verify it got all the hits it should have
-				if from == start && to == lastTs {
-					hits := accnt.CacheChunkHit.Peek()
-					if tc.Hits != hits {
-						t.Fatalf("Pattern %s From %d To %d; Expected %d hits but got %d", pattern, from, to, tc.Hits, hits)
+				expectedHits := uint32(0)
+				complete := false
+				// because ranges are exclusive at the end we'll test for to - 1
+				exclTo := to - 1
+
+				// if from is equal to we always expect 0 hits
+				if from != to {
+
+					// seek hits from beginning of the searched ranged within the given pattern
+					for i := 0; i < len(pattern); i++ {
+
+						// if pattern index is lower than from's chunk we continue
+						if from-(from%span) > start+uint32(i)*span {
+							continue
+						}
+
+						// current pattern index is a cache hit, so we expect one more
+						if pattern[i] == 'c' || pattern[i] == 'b' {
+							expectedHits++
+						} else {
+							break
+						}
+
+						// if we've already seeked beyond to's pattern we break and mark the seek as complete
+						if exclTo-(exclTo%span) == start+uint32(i)*span {
+							complete = true
+							break
+						}
 					}
+
+					// only if the previous seek was not complete we launch one from the other end
+					if !complete {
+
+						// now the same from the other end (just like the cache searching does)
+						for i := len(pattern) - 1; i >= 0; i-- {
+
+							// if pattern index is above to's chunk we continue
+							if exclTo-(exclTo%span)+span <= start+uint32(i)*span {
+								continue
+							}
+
+							// current pattern index is a cache hit, so we expecte one more
+							if pattern[i] == 'c' || pattern[i] == 'b' {
+								expectedHits++
+							} else {
+								break
+							}
+
+							// if we've already seeked beyond from's pattern we break
+							if from-(from%span) == start+uint32(i)*span {
+								break
+							}
+						}
+					}
+				}
+
+				// verify we got all cache hits we should have
+				hits := accnt.CacheChunkHit.Peek()
+				if expectedHits != hits {
+					t.Fatalf("Pattern %s From %d To %d; Expected %d hits but got %d", pattern, from, to, expectedHits, hits)
 				}
 				accnt.CacheChunkHit.SetUint32(0)
 
