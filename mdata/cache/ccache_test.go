@@ -8,12 +8,16 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
-func getItgens(values []uint32, ts uint32, spanaware bool) *chunk.IterGen {
+func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) *chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
 	if spanaware {
 		binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTszWithSpan))
-		binary.Write(buf, binary.LittleEndian, chunk.RevChunkSpans[uint32(len(values))])
+		spanCode, ok := chunk.RevChunkSpans[uint32(len(values))]
+		if !ok {
+			t.Fatalf("invalid chunk span provided (%d)", len(values))
+		}
+		binary.Write(buf, binary.LittleEndian, spanCode)
 	} else {
 		binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTsz))
 	}
@@ -27,15 +31,15 @@ func getItgens(values []uint32, ts uint32, spanaware bool) *chunk.IterGen {
 	return itgen
 }
 
-func getConnectedChunks(metric string) *CCache {
+func getConnectedChunks(t *testing.T, metric string) *CCache {
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
-	itgen1 := getItgens(values, 1000, false)
-	itgen2 := getItgens(values, 1005, false)
-	itgen3 := getItgens(values, 1010, false)
-	itgen4 := getItgens(values, 1015, false)
-	itgen5 := getItgens(values, 1020, false)
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen2 := getItgen(t, values, 1005, false)
+	itgen3 := getItgen(t, values, 1010, false)
+	itgen4 := getItgen(t, values, 1015, false)
+	itgen5 := getItgen(t, values, 1020, false)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 1000, *itgen2)
@@ -51,8 +55,8 @@ func TestConsecutiveAdding(t *testing.T) {
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
-	itgen1 := getItgens(values, 1000, false)
-	itgen2 := getItgens(values, 1005, false)
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen2 := getItgen(t, values, 1005, false)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 1000, *itgen2)
@@ -87,9 +91,9 @@ func TestDisconnectedAdding(t *testing.T) {
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
-	itgen1 := getItgens(values, 1000, true)
-	itgen2 := getItgens(values, 1005, true)
-	itgen3 := getItgens(values, 1010, true)
+	itgen1 := getItgen(t, values, 1000, true)
+	itgen2 := getItgen(t, values, 1005, true)
+	itgen3 := getItgen(t, values, 1010, true)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 0, *itgen2)
@@ -121,9 +125,9 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
-	itgen1 := getItgens(values, 1000, false)
-	itgen2 := getItgens(values, 1005, false)
-	itgen3 := getItgens(values, 1010, false)
+	itgen1 := getItgen(t, values, 1000, false)
+	itgen2 := getItgen(t, values, 1005, false)
+	itgen3 := getItgen(t, values, 1010, false)
 
 	cc.Add(metric, 0, *itgen1)
 	cc.Add(metric, 1000, *itgen2)
@@ -164,7 +168,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 
 func TestSearchFromBeginningComplete(t *testing.T) {
 	metric := "metric1"
-	cc := getConnectedChunks(metric)
+	cc := getConnectedChunks(t, metric)
 	res := cc.Search(metric, 1006, 1025)
 
 	if !res.Complete {
@@ -182,7 +186,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := "metric1"
-	cc := getConnectedChunks(metric)
+	cc := getConnectedChunks(t, metric)
 	res := cc.Search(metric, 1006, 1030)
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
@@ -199,7 +203,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 
 func TestSearchFromEnd(t *testing.T) {
 	metric := "metric1"
-	cc := getConnectedChunks(metric)
+	cc := getConnectedChunks(t, metric)
 	res := cc.Search(metric, 500, 1025)
 
 	if res.Complete {
@@ -241,12 +245,12 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 	metric := "metric1"
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
-	itgen1 := getItgens(values, 1000, spanaware)
-	itgen2 := getItgens(values, 1010, spanaware)
-	itgen3 := getItgens(values, 1020, spanaware)
-	itgen4 := getItgens(values, 1030, spanaware)
-	itgen5 := getItgens(values, 1040, spanaware)
-	itgen6 := getItgens(values, 1050, spanaware)
+	itgen1 := getItgen(t, values, 1000, spanaware)
+	itgen2 := getItgen(t, values, 1010, spanaware)
+	itgen3 := getItgen(t, values, 1020, spanaware)
+	itgen4 := getItgen(t, values, 1030, spanaware)
+	itgen5 := getItgen(t, values, 1040, spanaware)
+	itgen6 := getItgen(t, values, 1050, spanaware)
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
@@ -315,13 +319,13 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 	var res *CCSearchResult
 
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-	itgen1 := getItgens(values, 1000, spanaware)
-	itgen2 := getItgens(values, 1010, spanaware)
-	itgen3 := getItgens(values, 1020, spanaware)
+	itgen1 := getItgen(t, values, 1000, spanaware)
+	itgen2 := getItgen(t, values, 1010, spanaware)
+	itgen3 := getItgen(t, values, 1020, spanaware)
 	// missing chunk
-	itgen4 := getItgens(values, 1040, spanaware)
-	itgen5 := getItgens(values, 1050, spanaware)
-	itgen6 := getItgens(values, 1060, spanaware)
+	itgen4 := getItgen(t, values, 1040, spanaware)
+	itgen5 := getItgen(t, values, 1050, spanaware)
+	itgen6 := getItgen(t, values, 1060, spanaware)
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
