@@ -409,11 +409,11 @@ func main() {
 		plugin.Start(metrics, metricIndex, usg)
 	}
 
-	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
+	// metric cluster.self.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
 	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
 	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
-	stats.NewTimeDiffReporter32("cluster.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
+	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
 
 	/***********************************
 		Set our status so we can accept

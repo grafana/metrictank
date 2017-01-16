@@ -11,28 +11,37 @@ import (
 )
 
 var (
-	// total number of nodes this instance thinks are in the cluster.
-	nodeCount = stats.NewGauge32("cluster.node_count")
+	// metric cluster.events.join is how many node join events were received
+	eventsJoin = stats.NewCounter32("cluster.events.join")
+	// metric cluster.events.update is how many node update events were received
+	eventsUpdate = stats.NewCounter32("cluster.events.update")
+	// metric cluster.events.leave is how many node leave events were received
+	eventsLeave = stats.NewCounter32("cluster.events.leave")
 
-	// number of partitions this node is consuming
-	nodePartitionCount = stats.NewGauge32("cluster.node_partition_count")
+	// metric cluster.self.state.ready is whether this instance is ready
+	nodeReady = stats.NewBool("cluster.self.state.ready")
+	// metric cluster.self.state.primary is whether this instance is a primary
+	nodePrimary = stats.NewBool("cluster.self.state.primary")
+	// metric cluster.self.partitions is the number of partitions this instance consumes
+	nodePartitions = stats.NewGauge32("cluster.self.partitions")
 
-	// number of partitions in the cluster this node is aware of.
-	clusterPartitionCount = stats.NewGauge32("cluster.cluster_partition_count")
+	// metric cluster.total.state.primary-ready is the number of nodes we know to be primary and ready
+	totalPrimaryReady = stats.NewGauge32("cluster.total.state.primary-ready")
+	// metric cluster.total.state.primary-not-ready is the number of nodes we know to be primary but not ready (total should only be in this state very temporarily)
+	totalPrimaryNotReady = stats.NewGauge32("cluster.total.state.primary-not-ready")
+	// metric cluster.total.state.secondary-ready is the number of nodes we know to be secondary and ready
+	totalSecondaryReady = stats.NewGauge32("cluster.total.state.secondary-ready")
+	// metric cluster.total.state.secondary-not-ready is the number of nodes we know to be secondary and not ready
+	totalSecondaryNotReady = stats.NewGauge32("cluster.total.state.secondary-not-ready")
+	// metric cluster.total.partitions is the number of partitions in the cluster that we know of
+	totalPartitions = stats.NewGauge32("cluster.total.partitions")
 
-	// count of cluster join,update,leave events seen by this node.
-	joinEvents   = stats.NewCounter32("cluster.join_events")
-	updateEvents = stats.NewCounter32("cluster.update_events")
-	leaveEvents  = stats.NewCounter32("cluster.leave_events")
-
-	// the current state of this node.
-	nodeReady   = stats.NewBool("cluster.ready")
-	nodePrimary = stats.NewBool("cluster.primary")
-
-	// Number of ready nodes in the cluster
-	clusterReadyNodes = stats.NewGauge32("cluster.ready_nodes")
-	// number of primary nodes in the cluster
-	clusterPrimaryNodes = stats.NewGauge32("cluster.primary_nodes")
+	// metric cluster.decode_err.join is a counter of json unmarshal errors
+	unmarshalErrJoin = stats.NewCounter32("cluster.decode_err.join")
+	// metric cluster.decode_err.update is a counter of json unmarshal errors
+	unmarshalErrUpdate = stats.NewCounter32("cluster.decode_err.update")
+	// metric cluster.decode_err.merge_remote_state is a counter of json unmarshal errors
+	unmarshalErrMergeRemoteState = stats.NewCounter32("cluster.decode_err.merge_remote_state")
 )
 
 type ClusterManager struct {
@@ -69,29 +78,40 @@ func (c *ClusterManager) PeersList() []Node {
 // report the cluster stats every time there is a change to the cluster state.
 // it is assumed that the lock is acquired before calling this method.
 func (c *ClusterManager) clusterStats() {
-	readyCount := 0
-	primaryCount := 0
+	primReady := 0
+	primNotReady := 0
+	secReady := 0
+	secNotReady := 0
 	partitions := make(map[int32]int)
 	for _, p := range c.Peers {
 		if p.Primary {
-			primaryCount++
-		}
-		if p.IsReady() {
-			readyCount++
+			if p.IsReady() {
+				primReady++
+			} else {
+				primNotReady++
+			}
+		} else {
+			if p.IsReady() {
+				secReady++
+			} else {
+				secNotReady++
+			}
 		}
 		for _, partition := range p.Partitions {
 			partitions[partition]++
 		}
 	}
 
-	clusterReadyNodes.Set(readyCount)
-	clusterPrimaryNodes.Set(primaryCount)
-	clusterPartitionCount.Set(len(partitions))
-	nodeCount.Set(len(c.Peers))
+	totalPrimaryReady.Set(primReady)
+	totalPrimaryNotReady.Set(primNotReady)
+	totalSecondaryReady.Set(secReady)
+	totalSecondaryNotReady.Set(secNotReady)
+
+	totalPartitions.Set(len(partitions))
 }
 
 func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
-	joinEvents.Inc()
+	eventsJoin.Inc()
 	c.Lock()
 	defer c.Unlock()
 	if len(node.Meta) == 0 {
@@ -102,6 +122,7 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
+		unmarshalErrJoin.Inc()
 		return
 	}
 	peer.RemoteAddr = node.Addr.String()
@@ -113,7 +134,7 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 }
 
 func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
-	leaveEvents.Inc()
+	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
 	log.Info("CLU manager: Node %s has left the cluster", node.Name)
@@ -122,7 +143,7 @@ func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
 }
 
 func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
-	updateEvents.Inc()
+	eventsUpdate.Inc()
 	c.Lock()
 	defer c.Unlock()
 	if len(node.Meta) == 0 {
@@ -132,6 +153,7 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 	err := json.Unmarshal(node.Meta, &peer)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
+		unmarshalErrUpdate.Inc()
 		// if the node is known, lets mark it as notReady until it starts sending valid data again.
 		if p, ok := c.Peers[node.Name]; ok {
 			p.State = NodeNotReady
@@ -211,6 +233,7 @@ func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
 	knownPeers := make(map[string]Node)
 	err := json.Unmarshal(buf, &knownPeers)
 	if err != nil {
+		unmarshalErrMergeRemoteState.Inc()
 		log.Error(3, "CLU manager: Unable to decode remoteState message: %s", err.Error())
 		return
 	}
@@ -295,7 +318,7 @@ func (c *ClusterManager) SetPartitions(part []int32) {
 	c.node.Partitions = part
 	c.node.Updated = time.Now()
 	c.Unlock()
-	nodePartitionCount.Set(len(part))
+	nodePartitions.Set(len(part))
 	c.BroadcastUpdate()
 }
 

@@ -35,11 +35,39 @@ a counter of messages published to the kafka cluster notifier
 the sizes seen of messages through the nsq cluster notifier
 * `cluster.notifier.nsq.messages-published`:  
 a counter of messages published to the nsq cluster notifier
-* `cluster.promotion_wait`:  
+* `cluster.decode_err.join`:  
+a counter of json unmarshal errors
+* `cluster.decode_err.merge_remote_state`:  
+a counter of json unmarshal errors
+* `cluster.decode_err.update`:  
+a counter of json unmarshal errors
+* `cluster.events.join`:  
+how many node join events were received
+* `cluster.events.leave`:  
+how many node leave events were received
+* `cluster.events.update`:  
+how many node update events were received
+* `cluster.self.partitions`:  
+the number of partitions this instance consumes
+* `cluster.self.promotion_wait`:  
 how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 and it was able to save its complete chunks, this node will be able to take over without dataloss.
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+* `cluster.self.state.primary`:  
+whether this instance is a primary
+* `cluster.self.state.ready`:  
+whether this instance is ready
+* `cluster.total.partitions`:  
+the number of partitions in the cluster that we know of
+* `cluster.total.state.primary-not-ready`:  
+the number of nodes we know to be primary but not ready (total should only be in this state very temporarily)
+* `cluster.total.state.primary-ready`:  
+the number of nodes we know to be primary and ready
+* `cluster.total.state.secondary-not-ready`:  
+the number of nodes we know to be secondary and not ready
+* `cluster.total.state.secondary-ready`:  
+the number of nodes we know to be secondary and ready
 * `idx.cassadra.add.ok`:  
 how many metrics are successfully being indexed
 * `idx.cassandra.add`:  
@@ -170,23 +198,3 @@ how long it takes to persist a chunk (and chunks preceeding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
-* `cluster.node_count`:  
-total number of nodes this instance thinks are in the cluster.
-* `cluster.node_partition_count`:  
-number of partitions this node is consuming from
-* `cluster.cluster_partition_count`:  
-number of partitions in the cluster which this node is aware of.
-* `cluster.join_events`:  
-count of cluster join events processed
-* `cluster.update_events`:  
-count of cluster update events processed
-* `cluster.leave_events`:  
-count of cluster leave events processed
-* `cluster.ready`:  
-flag of whether the node is ready to accept queries or not.
-* `cluster.primary`:  
-flag of whether the node is a primary node who writes to cassandra.
-* `cluster.ready_nodes`:  
-number of nodes in the cluster that are currently in the ready stat
-* `cluster.primary_node`:  
-number of nodes int the cluster that are currently a primary
