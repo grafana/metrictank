@@ -73,6 +73,13 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
 }
 
+func (cc *CCache) Reset() {
+	cc.accnt.Reset()
+	cc.Lock()
+	cc.metricCache = make(map[string]*CCacheMetric)
+	cc.Unlock()
+}
+
 func (c *CCache) Stop() {
 	c.accnt.Stop()
 	c.stop <- nil

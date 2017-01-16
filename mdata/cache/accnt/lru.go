@@ -35,3 +35,11 @@ func (l *LRU) pop() interface{} {
 	delete(l.items, e)
 	return e
 }
+
+func (l *LRU) reset() {
+	for {
+		if l.pop() == nil {
+			break
+		}
+	}
+}

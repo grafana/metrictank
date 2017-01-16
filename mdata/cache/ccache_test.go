@@ -251,11 +251,12 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 	itgen4 := getItgen(t, values, 1030, spanaware)
 	itgen5 := getItgen(t, values, 1040, spanaware)
 	itgen6 := getItgen(t, values, 1050, spanaware)
+	cc = NewCCache()
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
 		for until := uint32(1051); until < 1061; until++ {
-			cc = NewCCache()
+			cc.Reset()
 
 			if ascending {
 				cc.Add(metric, 0, *itgen1)
@@ -326,11 +327,12 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 	itgen4 := getItgen(t, values, 1040, spanaware)
 	itgen5 := getItgen(t, values, 1050, spanaware)
 	itgen6 := getItgen(t, values, 1060, spanaware)
+	cc = NewCCache()
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
 		for until := uint32(1061); until < 1071; until++ {
-			cc = NewCCache()
+			cc.Reset()
 
 			if ascending {
 				cc.Add(metric, 0, *itgen1)

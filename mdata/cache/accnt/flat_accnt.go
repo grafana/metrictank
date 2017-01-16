@@ -52,6 +52,7 @@ type FlatAccntMet struct {
 const evnt_hit_chnk uint8 = 4
 const evnt_add_chnk uint8 = 5
 const evnt_stop uint8 = 100
+const evnt_reset uint8 = 101
 
 type FlatAccntEvent struct {
 	t  uint8       // event type
@@ -97,6 +98,10 @@ func (a *FlatAccnt) Stop() {
 	a.act(evnt_stop, nil)
 }
 
+func (a *FlatAccnt) Reset() {
+	a.act(evnt_reset, nil)
+}
+
 func (a *FlatAccnt) act(t uint8, payload interface{}) {
 	event := FlatAccntEvent{
 		t:  t,
@@ -136,6 +141,10 @@ func (a *FlatAccnt) eventLoop() {
 				)
 			case evnt_stop:
 				return
+			case evnt_reset:
+				a.metrics = make(map[string]*FlatAccntMet)
+				a.total = 0
+				a.lru.reset()
 			}
 
 			// evict until we're below the max
