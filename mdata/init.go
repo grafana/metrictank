@@ -19,16 +19,11 @@ var (
 	// that is not higher than the timestamp of the last written timestamp for that series.
 	metricsTooOld = stats.NewCounter32("tank.metrics_too_old")
 
-	// metric tank.add_to_saving_chunk is points received - by the primary node - for the most recent chunk
-	// when that chunk is already being saved (or has been saved).
+	// metric tank.add_to_closed_chunk is points received for the most recent chunk
+	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
-	// your (infrequent) updates.  The primary won't add them to its in-memory chunks, but secondaries will
-	// (because they are never in "saving" state for them), see below.
-	addToSavingChunk = stats.NewCounter32("tank.add_to_saving_chunk")
-
-	// metric tank.add_to_saved_chunk is points received - by a secondary node - for the most recent chunk when that chunk
-	// has already been saved by a primary.  A secondary can add this data to its chunks.
-	addToSavedChunk = stats.NewCounter32("tank.add_to_saved_chunk")
+	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
+	addToClosedChunk = stats.NewCounter32("tank.add_to_closed_chunk")
 
 	// metric mem.to_iter is how long it takes to transform in-memory chunks to iterators
 	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")

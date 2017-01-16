@@ -38,7 +38,7 @@
         {
           "aliasColors": {
             "ES backpressure": "#052B51",
-            "add-to-saving": "#C15C17",
+            "add-to-closed": "#C15C17",
             "primary": "#2F575E",
             "store backpressure": "#962D82",
             "too old": "#890F02"
@@ -124,22 +124,18 @@
             },
             {
               "refId": "C",
-              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.add_to_saved_chunk.counter32), 'add-to-saved')"
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32), 'add-to-closed')"
             },
             {
               "refId": "D",
-              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.add_to_saving_chunk.counter32), 'add-to-saving')"
-            },
-            {
-              "refId": "E",
               "target": "aliasSub(perSecond(metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32), '.*\\.([^\\.]+)\\.metrics_decode_err.*', '\\1 decode err')"
             },
             {
-              "refId": "F",
+              "refId": "E",
               "target": "aliasSub(perSecond(metrictank.stats.$environment.$instance.input.*.metric_invalid.counter32), '.*\\.([^\\.]+)\\.metric_invalid.*', '\\1 metric invalid')"
             },
             {
-              "refId": "G",
+              "refId": "F",
               "target": "aliasByNode(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.*.counter32), 0.000000001), 6, 7)"
             }
           ],
