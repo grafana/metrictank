@@ -77,7 +77,7 @@ func ConfigSetup() {
 	inCarbon := flag.NewFlagSet("carbon-in", flag.ExitOnError)
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
-	inCarbon.IntVar(&partitionId, "partition", 1, "partition Id.")
+	inCarbon.IntVar(&partitionId, "partition", 0, "partition Id.")
 	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
