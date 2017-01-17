@@ -76,8 +76,8 @@ func NewServer() (*Server, error) {
 	})
 
 	return &Server{
-		Addr:     addr,
-		SSL:      useSSL,
+		Addr:     Addr,
+		SSL:      UseSSL,
 		certFile: certFile,
 		keyFile:  keyFile,
 		shutdown: make(chan struct{}),

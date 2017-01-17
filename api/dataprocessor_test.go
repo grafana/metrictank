@@ -25,7 +25,7 @@ type testCase struct {
 }
 
 func init() {
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 }
 
 func validate(cases []testCase, t *testing.T) {
@@ -543,10 +543,10 @@ func TestPrevBoundary(t *testing.T) {
 
 // TestGetSeriesFixed assures that series data is returned in proper form.
 func TestGetSeriesFixed(t *testing.T) {
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewDevnullStore()
 	metrics := mdata.NewAggMetrics(store, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
-	addr = "localhost:6060"
+	Addr = "localhost:6060"
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
@@ -573,7 +573,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.ThisNode)
+				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.Manager.ThisNode())
 				req.ArchInterval = 10
 				points := srv.getSeriesFixed(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
@@ -592,11 +592,11 @@ type alignCase struct {
 }
 
 func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.ThisNode)
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode())
 	return req
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.ThisNode)
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode())
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.OutInterval = outInterval
@@ -1041,12 +1041,55 @@ func TestAlignRequests(t *testing.T) {
 			t.Errorf("different amount of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
 		} else {
 			for r, exp := range ac.outReqs {
-				if exp != out[r] {
+				if !compareReqEqual(exp, out[r]) {
 					t.Errorf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
 				}
 			}
 		}
 	}
+}
+
+// return true if a and b are equal. Equal means that all of the struct
+// fields are equal.  For the req.Node, we just compare the node.Name rather
+// then doing a deep comparision.
+func compareReqEqual(a, b models.Req) bool {
+	if a.Key != b.Key {
+		return false
+	}
+	if a.Target != b.Target {
+		return false
+	}
+	if a.From != b.From {
+		return false
+	}
+	if a.To != b.To {
+		return false
+	}
+	if a.MaxPoints != b.MaxPoints {
+		return false
+	}
+	if a.RawInterval != b.RawInterval {
+		return false
+	}
+	if a.Consolidator != b.Consolidator {
+		return false
+	}
+	if a.Node.Name != b.Node.Name {
+		return false
+	}
+	if a.Archive != b.Archive {
+		return false
+	}
+	if a.ArchInterval != b.ArchInterval {
+		return false
+	}
+	if a.OutInterval != b.OutInterval {
+		return false
+	}
+	if a.AggNum != b.AggNum {
+		return false
+	}
+	return true
 }
 
 func TestMergeSeries(t *testing.T) {
@@ -1360,12 +1403,12 @@ func TestGetSeriesCachedStore(t *testing.T) {
 }
 
 func TestGetSeriesAggMetrics(t *testing.T) {
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewMockStore()
 	chunkSpan := uint32(600)
 	numChunks := uint32(10)
 	metrics := mdata.NewAggMetrics(store, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
-	addr = "localhost:6060"
+	Addr = "localhost:6060"
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)

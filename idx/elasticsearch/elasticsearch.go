@@ -328,7 +328,7 @@ func (e *EsIdx) rebuildIndex() {
 			"term": {"partition": 0},
 		},
 	}
-	for _, partition := range cluster.ThisNode.GetPartitions() {
+	for _, partition := range cluster.Manager.GetPartitions() {
 		qry["query"]["term"]["partition"] = partition
 		loading := true
 		scroll_id := ""

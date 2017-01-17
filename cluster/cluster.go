@@ -2,9 +2,11 @@ package cluster
 
 import (
 	"math/rand"
-	"net/url"
-	"sync"
+	"strings"
 	"time"
+
+	"github.com/hashicorp/memberlist"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type ModeType string
@@ -22,124 +24,112 @@ func validMode(m string) bool {
 }
 
 var (
-	ThisNode *Node
-	Mode     ModeType
-	shutdown = make(chan struct{})
-
-	mu    sync.Mutex
-	peers = make([]*Node, 0)
+	Mode    ModeType
+	Manager *ClusterManager
+	cfg     *memberlist.Config
 )
 
-func Init(name, version string, started time.Time) {
-	ThisNode = &Node{
-		name:          name,
-		started:       started,
-		version:       version,
-		primary:       false,
-		primaryChange: time.Now(),
-		stateChange:   time.Now(),
+func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
+	Manager = &ClusterManager{
+		members: map[string]Node{
+			name: Node{
+				Name:          name,
+				ApiPort:       apiPort,
+				ApiScheme:     apiScheme,
+				Started:       started,
+				Version:       version,
+				Primary:       primary,
+				PrimaryChange: time.Now(),
+				StateChange:   time.Now(),
+				Updated:       time.Now(),
+				local:         true,
+			},
+		},
+		nodeName: name,
 	}
+	cfg = memberlist.DefaultLANConfig()
+	cfg.BindPort = clusterPort
+	cfg.BindAddr = clusterHost.String()
+	cfg.AdvertisePort = clusterPort
+	cfg.Events = Manager
+	cfg.Delegate = Manager
 }
 
 func Stop() {
-	close(shutdown)
+	Manager.list.Leave(time.Second)
 }
 
 func Start() {
-	go probePeers(probeInterval)
-}
-
-func AddPeer(remoteAddr *url.URL) {
-	mu.Lock()
-	peer := &Node{
-		remoteAddr:  remoteAddr,
-		stateChange: time.Now(),
+	log.Info("CLU Start: Starting cluster on %s:%d", cfg.BindAddr, cfg.BindPort)
+	list, err := memberlist.Create(cfg)
+	if err != nil {
+		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
 	}
-	peers = append(peers, peer)
-	go peer.Probe()
-	mu.Unlock()
-}
+	Manager.setList(list)
 
-func GetPeers() []*Node {
-	mu.Lock()
-	p := make([]*Node, len(peers))
-	copy(p, peers)
-	mu.Unlock()
-	return p
-}
-
-func probePeers(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	for {
-		select {
-		case <-shutdown:
-			ticker.Stop()
-			return
-		case <-ticker.C:
-			mu.Lock()
-			for _, peer := range peers {
-				go peer.Probe()
-			}
-			mu.Unlock()
-		}
+	if peersStr == "" {
+		return
 	}
+	n, err := list.Join(strings.Split(peersStr, ","))
+	if err != nil {
+		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
+	}
+	log.Info("CLU Start: joined to %d nodes in cluster", n)
 }
 
 // return the list of nodes to broadcast requests to
-// Only 1 peer per partition is returned. This list includes
+// Only 1 member per partition is returned. This list includes
 // ThisNode if it is capable of handling queries.
-func PeersForQuery() []*Node {
+func MembersForQuery() []Node {
+	thisNode := Manager.ThisNode()
 	// If we are running in single mode, just return thisNode
 	if Mode == ModeSingle {
-		return []*Node{ThisNode}
+		return []Node{thisNode}
 	}
 
-	peersMap := make(map[int32][]*Node)
-	if ThisNode.IsReady() {
-		for _, part := range ThisNode.GetPartitions() {
-			peersMap[part] = []*Node{ThisNode}
+	membersMap := make(map[int32][]Node)
+	if thisNode.IsReady() {
+		for _, part := range thisNode.Partitions {
+			membersMap[part] = []Node{thisNode}
 		}
 	}
-	mu.Lock()
-	for _, peer := range peers {
-		if !peer.IsReady() {
+
+	for _, member := range Manager.MemberList() {
+		if !member.IsReady() || member.Name == thisNode.Name {
 			continue
 		}
-		for _, part := range peer.GetPartitions() {
-			peersMap[part] = append(peersMap[part], peer)
+		for _, part := range member.Partitions {
+			membersMap[part] = append(membersMap[part], member)
 		}
 	}
-	mu.Unlock()
-	selectedPeers := make(map[*Node]struct{})
-	answer := make([]*Node, 0)
+
+	selectedMembers := make(map[string]struct{})
+	answer := make([]Node, 0)
 	// we want to get the minimum number of nodes
 	// needed to cover all partitions
-	for _, nodes := range peersMap {
-		selected := nodes[0]
+
+LOOP:
+	for _, nodes := range membersMap {
 		// always prefer the local node which will be nodes[0]
 		// if it has this partition
-		if selected != ThisNode {
-			// check if we are already going to use one of the
-			// available nodes and re-use it
-			reusePeer := false
-			for _, n := range nodes {
-				if _, ok := selectedPeers[n]; ok {
-					selected = n
-					reusePeer = true
-					break
-				}
+		if nodes[0].Name == thisNode.Name {
+			if _, ok := selectedMembers[thisNode.Name]; !ok {
+				selectedMembers[thisNode.Name] = struct{}{}
+				answer = append(answer, thisNode)
 			}
-			// if no nodes have been selected yet then grab a
-			// random node from the set of available nodes
-			if !reusePeer {
-				selected = nodes[rand.Intn(len(nodes))]
-			}
+			continue LOOP
 		}
 
-		if _, ok := selectedPeers[selected]; !ok {
-			selectedPeers[selected] = struct{}{}
-			answer = append(answer, selected)
+		for _, n := range nodes {
+			if _, ok := selectedMembers[n.Name]; ok {
+				continue LOOP
+			}
 		}
+		// if no nodes have been selected yet then grab a
+		// random node from the set of available nodes
+		selected := nodes[rand.Intn(len(nodes))]
+		selectedMembers[selected.Name] = struct{}{}
+		answer = append(answer, selected)
 	}
 
 	return answer

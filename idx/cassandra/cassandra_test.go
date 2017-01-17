@@ -23,7 +23,7 @@ func init() {
 	writeQueueSize = 1000
 	protoVer = 4
 
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 }
 
 func getSeriesNames(depth, count int, prefix string) []string {
@@ -208,7 +208,7 @@ func TestFind(t *testing.T) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
-	cluster.ThisNode.SetPartitions([]int32{1})
+	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
 	hosts = "localhost:9042"
 	consistency = "one"
@@ -253,7 +253,7 @@ func insertDefs(ix idx.MetricIndex, i int) {
 }
 
 func BenchmarkLoad(b *testing.B) {
-	cluster.ThisNode.SetPartitions([]int32{1})
+	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
 	hosts = "localhost:9042"
 	consistency = "one"
