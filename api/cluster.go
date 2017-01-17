@@ -2,7 +2,9 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
@@ -15,16 +17,24 @@ import (
 var NotFoundErr = errors.New("not found")
 
 func (s *Server) getNodeStatus(ctx *middleware.Context) {
-	response.Write(ctx, response.NewJson(200, cluster.ThisNode, ""))
+	response.Write(ctx, response.NewJson(200, cluster.Manager.ThisNode(), ""))
 }
 
 func (s *Server) setNodeStatus(ctx *middleware.Context, status models.NodeStatus) {
-	cluster.ThisNode.SetPrimary(status.Primary)
+	primary, err := strconv.ParseBool(status.Primary)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf(
+			"could not parse status to bool. %s",
+			err.Error())),
+		)
+		return
+	}
+	cluster.Manager.SetPrimary(primary)
 	ctx.PlainText(200, []byte("OK"))
 }
 
 func (s *Server) appStatus(ctx *middleware.Context) {
-	if cluster.ThisNode.IsReady() {
+	if cluster.Manager.IsReady() {
 		ctx.PlainText(200, []byte("OK"))
 		return
 	}
@@ -34,8 +44,8 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
-		Node:  cluster.ThisNode,
-		Peers: cluster.GetPeers(),
+		NodeName: cluster.Manager.ThisNode().Name,
+		Members:  cluster.Manager.MemberList(),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
 }

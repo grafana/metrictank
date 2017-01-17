@@ -5,12 +5,12 @@ import (
 )
 
 type NodeStatus struct {
-	Primary bool `json:"primary" form:"primary" binding:"Required"`
+	Primary string `json:"mode" form:"mode" binding:"Required"`
 }
 
 type ClusterStatus struct {
-	Node  *cluster.Node   `json:"node"`
-	Peers []*cluster.Node `json:"peers"`
+	NodeName string         `json:"nodeName"`
+	Members  []cluster.Node `json:"members"`
 }
 
 type IndexList struct {

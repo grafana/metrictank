@@ -16,8 +16,8 @@ services:
       MT_INSTANCE: metrictank0
       MT_LOG_LEVEL: 2
       MT_CLUSTER_MODE: multi
-      MT_CLUSTER_PEERS: metrictank1:6060,metrictank2:6060,metrictank3:6060
       MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_BIND_ADDR: "metrictank0:7946"
     links:
      - cassandra
 
@@ -36,7 +36,8 @@ services:
       MT_INSTANCE: metrictank1
       MT_LOG_LEVEL: 2
       MT_CLUSTER_MODE: multi
-      MT_CLUSTER_PEERS: metrictank0:6060,metrictank2:6060,metrictank3:6060
+      MT_CLUSTER_PEERS: metrictank0,metrictank2,metrictank3
+      MT_CLUSTER_BIND_ADDR: "metrictank1:7946"
     links:
      - cassandra
      - metrictank0
@@ -56,8 +57,9 @@ services:
       MT_INSTANCE: metrictank2
       MT_LOG_LEVEL: 2
       MT_CLUSTER_MODE: multi
-      MT_CLUSTER_PEERS: metrictank0:6060,metrictank1:6060,metrictank3:6060
+      MT_CLUSTER_PEERS: metrictank0,metrictank1,metrictank3
       MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_BIND_ADDR: "metrictank2:7946"
     links:
      - cassandra
      - metrictank0
@@ -77,7 +79,8 @@ services:
       MT_INSTANCE: metrictank3
       MT_LOG_LEVEL: 2
       MT_CLUSTER_MODE: multi
-      MT_CLUSTER_PEERS: metrictank0:6060,metrictank1:6060,metrictank2:6060
+      MT_CLUSTER_PEERS: metrictank0,metrictank1,metrictank2
+      MT_CLUSTER_BIND_ADDR: "metrictank3:7946"
     links:
      - cassandra
      - metrictank0

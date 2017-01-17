@@ -35,11 +35,39 @@ a counter of messages published to the kafka cluster notifier
 the sizes seen of messages through the nsq cluster notifier
 * `cluster.notifier.nsq.messages-published`:  
 a counter of messages published to the nsq cluster notifier
-* `cluster.promotion_wait`:  
+* `cluster.decode_err.join`:  
+a counter of json unmarshal errors
+* `cluster.decode_err.merge_remote_state`:  
+a counter of json unmarshal errors
+* `cluster.decode_err.update`:  
+a counter of json unmarshal errors
+* `cluster.events.join`:  
+how many node join events were received
+* `cluster.events.leave`:  
+how many node leave events were received
+* `cluster.events.update`:  
+how many node update events were received
+* `cluster.self.partitions`:  
+the number of partitions this instance consumes
+* `cluster.self.promotion_wait`:  
 how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 and it was able to save its complete chunks, this node will be able to take over without dataloss.
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+* `cluster.self.state.primary`:  
+whether this instance is a primary
+* `cluster.self.state.ready`:  
+whether this instance is ready
+* `cluster.total.partitions`:  
+the number of partitions in the cluster that we know of
+* `cluster.total.state.primary-not-ready`:  
+the number of nodes we know to be primary but not ready (total should only be in this state very temporarily)
+* `cluster.total.state.primary-ready`:  
+the number of nodes we know to be primary and ready
+* `cluster.total.state.secondary-not-ready`:  
+the number of nodes we know to be secondary and not ready
+* `cluster.total.state.secondary-ready`:  
+the number of nodes we know to be secondary and ready
 * `idx.cassadra.add.ok`:  
 how many metrics are successfully being indexed
 * `idx.cassandra.add`:  

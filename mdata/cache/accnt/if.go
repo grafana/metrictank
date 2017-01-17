@@ -9,6 +9,7 @@ type Accnt interface {
 	AddChunk(string, uint32, uint64)
 	HitChunk(string, uint32)
 	Stop()
+	Reset()
 }
 
 // EvictTarget is the definition of a chunk that should be evicted.

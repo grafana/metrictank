@@ -105,7 +105,7 @@ func ConfigProcess() {
 		// but we definitely need to always be able to determine which interval to use
 		log.Fatal(4, "carbon-in: storage-conf does not have a default '.*' pattern")
 	}
-	cluster.ThisNode.SetPartitions([]int32{int32(partitionId)})
+	cluster.Manager.SetPartitions([]int32{int32(partitionId)})
 }
 
 func New() *Carbon {

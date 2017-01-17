@@ -166,7 +166,7 @@ func ConfigProcess(instance string) {
 		}
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
-	cluster.ThisNode.SetPartitions(partitions)
+	cluster.Manager.SetPartitions(partitions)
 }
 
 // setDiff returns elements that are in a but not in b

@@ -167,7 +167,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 	// The first chunk is likely only a partial chunk. If we are not the primary node
 	// we should not serve data from this chunk, and should instead get the chunk from cassandra.
 	// if we are the primary node, then there is likely no data in Cassandra anyway.
-	if !cluster.ThisNode.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
+	if !cluster.Manager.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
 		oldestPos++
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
@@ -386,7 +386,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		}
 
 		// If we are a primary node, then add the chunk to the write queue to be saved to Cassandra
-		if cluster.ThisNode.IsPrimary() {
+		if cluster.Manager.IsPrimary() {
 			if LogLevel < 2 {
 				log.Debug("AM persist(): node is primary, saving chunk.")
 			}

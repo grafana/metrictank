@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/util"
@@ -170,12 +169,12 @@ func aggEvery(numPoints, maxPoints uint32) uint32 {
 func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
-	remoteReqs := make(map[*cluster.Node][]models.Req)
+	remoteReqs := make(map[string][]models.Req)
 	for _, req := range reqs {
-		if req.Node == cluster.ThisNode {
+		if req.Node.IsLocal() {
 			localReqs = append(localReqs, req)
 		} else {
-			remoteReqs[req.Node] = append(remoteReqs[req.Node], req)
+			remoteReqs[req.Node.Name] = append(remoteReqs[req.Node.Name], req)
 		}
 	}
 
@@ -227,15 +226,16 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	return out, err
 }
 
-func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]models.Series, error) {
+func (s *Server) getTargetsRemote(remoteReqs map[string][]models.Req) ([]models.Series, error) {
 	seriesChan := make(chan []models.Series, len(remoteReqs))
 	errorsChan := make(chan error, len(remoteReqs))
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
-	for node, nodeReqs := range remoteReqs {
-		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), node.GetName())
-		go func(reqs []models.Req, node *cluster.Node) {
+	for _, nodeReqs := range remoteReqs {
+		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.Name)
+		go func(reqs []models.Req) {
 			defer wg.Done()
+			node := reqs[0].Node
 			buf, err := node.Post("/getdata", models.GetData{Requests: reqs})
 			if err != nil {
 				errorsChan <- err
@@ -244,13 +244,13 @@ func (s *Server) getTargetsRemote(remoteReqs map[*cluster.Node][]models.Req) ([]
 			var resp models.GetDataResp
 			buf, err = resp.UnmarshalMsg(buf)
 			if err != nil {
-				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err)
+				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.Name, err)
 				errorsChan <- err
 				return
 			}
-			log.Debug("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
+			log.Debug("DP getTargetsRemote: %s returned %d series", node.Name, len(resp.Series))
 			seriesChan <- resp.Series
-		}(nodeReqs, node)
+		}(nodeReqs)
 	}
 	go func() {
 		wg.Wait()

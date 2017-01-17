@@ -332,11 +332,11 @@
           "targets": [
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.cluster.primary.gauge1, 'primary')"
+              "target": "alias(metrictank.stats.$environment.$instance.cluster.self.state.primary.gauge1, 'primary')"
             },
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.cluster.promotion_wait.gauge32, 'promotion wait')"
+              "target": "alias(metrictank.stats.$environment.$instance.cluster.self.promotion_wait.gauge32, 'promotion wait')"
             }
           ],
           "timeFrom": null,

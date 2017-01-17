@@ -14,7 +14,7 @@ import (
 )
 
 func Test_Process(t *testing.T) {
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))
 	metricIndex := memory.New()
@@ -84,7 +84,7 @@ func test_Process(worker int, in *Input, t *testing.T) map[string]int {
 }
 
 func BenchmarkProcess(b *testing.B) {
-	cluster.Init("default", "test", time.Now())
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	store := mdata.NewDevnullStore()
 	aggmetrics := mdata.NewAggMetrics(store, 600, 10, 800, 8000, 10000, 0, make([]mdata.AggSetting, 0))

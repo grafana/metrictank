@@ -218,10 +218,11 @@ net-max-open-requests = 100
 [cluster]
 # The primary node writes data to cassandra. There should only be 1 primary node per shardGroup.
 primary-node = true
-# http/s addresses of other nodes, comma separated. use this if you shard your data and want to query other instances
+# the TCP/UDP address to listen on for the gossip protocol.
+bind-addr = 0.0.0.0:7946
+# TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances.
+# If no port is specified, it is assumed the other nodes are using the same port this node is listening on.
 peers =
-# Interval to probe peer nodes
-probe-interval = 2s
 # Operating mode of cluster. (single|multi)
 mode = single
 ```
@@ -308,7 +309,7 @@ protocol-version = 4
 # write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
 consistency = one
 # cassandra request timeout
-timout = 1s
+timeout = 1s
 # number of concurrent connections to cassandra
 num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra

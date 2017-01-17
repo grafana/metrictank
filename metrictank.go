@@ -192,7 +192,18 @@ func main() {
 	/***********************************
 		Initialize our Cluster
 	***********************************/
-	cluster.Init(*instance, GitHash, startupTime)
+	api.ConfigProcess()
+	cluster.ConfigProcess()
+	scheme := "http"
+	if api.UseSSL {
+		scheme = "https"
+	}
+	addrParts := strings.Split(api.Addr, ":")
+	port, err := strconv.ParseInt(addrParts[len(addrParts)-1], 10, 64)
+	if err != nil {
+		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
+	}
+	cluster.Init(*instance, GitHash, startupTime, scheme, int(port))
 
 	/***********************************
 		Validate remaining settings
@@ -201,8 +212,6 @@ func main() {
 	inKafkaMdm.ConfigProcess(*instance)
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
-	api.ConfigProcess()
-	cluster.ConfigProcess()
 	statsConfig.ConfigProcess(*instance)
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
@@ -290,11 +299,6 @@ func main() {
 	***********************************/
 	statsConfig.Start()
 
-	/*************************************
-	  Start polling our Cluster Peers
-	**************************************/
-	cluster.Start()
-
 	/***********************************
 		Initialize our backendStore
 	***********************************/
@@ -341,6 +345,11 @@ func main() {
 	mdata.InitPersistNotifier(handlers...)
 
 	/***********************************
+	    Start the ClusterManager
+	***********************************/
+	cluster.Start()
+
+	/***********************************
 		Initialize our MetricIdx
 	***********************************/
 	ccache := cache.NewCCache()
@@ -369,6 +378,23 @@ func main() {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
 
+	/***********************************
+		Initialize our API server
+	***********************************/
+	apiServer, err := api.NewServer()
+	if err != nil {
+		log.Fatal(4, "Failed to start API. %s", err.Error())
+	}
+
+	apiServer.BindMetricIndex(metricIndex)
+	apiServer.BindMemoryStore(metrics)
+	apiServer.BindBackendStore(store)
+	apiServer.BindCache(ccache)
+	go apiServer.Run()
+
+	/***********************************
+		Load index entries from the backend store.
+	***********************************/
 	err = metricIndex.Init()
 	if err != nil {
 		log.Fatal(4, "failed to initialize metricIndex: %s", err)
@@ -387,34 +413,20 @@ func main() {
 		plugin.Start(metrics, metricIndex, usg)
 	}
 
-	// metric cluster.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
+	// metric cluster.self.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
 	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
 	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
-	stats.NewTimeDiffReporter32("cluster.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
-
-	/***********************************
-		Initialize our API server
-	***********************************/
-	apiServer, err := api.NewServer()
-	if err != nil {
-		log.Fatal(4, "Failed to start API. %s", err.Error())
-	}
-
-	apiServer.BindMetricIndex(metricIndex)
-	apiServer.BindMemoryStore(metrics)
-	apiServer.BindBackendStore(store)
-	apiServer.BindCache(ccache)
-	go apiServer.Run()
+	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
 
 	/***********************************
 		Set our status so we can accept
 		requests from users.
 	***********************************/
-	if cluster.ThisNode.IsPrimary() {
-		cluster.ThisNode.SetReady()
+	if cluster.Manager.IsPrimary() {
+		cluster.Manager.SetReady()
 	} else {
-		cluster.ThisNode.SetReadyIn(warmupPeriod)
+		cluster.Manager.SetReadyIn(warmupPeriod)
 	}
 
 	/***********************************
@@ -422,10 +434,12 @@ func main() {
 	***********************************/
 	<-sigChan
 
+	// Leave the cluster. All other nodes will be notified we have left
+	// and so will stop sending us requests.
+	cluster.Stop()
+
 	// stop API
 	apiServer.Stop()
-	// stop polling peer nodes
-	cluster.Stop()
 
 	// shutdown our input plugins.  These may take a while as we allow them
 	// to finish processing any metrics that have already been ingested.
