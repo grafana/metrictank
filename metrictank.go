@@ -204,7 +204,6 @@ func main() {
 		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
 	}
 	cluster.Init(*instance, GitHash, startupTime, scheme, int(port))
-	cluster.Start()
 
 	/***********************************
 		Validate remaining settings
@@ -344,6 +343,11 @@ func main() {
 	}
 
 	mdata.InitPersistNotifier(handlers...)
+
+	/***********************************
+	    Start the ClusterManager
+	***********************************/
+	cluster.Start()
 
 	/***********************************
 		Initialize our MetricIdx
