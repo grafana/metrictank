@@ -61,7 +61,7 @@ func parseTarget(target string) (string, string, error) {
 }
 
 func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
-	peers := cluster.PeersForQuery()
+	peers := cluster.MembersForQuery()
 	log.Debug("HTTP findSeries for %v across %d instances", patterns, len(peers))
 	errors := make([]error, 0)
 	series := make([]Series, 0)
@@ -367,7 +367,7 @@ func (s *Server) listRemote(orgId int, peer cluster.Node) ([]schema.MetricDefini
 }
 
 func (s *Server) metricsIndex(ctx *middleware.Context) {
-	peers := cluster.PeersForQuery()
+	peers := cluster.MembersForQuery()
 	errors := make([]error, 0)
 	series := make([]schema.MetricDefinition, 0)
 	seenDefs := make(map[string]struct{})
@@ -486,7 +486,7 @@ func findTreejson(query string, nodes []idx.Node) (models.SeriesTree, error) {
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {
-	peers := cluster.Manager.PeersList()
+	peers := cluster.Manager.MemberList()
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debug("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
 	errors := make([]error, 0)

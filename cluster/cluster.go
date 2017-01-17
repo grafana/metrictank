@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"encoding/json"
 	"math/rand"
 	"strings"
 	"time"
@@ -32,19 +31,21 @@ var (
 
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
 	Manager = &ClusterManager{
-		Peers: make(map[string]Node),
-		node: Node{
-			Name:          name,
-			ApiPort:       apiPort,
-			ApiScheme:     apiScheme,
-			Started:       started,
-			Version:       version,
-			Primary:       primary,
-			PrimaryChange: time.Now(),
-			StateChange:   time.Now(),
-			Updated:       time.Now(),
-			local:         true,
+		members: map[string]Node{
+			name: Node{
+				Name:          name,
+				ApiPort:       apiPort,
+				ApiScheme:     apiScheme,
+				Started:       started,
+				Version:       version,
+				Primary:       primary,
+				PrimaryChange: time.Now(),
+				StateChange:   time.Now(),
+				Updated:       time.Now(),
+				local:         true,
+			},
 		},
+		nodeName: name,
 	}
 	cfg = memberlist.DefaultLANConfig()
 	cfg.BindPort = clusterPort
@@ -64,12 +65,6 @@ func Start() {
 	if err != nil {
 		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
 	}
-	data, err := json.Marshal(Manager.ThisNode())
-	if err != nil {
-		log.Fatal(4, "CLU Start: Failed to marshal ThisNode metadata to json: %s", err.Error())
-	}
-	list.LocalNode().Meta = data
-
 	Manager.setList(list)
 
 	if peersStr == "" {
@@ -83,57 +78,57 @@ func Start() {
 }
 
 // return the list of nodes to broadcast requests to
-// Only 1 peer per partition is returned. This list includes
+// Only 1 member per partition is returned. This list includes
 // ThisNode if it is capable of handling queries.
-func PeersForQuery() []Node {
+func MembersForQuery() []Node {
 	thisNode := Manager.ThisNode()
 	// If we are running in single mode, just return thisNode
 	if Mode == ModeSingle {
 		return []Node{thisNode}
 	}
 
-	peersMap := make(map[int32][]Node)
+	membersMap := make(map[int32][]Node)
 	if thisNode.IsReady() {
 		for _, part := range thisNode.Partitions {
-			peersMap[part] = []Node{thisNode}
+			membersMap[part] = []Node{thisNode}
 		}
 	}
 
-	for _, peer := range Manager.PeersList() {
-		if !peer.IsReady() || peer.Name == thisNode.Name {
+	for _, member := range Manager.MemberList() {
+		if !member.IsReady() || member.Name == thisNode.Name {
 			continue
 		}
-		for _, part := range peer.Partitions {
-			peersMap[part] = append(peersMap[part], peer)
+		for _, part := range member.Partitions {
+			membersMap[part] = append(membersMap[part], member)
 		}
 	}
 
-	selectedPeers := make(map[string]struct{})
+	selectedMembers := make(map[string]struct{})
 	answer := make([]Node, 0)
 	// we want to get the minimum number of nodes
 	// needed to cover all partitions
 
 LOOP:
-	for _, nodes := range peersMap {
+	for _, nodes := range membersMap {
 		// always prefer the local node which will be nodes[0]
 		// if it has this partition
 		if nodes[0].Name == thisNode.Name {
-			if _, ok := selectedPeers[thisNode.Name]; !ok {
-				selectedPeers[thisNode.Name] = struct{}{}
+			if _, ok := selectedMembers[thisNode.Name]; !ok {
+				selectedMembers[thisNode.Name] = struct{}{}
 				answer = append(answer, thisNode)
 			}
 			continue LOOP
 		}
 
 		for _, n := range nodes {
-			if _, ok := selectedPeers[n.Name]; ok {
+			if _, ok := selectedMembers[n.Name]; ok {
 				continue LOOP
 			}
 		}
 		// if no nodes have been selected yet then grab a
 		// random node from the set of available nodes
 		selected := nodes[rand.Intn(len(nodes))]
-		selectedPeers[selected.Name] = struct{}{}
+		selectedMembers[selected.Name] = struct{}{}
 		answer = append(answer, selected)
 	}
 

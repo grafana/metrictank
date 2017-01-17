@@ -46,9 +46,9 @@ var (
 
 type ClusterManager struct {
 	sync.RWMutex
-	Peers map[string]Node
-	node  Node
-	list  *memberlist.Memberlist
+	members  map[string]Node // all members in the cluster, including this node.
+	nodeName string
+	list     *memberlist.Memberlist
 }
 
 func (c *ClusterManager) setList(list *memberlist.Memberlist) {
@@ -60,14 +60,14 @@ func (c *ClusterManager) setList(list *memberlist.Memberlist) {
 func (c *ClusterManager) ThisNode() Node {
 	c.RLock()
 	defer c.RUnlock()
-	return c.node
+	return c.members[c.nodeName]
 }
 
-func (c *ClusterManager) PeersList() []Node {
+func (c *ClusterManager) MemberList() []Node {
 	c.RLock()
-	list := make([]Node, len(c.Peers), len(c.Peers))
+	list := make([]Node, len(c.members), len(c.members))
 	i := 0
-	for _, p := range c.Peers {
+	for _, p := range c.members {
 		list[i] = p
 		i++
 	}
@@ -83,7 +83,7 @@ func (c *ClusterManager) clusterStats() {
 	secReady := 0
 	secNotReady := 0
 	partitions := make(map[int32]int)
-	for _, p := range c.Peers {
+	for _, p := range c.members {
 		if p.Primary {
 			if p.IsReady() {
 				primReady++
@@ -118,18 +118,18 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 		return
 	}
 	log.Info("CLU manager: Node %s with address %s has joined the cluster", node.Name, node.Addr.String())
-	peer := Node{}
-	err := json.Unmarshal(node.Meta, &peer)
+	member := Node{}
+	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
 		unmarshalErrJoin.Inc()
 		return
 	}
-	peer.RemoteAddr = node.Addr.String()
-	if peer.Name == c.node.Name {
-		peer.local = true
+	member.RemoteAddr = node.Addr.String()
+	if member.Name == c.nodeName {
+		member.local = true
 	}
-	c.Peers[node.Name] = peer
+	c.members[node.Name] = member
 	c.clusterStats()
 }
 
@@ -138,7 +138,7 @@ func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
 	c.Lock()
 	defer c.Unlock()
 	log.Info("CLU manager: Node %s has left the cluster", node.Name)
-	delete(c.Peers, node.Name)
+	delete(c.members, node.Name)
 	c.clusterStats()
 }
 
@@ -149,32 +149,34 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 	if len(node.Meta) == 0 {
 		return
 	}
-	peer := Node{}
-	err := json.Unmarshal(node.Meta, &peer)
+	member := Node{}
+	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
 		unmarshalErrUpdate.Inc()
 		// if the node is known, lets mark it as notReady until it starts sending valid data again.
-		if p, ok := c.Peers[node.Name]; ok {
+		if p, ok := c.members[node.Name]; ok {
 			p.State = NodeNotReady
 			p.StateChange = time.Now()
 			// we dont set Updated as we dont want the NotReady state to propagate incase we are the only node
 			// that got bad data.
-			c.Peers[node.Name] = p
+			c.members[node.Name] = p
 		}
 		return
 	}
-	peer.RemoteAddr = node.Addr.String()
-	if peer.Name == c.node.Name {
-		peer.local = true
+	member.RemoteAddr = node.Addr.String()
+	if member.Name == c.nodeName {
+		member.local = true
 	}
-	c.Peers[node.Name] = peer
+	c.members[node.Name] = member
 	log.Info("CLU manager: Node %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
 	c.clusterStats()
 }
 
 func (c *ClusterManager) BroadcastUpdate() {
 	if c.list != nil {
+		//notify our peers immediately of the change. If this fails, which will only happen if all peers
+		// are unreachable then the change will be picked up on the next complete state sync (run every 30seconds.)
 		go c.list.UpdateNode(time.Second)
 	}
 }
@@ -184,7 +186,7 @@ func (c *ClusterManager) BroadcastUpdate() {
 // the given byte size. This metadata is available in the Node structure.
 func (c *ClusterManager) NodeMeta(limit int) []byte {
 	c.RLock()
-	meta, err := json.Marshal(c.node)
+	meta, err := json.Marshal(c.members[c.nodeName])
 	c.RUnlock()
 	if err != nil {
 		log.Fatal(4, "CLU manager: %s", err.Error())
@@ -220,8 +222,7 @@ func (c *ClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
 // boolean indicates this is for a join instead of a push/pull.
 func (c *ClusterManager) LocalState(join bool) []byte {
 	c.Lock()
-	c.Peers[c.node.Name] = c.node
-	meta, err := json.Marshal(c.Peers)
+	meta, err := json.Marshal(c.members)
 	c.Unlock()
 	if err != nil {
 		log.Fatal(4, "CLU manager: %s", err.Error())
@@ -230,23 +231,23 @@ func (c *ClusterManager) LocalState(join bool) []byte {
 }
 
 func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
-	knownPeers := make(map[string]Node)
-	err := json.Unmarshal(buf, &knownPeers)
+	knownMembers := make(map[string]Node)
+	err := json.Unmarshal(buf, &knownMembers)
 	if err != nil {
 		unmarshalErrMergeRemoteState.Inc()
 		log.Error(3, "CLU manager: Unable to decode remoteState message: %s", err.Error())
 		return
 	}
 	c.Lock()
-	for name, meta := range knownPeers {
-		if existing, ok := c.Peers[name]; ok {
+	for name, meta := range knownMembers {
+		if existing, ok := c.members[name]; ok {
 			if meta.Updated.After(existing.Updated) {
 				log.Info("CLU manager: updated node meta found in state update for %s", meta.Name)
-				c.Peers[name] = meta
+				c.members[name] = meta
 			}
 		} else {
 			log.Info("CLU manager: new node found in state update. %s", meta.Name)
-			c.Peers[name] = meta
+			c.members[name] = meta
 		}
 	}
 	c.clusterStats()
@@ -258,7 +259,7 @@ func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
 func (c *ClusterManager) IsReady() bool {
 	c.RLock()
 	defer c.RUnlock()
-	return c.node.IsReady()
+	return c.members[c.nodeName].IsReady()
 }
 
 // mark this node as ready to accept requests from users.
@@ -269,12 +270,14 @@ func (c *ClusterManager) SetReady() {
 // Set the state of this node.
 func (c *ClusterManager) SetState(state NodeState) {
 	c.Lock()
-	if c.node.State == state {
+	if c.members[c.nodeName].State == state {
 		c.Unlock()
 		return
 	}
-	c.node.State = state
-	c.node.Updated = time.Now()
+	node := c.members[c.nodeName]
+	node.State = state
+	node.Updated = time.Now()
+	c.members[c.nodeName] = node
 	c.Unlock()
 	nodeReady.Set(state == NodeReady)
 	c.BroadcastUpdate()
@@ -294,19 +297,21 @@ func (c *ClusterManager) SetReadyIn(t time.Duration) {
 func (c *ClusterManager) IsPrimary() bool {
 	c.RLock()
 	defer c.RUnlock()
-	return c.node.Primary
+	return c.members[c.nodeName].Primary
 }
 
 // SetPrimary sets the primary status of this node
 func (c *ClusterManager) SetPrimary(p bool) {
 	c.Lock()
-	if c.node.Primary == p {
+	if c.members[c.nodeName].Primary == p {
 		c.Unlock()
 		return
 	}
-	c.node.Primary = p
-	c.node.PrimaryChange = time.Now()
-	c.node.Updated = time.Now()
+	node := c.members[c.nodeName]
+	node.Primary = p
+	node.PrimaryChange = time.Now()
+	node.Updated = time.Now()
+	c.members[c.nodeName] = node
 	c.Unlock()
 	nodePrimary.Set(p)
 	c.BroadcastUpdate()
@@ -315,8 +320,10 @@ func (c *ClusterManager) SetPrimary(p bool) {
 // set the partitions that this node is handling.
 func (c *ClusterManager) SetPartitions(part []int32) {
 	c.Lock()
-	c.node.Partitions = part
-	c.node.Updated = time.Now()
+	node := c.members[c.nodeName]
+	node.Partitions = part
+	node.Updated = time.Now()
+	c.members[c.nodeName] = node
 	c.Unlock()
 	nodePartitions.Set(len(part))
 	c.BroadcastUpdate()
@@ -326,5 +333,5 @@ func (c *ClusterManager) SetPartitions(part []int32) {
 func (c *ClusterManager) GetPartitions() []int32 {
 	c.RLock()
 	defer c.RUnlock()
-	return c.node.Partitions
+	return c.members[c.nodeName].Partitions
 }
