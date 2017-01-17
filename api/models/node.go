@@ -5,7 +5,7 @@ import (
 )
 
 type NodeStatus struct {
-	Primary bool `json:"primary" form:"primary" binding:"Required"`
+	Primary string `json:"mode" form:"mode" binding:"Required"`
 }
 
 type ClusterStatus struct {

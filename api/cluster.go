@@ -2,7 +2,9 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
@@ -19,7 +21,15 @@ func (s *Server) getNodeStatus(ctx *middleware.Context) {
 }
 
 func (s *Server) setNodeStatus(ctx *middleware.Context, status models.NodeStatus) {
-	cluster.Manager.SetPrimary(status.Primary)
+	primary, err := strconv.ParseBool(status.Primary)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf(
+			"could not parse status to bool. %s",
+			err.Error())),
+		)
+		return
+	}
+	cluster.Manager.SetPrimary(primary)
 	ctx.PlainText(200, []byte("OK"))
 }
 
