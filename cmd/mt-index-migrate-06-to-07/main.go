@@ -19,7 +19,7 @@ var (
 	logLevel        = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	cassAddr        = flag.String("cass-addr", "localhost", "Address of cassandra host.")
 	keyspace        = flag.String("keyspace", "raintank", "Cassandra keyspace to use.")
-	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for paritioning metrics. (byOrg|bySeries)")
+	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
 	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
 
 	wg sync.WaitGroup
