@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -22,19 +23,21 @@ import (
 const Month_sec = 60 * 60 * 24 * 28
 
 const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const table_schema = `CREATE TABLE IF NOT EXISTS %s.metric (
+const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
     key ascii,
     ts int,
     data blob,
     PRIMARY KEY (key, ts)
 ) WITH CLUSTERING ORDER BY (ts DESC)
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy', 'compaction_window_unit': 'DAYS', 'compaction_window_size': '1' }
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
+    AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d' }
+    AND compression = { 'class': 'LZ4Compressor' }`
+const table_name_format = `metric_%d`
 
 var (
 	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errStartBeforeEnd     = errors.New("start must be before end.")
+	errTableNotFound      = errors.New("table for given TTL not found")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -73,13 +76,69 @@ It's safe for concurrent use by multiple goroutines and a typical usage scenario
 object to interact with the whole Cassandra cluster.
 */
 
+type ttlTables map[uint32]ttlTable
+type ttlTable struct {
+	table      string
+	windowSize uint32
+}
+
 type cassandraStore struct {
 	session     *gocql.Session
 	writeQueues []chan *ChunkWriteRequest
 	readQueue   chan *ChunkReadRequest
+	ttlTables   ttlTables
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer int, ssl, auth, hostVerification bool) (*cassandraStore, error) {
+func ttlUnits(ttl uint32) float64 {
+	// convert ttl to hours
+	return float64(ttl) / (60 * 60)
+}
+
+func getTTLTables(ttls []uint32, windowFactor int, nameFormat string) ttlTables {
+	tables := make(ttlTables)
+	for _, ttl := range ttls {
+		/*
+		 * the purpose of this loop is to bucket metrics of similar TTLs.
+		 * we first calculate the largest power of 2 that's smaller than the TTL and then divide the result by
+		 * the window factor. for example with a window factor of 20 we want to group the metrics like this:
+		 *
+		 * generated with: https://gist.github.com/replay/69ad7cfd523edfa552cd12851fa74c58
+		 *
+		 * +------------------------+---------------+---------------------+----------+
+		 * |              TTL hours |    table_name | window_size (hours) | sstables |
+		 * +------------------------+---------------+---------------------+----------+
+		 * |         0 <= hours < 1 |     metrics_0 |                   1 |    0 - 2 |
+		 * |         1 <= hours < 2 |     metrics_1 |                   1 |    1 - 3 |
+		 * |         2 <= hours < 4 |     metrics_2 |                   1 |    2 - 5 |
+		 * |         4 <= hours < 8 |     metrics_4 |                   1 |    4 - 9 |
+		 * |        8 <= hours < 16 |     metrics_8 |                   1 |   8 - 17 |
+		 * |       16 <= hours < 32 |    metrics_16 |                   1 |  16 - 33 |
+		 * |       32 <= hours < 64 |    metrics_32 |                   2 |  16 - 33 |
+		 * |      64 <= hours < 128 |    metrics_64 |                   4 |  16 - 33 |
+		 * |     128 <= hours < 256 |   metrics_128 |                   7 |  19 - 38 |
+		 * |     256 <= hours < 512 |   metrics_256 |                  13 |  20 - 41 |
+		 * |    512 <= hours < 1024 |   metrics_512 |                  26 |  20 - 41 |
+		 * |   1024 <= hours < 2048 |  metrics_1024 |                  52 |  20 - 41 |
+		 * |   2048 <= hours < 4096 |  metrics_2048 |                 103 |  20 - 41 |
+		 * |   4096 <= hours < 8192 |  metrics_4096 |                 205 |  20 - 41 |
+		 * |  8192 <= hours < 16384 |  metrics_8192 |                 410 |  20 - 41 |
+		 * | 16384 <= hours < 32768 | metrics_16384 |                 820 |  20 - 41 |
+		 * | 32768 <= hours < 65536 | metrics_32768 |                1639 |  20 - 41 |
+		 * +------------------------+---------------+---------------------+----------+
+		 */
+
+		// calculate the pre factor window by finding the largest power of 2 that's smaller than ttl
+		preFactorWindow := uint32(math.Exp2(math.Floor(math.Log2(ttlUnits(ttl)))))
+		tableName := fmt.Sprintf(nameFormat, preFactorWindow)
+		tables[ttl] = ttlTable{
+			table:      tableName,
+			windowSize: preFactorWindow/uint32(windowFactor) + 1,
+		}
+	}
+	return tables
+}
+
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor int, ssl, auth, hostVerification bool, ttls []uint32) (*cassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -111,7 +170,15 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	if err != nil {
 		return nil, err
 	}
-	err = tmpSession.Query(fmt.Sprintf(table_schema, keyspace)).Exec()
+
+	ttlTables := getTTLTables(ttls, windowFactor, table_name_format)
+	for _, result := range ttlTables {
+		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.table, result.windowSize)).Exec()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +222,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		session:     session,
 		writeQueues: make([]chan *ChunkWriteRequest, writers),
 		readQueue:   make(chan *ChunkReadRequest, readqsize),
+		ttlTables:   ttlTables,
 	}
 
 	for i := 0; i < writers; i++ {
@@ -208,7 +276,8 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			success := false
 			attempts := 0
 			for !success {
-				err := c.insertChunk(cwr.key, cwr.chunk.T0, buf.Bytes(), int(cwr.ttl))
+				err := c.insertChunk(cwr.key, cwr.chunk.T0, cwr.ttl, buf.Bytes())
+
 				if err == nil {
 					success = true
 					cwr.metric.SyncChunkSaveState(cwr.chunk.T0)
@@ -233,17 +302,39 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 	}
 }
 
+func (c *cassandraStore) GetTableNames() []string {
+	names := make([]string, 0)
+	for _, table := range c.ttlTables {
+		names = append(names, table.table)
+	}
+	return names
+}
+
+func (c *cassandraStore) getTable(ttl uint32) (string, error) {
+	entry, ok := c.ttlTables[ttl]
+	if !ok {
+		return "", errTableNotFound
+	}
+	return entry.table, nil
+}
+
 // Insert Chunks into Cassandra.
 //
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func (c *cassandraStore) insertChunk(key string, t0 uint32, data []byte, ttl int) error {
+func (c *cassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) error {
 	// for unit tests
 	if c.session == nil {
 		return nil
 	}
-	query := fmt.Sprintf("INSERT INTO metric (key, ts, data) values(?,?,?) USING TTL %d", ttl)
+
+	table, err := c.getTable(ttl)
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ret := c.session.Query(query, row_key, t0, data).Exec()
@@ -274,10 +365,15 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, start, end uint32) ([]chunk.IterGen, error) {
+func (c *cassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
 		return itgens, errStartBeforeEnd
+	}
+
+	table, err := c.getTable(ttl)
+	if err != nil {
+		return itgens, err
 	}
 
 	pre := time.Now()
@@ -301,25 +397,25 @@ func (c *cassandraStore) Search(key string, start, end uint32) ([]chunk.IterGen,
 
 	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
-	query(start_month, start_month, "SELECT ts, data FROM metric WHERE key=? AND ts <= ? Limit 1", row_key, start)
+	query(start_month, start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(start_month, start_month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", row_key, start, end)
+		query(start_month, start_month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", table), row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for month := start_month; month <= end_month; month += Month_sec {
 			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, month+1, "SELECT ts, data FROM metric WHERE key = ? AND ts >= ? ORDER BY ts ASC", row_key, start+1)
+				query(month, month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts >= ? ORDER BY ts ASC", table), row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? AND ts <= ? ORDER BY ts ASC", row_key, end-1)
+				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts <= ? ORDER BY ts ASC", table), row_key, end-1)
 			} else {
 				// we want all columns
-				query(month, month, "SELECT ts, data FROM metric WHERE key = ? ORDER BY ts ASC", row_key)
+				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? ORDER BY ts ASC", table), row_key)
 			}
 		}
 	}

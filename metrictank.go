@@ -79,6 +79,7 @@ var (
 	cassandraReadQueueSize       = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraWriteQueueSize      = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
+	cassandraWindowFactor        = flag.Int("cassandra-window-factor", 20, "size of compaction window relative to TTL")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
@@ -235,6 +236,7 @@ func main() {
 	set := strings.Split(*aggSettings, ",")
 	finalSettings := make([]mdata.AggSetting, 0)
 	highestChunkSpan := chunkSpan
+	ttls := []uint32{ttl}
 	for _, v := range set {
 		if v == "" {
 			continue
@@ -263,6 +265,7 @@ func main() {
 			}
 		}
 		finalSettings = append(finalSettings, mdata.NewAggSetting(aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready))
+		ttls = append(ttls, aggTTL)
 	}
 	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
 	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
@@ -299,7 +302,7 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}

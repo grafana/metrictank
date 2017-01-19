@@ -53,7 +53,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, chunkS
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, as.Span, as.ChunkSpan, as.NumChunks, as.ttl))
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, as.Span, as.ChunkSpan, as.NumChunks, as.TTL))
 	}
 
 	return &m

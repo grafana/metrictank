@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -49,10 +50,11 @@ var (
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
 	// our own flags
-	from = flag.String("from", "-24h", "get data from (inclusive)")
-	to   = flag.String("to", "now", "get data until (exclusive)")
-	mdp  = flag.Int("mdp", 0, "max data points to return")
-	fix  = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization")
+	from         = flag.String("from", "-24h", "get data from (inclusive)")
+	to           = flag.String("to", "now", "get data until (exclusive)")
+	mdp          = flag.Int("mdp", 0, "max data points to return")
+	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization")
+	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
 )
 
 func printNormal(igens []chunk.IterGen, from, to uint32) {
@@ -186,7 +188,7 @@ func main() {
 		fmt.Println("Retrieves timeseries data from the cassandra store. Either raw or with minimal processing")
 		fmt.Println()
 		fmt.Println("Usage:")
-		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id>\n")
+		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl-in-seconds>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
@@ -200,19 +202,26 @@ func main() {
 		return
 	}
 
-	if flag.NArg() < 3 {
+	if flag.NArg() < 4 {
 		flag.Usage()
 		os.Exit(-1)
 	}
 
 	selector := flag.Arg(1)
 	var id string
+	var ttl uint32
 	// var query string
 	// var org int
 
 	switch selector {
 	case "id":
 		id = flag.Arg(2)
+		tmp, err := strconv.Atoi(flag.Arg(3))
+		if err != nil || tmp <= 0 {
+			flag.Usage()
+			os.Exit(-1)
+		}
+		ttl = uint32(tmp)
 	case "query":
 		//		if flag.NArg() < 4 {
 		//			flag.Usage()
@@ -267,7 +276,7 @@ func main() {
 		return
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, []uint32{ttl})
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -289,7 +298,7 @@ func main() {
 	mode := flag.Arg(0)
 
 	if *fix != 0 {
-		points := getSeries(id, fromUnix, toUnix, uint32(*fix), store)
+		points := getSeries(id, ttl, fromUnix, toUnix, uint32(*fix), store)
 
 		switch mode {
 		case "normal":
@@ -301,7 +310,7 @@ func main() {
 		}
 	} else {
 
-		igens, err := store.Search(id, fromUnix, toUnix)
+		igens, err := store.Search(id, ttl, fromUnix, toUnix)
 		if err != nil {
 			panic(err)
 		}
@@ -318,8 +327,8 @@ func main() {
 
 }
 
-func getSeries(id string, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
-	itgens, err := store.Search(id, fromUnix, toUnix)
+func getSeries(id string, ttl, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
+	itgens, err := store.Search(id, ttl, fromUnix, toUnix)
 	if err != nil {
 		panic(err)
 	}
