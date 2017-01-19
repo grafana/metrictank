@@ -198,3 +198,9 @@ how long it takes to persist a chunk (and chunks preceeding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
+* `input.kafka-mdm.partition.%d.offset`:   
+The current offset for the partition (%d) that we have consumed.
+* `input.kafka-mdm.partition.%d.log_size`:   
+The size of the kafka partition, aka the newest available offset.
+* `input.kafka-mdm.partition.%d.lag`:   
+How many messages (metrics) Kafaka has that we have not yet consumed.

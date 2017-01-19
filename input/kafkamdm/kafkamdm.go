@@ -2,6 +2,7 @@ package kafkamdm
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -55,6 +57,9 @@ var netMaxOpenRequests int
 var offsetMgr *kafka.OffsetMgr
 var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
+var partitionOffset map[int32]*stats.Gauge64
+var partitionLogSize map[int32]*stats.Gauge64
+var partitionLag map[int32]*stats.Gauge64
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -151,6 +156,16 @@ func ConfigProcess(instance string) {
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
 	cluster.Manager.SetPartitions(partitions)
+
+	// initialize our offset metrics
+	partitionOffset = make(map[int32]*stats.Gauge64)
+	partitionLogSize = make(map[int32]*stats.Gauge64)
+	partitionLag = make(map[int32]*stats.Gauge64)
+	for _, part := range partitions {
+		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part))
+		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part))
+		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part))
+	}
 }
 
 func New() *KafkaMdm {
@@ -180,9 +195,9 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 			var offset int64
 			switch offsetStr {
 			case "oldest":
-				offset = -2
+				offset = sarama.OffsetOldest
 			case "newest":
-				offset = -1
+				offset = sarama.OffsetNewest
 			case "last":
 				offset, err = offsetMgr.Last(topic, partition)
 			default:
@@ -197,18 +212,33 @@ func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg
 }
 
 // this will continually consume from the topic until k.stopConsuming is triggered.
-func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffset int64) {
+func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	k.wg.Add(1)
 	defer k.wg.Done()
 
-	pc, err := k.consumer.ConsumePartition(topic, partition, partitionOffset)
+	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
 	}
-	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
-	currentOffset := partitionOffset
+
+	partitionOffsetMetric := partitionOffset[partition]
+	partitionLogSizeMetric := partitionLogSize[partition]
+	partitionLagMetric := partitionLag[partition]
+
+	partitionOffsetMetric.Set(int(currentOffset))
+	// we need the currentLogSize to be able to record our inital Lag.
+	offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
+	if err != nil {
+		log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
+	} else {
+		partitionLogSizeMetric.Set(int(offset))
+		partitionLagMetric.Set(int(offset - currentOffset))
+	}
+
+	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
+
 	for {
 		select {
 		case msg := <-messages:
@@ -220,6 +250,14 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, partitionOffs
 		case <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
 				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+			}
+			partitionOffsetMetric.Set(int(currentOffset))
+			offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
+			if err != nil {
+				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
+			} else {
+				partitionLogSizeMetric.Set(int(offset))
+				partitionLagMetric.Set(int(offset - currentOffset))
 			}
 		case <-k.stopConsuming:
 			pc.Close()
