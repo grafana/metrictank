@@ -16,6 +16,7 @@ type ChunkReadRequest struct {
 }
 
 type ChunkWriteRequest struct {
+	metric    *AggMetric
 	key       string
 	chunk     *chunk.Chunk
 	ttl       uint32

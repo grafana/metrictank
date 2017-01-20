@@ -211,7 +211,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 				err := c.insertChunk(cwr.key, cwr.chunk.T0, buf.Bytes(), int(cwr.ttl))
 				if err == nil {
 					success = true
-					cwr.chunk.Saved = true
+					cwr.metric.SyncChunkSaveState(cwr.chunk.T0)
 					SendPersistMessage(cwr.key, cwr.chunk.T0)
 					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
 					chunkSaveOk.Inc()

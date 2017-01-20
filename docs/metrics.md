@@ -172,15 +172,11 @@ the duration of a put in the wait queue
 how many rows come per get response
 * `store.cassandra.to_iter`:  
 the duration of converting chunks to iterators
-* `tank.add_to_saved_chunk`:  
-points received - by a secondary node - for the most recent chunk when that chunk
-has already been saved by a primary.  A secondary can add this data to its chunks.
-* `tank.add_to_saving_chunk`:  
-points received - by the primary node - for the most recent chunk
-when that chunk is already being saved (or has been saved).
-this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
-your (infrequent) updates.  The primary won't add them to its in-memory chunks, but secondaries will
-(because they are never in "saving" state for them), see below.
+* `tank.add_to_closed_chunk`:    
+points received for the most recent chunk when that chunk is already being "closed",
+ie the end-of-stream marker has been written to the chunk.
+This indicates that your GC is actively sealing chunks and saving them before you have the chance to send
+your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 * `tank.chunk_operations.clear`:  
 a counter of how many chunks are cleared (replaced by new chunks)
 * `tank.chunk_operations.create`:  
