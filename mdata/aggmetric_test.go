@@ -95,10 +95,8 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	agg := NewAggMetric(dnstore, &mockCache, "foo", chunkSpan, numChunks, 1, []AggSetting{}...)
 
-	ts := uint32(1000)
-	for i := uint32(0); i < chunkAddCount; i++ {
+	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
-		ts += chunkSpan
 	}
 
 	timeout := time.After(1 * time.Second)
