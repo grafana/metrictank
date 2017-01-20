@@ -47,6 +47,8 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		},
 		nodeName: name,
 	}
+	// initialize our "primary" state metric.
+	nodePrimary.Set(primary)
 	cfg = memberlist.DefaultLANConfig()
 	cfg.BindPort = clusterPort
 	cfg.BindAddr = clusterHost.String()
