@@ -28,12 +28,13 @@ var (
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-index-migrate-06-to-07")
-		fmt.Fprintln(os.Stderr, "This tool converts a metrictank v0.6 index to the v0.7 format")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Converts a metrictank v0.6 index to the v0.7 format")
 		fmt.Fprintln(os.Stderr, "differences:")
 		fmt.Fprintln(os.Stderr, " * cassandra table: metric_def_idx -> metric_idx")
 		fmt.Fprintln(os.Stderr, " * data is stored as individual fields, not as messagepack encoded blob")
 		fmt.Fprintln(os.Stderr, " * support for partitioning. the partition field in cassandra will be set based on num-partitions and partition-schema")
-		fmt.Fprintf(os.Stderr, "\n\nFlags:\n\n")
+		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

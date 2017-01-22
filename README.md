@@ -62,6 +62,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)
 * [Metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
 * [Operations](https://github.com/raintank/metrictank/blob/master/docs/operations.md)
+* [Tools](https://github.com/raintank/metrictank/blob/master/docs/tools.md)
 
 ### features in-depth
 

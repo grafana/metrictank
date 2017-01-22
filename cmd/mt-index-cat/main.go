@@ -45,7 +45,11 @@ func main() {
 	outputs := []string{"dump", "list", "vegeta-render", "vegeta-render-patterns"}
 
 	flag.Usage = func() {
-		fmt.Println(os.Args[0])
+		fmt.Println("mt-index-cat")
+		fmt.Println()
+		fmt.Println("Retrieves a metrictank index and dumps it in the requested format")
+		fmt.Println("In particular, the vegeta outputs are handy to pipe requests for given series into the vegeta http benchmark tool")
+		fmt.Println()
 		fmt.Printf("Usage:\n\n")
 		fmt.Printf("  mt-index-cat [global config flags] <idxtype> [idx config flags] output \n\n")
 		fmt.Printf("global config flags:\n\n")
