@@ -86,32 +86,23 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	cluster.Manager.SetPrimary(primary)
 
-	callCount := uint32(0)
-	calledCb := make(chan bool)
-
-	mockCache := cache.MockCache{}
-	mockCache.CacheIfHotCb = func() { calledCb <- true }
+	mockCache := cache.NewMockCache()
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
-	agg := NewAggMetric(dnstore, &mockCache, "foo", chunkSpan, numChunks, 1, []AggSetting{}...)
+	agg := NewAggMetric(dnstore, mockCache, "foo", chunkSpan, numChunks, 1, []AggSetting{}...)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
 	}
 
-	timeout := time.After(1 * time.Second)
+	expectedHotAdds := int(chunkAddCount - 1)
 
-	for i := uint32(0); i < chunkAddCount-1; i++ {
-		select {
-		case <-timeout:
-			t.Fatalf("timed out waiting for a callback call")
-		case <-calledCb:
-			callCount = callCount + 1
-		}
-	}
-
-	if callCount < chunkAddCount-1 {
-		t.Fatalf("there should have been %d chunk pushes, but go %d", chunkAddCount-1, callCount)
+	select {
+	case <-time.After(1 * time.Second):
+		adds := mockCache.GetAddsIfHot()
+		t.Fatalf("timed out waiting for %d chunk pushes. only saw %s", expectedHotAdds, adds)
+	case <-mockCache.AfterAddsIfHot(expectedHotAdds):
+		break
 	}
 
 	if primary {
