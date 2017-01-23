@@ -4,11 +4,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type AggMetrics struct {
-	store Store
+	store       Store
+	cachePusher cache.CachePusher
 	sync.RWMutex
 	Metrics        map[string]*AggMetric
 	chunkSpan      uint32
@@ -20,9 +22,10 @@ type AggMetrics struct {
 	gcInterval     time.Duration
 }
 
-func NewAggMetrics(store Store, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
+func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
+		cachePusher:    cachePusher,
 		Metrics:        make(map[string]*AggMetric),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
@@ -88,7 +91,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(ms.store, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
+		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}

@@ -22,6 +22,9 @@ var (
 	// metric cache.ops.chunk.hit is how many chunks were hit
 	CacheChunkHit = stats.NewCounter32("cache.ops.chunk.hit")
 
+	// metric cache.ops.chunk.push-hot is how many chunks have been pushed into the cache because their metric is hot
+	CacheChunkPushHot = stats.NewCounter32("cache.ops.chunk.push-hot")
+
 	// metric cache.ops.chunk.add is how many chunks were added to the cache
 	cacheChunkAdd = stats.NewCounter32("cache.ops.chunk.add")
 

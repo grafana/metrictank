@@ -6,8 +6,13 @@ import (
 
 type Cache interface {
 	Add(string, uint32, chunk.IterGen)
+	CacheIfHot(string, uint32, chunk.IterGen)
 	Stop()
 	Search(string, uint32, uint32) *CCSearchResult
+}
+
+type CachePusher interface {
+	CacheIfHot(string, uint32, chunk.IterGen)
 }
 
 type CCSearchResult struct {

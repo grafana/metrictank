@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/mdata/cache"
 )
 
 var dnstore = NewDevnullStore()
@@ -69,10 +70,65 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	cluster.Manager.SetPrimary(currentClusterStatus)
 }
 
+func TestMetricPersistBeingPrimary(t *testing.T) {
+	testMetricPersistOptionalPrimary(t, true)
+}
+
+func TestMetricPersistBeingSecondary(t *testing.T) {
+	testMetricPersistOptionalPrimary(t, false)
+}
+
+func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
+	// always reset the counter when entering and leaving the test
+	dnstore.Reset()
+	defer dnstore.Reset()
+
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(primary)
+
+	callCount := uint32(0)
+	calledCb := make(chan bool)
+
+	mockCache := cache.MockCache{}
+	mockCache.CacheIfHotCb = func() { calledCb <- true }
+
+	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
+	agg := NewAggMetric(dnstore, &mockCache, "foo", chunkSpan, numChunks, 1, []AggSetting{}...)
+
+	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
+		agg.Add(ts, 1)
+	}
+
+	timeout := time.After(1 * time.Second)
+
+	for i := uint32(0); i < chunkAddCount-1; i++ {
+		select {
+		case <-timeout:
+			t.Fatalf("timed out waiting for a callback call")
+		case <-calledCb:
+			callCount = callCount + 1
+		}
+	}
+
+	if callCount < chunkAddCount-1 {
+		t.Fatalf("there should have been %d chunk pushes, but go %d", chunkAddCount-1, callCount)
+	}
+
+	if primary {
+		if dnstore.AddCount != chunkAddCount-1 {
+			t.Fatalf("there should have been %d chunk adds on store, but go %d", chunkAddCount-1, dnstore.AddCount)
+		}
+	} else {
+		if dnstore.AddCount != 0 {
+			t.Fatalf("there should have been %d chunk adds on store, but go %d", 0, dnstore.AddCount)
+		}
+	}
+}
+
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	c := NewChecker(t, NewAggMetric(dnstore, "foo", 100, 5, 1, []AggSetting{}...))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", 100, 5, 1, []AggSetting{}...))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -170,7 +226,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
@@ -182,7 +238,6 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 }
 
 func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
-
 	chunkSpan := uint32(600)
 	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
@@ -204,7 +259,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -237,7 +292,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -270,7 +325,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
