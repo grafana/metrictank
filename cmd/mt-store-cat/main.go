@@ -181,7 +181,10 @@ func printPointsSummary(points []schema.Point, from, to uint32) {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Println(os.Args[0])
+		fmt.Println("mt-store-cat")
+		fmt.Println()
+		fmt.Println("Retrieves timeseries data from the cassandra store. Either raw or with minimal processing")
+		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")

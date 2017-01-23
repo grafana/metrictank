@@ -35,6 +35,13 @@ type topic struct {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "mt-replicator")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Replicates a kafka mdm topic on a given cluster to a topic on another")
+		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, *logLevel))
 

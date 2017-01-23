@@ -27,12 +27,13 @@ var (
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-index-migrate-050-to054")
-		fmt.Fprintln(os.Stderr, "This tool converts a metrictank index to the format, using cassandra instead of elasticsearch")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Converts a metrictank index to the new 0.5.4 (and beyond) format, using cassandra instead of elasticsearch")
 		fmt.Fprintln(os.Stderr, "differences:")
 		fmt.Fprintln(os.Stderr, " * schema 0 to schema 1 - proper metrics2.0 - (for 0.5.1, 576d8fcb47888b8a334e9a125d6aadf8e0e4d4d7)")
 		fmt.Fprintln(os.Stderr, " * store data in cassandra in the metric_def_ix table, as a messagepack encoded blob (cassandra idx new in 0.5.3 - 26be821bd8bead43db120e96d14d0ee88d6b6880)")
 		fmt.Fprintln(os.Stderr, " * use lastUpdate field (for 0.5.4, a07007ab8d4a22b122bbc5f9fadb51480e1c5b0c)")
-		fmt.Fprintf(os.Stderr, "\n\nFlags:\n\n")
+		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}
 
