@@ -186,7 +186,8 @@ func (c *Carbon) handle(conn net.Conn) {
 			break
 		}
 
-		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.Medium)
+		// no validation for m2.0 to provide a grace period in adopting new clients
+		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.MediumLegacy, carbon20.NoneM20)
 		if err != nil {
 			c.Input.MetricsDecodeErr.Inc()
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
