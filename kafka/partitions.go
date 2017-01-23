@@ -24,7 +24,7 @@ Iter:
 func GetPartitions(client sarama.Client, topics []string) ([]int32, error) {
 	partitionCount := 0
 	partitions := make([]int32, 0)
-    var err error
+	var err error
 	for i, topic := range topics {
 		partitions, err = client.Partitions(topic)
 		if err != nil {

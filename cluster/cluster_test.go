@@ -21,19 +21,19 @@ func TestPeersForQuery(t *testing.T) {
 	Mode = ModeMulti
 	Manager.members = map[string]Node{
 		thisNode.Name: thisNode,
-		"node2": Node{
+		"node2": {
 			Name:       "node2",
 			Primary:    true,
 			Partitions: []int32{1, 2},
 			State:      NodeReady,
 		},
-		"node3": Node{
+		"node3": {
 			Name:       "node3",
 			Primary:    true,
 			Partitions: []int32{3, 4},
 			State:      NodeReady,
 		},
-		"node4": Node{
+		"node4": {
 			Name:       "node4",
 			Primary:    true,
 			Partitions: []int32{3, 4},

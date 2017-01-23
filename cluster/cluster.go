@@ -32,7 +32,7 @@ var (
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
 	Manager = &ClusterManager{
 		members: map[string]Node{
-			name: Node{
+			name: {
 				Name:          name,
 				ApiPort:       apiPort,
 				ApiScheme:     apiScheme,
