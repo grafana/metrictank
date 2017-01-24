@@ -21,7 +21,7 @@ func Test_Process(t *testing.T) {
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "TestProcess")
+	in := NewDefault(aggmetrics, metricIndex, usage, "TestProcess")
 
 	allMetrics := make(map[string]int)
 	for i := 0; i < 5; i++ {
@@ -58,7 +58,7 @@ func Test_Process(t *testing.T) {
 	}
 }
 
-func test_Process(worker int, in *Input, t *testing.T) map[string]int {
+func test_Process(worker int, in Handler, t *testing.T) map[string]int {
 	var metric *schema.MetricData
 	metrics := make(map[string]int)
 	for m := 0; m < 4; m++ {
@@ -92,7 +92,7 @@ func BenchmarkProcess(b *testing.B) {
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := New(aggmetrics, metricIndex, usage, "BenchmarkProcess")
+	in := NewDefault(aggmetrics, metricIndex, usage, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
 	datas := make([]*schema.MetricData, b.N)
