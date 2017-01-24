@@ -34,7 +34,7 @@ func Fuzz(data []byte) int {
 		data = data[2:]
 		v += float64(int16(binary.LittleEndian.Uint16(data))) + float64(binary.LittleEndian.Uint16(data[2:]))/float64(math.MaxUint16)
 		data = data[8:]
-		vals = append(vals, testdata.Point{v, t})
+		vals = append(vals, testdata.Point{V: v, T: t})
 		s.Push(t, v)
 	}
 
