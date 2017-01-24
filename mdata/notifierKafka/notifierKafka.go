@@ -62,8 +62,9 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 		producer:  producer,
 		instance:  instance,
 		Notifier: mdata.Notifier{
-			Instance: instance,
-			Metrics:  metrics,
+			Instance:             instance,
+			Metrics:              metrics,
+			CreateMissingMetrics: true,
 		},
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
@@ -78,6 +79,8 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 
 func (c *NotifierKafka) start() {
 	var err error
+	pre := time.Now()
+	processBacklog := new(sync.WaitGroup)
 	for _, partition := range partitions {
 		var offset int64
 		switch offsetStr {
@@ -93,11 +96,30 @@ func (c *NotifierKafka) start() {
 		if err != nil {
 			log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
 		}
-		go c.consumePartition(topic, partition, offset)
+		processBacklog.Add(1)
+		go c.consumePartition(topic, partition, offset, processBacklog)
 	}
+	// wait for our backlog to be processed before returning.  This will block metrictank from consuming metrics until
+	// we have processed old metricPersist messages. The end result is that we wont overwrite chunks in cassandra that
+	// have already been previously written.
+	// We dont wait more then backlogProcessTimeout for the backlog to be processed.
+	log.Info("kafka-cluster: waiting for metricPersist backlog to be processed.")
+	backlogProcessed := make(chan struct{}, 1)
+	go func() {
+		processBacklog.Wait()
+		backlogProcessed <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(backlogProcessTimeout):
+		log.Warn("kafka-cluster: Processing metricPersist backlog has taken too long, giving up lock after %s.", backlogProcessTimeout)
+	case <-backlogProcessed:
+		log.Info("kafka-cluster: metricPersist backlog processed in %s.", time.Since(pre))
+	}
+
 }
 
-func (c *NotifierKafka) consumePartition(topic string, partition int32, partitionOffset int64) {
+func (c *NotifierKafka) consumePartition(topic string, partition int32, partitionOffset int64, processBacklog *sync.WaitGroup) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
@@ -109,6 +131,10 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 	currentOffset := partitionOffset
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
+	startingUp := true
+	// the bootTimeOffset is the next available offset. There may not be a message with that
+	// offset yet, so we subtract 1 to get the highest offset that we can fetch.
+	bootTimeOffset := bootTimeOffsets[partition] - 1
 	for {
 		select {
 		case msg := <-messages:
@@ -120,6 +146,10 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
 				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
+			}
+			if startingUp && currentOffset >= bootTimeOffset {
+				processBacklog.Done()
+				startingUp = false
 			}
 		case <-c.stopConsuming:
 			pc.Close()

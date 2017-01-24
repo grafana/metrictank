@@ -395,6 +395,8 @@ func main() {
 	***********************************/
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
+		// The notifierKafka handler will block here until it has processed the backlog of metricPersist messages.
+		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
 		handlers = append(handlers, notifierKafka.New(*instance, metrics, metricIndex))
 	}
 

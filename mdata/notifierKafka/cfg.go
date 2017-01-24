@@ -27,6 +27,9 @@ var partitionStr string
 var partitions []int32
 var partitioner *cluster.KafkaPartitioner
 var partitionScheme string
+var bootTimeOffsets map[int32]int64
+var backlogProcessTimeout time.Duration
+var backlogProcessTimeoutStr string
 
 // metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
 var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
@@ -40,10 +43,11 @@ func init() {
 	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
-	fs.StringVar(&partitionScheme, "partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw.  (byOrg|bySeries)")
+	fs.StringVar(&partitionScheme, "partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
 	fs.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	fs.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
 	fs.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
+	fs.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
 	globalconf.Register("kafka-cluster", fs)
 }
 
@@ -74,6 +78,11 @@ func ConfigProcess(instance string) {
 	err = config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-cluster invalid consumer config: %s", err)
+	}
+
+	backlogProcessTimeout, err = time.ParseDuration(backlogProcessTimeoutStr)
+	if err != nil {
+		log.Fatal(4, "kafka-cluster: unable to parse backlog-process-timeout. %s", err)
 	}
 
 	partitioner, err = cluster.NewKafkaPartitioner(partitionScheme)
@@ -109,5 +118,17 @@ func ConfigProcess(instance string) {
 		if len(missing) > 0 {
 			log.Fatal(4, "kafka-cluster: configured partitions not in list of available partitions. missing %v", missing)
 		}
+	}
+
+	// get the "newest" offset for all partitions.
+	// when booting up, we will delay consuming metrics until we have
+	// caught up to these offsets.
+	bootTimeOffsets = make(map[int32]int64)
+	for _, part := range partitions {
+		offset, err := client.GetOffset(topic, part, sarama.OffsetNewest)
+		if err != nil {
+			log.Fatal(4, "kakfa-cluster: failed to get newest offset for %s:%d. %s", topic, part)
+		}
+		bootTimeOffsets[part] = offset
 	}
 }
