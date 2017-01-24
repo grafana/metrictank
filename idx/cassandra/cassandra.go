@@ -256,8 +256,12 @@ func (c *CasIdx) rebuildIndex() {
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = c.LoadPartition(partition, defs)
 	}
-	c.MemoryIdx.Load(defs)
-	log.Info("Rebuilding Memory Index Complete. Took %s to load %d series", time.Since(pre).String(), len(defs))
+	num, err := c.MemoryIdx.Load(defs)
+	if err != nil {
+		log.Error(4, "cassandra-idx Rebuilding Memory Index partial failure. Imported %d out of %d. Took %s. First error: %s", num, len(defs), time.Since(pre), err)
+	} else {
+		log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
+	}
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {

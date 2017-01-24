@@ -117,9 +117,11 @@ func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
+func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 	m.Lock()
 	var pre time.Time
+	var num int
+	var firstErr error
 	for i := range defs {
 		def := defs[i]
 		pre = time.Now()
@@ -128,11 +130,15 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 		}
 		err := m.add(&def)
 		if err == nil {
+			num++
 			metricsActive.Inc()
+		} else if firstErr == nil {
+			firstErr = err
 		}
 		idxAddDuration.Value(time.Since(pre))
 	}
 	m.Unlock()
+	return num, firstErr
 }
 
 func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {

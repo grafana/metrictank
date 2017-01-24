@@ -355,8 +355,12 @@ func (e *EsIdx) rebuildIndex() {
 			}
 		}
 	}
-	e.MemoryIdx.Load(defs)
-	log.Info("Rebuilding Memory Index Complete. Took %s", time.Since(pre).String())
+	num, err := e.MemoryIdx.Load(defs)
+	if err != nil {
+		log.Error(4, "ES Rebuilding Memory Index partial failure. Imported %d out of %d. Took %s. First error: %s", num, len(defs), time.Since(pre), err)
+	} else {
+		log.Info("ES Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
+	}
 }
 
 func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
