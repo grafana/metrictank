@@ -31,6 +31,9 @@ var (
 	// metric idx.memory.delete is the duration of memory idx deletes
 	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
 
+	// metric idx.metrics_active is the amount of currently known metrics in the index
+	metricsActive = stats.NewGauge32("idx.metrics_active")
+
 	Enabled bool
 )
 
@@ -106,6 +109,9 @@ func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
 
 	def := schema.MetricDefinitionFromMetricData(data)
 	err = m.add(def)
+	if err == nil {
+		metricsActive.Inc()
+	}
 	idxAddDuration.Value(time.Since(pre))
 	return err
 }
@@ -120,7 +126,10 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		m.add(&def)
+		err := m.add(&def)
+		if err == nil {
+			metricsActive.Inc()
+		}
 		idxAddDuration.Value(time.Since(pre))
 	}
 	m.Unlock()
@@ -138,6 +147,9 @@ func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
 		return nil
 	}
 	err := m.add(def)
+	if err == nil {
+		metricsActive.Inc()
+	}
 	idxAddDuration.Value(time.Since(pre))
 	return err
 }
@@ -472,6 +484,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 		if err != nil {
 			return nil, err
 		}
+		metricsActive.Dec()
 		deletedDefs = append(deletedDefs, deleted...)
 	}
 	idxDeleteDuration.Value(time.Since(pre))
@@ -588,6 +601,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 					m.Unlock()
 					return pruned, err
 				}
+				metricsActive.Dec()
 				pruned = append(pruned, defs...)
 			}
 		}
