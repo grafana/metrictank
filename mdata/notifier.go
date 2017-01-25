@@ -46,8 +46,9 @@ func InitPersistNotifier(handlers ...NotifierHandler) {
 }
 
 type Notifier struct {
-	Instance string
-	Metrics  Metrics
+	Instance             string
+	Metrics              Metrics
+	CreateMissingMetrics bool
 }
 
 func (cl Notifier) Handle(data []byte) {
@@ -83,7 +84,10 @@ func (cl Notifier) Handle(data []byte) {
 		}
 
 		// get metric
-		if agg, ok := cl.Metrics.Get(ms.Key); ok {
+		if cl.CreateMissingMetrics {
+			agg := cl.Metrics.GetOrCreate(ms.Key)
+			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
+		} else if agg, ok := cl.Metrics.Get(ms.Key); ok {
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
 		}
 	}
