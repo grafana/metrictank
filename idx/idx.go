@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	DefNotFound       = errors.New("MetricDef not found")
 	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
 	BranchUnderLeaf   = errors.New("can't add branch under leaf")
 )
@@ -53,8 +52,8 @@ Interface
   metric has been added to the index. The method is passed the metricData
   payload and the partition id of the metric
 
-* Get(string) (schema.MetricDefinition, error):
-  This method should return the  MetricDefintion with the passed Id.
+* Get(string) (schema.MetricDefinition, bool):
+  This method should return the MetricDefintion with the passed Id.
 
 * List(int) []schema.MetricDefinition:
   This method should return all MetricDefinitions for the passed OrgId.  If the
@@ -87,7 +86,7 @@ type MetricIndex interface {
 	Init() error
 	Stop()
 	AddOrUpdate(*schema.MetricData, int32) error
-	Get(string) (schema.MetricDefinition, error)
+	Get(string) (schema.MetricDefinition, bool)
 	Delete(int, string) ([]schema.MetricDefinition, error)
 	Find(int, string, int64) ([]Node, error)
 	List(int) []schema.MetricDefinition

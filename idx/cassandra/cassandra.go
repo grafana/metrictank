@@ -11,7 +11,6 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -207,16 +206,7 @@ func (c *CasIdx) Stop() {
 }
 
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
-	existing, err := c.MemoryIdx.Get(data.Id)
-	inMemory := true
-	if err != nil {
-		if err == idx.DefNotFound {
-			inMemory = false
-		} else {
-			log.Error(3, "cassandra-idx Failed to query Memory Index for %s. %s", data.Id, err)
-			return err
-		}
-	}
+	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
 	if inMemory {
 		if existing.Partition == partition {
@@ -245,7 +235,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	err = c.MemoryIdx.AddOrUpdateDef(def)
+	err := c.MemoryIdx.AddOrUpdateDef(def)
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	}

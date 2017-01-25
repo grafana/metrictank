@@ -64,17 +64,21 @@ func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	if metric.Time == 0 {
 		in.MetricInvalid.Inc()
 		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
-	} else {
-		pre := time.Now()
-		in.metricIndex.AddOrUpdate(metric, partition)
-		in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
-
-		pre = time.Now()
-		m := in.metrics.GetOrCreate(metric.Id)
-		m.Add(uint32(metric.Time), metric.Value)
-		if in.usage != nil {
-			in.usage.Add(metric.OrgId, metric.Id)
-		}
-		in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
+		return
 	}
+
+	pre := time.Now()
+	err = in.metricIndex.AddOrUpdate(metric, partition)
+	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
+	if err != nil {
+		return
+	}
+
+	pre = time.Now()
+	m := in.metrics.GetOrCreate(metric.Id)
+	m.Add(uint32(metric.Time), metric.Value)
+	if in.usage != nil {
+		in.usage.Add(metric.OrgId, metric.Id)
+	}
+	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 }

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	//"github.com/raintank/worldping-api/pkg/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
@@ -336,8 +335,8 @@ func TestDelete(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(defs, ShouldHaveLength, 1)
 		Convey("series should not be present in the metricDef index", func() {
-			_, err := ix.Get(org1Series[0].Id)
-			So(err, ShouldEqual, idx.DefNotFound)
+			_, ok := ix.Get(org1Series[0].Id)
+			So(ok, ShouldEqual, false)
 			Convey("series should not be present in searchs", func() {
 				nodes := strings.Split(org1Series[0].Name, ".")
 				branch := strings.Join(nodes[0:len(nodes)-2], ".")
@@ -358,8 +357,8 @@ func TestDelete(t *testing.T) {
 		So(defs, ShouldHaveLength, 4)
 		Convey("series should not be present in the metricDef index", func() {
 			for _, def := range org1Series {
-				_, err := ix.Get(def.Id)
-				So(err, ShouldEqual, idx.DefNotFound)
+				_, ok := ix.Get(def.Id)
+				So(ok, ShouldEqual, false)
 			}
 			Convey("series should not be present in searches", func() {
 				for _, def := range org1Series {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/mattbaird/elastigo/lib"
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -90,9 +89,9 @@ func (r *RetryBuffer) Items() []schema.MetricDefinition {
 
 // called when failing to bulkindexer fails, or when got a failure back from ES
 func (r *RetryBuffer) Queue(id string) {
-	def, err := r.Index.Get(id)
-	if err != nil {
-		log.Error(3, "Failed to get %s from Memory Index. %s", id, err)
+	def, ok := r.Index.Get(id)
+	if !ok {
+		log.Error(3, "Failed to get %s from Memory Index. %s", id)
 		return
 	}
 	r.Lock()
@@ -214,16 +213,8 @@ func (e *EsIdx) Init() error {
 }
 
 func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
-	existing, err := e.MemoryIdx.Get(data.Id)
-	inMemory := true
-	if err != nil {
-		if err == idx.DefNotFound {
-			inMemory = false
-		} else {
-			log.Error(3, "Failed to query Memory Index for %s. %s", data.Id, err)
-			return err
-		}
-	}
+	existing, inMemory := e.MemoryIdx.Get(data.Id)
+
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
 	if inMemory && existing.Partition == def.Partition {
@@ -233,7 +224,7 @@ func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		return e.MemoryIdx.AddOrUpdateDef(def)
 	}
 
-	err = e.MemoryIdx.AddOrUpdateDef(def)
+	err := e.MemoryIdx.AddOrUpdateDef(def)
 	if err == nil {
 		if err = e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)

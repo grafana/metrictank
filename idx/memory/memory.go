@@ -253,16 +253,16 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 	return nil
 }
 
-func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
+func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
 	def, ok := m.DefById[id]
 	idxGetDuration.Value(time.Since(pre))
 	if ok {
-		return *def, nil
+		return *def, ok
 	}
-	return schema.MetricDefinition{}, idx.DefNotFound
+	return schema.MetricDefinition{}, ok
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {

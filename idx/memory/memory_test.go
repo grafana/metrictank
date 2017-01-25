@@ -237,8 +237,8 @@ func TestDelete(t *testing.T) {
 		So(defs, ShouldHaveLength, 1)
 		So(defs[0].Id, ShouldEqual, org1Series[0].Id)
 		Convey("series should not be present in the metricDef index", func() {
-			_, err := ix.Get(org1Series[0].Id)
-			So(err, ShouldEqual, idx.DefNotFound)
+			_, ok := ix.Get(org1Series[0].Id)
+			So(ok, ShouldEqual, false)
 			Convey("series should not be present in searchs", func() {
 				nodes := strings.Split(org1Series[0].Name, ".")
 				branch := strings.Join(nodes[0:len(nodes)-2], ".")
@@ -259,8 +259,8 @@ func TestDelete(t *testing.T) {
 		So(defs, ShouldHaveLength, 4)
 		Convey("series should not be present in the metricDef index", func() {
 			for _, def := range org1Series {
-				_, err := ix.Get(def.Id)
-				So(err, ShouldEqual, idx.DefNotFound)
+				_, ok := ix.Get(def.Id)
+				So(ok, ShouldEqual, false)
 			}
 			Convey("series should not be present in searchs", func() {
 				for _, def := range org1Series {
@@ -313,8 +313,8 @@ func TestBadAdd(t *testing.T) {
 
 			err = ix.AddOrUpdate(bad1, 1)
 			So(err, ShouldEqual, idx.BranchUnderLeaf)
-			_, err := ix.Get(bad1.Id)
-			So(err, ShouldEqual, idx.DefNotFound)
+			_, ok := ix.Get(bad1.Id)
+			So(ok, ShouldEqual, false)
 			defs := ix.List(1)
 			So(len(defs), ShouldEqual, 1)
 			So(defs[0].Id, ShouldEqual, first.Id)
@@ -323,8 +323,8 @@ func TestBadAdd(t *testing.T) {
 
 			err = ix.AddOrUpdate(bad2, 1)
 			So(err, ShouldEqual, idx.BothBranchAndLeaf)
-			_, err := ix.Get(bad2.Id)
-			So(err, ShouldEqual, idx.DefNotFound)
+			_, ok := ix.Get(bad2.Id)
+			So(ok, ShouldEqual, false)
 			defs := ix.List(1)
 			So(len(defs), ShouldEqual, 1)
 			So(defs[0].Id, ShouldEqual, first.Id)
@@ -361,8 +361,8 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 			err = ix.AddOrUpdate(second, 1)
 			So(err, ShouldEqual, idx.BranchUnderLeaf)
 
-			_, err := ix.Get(second.Id)
-			So(err, ShouldEqual, idx.DefNotFound)
+			_, ok := ix.Get(second.Id)
+			So(ok, ShouldEqual, false)
 
 			Convey("when deleting the first metric", func() {
 
@@ -373,16 +373,16 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 
 				Convey("series should not be present in the metricDef index", func() {
 
-					_, err := ix.Get(first.Id)
-					So(err, ShouldEqual, idx.DefNotFound)
+					_, ok := ix.Get(first.Id)
+					So(ok, ShouldEqual, false)
 
 					Convey("we should be able to add a new branch under it", func() {
 
 						ix.AddOrUpdate(second, 1)
 
 						// validate Get
-						s, err := ix.Get(second.Id)
-						So(err, ShouldEqual, nil)
+						s, ok := ix.Get(second.Id)
+						So(ok, ShouldEqual, true)
 						So(s.Name, ShouldEqual, "foo.bar.baz")
 
 						// validate Find
