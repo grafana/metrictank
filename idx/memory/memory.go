@@ -54,11 +54,10 @@ type Node struct {
 }
 
 func (n *Node) String() string {
-	t := "branch"
 	if n.Leaf {
-		t = "leaf"
+		return fmt.Sprintf("leaf - %s", n.Path)
 	}
-	return fmt.Sprintf("%s - %s", t, n.Path)
+	return fmt.Sprintf("branch - %s", n.Path)
 }
 
 // Implements the the "MetricIndex" interface
