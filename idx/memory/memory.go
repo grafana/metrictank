@@ -316,10 +316,11 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 }
 
 func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
+	var results []*Node
 	tree, ok := m.Tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return []*Node{}, nil
+		return results, nil
 	}
 
 	nodes := strings.Split(pattern, ".")
@@ -336,7 +337,6 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			break
 		}
 	}
-	results := make([]*Node, 0)
 	var startNode *Node
 	if pos == -1 {
 		//we need to start at the root.
@@ -471,6 +471,7 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 }
 
 func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	var deletedDefs []schema.MetricDefinition
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -484,7 +485,6 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	// all a chance again
 	m.FailedDefs = make(map[string]error)
 
-	deletedDefs := make([]schema.MetricDefinition, 0)
 	for _, f := range found {
 		deleted, err := m.delete(orgId, f)
 		if err != nil {
