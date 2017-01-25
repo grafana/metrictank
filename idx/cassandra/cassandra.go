@@ -206,7 +206,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) Add(data *schema.MetricData, partition int32) error {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	existing, err := c.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -225,7 +225,7 @@ func (c *CasIdx) Add(data *schema.MetricData, partition int32) error {
 				log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
-				c.MemoryIdx.AddDef(def)
+				c.MemoryIdx.AddOrUpdateDef(def)
 				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 			}
 			return nil
@@ -242,7 +242,7 @@ func (c *CasIdx) Add(data *schema.MetricData, partition int32) error {
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	err = c.MemoryIdx.AddDef(def)
+	err = c.MemoryIdx.AddOrUpdateDef(def)
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	}

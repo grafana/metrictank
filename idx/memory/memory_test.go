@@ -68,7 +68,7 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.Add(s, 1)
+				ix.AddOrUpdate(s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -86,7 +86,7 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.Add(series, 1)
+			ix.AddOrUpdate(series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -100,23 +100,23 @@ func TestFind(t *testing.T) {
 	ix.Init()
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
 		s.Time = 10 * 86400
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
 		s.Time = 10 * 86400
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
 		s.Time = 1 * 86400
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 		s.Time = 2 * 86400
 		s.Interval = 60
 		s.SetId()
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
 		s.Time = 1 * 86400
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -226,10 +226,10 @@ func TestDelete(t *testing.T) {
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
 
 	for _, s := range publicSeries {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range org1Series {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	Convey("when deleting exact path", t, func() {
 		defs, err := ix.Delete(1, org1Series[0].Name)
@@ -307,11 +307,11 @@ func TestBadAdd(t *testing.T) {
 
 	Convey("when adding the first metric", t, func() {
 
-		err := ix.Add(first, 1)
+		err := ix.AddOrUpdate(first, 1)
 		So(err, ShouldBeNil)
 		Convey("we should not be able to add a leaf under another leaf", func() {
 
-			err = ix.Add(bad1, 1)
+			err = ix.AddOrUpdate(bad1, 1)
 			So(err, ShouldEqual, idx.BranchUnderLeaf)
 			_, err := ix.Get(bad1.Id)
 			So(err, ShouldEqual, idx.DefNotFound)
@@ -321,7 +321,7 @@ func TestBadAdd(t *testing.T) {
 		})
 		Convey("we should not be able to add a leaf that collides with an existing branch", func() {
 
-			err = ix.Add(bad2, 1)
+			err = ix.AddOrUpdate(bad2, 1)
 			So(err, ShouldEqual, idx.BothBranchAndLeaf)
 			_, err := ix.Get(bad2.Id)
 			So(err, ShouldEqual, idx.DefNotFound)
@@ -354,11 +354,11 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 
 	Convey("when adding the first metric", t, func() {
 
-		err := ix.Add(first, 1)
+		err := ix.AddOrUpdate(first, 1)
 		So(err, ShouldBeNil)
 		Convey("we should not be able to add a leaf under another leaf", func() {
 
-			err = ix.Add(second, 1)
+			err = ix.AddOrUpdate(second, 1)
 			So(err, ShouldEqual, idx.BranchUnderLeaf)
 
 			_, err := ix.Get(second.Id)
@@ -378,7 +378,7 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 
 					Convey("we should be able to add a new branch under it", func() {
 
-						ix.Add(second, 1)
+						ix.AddOrUpdate(second, 1)
 
 						// validate Get
 						s, err := ix.Get(second.Id)
@@ -418,7 +418,7 @@ func TestPrune(t *testing.T) {
 			Time:     1,
 		}
 		d.SetId()
-		ix.Add(d, 1)
+		ix.AddOrUpdate(d, 1)
 	}
 	//new series
 	for _, s := range getSeriesNames(2, 5, "metric.foo") {
@@ -430,7 +430,7 @@ func TestPrune(t *testing.T) {
 			Time:     10,
 		}
 		d.SetId()
-		ix.Add(d, 1)
+		ix.AddOrUpdate(d, 1)
 	}
 	Convey("after populating index", t, func() {
 		defs := ix.List(-1)
@@ -455,7 +455,7 @@ func TestPrune(t *testing.T) {
 		newDef.Interval = 30
 		newDef.LastUpdate = 100
 		newDef.SetId()
-		ix.AddDef(&newDef)
+		ix.AddOrUpdateDef(&newDef)
 		Convey("When purging old series", func() {
 			purged, err := ix.Prune(1, time.Unix(12, 0))
 			So(err, ShouldBeNil)
@@ -485,6 +485,6 @@ func BenchmarkIndexing(b *testing.B) {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.Add(data, 1)
+		ix.AddOrUpdate(data, 1)
 	}
 }

@@ -91,7 +91,7 @@ func TestES(t *testing.T) {
 		Convey("When adding def to index", func() {
 			data := &schema.MetricData{Name: "test0.data", Metric: "test0.data", OrgId: 1}
 			data.SetId()
-			ix.Add(data, 1)
+			ix.AddOrUpdate(data, 1)
 			req = <-reqChan
 			So(req.method, ShouldEqual, "POST")
 			So(req.url, ShouldEqual, "http://localhost:9200/_bulk?refresh=true")
@@ -103,11 +103,11 @@ func TestES(t *testing.T) {
 			rt.Set("POST http://localhost:9200/_bulk?refresh=true", handleBulkHalfError)
 			data := &schema.MetricData{Name: "test0.data", Metric: "test0.data", OrgId: 1}
 			data.SetId()
-			ix.Add(data, 1)
+			ix.AddOrUpdate(data, 1)
 			data.Name = "test2.data"
 			data.Metric = "Test2.data"
 			data.SetId()
-			ix.Add(data, 1)
+			ix.AddOrUpdate(data, 1)
 			req = <-reqChan
 			So(req.method, ShouldEqual, "POST")
 			So(req.url, ShouldEqual, "http://localhost:9200/_bulk?refresh=true")
@@ -157,7 +157,7 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.Add(s, 1)
+				ix.AddOrUpdate(s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -175,7 +175,7 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.Add(series, 1)
+			ix.AddOrUpdate(series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -206,19 +206,19 @@ func TestFind(t *testing.T) {
 	defer ix.Stop()
 
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 		s.Interval = 60
 		s.SetId()
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -326,10 +326,10 @@ func TestDelete(t *testing.T) {
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
 
 	for _, s := range publicSeries {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range org1Series {
-		ix.Add(s, 1)
+		ix.AddOrUpdate(s, 1)
 	}
 	Convey("when deleting exact path", t, func() {
 		defs, err := ix.Delete(1, org1Series[0].Name)
@@ -407,7 +407,7 @@ func BenchmarkIndexing(b *testing.B) {
 			OrgId:    (n % 15) + 1,
 		}
 		data.SetId()
-		ix.Add(data, 1)
+		ix.AddOrUpdate(data, 1)
 	}
 	ix.Stop()
 }

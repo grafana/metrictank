@@ -84,7 +84,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -140,7 +140,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 	return num, firstErr
 }
 
-func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()

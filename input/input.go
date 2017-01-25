@@ -66,7 +66,7 @@ func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
 	} else {
 		pre := time.Now()
-		in.metricIndex.Add(metric, partition)
+		in.metricIndex.AddOrUpdate(metric, partition)
 		in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 		pre = time.Now()

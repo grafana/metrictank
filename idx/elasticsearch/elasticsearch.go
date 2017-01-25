@@ -213,7 +213,7 @@ func (e *EsIdx) Init() error {
 	return nil
 }
 
-func (e *EsIdx) Add(data *schema.MetricData, partition int32) error {
+func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	existing, err := e.MemoryIdx.Get(data.Id)
 	inMemory := true
 	if err != nil {
@@ -228,11 +228,11 @@ func (e *EsIdx) Add(data *schema.MetricData, partition int32) error {
 	def.Partition = partition
 	if inMemory && existing.Partition == def.Partition {
 		log.Debug("def already seen before. Just updating memory Index")
-		e.MemoryIdx.AddDef(def)
+		e.MemoryIdx.AddOrUpdateDef(def)
 		return nil
 	}
 
-	err = e.MemoryIdx.AddDef(def)
+	err = e.MemoryIdx.AddOrUpdateDef(def)
 	if err == nil {
 		if err = e.BulkIndexer.Index(esIndex, "metric_index", def.Id, "", "", nil, def); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
