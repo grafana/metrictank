@@ -44,6 +44,13 @@ var (
 	// metric idx.cassandra.query-delete.fail is how many delete queries for a metric failed (triggered by an update or a delete)
 	idxCasQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail")
 
+	// metric idx.cassandra.query-insert.wait is time inserts spent in queue before being executed
+	idxCasQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.cassandra.query-insert.wait")
+	// metric idx.cassandra.query-insert.exec is time spent executing inserts (possibly repeatedly until success)
+	idxCasQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-insert.exec")
+	// metric idx.cassandra.query-delete.exec is time spent executing deletes (possibly repeatedly until success)
+	idxCasQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-delete.exec")
+
 	// metric idx.cassandra.add is the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
 	idxCasAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
 	// metric idx.cassandra.update is the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
@@ -325,6 +332,8 @@ func (c *CasIdx) processWriteQueue() {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
 			continue
 		}
+		idxCasQueryInsertWaitDuration.Value(time.Since(req.recvTime))
+		pre := time.Now()
 		success = false
 		attempts = 0
 
@@ -355,6 +364,7 @@ func (c *CasIdx) processWriteQueue() {
 				attempts++
 			} else {
 				success = true
+				idxCasQueryInsertExecDuration.Value(time.Since(pre))
 				idxCasQueryInsertOk.Inc()
 				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
 			}
@@ -381,6 +391,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 }
 
 func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
+	pre := time.Now()
 	attempts := 0
 	for attempts < 5 {
 		attempts++
@@ -392,6 +403,7 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 			time.Sleep(time.Second)
 		} else {
 			idxCasQueryDeleteOk.Inc()
+			idxCasQueryDeleteExecDuration.Value(time.Since(pre))
 			return nil
 		}
 	}
