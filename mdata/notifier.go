@@ -3,12 +3,16 @@ package mdata
 import (
 	"encoding/json"
 
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
 	notifierHandlers    []NotifierHandler
 	persistMessageBatch *PersistMessageBatch
+
+	// metric cluster.notifier.all.messages-received is a counter of messages received from cluster notifiers
+	messagesReceived = stats.NewCounter32("cluster.notifier.all.messages-received")
 )
 
 type NotifierHandler interface {
@@ -61,12 +65,12 @@ func (cl Notifier) Handle(data []byte) {
 			log.Error(3, "failed to unmarsh batch message. skipping.", err)
 			return
 		}
-		if batch.Instance == cl.Instance {
-			log.Debug("CLU skipping batch message we generated.")
-			return
-		}
+		messagesReceived.Add(len(batch.SavedChunks))
 		for _, c := range batch.SavedChunks {
-			if agg, ok := cl.Metrics.Get(c.Key); ok {
+			if cl.CreateMissingMetrics {
+				agg := cl.Metrics.GetOrCreate(c.Key)
+				agg.(*AggMetric).SyncChunkSaveState(c.T0)
+			} else if agg, ok := cl.Metrics.Get(c.Key); ok {
 				agg.(*AggMetric).SyncChunkSaveState(c.T0)
 			}
 		}
@@ -78,11 +82,7 @@ func (cl Notifier) Handle(data []byte) {
 			log.Error(3, "skipping message. %s", err)
 			return
 		}
-		if ms.Instance == cl.Instance {
-			log.Debug("CLU skipping message we generated. %s - %s:%d", ms.Instance, ms.Key, ms.T0)
-			return
-		}
-
+		messagesReceived.Add(1)
 		// get metric
 		if cl.CreateMissingMetrics {
 			agg := cl.Metrics.GetOrCreate(ms.Key)
