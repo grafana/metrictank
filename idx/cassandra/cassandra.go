@@ -35,13 +35,22 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
-	// metric idx.cassadra.add.ok is how many metrics are successfully being indexed
-	idxCasOk = stats.NewCounter32("idx.cassandra.add.ok")
-	// metric idx.cassandra.add.fail is how many failures were encountered while trying to index metrics
-	idxCasFail = stats.NewCounter32("idx.cassandra.add.fail")
-	// metric idx.cassandra.add is the duration of addititons to the cassandra idx
+	// metric idx.cassadra.query-insert.ok is how many insert queries for a metric completed successfully (triggered by an add or an update)
+	idxCasQueryInsertOk = stats.NewCounter32("idx.cassandra.query-insert.ok")
+	// metric idx.cassandra.query-insert.fail is how many insert queries for a metric failed (triggered by an add or an update)
+	idxCasQueryInsertFail = stats.NewCounter32("idx.cassandra.query-insert.fail")
+	// metric idx.cassadra.query-delete.ok is how many delete queries for a metric completed successfully (triggered by an update or a delete)
+	idxCasQueryDeleteOk = stats.NewCounter32("idx.cassandra.query-delete.ok")
+	// metric idx.cassandra.query-delete.fail is how many delete queries for a metric failed (triggered by an update or a delete)
+	idxCasQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail")
+
+	// metric idx.cassandra.add is the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
 	idxCasAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
-	// metric idx.cassandra.delete is the duration of deletions from the cassandra idx
+	// metric idx.cassandra.update is the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
+	idxCasUpdateDuration = stats.NewLatencyHistogram15s32("idx.cassandra.update")
+	// metric idx.cassandra.prune is the duration of a prune of the cassandra idx, including the prune of the in-memory index and all needed delete queries
+	idxCasPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune")
+	// metric idx.cassandra.delete is the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
 	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
 	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")
 
@@ -206,6 +215,7 @@ func (c *CasIdx) Stop() {
 }
 
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
 	if inMemory {
@@ -219,6 +229,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				if err != nil {
 					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				}
+				idxCasUpdateDuration.Value(time.Since(pre))
 				return err
 			}
 			return nil
@@ -232,6 +243,14 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				}
 			}()
 		}
+		def := schema.MetricDefinitionFromMetricData(data)
+		def.Partition = partition
+		err := c.MemoryIdx.AddOrUpdateDef(def)
+		if err == nil {
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+		}
+		idxCasUpdateDuration.Value(time.Since(pre))
+		return err
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
@@ -239,6 +258,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	}
+	idxCasAddDuration.Value(time.Since(pre))
 	return err
 }
 
@@ -322,7 +342,7 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Tags,
 				req.def.LastUpdate).Exec(); err != nil {
 
-				idxCasFail.Inc()
+				idxCasQueryInsertFail.Inc()
 				errmetrics.Inc(err)
 				if (attempts % 20) == 0 {
 					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
@@ -335,8 +355,7 @@ func (c *CasIdx) processWriteQueue() {
 				attempts++
 			} else {
 				success = true
-				idxCasAddDuration.Value(time.Since(req.recvTime))
-				idxCasOk.Inc()
+				idxCasQueryInsertOk.Inc()
 				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
 			}
 		}
@@ -367,10 +386,12 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 		attempts++
 		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
 		if err != nil {
+			idxCasQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
 			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 			time.Sleep(time.Second)
 		} else {
+			idxCasQueryDeleteOk.Inc()
 			return nil
 		}
 	}
@@ -378,6 +399,7 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 }
 
 func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	pre := time.Now()
 	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
 	// if an error was encountered then pruned is probably a partial list of metricDefs
 	// deleted, so lets still try and delete these from Cassandra.
@@ -388,6 +410,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 			log.Error(3, "cassandra-idx: %s", err.Error())
 		}
 	}
+	idxCasPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }
 

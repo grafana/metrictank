@@ -20,14 +20,20 @@ import (
 )
 
 var (
-	// metric idx.elasticsearch.add.ok is the number of successfull additions to the ES idx
-	idxEsOk = stats.NewCounter32("idx.elasticsearch.add.ok")
-	// metric idx.elasticsearch.add.fail is the number of failed additions to the ES idx
-	idxEsFail = stats.NewCounter32("idx.elasticsearch.add.fail")
-	// metric idx.elasticsearch.add is the duration of additions to the ES idx
+	// metric idx.elasticsearch.add.ok is the number of successfull add/update/delete operations on the ES idx, via a bulk operation
+	idxEsOk = stats.NewCounter32("idx.elasticsearch.bulk.ok")
+	// metric idx.elasticsearch.add.fail is the number of failed add/update/delete operations on the ES idx, via a bulk operation
+	idxEsFail = stats.NewCounter32("idx.elasticsearch.bulk.fail")
+	// metric idx.elasticsearch.add is the duration of an add of one metric, including the add to the in-memory index (note: excludes time to flush to index. see bulk)
 	idxEsAddDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
-	// metric idx.elasticsearch.delete is the duration of deletes from the ES idx
+	// metric idx.elasticsearch.update is the duration of an update of one metric, including the update to the in-memory index (note: excludes time to flush to index. see bulk)
+	idxEsUpdateDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.update")
+	// metric idx.elasticsearch.delete is the duration of a delete of one or more metrics, including the delete in the in-memory index (note: excludes time to flush to index. see bulk)
 	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete")
+	// metric idx.elasticsearch.prune is the duration of an index prune operation, including the prune of the in-memory index (note: excludes time to flush to index. see bulk)
+	idxEsPruneDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.prune")
+	// metric idx.elasticsearch.bulk is the duration of a bulk operation to the ES index, which persists any pending adds, deletes and updates
+	idxEsBulkDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.bulk")
 	// metric idx.elasticsearch.retrybuf.items is the amount of items currently in the retry buffer
 	retryBufItems = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
 
@@ -213,6 +219,7 @@ func (e *EsIdx) Init() error {
 }
 
 func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+	pre := time.Now()
 	existing, inMemory := e.MemoryIdx.Get(data.Id)
 
 	def := schema.MetricDefinitionFromMetricData(data)
@@ -231,6 +238,11 @@ func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 			e.retryBuf.Queue(def.Id)
 		}
 	}
+	if inMemory {
+		idxEsUpdateDuration.Value(time.Since(pre))
+	} else {
+		idxEsAddDuration.Value(time.Since(pre))
+	}
 	return err
 }
 
@@ -248,7 +260,7 @@ func (e *EsIdx) bulkSend(buf *bytes.Buffer) error {
 	if err := e.processEsResponse(body); err != nil {
 		return err
 	}
-	idxEsAddDuration.Value(time.Since(pre))
+	idxEsBulkDuration.Value(time.Since(pre))
 	return nil
 }
 
@@ -369,11 +381,13 @@ func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, er
 }
 
 func (e *EsIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+	pre := time.Now()
 	pruned, err := e.MemoryIdx.Prune(orgId, oldest)
 	// if an error was encountered then pruned is probably a partial list of metricDefs
-	// deleted, so lets still try and delete these from Cassandra.
+	// deleted, so lets still try and delete these from Es
 	for _, def := range pruned {
 		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
 	}
+	idxEsPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }
