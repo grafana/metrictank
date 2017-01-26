@@ -35,6 +35,8 @@ a counter of messages published to the kafka cluster notifier
 the sizes seen of messages through the nsq cluster notifier
 * `cluster.notifier.nsq.messages-published`:  
 a counter of messages published to the nsq cluster notifier
+* `cluster.notifier.all.messages-received`:  
+a counter of messages received from cluster notifiers
 * `cluster.decode_err.join`:  
 a counter of json unmarshal errors
 * `cluster.decode_err.merge_remote_state`:  
