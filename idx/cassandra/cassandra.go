@@ -225,8 +225,11 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
-				c.MemoryIdx.AddOrUpdateDef(def)
-				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+				err := c.MemoryIdx.AddOrUpdateDef(def)
+				if err != nil {
+					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+				}
+				return err
 			}
 			return nil
 		} else {

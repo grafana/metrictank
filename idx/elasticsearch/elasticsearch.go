@@ -228,8 +228,9 @@ func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	def.Partition = partition
 	if inMemory && existing.Partition == def.Partition {
 		log.Debug("def already seen before. Just updating memory Index")
-		e.MemoryIdx.AddOrUpdateDef(def)
-		return nil
+		// note for updating, err should always be nil
+		// however if somebody else just deleted it and we're readding, err might be non-nil
+		return e.MemoryIdx.AddOrUpdateDef(def)
 	}
 
 	err = e.MemoryIdx.AddOrUpdateDef(def)
