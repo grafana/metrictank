@@ -36,30 +36,30 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
 
 var (
 	// metric idx.cassadra.query-insert.ok is how many insert queries for a metric completed successfully (triggered by an add or an update)
-	idxCasQueryInsertOk = stats.NewCounter32("idx.cassandra.query-insert.ok")
+	statQueryInsertOk = stats.NewCounter32("idx.cassandra.query-insert.ok")
 	// metric idx.cassandra.query-insert.fail is how many insert queries for a metric failed (triggered by an add or an update)
-	idxCasQueryInsertFail = stats.NewCounter32("idx.cassandra.query-insert.fail")
+	statQueryInsertFail = stats.NewCounter32("idx.cassandra.query-insert.fail")
 	// metric idx.cassadra.query-delete.ok is how many delete queries for a metric completed successfully (triggered by an update or a delete)
-	idxCasQueryDeleteOk = stats.NewCounter32("idx.cassandra.query-delete.ok")
+	statQueryDeleteOk = stats.NewCounter32("idx.cassandra.query-delete.ok")
 	// metric idx.cassandra.query-delete.fail is how many delete queries for a metric failed (triggered by an update or a delete)
-	idxCasQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail")
+	statQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail")
 
 	// metric idx.cassandra.query-insert.wait is time inserts spent in queue before being executed
-	idxCasQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.cassandra.query-insert.wait")
+	statQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.cassandra.query-insert.wait")
 	// metric idx.cassandra.query-insert.exec is time spent executing inserts (possibly repeatedly until success)
-	idxCasQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-insert.exec")
+	statQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-insert.exec")
 	// metric idx.cassandra.query-delete.exec is time spent executing deletes (possibly repeatedly until success)
-	idxCasQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-delete.exec")
+	statQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-delete.exec")
 
 	// metric idx.cassandra.add is the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
-	idxCasAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
 	// metric idx.cassandra.update is the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
-	idxCasUpdateDuration = stats.NewLatencyHistogram15s32("idx.cassandra.update")
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.cassandra.update")
 	// metric idx.cassandra.prune is the duration of a prune of the cassandra idx, including the prune of the in-memory index and all needed delete queries
-	idxCasPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune")
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune")
 	// metric idx.cassandra.delete is the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
-	idxCasDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
-	errmetrics           = cassandra.NewErrMetrics("idx.cassandra")
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
+	errmetrics         = cassandra.NewErrMetrics("idx.cassandra")
 
 	Enabled          bool
 	ssl              bool
@@ -236,7 +236,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				if err != nil {
 					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				}
-				idxCasUpdateDuration.Value(time.Since(pre))
+				statUpdateDuration.Value(time.Since(pre))
 				return err
 			}
 			return nil
@@ -256,7 +256,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		if err == nil {
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		}
-		idxCasUpdateDuration.Value(time.Since(pre))
+		statUpdateDuration.Value(time.Since(pre))
 		return err
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
@@ -265,7 +265,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	}
-	idxCasAddDuration.Value(time.Since(pre))
+	statAddDuration.Value(time.Since(pre))
 	return err
 }
 
@@ -332,7 +332,7 @@ func (c *CasIdx) processWriteQueue() {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
 			continue
 		}
-		idxCasQueryInsertWaitDuration.Value(time.Since(req.recvTime))
+		statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
 		pre := time.Now()
 		success = false
 		attempts = 0
@@ -351,7 +351,7 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Tags,
 				req.def.LastUpdate).Exec(); err != nil {
 
-				idxCasQueryInsertFail.Inc()
+				statQueryInsertFail.Inc()
 				errmetrics.Inc(err)
 				if (attempts % 20) == 0 {
 					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
@@ -364,8 +364,8 @@ func (c *CasIdx) processWriteQueue() {
 				attempts++
 			} else {
 				success = true
-				idxCasQueryInsertExecDuration.Value(time.Since(pre))
-				idxCasQueryInsertOk.Inc()
+				statQueryInsertExecDuration.Value(time.Since(pre))
+				statQueryInsertOk.Inc()
 				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
 			}
 		}
@@ -386,7 +386,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 			log.Error(3, "cassandra-idx: %s", err.Error())
 		}
 	}
-	idxCasDeleteDuration.Value(time.Since(pre))
+	statDeleteDuration.Value(time.Since(pre))
 	return defs, err
 }
 
@@ -397,13 +397,13 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 		attempts++
 		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
 		if err != nil {
-			idxCasQueryDeleteFail.Inc()
+			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
 			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
 			time.Sleep(time.Second)
 		} else {
-			idxCasQueryDeleteOk.Inc()
-			idxCasQueryDeleteExecDuration.Value(time.Since(pre))
+			statQueryDeleteOk.Inc()
+			statQueryDeleteExecDuration.Value(time.Since(pre))
 			return nil
 		}
 	}
@@ -422,7 +422,7 @@ func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, 
 			log.Error(3, "cassandra-idx: %s", err.Error())
 		}
 	}
-	idxCasPruneDuration.Value(time.Since(pre))
+	statPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }
 

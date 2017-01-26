@@ -21,21 +21,21 @@ import (
 
 var (
 	// metric idx.elasticsearch.add.ok is the number of successfull add/update/delete operations on the ES idx, via a bulk operation
-	idxEsOk = stats.NewCounter32("idx.elasticsearch.bulk.ok")
+	statBulkOk = stats.NewCounter32("idx.elasticsearch.bulk.ok")
 	// metric idx.elasticsearch.add.fail is the number of failed add/update/delete operations on the ES idx, via a bulk operation
-	idxEsFail = stats.NewCounter32("idx.elasticsearch.bulk.fail")
+	statBulkFail = stats.NewCounter32("idx.elasticsearch.bulk.fail")
 	// metric idx.elasticsearch.add is the duration of an add of one metric, including the add to the in-memory index (note: excludes time to flush to index. see bulk)
-	idxEsAddDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.add")
 	// metric idx.elasticsearch.update is the duration of an update of one metric, including the update to the in-memory index (note: excludes time to flush to index. see bulk)
-	idxEsUpdateDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.update")
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.update")
 	// metric idx.elasticsearch.delete is the duration of a delete of one or more metrics, including the delete in the in-memory index (note: excludes time to flush to index. see bulk)
-	idxEsDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete")
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.delete")
 	// metric idx.elasticsearch.prune is the duration of an index prune operation, including the prune of the in-memory index (note: excludes time to flush to index. see bulk)
-	idxEsPruneDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.prune")
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.prune")
 	// metric idx.elasticsearch.bulk is the duration of a bulk operation to the ES index, which persists any pending adds, deletes and updates
-	idxEsBulkDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.bulk")
+	statBulkDuration = stats.NewLatencyHistogram15s32("idx.elasticsearch.bulk")
 	// metric idx.elasticsearch.retrybuf.items is the amount of items currently in the retry buffer
-	retryBufItems = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
+	statRetryBufItems = stats.NewGauge32("idx.elasticsearch.retrybuf.items")
 
 	Enabled          bool
 	esIndex          string
@@ -102,7 +102,7 @@ func (r *RetryBuffer) Queue(id string) {
 	}
 	r.Lock()
 	r.Defs = append(r.Defs, def)
-	retryBufItems.Set(len(r.Defs))
+	statRetryBufItems.Set(len(r.Defs))
 	r.Unlock()
 }
 
@@ -110,7 +110,7 @@ func (r *RetryBuffer) retry() {
 	r.Lock()
 	defs := r.Defs
 	r.Defs = make([]schema.MetricDefinition, 0, len(defs))
-	retryBufItems.Set(0)
+	statRetryBufItems.Set(0)
 	r.Unlock()
 	if len(defs) == 0 {
 		log.Debug("retry buffer is empty")
@@ -120,7 +120,7 @@ func (r *RetryBuffer) retry() {
 		if err := r.Index.BulkIndexer.Index(esIndex, "metric_index", d.Id, "", "", nil, d); err != nil {
 			log.Error(3, "Failed to add metricDef to BulkIndexer queue. %s", err)
 			r.Defs = append(r.Defs, d)
-			retryBufItems.Set(len(r.Defs))
+			statRetryBufItems.Set(len(r.Defs))
 			return
 		}
 	}
@@ -239,9 +239,9 @@ func (e *EsIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		}
 	}
 	if inMemory {
-		idxEsUpdateDuration.Value(time.Since(pre))
+		statUpdateDuration.Value(time.Since(pre))
 	} else {
-		idxEsAddDuration.Value(time.Since(pre))
+		statAddDuration.Value(time.Since(pre))
 	}
 	return err
 }
@@ -260,7 +260,7 @@ func (e *EsIdx) bulkSend(buf *bytes.Buffer) error {
 	if err := e.processEsResponse(body); err != nil {
 		return err
 	}
-	idxEsBulkDuration.Value(time.Since(pre))
+	statBulkDuration.Value(time.Since(pre))
 	return nil
 }
 
@@ -289,7 +289,7 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 		for _, m := range response.Items {
 			docCount += len(m)
 		}
-		idxEsOk.Add(docCount)
+		statBulkOk.Add(docCount)
 		return nil
 	}
 
@@ -300,14 +300,14 @@ func (e *EsIdx) processEsResponse(body []byte) error {
 			if errStr, ok := v["error"].(string); ok {
 				log.Warn("ES: %s failed: %s", id, errStr)
 				e.retryBuf.Queue(id)
-				idxEsFail.Inc()
+				statBulkFail.Inc()
 			} else if errMap, ok := v["error"].(map[string]interface{}); ok {
 				log.Warn("ES: %s failed: %s: %q", id, errMap["type"].(string), errMap["reason"].(string))
 				e.retryBuf.Queue(id)
-				idxEsFail.Inc()
+				statBulkFail.Inc()
 			} else {
 				log.Debug("ES: completed %s successfully.", id)
-				idxEsOk.Inc()
+				statBulkOk.Inc()
 			}
 		}
 	}
@@ -376,7 +376,7 @@ func (e *EsIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, er
 	for _, def := range defs {
 		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
 	}
-	idxEsDeleteDuration.Value(time.Since(pre))
+	statDeleteDuration.Value(time.Since(pre))
 	return defs, nil
 }
 
@@ -388,6 +388,6 @@ func (e *EsIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, e
 	for _, def := range pruned {
 		e.BulkIndexer.Delete(esIndex, "metric_index", def.Id)
 	}
-	idxEsPruneDuration.Value(time.Since(pre))
+	statPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }
