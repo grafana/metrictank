@@ -113,9 +113,11 @@ func alignRequests(reqs []models.Req, aggSettings []mdata.AggSetting) ([]models.
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
 		runTimeConsolidate = true
-		var keys []uint32
+		keys := make([]uint32, len(rawIntervals))
+		i := 0
 		for k := range rawIntervals {
-			keys = append(keys, k)
+			keys[i] = k
+			i++
 		}
 		chosenInterval = util.Lcm(keys)
 		options[0].interval = chosenInterval
