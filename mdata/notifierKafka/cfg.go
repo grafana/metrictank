@@ -2,7 +2,7 @@ package notifierKafka
 
 import (
 	"flag"
-	"log"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +11,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
@@ -30,6 +31,9 @@ var partitionScheme string
 var bootTimeOffsets map[int32]int64
 var backlogProcessTimeout time.Duration
 var backlogProcessTimeoutStr string
+var partitionOffset map[int32]*stats.Gauge64
+var partitionLogSize map[int32]*stats.Gauge64
+var partitionLag map[int32]*stats.Gauge64
 
 // metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
 var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
@@ -120,6 +124,11 @@ func ConfigProcess(instance string) {
 		}
 	}
 
+	// initialize our offset metrics
+	partitionOffset = make(map[int32]*stats.Gauge64)
+	partitionLogSize = make(map[int32]*stats.Gauge64)
+	partitionLag = make(map[int32]*stats.Gauge64)
+
 	// get the "newest" offset for all partitions.
 	// when booting up, we will delay consuming metrics until we have
 	// caught up to these offsets.
@@ -130,5 +139,9 @@ func ConfigProcess(instance string) {
 			log.Fatal(4, "kakfa-cluster: failed to get newest offset for %s:%d. %s", topic, part)
 		}
 		bootTimeOffsets[part] = offset
+		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
+		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.log_size", part))
+		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.lag", part))
 	}
+	log.Info("kafka-cluster: consuming from partitions %v", partitions)
 }

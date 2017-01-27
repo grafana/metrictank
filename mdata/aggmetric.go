@@ -471,6 +471,12 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
+
+	// this aggMetric has never had metrics written to it.
+	if len(a.Chunks) == 0 {
+		return true
+	}
+
 	currentChunk := a.getChunk(a.CurrentChunkPos)
 	if currentChunk == nil {
 		return false

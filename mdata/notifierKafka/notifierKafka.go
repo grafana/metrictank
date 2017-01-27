@@ -96,6 +96,11 @@ func (c *NotifierKafka) start() {
 		if err != nil {
 			log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
 		}
+		partitionLogSize[partition].Set(int(bootTimeOffsets[partition]))
+		if offset >= 0 {
+			partitionOffset[partition].Set(int(offset))
+			partitionLag[partition].Set(int(bootTimeOffsets[partition] - offset))
+		}
 		processBacklog.Add(1)
 		go c.consumePartition(topic, partition, offset, processBacklog)
 	}
@@ -119,22 +124,25 @@ func (c *NotifierKafka) start() {
 
 }
 
-func (c *NotifierKafka) consumePartition(topic string, partition int32, partitionOffset int64, processBacklog *sync.WaitGroup) {
+func (c *NotifierKafka) consumePartition(topic string, partition int32, currentOffset int64, processBacklog *sync.WaitGroup) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
-	pc, err := c.consumer.ConsumePartition(topic, partition, partitionOffset)
+	pc, err := c.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
 		log.Fatal(4, "kafka-cluster: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
 	}
-	log.Info("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, partitionOffset)
-	currentOffset := partitionOffset
+	log.Info("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, currentOffset)
+
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
 	startingUp := true
 	// the bootTimeOffset is the next available offset. There may not be a message with that
 	// offset yet, so we subtract 1 to get the highest offset that we can fetch.
 	bootTimeOffset := bootTimeOffsets[partition] - 1
+	partitionOffsetMetric := partitionOffset[partition]
+	partitionLogSizeMetric := partitionLogSize[partition]
+	partitionLagMetric := partitionLag[partition]
 	for {
 		select {
 		case msg := <-messages:
@@ -150,6 +158,20 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, partitio
 			if startingUp && currentOffset >= bootTimeOffset {
 				processBacklog.Done()
 				startingUp = false
+			}
+			offset, err := c.client.GetOffset(topic, partition, sarama.OffsetNewest)
+			if err != nil {
+				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
+			} else {
+				partitionLogSizeMetric.Set(int(offset))
+			}
+			if currentOffset < 0 {
+				// we have not yet consumed any messages.
+				continue
+			}
+			partitionOffsetMetric.Set(int(currentOffset))
+			if err == nil {
+				partitionLagMetric.Set(int(offset - currentOffset))
 			}
 		case <-c.stopConsuming:
 			pc.Close()
