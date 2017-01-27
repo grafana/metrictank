@@ -74,6 +74,33 @@ func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	}
 }
 
+// Sync the saved state of a chunk by its T0.
+func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consolidation.Consolidator, aggSpan uint32) {
+	// no lock needed cause aggregators don't change at runtime
+	for _, a := range a.aggregators {
+		if a.span == aggSpan {
+			switch consolidator {
+			case consolidation.None:
+				panic("cannot get an archive for no consolidation")
+			case consolidation.Avg:
+				panic("avg consolidator has no matching Archive(). you need sum and cnt")
+			case consolidation.Cnt:
+				a.cntMetric.SyncChunkSaveState(ts)
+				return
+			case consolidation.Min:
+				a.minMetric.SyncChunkSaveState(ts)
+				return
+			case consolidation.Max:
+				a.maxMetric.SyncChunkSaveState(ts)
+				return
+			case consolidation.Sum:
+				a.sumMetric.SyncChunkSaveState(ts)
+				return
+			}
+		}
+	}
+}
+
 func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	if pos < 0 || pos >= len(a.Chunks) {
 		panic(fmt.Sprintf("aggmetric %s queried for chunk %d out of %d chunks", a.Key, pos, len(a.Chunks)))

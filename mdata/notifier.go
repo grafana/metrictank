@@ -2,7 +2,10 @@ package mdata
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 
+	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -67,11 +70,30 @@ func (cl Notifier) Handle(data []byte) {
 		}
 		messagesReceived.Add(len(batch.SavedChunks))
 		for _, c := range batch.SavedChunks {
+			key := strings.Split(c.Key, "_")
+			var consolidator consolidation.Consolidator
+			var aggSpan int
+			if len(key) == 3 {
+				consolidator = consolidation.FromArchive(key[1])
+				aggSpan, err = strconv.Atoi(key[2])
+				if err != nil {
+					log.Error(3, "notifier: skipping message due to parsing failure. %s", err)
+					continue
+				}
+			}
 			if cl.CreateMissingMetrics {
-				agg := cl.Metrics.GetOrCreate(c.Key)
-				agg.(*AggMetric).SyncChunkSaveState(c.T0)
-			} else if agg, ok := cl.Metrics.Get(c.Key); ok {
-				agg.(*AggMetric).SyncChunkSaveState(c.T0)
+				agg := cl.Metrics.GetOrCreate(key[0])
+				if len(key) == 3 {
+					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
+				} else {
+					agg.(*AggMetric).SyncChunkSaveState(c.T0)
+				}
+			} else if agg, ok := cl.Metrics.Get(key[0]); ok {
+				if len(key) > 1 {
+					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
+				} else {
+					agg.(*AggMetric).SyncChunkSaveState(c.T0)
+				}
 			}
 		}
 	} else {
@@ -79,7 +101,7 @@ func (cl Notifier) Handle(data []byte) {
 		ms := PersistMessage{}
 		err := json.Unmarshal(data, &ms)
 		if err != nil {
-			log.Error(3, "skipping message. %s", err)
+			log.Error(3, "notifier: skipping message due to parsing failure. %s", err)
 			return
 		}
 		messagesReceived.Add(1)
