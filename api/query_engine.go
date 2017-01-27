@@ -3,11 +3,20 @@ package api
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
+)
+
+var (
+	dpAdjGranularity  = stats.NewGauge32("api.dp_adj_granularity")
+	dpMaxGranularity  = stats.NewGauge32("api.dp_max_granularity")
+	aggAdjGranularity = stats.NewGauge32("api.agg_adj_granularity")
+	aggMaxGranularity = stats.NewGauge32("api.agg_max_granularity")
 )
 
 // represents a data "archive", i.e. the raw one, or an aggregated series
@@ -27,6 +36,11 @@ type archives []archive
 func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
+
+// takes a ttl and returns the oldest timestamp with that ttl
+func oldestTs(ttl uint32) uint32 {
+	return uint32(time.Now().Unix()) - ttl
+}
 
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
@@ -110,6 +124,30 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 	}
 
 	chosenInterval := options[selected].interval
+
+	// by default we select the lowest res (longest time range) option.
+	selectedHighestRes := len(options) - 1
+	// then we loop over the remaining options trying to find the highest res where the
+	// oldest timestamp is still older than our From ts
+	for i := len(options) - 2; i >= 0; i-- {
+		if oldestTs(options[i].ttl) > reqs[0].From {
+			break
+		}
+		selectedHighestRes = i
+	}
+
+	// record how many datapoints will be sent to graphite-api if we use the old-style selection mechanism
+	dpAdjGranularity.SetUint32(tsRange / chosenInterval)
+
+	// record the aggregation index that has been selected
+	aggAdjGranularity.SetUint32(uint32(selected))
+
+	// also record how many there would be if instead we select the aggregation with the highest resolution
+	// that can still cover the requested time range
+	dpMaxGranularity.SetUint32(tsRange / options[selectedHighestRes].interval)
+
+	// record the aggregation index that would be selected for max granularity
+	aggMaxGranularity.SetUint32(uint32(selectedHighestRes))
 
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
