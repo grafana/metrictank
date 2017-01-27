@@ -9,7 +9,7 @@ type AggSetting struct {
 	Span      uint32 // in seconds, controls how many input points go into an aggregated point.
 	ChunkSpan uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
 	NumChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
-	Ttl       uint32 // how many seconds to keep the chunk in cassandra
+	ttl       uint32 // how many seconds to keep the chunk in cassandra
 	Ready     bool   // ready for reads?
 }
 
@@ -18,7 +18,7 @@ func NewAggSetting(span, chunkSpan, numChunks, ttl uint32, ready bool) AggSettin
 		Span:      span,
 		ChunkSpan: chunkSpan,
 		NumChunks: numChunks,
-		Ttl:       ttl,
+		ttl:       ttl,
 		Ready:     ready,
 	}
 }
