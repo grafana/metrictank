@@ -31,6 +31,12 @@ how many metrics were missed completely (none of the needed chunks in cache)
 the sizes seen of messages through the kafka cluster notifier
 * `cluster.notifier.kafka.messages-published`:  
 a counter of messages published to the kafka cluster notifier
+* `cluster.notifier.kafka.partition.%d.offset`:   
+The current offset for the partition (%d) that we have consumed.
+* `cluster.notifier.kafka.partition.%d.log_size`:   
+The size of the kafka partition, aka the newest available offset.
+* `cluster.notifier.kafka.partition.%d.lag`:   
+How many messages (chunkWriteRequests) Kafaka has that we have not yet consumed.
 * `cluster.notifier.nsq.message_size`:  
 the sizes seen of messages through the nsq cluster notifier
 * `cluster.notifier.nsq.messages-published`:  
