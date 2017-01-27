@@ -62,6 +62,20 @@ func (c Consolidator) Archive() string {
 	panic(fmt.Sprintf("Consolidator.Archive(): unknown consolidator %q", c))
 }
 
+func FromArchive(archive string) Consolidator {
+	switch archive {
+	case "cnt":
+		return Cnt
+	case "min":
+		return Min
+	case "max":
+		return Max
+	case "sum":
+		return Sum
+	}
+	return None
+}
+
 // map the consolidation to the respective aggregation function, if applicable.
 func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 	var consFunc batch.AggFunc
