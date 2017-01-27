@@ -2,7 +2,6 @@ package notifierKafka
 
 import (
 	"flag"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
