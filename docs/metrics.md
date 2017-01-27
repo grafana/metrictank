@@ -98,16 +98,6 @@ a counter of timeouts seen to the cassandra idx
 a counter of how many times we saw to many timeouts and closed the connection to the cassandra idx
 * `idx.cassandra.error.unavailable`:  
 a counter of how many times the cassandra idx was unavailable
-* `idx.elasticsearch.add`:  
-the duration of additions to the ES idx
-* `idx.elasticsearch.add.fail`:  
-the number of failed additions to the ES idx
-* `idx.elasticsearch.add.ok`:  
-the number of successfull additions to the ES idx
-* `idx.elasticsearch.delete`:  
-the duration of deletes from the ES idx
-* `idx.elasticsearch.retrybuf.items`:  
-the amount of items currently in the retry buffer
 * `idx.memory.add`:  
 the duration of (successfull) memory idx additions
 * `idx.memory.add.fail`:  

@@ -2099,8 +2099,6 @@
             "add-to-bulk-index-ok": "#3F6833",
             "cassandra.fail": "#E24D42",
             "cassandra.ok": "#3F6833",
-            "elasticsearch.fail": "#E0752D",
-            "elasticsearch.ok": "#3F6833",
             "indexed-fail": "#E0752D",
             "indexed-ok": "#629E51",
             "max": "#DEDAF7",
@@ -2158,13 +2156,8 @@
           "steppedLine": false,
           "targets": [
             {
-              "refId": "C",
-              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.*.{ok,fail}.counter32), 5, 6, 7)",
-              "textEditor": false
-            },
-            {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.idx.elasticsearch.retrybuf.items.gauge32, 'es-retrybuf-items')",
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.*.{ok,fail}.counter32), 5, 6, 7)",
               "textEditor": false
             }
           ],
