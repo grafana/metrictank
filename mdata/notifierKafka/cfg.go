@@ -131,4 +131,5 @@ func ConfigProcess(instance string) {
 		}
 		bootTimeOffsets[part] = offset
 	}
+	log.Info("kafka-cluster: consuming from partitions %v", partitions)
 }
