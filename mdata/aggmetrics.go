@@ -6,13 +6,24 @@ import (
 
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/zhangxinngang/murmur"
 )
 
-type AggMetrics struct {
-	store       Store
-	cachePusher cache.CachePusher
+const NUM_SHARDS = uint32(256)
+
+type Shard struct {
 	sync.RWMutex
-	Metrics        map[string]*AggMetric
+	Metrics map[string]*AggMetric
+}
+
+func GetShardBucket(key string) uint32 {
+	return murmur.Murmur3([]byte(key)) % NUM_SHARDS
+}
+
+type AggMetrics struct {
+	store          Store
+	cachePusher    cache.CachePusher
+	Shards         []Shard
 	chunkSpan      uint32
 	numChunks      uint32
 	aggSettings    []AggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
@@ -26,7 +37,7 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChu
 	ms := AggMetrics{
 		store:          store,
 		cachePusher:    cachePusher,
-		Metrics:        make(map[string]*AggMetric),
+		Shards:         make([]Shard, NUM_SHARDS),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
 		aggSettings:    aggSettings,
@@ -36,6 +47,11 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChu
 		gcInterval:     gcInterval,
 	}
 
+	for i := uint32(0); i < NUM_SHARDS; i++ {
+		ms.Shards[i] = Shard{
+			Metrics: make(map[string]*AggMetric),
+		}
+	}
 	// gcInterval = 0 can be useful in tests
 	if gcInterval > 0 {
 		go ms.GC()
@@ -54,26 +70,29 @@ func (ms *AggMetrics) GC() {
 		chunkMinTs := now - (now % ms.chunkSpan) - uint32(ms.chunkMaxStale)
 		metricMinTs := now - (now % ms.chunkSpan) - uint32(ms.metricMaxStale)
 
-		// as this is the only goroutine that can delete from ms.Metrics
-		// we only need to lock long enough to get the list of actives metrics.
-		// it doesn't matter if new metrics are added while we iterate this list.
-		ms.RLock()
-		keys := make([]string, 0, len(ms.Metrics))
-		for k := range ms.Metrics {
-			keys = append(keys, k)
-		}
-		ms.RUnlock()
-		for _, key := range keys {
-			gcMetric.Inc()
-			ms.RLock()
-			a := ms.Metrics[key]
-			ms.RUnlock()
-			if stale := a.GC(chunkMinTs, metricMinTs); stale {
-				log.Info("metric %s is stale. Purging data from memory.", key)
-				ms.Lock()
-				delete(ms.Metrics, key)
-				metricsActive.Set(len(ms.Metrics))
-				ms.Unlock()
+		for i := range ms.Shards {
+			shard := &ms.Shards[i]
+			// as this is the only goroutine that can delete from ms.Metrics
+			// we only need to lock long enough to get the list of actives metrics.
+			// it doesn't matter if new metrics are added while we iterate this list.
+			shard.RLock()
+			keys := make([]string, 0, len(shard.Metrics))
+			for k := range shard.Metrics {
+				keys = append(keys, k)
+			}
+			shard.RUnlock()
+			for _, key := range keys {
+				gcMetric.Inc()
+				shard.RLock()
+				a := shard.Metrics[key]
+				shard.RUnlock()
+				if stale := a.GC(chunkMinTs, metricMinTs); stale {
+					log.Info("metric %s is stale. Purging data from memory.", key)
+					shard.Lock()
+					delete(shard.Metrics, key)
+					metricsActive.Dec()
+					shard.Unlock()
+				}
 			}
 		}
 
@@ -81,21 +100,23 @@ func (ms *AggMetrics) GC() {
 }
 
 func (ms *AggMetrics) Get(key string) (Metric, bool) {
-	ms.RLock()
-	m, ok := ms.Metrics[key]
-	ms.RUnlock()
+	shard := &ms.Shards[GetShardBucket(key)]
+	shard.RLock()
+	m, ok := shard.Metrics[key]
+	shard.RUnlock()
 	return m, ok
 }
 
 func (ms *AggMetrics) GetOrCreate(key string) Metric {
-	ms.Lock()
-	m, ok := ms.Metrics[key]
+	shard := &ms.Shards[GetShardBucket(key)]
+	shard.Lock()
+	m, ok := shard.Metrics[key]
 	if !ok {
 		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
-		ms.Metrics[key] = m
-		metricsActive.Set(len(ms.Metrics))
+		shard.Metrics[key] = m
+		metricsActive.Inc()
 	}
-	ms.Unlock()
+	shard.Unlock()
 	return m
 }
 
