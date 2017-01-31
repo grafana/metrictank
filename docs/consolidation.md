@@ -1,6 +1,6 @@
 # Consolidation
 
-When you request a larger amount of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
+When you request a larger number of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
 There's two pieces to this puzzle - rollups and runtime consolidation - explained below.
 
 In metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))

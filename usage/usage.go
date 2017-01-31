@@ -17,7 +17,7 @@ var metricIndex idx.MetricIndex
 
 type orgstat struct {
 	keys   map[string]struct{} // track unique keys seen
-	points uint32              // track amount of points seen
+	points uint32              // track number of points seen
 }
 
 // tracks for every org

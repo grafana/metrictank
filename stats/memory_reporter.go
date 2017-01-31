@@ -18,13 +18,13 @@ func NewMemoryReporter() *MemoryReporter {
 func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	runtime.ReadMemStats(&m.mem)
 
-	// metric memory.total_bytes_allocated is a counter of total amount of bytes allocated during process lifetime
+	// metric memory.total_bytes_allocated is a counter of total number of bytes allocated during process lifetime
 	buf = WriteUint64(buf, prefix, []byte("total_bytes_allocated.counter64"), m.mem.TotalAlloc, now)
 
 	// metric memory.bytes_allocated_on_heap is a gauge of currently allocated (within the runtime) memory.
 	buf = WriteUint64(buf, prefix, []byte("bytes.allocated_in_heap.gauge64"), m.mem.Alloc, now)
 
-	// metric memory.bytes.obtained_from_sys is the amount of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
+	// metric memory.bytes.obtained_from_sys is the number of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
 	buf = WriteUint64(buf, prefix, []byte("bytes.obtained_from_sys.gauge64"), m.mem.Sys, now)
 
 	// metric memory.total_gc_cycles is a counter of the number of GC cycles since process start

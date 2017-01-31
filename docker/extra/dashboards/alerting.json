@@ -523,7 +523,7 @@
           ]
         },
         {
-          "content": "executors read from the jobqueue and execute the alerting job.    \n__if they can't keep up with the rate of new jobs, than this queue will fill up and the executors will skip the jobs__  \nthe size of this queue should comfortably encompass the amount of jobs scheduled at any point in time.\n   \n\n**alert outcomes** below:  \n\nno results should ever contain missing values, but if they do, than the results become unknown",
+          "content": "executors read from the jobqueue and execute the alerting job.    \n__if they can't keep up with the rate of new jobs, than this queue will fill up and the executors will skip the jobs__  \nthe size of this queue should comfortably encompass the number of jobs scheduled at any point in time.\n   \n\n**alert outcomes** below:  \n\nno results should ever contain missing values, but if they do, than the results become unknown",
           "editable": true,
           "error": false,
           "id": 6,

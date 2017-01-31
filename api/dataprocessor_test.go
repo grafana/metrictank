@@ -1037,7 +1037,7 @@ func TestAlignRequests(t *testing.T) {
 			t.Errorf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
 		}
 		if len(out) != len(ac.outReqs) {
-			t.Errorf("different amount of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
+			t.Errorf("different number of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
 		} else {
 			for r, exp := range ac.outReqs {
 				if !compareReqEqual(exp, out[r]) {

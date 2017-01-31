@@ -37,7 +37,7 @@ var (
 	// metric idx.memory.prune is the duration of successful memory idx prunes
 	statPruneDuration = stats.NewLatencyHistogram15s32("idx.memory.prune")
 
-	// metric idx.metrics_active is the amount of currently known metrics in the index
+	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
 	Enabled bool

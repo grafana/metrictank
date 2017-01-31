@@ -19,7 +19,7 @@ Note: Cassandra and Kafka require Java, which will be automatically installed by
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
 [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)).  
-Metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
+Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.

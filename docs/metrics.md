@@ -133,11 +133,11 @@ the duration of (successful) update of a metric to the memory idx
 * `idx.memory.update.ok`:  
 the number of successful updates to the memory idx
 * `idx.metrics_active`:  
-the amount of currently known metrics in the index
+the number of currently known metrics in the index
 * `mem.to_iter`:  
 how long it takes to transform in-memory chunks to iterators
 * `memory.bytes.obtained_from_sys`:  
-the amount of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
+the number of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
 * `memory.bytes_allocated_on_heap`:  
 a gauge of currently allocated (within the runtime) memory.
 * `memory.gc.cpu_fraction`:  
@@ -147,7 +147,7 @@ how many objects are allocated on the heap, it's a key indicator for GC workload
 * `memory.gc.last_duration`:  
 the duration of the last GC STW pause in nanoseconds
 * `memory.total_bytes_allocated`:  
-a counter of total amount of bytes allocated during process lifetime
+a counter of total number of bytes allocated during process lifetime
 * `memory.total_gc_cycles`:  
 a counter of the number of GC cycles since process start
 * `metric_invalid`:  
@@ -202,9 +202,9 @@ a counter of how many chunks are cleared (replaced by new chunks)
 * `tank.chunk_operations.create`:  
 a counter of how many chunks are created
 * `tank.gc_metric`:  
-the amount of times the metrics GC is about to inspect a metric (series)
+the number of times the metrics GC is about to inspect a metric (series)
 * `tank.metrics_active`:  
-the amount of currently known metrics (excl rollup series), measured every second
+the number of currently known metrics (excl rollup series), measured every second
 * `tank.metrics_too_old`:  
 points that go back in time.
 E.g. for any given series, when a point has a timestamp
