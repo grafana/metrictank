@@ -21,7 +21,7 @@ type Handler interface {
 // TODO: clever way to document all metrics for all different inputs
 
 // Default is a base handler for a metrics packet, aimed to be embedded by concrete implementations
-type Default struct {
+type DefaultHandler struct {
 	metricsReceived *stats.Counter32
 	MetricInvalid   *stats.Counter32 // metric metric_invalid is a count of times a metric did not validate
 	MsgsAge         *stats.Meter32   // in ms
@@ -33,8 +33,8 @@ type Default struct {
 	usage       *usage.Usage
 }
 
-func NewDefault(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) Default {
-	return Default{
+func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) DefaultHandler {
+	return DefaultHandler{
 		metricsReceived: stats.NewCounter32(fmt.Sprintf("input.%s.metrics_received", input)),
 		MetricInvalid:   stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
 		MsgsAge:         stats.NewMeter32(fmt.Sprintf("input.%s.message_age", input), false),
@@ -50,7 +50,7 @@ func NewDefault(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage
 // process makes sure the data is stored and the metadata is in the index,
 // and the usage is tracked, if enabled.
 // concurrency-safe.
-func (in Default) Process(metric *schema.MetricData, partition int32) {
+func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	if metric == nil {
 		return
 	}

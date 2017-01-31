@@ -43,7 +43,7 @@ func Test_HandleMessage(t *testing.T) {
 	c := New()
 	// note: we could better create a mock handler that tracks Process calls
 	// rather then having to rely on the real one and index.
-	c.Start(input.NewDefault(aggmetrics, metricIndex, usage, "carbon"))
+	c.Start(input.NewDefaultHandler(aggmetrics, metricIndex, usage, "carbon"))
 
 	allMetrics := make(map[string]int)
 	var mu sync.Mutex

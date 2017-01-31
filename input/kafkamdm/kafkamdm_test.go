@@ -24,7 +24,7 @@ func Test_HandleMessage(t *testing.T) {
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
 	k := KafkaMdm{}
-	k.Start(input.NewDefault(aggmetrics, metricIndex, usage, "test"))
+	k.Start(input.NewDefaultHandler(aggmetrics, metricIndex, usage, "test"))
 
 	allMetrics := make(map[string]int)
 	for i := 0; i < 5; i++ {
