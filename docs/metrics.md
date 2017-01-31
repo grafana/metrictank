@@ -76,14 +76,14 @@ the number of nodes we know to be primary and ready
 the number of nodes we know to be secondary and not ready
 * `cluster.total.state.secondary-ready`:  
 the number of nodes we know to be secondary and ready
-* `idx.cassadra.add.ok`:  
-how many metrics are successfully being indexed
+* `idx.cassadra.query-delete.ok`:  
+how many delete queries for a metric completed successfully (triggered by an update or a delete)
+* `idx.cassadra.query-insert.ok`:  
+how many insert queries for a metric completed successfully (triggered by an add or an update)
 * `idx.cassandra.add`:  
-the duration of addititons to the cassandra idx
-* `idx.cassandra.add.fail`:  
-how many failures were encountered while trying to index metrics
+the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
 * `idx.cassandra.delete`:  
-the duration of deletions from the cassandra idx
+the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
 * `idx.cassandra.error.cannot-achieve-consistency`:  
 a counter of the cassandra idx not being able to achieve consistency for a given query
 * `idx.cassandra.error.conn-closed`:  
@@ -98,20 +98,42 @@ a counter of timeouts seen to the cassandra idx
 a counter of how many times we saw to many timeouts and closed the connection to the cassandra idx
 * `idx.cassandra.error.unavailable`:  
 a counter of how many times the cassandra idx was unavailable
+* `idx.cassandra.prune`:  
+the duration of a prune of the cassandra idx, including the prune of the in-memory index and all needed delete queries
+* `idx.cassandra.query-delete.exec`:  
+time spent executing deletes (possibly repeatedly until success)
+* `idx.cassandra.query-delete.fail`:  
+how many delete queries for a metric failed (triggered by an update or a delete)
+* `idx.cassandra.query-insert.exec`:  
+time spent executing inserts (possibly repeatedly until success)
+* `idx.cassandra.query-insert.fail`:  
+how many insert queries for a metric failed (triggered by an add or an update)
+* `idx.cassandra.query-insert.wait`:  
+time inserts spent in queue before being executed
+* `idx.cassandra.update`:  
+the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
 * `idx.memory.add`:  
-the duration of (successfull) memory idx additions
+the duration of a (successful) add of a metric to the memory idx
 * `idx.memory.add.fail`:  
 the number of failed additions to the memory idx
 * `idx.memory.add.ok`:  
 the number of successful additions to the memory idx
 * `idx.memory.delete`:  
-the duration of memory idx deletes
+the duration of a delete of one or more metrics from the memory idx
 * `idx.memory.find`:  
 the duration of memory idx find
 * `idx.memory.get`:  
-the duration of memory idx gets
+the duration of a get of one metric in the memory idx
 * `idx.memory.list`:  
 the duration of memory idx listings
+* `idx.memory.prune`:  
+the duration of successful memory idx prunes
+* `idx.memory.update`:  
+the duration of (successful) update of a metric to the memory idx
+* `idx.memory.update.ok`:  
+the number of successful updates to the memory idx
+* `idx.metrics_active`:  
+the amount of currently known metrics in the index
 * `mem.to_iter`:  
 how long it takes to transform in-memory chunks to iterators
 * `memory.bytes.obtained_from_sys`:  
@@ -135,7 +157,7 @@ a count of times an input message (MetricData, MetricDataArray or carbon line) f
 * `store.cassandra.chunk_operations.save_fail`:  
 counter of failed saves
 * `store.cassandra.chunk_operations.save_ok`:  
-counter of successfull saves
+counter of successful saves
 * `store.cassandra.chunk_size.at_load`:  
 the sizes of chunks seen when loading them
 * `store.cassandra.chunk_size.at_save`:  
