@@ -12,6 +12,7 @@ import (
 	"github.com/lomik/go-carbon/persister"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx/memory"
+	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/usage"
@@ -40,7 +41,9 @@ func Test_HandleMessage(t *testing.T) {
 
 	schemas = persister.WhisperSchemas{s}
 	c := New()
-	c.Start(aggmetrics, metricIndex, usage)
+	// note: we could better create a mock handler that tracks Process calls
+	// rather then having to rely on the real one and index.
+	c.Start(input.NewDefaultHandler(aggmetrics, metricIndex, usage, "carbon"))
 
 	allMetrics := make(map[string]int)
 	var mu sync.Mutex

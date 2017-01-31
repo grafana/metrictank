@@ -415,7 +415,7 @@ func main() {
 		Start our inputs
 	***********************************/
 	for _, plugin := range inputs {
-		plugin.Start(metrics, metricIndex, usg)
+		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, usg, plugin.Name()))
 	}
 
 	// metric cluster.self.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary

@@ -13,17 +13,20 @@ import (
 	"github.com/rakyll/globalconf"
 
 	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/input"
 	"github.com/raintank/metrictank/kafka"
-	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
 
+// metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
+var metricsPerMessage = stats.NewMeter32("input.kafka-mdm.metrics_per_message", false)
+
+// metric input.kafka-mdm.metrics_decode_err is a count of times an input message failed to parse
+var metricsDecodeErr = stats.NewCounter32("input.kafka-mdm.metrics_decode_err")
+
 type KafkaMdm struct {
-	input.Input
+	input.Handler
 	consumer sarama.Consumer
 	client   sarama.Client
 
@@ -34,7 +37,7 @@ type KafkaMdm struct {
 }
 
 func (k *KafkaMdm) Name() string {
-	return "kafkaMdm"
+	return "kafka-mdm"
 }
 
 var LogLevel int
@@ -46,7 +49,7 @@ var topics []string
 var partitionStr string
 var partitions []int32
 var offsetStr string
-var dataDir string
+var DataDir string
 var config *sarama.Config
 var channelBufferSize int
 var consumerFetchMin int
@@ -69,7 +72,7 @@ func ConfigSetup() {
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's")
 	inKafkaMdm.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
-	inKafkaMdm.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
+	inKafkaMdm.StringVar(&DataDir, "data-dir", "", "Directory to store partition offsets index")
 	inKafkaMdm.IntVar(&channelBufferSize, "channel-buffer-size", 1000000, "The number of metrics to buffer in internal and external channels")
 	inKafkaMdm.IntVar(&consumerFetchMin, "consumer-fetch-min", 1, "The minimum number of message bytes to fetch in a request")
 	inKafkaMdm.IntVar(&consumerFetchDefault, "consumer-fetch-default", 32768, "The default number of message bytes to fetch in a request")
@@ -105,7 +108,7 @@ func ConfigProcess(instance string) {
 		}
 	}
 
-	offsetMgr, err = kafka.NewOffsetMgr(dataDir)
+	offsetMgr, err = kafka.NewOffsetMgr(DataDir)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm couldnt create offsetMgr. %s", err)
 	}
@@ -155,7 +158,10 @@ func ConfigProcess(instance string) {
 		}
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
-	cluster.Manager.SetPartitions(partitions)
+	// but only if the manager has been created (e.g. in metrictank), not when this input plugin is used in other contexts
+	if cluster.Manager != nil {
+		cluster.Manager.SetPartitions(partitions)
+	}
 
 	// initialize our offset metrics
 	partitionOffset = make(map[int32]*stats.Gauge64)
@@ -187,8 +193,8 @@ func New() *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(metrics mdata.Metrics, metricIndex idx.MetricIndex, usg *usage.Usage) {
-	k.Input = input.New(metrics, metricIndex, usg, "kafka-mdm")
+func (k *KafkaMdm) Start(handler input.Handler) {
+	k.Handler = handler
 	var err error
 	for _, topic := range topics {
 		for _, partition := range partitions {
@@ -284,12 +290,12 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
-		k.Input.MetricsDecodeErr.Inc()
+		metricsDecodeErr.Inc()
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
-	k.Input.MetricsPerMessage.ValueUint32(1)
-	k.Input.Process(&md, partition)
+	metricsPerMessage.ValueUint32(1)
+	k.Handler.Process(&md, partition)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

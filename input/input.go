@@ -14,32 +14,32 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+type Handler interface {
+	Process(metric *schema.MetricData, partition int32)
+}
+
 // TODO: clever way to document all metrics for all different inputs
 
-// In is a base handler for a metrics packet, aimed to be embedded by concrete implementations
-type Input struct {
-	MetricsPerMessage *stats.Meter32
-	metricsReceived   *stats.Counter32
-	MetricsDecodeErr  *stats.Counter32 // metric metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
-	MetricInvalid     *stats.Counter32 // metric metric_invalid is a count of times a metric did not validate
-	MsgsAge           *stats.Meter32   // in ms
-	pressureIdx       *stats.Counter32
-	pressureTank      *stats.Counter32
+// Default is a base handler for a metrics packet, aimed to be embedded by concrete implementations
+type DefaultHandler struct {
+	metricsReceived *stats.Counter32
+	MetricInvalid   *stats.Counter32 // metric metric_invalid is a count of times a metric did not validate
+	MsgsAge         *stats.Meter32   // in ms
+	pressureIdx     *stats.Counter32
+	pressureTank    *stats.Counter32
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
 	usage       *usage.Usage
 }
 
-func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) Input {
-	return Input{
-		MetricsPerMessage: stats.NewMeter32(fmt.Sprintf("input.%s.metrics_per_message", input), false),
-		metricsReceived:   stats.NewCounter32(fmt.Sprintf("input.%s.metrics_received", input)),
-		MetricsDecodeErr:  stats.NewCounter32(fmt.Sprintf("input.%s.metrics_decode_err", input)),
-		MetricInvalid:     stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
-		MsgsAge:           stats.NewMeter32(fmt.Sprintf("input.%s.message_age", input), false),
-		pressureIdx:       stats.NewCounter32(fmt.Sprintf("input.%s.pressure.idx", input)),
-		pressureTank:      stats.NewCounter32(fmt.Sprintf("input.%s.pressure.tank", input)),
+func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) DefaultHandler {
+	return DefaultHandler{
+		metricsReceived: stats.NewCounter32(fmt.Sprintf("input.%s.metrics_received", input)),
+		MetricInvalid:   stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
+		MsgsAge:         stats.NewMeter32(fmt.Sprintf("input.%s.message_age", input), false),
+		pressureIdx:     stats.NewCounter32(fmt.Sprintf("input.%s.pressure.idx", input)),
+		pressureTank:    stats.NewCounter32(fmt.Sprintf("input.%s.pressure.tank", input)),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,
@@ -50,7 +50,7 @@ func New(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage,
 // process makes sure the data is stored and the metadata is in the index,
 // and the usage is tracked, if enabled.
 // concurrency-safe.
-func (in Input) Process(metric *schema.MetricData, partition int32) {
+func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	if metric == nil {
 		return
 	}
