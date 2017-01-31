@@ -28,7 +28,7 @@ This is the recommended option because it persists.
 * persistence:  persists new metricDefinitions as they are seen.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
 * efficiency: On low end hardware the index rebuilds at about 70000 metricDefinitions per second. Saving new metrics works pretty fast.
 
-Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suite your deployment.
+Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suit your deployment.
 Refer to the [cassandra guide](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md) for more details.
 
 #### Configuration
