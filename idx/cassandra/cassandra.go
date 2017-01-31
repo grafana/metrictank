@@ -240,16 +240,15 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				return err
 			}
 			return nil
-		} else {
-			// the partition of the metric has changed. So we need to delete
-			// the current metricDef from cassandra.  We do this is a separate
-			// goroutine as we dont want to block waiting for the delete to succeed.
-			go func() {
-				if err := c.deleteDef(&existing); err != nil {
-					log.Error(3, err.Error())
-				}
-			}()
 		}
+		// the partition of the metric has changed. So we need to delete
+		// the current metricDef from cassandra.  We do this is a separate
+		// goroutine as we dont want to block waiting for the delete to succeed.
+		go func() {
+			if err := c.deleteDef(&existing); err != nil {
+				log.Error(3, err.Error())
+			}
+		}()
 		def := schema.MetricDefinitionFromMetricData(data)
 		def.Partition = partition
 		err := c.MemoryIdx.AddOrUpdateDef(def)
