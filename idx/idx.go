@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	DefNotFound       = errors.New("MetricDef not found")
 	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
 	BranchUnderLeaf   = errors.New("can't add branch under leaf")
 )
@@ -48,13 +47,13 @@ Interface
 * Stop():
  This will be called when metrictank is shutting down.
 
-* Add(*schema.MetricData, int32) error:
+* AddOrUpdate(*schema.MetricData, int32) error:
   Every metric received will result in a call to this method to ensure the
   metric has been added to the index. The method is passed the metricData
   payload and the partition id of the metric
 
-* Get(string) (schema.MetricDefinition, error):
-  This method should return the  MetricDefintion with the passed Id.
+* Get(string) (schema.MetricDefinition, bool):
+  This method should return the MetricDefintion with the passed Id.
 
 * List(int) []schema.MetricDefinition:
   This method should return all MetricDefinitions for the passed OrgId.  If the
@@ -86,8 +85,8 @@ Interface
 type MetricIndex interface {
 	Init() error
 	Stop()
-	Add(*schema.MetricData, int32) error
-	Get(string) (schema.MetricDefinition, error)
+	AddOrUpdate(*schema.MetricData, int32) error
+	Get(string) (schema.MetricDefinition, bool)
 	Delete(int, string) ([]schema.MetricDefinition, error)
 	Find(int, string, int64) ([]Node, error)
 	List(int) []schema.MetricDefinition

@@ -32,9 +32,9 @@ var (
 	// this is subject to backpressure from the store when the store's queue runs full
 	persistDuration = stats.NewLatencyHistogram15s32("tank.persist")
 
-	// metric tank.metrics_active is the amount of currently known metrics (excl rollup series), measured every second
+	// metric tank.metrics_active is the number of currently known metrics (excl rollup series), measured every second
 	metricsActive = stats.NewGauge32("tank.metrics_active")
 
-	// metric tank.gc_metric is the amount of times the metrics GC is about to inspect a metric (series)
+	// metric tank.gc_metric is the number of times the metrics GC is about to inspect a metric (series)
 	gcMetric = stats.NewCounter32("tank.gc_metric")
 )

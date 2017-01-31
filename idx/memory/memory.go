@@ -16,20 +16,29 @@ import (
 )
 
 var (
+	// metric idx.memory.update.ok is the number of successful updates to the memory idx
+	statUpdateOk = stats.NewCounter32("idx.memory.update.ok")
 	// metric idx.memory.add.ok is the number of successful additions to the memory idx
-	idxOk = stats.NewCounter32("idx.memory.add.ok")
+	statAddOk = stats.NewCounter32("idx.memory.add.ok")
 	// metric idx.memory.add.fail is the number of failed additions to the memory idx
-	idxFail = stats.NewCounter32("idx.memory.add.fail")
-	// metric idx.memory.add is the duration of (successfull) memory idx additions
-	idxAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")
-	// metric idx.memory.get is the duration of memory idx gets
-	idxGetDuration = stats.NewLatencyHistogram15s32("idx.memory.get")
+	statAddFail = stats.NewCounter32("idx.memory.add.fail")
+	// metric idx.memory.add is the duration of a (successful) add of a metric to the memory idx
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")
+	// metric idx.memory.update is the duration of (successful) update of a metric to the memory idx
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.memory.update")
+	// metric idx.memory.get is the duration of a get of one metric in the memory idx
+	statGetDuration = stats.NewLatencyHistogram15s32("idx.memory.get")
 	// metric idx.memory.list is the duration of memory idx listings
-	idxListDuration = stats.NewLatencyHistogram15s32("idx.memory.list")
+	statListDuration = stats.NewLatencyHistogram15s32("idx.memory.list")
 	// metric idx.memory.find is the duration of memory idx find
-	idxFindDuration = stats.NewLatencyHistogram15s32("idx.memory.find")
-	// metric idx.memory.delete is the duration of memory idx deletes
-	idxDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
+	statFindDuration = stats.NewLatencyHistogram15s32("idx.memory.find")
+	// metric idx.memory.delete is the duration of a delete of one or more metrics from the memory idx
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
+	// metric idx.memory.prune is the duration of successful memory idx prunes
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.memory.prune")
+
+	// metric idx.metrics_active is the number of currently known metrics in the index
+	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
 	Enabled bool
 )
@@ -51,24 +60,23 @@ type Node struct {
 }
 
 func (n *Node) String() string {
-	t := "branch"
 	if n.Leaf {
-		t = "leaf"
+		return fmt.Sprintf("leaf - %s", n.Path)
 	}
-	return fmt.Sprintf("%s - %s", t, n.Path)
+	return fmt.Sprintf("branch - %s", n.Path)
 }
 
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	FailedDefs map[string]error
+	FailedAdds map[string]error // by metric id
 	DefById    map[string]*schema.MetricDefinition
 	Tree       map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		FailedDefs: make(map[string]error),
+		FailedAdds: make(map[string]error),
 		DefById:    make(map[string]*schema.MetricDefinition),
 		Tree:       make(map[int]*Tree),
 	}
@@ -82,63 +90,78 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) Add(data *schema.MetricData, partition int32) error {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	err, ok := m.FailedDefs[data.Id]
+	err, ok := m.FailedAdds[data.Id]
 	if ok {
 		// if it failed before, it would fail again.
 		// there's not much point in doing the work of trying over
 		// and over again, and flooding the logs with the same failure.
 		// so just trigger the stats metric as if we tried again
-		idxFail.Inc()
+		statAddFail.Inc()
 		return err
 	}
 	existing, ok := m.DefById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
-		idxOk.Inc()
-		idxAddDuration.Value(time.Since(pre))
+		statUpdateOk.Inc()
+		statUpdateDuration.Value(time.Since(pre))
 		return nil
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
 	err = m.add(def)
-	idxAddDuration.Value(time.Since(pre))
+	if err == nil {
+		statMetricsActive.Inc()
+	}
+	statAddDuration.Value(time.Since(pre))
 	return err
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (m *MemoryIdx) Load(defs []schema.MetricDefinition) {
+func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 	m.Lock()
 	var pre time.Time
+	var num int
+	var firstErr error
 	for i := range defs {
 		def := defs[i]
 		pre = time.Now()
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		m.add(&def)
-		idxAddDuration.Value(time.Since(pre))
+		err := m.add(&def)
+		if err == nil {
+			num++
+			statMetricsActive.Inc()
+		} else if firstErr == nil {
+			firstErr = err
+		}
+		statAddDuration.Value(time.Since(pre))
 	}
 	m.Unlock()
+	return num, firstErr
 }
 
-func (m *MemoryIdx) AddDef(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
 	if _, ok := m.DefById[def.Id]; ok {
 		log.Debug("memory-idx: metricDef with id %s already in index.", def.Id)
 		m.DefById[def.Id] = def
-		idxOk.Inc()
-		idxAddDuration.Value(time.Since(pre))
+		statUpdateOk.Inc()
+		statUpdateDuration.Value(time.Since(pre))
 		return nil
 	}
 	err := m.add(def)
-	idxAddDuration.Value(time.Since(pre))
+	if err == nil {
+		statMetricsActive.Inc()
+	}
+	statAddDuration.Value(time.Since(pre))
 	return err
 }
 
@@ -165,14 +188,14 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 			if !node.Leaf {
 				//bad data. A path cant be both a leaf and a branch.
 				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
-				m.FailedDefs[def.Id] = idx.BothBranchAndLeaf
-				idxFail.Inc()
+				m.FailedAdds[def.Id] = idx.BothBranchAndLeaf
+				statAddFail.Inc()
 				return idx.BothBranchAndLeaf
 			}
 			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
 			node.Children = append(node.Children, def.Id)
 			m.DefById[def.Id] = def
-			idxOk.Inc()
+			statAddOk.Inc()
 			return nil
 		}
 	}
@@ -192,8 +215,8 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 			if n, ok := tree.Items[branch]; ok {
 				if n.Leaf {
 					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
-					m.FailedDefs[def.Id] = idx.BranchUnderLeaf
-					idxFail.Inc()
+					m.FailedAdds[def.Id] = idx.BranchUnderLeaf
+					statAddFail.Inc()
 					return idx.BranchUnderLeaf
 				}
 				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
@@ -232,20 +255,20 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		Children: []string{def.Id},
 	}
 	m.DefById[def.Id] = def
-	idxOk.Inc()
+	statAddOk.Inc()
 	return nil
 }
 
-func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, error) {
+func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
 	def, ok := m.DefById[id]
-	idxGetDuration.Value(time.Since(pre))
+	statGetDuration.Value(time.Since(pre))
 	if ok {
-		return *def, nil
+		return *def, ok
 	}
-	return schema.MetricDefinition{}, idx.DefNotFound
+	return schema.MetricDefinition{}, ok
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
@@ -293,15 +316,16 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 		}
 	}
 	log.Debug("memory-idx: %d nodes has %d unique paths.", len(matchedNodes), len(results))
-	idxFindDuration.Value(time.Since(pre))
+	statFindDuration.Value(time.Since(pre))
 	return results, nil
 }
 
 func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
+	var results []*Node
 	tree, ok := m.Tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return []*Node{}, nil
+		return results, nil
 	}
 
 	nodes := strings.Split(pattern, ".")
@@ -318,7 +342,6 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			break
 		}
 	}
-	results := make([]*Node, 0)
 	var startNode *Node
 	if pos == -1 {
 		//we need to start at the root.
@@ -447,12 +470,13 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 			}
 		}
 	}
-	idxListDuration.Value(time.Since(pre))
+	statListDuration.Value(time.Since(pre))
 
 	return defs
 }
 
 func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+	var deletedDefs []schema.MetricDefinition
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -464,17 +488,17 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	// by deleting one or more nodes in the tree, any defs that previously failed may now
 	// be able to be added. An easy way to support this is just reset this map and give them
 	// all a chance again
-	m.FailedDefs = make(map[string]error)
+	m.FailedAdds = make(map[string]error)
 
-	deletedDefs := make([]schema.MetricDefinition, 0)
 	for _, f := range found {
 		deleted, err := m.delete(orgId, f)
 		if err != nil {
 			return nil, err
 		}
+		statMetricsActive.Dec()
 		deletedDefs = append(deletedDefs, deleted...)
 	}
-	idxDeleteDuration.Value(time.Since(pre))
+	statDeleteDuration.Value(time.Since(pre))
 	return deletedDefs, nil
 }
 
@@ -588,6 +612,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 					m.Unlock()
 					return pruned, err
 				}
+				statMetricsActive.Dec()
 				pruned = append(pruned, defs...)
 			}
 		}
@@ -596,6 +621,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 	}
+	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil
 }
 

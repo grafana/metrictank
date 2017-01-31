@@ -72,9 +72,8 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
-	def, err := s.MetricIndex.Get(req.Id)
-	if err != nil {
-	} else { // currently this can only be notFound
+	def, ok := s.MetricIndex.Get(req.Id)
+	if !ok {
 		response.Write(ctx, response.NewError(http.StatusNotFound, "Not Found"))
 		return
 	}

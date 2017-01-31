@@ -27,7 +27,7 @@ Just make sure to have a properly configured statsd setup (or adjust the dashboa
 
 If you expect consistent or predictable load, you may also want to monitor:
 
-* `stats.*.metric_tank.*.chunks.save_ok`: amount of saved chunks (based on your chunkspan settings)
+* `stats.*.metric_tank.*.chunks.save_ok`: number of saved chunks (based on your chunkspan settings)
 * `stats.*.timers.metrictank.*.request_handle_duration.count_ps` : rate per second of render requests
 * `stats.*.timers.metric_tank.*.requests_span.*.count_ps` : rate per second of series lookups
 
@@ -92,10 +92,10 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 
 1) [Indexing of metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
    New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed into:
-   * an internal index (which seems to always be snappy and not exert any backpressure)
-   * Cassandra or Elasticsearch, which tends to not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
-   ES backpressure is visualized in the 'metrics in' graph of the metrictank dashboard.
-   For more details, look at the 'ES index writes' chart in the dashboard, specifically latency timings and adding to bulkindexer activity, those create the backpressure.
+   * an in-memory index (which seems to always be snappy and not exert any backpressure)
+   * Cassandra - if enabled - which may not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
+   See the `pressure.idx` metric in the 'metrics in' graph of the metrictank dashboard.
+   For more details, look at the various index stats further down the dashboard.
 
 2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and

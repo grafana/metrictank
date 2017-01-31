@@ -12,21 +12,19 @@ We'll go over these in more detail below.
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite-api.
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
   [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
-* (you can optionally use Elasticsearch for persistence of metrics metadata.  We recommend Cassandra instead, much better and easier. So that's what we'll use here)
-  See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 
-Note: Cassandra, Elasticsearch, and Kafka require Java. We recommend using Oracle Java 8.
+Note: Cassandra and Kafka require Java. We recommend using Oracle Java 8.
 
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
 [Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)).  
-Metrictank will compress the data into chunks in RAM, a configurable amount of the most recent data
+Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank maintains an index of metrics metadata, for all series it Sees.  
-You can use an index entirely in memory, or backed by Cassandra or Elasticsearch for persistence.
+Metrictank maintains an index of metrics metadata, for all series it sees.  
+You can use an index entirely in memory, or backed by Cassandra for persistence.
 You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
 to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
 
@@ -120,36 +118,6 @@ systemctl start cassandra
 The log - should you need it - is at /var/log/cassandra/cassandra.log
 
 [more info](http://docs.datastax.com/en/cassandra/3.x/cassandra/install/installRHEL.html)
-
-
-## Set up elasticsearch
-
-* Install the GPG key with `rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch`
-
-* Add the elastic repository:
-
-```
-cat << EOF > /etc/yum.repos.d/elasticsearch.repo
-[elasticsearch-2.x]
-name=Elasticsearch repository for 2.x packages
-baseurl=https://packages.elastic.co/elasticsearch/2.x/centos
-gpgcheck=1
-gpgkey=https://packages.elastic.co/GPG-KEY-elasticsearch
-enabled=1
-EOF
-```
-
-* Install elasticsearch with `yum install elasticsearch`
-
-* You can start it with default settings.
-
-```
-systemctl start elasticsearch.service
-```
-
-The log - should you need it - is at /var/log/elasticsearch/elasticsearch.log
-
-[more info](https://www.elastic.co/guide/en/elasticsearch/reference/2.3/setup-repositories.html)
 
 
 ## Set up statsd
@@ -281,7 +249,7 @@ If you want to use Kafka, you should enable the Kafka-mdm input plugin.
 See the `kafka-mdm-in` section, set `enabled` to true.
 See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
 
-Finally, by default `memory-idx` `enabled` is true, while `elasticsearch-idx` and `cassandra-idx` have `enabled` as false.
+Finally, by default `memory-idx` `enabled` is true, while `cassandra-idx` has `enabled` as false.
 This will use the non-persistent index, starting with a fresh index at every start of metrictank.
 You probably want to disable the memory index an enable `cassandra-idx` instead. (just switch the enabled values around).
 See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) for more details.
