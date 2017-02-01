@@ -15,10 +15,9 @@ type AggMetrics struct {
 	Metrics        map[string]*AggMetric
 	chunkSpan      uint32
 	numChunks      uint32
-	aggSettings    []AggSetting // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
+	aggSettings    AggSettings // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
-	ttl            uint32
 	gcInterval     time.Duration
 }
 
@@ -29,10 +28,9 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChu
 		Metrics:        make(map[string]*AggMetric),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
-		aggSettings:    aggSettings,
+		aggSettings:    AggSettings{ttl, aggSettings},
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
-		ttl:            ttl,
 		gcInterval:     gcInterval,
 	}
 
@@ -91,7 +89,7 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.ttl, ms.aggSettings...)
+		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.aggSettings.RawTTL, ms.aggSettings.Aggs...)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}
@@ -99,6 +97,6 @@ func (ms *AggMetrics) GetOrCreate(key string) Metric {
 	return m
 }
 
-func (ms *AggMetrics) AggSettings() []AggSetting {
+func (ms *AggMetrics) AggSettings() AggSettings {
 	return ms.aggSettings
 }

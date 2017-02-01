@@ -466,7 +466,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	// the request cannot completely be served from cache, it will require cassandra involvement
 	if !cacheRes.Complete {
 		if cacheRes.From != cacheRes.Until {
-			storeIterGens, err := s.BackendStore.Search(key, cacheRes.From, cacheRes.Until)
+			storeIterGens, err := s.BackendStore.Search(key, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
 				panic(err)
 			}

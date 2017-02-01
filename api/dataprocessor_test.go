@@ -585,7 +585,7 @@ func TestGetSeriesFixed(t *testing.T) {
 
 type alignCase struct {
 	reqs        []models.Req
-	aggSettings []mdata.AggSetting
+	aggSettings mdata.AggSettings
 	outReqs     []models.Req
 	outErr      error
 }
@@ -611,7 +611,10 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
 				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{},
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{},
+			},
 			[]models.Req{
 				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 10, 60, 6),
 				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
@@ -627,9 +630,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600, 800, 10, consolidation.Avg),
 			},
 			// span, chunkspan, numchunks, ttl, ready
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(60, 600, 2, 0, true),
-				mdata.NewAggSetting(120, 600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(60, 600, 2, 0, true),
+					mdata.NewAggSetting(120, 600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -646,9 +652,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("c", 0, 3600, 800, 10, consolidation.Avg),
 			},
 			// span, chunkspan, numchunks, ttl, ready
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(60, 600, 2, 0, false),
-				mdata.NewAggSetting(120, 600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(60, 600, 2, 0, false),
+					mdata.NewAggSetting(120, 600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600, 800, 10, consolidation.Avg, 0, 10, 10, 1),
@@ -668,9 +677,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 10, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(60, 600, 2, 0, true),
-				mdata.NewAggSetting(120, 600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(60, 600, 2, 0, true),
+					mdata.NewAggSetting(120, 600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 30, 3),
@@ -689,9 +701,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(120, 600, 2, 0, true),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(120, 600, 2, 0, true),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 39, 10, consolidation.Avg, 1, 120, 120, 1),
@@ -709,9 +724,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 2400, 39, 10, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(120, 600, 2, 0, false),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(120, 600, 2, 0, false),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
 			[]models.Req{
@@ -731,9 +749,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 24000, 39, 10, consolidation.Avg),
 				reqRaw("c", 0, 24000, 39, 10, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(120, 600, 2, 0, false),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(120, 600, 2, 0, false),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			// rawInterval, archive, archInterval, outInterval, aggNum
 			[]models.Req{
@@ -752,9 +773,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 30, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(120, 600, 2, 0, true),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(120, 600, 2, 0, true),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -774,9 +798,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(120, 600, 2, 0, true),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(120, 600, 2, 0, true),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 120, 120, 1),
@@ -794,9 +821,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(300, 600, 2, 0, true),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(300, 600, 2, 0, true),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 1, 300, 300, 1),
@@ -816,9 +846,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(300, 600, 2, 0, false),
-				mdata.NewAggSetting(600, 600, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(300, 600, 2, 0, false),
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
@@ -835,9 +868,12 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 2400, 100, 50, consolidation.Avg),
 				reqRaw("c", 0, 2400, 100, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 600, 2, 0, true),
-				mdata.NewAggSetting(1200, 1200, 2, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 600, 2, 0, true),
+					mdata.NewAggSetting(1200, 1200, 2, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 2400, 100, 10, consolidation.Avg, 0, 10, 300, 30),
@@ -857,10 +893,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*3, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*3, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*3, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -877,10 +916,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*6, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*6, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*6, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -897,10 +939,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*9, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*9, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*9, 1000, 10, consolidation.Avg, 0, 10, 60, 6),
@@ -918,10 +963,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24, 1000, 10, consolidation.Avg, 1, 600, 600, 1),
@@ -940,10 +988,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*7, 1000, 10, consolidation.Avg, 1, 600, 1200, 2),
@@ -964,10 +1015,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, true),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, true),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 3, 21600, 43200, 2),
@@ -984,10 +1038,13 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{
-				mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
-				mdata.NewAggSetting(7200, 21600, 1, 0, true),
-				mdata.NewAggSetting(21600, 21600, 1, 0, false),
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{
+					mdata.NewAggSetting(600, 21600, 1, 0, true), // aggregations stored in 6h chunks
+					mdata.NewAggSetting(7200, 21600, 1, 0, true),
+					mdata.NewAggSetting(21600, 21600, 1, 0, false),
+				},
 			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 2, 7200, 36000, 5),
@@ -1005,7 +1062,10 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 60, consolidation.Avg),
 			},
-			[]mdata.AggSetting{},
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{},
+			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 10, consolidation.Avg, 0, 10, 31560, 526*6),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
@@ -1022,7 +1082,10 @@ func TestAlignRequests(t *testing.T) {
 				reqRaw("b", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 				reqRaw("c", 0, 3600*24*365, 1000, 30, consolidation.Avg),
 			},
-			[]mdata.AggSetting{},
+			mdata.AggSettings{
+				35 * 24 * 60 * 60,
+				[]mdata.AggSetting{},
+			},
 			[]models.Req{
 				reqOut("a", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
 				reqOut("b", 0, 3600*24*365, 1000, 30, consolidation.Avg, 0, 30, 31560, 526*2),
@@ -1655,10 +1718,13 @@ func BenchmarkAlignRequests(b *testing.B) {
 		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg),
 		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
 	}
-	aggSettings := []mdata.AggSetting{
-		mdata.NewAggSetting(600, 21600, 1, 0, true),
-		mdata.NewAggSetting(7200, 21600, 1, 0, true),
-		mdata.NewAggSetting(21600, 21600, 1, 0, true),
+	aggSettings := mdata.AggSettings{
+		35 * 24 * 60 * 60,
+		[]mdata.AggSetting{
+			mdata.NewAggSetting(600, 21600, 1, 0, true),
+			mdata.NewAggSetting(7200, 21600, 1, 0, true),
+			mdata.NewAggSetting(21600, 21600, 1, 0, true),
+		},
 	}
 
 	for n := 0; n < b.N; n++ {

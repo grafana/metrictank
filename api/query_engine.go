@@ -15,6 +15,7 @@ type archive struct {
 	interval   uint32
 	pointCount uint32
 	chosen     bool
+	ttl        uint32
 }
 
 func (b archive) String() string {
@@ -31,11 +32,11 @@ func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 // this function ignores the TTL values. it is assumed that you've set sensible TTL's
-func alignRequests(reqs []models.Req, aggSettings []mdata.AggSetting) ([]models.Req, error) {
+func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
 
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
-	aggs := mdata.AggSettingsSpanAsc(aggSettings)
+	aggs := mdata.AggSettingsSpanAsc(aggSettings.Aggs)
 	sort.Sort(aggs)
 
 	options := make([]archive, 1, len(aggs)+1)
@@ -51,14 +52,14 @@ func alignRequests(reqs []models.Req, aggSettings []mdata.AggSetting) ([]models.
 	tsRange := (reqs[0].To - reqs[0].From)
 
 	// note: not all series necessarily have the same raw settings, will be fixed further down
-	options[0] = archive{minInterval, tsRange / minInterval, false}
+	options[0] = archive{minInterval, tsRange / minInterval, false, aggSettings.RawTTL}
 	// now model the archives we get from the aggregations
 	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
 	aggRef := []int{0}
 	for j, agg := range aggs {
 		if agg.Ready {
-			options = append(options, archive{agg.Span, tsRange / agg.Span, false})
+			options = append(options, archive{agg.Span, tsRange / agg.Span, false, agg.TTL})
 			aggRef = append(aggRef, j+1)
 		}
 	}
@@ -150,6 +151,7 @@ func alignRequests(reqs []models.Req, aggSettings []mdata.AggSetting) ([]models.
 		req := &reqs[i]
 		req.Archive = aggRef[selected]
 		req.ArchInterval = options[selected].interval
+		req.TTL = options[selected].ttl
 		req.OutInterval = chosenInterval
 		req.AggNum = 1
 		if runTimeConsolidate {

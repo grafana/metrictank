@@ -6,7 +6,7 @@ import "github.com/raintank/metrictank/mdata/chunk"
 type Metrics interface {
 	Get(key string) (Metric, bool)
 	GetOrCreate(key string) Metric
-	AggSettings() []AggSetting
+	AggSettings() AggSettings
 }
 
 type Metric interface {
