@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"strconv"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -216,12 +215,7 @@ func main() {
 	switch selector {
 	case "id":
 		id = flag.Arg(2)
-		tmp, err := strconv.Atoi(flag.Arg(3))
-		if err != nil || tmp <= 0 {
-			flag.Usage()
-			os.Exit(-1)
-		}
-		ttl = uint32(tmp)
+		ttl = dur.MustParseUNsec("ttl", flag.Arg(3))
 	case "query":
 		//		if flag.NArg() < 4 {
 		//			flag.Usage()

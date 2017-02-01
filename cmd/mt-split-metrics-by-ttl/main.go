@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 
+	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/mdata"
 )
 
@@ -53,11 +53,7 @@ func main() {
 	}
 
 	for i := 0; i < flag.NArg(); i++ {
-		ttl, err := strconv.Atoi(flag.Arg(i))
-		if err != nil {
-			flag.Usage()
-		}
-		ttls = append(ttls, uint32(ttl))
+		ttls = append(ttls, uint32(dur.MustParseUNsec("ttl", flag.Arg(i))))
 	}
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), *cassandraKeyspace)
