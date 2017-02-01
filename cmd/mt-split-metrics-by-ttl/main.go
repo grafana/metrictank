@@ -37,7 +37,7 @@ var (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "mt-split-metrics-by-ttl [flags] ttl-in-seconds [ttl-in-seconds...]")
+		fmt.Fprintln(os.Stderr, "mt-split-metrics-by-ttl [flags] ttl [ttl...]")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Creates schema of metric tables split by TTLs and")
 		fmt.Fprintln(os.Stderr, "assists in migrating the data to new tables.")

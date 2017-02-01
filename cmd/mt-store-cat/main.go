@@ -187,7 +187,7 @@ func main() {
 		fmt.Println("Retrieves timeseries data from the cassandra store. Either raw or with minimal processing")
 		fmt.Println()
 		fmt.Println("Usage:")
-		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl-in-seconds>\n")
+		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
