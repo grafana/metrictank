@@ -58,7 +58,7 @@ var (
 
 	// Data:
 	chunkSpanStr = flag.String("chunkspan", "10min", "duration of raw chunks")
-	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in in-memory ring buffer. note that the chunk-cache is a more effective method to cache data and alleviate workload for cassandra. but this allows secondary nodes to keep serving data in case the primary is not able to save data upto chunkspan*numchunks")
+	numChunksInt = flag.Int("numchunks", 7, "number of raw chunks to keep in in-memory ring buffer. See https://github.com/raintank/metrictank/blob/master/docs/memory-server.md for details and trade-offs, especially when compared to chunk-cache")
 	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
