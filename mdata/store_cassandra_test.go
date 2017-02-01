@@ -32,6 +32,12 @@ func TestGetTTLTables(t *testing.T) {
 		{oneDay, 20, "metric_%d", "metric_16", 1},
 		{oneMonth, 20, "metric_%d", "metric_512", 26},
 		{oneYear, 20, "metric_%d", "metric_8192", 410},
+
+		// cases around the edge
+		{1024*3600 - 1, 20, "metric_%d", "metric_512", 26},
+		{1024 * 3600, 20, "metric_%d", "metric_1024", 52},
+
+		// alternative window factor
 		{oneDay, 50, "metric_%d", "metric_16", 1},
 		{oneMonth, 50, "metric_%d", "metric_512", 11},
 		{oneYear, 50, "metric_%d", "metric_8192", 164},
