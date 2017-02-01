@@ -107,7 +107,7 @@ func (c *NotifierKafka) start() {
 	// wait for our backlog to be processed before returning.  This will block metrictank from consuming metrics until
 	// we have processed old metricPersist messages. The end result is that we wont overwrite chunks in cassandra that
 	// have already been previously written.
-	// We dont wait more then backlogProcessTimeout for the backlog to be processed.
+	// We don't wait more than backlogProcessTimeout for the backlog to be processed.
 	log.Info("kafka-cluster: waiting for metricPersist backlog to be processed.")
 	backlogProcessed := make(chan struct{}, 1)
 	go func() {
