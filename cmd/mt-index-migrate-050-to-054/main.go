@@ -26,7 +26,7 @@ var (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "mt-index-migrate-050-to054")
+		fmt.Fprintln(os.Stderr, "mt-index-migrate-050-to-054")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Converts a metrictank index to the new 0.5.4 (and beyond) format, using cassandra instead of elasticsearch")
 		fmt.Fprintln(os.Stderr, "differences:")
