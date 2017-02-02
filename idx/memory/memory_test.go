@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/metrictank/idx"
+	//"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -279,61 +279,7 @@ func TestDelete(t *testing.T) {
 	})
 }
 
-func TestBadAdd(t *testing.T) {
-	ix := New()
-	ix.Init()
-
-	first := &schema.MetricData{
-		Name:     "foo.bar",
-		Metric:   "foo.bar",
-		OrgId:    1,
-		Interval: 10,
-	}
-	bad1 := &schema.MetricData{
-		Name:     "foo.bar.baz",
-		Metric:   "foo.bar.baz",
-		OrgId:    1,
-		Interval: 10,
-	}
-	bad2 := &schema.MetricData{
-		Name:     "foo",
-		Metric:   "foo",
-		OrgId:    1,
-		Interval: 10,
-	}
-	first.SetId()
-	bad1.SetId()
-	bad2.SetId()
-
-	Convey("when adding the first metric", t, func() {
-
-		err := ix.AddOrUpdate(first, 1)
-		So(err, ShouldBeNil)
-		Convey("we should not be able to add a leaf under another leaf", func() {
-
-			err = ix.AddOrUpdate(bad1, 1)
-			So(err, ShouldEqual, idx.BranchUnderLeaf)
-			_, ok := ix.Get(bad1.Id)
-			So(ok, ShouldEqual, false)
-			defs := ix.List(1)
-			So(len(defs), ShouldEqual, 1)
-			So(defs[0].Id, ShouldEqual, first.Id)
-		})
-		Convey("we should not be able to add a leaf that collides with an existing branch", func() {
-
-			err = ix.AddOrUpdate(bad2, 1)
-			So(err, ShouldEqual, idx.BothBranchAndLeaf)
-			_, ok := ix.Get(bad2.Id)
-			So(ok, ShouldEqual, false)
-			defs := ix.List(1)
-			So(len(defs), ShouldEqual, 1)
-			So(defs[0].Id, ShouldEqual, first.Id)
-		})
-	})
-}
-
-// verify that if a leaf blocks a new branch, we can add the branch after deleting the leaf
-func TestDeleteLeafAddBranch(t *testing.T) {
+func TestMixedBranchLeaf(t *testing.T) {
 	ix := New()
 	ix.Init()
 
@@ -349,57 +295,37 @@ func TestDeleteLeafAddBranch(t *testing.T) {
 		OrgId:    1,
 		Interval: 10,
 	}
+	third := &schema.MetricData{
+		Name:     "foo",
+		Metric:   "foo",
+		OrgId:    1,
+		Interval: 10,
+	}
 	first.SetId()
 	second.SetId()
+	third.SetId()
 
 	Convey("when adding the first metric", t, func() {
 
 		err := ix.AddOrUpdate(first, 1)
 		So(err, ShouldBeNil)
-		Convey("we should not be able to add a leaf under another leaf", func() {
+		Convey("we should be able to add a leaf under another leaf", func() {
 
 			err = ix.AddOrUpdate(second, 1)
-			So(err, ShouldEqual, idx.BranchUnderLeaf)
-
+			So(err, ShouldBeNil)
 			_, ok := ix.Get(second.Id)
-			So(ok, ShouldEqual, false)
+			So(ok, ShouldEqual, true)
+			defs := ix.List(1)
+			So(len(defs), ShouldEqual, 2)
+		})
+		Convey("we should be able to add a leaf that collides with an existing branch", func() {
 
-			Convey("when deleting the first metric", func() {
-
-				defs, err := ix.Delete(1, "foo.bar")
-				So(err, ShouldBeNil)
-				So(defs, ShouldHaveLength, 1)
-				So(defs[0].Id, ShouldEqual, first.Id)
-
-				Convey("series should not be present in the metricDef index", func() {
-
-					_, ok := ix.Get(first.Id)
-					So(ok, ShouldEqual, false)
-
-					Convey("we should be able to add a new branch under it", func() {
-
-						ix.AddOrUpdate(second, 1)
-
-						// validate Get
-						s, ok := ix.Get(second.Id)
-						So(ok, ShouldEqual, true)
-						So(s.Name, ShouldEqual, "foo.bar.baz")
-
-						// validate Find
-						nodes, err := ix.Find(1, "foo.bar.*", 0)
-						So(err, ShouldBeNil)
-						So(nodes, ShouldHaveLength, 1)
-						So(nodes[0].Path, ShouldEqual, second.Name)
-
-						// validate List
-						defs := ix.List(1)
-						So(defs, ShouldHaveLength, 1)
-						if len(defs) == 1 {
-							So(defs[0].Name, ShouldEqual, "foo.bar.baz")
-						}
-					})
-				})
-			})
+			err = ix.AddOrUpdate(third, 1)
+			So(err, ShouldBeNil)
+			_, ok := ix.Get(third.Id)
+			So(ok, ShouldEqual, true)
+			defs := ix.List(1)
+			So(len(defs), ShouldEqual, 3)
 		})
 	})
 }

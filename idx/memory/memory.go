@@ -56,11 +56,19 @@ type Tree struct {
 type Node struct {
 	Path     string
 	Children []string
-	Leaf     bool
+	Defs     []string
+}
+
+func (n *Node) HasChildren() bool {
+	return len(n.Children) > 0
+}
+
+func (n *Node) Leaf() bool {
+	return len(n.Defs) > 0
 }
 
 func (n *Node) String() string {
-	if n.Leaf {
+	if n.Leaf() {
 		return fmt.Sprintf("leaf - %s", n.Path)
 	}
 	return fmt.Sprintf("branch - %s", n.Path)
@@ -128,12 +136,12 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 	var num int
 	var firstErr error
 	for i := range defs {
-		def := defs[i]
+		def := &defs[i]
 		pre = time.Now()
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		err := m.add(&def)
+		err := m.add(def)
 		if err == nil {
 			num++
 			statMetricsActive.Inc()
@@ -174,26 +182,19 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		root := &Node{
 			Path:     "",
 			Children: make([]string, 0),
-			Leaf:     false,
+			Defs:     make([]string, 0),
 		}
 		m.Tree[def.OrgId] = &Tree{
 			Items: map[string]*Node{"": root},
 		}
 		tree = m.Tree[def.OrgId]
 	} else {
-		// now see if there is alread a leaf node. This happens
-		// when there are multiple metricDefs for the same path due
+		// now see if there is an existing branch or leaf with the same path.
+		// An existing leaf is possible if there are multiple metricDefs for the same path due
 		// to different tags or interval
 		if node, ok := tree.Items[path]; ok {
-			if !node.Leaf {
-				//bad data. A path cant be both a leaf and a branch.
-				log.Info("memory-idx: Bad data, a path can not be both a leaf and a branch. %d - %s", def.OrgId, path)
-				m.FailedAdds[def.Id] = idx.BothBranchAndLeaf
-				statAddFail.Inc()
-				return idx.BothBranchAndLeaf
-			}
-			log.Debug("memory-idx: existing index entry for %s. Adding %s as child", path, def.Id)
-			node.Children = append(node.Children, def.Id)
+			log.Debug("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
+			node.Defs = append(node.Defs, def.Id)
 			m.DefById[def.Id] = def
 			statAddOk.Inc()
 			return nil
@@ -207,52 +208,46 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 	// - foo.bar.baz (if found, startPos is 3)
 	// - foo.bar (if found, startPos is 2)
 	// - foo (if found, startPos is 1)
-	startPos := 0 // the index of the first word that is not part of the prefix
+	nodePos := 0 // the index of the first word that is not part of the prefix
 	var startNode *Node
-	if len(nodes) > 1 {
-		for i := len(nodes) - 1; i > 0; i-- {
-			branch := strings.Join(nodes[0:i], ".")
-			if n, ok := tree.Items[branch]; ok {
-				if n.Leaf {
-					log.Info("memory-idx: Branches cant be added to a leaf node. %d - %s", def.OrgId, path)
-					m.FailedAdds[def.Id] = idx.BranchUnderLeaf
-					statAddFail.Inc()
-					return idx.BranchUnderLeaf
-				}
-				log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
-				startNode = n
-				startPos = i
-				break
-			}
+
+	for i := len(nodes) - 1; i > 0; i-- {
+		branch := strings.Join(nodes[0:i], ".")
+		if n, ok := tree.Items[branch]; ok {
+			log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
+			startNode = n
+			nodePos = i
+			break
 		}
 	}
-	if startPos == 0 && startNode == nil {
+
+	if nodePos == 0 && startNode == nil {
 		// need to add to the root node.
 		log.Debug("memory-idx: no existing branches found for %s.  Adding to the root node.", path)
 		startNode = tree.Items[""]
 	}
 
-	log.Debug("memory-idx: adding %s as child of %s", nodes[startPos], startNode.Path)
-	startNode.Children = append(startNode.Children, nodes[startPos])
-	startPos++
+	log.Debug("memory-idx: adding %s as child of %s", nodes[nodePos], startNode.Path)
+	startNode.Children = append(startNode.Children, nodes[nodePos])
+	nodePos++
 
 	// Add missing branch nodes
-	for i := startPos; i < len(nodes); i++ {
-		branch := strings.Join(nodes[0:i], ".")
-		log.Debug("memory-idx: creating branch %s with child %s", branch, nodes[i])
+	for ; nodePos < len(nodes); nodePos++ {
+		branch := strings.Join(nodes[0:nodePos], ".")
+		log.Debug("memory-idx: creating branch %s with child %s", branch, nodes[nodePos])
 		tree.Items[branch] = &Node{
 			Path:     branch,
-			Leaf:     false,
-			Children: []string{nodes[i]},
+			Children: []string{nodes[nodePos]},
+			Defs:     make([]string, 0),
 		}
 	}
 
 	// Add leaf node
 	log.Debug("memory-idx: creating leaf %s", path)
 	tree.Items[path] = &Node{
-		Leaf:     true,
 		Path:     path,
-		Children: []string{def.Id},
+		Children: []string{},
+		Defs:     []string{def.Id},
 	}
 	m.DefById[def.Id] = def
 	statAddOk.Inc()
@@ -292,12 +287,13 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 	for _, n := range matchedNodes {
 		if _, ok := seen[n.Path]; !ok {
 			idxNode := idx.Node{
-				Path: n.Path,
-				Leaf: n.Leaf,
+				Path:        n.Path,
+				Leaf:        n.Leaf(),
+				HasChildren: n.HasChildren(),
 			}
-			if n.Leaf {
-				idxNode.Defs = make([]schema.MetricDefinition, 0)
-				for _, id := range n.Children {
+			if idxNode.Leaf {
+				idxNode.Defs = make([]schema.MetricDefinition, 0, len(n.Defs))
+				for _, id := range n.Defs {
 					def := m.DefById[id]
 					if from != 0 && def.LastUpdate < from {
 						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, def.LastUpdate)
@@ -376,8 +372,8 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		}
 		grandChildren := make([]*Node, 0)
 		for _, c := range children {
-			if c.Leaf {
-				log.Debug("memory-idx: leaf node %s found but we havent reached the end of the pattern %s", c.Path, pattern)
+			if !c.HasChildren() {
+				log.Debug("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
 				// expecting a branch
 				continue
 			}
@@ -462,10 +458,10 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 			continue
 		}
 		for _, n := range tree.Items {
-			if !n.Leaf {
+			if !n.Leaf() {
 				continue
 			}
-			for _, id := range n.Children {
+			for _, id := range n.Defs {
 				defs = append(defs, *m.DefById[id])
 			}
 		}
@@ -491,10 +487,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	m.FailedAdds = make(map[string]error)
 
 	for _, f := range found {
-		deleted, err := m.delete(orgId, f)
-		if err != nil {
-			return nil, err
-		}
+		deleted := m.delete(orgId, f)
 		statMetricsActive.Dec()
 		deletedDefs = append(deletedDefs, deleted...)
 	}
@@ -502,33 +495,32 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error) {
-	if !n.Leaf {
+func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
+	tree := m.Tree[orgId]
+	if n.HasChildren() {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
-		children, err := m.find(orgId, n.Path+".*")
-		if err != nil {
-			return nil, err
-		}
 		deletedDefs := make([]schema.MetricDefinition, 0)
-		for _, child := range children {
-			log.Debug("memory-idx: deleting child %s from branch %s", child.Path, n.Path)
-			deleted, err := m.delete(orgId, child)
-			if err != nil {
-				return deletedDefs, err
+		for _, child := range n.Children {
+			node, ok := tree.Items[n.Path+"."+child]
+			if !ok {
+				log.Error(3, "memory-idx: node %s missing. Index is corrupt.", n.Path+"."+child)
+				continue
 			}
+			log.Debug("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
+			deleted := m.delete(orgId, node)
 			deletedDefs = append(deletedDefs, deleted...)
 		}
-		return deletedDefs, nil
+		return deletedDefs
 	}
-	deletedDefs := make([]schema.MetricDefinition, len(n.Children))
+	deletedDefs := make([]schema.MetricDefinition, len(n.Defs))
 	// delete the metricDefs
-	for i, id := range n.Children {
+	for i, id := range n.Defs {
 		log.Debug("memory-idx: deleting %s from index", id)
 		deletedDefs[i] = *m.DefById[id]
 		delete(m.DefById, id)
 	}
-	tree := m.Tree[orgId]
+
 	// delete the leaf.
 	delete(tree.Items, n.Path)
 
@@ -539,11 +531,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error
 		log.Debug("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {
-			log.Error(3, "memory-idx: Branch %s missing. Index is corrupt.", branch)
+			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", branch)
 			continue
 		}
 		if len(bNode.Children) > 1 {
-			newChildren := make([]string, 0)
+			newChildren := make([]string, 0, len(bNode.Children)-1)
 			for _, child := range bNode.Children {
 				if child != nodes[i] {
 					newChildren = append(newChildren, child)
@@ -562,11 +554,13 @@ func (m *MemoryIdx) delete(orgId int, n *Node) ([]schema.MetricDefinition, error
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
-		log.Debug("memory-idx: branch %s has no children, deleting it.", branch)
-		delete(tree.Items, branch)
+		if !bNode.Leaf() {
+			log.Debug("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
+			delete(tree.Items, branch)
+		}
 	}
 
-	return deletedDefs, nil
+	return deletedDefs
 }
 
 // delete series from the index if they have not been seen since "oldest"
@@ -595,23 +589,19 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 		}
 
 		for _, n := range tree.Items {
-			if !n.Leaf {
+			if !n.Leaf() {
 				continue
 			}
 			staleCount := 0
-			for _, id := range n.Children {
+			for _, id := range n.Defs {
 				if m.DefById[id].LastUpdate < oldestUnix {
 					staleCount++
 				}
 			}
-			if staleCount == len(n.Children) {
+			if staleCount == len(n.Defs) {
 				log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 				//we need to delete this node.
-				defs, err := m.delete(org, n)
-				if err != nil {
-					m.Unlock()
-					return pruned, err
-				}
+				defs := m.delete(org, n)
 				statMetricsActive.Dec()
 				pruned = append(pruned, defs...)
 			}
