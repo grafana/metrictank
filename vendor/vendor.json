@@ -363,6 +363,12 @@
 			"revisionTime": "2016-01-19T22:16:36Z"
 		},
 		{
+			"checksumSHA1": "KoefD9A3V8xGM+RpcQRyt5kK0XY=",
+			"path": "github.com/streamrail/concurrent-map",
+			"revision": "8bf1e9bacbf65b10c81d0f4314cf2b1ebef728b5",
+			"revisionTime": "2016-08-23T15:06:47Z"
+		},
+		{
 			"checksumSHA1": "QMPn4XX/OM3SYq3leNhEty32hmk=",
 			"path": "github.com/syndtr/goleveldb/leveldb",
 			"revision": "6ae1797c0b42b9323fc27ff7dcf568df88f2f33d",

@@ -1,18 +1,17 @@
 package mdata
 
 import (
-	"sync"
 	"time"
 
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/streamrail/concurrent-map"
 )
 
 type AggMetrics struct {
-	store       Store
-	cachePusher cache.CachePusher
-	sync.RWMutex
-	Metrics        map[string]*AggMetric
+	store          Store
+	cachePusher    cache.CachePusher
+	Metrics        cmap.ConcurrentMap
 	chunkSpan      uint32
 	numChunks      uint32
 	aggSettings    AggSettings // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
@@ -25,7 +24,7 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChu
 	ms := AggMetrics{
 		store:          store,
 		cachePusher:    cachePusher,
-		Metrics:        make(map[string]*AggMetric),
+		Metrics:        cmap.New(),
 		chunkSpan:      chunkSpan,
 		numChunks:      numChunks,
 		aggSettings:    AggSettings{ttl, aggSettings},
@@ -55,46 +54,32 @@ func (ms *AggMetrics) GC() {
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.
 		// it doesn't matter if new metrics are added while we iterate this list.
-		ms.RLock()
-		keys := make([]string, 0, len(ms.Metrics))
-		for k := range ms.Metrics {
-			keys = append(keys, k)
-		}
-		ms.RUnlock()
+		keys := ms.Metrics.Keys()
 		for _, key := range keys {
 			gcMetric.Inc()
-			ms.RLock()
-			a := ms.Metrics[key]
-			ms.RUnlock()
-			if stale := a.GC(chunkMinTs, metricMinTs); stale {
+			a, _ := ms.Metrics.Get(key)
+			if stale := a.(*AggMetric).GC(chunkMinTs, metricMinTs); stale {
 				log.Info("metric %s is stale. Purging data from memory.", key)
-				ms.Lock()
-				delete(ms.Metrics, key)
-				metricsActive.Set(len(ms.Metrics))
-				ms.Unlock()
+				ms.Metrics.Remove(key)
+				metricsActive.Dec()
 			}
 		}
-
 	}
 }
 
 func (ms *AggMetrics) Get(key string) (Metric, bool) {
-	ms.RLock()
-	m, ok := ms.Metrics[key]
-	ms.RUnlock()
-	return m, ok
+	m, ok := ms.Metrics.Get(key)
+	return m.(*AggMetric), ok
 }
 
 func (ms *AggMetrics) GetOrCreate(key string) Metric {
-	ms.Lock()
-	m, ok := ms.Metrics[key]
+	m, ok := ms.Metrics.Get(key)
 	if !ok {
 		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.aggSettings.RawTTL, ms.aggSettings.Aggs...)
-		ms.Metrics[key] = m
-		metricsActive.Set(len(ms.Metrics))
+		ms.Metrics.Set(key, m.(*AggMetric))
+		metricsActive.Inc()
 	}
-	ms.Unlock()
-	return m
+	return m.(*AggMetric)
 }
 
 func (ms *AggMetrics) AggSettings() AggSettings {
