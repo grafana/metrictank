@@ -79,6 +79,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Development](https://github.com/raintank/metrictank/blob/master/docs/development.md)
 * [Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
 * [Roadmap](https://github.com/raintank/metrictank/blob/master/docs/roadmap.md)
+* [Faq](https://github.com/raintank/metrictank/blob/master/docs/faq.md)
 
 ## Releases and versioning
 
