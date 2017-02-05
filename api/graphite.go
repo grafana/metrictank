@@ -233,6 +233,9 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	for _, s := range series {
 		for _, metric := range s.Series {
+			if !metric.Leaf {
+				continue
+			}
 			for _, def := range metric.Defs {
 				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
 			}
@@ -466,20 +469,25 @@ func findTreejson(query string, nodes []idx.Node) (models.SeriesTree, error) {
 			continue
 		}
 		seen[name] = struct{}{}
+		allowChildren := 0
+		leaf := 0
+		expandable := 0
+		if g.HasChildren {
+			allowChildren = 1
+			expandable = 1
+		}
+		if g.Leaf {
+			leaf = 1
+		}
 
 		t := models.SeriesTreeItem{
-			ID:      basepath + name,
-			Context: treejsonContext,
-			Text:    name,
+			ID:            basepath + name,
+			Context:       treejsonContext,
+			Text:          name,
+			AllowChildren: allowChildren,
+			Expandable:    expandable,
+			Leaf:          leaf,
 		}
-
-		if g.Leaf {
-			t.Leaf = 1
-		} else {
-			t.AllowChildren = 1
-			t.Expandable = 1
-		}
-
 		tree.Add(&t)
 	}
 	return *tree, nil

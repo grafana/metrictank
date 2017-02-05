@@ -16,9 +16,10 @@ var (
 
 //go:generate msgp
 type Node struct {
-	Path string
-	Leaf bool
-	Defs []schema.MetricDefinition
+	Path        string
+	Leaf        bool
+	Defs        []schema.MetricDefinition
+	HasChildren bool
 }
 
 /*
