@@ -45,7 +45,7 @@ var (
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
-	memoryIdx.BoolVar(&Enabled, "enabled", true, "")
+	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	globalconf.Register("memory-idx", memoryIdx)
 }
 

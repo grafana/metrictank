@@ -57,8 +57,8 @@ var (
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Data:
-	chunkSpanStr = flag.String("chunkspan", "2h", "duration of raw chunks")
-	numChunksInt = flag.Int("numchunks", 5, "number of raw chunks to keep in memory. should be at least 1 more than what's needed to satisfy aggregation rules")
+	chunkSpanStr = flag.String("chunkspan", "10min", "duration of raw chunks")
+	numChunksInt = flag.Int("numchunks", 7, "number of raw chunks to keep in in-memory ring buffer. See https://github.com/raintank/metrictank/blob/master/docs/memory-server.md for details and trade-offs, especially when compared to chunk-cache")
 	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
 
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
@@ -230,7 +230,7 @@ func main() {
 	}
 	_, ok := chunk.RevChunkSpans[chunkSpan]
 	if !ok {
-		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *chunkSpanStr)
+		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", *chunkSpanStr)
 	}
 
 	set := strings.Split(*aggSettings, ",")
@@ -254,7 +254,7 @@ func main() {
 		}
 		_, ok := chunk.RevChunkSpans[aggChunkSpan]
 		if !ok {
-			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", fields[1])
+			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", fields[1])
 		}
 		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
 		ready := true
@@ -332,7 +332,7 @@ func main() {
 	}
 
 	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
-		log.Warn("It is not recommended to run a mulitnode cluster with more then 1 input plugin.")
+		log.Warn("It is not recommended to run a mulitnode cluster with more than 1 input plugin.")
 	}
 
 	/***********************************

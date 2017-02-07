@@ -40,6 +40,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0,metrictank2,metrictank3
       MT_CLUSTER_BIND_ADDR: "metrictank1:7946"
+      MT_CLUSTER_PRIMARY_NODE: "false"
     links:
      - cassandra
      - metrictank0
@@ -85,6 +86,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0,metrictank1,metrictank2
       MT_CLUSTER_BIND_ADDR: "metrictank3:7946"
+      MT_CLUSTER_PRIMARY_NODE: "false"
     links:
      - cassandra
      - metrictank0
