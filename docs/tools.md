@@ -90,7 +90,7 @@ mt-index-cat -from 60min cass -hosts cassandra:9042 list
 ## mt-index-migrate-050-to-054
 
 ```
-mt-index-migrate-050-to054
+mt-index-migrate-050-to-054
 
 Converts a metrictank index to the new 0.5.4 (and beyond) format, using cassandra instead of elasticsearch
 differences:
@@ -153,7 +153,7 @@ Flags:
   -config string
     	configuration file path (default "/etc/raintank/metrictank.ini")
   -format string
-    	template to render the data with (default "{{.Part .OrgId .Id .Name .Metric .Interval .Value .Time .Unit .Mtype .Tags}}")
+    	template to render the data with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
 ```
 
 
@@ -187,6 +187,49 @@ Flags:
 ```
 
 
+## mt-split-metrics-by-ttl
+
+```
+mt-split-metrics-by-ttl [flags] ttl [ttl...]
+
+Creates schema of metric tables split by TTLs and
+assists in migrating the data to new tables.
+Flags:
+  -cassandra-addrs string
+    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -cassandra-auth
+    	enable cassandra authentication
+  -cassandra-ca-path string
+    	cassandra CA certificate path when using SSL (default "/etc/raintank/ca.pem")
+  -cassandra-consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-host-selection-policy string
+    	 (default "roundrobin")
+  -cassandra-host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
+  -cassandra-keyspace string
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+  -cassandra-password string
+    	password for authentication (default "cassandra")
+  -cassandra-read-concurrency int
+    	max number of concurrent reads to cassandra. (default 20)
+  -cassandra-read-queue-size int
+    	max number of outstanding reads before blocking. value doesn't matter much (default 100)
+  -cassandra-retries int
+    	how many times to retry a query before failing it
+  -cassandra-ssl
+    	enable SSL connection to cassandra
+  -cassandra-timeout int
+    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-username string
+    	username for authentication (default "cassandra")
+  -cql-protocol-version int
+    	cql protocol version to use (default 4)
+  -window-factor int
+    	the window factor be used when creating the metric table schema (default 20)
+```
+
+
 ## mt-store-cat
 
 ```
@@ -195,7 +238,7 @@ mt-store-cat
 Retrieves timeseries data from the cassandra store. Either raw or with minimal processing
 
 Usage:
-	mt-store-cat [flags] <normal|summary> id <metric-id>
+	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl>
 	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)
 Flags:
   -cassandra-addrs string
@@ -240,8 +283,53 @@ Flags:
     	get data until (exclusive) (default "now")
   -version
     	print version string
+  -window-factor int
+    	the window factor be used when creating the metric table schema (default 20)
 Notes:
  * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`
+```
+
+
+## mt-update-ttl
+
+```
+mt-update-ttl [flags] ttl table-in [table-out]
+
+Adjusts the data in Cassandra to use a new TTL value. The TTL is applied counting from the timestamp of the data
+If table-out not specified or same as table-in, will update in place. Otherwise will not touch input table and store results in table-out
+In that case, it is up to you to assure table-out exists before running this tool
+Not supported yet: for the per-ttl tables as of 0.7, automatically putting data in the right table
+Flags:
+  -cassandra-addrs string
+    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -cassandra-auth
+    	enable cassandra authentication
+  -cassandra-ca-path string
+    	cassandra CA certificate path when using SSL (default "/etc/raintank/ca.pem")
+  -cassandra-concurrency int
+    	max number of concurrent reads to cassandra. (default 20)
+  -cassandra-consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-host-selection-policy string
+    	 (default "roundrobin")
+  -cassandra-host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
+  -cassandra-keyspace string
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+  -cassandra-password string
+    	password for authentication (default "cassandra")
+  -cassandra-retries int
+    	how many times to retry a query before failing it
+  -cassandra-ssl
+    	enable SSL connection to cassandra
+  -cassandra-timeout int
+    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-username string
+    	username for authentication (default "cassandra")
+  -cql-protocol-version int
+    	cql protocol version to use (default 4)
+  -verbose
+    	show every record being processed
 ```
 
 
