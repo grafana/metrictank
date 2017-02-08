@@ -23,6 +23,7 @@ var (
 	group           = flag.String("group", "mt-replicator", "Kafka consumer group")
 	srcTopic        = flag.String("src-topic", "mdm", "topic name on source cluster")
 	dstTopic        = flag.String("dst-topic", "mdm", "topic name on destination cluster")
+	initialOffset   = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
 	srcBrokerStr    = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
 	dstBrokerStr    = flag.String("dst-brokers", "localhost:9092", "tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list)")
 
@@ -72,7 +73,7 @@ func main() {
 	srcBrokers := strings.Split(*srcBrokerStr, ",")
 	dstBrokers := strings.Split(*dstBrokerStr, ",")
 
-	consumer, err := NewConsumer(srcBrokers, *group, *srcTopic)
+	consumer, err := NewConsumer(srcBrokers, *group, *srcTopic, *initialOffset)
 	if err != nil {
 		log.Fatal(4, err.Error())
 	}

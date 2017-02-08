@@ -14,9 +14,9 @@ type Consumer struct {
 	Done     chan struct{}
 }
 
-func NewConsumer(brokers []string, group, topic string) (*Consumer, error) {
+func NewConsumer(brokers []string, group, topic string, initialOffset int) (*Consumer, error) {
 	config := cluster.NewConfig()
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.Initial = int64(initialOffset)
 	config.ClientID = "mt-replicator"
 	config.Group.Return.Notifications = true
 	config.ChannelBufferSize = 1000
