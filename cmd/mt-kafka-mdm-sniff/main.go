@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"text/template"
 
@@ -20,6 +21,8 @@ import (
 var (
 	confFile = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
 	format   = flag.String("format", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
+
+	stdoutLock = sync.Mutex{}
 )
 
 type Data struct {
@@ -43,7 +46,9 @@ func newInputPrinter(format string) inputPrinter {
 func (ip inputPrinter) Process(metric *schema.MetricData, partition int32) {
 	ip.data.MetricData = *metric
 	ip.data.Part = partition
+	stdoutLock.Lock()
 	err := ip.Execute(os.Stdout, ip.data)
+	stdoutLock.Unlock()
 	if err != nil {
 		log.Error(0, "executing template: %s", err)
 	}
