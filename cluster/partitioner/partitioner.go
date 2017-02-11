@@ -1,4 +1,4 @@
-package cluster
+package partitioner
 
 import (
 	"fmt"
@@ -11,25 +11,25 @@ type Partitioner interface {
 	Partition(schema.PartitionedMetric, int32) (int32, error)
 }
 
-type KafkaPartitioner struct {
+type Kafka struct {
 	PartitionBy string
 	Partitioner sarama.Partitioner
 }
 
-func NewKafkaPartitioner(partitionBy string) (*KafkaPartitioner, error) {
+func NewKafka(partitionBy string) (*Kafka, error) {
 	switch partitionBy {
 	case "byOrg":
 	case "bySeries":
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries'. got %s", partitionBy)
 	}
-	return &KafkaPartitioner{
+	return &Kafka{
 		PartitionBy: partitionBy,
 		Partitioner: sarama.NewHashPartitioner(""),
 	}, nil
 }
 
-func (k *KafkaPartitioner) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
+func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
 	key, err := k.GetPartitionKey(m, nil)
 	if err != nil {
 		return 0, err
@@ -37,7 +37,7 @@ func (k *KafkaPartitioner) Partition(m schema.PartitionedMetric, numPartitions i
 	return k.Partitioner.Partition(&sarama.ProducerMessage{Key: sarama.ByteEncoder(key)}, numPartitions)
 }
 
-func (k *KafkaPartitioner) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, error) {
+func (k *Kafka) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, error) {
 	switch k.PartitionBy {
 	case "byOrg":
 		// partition by organisation: metrics for the same org should go to the same
