@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/Shopify/sarama"
-	"github.com/raintank/metrictank/cluster"
+	part "github.com/raintank/metrictank/cluster/partitioner"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -10,7 +10,7 @@ import (
 type Publisher struct {
 	topic       string
 	producer    sarama.SyncProducer
-	partitioner *cluster.KafkaPartitioner
+	partitioner *part.Kafka
 }
 
 func GetCompression(codec string) sarama.CompressionCodec {
@@ -44,7 +44,7 @@ func NewPublisher(brokers []string, topic string, compression string, partitionS
 	if err != nil {
 		return nil, err
 	}
-	partitioner, err := cluster.NewKafkaPartitioner(partitionScheme)
+	partitioner, err := part.NewKafka(partitionScheme)
 	if err != nil {
 		return nil, err
 	}

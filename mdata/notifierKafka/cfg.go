@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/raintank/metrictank/cluster"
+	part "github.com/raintank/metrictank/cluster/partitioner"
 	"github.com/raintank/metrictank/kafka"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -26,7 +26,7 @@ var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
 var partitionStr string
 var partitions []int32
-var partitioner *cluster.KafkaPartitioner
+var partitioner *part.Kafka
 var partitionScheme string
 var bootTimeOffsets map[int32]int64
 var backlogProcessTimeout time.Duration
@@ -89,7 +89,7 @@ func ConfigProcess(instance string) {
 		log.Fatal(4, "kafka-cluster: unable to parse backlog-process-timeout. %s", err)
 	}
 
-	partitioner, err = cluster.NewKafkaPartitioner(partitionScheme)
+	partitioner, err = part.NewKafka(partitionScheme)
 	if err != nil {
 		log.Fatal(4, "kafka-cluster: failed to initialize partitioner. %s", err)
 	}
