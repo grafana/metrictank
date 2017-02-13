@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/cluster/partitioner"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -139,7 +139,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Info("starting read thread")
 	defer wg.Done()
 	defer close(defsChan)
-	partitioner, err := cluster.NewKafkaPartitioner(*partitionScheme)
+	partitioner, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
 		log.Fatal(4, "failed to initialize partitioner. %s", err)
 	}
