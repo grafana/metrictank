@@ -23,8 +23,8 @@ var (
 	replicateMetrics = flag.Bool("metrics", false, "replicate metrics")
 	replicatePersist = flag.Bool("persist", false, "replicate persistMetrics")
 	group            = flag.String("group", "mt-replicator", "Kafka consumer group")
-	srcTopic         = flag.String("src-topic", "mdm", "topic name on source cluster")
-	dstTopic         = flag.String("dst-topic", "mdm", "topic name on destination cluster")
+	metricSrcTopic   = flag.String("metric-src-topic", "mdm", "metrics topic name on source cluster")
+	metricDstTopic   = flag.String("metric-dst-topic", "mdm", "metrics topic name on destination cluster")
 	persistSrcTopic  = flag.String("persist-src-topic", "metricpersist", "metricPersist topic name on source cluster")
 	persistDstTopic  = flag.String("persist-dst-topic", "metricpersist", "metricPersist topic name on destination cluster")
 	initialOffset    = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
@@ -75,19 +75,19 @@ func main() {
 
 	if *replicateMetrics {
 
-		if *srcTopic == "" {
-			log.Fatal(4, "--src-topic is required")
+		if *metricSrcTopic == "" {
+			log.Fatal(4, "--metric-src-topic is required")
 		}
 
-		if *dstTopic == "" {
-			log.Fatal(4, "--dst-topic is required")
+		if *metricDstTopic == "" {
+			log.Fatal(4, "--metric-dst-topic is required")
 		}
 
-		consumer, err := NewConsumer(srcBrokers, *group, *srcTopic, *initialOffset)
+		consumer, err := NewConsumer(srcBrokers, *group, *metricSrcTopic, *initialOffset)
 		if err != nil {
 			log.Fatal(4, err.Error())
 		}
-		publisher, err := NewPublisher(dstBrokers, *dstTopic, *compression, *partitionScheme)
+		publisher, err := NewPublisher(dstBrokers, *metricDstTopic, *compression, *partitionScheme)
 		if err != nil {
 			log.Fatal(4, err.Error())
 		}
