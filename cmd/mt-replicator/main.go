@@ -100,13 +100,13 @@ func main() {
 				select {
 				case <-consumer.Done:
 					log.Info("metrics consumer ended.")
+					publisher.Stop()
 					return
 				case <-sigChan:
 					log.Info("metrics shutdown started.")
 					consumer.Stop()
 				}
 			}
-			publisher.Stop()
 		}()
 	}
 
