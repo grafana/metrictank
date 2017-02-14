@@ -44,7 +44,7 @@ parser.add_argument(
     dest='src_table',
     type=str,
     help='source table name',
-    default='metrics',
+    default='metric',
     required=False,
 )
 parser.add_argument(
@@ -52,7 +52,7 @@ parser.add_argument(
     dest='dst_table',
     type=str,
     help='first part of destination table name',
-    default='metrics_',
+    default='metric_',
     required=False,
 )
 parser.add_argument(
@@ -138,11 +138,21 @@ def snapshot():
 
 
 def symlink():
-
-    cmds = ['mkdir -p {tmp_dir}'.format(tmp_dir=tmp_dir)]
+    cmds = ['mkdir -p {tmp_dir}/{dst_kspace}'.format(
+        tmp_dir=tmp_dir,
+        dst_kspace=args.dst_kspace,
+    )]
+    cmds.extend([
+        'for i in $(find {data_dir}/{src_kspace}/ -maxdepth 1 -name "{src_table}-*"); do src_table=$i; done'
+        .format(
+            data_dir=data_dir,
+            src_kspace=args.src_kspace,
+            src_table=args.src_table,
+        ),
+    ])
     cmds.extend(
         'ln -s '
-        '{data_dir}/{src_kspace}/{src_table}/snapshots/{snapshot} '
+        '$src_table/snapshots/{snapshot} '
         '{tmp_dir}/{dst_kspace}/{table}'
         .format(
             data_dir=data_dir,
