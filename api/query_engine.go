@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	dpAdjGranularity  = stats.NewGauge32("api.dp_adj_granularity")
-	dpMaxGranularity  = stats.NewGauge32("api.dp_max_granularity")
-	aggAdjGranularity = stats.NewGauge32("api.agg_adj_granularity")
-	aggMaxGranularity = stats.NewGauge32("api.agg_max_granularity")
+	lowResNumPointsFetch  = stats.NewMeter32("api.align_requests.low_res.num_points_fetching", false)
+	lowResNumPointsReturn = stats.NewMeter32("api.align_requests.low_res.num_points_returning", false)
+	lowResChosenArchive   = stats.NewMeter32("api.align_requests.low_res.chosen_archive", false)
+	maxResNumPoints       = stats.NewMeter32("api.align_requests.max_res.num_points", false)
+	maxResChosenArchive   = stats.NewMeter32("api.align_requests.max_res.chosen_archive", false)
 )
 
 // represents a data "archive", i.e. the raw one, or an aggregated series
@@ -36,11 +37,6 @@ type archives []archive
 func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
-
-// takes a ttl and returns the oldest timestamp with that ttl
-func oldestTs(ttl uint32) uint32 {
-	return uint32(time.Now().Unix()) - ttl
-}
 
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
@@ -125,30 +121,6 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 
 	chosenInterval := options[selected].interval
 
-	// by default we select the lowest res (longest time range) option.
-	selectedHighestRes := len(options) - 1
-	// then we loop over the remaining options trying to find the highest res where the
-	// oldest timestamp is still older than our From ts
-	for i := len(options) - 2; i >= 0; i-- {
-		if oldestTs(options[i].ttl) > reqs[0].From {
-			break
-		}
-		selectedHighestRes = i
-	}
-
-	// record how many datapoints will be sent to graphite-api if we use the old-style selection mechanism
-	dpAdjGranularity.SetUint32(tsRange / chosenInterval)
-
-	// record the aggregation index that has been selected
-	aggAdjGranularity.SetUint32(uint32(selected))
-
-	// also record how many there would be if instead we select the aggregation with the highest resolution
-	// that can still cover the requested time range
-	dpMaxGranularity.SetUint32(tsRange / options[selectedHighestRes].interval)
-
-	// record the aggregation index that would be selected for max granularity
-	aggMaxGranularity.SetUint32(uint32(selectedHighestRes))
-
 	// if we are using raw metrics, we need to find an interval that all request intervals work with.
 	if selected == 0 && len(rawIntervals) > 1 {
 		runTimeConsolidate = true
@@ -179,6 +151,24 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 		}
 	}
 
+	// === intermezzo ===
+	// prospective new approach, per https://github.com/raintank/metrictank/issues/463 :
+	// find the highest resolution archive that has enough retention.
+	// not in use yet. but report metrics on what would be.
+
+	// find the highest res archive that retains all the data we need.
+	// fallback to lowest res option (which *should* have the longest TTL)
+	selectedMaxRes := len(options) - 1
+	now := uint32(time.Now().Unix())
+	for i := len(options) - 2; i >= 0; i-- {
+		if now-options[i].ttl > reqs[0].From {
+			break
+		}
+		selectedMaxRes = i
+	}
+
+	// === end intermezzo ===
+
 	/* we now just need to update the following properties for each req:
 	   archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
 	   archInterval uint32 // the interval corresponding to the archive we'll fetch
@@ -192,6 +182,7 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 		req.TTL = options[selected].ttl
 		req.OutInterval = chosenInterval
 		req.AggNum = 1
+		pointCount := options[selected].pointCount
 		if runTimeConsolidate {
 			req.AggNum = aggEvery(options[selected].pointCount, req.MaxPoints)
 
@@ -200,10 +191,25 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 			if selected == 0 && chosenInterval != req.RawInterval {
 				req.ArchInterval = req.RawInterval
 				req.AggNum *= chosenInterval / req.RawInterval
+				pointCount = tsRange / req.ArchInterval
 			}
 
 			req.OutInterval = req.ArchInterval * req.AggNum
 		}
+
+		lowResNumPointsFetch.ValuesUint32(pointCount, uint32(len(reqs)))
+		lowResNumPointsReturn.ValueUint32(tsRange / req.OutInterval)
+
+		pointCountMaxRes := options[selectedMaxRes].pointCount
+		// just like higher up, the value may need to be adjusted
+		if selectedMaxRes == 0 {
+			pointCountMaxRes = tsRange / req.RawInterval
+		}
+		maxResNumPoints.ValuesUint32(pointCountMaxRes, uint32(len(reqs)))
 	}
+
+	lowResChosenArchive.Values(aggRef[selected], len(reqs))
+	maxResChosenArchive.Values(aggRef[selectedMaxRes], len(reqs))
+
 	return reqs, nil
 }
