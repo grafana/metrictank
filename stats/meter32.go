@@ -46,6 +46,10 @@ func (m *Meter32) Value(val int) {
 	m.ValueUint32(uint32(val))
 }
 
+func (m *Meter32) Values(val, num int) {
+	m.ValuesUint32(uint32(val), uint32(num))
+}
+
 func (m *Meter32) ValueUint32(val uint32) {
 	bin := val
 	if m.approx {
@@ -64,6 +68,27 @@ func (m *Meter32) ValueUint32(val uint32) {
 	}
 	m.hist[bin]++
 	m.count += 1
+	m.Unlock()
+}
+
+func (m *Meter32) ValuesUint32(val, num uint32) {
+	bin := val
+	if m.approx {
+		// subbin log2(16)= 4 -> up to 100/16 = 6.25% error I think
+		// in practice it's max about 12% but anyway.
+		tmp, _ := linlog.BinOf(uint64(val), 4, 2)
+		bin = uint32(tmp)
+	}
+	m.Lock()
+	if val < m.min {
+		m.min = val
+	}
+
+	if val > m.max {
+		m.max = val
+	}
+	m.hist[bin] += num
+	m.count += num
 	m.Unlock()
 }
 
