@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"text/template"
@@ -21,6 +22,8 @@ import (
 var (
 	confFile = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
 	format   = flag.String("format", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
+	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
+	substr   = flag.String("substr", "", "only show metrics that have this substring")
 
 	stdoutLock = sync.Mutex{}
 )
@@ -44,6 +47,12 @@ func newInputPrinter(format string) inputPrinter {
 }
 
 func (ip inputPrinter) Process(metric *schema.MetricData, partition int32) {
+	if *prefix != "" && !strings.HasPrefix(metric.Metric, *prefix) {
+		return
+	}
+	if *substr != "" && !strings.Contains(metric.Metric, *substr) {
+		return
+	}
 	ip.data.MetricData = *metric
 	ip.data.Part = partition
 	stdoutLock.Lock()
