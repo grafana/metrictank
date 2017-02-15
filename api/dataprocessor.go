@@ -360,7 +360,7 @@ func logLoad(typ, key string, from, to uint32) {
 	}
 }
 
-func aggMetricKey(key, archive string, aggSpan uint32) string {
+func AggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
@@ -573,7 +573,7 @@ func newRequestContext(req *models.Req, consolidator consolidation.Consolidator)
 	} else {
 		rc.From = req.From
 		rc.To = req.To
-		rc.AggKey = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+		rc.AggKey = AggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
 	}
 
 	return &rc
