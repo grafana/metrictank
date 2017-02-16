@@ -269,7 +269,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			ctx.Req.Method, from, to, request.Targets, request.MaxDataPoints)
 	}
 
-	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
+	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings(), readLikeGraphite)
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
 		response.Write(ctx, response.WrapError(err))

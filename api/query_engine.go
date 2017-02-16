@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/raintank/metrictank/api/models"
@@ -37,6 +38,27 @@ func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 
+// represents a numbered data "archive", i.e. the raw one, or an aggregated series
+// number 0 = raw archive, number 1,2,..N = aggregation 1,2..N
+// this allows you to reorder narchives and still keep track of which is which
+type narchive struct {
+	i          int
+	interval   uint32
+	pointCount uint32
+	ttl        uint32
+	chosen     bool
+}
+
+func (b narchive) String() string {
+	return fmt.Sprintf("<archive int:%d, pointCount: %d, chosen: %t", b.interval, b.pointCount, b.chosen)
+}
+
+type narchives []narchive
+
+func (a narchives) Len() int           { return len(a) }
+func (a narchives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a narchives) Less(i, j int) bool { return a[i].interval < a[j].interval }
+
 // summarizeRawIntervals returns the set of all rawIntervals seen, as well as the minimum value
 func summarizeRawIntervals(reqs []models.Req) (uint32, map[uint32]struct{}) {
 	min := uint32(0)
@@ -50,11 +72,11 @@ func summarizeRawIntervals(reqs []models.Req) (uint32, map[uint32]struct{}) {
 	return min, all
 }
 
-// getOptions returns a slice describing each readable archive, as well as a lookup slice
+// getOptionsLegacy returns a slice describing each readable archive, as well as a lookup slice
 // which, given an index for a given archive, will return the index in the sorted list of all archives (incl raw)
 // IMPORTANT: not all series necessarily have the same raw settings, but we only return the smallest one.
 // this is corrected further down.
-func getOptions(aggSettings mdata.AggSettings, minInterval, tsRange uint32) ([]archive, []int) {
+func getOptionsLegacy(aggSettings mdata.AggSettings, minInterval, tsRange uint32) ([]archive, []int) {
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
 	options := make([]archive, 1, len(aggSettings.Aggs)+1)
@@ -73,15 +95,120 @@ func getOptions(aggSettings mdata.AggSettings, minInterval, tsRange uint32) ([]a
 	return options, aggRef
 }
 
+// getOptionsLikeGraphite is like getOptionsLegacy but returns a sorted (by interval, asc) slice of narchives
+// in which we use
+// the actual interval we would need for raw (which is the LCM of the different raw intervals),
+// potentially making the "raw interval" > first rollup interval, so that
+// raw archive might be ordered after a rollup, and where the archive
+// itself knows which one it is, instead of having to rely on index lookup table.
+func getOptionsLikeGraphite(reqs []models.Req, aggSettings mdata.AggSettings, tsRange uint32) ([]narchive, map[uint32]struct{}) {
+	_, rawIntervals := summarizeRawIntervals(reqs)
+
+	keys := make([]uint32, len(rawIntervals))
+	i := 0
+	for k := range rawIntervals {
+		keys[i] = k
+		i++
+	}
+	lcm := util.Lcm(keys)
+
+	options := make([]narchive, 0, len(aggSettings.Aggs)+1)
+	options = append(options, narchive{0, lcm, tsRange / lcm, aggSettings.RawTTL, false})
+
+	// now model the archives we get from the aggregations
+	// note that during the processing, we skip non-ready aggregations for simplicity
+	for i, agg := range aggSettings.Aggs {
+		if agg.Ready {
+			options = append(options, narchive{i + 1, agg.Span, tsRange / agg.Span, agg.TTL, false})
+		}
+	}
+
+	sort.Sort(narchives(options))
+	return options, rawIntervals
+}
+
+func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings, likeGraphite bool) ([]models.Req, error) {
+	if likeGraphite {
+		return alignRequestsLikeGraphite(reqs, aggSettings)
+	}
+	return alignRequestsLegacy(reqs, aggSettings)
+}
+
+// alignRequestsLikeGraphite is the new approach which selects the highest resolution possible, like graphite does.
+// note: instead of the traditional approach where we have the raw archive with min interval, and then compensate later
+// this mechanism tackles this aspect head-on.
+func alignRequestsLikeGraphite(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
+
+	tsRange := (reqs[0].To - reqs[0].From)
+	options, rawIntervals := getOptionsLikeGraphite(reqs, aggSettings, tsRange)
+
+	// find the highest res archive that retains all the data we need.
+	// fallback to lowest res option (which *should* have the longest TTL)
+	var selected int // index of selected archive within options
+	now := uint32(time.Now().Unix())
+	for i, opt := range options {
+		selected = i
+		if now-opt.ttl <= reqs[0].From {
+			break
+		}
+	}
+
+	if LogLevel < 2 {
+		options[selected].chosen = true
+		for _, archive := range options {
+			if archive.chosen {
+				log.Debug("QE %-2d %-6d %-6d <-", archive.i, archive.interval, tsRange/archive.interval)
+			} else {
+				log.Debug("QE %-2d %-6d %-6d", archive.i, archive.interval, tsRange/archive.interval)
+			}
+		}
+	}
+
+	/* we now just need to update the following properties for each req:
+	   archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
+	   archInterval uint32 // the interval corresponding to the archive we'll fetch
+	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
+	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
+	*/
+
+	// only apply runtime consolidation (pre data processing in graphite api) if we have to due to non uniform raw intervals
+	runtimeConsolidate := options[selected].i == 0 && len(rawIntervals) > 1
+	for i := range reqs {
+		req := &reqs[i]
+		req.Archive = options[selected].i
+		req.TTL = options[selected].ttl
+		req.OutInterval = options[selected].interval
+
+		req.ArchInterval = options[selected].interval
+		req.AggNum = 1
+		if runtimeConsolidate {
+			req.ArchInterval = req.RawInterval
+			req.AggNum = req.OutInterval / req.RawInterval
+		}
+
+		// note: when non-uniform intervals, we consolidate for now, making this a bit inaccurate.
+		// but for now, should be good enough as indicator
+		maxResNumPoints.ValuesUint32(tsRange/req.ArchInterval, uint32(len(reqs)))
+	}
+
+	maxResChosenArchive.Values(options[selected].i, len(reqs))
+
+	return reqs, nil
+
+}
+
+// alignRequestsLegacy is metrictank's traditional request alignment method.
+// it was designed to be smart and efficient, but came with some issues. see
+// https://github.com/raintank/metrictank/issues/463
 // updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from, to and maxdatapoints!
 // this function ignores the TTL values. it is assumed that you've set sensible TTL's
-func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
+func alignRequestsLegacy(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
 
 	tsRange := (reqs[0].To - reqs[0].From)
 	minInterval, rawIntervals := summarizeRawIntervals(reqs)
-	options, aggRef := getOptions(aggSettings, minInterval, tsRange)
+	options, aggRef := getOptionsLegacy(aggSettings, minInterval, tsRange)
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
 	// if all options have too many points, fall back to the lowest-res option and apply runtime
@@ -142,7 +269,7 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 		chosenInterval = util.Lcm(keys)
 		options[0].interval = chosenInterval
 		options[0].pointCount = tsRange / chosenInterval
-		//make sure that the calculated interval is not greater then the interval of the first rollup.
+		// make sure that the calculated interval is not greater then the interval of the first rollup.
 		if len(options) > 1 && chosenInterval >= options[1].interval {
 			selected = 1
 			chosenInterval = options[1].interval
