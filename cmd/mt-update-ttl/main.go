@@ -57,7 +57,7 @@ func main() {
 		tableOut = flag.Arg(2)
 	}
 
-	session, err := NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraConcurrency, *cassandraRetries, *cqlProtocolVersion, *cassandraSSL, *cassandraAuth, *cassandraHostVerification)
+	session, err := NewCassandraStore()
 
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
@@ -66,29 +66,28 @@ func main() {
 	update(session, ttl, tableIn, tableOut)
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, concurrency, retries, protoVer int, ssl, auth, hostVerification bool) (*gocql.Session, error) {
-
-	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
-	if ssl {
+func NewCassandraStore() (*gocql.Session, error) {
+	cluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
+	if *cassandraSSL {
 		cluster.SslOpts = &gocql.SslOptions{
-			CaPath:                 CaPath,
-			EnableHostVerification: hostVerification,
+			CaPath:                 *cassandraCaPath,
+			EnableHostVerification: *cassandraHostVerification,
 		}
 	}
-	if auth {
+	if *cassandraAuth {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: Username,
-			Password: Password,
+			Username: *cassandraUsername,
+			Password: *cassandraPassword,
 		}
 	}
-	cluster.Consistency = gocql.ParseConsistency(consistency)
-	cluster.Timeout = time.Duration(timeout) * time.Millisecond
-	cluster.NumConns = concurrency
-	cluster.ProtoVersion = protoVer
-	cluster.Keyspace = keyspace
-	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
+	cluster.Consistency = gocql.ParseConsistency(*cassandraConsistency)
+	cluster.Timeout = time.Duration(*cassandraTimeout) * time.Millisecond
+	cluster.NumConns = *cassandraConcurrency
+	cluster.ProtoVersion = *cqlProtocolVersion
+	cluster.Keyspace = *cassandraKeyspace
+	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: *cassandraRetries}
 
-	switch hostSelectionPolicy {
+	switch *cassandraHostSelectionPolicy {
 	case "roundrobin":
 		cluster.PoolConfig.HostSelectionPolicy = gocql.RoundRobinHostPolicy()
 	case "hostpool-simple":
@@ -112,7 +111,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 			),
 		)
 	default:
-		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", hostSelectionPolicy)
+		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", *cassandraHostSelectionPolicy)
 	}
 
 	return cluster.CreateSession()
