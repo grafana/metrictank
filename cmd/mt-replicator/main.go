@@ -18,8 +18,8 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	logLevel    = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 
-	partitionScheme  = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
-	compression      = flag.String("compression", "none", "compression: none|gzip|snappy")
+	partitionScheme  = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. (byOrg|bySeries)")
+	compression      = flag.String("compression", "snappy", "compression: none|gzip|snappy")
 	replicateMetrics = flag.Bool("metrics", false, "replicate metrics")
 	replicatePersist = flag.Bool("persist", false, "replicate persistMetrics")
 	group            = flag.String("group", "mt-replicator", "Kafka consumer group")
@@ -30,14 +30,7 @@ var (
 	initialOffset    = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
 	srcBrokerStr     = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
 	dstBrokerStr     = flag.String("dst-brokers", "localhost:9092", "tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list)")
-
-	wg sync.WaitGroup
 )
-
-type topic struct {
-	src string
-	dst string
-}
 
 func main() {
 	flag.Usage = func() {
@@ -51,12 +44,13 @@ func main() {
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, *logLevel))
 
 	if *showVersion {
-		fmt.Printf("eventtank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-replicator (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	if !*replicateMetrics && !*replicatePersist {
+		log.Fatal(4, "at least one of --metrics or --persist is needed.")
+	}
 
 	if *group == "" {
 		log.Fatal(4, "--group is required")
@@ -69,12 +63,14 @@ func main() {
 		log.Fatal(4, "--dst-brokers required")
 	}
 
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
 	srcBrokers := strings.Split(*srcBrokerStr, ",")
 	dstBrokers := strings.Split(*dstBrokerStr, ",")
 	wg := new(sync.WaitGroup)
-
+	shutdown := make(chan struct{})
 	if *replicateMetrics {
-
 		if *metricSrcTopic == "" {
 			log.Fatal(4, "--metric-src-topic is required")
 		}
@@ -83,30 +79,20 @@ func main() {
 			log.Fatal(4, "--metric-dst-topic is required")
 		}
 
-		consumer, err := NewConsumer(srcBrokers, *group, *metricSrcTopic, *initialOffset)
+		metrics, err := NewMetricsReplicator(srcBrokers, dstBrokers, *compression, *group, *metricSrcTopic, *metricDstTopic, *initialOffset, *partitionScheme)
 		if err != nil {
 			log.Fatal(4, err.Error())
 		}
-		publisher, err := NewPublisher(dstBrokers, *metricDstTopic, *compression, *partitionScheme)
-		if err != nil {
-			log.Fatal(4, err.Error())
-		}
-		log.Info("starting metrics consumer")
-		consumer.Start(publisher)
+
+		log.Info("starting metrics replicator")
+		metrics.Start()
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-consumer.Done:
-					log.Info("metrics consumer ended.")
-					publisher.Stop()
-					return
-				case <-sigChan:
-					log.Info("metrics shutdown started.")
-					consumer.Stop()
-				}
-			}
+			<-shutdown
+			log.Info("metrics replicator shutdown started.")
+			metrics.Stop()
+			log.Info("metrics replicator ended.")
+			wg.Done()
 		}()
 	}
 
@@ -119,29 +105,25 @@ func main() {
 			log.Fatal(4, "--persist-dst-topic is required")
 		}
 
-		metricPersist, err := NewPersistRelay(srcBrokers, dstBrokers, *group, *persistSrcTopic, *persistDstTopic, *initialOffset)
+		metricPersist, err := NewPersistReplicator(srcBrokers, dstBrokers, *group, *persistSrcTopic, *persistDstTopic, *initialOffset)
 		if err != nil {
 			log.Fatal(4, err.Error())
 		}
 
-		log.Info("starting metricPersist relay")
+		log.Info("starting metricPersist replicator")
 		metricPersist.Start()
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-metricPersist.Done:
-					log.Info("metricPersist ended.")
-					return
-				case <-sigChan:
-					log.Info("metricPersist shutdown started.")
-					metricPersist.Stop()
-				}
-			}
+			<-shutdown
+			log.Info("metricPersist replicator shutdown started.")
+			metricPersist.Stop()
+			log.Info("metricPersist replicator ended.")
+			wg.Done()
 		}()
 	}
 
+	<-sigChan
+	close(shutdown)
 	wg.Wait()
 	log.Info("shutdown complete")
 	log.Close()

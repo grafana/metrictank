@@ -9,14 +9,14 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
-type PersistRelay struct {
+type PersistReplicator struct {
 	consumer  *cluster.Consumer
 	producer  sarama.SyncProducer
 	destTopic string
-	Done      chan struct{}
+	done      chan struct{}
 }
 
-func NewPersistRelay(srcBrokers []string, dstBrokers []string, group, srcTopic, destTopic string, initialOffset int) (*PersistRelay, error) {
+func NewPersistReplicator(srcBrokers []string, dstBrokers []string, group, srcTopic, destTopic string, initialOffset int) (*PersistReplicator, error) {
 	config := cluster.NewConfig()
 	config.Consumer.Offsets.Initial = int64(initialOffset)
 	config.ClientID = "mt-persist-replicator"
@@ -44,46 +44,56 @@ func NewPersistRelay(srcBrokers []string, dstBrokers []string, group, srcTopic, 
 		return nil, err
 	}
 
-	return &PersistRelay{
+	return &PersistReplicator{
 		consumer:  consumer,
 		producer:  producer,
 		destTopic: destTopic,
-		Done:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}, nil
 }
 
-func (c *PersistRelay) Consume() {
-	ticker := time.NewTicker(time.Second * 10)
+func (r *PersistReplicator) Consume() {
+	accountingTicker := time.NewTicker(time.Second * 10)
+	flushTicker := time.NewTicker(time.Second)
 	counter := 0
 	counterTs := time.Now()
-	msgChan := c.consumer.Messages()
-	complete := false
-	defer close(c.Done)
+	msgChan := r.consumer.Messages()
+	var m *sarama.ConsumerMessage
+	var ok bool
+
+	buf := make([]*sarama.ProducerMessage, 0)
+	defer close(r.done)
 	for {
 		select {
-		case m, ok := <-msgChan:
+		case m, ok = <-msgChan:
 			if !ok {
+				if len(buf) != 0 {
+					r.Flush(buf)
+				}
 				return
 			}
 			log.Debug("received metricPersist message with key: %s", m.Key)
 			msg := &sarama.ProducerMessage{
 				Key:   sarama.ByteEncoder(m.Key),
-				Topic: c.destTopic,
+				Topic: r.destTopic,
 				Value: sarama.ByteEncoder(m.Value),
 			}
-			complete = false
-			for !complete {
-				_, _, err := c.producer.SendMessage(msg)
-				if err != nil {
-					log.Error(3, "failed to publish metricPersist message. %s . trying again in 1second", err)
-					time.Sleep(time.Second)
-				} else {
-					complete = true
-				}
+			buf = append(buf, msg)
+			if len(buf) >= 1000 {
+				r.Flush(buf)
+				counter += len(buf)
+				buf = buf[:0]
+				r.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
 			}
-			counter++
-			c.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
-		case t := <-ticker.C:
+		case <-flushTicker.C:
+			if len(buf) == 0 {
+				continue
+			}
+			r.Flush(buf)
+			counter += len(buf)
+			buf = buf[:0]
+			r.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
+		case t := <-accountingTicker.C:
 			log.Info("%d metricpersist messages procesed in last %.1fseconds.", counter, t.Sub(counterTs).Seconds())
 			counter = 0
 			counterTs = t
@@ -92,36 +102,24 @@ func (c *PersistRelay) Consume() {
 
 }
 
-func (c *PersistRelay) Stop() {
-	c.consumer.Close()
-	c.producer.Close()
-}
-
-func (c *PersistRelay) Start() {
-	go c.Consume()
-}
-
-func (c *PersistRelay) kafkaNotifications() {
-	for msg := range c.consumer.Notifications() {
-		if len(msg.Claimed) > 0 {
-			for topic, partitions := range msg.Claimed {
-				log.Info("kafka consumer claimed %d partitions on topic: %s", len(partitions), topic)
-			}
-		}
-		if len(msg.Released) > 0 {
-			for topic, partitions := range msg.Released {
-				log.Info("kafka consumer released %d partitions on topic: %s", len(partitions), topic)
-			}
-		}
-
-		if len(msg.Current) == 0 {
-			log.Info("kafka consumer is no longer consuming from any partitions.")
+func (r *PersistReplicator) Flush(buf []*sarama.ProducerMessage) {
+	for {
+		err := r.producer.SendMessages(buf)
+		if err != nil {
+			log.Error(3, "failed to publish metricPersist message. %s . trying again in 1second", err)
+			time.Sleep(time.Second)
 		} else {
-			log.Info("kafka Current partitions:")
-			for topic, partitions := range msg.Current {
-				log.Info("kafka Current partitions: %s: %v", topic, partitions)
-			}
+			return
 		}
 	}
-	log.Info("kafka notification processing stopped")
+}
+
+func (r *PersistReplicator) Stop() {
+	r.consumer.Close()
+	<-r.done
+	r.producer.Close()
+}
+
+func (r *PersistReplicator) Start() {
+	go r.Consume()
 }
