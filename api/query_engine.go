@@ -38,12 +38,24 @@ func (a archives) Len() int           { return len(a) }
 func (a archives) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a archives) Less(i, j int) bool { return a[i].interval < a[j].interval }
 
-// updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
-// luckily, all metrics still use the same aggSettings, making this a bit simpler
-// note: it is assumed that all requests have the same from, to and maxdatapoints!
-// this function ignores the TTL values. it is assumed that you've set sensible TTL's
-func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
+// summarizeRawIntervals returns the set of all rawIntervals seen, as well as the minimum value
+func summarizeRawIntervals(reqs []models.Req) (uint32, map[uint32]struct{}) {
+	min := uint32(0)
+	all := make(map[uint32]struct{})
+	for _, req := range reqs {
+		if min == 0 || min > req.RawInterval {
+			min = req.RawInterval
+		}
+		all[req.RawInterval] = struct{}{}
+	}
+	return min, all
+}
 
+// getOptions returns a slice describing each readable archive, as well as a lookup slice
+// which, given an index for a given archive, will return the index in the sorted list of all archives (incl raw)
+// IMPORTANT: not all series necessarily have the same raw settings, but we only return the smallest one.
+// this is corrected further down.
+func getOptions(aggSettings mdata.AggSettings, minInterval, tsRange uint32) ([]archive, []int) {
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
 	aggs := mdata.AggSettingsSpanAsc(aggSettings.Aggs)
@@ -51,28 +63,29 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.R
 
 	options := make([]archive, 1, len(aggs)+1)
 
-	minInterval := uint32(0) // will contain the smallest rawInterval from all requested series
-	rawIntervals := make(map[uint32]struct{})
-	for _, req := range reqs {
-		if minInterval == 0 || minInterval > req.RawInterval {
-			minInterval = req.RawInterval
-		}
-		rawIntervals[req.RawInterval] = struct{}{}
-	}
-	tsRange := (reqs[0].To - reqs[0].From)
-
-	// note: not all series necessarily have the same raw settings, will be fixed further down
 	options[0] = archive{minInterval, tsRange / minInterval, false, aggSettings.RawTTL}
+	aggRef := []int{0}
 	// now model the archives we get from the aggregations
 	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
-	aggRef := []int{0}
 	for j, agg := range aggs {
 		if agg.Ready {
 			options = append(options, archive{agg.Span, tsRange / agg.Span, false, agg.TTL})
 			aggRef = append(aggRef, j+1)
 		}
 	}
+	return options, aggRef
+}
+
+// updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
+// luckily, all metrics still use the same aggSettings, making this a bit simpler
+// note: it is assumed that all requests have the same from, to and maxdatapoints!
+// this function ignores the TTL values. it is assumed that you've set sensible TTL's
+func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
+
+	tsRange := (reqs[0].To - reqs[0].From)
+	minInterval, rawIntervals := summarizeRawIntervals(reqs)
+	options, aggRef := getOptions(aggSettings, minInterval, tsRange)
 
 	// find the first, i.e. highest-res option with a pointCount <= maxDataPoints
 	// if all options have too many points, fall back to the lowest-res option and apply runtime
