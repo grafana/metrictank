@@ -134,10 +134,6 @@ func (r *MetricsReplicator) Start() {
 }
 
 func (r *MetricsReplicator) Flush(metrics []*schema.MetricData) {
-	if len(metrics) == 0 {
-		return
-	}
-
 	payload := make([]*sarama.ProducerMessage, len(metrics))
 
 	for i, metric := range metrics {
