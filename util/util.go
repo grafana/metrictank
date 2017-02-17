@@ -25,18 +25,18 @@ func MaxInt(a, b int) int {
 func Lcm(vals []uint32) uint32 {
 	out := vals[0]
 	for i := 1; i < len(vals); i++ {
-		a := Max(uint32(vals[i]), out)
-		b := Min(uint32(vals[i]), out)
-		r := a % b
+		max := Max(uint32(vals[i]), out)
+		min := Min(uint32(vals[i]), out)
+		r := max % min
 		if r != 0 {
-			for j := uint32(2); j <= b; j++ {
-				if (j*a)%b == 0 {
-					out = j * a
+			for j := uint32(2); j <= min; j++ {
+				if (j*max)%min == 0 {
+					out = j * max
 					break
 				}
 			}
 		} else {
-			out = a
+			out = max
 		}
 	}
 	return out
