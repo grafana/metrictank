@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/raintank/metrictank/api/models"
@@ -58,17 +57,14 @@ func summarizeRawIntervals(reqs []models.Req) (uint32, map[uint32]struct{}) {
 func getOptions(aggSettings mdata.AggSettings, minInterval, tsRange uint32) ([]archive, []int) {
 	// model all the archives for each requested metric
 	// the 0th archive is always the raw series, with highest res (lowest interval)
-	aggs := mdata.AggSettingsSpanAsc(aggSettings.Aggs)
-	sort.Sort(aggs)
-
-	options := make([]archive, 1, len(aggs)+1)
+	options := make([]archive, 1, len(aggSettings.Aggs)+1)
 
 	options[0] = archive{minInterval, tsRange / minInterval, false, aggSettings.RawTTL}
 	aggRef := []int{0}
 	// now model the archives we get from the aggregations
 	// note that during the processing, we skip non-ready aggregations for simplicity, but at the
 	// end we need to convert the index back to the real index in the full (incl non-ready) aggSettings array.
-	for j, agg := range aggs {
+	for j, agg := range aggSettings.Aggs {
 		if agg.Ready {
 			options = append(options, archive{agg.Span, tsRange / agg.Span, false, agg.TTL})
 			aggRef = append(aggRef, j+1)
