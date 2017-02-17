@@ -15,7 +15,7 @@ type alignCase struct {
 	outErr      error
 }
 
-func TestAlignRequests(t *testing.T) {
+func TestAlignRequestsLegacy(t *testing.T) {
 	input := []alignCase{
 		{
 			// real example seen with alerting queries
@@ -507,7 +507,7 @@ func TestAlignRequests(t *testing.T) {
 		},
 	}
 	for i, ac := range input {
-		out, err := alignRequests(ac.reqs, ac.aggSettings)
+		out, err := alignRequestsLegacy(ac.reqs, ac.aggSettings)
 		if err != ac.outErr {
 			t.Errorf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
 		}
@@ -525,7 +525,7 @@ func TestAlignRequests(t *testing.T) {
 
 var result []models.Req
 
-func BenchmarkAlignRequests(b *testing.B) {
+func BenchmarkAlignRequestsLegacy(b *testing.B) {
 	var res []models.Req
 	reqs := []models.Req{
 		reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg),
@@ -542,7 +542,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		res, _ = alignRequests(reqs, aggSettings)
+		res, _ = alignRequestsLegacy(reqs, aggSettings)
 	}
 	result = res
 }
