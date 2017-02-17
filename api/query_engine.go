@@ -129,7 +129,8 @@ func getOptionsLikeGraphite(reqs []models.Req, aggSettings mdata.AggSettings, ts
 
 func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings, likeGraphite bool) ([]models.Req, error) {
 	if likeGraphite {
-		return alignRequestsLikeGraphite(reqs, aggSettings)
+		now := uint32(time.Now().Unix())
+		return alignRequestsLikeGraphite(now, reqs, aggSettings)
 	}
 	return alignRequestsLegacy(reqs, aggSettings)
 }
@@ -137,7 +138,8 @@ func alignRequests(reqs []models.Req, aggSettings mdata.AggSettings, likeGraphit
 // alignRequestsLikeGraphite is the new approach which selects the highest resolution possible, like graphite does.
 // note: instead of the traditional approach where we have the raw archive with min interval, and then compensate later
 // this mechanism tackles this aspect head-on.
-func alignRequestsLikeGraphite(reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
+// also takes a "now" value which we compare the TTL against
+func alignRequestsLikeGraphite(now uint32, reqs []models.Req, aggSettings mdata.AggSettings) ([]models.Req, error) {
 
 	tsRange := (reqs[0].To - reqs[0].From)
 	options, rawIntervals := getOptionsLikeGraphite(reqs, aggSettings, tsRange)
@@ -145,7 +147,6 @@ func alignRequestsLikeGraphite(reqs []models.Req, aggSettings mdata.AggSettings)
 	// find the highest res archive that retains all the data we need.
 	// fallback to lowest res option (which *should* have the longest TTL)
 	var selected int // index of selected archive within options
-	now := uint32(time.Now().Unix())
 	for i, opt := range options {
 		selected = i
 		if now-opt.ttl <= reqs[0].From {
