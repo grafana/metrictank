@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -60,6 +61,9 @@ type Node struct {
 	Path     string
 	Children []string
 	Defs     []string
+	SchemaI  uint16 // index in mdata.schemas (not persisted)
+	AggI     uint16 // index in mdata.aggregations (not persisted)
+
 }
 
 func (n *Node) HasChildren() bool {
@@ -101,7 +105,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, aggI uint16) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -124,7 +128,7 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) error 
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	err = m.add(def)
+	err = m.add(def, schemaI, aggI)
 	if err == nil {
 		statMetricsActive.Inc()
 	}
@@ -144,7 +148,10 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		err := m.add(def)
+		schemaI, _ := mdata.MatchSchema(def.Name)
+		aggI, _ := mdata.MatchAgg(def.Name)
+
+		err := m.add(def, schemaI, aggI)
 		if err == nil {
 			num++
 			statMetricsActive.Inc()
@@ -157,7 +164,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
 	return num, firstErr
 }
 
-func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition, schemaI, aggI uint16) error {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -168,7 +175,7 @@ func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
 		statUpdateDuration.Value(time.Since(pre))
 		return nil
 	}
-	err := m.add(def)
+	err := m.add(def, schemaI, aggI)
 	if err == nil {
 		statMetricsActive.Inc()
 	}
@@ -176,7 +183,7 @@ func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
 	return err
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) add(def *schema.MetricDefinition, schemaI, aggI uint16) error {
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
@@ -251,6 +258,8 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		Path:     path,
 		Children: []string{},
 		Defs:     []string{def.Id},
+		SchemaI:  schemaI,
+		AggI:     aggI,
 	}
 	m.DefById[def.Id] = def
 	statAddOk.Inc()

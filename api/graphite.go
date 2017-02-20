@@ -213,8 +213,10 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	consolidatorForPattern := make(map[string]string)
 	patterns := make([]string, 0)
 	type locatedDef struct {
-		def  schema.MetricDefinition
-		node cluster.Node
+		def     schema.MetricDefinition
+		node    cluster.Node
+		SchemaI uint16
+		AggI    uint16
 	}
 
 	//locatedDefs[<pattern>][<def.id>]locatedDef
@@ -245,7 +247,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				continue
 			}
 			for _, def := range metric.Defs {
-				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
+				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node, metric.SchemaI, metric.AggI}
 			}
 		}
 	}
@@ -263,7 +265,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			// def.Name is like foo.concretebar
 			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
 			target := strings.Replace(targetForPattern[pattern], pattern, def.Name, -1)
-			reqs = append(reqs, models.NewReq(def.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator, locdef.node))
+			reqs = append(reqs, models.NewReq(def.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator, locdef.node, locdef.SchemaI, locdef.AggI))
 		}
 	}
 
@@ -279,7 +281,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
 	}
 
-	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs, s.MemoryStore.AggSettings())
+	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
 		response.Write(ctx, response.WrapError(err))

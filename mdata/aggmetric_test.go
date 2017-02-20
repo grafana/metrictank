@@ -231,7 +231,8 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
-			m := metrics.GetOrCreate(keys[metricI])
+			k := keys[metricI]
+			m := metrics.GetOrCreate(k, k)
 			m.Add(t, float64(t))
 		}
 	}

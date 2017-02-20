@@ -30,7 +30,7 @@ func (f *FakeAggMetrics) Get(key string) (mdata.Metric, bool) {
 	f.Unlock()
 	return m, ok
 }
-func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
+func (f *FakeAggMetrics) GetOrCreate(key, name string) mdata.Metric {
 	f.Lock()
 	m, ok := f.Metrics[key]
 	if !ok {

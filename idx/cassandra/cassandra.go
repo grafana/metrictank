@@ -221,7 +221,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, aggI uint16) error {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
@@ -232,7 +232,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				log.Debug("cassandra-idx def hasn't been seen for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
-				err := c.MemoryIdx.AddOrUpdateDef(def)
+				err := c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 				if err != nil {
 					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				}
@@ -251,7 +251,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		}()
 		def := schema.MetricDefinitionFromMetricData(data)
 		def.Partition = partition
-		err := c.MemoryIdx.AddOrUpdateDef(def)
+		err := c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 		if err == nil {
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		}
@@ -260,7 +260,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	err := c.MemoryIdx.AddOrUpdateDef(def)
+	err := c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 	if err == nil {
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	}
