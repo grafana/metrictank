@@ -15,8 +15,6 @@ var (
 	logMinDurStr    string
 	logMinDur       uint32
 
-	readLikeGraphite bool
-
 	Addr     string
 	UseSSL   bool
 	certFile string
@@ -28,8 +26,6 @@ func ConfigSetup() {
 	apiCfg.IntVar(&maxDaysPerReq, "max-days-per-req", 365000, "max number of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
 	apiCfg.IntVar(&maxPointsPerReq, "max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
 	apiCfg.StringVar(&logMinDurStr, "log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
-
-	apiCfg.BoolVar(&readLikeGraphite, "read-like-graphite", true, "read from the highest resolution archive that has a long enough TTL. as opposed to old behavior of tailoring to maxDataPoints")
 
 	apiCfg.StringVar(&Addr, "listen", ":6060", "http listener address.")
 	apiCfg.BoolVar(&UseSSL, "ssl", false, "use HTTPS")
