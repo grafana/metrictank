@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -58,6 +59,9 @@ type Node struct {
 	Path     string
 	Children []string
 	Defs     []string
+	SchemaI  uint16 // index in mdata.schemas (not persisted)
+	AggI     uint16 // index in mdata.aggregations (not persisted)
+
 }
 
 func (n *Node) HasChildren() bool {
@@ -97,7 +101,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, aggI uint16) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -111,7 +115,7 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	m.add(def)
+	m.add(def, schemaI, aggI)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 }
@@ -127,7 +131,10 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		m.add(def)
+		schemaI, _ := mdata.MatchSchema(def.Name)
+		aggI, _ := mdata.MatchAgg(def.Name)
+
+		m.add(def, schemaI, aggI)
 		num++
 		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
@@ -136,7 +143,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
-func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) {
+func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition, schemaI, aggI uint16) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -147,12 +154,12 @@ func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) {
 		statUpdateDuration.Value(time.Since(pre))
 		return
 	}
-	m.add(def)
+	m.add(def, schemaI, aggI)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) {
+func (m *MemoryIdx) add(def *schema.MetricDefinition, schemaI, aggI uint16) {
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
@@ -227,6 +234,8 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 		Path:     path,
 		Children: []string{},
 		Defs:     []string{def.Id},
+		SchemaI:  schemaI,
+		AggI:     aggI,
 	}
 	m.DefById[def.Id] = def
 	statAdd.Inc()

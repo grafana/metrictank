@@ -155,6 +155,20 @@ func TestConsolidationFunctions(t *testing.T) {
 				{Val: 3, Ts: 1449178151},
 				{Val: 4, Ts: 1449178161},
 			},
+			consolidation.Lst,
+			2,
+			[]schema.Point{
+				{2, 1449178141},
+				{4, 1449178161},
+			},
+		},
+		{
+			[]schema.Point{
+				{1, 1449178131},
+				{2, 1449178141},
+				{3, 1449178151},
+				{4, 1449178161},
+			},
 			consolidation.Min,
 			2,
 			[]schema.Point{
@@ -566,7 +580,7 @@ func TestGetSeriesFixed(t *testing.T) {
 			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
 				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
 
-				metric := metrics.GetOrCreate(name)
+				metric := metrics.GetOrCreate(name, name)
 				metric.Add(offset, 10)    // this point will always be quantized to 10
 				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected

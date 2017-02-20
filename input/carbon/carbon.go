@@ -9,10 +9,10 @@ import (
 	"net"
 	"sync"
 
-	"github.com/lomik/go-carbon/persister"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/input"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -29,7 +29,6 @@ type Carbon struct {
 	input.Handler
 	addrStr          string
 	addr             *net.TCPAddr
-	schemas          persister.WhisperSchemas
 	listener         *net.TCPListener
 	handlerWaitGroup sync.WaitGroup
 	quit             chan struct{}
@@ -73,8 +72,6 @@ func (c *Carbon) Name() string {
 
 var Enabled bool
 var addr string
-var schemasFile string
-var schemas persister.WhisperSchemas
 var partitionId int
 
 func ConfigSetup() {
@@ -82,32 +79,12 @@ func ConfigSetup() {
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
 	inCarbon.IntVar(&partitionId, "partition", 0, "partition Id.")
-	inCarbon.StringVar(&schemasFile, "schemas-file", "/path/to/your/schemas-file", "see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf")
 	globalconf.Register("carbon-in", inCarbon)
 }
 
 func ConfigProcess() {
 	if !Enabled {
 		return
-	}
-	var err error
-	schemas, err = persister.ReadWhisperSchemas(schemasFile)
-	if err != nil {
-		log.Fatal(4, "carbon-in: can't read schemas file %q: %s", schemasFile, err.Error())
-	}
-	var defaultFound bool
-	for _, schema := range schemas {
-		if schema.Pattern.String() == ".*" {
-			defaultFound = true
-		}
-		if len(schema.Retentions) == 0 {
-			log.Fatal(4, "carbon-in: retention setting cannot be empty")
-		}
-	}
-	if !defaultFound {
-		// good graphite health (not sure what graphite does if there's no .*)
-		// but we definitely need to always be able to determine which interval to use
-		log.Fatal(4, "carbon-in: storage-conf does not have a default '.*' pattern")
 	}
 	cluster.Manager.SetPartitions([]int32{int32(partitionId)})
 }
@@ -120,7 +97,6 @@ func New() *Carbon {
 	return &Carbon{
 		addrStr:   addr,
 		addr:      addrT,
-		schemas:   schemas,
 		connTrack: NewConnTrack(),
 	}
 }
@@ -196,10 +172,7 @@ func (c *Carbon) handle(conn net.Conn) {
 			continue
 		}
 		name := string(key)
-		s, ok := c.schemas.Match(name)
-		if !ok {
-			log.Fatal(4, "carbon-in: couldn't find a schema for %q - this is impossible since we asserted there was a default with patt .*", name)
-		}
+		_, s := mdata.MatchSchema(name) // note: also called by metrictank DefaultHandler.Process. maybe can be optimized
 		interval := s.Retentions[0].SecondsPerPoint()
 		md := &schema.MetricData{
 			Name:     name,

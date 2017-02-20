@@ -117,6 +117,10 @@ func TestAggregator(t *testing.T) {
 		{Val: 2, Ts: 120},
 		{Val: 3, Ts: 240},
 	})
+	compare("simple-lst-skip-a-block", agg.lstMetric, []schema.Point{
+		{Val: 5, Ts: 120},
+		{Val: 978894.445, Ts: 240},
+	})
 	compare("simple-sum-skip-a-block", agg.sumMetric, []schema.Point{
 		{Val: 128.4, Ts: 120},
 		{Val: 2451.123 + 1451.123 + 978894.445, Ts: 240},

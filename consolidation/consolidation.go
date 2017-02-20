@@ -18,6 +18,7 @@ const (
 	None Consolidator = iota
 	Avg
 	Cnt // not available through http api
+	Lst
 	Min
 	Max
 	Sum
@@ -32,6 +33,8 @@ func (c Consolidator) String() string {
 		return "AverageConsolidator"
 	case Cnt:
 		return "CountConsolidator"
+	case Lst:
+		return "LastConsolidator"
 	case Min:
 		return "MinimumConsolidator"
 	case Max:
@@ -52,6 +55,8 @@ func (c Consolidator) Archive() string {
 		panic("avg consolidator has no matching Archive(). you need sum and cnt")
 	case Cnt:
 		return "cnt"
+	case Lst:
+		return "lst"
 	case Min:
 		return "min"
 	case Max:
@@ -66,6 +71,8 @@ func FromArchive(archive string) Consolidator {
 	switch archive {
 	case "cnt":
 		return Cnt
+	case "lst":
+		return Lst
 	case "min":
 		return Min
 	case "max":
@@ -84,6 +91,8 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 		consFunc = batch.Avg
 	case Cnt:
 		consFunc = batch.Cnt
+	case Lst:
+		consFunc = batch.Lst
 	case Min:
 		consFunc = batch.Min
 	case Max:
@@ -107,6 +116,8 @@ func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, e
 	switch consolidateBy {
 	case "avg", "average":
 		consolidator = Avg
+	case "last":
+		consolidator = Lst
 	case "min":
 		consolidator = Min
 	case "max":
@@ -120,7 +131,7 @@ func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, e
 }
 
 func Validate(fn string) error {
-	if fn == "avg" || fn == "average" || fn == "min" || fn == "max" || fn == "sum" {
+	if fn == "avg" || fn == "average" || fn == "last" || fn == "min" || fn == "max" || fn == "sum" {
 		return nil
 	}
 	return errUnknownConsolidationFunction

@@ -221,7 +221,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, aggI uint16) {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
@@ -232,7 +232,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 				log.Debug("cassandra-idx def hasn't been seen for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
-				c.MemoryIdx.AddOrUpdateDef(def)
+				c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				statUpdateDuration.Value(time.Since(pre))
 			}
@@ -248,14 +248,14 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 		}()
 		def := schema.MetricDefinitionFromMetricData(data)
 		def.Partition = partition
-		c.MemoryIdx.AddOrUpdateDef(def)
+		c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		statUpdateDuration.Value(time.Since(pre))
 		return
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	c.MemoryIdx.AddOrUpdateDef(def)
+	c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
 	c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	statAddDuration.Value(time.Since(pre))
 }

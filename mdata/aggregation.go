@@ -9,6 +9,7 @@ type Aggregation struct {
 	max float64
 	sum float64
 	cnt float64
+	lst float64
 }
 
 func NewAggregation() *Aggregation {
@@ -23,6 +24,7 @@ func (a *Aggregation) Add(val float64) {
 	a.max = math.Max(val, a.max)
 	a.sum += val
 	a.cnt += 1
+	a.lst = val
 }
 
 func (a *Aggregation) Reset() {
@@ -30,4 +32,5 @@ func (a *Aggregation) Reset() {
 	a.max = -math.MaxFloat64
 	a.sum = 0
 	a.cnt = 0
+	// no need to set a.lst, for a to be valid (cnt > 1), a.lst will always be set properly
 }

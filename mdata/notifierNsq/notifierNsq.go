@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/bitly/go-hostpool"
 	"github.com/nsqio/go-nsq"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/notifierNsq/instrumented_nsq"
 	"github.com/raintank/metrictank/stats"
@@ -24,9 +26,10 @@ type NotifierNSQ struct {
 	buf      []mdata.SavedChunk
 	instance string
 	mdata.Notifier
+	idx idx.MetricIndex
 }
 
-func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
+func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierNSQ {
 	// metric cluster.notifier.nsq.messages-published is a counter of messages published to the nsq cluster notifier
 	messagesPublished = stats.NewCounter32("cluster.notifier.nsq.messages-published")
 	// metric cluster.notifier.nsq.message_size is the sizes seen of messages through the nsq cluster notifier
@@ -55,6 +58,7 @@ func New(instance string, metrics mdata.Metrics) *NotifierNSQ {
 			Instance: instance,
 			Metrics:  metrics,
 		},
+		idx: idx,
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
@@ -78,6 +82,12 @@ func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
 }
 
 func (c *NotifierNSQ) Send(sc mdata.SavedChunk) {
+	def, ok := c.idx.Get(strings.SplitN(sc.Key, "_", 2)[0])
+	if !ok {
+		log.Error(3, "nsq-cluster: failed to lookup metricDef with id %s", sc.Key)
+		return
+	}
+	sc.Name = def.Name
 	c.in <- sc
 }
 
