@@ -129,7 +129,7 @@ func store(p *Whisper, values *points.Points) {
 			return
 		}
 
-		w, err = whisper.CreateWithOptions(path, schema.Retentions, aggr.aggregationMethod, float32(aggr.xFilesFactor), &whisper.Options{
+		w, err = whisper.CreateWithOptions(path, schema.Retentions, aggr.aggregationMethod[0], float32(aggr.xFilesFactor), &whisper.Options{
 			Sparse: p.sparse,
 		})
 		if err != nil {

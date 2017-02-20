@@ -5,6 +5,7 @@ Schemas read code from https://github.com/grobian/carbonwriter/
 */
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ type whisperAggregationItem struct {
 	pattern              *regexp.Regexp
 	xFilesFactor         float64
 	aggregationMethodStr string
-	aggregationMethod    whisper.AggregationMethod
+	aggregationMethod    []whisper.AggregationMethod
 }
 
 // WhisperAggregation ...
@@ -37,7 +38,7 @@ func NewWhisperAggregation() *WhisperAggregation {
 			pattern:              nil,
 			xFilesFactor:         0.5,
 			aggregationMethodStr: "average",
-			aggregationMethod:    whisper.Average,
+			aggregationMethod:    []whisper.AggregationMethod{whisper.Average},
 		},
 	}
 }
@@ -77,25 +78,27 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 		if err != nil {
 			logrus.Errorf("failed to parse xFilesFactor '%s' in %s: %s",
 				s.ValueOf("xFilesFactor"), item.name, err.Error())
-			continue
+			return nil, err
 		}
 
 		item.aggregationMethodStr = s.ValueOf("aggregationMethod")
-		switch item.aggregationMethodStr {
-		case "average", "avg":
-			item.aggregationMethod = whisper.Average
-		case "sum":
-			item.aggregationMethod = whisper.Sum
-		case "last":
-			item.aggregationMethod = whisper.Last
-		case "max":
-			item.aggregationMethod = whisper.Max
-		case "min":
-			item.aggregationMethod = whisper.Min
-		default:
-			logrus.Errorf("unknown aggregation method '%s'",
-				s.ValueOf("aggregationMethod"))
-			continue
+		methodStrs := strings.Split(item.aggregationMethodStr, ",")
+		for _, methodStr := range methodStrs {
+			switch methodStr {
+			case "average", "avg":
+				item.aggregationMethod = append(item.aggregationMethod, whisper.Average)
+			case "sum":
+				item.aggregationMethod = append(item.aggregationMethod, whisper.Sum)
+			case "last":
+				item.aggregationMethod = append(item.aggregationMethod, whisper.Last)
+			case "max":
+				item.aggregationMethod = append(item.aggregationMethod, whisper.Max)
+			case "min":
+				item.aggregationMethod = append(item.aggregationMethod, whisper.Min)
+			default:
+				logrus.Errorf("unknown aggregation method '%s'", methodStr)
+				return result, fmt.Errorf("unknown aggregation method %q", methodStr)
+			}
 		}
 
 		logrus.Debugf("[persister] Adding aggregation [%s] pattern = %s aggregationMethod = %s xFilesFactor = %f",
