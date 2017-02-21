@@ -265,8 +265,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	if (toUnix - fromUnix) >= logMinDur {
-		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q targets: %q, maxDataPoints: %d",
-			ctx.Req.Method, from, to, request.Targets, request.MaxDataPoints)
+		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q target cnt: %d, maxDataPoints: %d",
+			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
 	}
 
 	reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
