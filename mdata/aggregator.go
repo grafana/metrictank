@@ -5,35 +5,6 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 )
 
-type AggSetting struct {
-	Span      uint32 // in seconds, controls how many input points go into an aggregated point.
-	ChunkSpan uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
-	NumChunks uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
-	TTL       uint32 // how many seconds to keep the chunk in cassandra
-	Ready     bool   // ready for reads?
-}
-
-type AggSettings struct {
-	RawTTL uint32       // TTL for raw data
-	Aggs   []AggSetting // aggregations
-}
-
-func NewAggSetting(span, chunkSpan, numChunks, ttl uint32, ready bool) AggSetting {
-	return AggSetting{
-		Span:      span,
-		ChunkSpan: chunkSpan,
-		NumChunks: numChunks,
-		TTL:       ttl,
-		Ready:     ready,
-	}
-}
-
-type AggSettingsSpanAsc []AggSetting
-
-func (a AggSettingsSpanAsc) Len() int           { return len(a) }
-func (a AggSettingsSpanAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a AggSettingsSpanAsc) Less(i, j int) bool { return a[i].Span < a[j].Span }
-
 // aggBoundary returns ts if it is a boundary, or the next boundary otherwise.
 // see description for Aggregator and unit tests, for more details
 func aggBoundary(ts uint32, span uint32) uint32 {

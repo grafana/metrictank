@@ -66,7 +66,7 @@ var (
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
 
-	aggSettings = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
+	aggSettingsStr = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
 	// Cassandra:
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -233,40 +233,11 @@ func main() {
 		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", *chunkSpanStr)
 	}
 
-	set := strings.Split(*aggSettings, ",")
-	finalSettings := make([]mdata.AggSetting, 0)
-	highestChunkSpan := chunkSpan
-	ttls := []uint32{ttl}
-	for _, v := range set {
-		if v == "" {
-			continue
-		}
-		fields := strings.Split(v, ":")
-		if len(fields) < 4 {
-			log.Fatal(4, "bad agg settings")
-		}
-		aggSpan := dur.MustParseUNsec("aggsettings", fields[0])
-		aggChunkSpan := dur.MustParseUNsec("aggsettings", fields[1])
-		aggNumChunks := dur.MustParseUNsec("aggsettings", fields[2])
-		aggTTL := dur.MustParseUNsec("aggsettings", fields[3])
-		if (mdata.Month_sec % aggChunkSpan) != 0 {
-			log.Fatal(4, "aggChunkSpan must fit without remainders into month_sec (28*24*60*60)")
-		}
-		_, ok := chunk.RevChunkSpans[aggChunkSpan]
-		if !ok {
-			log.Fatal(4, "aggChunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", fields[1])
-		}
-		highestChunkSpan = util.Max(highestChunkSpan, aggChunkSpan)
-		ready := true
-		if len(fields) == 5 {
-			ready, err = strconv.ParseBool(fields[4])
-			if err != nil {
-				log.Fatal(4, "aggsettings ready: %s", err)
-			}
-		}
-		finalSettings = append(finalSettings, mdata.NewAggSetting(aggSpan, aggChunkSpan, aggNumChunks, aggTTL, ready))
-		ttls = append(ttls, aggTTL)
+	aggSettings, err := mdata.ParseAggSettings(*aggSettingsStr)
+	if err != nil {
+		log.Fatal(4, "invalid agg-settings: %s", err)
 	}
+
 	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
 	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
 	if proftrigFreq > 0 {
@@ -302,6 +273,10 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
+	ttls := []uint32{ttl}
+	for _, agg := range aggSettings {
+		ttls = append(ttls, agg.TTL)
+	}
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
@@ -315,7 +290,7 @@ func main() {
 	/***********************************
 		Initialize our MemoryStore
 	***********************************/
-	metrics = mdata.NewAggMetrics(store, ccache, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, finalSettings)
+	metrics = mdata.NewAggMetrics(store, ccache, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, aggSettings)
 
 	/***********************************
 		Initialize our Inputs
@@ -417,6 +392,10 @@ func main() {
 	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
 	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+	highestChunkSpan := chunkSpan
+	for _, agg := range aggSettings {
+		highestChunkSpan = util.Max(chunkSpan, agg.ChunkSpan)
+	}
 	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
 
 	/***********************************
