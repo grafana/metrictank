@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -8,6 +9,11 @@ import (
 	"github.com/raintank/metrictank/cluster/partitioner"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
+)
+
+var (
+	metricsBatchSize    = flag.Int("metrics-batch-size", 1000, "number of metrics in each write batch")
+	metricsFetchDefault = flag.Int("metrics-fetch-defaut", 32768, "default number of bytes to fetch with each read")
 )
 
 func GetCompression(codec string) sarama.CompressionCodec {
@@ -39,7 +45,7 @@ func NewMetricsReplicator(srcBrokers, dstBrokers []string, compression, group, s
 	config.Group.Return.Notifications = true
 	config.ChannelBufferSize = 1000
 	config.Consumer.Fetch.Min = 1
-	config.Consumer.Fetch.Default = 32768
+	config.Consumer.Fetch.Default = int32(*metricsFetchDefault)
 	config.Consumer.MaxWaitTime = time.Second
 	config.Consumer.MaxProcessingTime = time.Second
 	config.Config.Version = sarama.V0_10_0_0
@@ -100,7 +106,7 @@ func (r *MetricsReplicator) Consume() {
 			}
 
 			buf = append(buf, md)
-			if len(buf) > 1000 {
+			if len(buf) > *metricsBatchSize {
 				r.Flush(buf)
 				counter += len(buf)
 				buf = buf[:0]
