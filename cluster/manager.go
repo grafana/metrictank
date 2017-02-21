@@ -221,37 +221,11 @@ func (c *ClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
 // data can be sent here. See MergeRemoteState as well. The `join`
 // boolean indicates this is for a join instead of a push/pull.
 func (c *ClusterManager) LocalState(join bool) []byte {
-	c.Lock()
-	meta, err := json.Marshal(c.members)
-	c.Unlock()
-	if err != nil {
-		log.Fatal(4, "CLU manager: %s", err.Error())
-	}
-	return meta
+	return nil
 }
 
 func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
-	knownMembers := make(map[string]Node)
-	err := json.Unmarshal(buf, &knownMembers)
-	if err != nil {
-		unmarshalErrMergeRemoteState.Inc()
-		log.Error(3, "CLU manager: Unable to decode remoteState message: %s", err.Error())
-		return
-	}
-	c.Lock()
-	for name, meta := range knownMembers {
-		if existing, ok := c.members[name]; ok {
-			if meta.Updated.After(existing.Updated) {
-				log.Info("CLU manager: updated node meta found in state update for %s", meta.Name)
-				c.members[name] = meta
-			}
-		} else {
-			log.Info("CLU manager: new node found in state update. %s", meta.Name)
-			c.members[name] = meta
-		}
-	}
-	c.clusterStats()
-	c.Unlock()
+	return
 }
 
 // Returns true if this node is a ready to accept requests
