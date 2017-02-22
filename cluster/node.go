@@ -2,11 +2,9 @@ package cluster
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"time"
 
@@ -22,19 +20,6 @@ const (
 	NodeReady
 	NodeUnreachable
 )
-
-var client = http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   time.Second * 5,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: time.Second,
-	},
-	Timeout: time.Second,
-}
 
 func NodeStateFromString(s string) NodeState {
 	switch s {
