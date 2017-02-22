@@ -374,7 +374,7 @@ func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Conso
 func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
 
 	oldest, memIters := s.getSeriesAggMetrics(ctx)
-	log.Debug("oldest from aggmetrics is %d\n", oldest)
+	log.Debug("oldest from aggmetrics is %d", oldest)
 
 	if oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
