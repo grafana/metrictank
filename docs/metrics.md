@@ -62,6 +62,9 @@ how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 and it was able to save its complete chunks, this node will be able to take over without dataloss.
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
+* `cluster.self.priority`:   
+The priority of the node. A lower number gives higher priority.  When using the kafkamdm input plugin this will be set to the number of seconds
+the node is lagging by.
 * `cluster.self.state.primary`:  
 whether this instance is a primary
 * `cluster.self.state.ready`:  
