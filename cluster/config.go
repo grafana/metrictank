@@ -15,6 +15,7 @@ var (
 	primary         bool
 	peersStr        string
 	mode            string
+	maxPrio         int
 	clusterPort     int
 	clusterHost     net.IP
 	clusterBindAddr string
@@ -30,6 +31,7 @@ func ConfigSetup() {
 	clusterCfg.StringVar(&peersStr, "peers", "", "TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
 	clusterCfg.StringVar(&mode, "mode", "single", "Operating mode of cluster. (single|multi)")
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
+	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	globalconf.Register("cluster", clusterCfg)
 }
 

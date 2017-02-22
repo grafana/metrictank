@@ -78,7 +78,7 @@ func (n Node) RemoteURL() string {
 }
 
 func (n Node) IsReady() bool {
-	return n.State == NodeReady
+	return n.State == NodeReady && n.Priority <= maxPrio
 }
 
 func (n Node) IsLocal() bool {
