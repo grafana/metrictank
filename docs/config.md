@@ -238,6 +238,8 @@ bind-addr = 0.0.0.0:7946
 peers =
 # Operating mode of cluster. (single|multi)
 mode = single
+# How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable
+http-timeout = 60s
 ```
 
 ## clustering transports for tracking chunk saves between replicated instances ##
