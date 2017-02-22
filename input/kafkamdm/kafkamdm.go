@@ -259,10 +259,11 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			}
 			k.handleMsg(msg.Value, partition)
 			currentOffset = msg.Offset
-		case <-ticker.C:
+		case ts := <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
 				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
 			}
+			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
 			offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
 			if err != nil {
 				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
@@ -277,7 +278,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			if err == nil {
 				lag := int(offset - currentOffset)
 				partitionLagMetric.Set(lag)
-				k.lagMonitor.Store(partition, lag)
+				k.lagMonitor.StoreLag(partition, lag)
 			}
 		case <-k.stopConsuming:
 			pc.Close()
