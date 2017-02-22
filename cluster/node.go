@@ -62,6 +62,7 @@ type Node struct {
 	Primary       bool      `json:"primary"`
 	PrimaryChange time.Time `json:"primaryChange"`
 	State         NodeState `json:"state"`
+	Priority      int       `json:"priority"`
 	Started       time.Time `json:"started"`
 	StateChange   time.Time `json:"stateChange"`
 	Partitions    []int32   `json:"partitions"`
