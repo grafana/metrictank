@@ -15,6 +15,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -25,6 +26,15 @@ var InvalidFormatErr = errors.New("invalid format specified")
 var MaxPointsPerReqErr = errors.New("request exceeds max-points-per-req limit. Reduce the number of series and or maxDataPoints requested or ask your admin to increase the limit.")
 var MaxDaysPerReqErr = errors.New("request exceeds max-days-per-req limit. Reduce the number of series and or time range requested or ask your admin to increase the limit.")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
+
+var (
+	// metric api.request.render.series is the number of series a /render request is handling.  This is the number
+	// of metrics after all of the targets in the request have expanded by searching the index.
+	reqRenderSeriesCount = stats.NewMeter32("api.request.render.series", false)
+
+	// metric api.request.render.series is the number of targets a /render request is handling.
+	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", false)
+)
 
 type Series struct {
 	Pattern string
@@ -153,8 +163,6 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
-	pre := time.Now()
-
 	targets := request.Targets
 	if maxPointsPerReq != 0 && len(targets)*int(request.MaxDataPoints) > maxPointsPerReq {
 		response.Write(ctx, response.NewError(http.StatusForbidden, MaxPointsPerReqErr.Error()))
@@ -264,6 +272,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
+	reqRenderSeriesCount.Value(len(reqs))
+	reqRenderTargetCount.Value(len(request.Targets))
 	if (toUnix - fromUnix) >= logMinDur {
 		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q target cnt: %d, maxDataPoints: %d",
 			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
@@ -297,7 +307,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 	}()
 
-	reqHandleDuration.Value(time.Now().Sub(pre))
 	response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(merged)))
 }
 

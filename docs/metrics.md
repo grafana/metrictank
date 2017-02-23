@@ -5,8 +5,25 @@
 how long it takes to get a target
 * `api.iters_to_points`:  
 how long it takes to decode points from a chunk iterator
-* `api.request_handle`:  
-how long it takes to handle a render request
+* `api.request.render.targets`:  
+the number of targets a /render request is handling
+* `api.request.render.series`:  
+the number of series a /render request is handling.  This is the number
+of metrics after all of the targets in the request have been expanded by searching the index.
+* `api.request.render.points_fetched`:  
+the number of points that need to be fetched for a /render request. This includes null values.
+* `api.request.render.points_returned`:  
+the number of points that will be returned for a /render request. This includes null values. This
+should only vary from points_fetched if runtime consolidation is performed.
+* `api.request.render.chosen_archive`:  
+the archive chosen for the request. 0 means original data, 1 means first agg level, 2 means 2nd
+* `api.request.%s.status.%d`:  
+count of the number of responses for each request path, status code combination.
+eg. `api.requests.metrics_find.200` and `api.request.render.503`
+* `api.request.%s.handle`:  
+the latency of each request by request path.
+* `api.request.%s.size`:  
+the size of each response by request path
 * `api.requests_span.mem`:  
 the timerange of requests hitting only the ringbuffer
 * `api.requests_span.mem_and_cassandra`:  
