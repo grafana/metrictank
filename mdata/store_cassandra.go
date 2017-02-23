@@ -34,10 +34,9 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
 const table_name_format = `metric_%d`
 
 var (
-	errChunkTooSmall      = errors.New("unpossibly small chunk in cassandra")
-	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
-	errStartBeforeEnd     = errors.New("start must be before end.")
-	errTableNotFound      = errors.New("table for given TTL not found")
+	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
+	errStartBeforeEnd = errors.New("start must be before end.")
+	errTableNotFound  = errors.New("table for given TTL not found")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
