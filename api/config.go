@@ -17,6 +17,7 @@ var (
 
 	Addr     string
 	UseSSL   bool
+	useGzip  bool
 	certFile string
 	keyFile  string
 )
@@ -29,6 +30,7 @@ func ConfigSetup() {
 
 	apiCfg.StringVar(&Addr, "listen", ":6060", "http listener address.")
 	apiCfg.BoolVar(&UseSSL, "ssl", false, "use HTTPS")
+	apiCfg.BoolVar(&useGzip, "gzip", true, "use GZIP compression of all responses")
 	apiCfg.StringVar(&certFile, "cert-file", "", "SSL certificate file")
 	apiCfg.StringVar(&keyFile, "key-file", "", "SSL key file")
 	globalconf.Register("http", apiCfg)

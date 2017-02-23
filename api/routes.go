@@ -10,7 +10,10 @@ import (
 
 func (s *Server) RegisterRoutes() {
 	r := s.Macaron
-	r.Use(gzip.Gziper())
+	if useGzip {
+		r.Use(gzip.Gziper())
+	}
+	r.Use(middleware.RequestStats())
 	r.Use(macaron.Renderer())
 	r.Use(middleware.OrgMiddleware())
 	r.Use(middleware.CorsHandler())
