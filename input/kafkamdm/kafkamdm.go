@@ -27,10 +27,10 @@ var metricsDecodeErr = stats.NewCounter32("input.kafka-mdm.metrics_decode_err")
 
 type KafkaMdm struct {
 	input.Handler
-	consumer sarama.Consumer
-	client   sarama.Client
-
-	wg sync.WaitGroup
+	consumer   sarama.Consumer
+	client     sarama.Client
+	lagMonitor *LagMonitor
+	wg         sync.WaitGroup
 
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
@@ -187,6 +187,7 @@ func New() *KafkaMdm {
 	k := KafkaMdm{
 		consumer:      consumer,
 		client:        client,
+		lagMonitor:    NewLagMonitor(10, partitions),
 		stopConsuming: make(chan struct{}),
 	}
 
@@ -215,6 +216,8 @@ func (k *KafkaMdm) Start(handler input.Handler) {
 			go k.consumePartition(topic, partition, offset)
 		}
 	}
+
+	go k.setClusterPrio()
 }
 
 // this will continually consume from the topic until k.stopConsuming is triggered.
@@ -248,7 +251,6 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
-
 	for {
 		select {
 		case msg := <-messages:
@@ -257,10 +259,11 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			}
 			k.handleMsg(msg.Value, partition)
 			currentOffset = msg.Offset
-		case <-ticker.C:
+		case ts := <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
 				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
 			}
+			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
 			offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
 			if err != nil {
 				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
@@ -273,7 +276,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			}
 			partitionOffsetMetric.Set(int(currentOffset))
 			if err == nil {
-				partitionLagMetric.Set(int(offset - currentOffset))
+				lag := int(offset - currentOffset)
+				partitionLagMetric.Set(lag)
+				k.lagMonitor.StoreLag(partition, lag)
 			}
 		case <-k.stopConsuming:
 			pc.Close()
@@ -306,4 +311,16 @@ func (k *KafkaMdm) Stop() {
 	k.wg.Wait()
 	k.client.Close()
 	offsetMgr.Close()
+}
+
+func (k *KafkaMdm) setClusterPrio() {
+	ticker := time.NewTicker(time.Second * 10)
+	for {
+		select {
+		case <-k.stopConsuming:
+			return
+		case <-ticker.C:
+			cluster.Manager.SetPriority(k.lagMonitor.Metric())
+		}
+	}
 }

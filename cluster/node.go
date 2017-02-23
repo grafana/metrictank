@@ -62,6 +62,7 @@ type Node struct {
 	Primary       bool      `json:"primary"`
 	PrimaryChange time.Time `json:"primaryChange"`
 	State         NodeState `json:"state"`
+	Priority      int       `json:"priority"`
 	Started       time.Time `json:"started"`
 	StateChange   time.Time `json:"stateChange"`
 	Partitions    []int32   `json:"partitions"`
@@ -77,7 +78,7 @@ func (n Node) RemoteURL() string {
 }
 
 func (n Node) IsReady() bool {
-	return n.State == NodeReady
+	return n.State == NodeReady && n.Priority <= maxPrio
 }
 
 func (n Node) IsLocal() bool {

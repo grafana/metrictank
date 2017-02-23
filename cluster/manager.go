@@ -24,6 +24,8 @@ var (
 	nodePrimary = stats.NewBool("cluster.self.state.primary")
 	// metric cluster.self.partitions is the number of partitions this instance consumes
 	nodePartitions = stats.NewGauge32("cluster.self.partitions")
+	// metric cluster.self.priority is the priority of the node. A lower number gives higher priority
+	nodePriority = stats.NewGauge32("cluster.self.priority")
 
 	// metric cluster.total.state.primary-ready is the number of nodes we know to be primary and ready
 	totalPrimaryReady = stats.NewGauge32("cluster.total.state.primary-ready")
@@ -308,4 +310,21 @@ func (c *ClusterManager) GetPartitions() []int32 {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].Partitions
+}
+
+// set the priority of this node.
+// lower values == higher priority
+func (c *ClusterManager) SetPriority(prio int) {
+	c.Lock()
+	if c.members[c.nodeName].Priority == prio {
+		c.Unlock()
+		return
+	}
+	node := c.members[c.nodeName]
+	node.Priority = prio
+	node.Updated = time.Now()
+	c.members[c.nodeName] = node
+	c.Unlock()
+	nodePriority.Set(prio)
+	c.BroadcastUpdate()
 }
