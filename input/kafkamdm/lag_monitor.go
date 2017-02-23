@@ -65,25 +65,23 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 		return
 	}
 	metrics := offset - o.lastOffset
-
 	o.lastOffset = offset
-
 	duration := int64(ts.Sub(o.lastTs) / time.Second)
 	o.lastTs = ts
 	if duration <= 0 {
-		// current ts is > last ts. This would only happen if our clock
+		// current ts is <= last ts. This would only happen if our clock
 		// suddenly changes, in which case we cant reliably work out how
-		// low it has really been since we last took a measurement.
+		// long it has really been since we last took a measurement.
 		return
 	}
-	rate := metrics / duration
-	if rate < 0 {
+	if metrics < 0 {
 		// this is possible if our offset counter rolls over or is reset.
 		// If it was a rollover we could compute the rate, but it is safer
 		// to just keep using the last computed rate, and wait for the next
 		// measurement to compute a new rate.
 		return
 	}
+	rate := metrics / duration
 	o.rate = rate
 	return
 }
