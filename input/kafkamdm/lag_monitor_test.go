@@ -52,6 +52,55 @@ func TestRateLogger(t *testing.T) {
 	})
 }
 
+func TestRateLoggerSmallIncrements(t *testing.T) {
+	logger := newRateLogger()
+	now := time.Now()
+	Convey("after 1st measurements", t, func() {
+		logger.Store(10, now)
+		So(logger.Rate(), ShouldEqual, 0)
+	})
+	Convey("with 2nd measurements", t, func() {
+		logger.Store(20, now.Add(200*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 0)
+	})
+	Convey("with 3rd measurements", t, func() {
+		logger.Store(30, now.Add(400*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 0)
+	})
+	Convey("with 4th measurements", t, func() {
+		logger.Store(40, now.Add(600*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 0)
+	})
+	Convey("with 5th measurements", t, func() {
+		logger.Store(50, now.Add(800*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 0)
+	})
+	Convey("with 6th measurements", t, func() {
+		logger.Store(60, now.Add(1000*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 60-10)
+	})
+	Convey("with 7th measurements", t, func() {
+		logger.Store(80, now.Add(1200*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 60-10)
+	})
+	Convey("with 8th measurements", t, func() {
+		logger.Store(100, now.Add(1400*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 60-10)
+	})
+	Convey("with 9th measurements", t, func() {
+		logger.Store(120, now.Add(1600*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 60-10)
+	})
+	Convey("with 10th measurements", t, func() {
+		logger.Store(140, now.Add(1800*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 60-10)
+	})
+	Convey("with 11th measurements", t, func() {
+		logger.Store(160, now.Add(2000*time.Millisecond))
+		So(logger.Rate(), ShouldEqual, 160-60)
+	})
+}
+
 func TestLagMonitor(t *testing.T) {
 	mon := NewLagMonitor(10, []int32{0, 1, 2, 3})
 	Convey("with 0 measurements", t, func() {
