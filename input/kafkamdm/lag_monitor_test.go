@@ -46,9 +46,6 @@ func TestRateLogger(t *testing.T) {
 		logger.Store(25, now)
 		So(logger.Rate(), ShouldEqual, 5)
 	})
-
-	//	metrics 15 duration 9s rate is 1
-
 	Convey("with less then 1per second", t, func() {
 		logger.Store(30, now.Add(time.Second*10))
 		So(logger.Rate(), ShouldEqual, 0)

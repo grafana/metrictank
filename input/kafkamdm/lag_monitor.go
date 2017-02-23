@@ -64,25 +64,35 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 		o.lastTs = ts
 		return
 	}
-	metrics := offset - o.lastOffset
-	o.lastOffset = offset
-	duration := int64(ts.Sub(o.lastTs) / time.Second)
-	o.lastTs = ts
-	if duration <= 0 {
-		// current ts is <= last ts. This would only happen if our clock
-		// suddenly changes, in which case we cant reliably work out how
-		// long it has really been since we last took a measurement.
+	duration := ts.Sub(o.lastTs)
+	if duration < time.Second && duration > 0 {
+		// too small difference. either due to clock adjustment or this method
+		// is called very frequently, e.g. due to a subsecond offset-commit-interval.
+		// We need to let more time pass to make an accurate calculation.
 		return
 	}
+	if duration <= 0 {
+		// current ts is <= last ts. This would only happen if clock went back in time
+		// in which case we can't reliably work out how
+		// long it has really been since we last took a measurement.
+		// but set a new baseline for next time
+		o.lastTs = ts
+		o.lastOffset = offset
+		return
+	}
+	metrics := offset - o.lastOffset
+	o.lastTs = ts
+	o.lastOffset = offset
 	if metrics < 0 {
 		// this is possible if our offset counter rolls over or is reset.
 		// If it was a rollover we could compute the rate, but it is safer
 		// to just keep using the last computed rate, and wait for the next
-		// measurement to compute a new rate.
+		// measurement to compute a new rate based on the new baseline
 		return
 	}
-	rate := metrics / duration
-	o.rate = rate
+	// note the multiplication overflows if you have 9 billion metrics
+	// sice max int64 is 9 223 372 036 854 775 807 (not an issue in practice)
+	o.rate = (1e9 * metrics / int64(duration)) // metrics/ns -> metrics/s
 	return
 }
 
