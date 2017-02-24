@@ -139,7 +139,7 @@ func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) 
 
 func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
 	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.Name, orgId, patterns)
-	buf, err := peer.Post("/index/find", models.IndexFind{Patterns: patterns, OrgId: orgId})
+	buf, err := peer.Post("/index/find", models.IndexFind{Patterns: patterns, OrgId: orgId, From: seenAfter})
 	if err != nil {
 		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.Name, err)
 		return nil, err
@@ -311,13 +311,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
-	// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
-	// filtering by our From timestamp.  This should be moved to a configuration option,
-	// but that will require significant refactoring to expose the updateInterval used
-	// in the MetricIdx.  So this will have to do for now.
-	if request.From != 0 {
-		request.From -= 86400
-	}
 	nodes := make([]idx.Node, 0)
 	series, err := s.findSeries(ctx.OrgId, []string{request.Query}, request.From)
 	if err != nil {
