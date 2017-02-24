@@ -26,9 +26,6 @@ var (
 	// metric api.iters_to_points is how long it takes to decode points from a chunk iterator
 	itersToPointsDuration = stats.NewLatencyHistogram15s32("api.iters_to_points")
 
-	// metric api.request_handle is how long it takes to handle a render request
-	reqHandleDuration = stats.NewLatencyHistogram15s32("api.request_handle")
-
 	// metric api.requests_span.mem_and_cassandra is the timerange of requests hitting both in-memory and cassandra
 	reqSpanBoth = stats.NewMeter32("api.requests_span.mem_and_cassandra", false)
 

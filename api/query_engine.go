@@ -8,9 +8,13 @@ import (
 )
 
 var (
-	numPointsFetch  = stats.NewMeter32("api.align_requests.num_points_fetching", false)
-	numPointsReturn = stats.NewMeter32("api.align_requests.num_points_returning", false)
-	chosenArchive   = stats.NewMeter32("api.align_requests.chosen_archive", false)
+	// metric api.request.render.chosen_archive is the archive chosen for the request.
+	// 0 means original data, 1 means first agg level, 2 means 2nd
+	reqRenderChosenArchive = stats.NewMeter32("api.request.render.chosen_archive", false)
+	// metric api.request.render.series is the number of points that need to be fetched for a /render request.
+	reqRenderPointsFetched = stats.NewMeter32("api.request.render.points_fetched", false)
+	// metric api.request.render.series is the number of points the request will return.
+	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
@@ -86,9 +90,9 @@ func alignRequests(now uint32, reqs []models.Req, s mdata.AggSettings) ([]models
 		pointsFetch += tsRange / req.ArchInterval
 	}
 
-	numPointsFetch.ValueUint32(pointsFetch)
-	numPointsReturn.ValueUint32(uint32(len(reqs)) * tsRange / interval)
-	chosenArchive.Values(archive, len(reqs))
+	reqRenderPointsFetched.ValueUint32(pointsFetch)
+	reqRenderPointsReturned.ValueUint32(uint32(len(reqs)) * tsRange / interval)
+	reqRenderChosenArchive.Values(archive, len(reqs))
 
 	return reqs, nil
 }

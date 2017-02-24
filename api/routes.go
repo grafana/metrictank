@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/go-macaron/binding"
+	"github.com/go-macaron/gzip"
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/macaron.v1"
@@ -9,6 +10,10 @@ import (
 
 func (s *Server) RegisterRoutes() {
 	r := s.Macaron
+	if useGzip {
+		r.Use(gzip.Gziper())
+	}
+	r.Use(middleware.RequestStats())
 	r.Use(macaron.Renderer())
 	r.Use(middleware.OrgMiddleware())
 	r.Use(middleware.CorsHandler())
