@@ -46,7 +46,7 @@ numchunks = 7
 ttl = 35d
 # max age for a chunk before to be considered stale and to be persisted to Cassandra
 chunk-max-stale = 1h
-# max age for a metric before to be considered stale and to be purged from memory
+# max age for a metric before to be considered stale and to be purged from in-memory ring buffer.
 metric-max-stale = 6h
 # Interval to run garbage collection job
 gc-interval = 1h
@@ -163,6 +163,8 @@ max-size = 4294967296
 [http]
 # tcp address for metrictank to bind to for its HTTP interface
 listen = :6060
+# use gzip compression
+gzip = true
 # use HTTPS
 ssl = false
 # SSL certificate file
@@ -231,6 +233,8 @@ net-max-open-requests = 100
 [cluster]
 # The primary node writes data to cassandra. There should only be 1 primary node per shardGroup.
 primary-node = true
+# maximum priority before a node should be considered not-ready.
+max-priority = 10
 # the TCP/UDP address to listen on for the gossip protocol.
 bind-addr = 0.0.0.0:7946
 # TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances.
