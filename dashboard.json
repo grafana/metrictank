@@ -1034,7 +1034,7 @@
             },
             {
               "refId": "F",
-              "target": "alias(metrictank.stats.$environment.$instance.api.mem.to_iter.latency.mean.gauge32, 'mem to iter')",
+              "target": "alias(metrictank.stats.$environment.$instance.mem.to_iter.latency.mean.gauge32, 'mem to iter')",
               "textEditor": false
             }
           ],
