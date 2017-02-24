@@ -37,6 +37,9 @@ var (
 	// metric idx.memory.prune is the duration of successful memory idx prunes
 	statPruneDuration = stats.NewLatencyHistogram15s32("idx.memory.prune")
 
+	// metric idx.memory.filtered is number of series that have been excluded from responses due to their lastUpdate property
+	statFiltered = stats.NewCounter32("idx.memory.filtered")
+
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
@@ -296,6 +299,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 				for _, id := range n.Defs {
 					def := m.DefById[id]
 					if from != 0 && def.LastUpdate < from {
+						statFiltered.Inc()
 						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, def.LastUpdate)
 						continue
 					}
