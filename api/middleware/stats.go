@@ -38,7 +38,7 @@ func (r *requestStats) PathLatency(path string, dur time.Duration) {
 	r.Lock()
 	p, ok := r.latencyHistograms[path]
 	if !ok {
-		p = stats.NewLatencyHistogram15s32(fmt.Sprintf("api.request.%s.handle", path))
+		p = stats.NewLatencyHistogram15s32(fmt.Sprintf("api.request.%s", path))
 		r.latencyHistograms[path] = p
 	}
 	r.Unlock()

@@ -20,7 +20,7 @@ the archive chosen for the request. 0 means original data, 1 means first agg lev
 * `api.request.%s.status.%d`:  
 count of the number of responses for each request path, status code combination.
 eg. `api.requests.metrics_find.200` and `api.request.render.503`
-* `api.request.%s.handle`:  
+* `api.request.%s.latency`:  
 the latency of each request by request path.
 * `api.request.%s.size`:  
 the size of each response by request path
