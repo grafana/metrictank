@@ -154,6 +154,8 @@ the duration of (successful) update of a metric to the memory idx
 the number of successful updates to the memory idx
 * `idx.metrics_active`:  
 the number of currently known metrics in the index
+* `idx.memory.filtered`:  
+number of series that have been excluded from responses due to their lastUpdate property
 * `mem.to_iter`:  
 how long it takes to transform in-memory chunks to iterators
 * `memory.bytes.obtained_from_sys`:  
