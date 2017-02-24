@@ -706,15 +706,15 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.median.gauge32, 'median')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.latency.median.gauge32, 'median')"
             },
             {
               "refId": "B",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.p90.gauge32, 'p90')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.latency.p90.gauge32, 'p90')"
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.max.gauge32, 'max')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.latency.max.gauge32, 'max')"
             },
             {
               "refId": "D",
@@ -722,7 +722,7 @@
             },
             {
               "refId": "E",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.values.rate32, 'reqs')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.values.rate32, 'reqs')"
             }
           ],
           "thresholds": [],
@@ -1011,7 +1011,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request_handle.latency.mean.gauge32, 'total request handle')"
+              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.latency.mean.gauge32, 'total request handle')"
             },
             {
               "refId": "B",
