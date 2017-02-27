@@ -557,6 +557,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 			break
 		}
 
+		if len(bNode.Children) == 0 {
+			log.Error(3, "memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
+			break
+		}
+
 		if bNode.Children[0] != nodes[i] {
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
