@@ -330,6 +330,89 @@ func TestMixedBranchLeaf(t *testing.T) {
 	})
 }
 
+func TestMixedBranchLeafDelete(t *testing.T) {
+	ix := New()
+	ix.Init()
+	series := []*schema.MetricData{
+		{
+			Name:     "a.b.c",
+			Metric:   "a.b.c",
+			OrgId:    1,
+			Interval: 10,
+		},
+		{
+			Name:     "a.b.c.d",
+			Metric:   "a.b.c.d",
+			OrgId:    1,
+			Interval: 10,
+		},
+		{
+			Name:     "a.b.c2",
+			Metric:   "a.b.c2",
+			OrgId:    1,
+			Interval: 10,
+		},
+		{
+			Name:     "a.b.c2.d.e",
+			Metric:   "a.b.c2.d.e",
+			OrgId:    1,
+			Interval: 10,
+		},
+		{
+			Name:     "a.b.c2.d2.e",
+			Metric:   "a.b.c2.d2.e",
+			OrgId:    1,
+			Interval: 10,
+		},
+	}
+	for _, s := range series {
+		s.SetId()
+		ix.AddOrUpdate(s, 1)
+	}
+	Convey("when deleting mixed leaf/branch", t, func() {
+		defs, err := ix.Delete(1, "a.b.c")
+		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 2)
+		deletedIds := make([]string, len(defs))
+		for i, d := range defs {
+			deletedIds[i] = d.Id
+		}
+		So(series[0].Id, ShouldBeIn, deletedIds)
+		So(series[1].Id, ShouldBeIn, deletedIds)
+		Convey("series should not be present in the metricDef index", func() {
+			_, ok := ix.Get(series[0].Id)
+			So(ok, ShouldEqual, false)
+			Convey("series should not be present in searches", func() {
+				found, err := ix.Find(1, "a.b.c", 0)
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 0)
+				found, err = ix.Find(1, "a.b.c.d", 0)
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 0)
+			})
+		})
+	})
+	Convey("when deleting from branch", t, func() {
+		defs, err := ix.Delete(1, "a.b.c2.d.*")
+		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 1)
+		So(defs[0].Id, ShouldEqual, series[3].Id)
+
+		Convey("deleted series should not be present in the metricDef index", func() {
+			_, ok := ix.Get(series[3].Id)
+			So(ok, ShouldEqual, false)
+			Convey("deleted series should not be present in searches", func() {
+				found, err := ix.Find(1, "a.b.c2.*", 0)
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 1)
+				found, err = ix.Find(1, "a.b.c2.d", 0)
+				So(err, ShouldBeNil)
+				So(found, ShouldHaveLength, 0)
+			})
+		})
+	})
+}
+
 func TestPrune(t *testing.T) {
 	ix := New()
 	ix.Init()

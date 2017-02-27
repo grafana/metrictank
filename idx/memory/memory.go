@@ -492,7 +492,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 
 	for _, f := range found {
 		deleted := m.delete(orgId, f)
-		statMetricsActive.Dec()
+		statMetricsActive.DecUint32(uint32(len(deleted)))
 		deletedDefs = append(deletedDefs, deleted...)
 	}
 	statDeleteDuration.Value(time.Since(pre))
@@ -501,10 +501,10 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 
 func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 	tree := m.Tree[orgId]
+	deletedDefs := make([]schema.MetricDefinition, 0)
 	if n.HasChildren() {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
-		deletedDefs := make([]schema.MetricDefinition, 0)
 		for _, child := range n.Children {
 			node, ok := tree.Items[n.Path+"."+child]
 			if !ok {
@@ -515,17 +515,16 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 			deleted := m.delete(orgId, node)
 			deletedDefs = append(deletedDefs, deleted...)
 		}
-		return deletedDefs
 	}
-	deletedDefs := make([]schema.MetricDefinition, len(n.Defs))
+
 	// delete the metricDefs
-	for i, id := range n.Defs {
+	for _, id := range n.Defs {
 		log.Debug("memory-idx: deleting %s from index", id)
-		deletedDefs[i] = *m.DefById[id]
+		deletedDefs = append(deletedDefs, *m.DefById[id])
 		delete(m.DefById, id)
 	}
 
-	// delete the leaf.
+	// delete the node.
 	delete(tree.Items, n.Path)
 
 	// delete from the branches
@@ -558,10 +557,13 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
-		if !bNode.Leaf() {
-			log.Debug("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
-			delete(tree.Items, branch)
+		bNode.Children = make([]string, 0)
+		if bNode.Leaf() {
+			log.Debug("memory-idx: branch %s is also a leaf node, keeping it.", branch)
+			break
 		}
+		log.Debug("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
+		delete(tree.Items, branch)
 	}
 
 	return deletedDefs
