@@ -527,7 +527,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 	// delete the node.
 	delete(tree.Items, n.Path)
 
-	// delete from the branches
+	// delete node from the branches
+	// e.g. for foo.bar.baz
+	// branch "foo.bar" -> node "baz"
+	// branch "foo"     -> node "bar"
+	// branch ""        -> node "foo"
 	nodes := strings.Split(n.Path, ".")
 	for i := len(nodes) - 1; i >= 0; i-- {
 		branch := strings.Join(nodes[0:i], ".")
