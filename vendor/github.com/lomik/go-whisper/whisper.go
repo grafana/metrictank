@@ -96,7 +96,7 @@ func parseRetentionPart(retentionPart string) (int, error) {
 */
 func ParseRetentionDef(retentionDef string) (*Retention, error) {
 	parts := strings.Split(retentionDef, ":")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 		return nil, fmt.Errorf("Not enough parts in retentionDef [%v]", retentionDef)
 	}
 	precision, err := parseRetentionPart(parts[0])
@@ -104,13 +104,14 @@ func ParseRetentionDef(retentionDef string) (*Retention, error) {
 		return nil, fmt.Errorf("Failed to parse precision: %v", err)
 	}
 
-	points, err := parseRetentionPart(parts[1])
+	ttl, err := parseRetentionPart(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse points: %v", err)
 	}
-	points /= precision
 
-	return &Retention{precision, points}, err
+	return &Retention{
+		secondsPerPoint: precision,
+		numberOfPoints:  ttl / precision}, err
 }
 
 func ParseRetentionDefs(retentionDefs string) (Retentions, error) {
@@ -789,9 +790,14 @@ func (whisper *Whisper) readInt(offset int64) (int, error) {
   it records.
 */
 type Retention struct {
-	secondsPerPoint int
-	numberOfPoints  int
+	secondsPerPoint int    // interval in seconds
+	numberOfPoints  int    // ~ttl
+	ChunkSpan       uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
+	NumChunks       uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
+	Ready           bool   // ready for reads?
 }
+
+// note missing, but can be gotten via MaxRetention: TTL       uint32 // how many seconds to keep the chunk in cassandra
 
 func (retention *Retention) MaxRetention() int {
 	return retention.secondsPerPoint * retention.numberOfPoints
@@ -811,8 +817,8 @@ func (retention *Retention) NumberOfPoints() int {
 
 func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
 	return Retention{
-		secondsPerPoint,
-		numberOfPoints,
+		secondsPerPoint: secondsPerPoint,
+		numberOfPoints:  numberOfPoints,
 	}
 }
 
@@ -998,7 +1004,7 @@ func unpackFloat64(b []byte) float64 {
 }
 
 func unpackArchiveInfo(b []byte) *archiveInfo {
-	return &archiveInfo{Retention{unpackInt(b[IntSize : IntSize*2]), unpackInt(b[IntSize*2 : IntSize*3])}, unpackInt(b[:IntSize])}
+	return &archiveInfo{Retention{secondsPerPoint: unpackInt(b[IntSize : IntSize*2]), numberOfPoints: unpackInt(b[IntSize*2 : IntSize*3])}, unpackInt(b[:IntSize])}
 }
 
 func unpackDataPoint(b []byte) dataPoint {
