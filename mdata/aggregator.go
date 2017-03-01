@@ -46,14 +46,14 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret w
 		switch agg {
 		case whisper.Average:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{&ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{ret}, nil)
 			}
 			if aggregator.cntMetric == nil {
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), whisper.Retentions{&ret}, nil)
+				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), whisper.Retentions{ret}, nil)
 			}
 		case whisper.Sum:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{&ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{ret}, nil)
 			}
 		case whisper.Last:
 			if aggregator.lstMetric == nil {
@@ -61,11 +61,11 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret w
 			}
 		case whisper.Max:
 			if aggregator.maxMetric == nil {
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), whisper.Retentions{&ret}, nil)
+				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), whisper.Retentions{ret}, nil)
 			}
 		case whisper.Min:
 			if aggregator.minMetric == nil {
-				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), whisper.Retentions{&ret}, nil)
+				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), whisper.Retentions{ret}, nil)
 			}
 		}
 	}

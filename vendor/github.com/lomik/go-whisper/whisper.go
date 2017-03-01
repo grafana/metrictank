@@ -94,22 +94,22 @@ func parseRetentionPart(retentionPart string) (int, error) {
 
   See: http://graphite.readthedocs.org/en/1.0/config-carbon.html#storage-schemas-conf
 */
-func ParseRetentionDef(retentionDef string) (*Retention, error) {
+func ParseRetentionDef(retentionDef string) (Retention, error) {
 	parts := strings.Split(retentionDef, ":")
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("Not enough parts in retentionDef [%v]", retentionDef)
+		return Retention{}, fmt.Errorf("Not enough parts in retentionDef [%v]", retentionDef)
 	}
 	precision, err := parseRetentionPart(parts[0])
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse precision: %v", err)
+		return Retention{}, fmt.Errorf("Failed to parse precision: %v", err)
 	}
 
 	ttl, err := parseRetentionPart(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse points: %v", err)
+		return Retention{}, fmt.Errorf("Failed to parse points: %v", err)
 	}
 
-	return &Retention{
+	return Retention{
 		secondsPerPoint: precision,
 		numberOfPoints:  ttl / precision}, err
 }
@@ -193,7 +193,7 @@ func CreateWithOptions(path string, retentions Retentions, aggregationMethod Agg
 	offset := MetadataSize + (ArchiveInfoSize * len(retentions))
 	whisper.archives = make([]*archiveInfo, 0, len(retentions))
 	for _, retention := range retentions {
-		whisper.archives = append(whisper.archives, &archiveInfo{*retention, offset})
+		whisper.archives = append(whisper.archives, &archiveInfo{retention, offset})
 		offset += retention.Size()
 	}
 
@@ -822,8 +822,8 @@ func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
 	}
 }
 
-func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready bool) *Retention {
-	return &Retention{
+func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready bool) Retention {
+	return Retention{
 		secondsPerPoint: secondsPerPoint,
 		numberOfPoints:  int(ttl) / secondsPerPoint,
 		ChunkSpan:       chunkSpan,
@@ -832,7 +832,7 @@ func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready
 	}
 }
 
-type Retentions []*Retention
+type Retentions []Retention
 
 func (r Retentions) Len() int {
 	return len(r)

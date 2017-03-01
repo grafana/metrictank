@@ -17,9 +17,8 @@ func MatchSchema(key string) (uint16, persister.Schema) {
 
 // MatchAgg returns the aggregation definition for the given metric key, and the index of it (to efficiently reference it)
 // i may be 1 more than the last defined by user, in which case it's the default.
-func MatchAgg(key string) (uint16, *persister.WhisperAggregationItem) {
-	i, agg := Aggregations.Match(key)
-	return i, agg
+func MatchAgg(key string) (uint16, persister.WhisperAggregationItem) {
+	return Aggregations.Match(key)
 }
 
 // caller must assure i is valid
@@ -31,9 +30,9 @@ func GetRetentions(i uint16) whisper.Retentions {
 // note the special case
 func GetAgg(i uint16) persister.WhisperAggregationItem {
 	if i+1 > uint16(len(Aggregations.Data)) {
-		return *Aggregations.Default
+		return Aggregations.Default
 	}
-	return *Aggregations.Data[i]
+	return Aggregations.Data[i]
 }
 
 // TTLs returns a slice of all TTL's seen amongst all archives of all schemas

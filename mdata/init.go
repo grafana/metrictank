@@ -45,7 +45,7 @@ var (
 
 	// set either via ConfigProcess or from the unit tests. other code should not touch
 	Schemas      persister.WhisperSchemas
-	Aggregations *persister.WhisperAggregation
+	Aggregations persister.WhisperAggregation
 
 	schemasFile = "/etc/raintank/storage-schemas.conf"
 	aggFile     = "/etc/raintank/storage-aggregation.conf"

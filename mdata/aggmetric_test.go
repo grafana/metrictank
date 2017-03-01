@@ -94,7 +94,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	mockCache.CacheIfHotCb = func() { calledCb <- true }
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
-	ret := []*whisper.Retention{whisper.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	ret := []whisper.Retention{whisper.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
 	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
@@ -130,7 +130,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	ret := []*whisper.Retention{whisper.NewRetentionMT(1, 1, 100, 5, true)}
+	ret := []whisper.Retention{whisper.NewRetentionMT(1, 1, 100, 5, true)}
 	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil))
 
 	// basic case, single range

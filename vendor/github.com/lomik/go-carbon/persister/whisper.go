@@ -111,10 +111,6 @@ func store(p *Whisper, values *points.Points) {
 		}
 
 		_, aggr := p.aggregation.Match(values.Metric)
-		if aggr == nil {
-			logrus.Errorf("[persister] No storage aggregation defined for %s", values.Metric)
-			return
-		}
 
 		logrus.WithFields(logrus.Fields{
 			"retention":    schema.RetentionStr,
