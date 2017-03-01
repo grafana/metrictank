@@ -105,11 +105,10 @@ func ParseRetentionDefs(retentionDefs string) (whisper.Retentions, error) {
 		val1, err1 := strconv.ParseInt(parts[0], 10, 0)
 		val2, err2 := strconv.ParseInt(parts[1], 10, 0)
 
-		var retention *whisper.Retention
+		var retention whisper.Retention
 		var err error
 		if err1 == nil && err2 == nil {
-			ret := whisper.NewRetention(int(val1), int(val2))
-			retention = &ret
+			retention = whisper.NewRetention(int(val1), int(val2))
 		} else {
 			// try new format
 			retention, err = whisper.ParseRetentionDef(retentionDef)

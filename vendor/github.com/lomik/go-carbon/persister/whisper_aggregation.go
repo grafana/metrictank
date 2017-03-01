@@ -25,15 +25,15 @@ type WhisperAggregationItem struct {
 
 // WhisperAggregation ...
 type WhisperAggregation struct {
-	Data    []*WhisperAggregationItem
-	Default *WhisperAggregationItem
+	Data    []WhisperAggregationItem
+	Default WhisperAggregationItem
 }
 
 // NewWhisperAggregation create instance of WhisperAggregation
-func NewWhisperAggregation() *WhisperAggregation {
-	return &WhisperAggregation{
-		Data: make([]*WhisperAggregationItem, 0),
-		Default: &WhisperAggregationItem{
+func NewWhisperAggregation() WhisperAggregation {
+	return WhisperAggregation{
+		Data: make([]WhisperAggregationItem, 0),
+		Default: WhisperAggregationItem{
 			name:                 "default",
 			pattern:              nil,
 			XFilesFactor:         0.5,
@@ -44,21 +44,21 @@ func NewWhisperAggregation() *WhisperAggregation {
 }
 
 // ReadWhisperAggregation ...
-func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
+func ReadWhisperAggregation(file string) (WhisperAggregation, error) {
 	config, err := configparser.Read(file)
 	if err != nil {
-		return nil, err
+		return WhisperAggregation{}, err
 	}
 	// pp.Println(config)
 	sections, err := config.AllSections()
 	if err != nil {
-		return nil, err
+		return WhisperAggregation{}, err
 	}
 
 	result := NewWhisperAggregation()
 
 	for _, s := range sections {
-		item := &WhisperAggregationItem{}
+		item := WhisperAggregationItem{}
 		// this is mildly stupid, but I don't feel like forking
 		// configparser just for this
 		item.name =
@@ -71,14 +71,14 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 		if err != nil {
 			logrus.Errorf("[persister] Failed to parse pattern '%s'for [%s]: %s",
 				s.ValueOf("pattern"), item.name, err.Error())
-			return nil, err
+			return WhisperAggregation{}, err
 		}
 
 		item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
 		if err != nil {
 			logrus.Errorf("failed to parse xFilesFactor '%s' in %s: %s",
 				s.ValueOf("xFilesFactor"), item.name, err.Error())
-			return nil, err
+			return WhisperAggregation{}, err
 		}
 
 		item.aggregationMethodStr = s.ValueOf("aggregationMethod")
@@ -112,7 +112,7 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 }
 
 // Match find schema for metric
-func (a *WhisperAggregation) Match(metric string) (uint16, *WhisperAggregationItem) {
+func (a *WhisperAggregation) Match(metric string) (uint16, WhisperAggregationItem) {
 	for i, s := range a.Data {
 		if s.pattern.MatchString(metric) {
 			return uint16(i), s

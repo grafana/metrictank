@@ -61,7 +61,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	for _, ret := range retentions[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, *ret, *agg))
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg))
 	}
 
 	return &m
