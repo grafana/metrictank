@@ -112,11 +112,11 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 }
 
 // Match find schema for metric
-func (a *WhisperAggregation) match(metric string) *whisperAggregationItem {
-	for _, s := range a.Data {
+func (a *WhisperAggregation) Match(metric string) (uint16, *whisperAggregationItem) {
+	for i, s := range a.Data {
 		if s.pattern.MatchString(metric) {
-			return s
+			return uint16(i), s
 		}
 	}
-	return a.Default
+	return uint16(len(a.Data)), a.Default // default has the index of one more than last of what's in a.Data
 }

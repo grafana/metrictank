@@ -82,13 +82,13 @@ func (s WhisperSchemas) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s WhisperSchemas) Less(i, j int) bool { return s[i].Priority >= s[j].Priority }
 
 // Match finds the schema for metric or returns false if none found
-func (s WhisperSchemas) Match(metric string) (Schema, bool) {
-	for _, schema := range s {
+func (s WhisperSchemas) Match(metric string) (uint16, Schema, bool) {
+	for i, schema := range s {
 		if schema.Pattern.MatchString(metric) {
-			return schema, true
+			return uint16(i), schema, true
 		}
 	}
-	return Schema{}, false
+	return 0, Schema{}, false
 }
 
 // ParseRetentionDefs parses retention definitions into a Retentions structure
