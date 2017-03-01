@@ -68,7 +68,7 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.AddOrUpdate(s, 1)
+				ix.AddOrUpdate(s, 1, 0, 0)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -86,7 +86,7 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.AddOrUpdate(series, 1)
+			ix.AddOrUpdate(series, 1, 0, 0)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -100,23 +100,23 @@ func TestFind(t *testing.T) {
 	ix.Init()
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
 		s.Time = 10 * 86400
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
 		s.Time = 10 * 86400
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
 		s.Time = 1 * 86400
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 		s.Time = 2 * 86400
 		s.Interval = 60
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
 		s.Time = 1 * 86400
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -226,10 +226,10 @@ func TestDelete(t *testing.T) {
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
 
 	for _, s := range publicSeries {
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	for _, s := range org1Series {
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	Convey("when deleting exact path", t, func() {
 		defs, err := ix.Delete(1, org1Series[0].Name)
@@ -307,11 +307,11 @@ func TestMixedBranchLeaf(t *testing.T) {
 
 	Convey("when adding the first metric", t, func() {
 
-		err := ix.AddOrUpdate(first, 1)
+		err := ix.AddOrUpdate(first, 1, 0, 0)
 		So(err, ShouldBeNil)
 		Convey("we should be able to add a leaf under another leaf", func() {
 
-			err = ix.AddOrUpdate(second, 1)
+			err = ix.AddOrUpdate(second, 1, 0, 0)
 			So(err, ShouldBeNil)
 			_, ok := ix.Get(second.Id)
 			So(ok, ShouldEqual, true)
@@ -320,7 +320,7 @@ func TestMixedBranchLeaf(t *testing.T) {
 		})
 		Convey("we should be able to add a leaf that collides with an existing branch", func() {
 
-			err = ix.AddOrUpdate(third, 1)
+			err = ix.AddOrUpdate(third, 1, 0, 0)
 			So(err, ShouldBeNil)
 			_, ok := ix.Get(third.Id)
 			So(ok, ShouldEqual, true)
@@ -367,7 +367,7 @@ func TestMixedBranchLeafDelete(t *testing.T) {
 	}
 	for _, s := range series {
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		ix.AddOrUpdate(s, 1, 0, 0)
 	}
 	Convey("when deleting mixed leaf/branch", t, func() {
 		defs, err := ix.Delete(1, "a.b.c")
@@ -427,7 +427,7 @@ func TestPrune(t *testing.T) {
 			Time:     1,
 		}
 		d.SetId()
-		ix.AddOrUpdate(d, 1)
+		ix.AddOrUpdate(d, 1, 0, 0)
 	}
 	//new series
 	for _, s := range getSeriesNames(2, 5, "metric.foo") {
@@ -439,7 +439,7 @@ func TestPrune(t *testing.T) {
 			Time:     10,
 		}
 		d.SetId()
-		ix.AddOrUpdate(d, 1)
+		ix.AddOrUpdate(d, 1, 0, 0)
 	}
 	Convey("after populating index", t, func() {
 		defs := ix.List(-1)
@@ -464,7 +464,7 @@ func TestPrune(t *testing.T) {
 		newDef.Interval = 30
 		newDef.LastUpdate = 100
 		newDef.SetId()
-		ix.AddOrUpdateDef(&newDef)
+		ix.AddOrUpdateDef(&newDef, 0, 0)
 		Convey("When purging old series", func() {
 			purged, err := ix.Prune(1, time.Unix(12, 0))
 			So(err, ShouldBeNil)
@@ -494,6 +494,6 @@ func BenchmarkIndexing(b *testing.B) {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		ix.AddOrUpdate(data, 1, 0, 0)
 	}
 }

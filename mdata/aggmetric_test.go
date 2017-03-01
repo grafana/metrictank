@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/mdata/cache"
 )
@@ -93,7 +94,8 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	mockCache.CacheIfHotCb = func() { calledCb <- true }
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
-	agg := NewAggMetric(dnstore, &mockCache, "foo", chunkSpan, numChunks, 1, []AggSetting{}...)
+	ret := []*whisper.Retention{whisper.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -128,7 +130,8 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", 100, 5, 1, []AggSetting{}...))
+	ret := []*whisper.Retention{whisper.NewRetentionMT(1, 1, 100, 5, true)}
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -207,131 +210,114 @@ func TestAggMetric(t *testing.T) {
 func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	// we will store 10s metrics in 5 chunks of 2 hours
-	// aggragate them in 5min buckets, stored in 1 chunk of 24hours
-	chunkSpan := uint32(2 * 3600)
-	numChunks := uint32(5)
+	// aggregate them in 5min buckets, stored in 1 chunk of 24hours
+	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleSchema(
+		whisper.NewRetentionMT(1, 84600, 2*3600, 5, true),
+		whisper.NewRetentionMT(300, 30*84600, 24*3600, 1, true),
+	)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
-	ttl := uint32(84600)
-	aggSettings := []AggSetting{
-		{
-			Span:      uint32(300),
-			ChunkSpan: uint32(24 * 3600),
-			NumChunks: uint32(1),
-		},
-	}
 
 	keys := make([]string, 1000)
 	for i := 0; i < 1000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
 			k := keys[metricI]
-			m := metrics.GetOrCreate(k, k)
+			m := metrics.GetOrCreate(k, k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
 }
 
 func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", time.Now(), "http", 6060)
+	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleSchema(
+		whisper.NewRetentionMT(1, 84600, 600, 5, true),
+		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+	)
 
-	ttl := uint32(84600)
-	aggSettings := []AggSetting{
-		{
-			Span:      uint32(300),
-			ChunkSpan: uint32(24 * 3600),
-			NumChunks: uint32(2),
-		},
-	}
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	keys := make([]string, 1000)
 	for i := 0; i < 1000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
-			m := metrics.GetOrCreate(keys[metricI])
+			k := keys[metricI]
+			m := metrics.GetOrCreate(k, k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
 }
 
 func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", time.Now(), "http", 6060)
+	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleSchema(
+		whisper.NewRetentionMT(1, 84600, 600, 5, true),
+		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+	)
 
-	ttl := uint32(84600)
-	aggSettings := []AggSetting{
-		{
-			Span:      uint32(300),
-			ChunkSpan: uint32(24 * 3600),
-			NumChunks: uint32(2),
-		},
-	}
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	keys := make([]string, 10000)
 	for i := 0; i < 10000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 10000; metricI++ {
-			m := metrics.GetOrCreate(keys[metricI])
+			k := keys[metricI]
+			m := metrics.GetOrCreate(k, k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
 }
 
 func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
-	chunkSpan := uint32(600)
-	numChunks := uint32(5)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	cluster.Init("default", "test", time.Now(), "http", 6060)
+	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleSchema(
+		whisper.NewRetentionMT(1, 84600, 600, 5, true),
+		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+	)
 
-	ttl := uint32(84600)
-	aggSettings := []AggSetting{
-		{
-			Span:      uint32(300),
-			ChunkSpan: uint32(24 * 3600),
-			NumChunks: uint32(2),
-		},
-	}
+	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	keys := make([]string, 100000)
 	for i := 0; i < 100000; i++ {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, 0, aggSettings)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 100000; metricI++ {
-			m := metrics.GetOrCreate(keys[metricI])
+			k := keys[metricI]
+			m := metrics.GetOrCreate(k, k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}

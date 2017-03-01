@@ -822,6 +822,16 @@ func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
 	}
 }
 
+func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready bool) *Retention {
+	return &Retention{
+		secondsPerPoint: secondsPerPoint,
+		numberOfPoints:  int(ttl) / secondsPerPoint,
+		ChunkSpan:       chunkSpan,
+		NumChunks:       numChunks,
+		Ready:           ready,
+	}
+}
+
 type Retentions []*Retention
 
 func (r Retentions) Len() int {

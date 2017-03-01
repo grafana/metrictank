@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/lomik/go-carbon/persister"
+	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
@@ -30,7 +32,7 @@ func (f *FakeAggMetrics) Get(key string) (mdata.Metric, bool) {
 	f.Unlock()
 	return m, ok
 }
-func (f *FakeAggMetrics) GetOrCreate(key, name string) mdata.Metric {
+func (f *FakeAggMetrics) GetOrCreate(key, name string, schemaI, aggI uint16) mdata.Metric {
 	f.Lock()
 	m, ok := f.Metrics[key]
 	if !ok {
@@ -40,10 +42,15 @@ func (f *FakeAggMetrics) GetOrCreate(key, name string) mdata.Metric {
 	f.Unlock()
 	return m
 }
-func (f *FakeAggMetrics) AggSettings() mdata.AggSettings {
-	return mdata.AggSettings{
-		35 * 24 * 60 * 60,
-		[]mdata.AggSetting{},
+func (f *FakeAggMetrics) Schemas() persister.WhisperSchemas {
+	return persister.WhisperSchemas{
+		{
+			Retentions: whisper.Retentions(
+				[]whisper.Retention{
+					whisper.NewRetentionMT(1, 35*24*3600, 600, 5, true),
+				},
+			),
+		},
 	}
 }
 

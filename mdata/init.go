@@ -43,8 +43,9 @@ var (
 	// metric tank.gc_metric is the number of times the metrics GC is about to inspect a metric (series)
 	gcMetric = stats.NewCounter32("tank.gc_metric")
 
-	schemas      persister.WhisperSchemas
-	aggregations *persister.WhisperAggregation
+	// set either via ConfigProcess or from the unit tests. other code should not touch
+	Schemas      persister.WhisperSchemas
+	Aggregations *persister.WhisperAggregation
 
 	schemasFile = "/etc/raintank/storage-schemas.conf"
 	aggFile     = "/etc/raintank/storage-aggregation.conf"
@@ -52,12 +53,12 @@ var (
 
 func ConfigProcess() {
 	var err error
-	schemas, err = persister.ReadWhisperSchemas(schemasFile)
+	Schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
 		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
 	}
 	var defaultFound bool
-	for _, schema := range schemas {
+	for _, schema := range Schemas {
 		if schema.Pattern.String() == ".*" {
 			defaultFound = true
 		}
@@ -70,7 +71,7 @@ func ConfigProcess() {
 		// but we definitely need to always be able to determine which interval to use
 		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
 	}
-	aggregations, err = persister.ReadWhisperAggregation(aggFile)
+	Aggregations, err = persister.ReadWhisperAggregation(aggFile)
 	if err != nil {
 		log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
 	}
