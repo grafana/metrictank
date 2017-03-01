@@ -104,13 +104,13 @@ func store(p *Whisper, values *points.Points) {
 			return
 		}
 
-		schema, ok := p.schemas.Match(values.Metric)
+		_, schema, ok := p.schemas.Match(values.Metric)
 		if !ok {
 			logrus.Errorf("[persister] No storage schema defined for %s", values.Metric)
 			return
 		}
 
-		aggr := p.aggregation.match(values.Metric)
+		_, aggr := p.aggregation.Match(values.Metric)
 		if aggr == nil {
 			logrus.Errorf("[persister] No storage aggregation defined for %s", values.Metric)
 			return
