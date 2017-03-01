@@ -15,30 +15,30 @@ import (
 	"github.com/lomik/go-whisper"
 )
 
-type whisperAggregationItem struct {
+type WhisperAggregationItem struct {
 	name                 string
 	pattern              *regexp.Regexp
-	xFilesFactor         float64
+	XFilesFactor         float64
 	aggregationMethodStr string
-	aggregationMethod    []whisper.AggregationMethod
+	AggregationMethod    []whisper.AggregationMethod
 }
 
 // WhisperAggregation ...
 type WhisperAggregation struct {
-	Data    []*whisperAggregationItem
-	Default *whisperAggregationItem
+	Data    []*WhisperAggregationItem
+	Default *WhisperAggregationItem
 }
 
 // NewWhisperAggregation create instance of WhisperAggregation
 func NewWhisperAggregation() *WhisperAggregation {
 	return &WhisperAggregation{
-		Data: make([]*whisperAggregationItem, 0),
-		Default: &whisperAggregationItem{
+		Data: make([]*WhisperAggregationItem, 0),
+		Default: &WhisperAggregationItem{
 			name:                 "default",
 			pattern:              nil,
-			xFilesFactor:         0.5,
+			XFilesFactor:         0.5,
 			aggregationMethodStr: "average",
-			aggregationMethod:    []whisper.AggregationMethod{whisper.Average},
+			AggregationMethod:    []whisper.AggregationMethod{whisper.Average},
 		},
 	}
 }
@@ -58,7 +58,7 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 	result := NewWhisperAggregation()
 
 	for _, s := range sections {
-		item := &whisperAggregationItem{}
+		item := &WhisperAggregationItem{}
 		// this is mildly stupid, but I don't feel like forking
 		// configparser just for this
 		item.name =
@@ -74,7 +74,7 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 			return nil, err
 		}
 
-		item.xFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
+		item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
 		if err != nil {
 			logrus.Errorf("failed to parse xFilesFactor '%s' in %s: %s",
 				s.ValueOf("xFilesFactor"), item.name, err.Error())
@@ -86,15 +86,15 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 		for _, methodStr := range methodStrs {
 			switch methodStr {
 			case "average", "avg":
-				item.aggregationMethod = append(item.aggregationMethod, whisper.Average)
+				item.AggregationMethod = append(item.AggregationMethod, whisper.Average)
 			case "sum":
-				item.aggregationMethod = append(item.aggregationMethod, whisper.Sum)
+				item.AggregationMethod = append(item.AggregationMethod, whisper.Sum)
 			case "last":
-				item.aggregationMethod = append(item.aggregationMethod, whisper.Last)
+				item.AggregationMethod = append(item.AggregationMethod, whisper.Last)
 			case "max":
-				item.aggregationMethod = append(item.aggregationMethod, whisper.Max)
+				item.AggregationMethod = append(item.AggregationMethod, whisper.Max)
 			case "min":
-				item.aggregationMethod = append(item.aggregationMethod, whisper.Min)
+				item.AggregationMethod = append(item.AggregationMethod, whisper.Min)
 			default:
 				logrus.Errorf("unknown aggregation method '%s'", methodStr)
 				return result, fmt.Errorf("unknown aggregation method %q", methodStr)
@@ -103,7 +103,7 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 
 		logrus.Debugf("[persister] Adding aggregation [%s] pattern = %s aggregationMethod = %s xFilesFactor = %f",
 			item.name, s.ValueOf("pattern"),
-			item.aggregationMethodStr, item.xFilesFactor)
+			item.aggregationMethodStr, item.XFilesFactor)
 
 		result.Data = append(result.Data, item)
 	}
@@ -112,7 +112,7 @@ func ReadWhisperAggregation(file string) (*WhisperAggregation, error) {
 }
 
 // Match find schema for metric
-func (a *WhisperAggregation) Match(metric string) (uint16, *whisperAggregationItem) {
+func (a *WhisperAggregation) Match(metric string) (uint16, *WhisperAggregationItem) {
 	for i, s := range a.Data {
 		if s.pattern.MatchString(metric) {
 			return uint16(i), s
