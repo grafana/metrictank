@@ -120,7 +120,7 @@ func store(p *Whisper, values *points.Points) {
 			"retention":    schema.RetentionStr,
 			"schema":       schema.Name,
 			"aggregation":  aggr.name,
-			"xFilesFactor": aggr.xFilesFactor,
+			"xFilesFactor": aggr.XFilesFactor,
 			"method":       aggr.aggregationMethodStr,
 		}).Debugf("[persister] Creating %s", path)
 
@@ -129,7 +129,7 @@ func store(p *Whisper, values *points.Points) {
 			return
 		}
 
-		w, err = whisper.CreateWithOptions(path, schema.Retentions, aggr.aggregationMethod[0], float32(aggr.xFilesFactor), &whisper.Options{
+		w, err = whisper.CreateWithOptions(path, schema.Retentions, aggr.AggregationMethod[0], float32(aggr.XFilesFactor), &whisper.Options{
 			Sparse: p.sparse,
 		})
 		if err != nil {
