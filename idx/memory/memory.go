@@ -527,7 +527,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 	// delete the node.
 	delete(tree.Items, n.Path)
 
-	// delete from the branches
+	// delete node from the branches
+	// e.g. for foo.bar.baz
+	// branch "foo.bar" -> node "baz"
+	// branch "foo"     -> node "bar"
+	// branch ""        -> node "foo"
 	nodes := strings.Split(n.Path, ".")
 	for i := len(nodes) - 1; i >= 0; i-- {
 		branch := strings.Join(nodes[0:i], ".")
@@ -550,6 +554,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 			log.Debug("memory-idx: branch %s has other children. Leaving it in place", bNode.Path)
 			// no need to delete any parents as they are needed by this node and its
 			// remaining children
+			break
+		}
+
+		if len(bNode.Children) == 0 {
+			log.Error(3, "memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
 			break
 		}
 

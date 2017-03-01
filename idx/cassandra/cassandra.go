@@ -229,7 +229,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		if existing.Partition == partition {
 			oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100))))
 			if existing.LastUpdate < oldest.Unix() {
-				log.Debug("cassandra-idx def hasnt been seem for a while, updating index.")
+				log.Debug("cassandra-idx def hasn't been seen for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
 				err := c.MemoryIdx.AddOrUpdateDef(def)
