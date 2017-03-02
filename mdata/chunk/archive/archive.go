@@ -22,14 +22,15 @@ type MetricChunk struct {
 type ArchiveOfChunks map[uint32]MetricChunk
 
 type Archive struct {
-	MetricData  schema.MetricData
+	RowKey      string
 	ArchiveInfo whisper.ArchiveInfo
 	Chunks      ArchiveOfChunks
 }
 
 type Metric struct {
-	Metadata whisper.Metadata
-	Archives []Archive
+	MetricData schema.MetricData
+	Metadata   whisper.Metadata
+	Archives   []Archive
 }
 
 func NewMetricFromEncoded(body io.Reader) *Metric {

@@ -176,17 +176,13 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		avg = true
 	}
 
-	base_id := metric.Archives[0].MetricData.Id
+	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
+	err = s.Index.AddOrUpdate(&metric.MetricData, partition)
+	if err != nil {
+		throwError(fmt.Sprintf("Error updating metric index: %s", err))
+	}
 
 	for archiveIdx, a := range metric.Archives {
-		partition, err := s.Partitioner.Partition(&a.MetricData, int32(*numPartitions))
-		if archiveIdx == 0 {
-			err = s.Index.AddOrUpdate(&a.MetricData, partition)
-			if err != nil {
-				throwError(fmt.Sprintf("Error updating metric index: %s", err))
-			}
-		}
-
 		archiveTTL := a.ArchiveInfo.SecondsPerPoint * a.ArchiveInfo.Points
 		tableTTL := s.selectTableByTTL(archiveTTL)
 		entry, ok := s.TTLTables[tableTTL]
@@ -198,9 +194,9 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		if !avg || archiveIdx == 0 || !*fakeAvgAggregates {
 			log(fmt.Sprintf(
 				"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
-				len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.MetricData.Id,
+				len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
 			))
-			s.insertChunk(tableName, a.MetricData.Id, tableTTL, a.Chunks)
+			s.insertChunk(tableName, a.RowKey, tableTTL, a.Chunks)
 		} else {
 			// averaged archives are a special case because mt doesn't store them as such.
 			// mt reconstructs the averages on the fly from the sum and cnt series, so we need
@@ -237,8 +233,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 				cntArchive[T0] = archive.MetricChunk{ChunkSpan: aggSpan, Bytes: cnt.Bytes()}
 			}
 
-			cntId := api.AggMetricKey(base_id, "cnt", aggSpan)
-			sumId := api.AggMetricKey(base_id, "sum", aggSpan)
+			cntId := api.AggMetricKey(metric.MetricData.Id, "cnt", aggSpan)
+			sumId := api.AggMetricKey(metric.MetricData.Id, "sum", aggSpan)
 
 			log(fmt.Sprintf(
 				"inserting 2 archives of %d chunks per archive with ttl %d into table %s with ttl %d and keys %s/%s",
@@ -247,7 +243,6 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 			s.insertChunk(tableName, cntId, tableTTL, cntArchive)
 			s.insertChunk(tableName, sumId, tableTTL, sumArchive)
-
 		}
 	}
 }

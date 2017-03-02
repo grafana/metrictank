@@ -196,20 +196,21 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 
 	archives := make([]archive.Archive, 0, len(w.Header.Archives))
 	var chunkSpan uint32
-	var base_id string
+	var rowKey string
 	name := getMetricName(file)
 
-	for archiveIdx, archiveInfo := range w.Header.Archives {
-		md := getMetricData(name, int(archiveInfo.SecondsPerPoint))
+	// md gets generated from the first archive in the whisper file
+	md := getMetricData(name, int(w.Header.Archives[0].SecondsPerPoint))
 
+	for archiveIdx, archiveInfo := range w.Header.Archives {
 		if archiveIdx > 0 {
-			md.Id = api.AggMetricKey(
-				base_id,
+			rowKey = api.AggMetricKey(
+				md.Id,
 				w.Header.Metadata.AggregationMethod.String(),
 				archiveInfo.SecondsPerPoint,
 			)
 		} else {
-			base_id = md.Id
+			rowKey = md.Id
 		}
 
 		// only read archive if archiveIdx is in readArchives
@@ -284,13 +285,14 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 		archives = append(archives, archive.Archive{
 			ArchiveInfo: archiveInfo,
 			Chunks:      encodedChunks,
-			MetricData:  *md,
+			RowKey:      rowKey,
 		})
 	}
 
 	return &archive.Metric{
-		Metadata: w.Header.Metadata,
-		Archives: archives,
+		Metadata:   w.Header.Metadata,
+		MetricData: *md,
+		Archives:   archives,
 	}
 }
 
