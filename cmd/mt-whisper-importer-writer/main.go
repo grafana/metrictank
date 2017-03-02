@@ -56,11 +56,6 @@ var (
 		"metrictank",
 		"cassandra keyspace to use for storing the metric data table",
 	)
-	cassAddr = flag.String(
-		"cass-addr",
-		"localhost",
-		"Address of cassandra host.",
-	)
 	ttlsStr = flag.String(
 		"ttls",
 		"35d",
@@ -102,7 +97,7 @@ func main() {
 	cassandra.ConfigSetup()
 	flag.Parse()
 
-	cassCluster := gocql.NewCluster(*cassAddr)
+	cassCluster := gocql.NewCluster(*cassandraAddrs)
 	cassCluster.Consistency = gocql.ParseConsistency("one")
 	cassCluster.Timeout = time.Second
 	cassCluster.NumConns = 2
@@ -260,8 +255,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 func (s *Server) insertChunk(table, id string, ttl uint32, chunks archive.ArchiveOfChunks) {
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
 	for t0, chunk := range chunks {
-		row_key := fmt.Sprintf("%s_%d", id, t0/mdata.Month_sec)
-		err := s.Session.Query(query, row_key, t0, mdata.PrepareChunkData(chunk.ChunkSpan, chunk.Bytes)).Exec()
+		rowKey := fmt.Sprintf("%s_%d", id, t0/mdata.Month_sec)
+		err := s.Session.Query(query, rowKey, t0, mdata.PrepareChunkData(chunk.ChunkSpan, chunk.Bytes)).Exec()
 		if err != nil {
 			throwError(fmt.Sprintf("Error in query: %q", err))
 		}
