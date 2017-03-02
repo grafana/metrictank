@@ -182,12 +182,17 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 
 // generate the metric name based on the file name and given prefix
 func getMetricName(file string) string {
+	// remove all leading '/' from file name
 	for file[0] == '/' {
 		file = file[1:]
 	}
 	splits := strings.Split(file, "/")
+
+	// remove the .wsp from the name of the last path element
 	leafNode := strings.Split(splits[len(splits)-1], ".")
-	splits[len(splits)-1] = leafNode[0]
+	splits[len(splits)-1] = strings.Join(leafNode[:len(leafNode)-1], ".")
+
+	// prepend the prefix and concatenate with all the parts of the file name joined by .
 	return *namePrefix + strings.Join(splits, ".")
 }
 
