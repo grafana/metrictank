@@ -109,11 +109,12 @@ func main() {
 	fileChan := make(chan string)
 
 	wg := &sync.WaitGroup{}
+	wg.Add(*threads)
 	for i := 0; i < *threads; i++ {
 		go processFromChan(fileChan, wg)
 	}
 
-	getFileListIntoChan(fileChan, wg)
+	getFileListIntoChan(fileChan)
 	wg.Wait()
 }
 
@@ -139,7 +140,13 @@ func log(msg string) {
 func processFromChan(files chan string, wg *sync.WaitGroup) {
 	client := &http.Client{}
 
-	for file := range files {
+	for {
+		file, more := <-files
+		if !more {
+			wg.Done()
+			return
+		}
+
 		fd, err := os.Open(file)
 		if err != nil {
 			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%q': %q\n", file, err))
@@ -175,8 +182,6 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
 			continue
 		}
-
-		wg.Done()
 	}
 }
 
@@ -334,13 +339,11 @@ func getMetricData(name string, interval int) *schema.MetricData {
 }
 
 // scan a directory and feed the list of whisper files relative to base into the given channel
-func getFileListIntoChan(fileChan chan string, wg *sync.WaitGroup) {
-
+func getFileListIntoChan(fileChan chan string) {
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
 			if path[len(path)-4:] == ".wsp" {
-				wg.Add(1)
 				fileChan <- path
 			}
 			return nil
