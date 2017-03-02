@@ -233,7 +233,7 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 		}
 
 		var point whisper.Point
-		var t0, prevT0 uint32 = 0, 0
+		var t0, prevT0 uint32
 		var c *chunk.Chunk
 
 		for _, point = range sortPoints(points) {
