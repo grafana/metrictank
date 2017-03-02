@@ -163,7 +163,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 // generate the metric name based on the file name and given prefix
 func getMetricName(file string) string {
 	for {
-		if file[:1] == "/" {
+		if file[0] == '/' {
 			file = file[1:]
 		} else {
 			break
