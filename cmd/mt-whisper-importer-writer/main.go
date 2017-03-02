@@ -64,7 +64,7 @@ var (
 	ttlsStr = flag.String(
 		"ttls",
 		"35d",
-		"list of ttl strings used by MT separated by ':'",
+		"list of ttl strings used by MT separated by ','",
 	)
 	windowFactor = flag.Int(
 		"window-factor",
@@ -114,7 +114,7 @@ func main() {
 		panic(fmt.Sprintf("Failed to create cassandra session: %q", err))
 	}
 
-	splits := strings.Split(*ttlsStr, ":")
+	splits := strings.Split(*ttlsStr, ",")
 	ttls := make([]uint32, 0)
 	for _, split := range splits {
 		ttls = append(ttls, dur.MustParseUNsec("ttl", split))

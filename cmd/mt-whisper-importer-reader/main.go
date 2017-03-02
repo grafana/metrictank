@@ -80,7 +80,7 @@ var (
 func main() {
 	flag.Parse()
 
-	for _, chunkSpanStrSplit := range strings.Split(*chunkSpanStr, ":") {
+	for _, chunkSpanStrSplit := range strings.Split(*chunkSpanStr, ",") {
 		chunkSpan := dur.MustParseUNsec("chunkspan", chunkSpanStrSplit)
 
 		if (mdata.Month_sec % chunkSpan) != 0 {
