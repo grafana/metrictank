@@ -4,5 +4,5 @@ build/
 /metrictank
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat
-/cmd/mt-whisper-importer-reader/main
-/cmd/mt-whisper-importer-writer/main
+/cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
+/cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
