@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/chunk/archive"
 	"gopkg.in/raintank/schema.v1"
@@ -79,7 +81,18 @@ func main() {
 	flag.Parse()
 
 	for _, chunkSpanStrSplit := range strings.Split(*chunkSpanStr, ":") {
-		chunkSpans = append(chunkSpans, dur.MustParseUNsec("chunkspan", chunkSpanStrSplit))
+		chunkSpan := dur.MustParseUNsec("chunkspan", chunkSpanStrSplit)
+
+		if (mdata.Month_sec % chunkSpan) != 0 {
+			panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
+		}
+
+		_, ok := chunk.RevChunkSpans[chunkSpan]
+		if !ok {
+			panic(fmt.Sprintf("chunkSpan %d is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", chunkSpan))
+		}
+
+		chunkSpans = append(chunkSpans, chunkSpan)
 	}
 
 	if *readArchivesStr != "*" {
@@ -87,7 +100,7 @@ func main() {
 		for _, archiveIdStr := range strings.Split(*readArchivesStr, ",") {
 			archiveId, err := strconv.Atoi(archiveIdStr)
 			if err != nil {
-				throwError(fmt.Sprintf("Invalid archive id %s: %s", archiveIdStr, err))
+				panic(fmt.Sprintf("Invalid archive id %q: %q", archiveIdStr, err))
 			}
 			readArchives[archiveId] = struct{}{}
 		}
@@ -129,31 +142,38 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%s': %s\n", file, err))
+			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%q': %q\n", file, err))
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%s': %s\n", file, err))
+			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%q': %q\n", file, err))
 			continue
 		}
 
-		log(fmt.Sprintf("Processing file %s", file))
-		b, err := getMetric(w, file).Encode()
+		log(fmt.Sprintf("Processing file %q", file))
+		met, err := getMetric(w, file)
 		if err != nil {
-			throwError(fmt.Sprintf("%s", err))
+			throwError(fmt.Sprintf("Failed to get metric: %q", err))
+			continue
+		}
+		b, err := met.Encode()
+		if err != nil {
+			throwError(fmt.Sprintf("Failed to encode metric: %q", err))
+			continue
 		}
 
 		req, err := http.NewRequest("POST", *httpEndpoint, b)
 		if err != nil {
-			throwError(fmt.Sprintf("Cannot send request to http endpoint %s: %s", *httpEndpoint, err))
+			panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 
 		_, err = client.Do(req)
 		if err != nil {
-			throwError(fmt.Sprintf("Error sending request to http endpoint %s: %s", *httpEndpoint, err))
+			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
+			continue
 		}
 
 		wg.Done()
@@ -189,9 +209,9 @@ func sortPoints(points pointSorter) pointSorter {
 	return points
 }
 
-func getMetric(w *whisper.Whisper, file string) *archive.Metric {
+func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 	if len(w.Header.Archives) == 0 {
-		throwError(fmt.Sprintf("ERROR: Whisper file contains no archives: %s", file))
+		return nil, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
 	}
 
 	archives := make([]archive.Archive, 0, len(w.Header.Archives))
@@ -229,7 +249,7 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 
 		points, err := w.DumpArchive(archiveIdx)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to read archive %d in '%s', skipping: %s", archiveIdx, file, err))
+			return nil, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
 
 		var point whisper.Point
@@ -262,7 +282,7 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 
 			err := c.Push(point.Timestamp, point.Value)
 			if err != nil {
-				throwError(fmt.Sprintf("ERROR: Failed to push value into chunk at t0 %d: %s", t0, err))
+				return nil, errors.New(fmt.Sprintf("ERROR: Failed to push value into chunk at t0 %d: %q", t0, err))
 			}
 		}
 
@@ -281,7 +301,7 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 			}
 		}
 
-		log(fmt.Sprintf("Whisper file %s archive %d (%s) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
+		log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
 		archives = append(archives, archive.Archive{
 			ArchiveInfo: archiveInfo,
 			Chunks:      encodedChunks,
@@ -293,7 +313,7 @@ func getMetric(w *whisper.Whisper, file string) *archive.Metric {
 		Metadata:   w.Header.Metadata,
 		MetricData: *md,
 		Archives:   archives,
-	}
+	}, nil
 }
 
 func getMetricData(name string, interval int) *schema.MetricData {

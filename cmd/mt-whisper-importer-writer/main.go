@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -110,7 +111,7 @@ func main() {
 
 	session, err := cassCluster.CreateSession()
 	if err != nil {
-		throwError(fmt.Sprintf("Failed to create cassandra session: %s", err))
+		panic(fmt.Sprintf("Failed to create cassandra session: %q", err))
 	}
 
 	splits := strings.Split(*ttlsStr, ":")
@@ -122,7 +123,7 @@ func main() {
 
 	p, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
-		throwError(fmt.Sprintf("Failed to instantiate partitioner: %s", err))
+		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
 	server := &Server{
@@ -137,10 +138,10 @@ func main() {
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
 
-	log(fmt.Sprintf("Listening on %s", *httpEndpoint))
+	log(fmt.Sprintf("Listening on %q", *httpEndpoint))
 	err = http.ListenAndServe(*httpEndpoint, nil)
 	if err != nil {
-		throwError(fmt.Sprintf("Error creating listener: %s", err))
+		panic(fmt.Sprintf("Error creating listener: %q", err))
 	}
 }
 
@@ -169,6 +170,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 	if len(metric.Archives) == 0 {
 		throwError("Metric has no archives")
+		return
 	}
 
 	avg := false
@@ -179,15 +181,21 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
 	err = s.Index.AddOrUpdate(&metric.MetricData, partition)
 	if err != nil {
-		throwError(fmt.Sprintf("Error updating metric index: %s", err))
+		throwError(fmt.Sprintf("Error updating metric index: %q", err))
+		return
 	}
 
 	for archiveIdx, a := range metric.Archives {
 		archiveTTL := a.ArchiveInfo.SecondsPerPoint * a.ArchiveInfo.Points
-		tableTTL := s.selectTableByTTL(archiveTTL)
+		tableTTL, err := s.selectTableByTTL(archiveTTL)
+		if err != nil {
+			throwError(fmt.Sprintf("Failed to select table for ttl %d in %+v: %q", archiveTTL, s.TTLTables, err))
+			return
+		}
 		entry, ok := s.TTLTables[tableTTL]
 		if !ok {
-			throwError(fmt.Sprintf("Failed to find table with ttl %d in %+v", tableTTL, s.TTLTables))
+			throwError(fmt.Sprintf("Failed to get selected table %d in %+v", tableTTL, s.TTLTables))
+			return
 		}
 		tableName := entry.Table
 
@@ -218,8 +226,10 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 				it, err := tsz.NewIterator(c.Bytes)
 				if err != nil {
-					throwError(fmt.Sprintf("failed to get iterator from chunk: %s", err))
+					throwError(fmt.Sprintf("failed to get iterator from chunk: %q", err))
+					continue
 				}
+
 				for it.Next() {
 					ts, val := it.Values()
 					cnt.Push(ts, float64(aggSpan))
@@ -253,12 +263,12 @@ func (s *Server) insertChunk(table, id string, ttl uint32, chunks archive.Archiv
 		row_key := fmt.Sprintf("%s_%d", id, t0/mdata.Month_sec)
 		err := s.Session.Query(query, row_key, t0, mdata.PrepareChunkData(chunk.ChunkSpan, chunk.Bytes)).Exec()
 		if err != nil {
-			throwError(fmt.Sprintf("Error in query: %s", err))
+			throwError(fmt.Sprintf("Error in query: %q", err))
 		}
 	}
 }
 
-func (s *Server) selectTableByTTL(ttl uint32) uint32 {
+func (s *Server) selectTableByTTL(ttl uint32) (uint32, error) {
 	selectedTTL := uint32(math.MaxUint32)
 
 	// find the table with the smallest TTL that is at least equal to archiveTTL
@@ -272,8 +282,8 @@ func (s *Server) selectTableByTTL(ttl uint32) uint32 {
 
 	// we have not found a table that can accommodate the requested ttl
 	if selectedTTL == math.MaxUint32 {
-		throwError(fmt.Sprintf("No Table found that can hold TTL %d", ttl))
+		return 0, errors.New(fmt.Sprintf("No Table found that can hold TTL %d", ttl))
 	}
 
-	return selectedTTL
+	return selectedTTL, nil
 }
