@@ -4,8 +4,8 @@ package consolidation
 import (
 	"errors"
 	"fmt"
+
 	"github.com/raintank/metrictank/batch"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // consolidator is a highlevel description of a point consolidation method
@@ -17,11 +17,11 @@ var errUnknownConsolidationFunction = errors.New("unknown consolidation function
 const (
 	None Consolidator = iota
 	Avg
-	Cnt // not available through http api
-	Lst
-	Min
-	Max
 	Sum
+	Lst
+	Max
+	Min
+	Cnt // not available through http api
 )
 
 // String provides human friendly names
@@ -101,33 +101,6 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 		consFunc = batch.Sum
 	}
 	return consFunc
-}
-
-func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, error) {
-	consolidateBy := pref
-
-	if consolidateBy == "" {
-		consolidateBy = "avg"
-		if def.Mtype == "counter" {
-			consolidateBy = "max"
-		}
-	}
-	var consolidator Consolidator
-	switch consolidateBy {
-	case "avg", "average":
-		consolidator = Avg
-	case "last":
-		consolidator = Lst
-	case "min":
-		consolidator = Min
-	case "max":
-		consolidator = Max
-	case "sum":
-		consolidator = Sum
-	default:
-		return consolidator, errUnknownConsolidationFunction
-	}
-	return consolidator, nil
 }
 
 func Validate(fn string) error {
