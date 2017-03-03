@@ -98,7 +98,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
-	casIdx.StringVar(&capath, "ca-path", "/etc/raintank/ca.pem", "cassandra CA certficate path when using SSL")
+	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
 	casIdx.BoolVar(&hostverification, "host-verification", true, "host (hostname and server cert) verification when using SSL")
 
 	casIdx.BoolVar(&auth, "auth", false, "enable cassandra user authentication")

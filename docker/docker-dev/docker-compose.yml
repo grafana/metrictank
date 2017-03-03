@@ -9,9 +9,9 @@ services:
      - "2003:2003"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ../../scripts/config/metrictank-docker.ini:/etc/raintank/metrictank.ini
-      - ../../scripts/config/storage-schemas.conf:/etc/raintank/storage-schemas.conf
-      - ../../scripts/config/storage-aggregation.conf:/etc/raintank/storage-aggregation.conf
+      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
     environment:
      WAIT_HOSTS: cassandra:9042
      WAIT_TIMEOUT: 60

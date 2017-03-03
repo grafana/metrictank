@@ -50,7 +50,7 @@ var (
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
-	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
+	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
@@ -75,7 +75,7 @@ var (
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/raintank/ca.pem", "cassandra CA certificate path when using SSL")
+	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
 	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
 
 	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
