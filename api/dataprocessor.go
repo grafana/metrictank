@@ -316,22 +316,22 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 
 func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
-	readConsolidated := req.Archive != 0   // do we need to read from a downsampled series?
-	runtimeConsolidation := req.AggNum > 1 // do we need to compress any points at runtime?
+	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
+	normalize := req.AggNum > 1    // do we need to compress any points at runtime?
 
 	if LogLevel < 2 {
-		if runtimeConsolidation {
-			log.Debug("DP getTarget() %s runtimeConsolidation: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
+		if normalize {
+			log.Debug("DP getTarget() %s normalize: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
 		} else {
-			log.Debug("DP getTarget() %s runtimeConsolidation: false. output interval: %d", req, req.OutInterval)
+			log.Debug("DP getTarget() %s normalize: false. output interval: %d", req, req.OutInterval)
 		}
 	}
 
-	if !readConsolidated && !runtimeConsolidation {
+	if !readRollup && !normalize {
 		return s.getSeriesFixed(req, consolidation.None), req.OutInterval, nil
-	} else if !readConsolidated && runtimeConsolidation {
+	} else if !readRollup && normalize {
 		return consolidate(s.getSeriesFixed(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
-	} else if readConsolidated && !runtimeConsolidation {
+	} else if readRollup && !normalize {
 		if req.Consolidator == consolidation.Avg {
 			return divide(
 				s.getSeriesFixed(req, consolidation.Sum),
@@ -341,7 +341,7 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 			return s.getSeriesFixed(req, req.Consolidator), req.OutInterval, nil
 		}
 	} else {
-		// readConsolidated && runtimeConsolidation
+		// readRollup && normalize
 		if req.Consolidator == consolidation.Avg {
 			return divide(
 				consolidate(s.getSeriesFixed(req, consolidation.Sum), req.AggNum, consolidation.Sum),

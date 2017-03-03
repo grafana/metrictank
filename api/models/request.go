@@ -14,8 +14,8 @@ type Req struct {
 	From         uint32                     `json:"from"`
 	To           uint32                     `json:"to"`
 	MaxPoints    uint32                     `json:"maxPoints"`
-	RawInterval  uint32                     `json:"rawInterval"` // the interval of the raw metric before any consolidation
-	Consolidator consolidation.Consolidator `json:"consolidator"`
+	RawInterval  uint32                     `json:"rawInterval"`  // the interval of the raw metric before any consolidation
+	Consolidator consolidation.Consolidator `json:"consolidator"` // consolidation method for rollup archive and normalization. (not runtime consolidation)
 	Node         cluster.Node               `json:"-"`
 	SchemaI      uint16                     `json:"schemaI"`
 	AggI         uint16                     `json:"aggI"`

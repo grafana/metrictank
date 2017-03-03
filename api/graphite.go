@@ -15,6 +15,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -209,8 +210,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	reqs := make([]models.Req, 0)
 
-	// consolidatorForPattern[<pattern>]<consolidateBy>
-	consolidatorForPattern := make(map[string]string)
 	patterns := make([]string, 0)
 	type locatedDef struct {
 		def     schema.MetricDefinition
@@ -224,12 +223,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	//targetForPattern[<pattern>]<target>
 	targetForPattern := make(map[string]string)
 	for _, target := range targets {
-		pattern, consolidateBy, err := parseTarget(target)
+		pattern, _, err := parseTarget(target)
 		if err != nil {
 			ctx.Error(http.StatusBadRequest, err.Error())
 			return
 		}
-		consolidatorForPattern[pattern] = consolidateBy
 		patterns = append(patterns, pattern)
 		targetForPattern[pattern] = target
 		locatedDefs[pattern] = make(map[string]locatedDef)
@@ -255,11 +253,10 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	for pattern, ldefs := range locatedDefs {
 		for _, locdef := range ldefs {
 			def := locdef.def
-			consolidator, err := consolidation.GetConsolidator(&def, consolidatorForPattern[pattern])
-			if err != nil {
-				response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-				return
-			}
+			// set consolidator that will be used to normalize raw data before feeding into processing functions
+			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
+			fn := mdata.GetAgg(locdef.AggI).AggregationMethod[0]
+			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
 			// pattern is like foo.bar or foo.*
 			// def.Name is like foo.concretebar
