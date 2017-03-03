@@ -4,9 +4,12 @@
 package mdata
 
 import (
+	"io/ioutil"
 	"log"
+	"regexp"
 
 	"github.com/lomik/go-carbon/persister"
+	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/stats"
 )
 
@@ -53,26 +56,41 @@ var (
 
 func ConfigProcess() {
 	var err error
+
+	// === read storage-schemas.conf ===
+
+	// graphite behavior: abort on any config reading errors, but skip any rules that have problems.
+	// at the end, add a default schema of 7 days of minutely data.
+	// we are stricter and don't tolerate any errors, that seems in the user's best interest.
+
 	Schemas, err = persister.ReadWhisperSchemas(schemasFile)
 	if err != nil {
 		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
 	}
-	var defaultFound bool
-	for _, schema := range Schemas {
-		if schema.Pattern.String() == ".*" {
-			defaultFound = true
-		}
-		if len(schema.Retentions) == 0 {
-			log.Fatal(4, "retention setting cannot be empty")
-		}
+	Schemas = append(Schemas, persister.Schema{
+		Name:       "default",
+		Pattern:    regexp.MustCompile(""),
+		Retentions: whisper.Retentions([]whisper.Retention{whisper.NewRetentionMT(60, 3600*24*7, 120*60, 2, true)}),
+	})
+
+	// === read storage-aggregation.conf ===
+
+	// graphite behavior:
+	// continue if file can't be read. (e.g. file is optional) but quit if other error reading config
+	// always add a default rule with xFilesFactor None and aggregationMethod None
+	// (which get interpreted by whisper as 0.5 and avg) at the end.
+
+	// since we can't distinguish errors reading vs parsing, we'll just try a read separately first
+	_, err = ioutil.ReadFile(aggFile)
+	if err != nil {
+		// this will add the default case we need
+		Aggregations = persister.NewWhisperAggregation()
+		return
 	}
-	if !defaultFound {
-		// good graphite health (not sure what graphite does if there's no .*)
-		// but we definitely need to always be able to determine which interval to use
-		log.Fatal(4, "storage-conf does not have a default '.*' pattern")
-	}
+	// note: in this case, the library will include the default setting
 	Aggregations, err = persister.ReadWhisperAggregation(aggFile)
 	if err != nil {
 		log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
 	}
+
 }
