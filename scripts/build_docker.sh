@@ -7,7 +7,7 @@ cd ${DIR}
 
 VERSION=`git describe --always`
 
-mkdir build
+mkdir -p build
 cp ../build/metrictank build/
 
 docker build -t raintank/metrictank .
