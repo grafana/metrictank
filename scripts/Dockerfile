@@ -4,6 +4,7 @@ MAINTAINER Anthony Woods awoods@raintank.io
 RUN mkdir -p /etc/raintank
 COPY config/metrictank-docker.ini /etc/raintank/metrictank.ini
 COPY config/storage-schemas.conf /etc/raintank/storage-schemas.conf
+COPY config/storage-aggregation.conf /etc/raintank/storage-aggregation.conf
 
 COPY build/* /usr/bin/
 
