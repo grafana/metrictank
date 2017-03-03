@@ -25,7 +25,7 @@ You may want to make the `GOPATH` setting persistent, by putting that export lin
 go get github.com/raintank/metrictank
 ```
 
-Take the file from `go/src/github.com/raintank/metrictank/metrictank-sample.ini`, put it in `/etc/raintank/metrictank.ini` and make any changes.
+Take the file from `go/src/github.com/raintank/metrictank/metrictank-sample.ini`, put it in `/etc/metrictank/metrictank.ini` and make any changes.
 
 ## Run it!
 

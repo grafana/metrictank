@@ -235,14 +235,14 @@ The log - if you need it - lives at /opt/kafka/logs/server.log
 
 ## Configuration
 
-Now edit the file at `/etc/raintank/metrictank.ini`.  It should be commented enough to guide you through the various options.
+Now edit the file at `/etc/metrictank/metrictank.ini`.  It should be commented enough to guide you through the various options.
 
 You may have to adjust `statsd-addr`, `cassandra-addrs`, `cassandra-idx`'s `hosts` option and `kafka-mdm-in`'s `brokers` option if you run
 any of these services on different locations then the localhost defaults.
 
 Out of the box, one input is enabled: the [Carbon line input](https://github.com/raintank/metrictank/blob/master/docs/inputs.md#carbon)
 It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs
-at `/etc/raintank/storage-schemas.conf`. (or simply what you already use in a pre-existing Graphite install).
+at `/etc/metrictank/storage-schemas.conf`. (or simply what you already use in a pre-existing Graphite install).
 See the input plugin documentation referenced above for more details.
 
 If you want to use Kafka, you should enable the Kafka-mdm input plugin.

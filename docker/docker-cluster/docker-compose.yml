@@ -8,7 +8,7 @@ services:
      - "6060:6060"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/raintank/metrictank.ini
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042
       WAIT_TIMEOUT: 30
@@ -29,7 +29,7 @@ services:
       - "6061:6060"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/raintank/metrictank.ini
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
       WAIT_TIMEOUT: 30
@@ -52,7 +52,7 @@ services:
       - "6062:6060"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/raintank/metrictank.ini
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
       WAIT_TIMEOUT: 30
@@ -75,7 +75,7 @@ services:
       - "6063:6060"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/raintank/metrictank.ini
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
       WAIT_TIMEOUT: 30

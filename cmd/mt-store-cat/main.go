@@ -25,7 +25,7 @@ var (
 
 	// flags from metrictank.go, globals
 	showVersion = flag.Bool("version", false, "print version string")
-	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
+	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 
 	// flags from metrictank.go, Cassandra
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -41,7 +41,7 @@ var (
 	cqlProtocolVersion = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/raintank/ca.pem", "cassandra CA certificate path when using SSL")
+	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
 	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
 
 	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")

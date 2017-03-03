@@ -47,8 +47,8 @@ var (
 	Schemas      persister.WhisperSchemas
 	Aggregations persister.WhisperAggregation
 
-	schemasFile = "/etc/raintank/storage-schemas.conf"
-	aggFile     = "/etc/raintank/storage-aggregation.conf"
+	schemasFile = "/etc/metrictank/storage-schemas.conf"
+	aggFile     = "/etc/metrictank/storage-aggregation.conf"
 )
 
 func ConfigProcess() {

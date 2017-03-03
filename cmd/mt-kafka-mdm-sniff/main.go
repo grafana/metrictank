@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	confFile = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
+	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 	format   = flag.String("format", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
