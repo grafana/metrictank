@@ -74,7 +74,7 @@ func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	// if the previous chunk is not cached we consider the metric not hot enough to cache this chunk
 	// only works reliably if the last chunk of that metric is span aware, otherwise lastTs() will be guessed
 	// conservatively which means that the returned value will probably be lower than the real last ts
-	if met.lastTs() < itergen.Ts() {
+	if met.lastTs() < itergen.Ts {
 		c.RUnlock()
 		return
 	}
@@ -97,7 +97,7 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 		ccm.Add(prev, itergen)
 	}
 
-	c.accnt.AddChunk(metric, itergen.Ts(), itergen.Size())
+	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
 }
 
 func (cc *CCache) Reset() {
@@ -158,10 +158,10 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 		accnt.CacheChunkHit.Add(len(res.Start) + len(res.End))
 		go func() {
 			for _, hit = range res.Start {
-				c.accnt.HitChunk(metric, hit.Ts())
+				c.accnt.HitChunk(metric, hit.Ts)
 			}
 			for _, hit = range res.End {
-				c.accnt.HitChunk(metric, hit.Ts())
+				c.accnt.HitChunk(metric, hit.Ts)
 			}
 		}()
 

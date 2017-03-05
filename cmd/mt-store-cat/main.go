@@ -60,7 +60,7 @@ var (
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span())
+		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span)
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)

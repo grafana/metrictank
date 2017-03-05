@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgryski/go-tsz"
 	"github.com/gocql/gocql"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/dur"
@@ -160,7 +160,18 @@ func log(msg string) {
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
-	metric := archive.NewMetricFromEncoded(req.Body)
+	b, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		throwError(fmt.Sprintf("Error reading body: %q", err))
+		return
+	}
+
+	metric := &archive.Metric{}
+	_, err = metric.UnmarshalMsg(b)
+	if err != nil {
+		throwError(fmt.Sprintf("Error decoding metric stream: %q", err))
+		return
+	}
 	log("Handling new metric")
 
 	if len(metric.Archives) == 0 {
@@ -169,7 +180,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	avg := false
-	if metric.Metadata.AggregationMethod == whisper.AggregationAverage {
+	if whisper.AggregationMethod(metric.AggregationMethod) == whisper.AggregationAverage {
 		avg = true
 	}
 
@@ -181,7 +192,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	for archiveIdx, a := range metric.Archives {
-		archiveTTL := a.ArchiveInfo.SecondsPerPoint * a.ArchiveInfo.Points
+		archiveTTL := a.SecondsPerPoint * a.Points
 		tableTTL, err := s.selectTableByTTL(archiveTTL)
 		if err != nil {
 			throwError(fmt.Sprintf("Failed to select table for ttl %d in %+v: %q", archiveTTL, s.TTLTables, err))
@@ -199,7 +210,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 				"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
 				len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
 			))
-			s.insertChunk(tableName, a.RowKey, tableTTL, a.Chunks)
+			s.insertChunks(tableName, a.RowKey, tableTTL, a.Chunks)
 		} else {
 			// averaged archives are a special case because mt doesn't store them as such.
 			// mt reconstructs the averages on the fly from the sum and cnt series, so we need
@@ -211,17 +222,18 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			// seconds per point is assumed to be the aggregation span
-			aggSpan := a.ArchiveInfo.SecondsPerPoint
+			aggSpan := a.SecondsPerPoint
 
-			sumArchive := make(archive.ArchiveOfChunks)
-			cntArchive := make(archive.ArchiveOfChunks)
-			for T0, c := range a.Chunks {
+			sumArchive := make([]chunk.IterGen, 0, len(a.Chunks))
+			cntArchive := make([]chunk.IterGen, 0, len(a.Chunks))
+			for _, ig := range a.Chunks {
+				T0 := ig.Ts
 				sum := chunk.New(T0)
 				cnt := chunk.New(T0)
 
-				it, err := tsz.NewIterator(c.Bytes)
+				it, err := ig.Get()
 				if err != nil {
-					throwError(fmt.Sprintf("failed to get iterator from chunk: %q", err))
+					throwError(fmt.Sprintf("failed to get iterator from itergen: %q", err))
 					continue
 				}
 
@@ -234,8 +246,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 				cnt.Finish()
 				sum.Finish()
 
-				sumArchive[T0] = archive.MetricChunk{ChunkSpan: aggSpan, Bytes: sum.Bytes()}
-				cntArchive[T0] = archive.MetricChunk{ChunkSpan: aggSpan, Bytes: cnt.Bytes()}
+				cntArchive = append(cntArchive, *chunk.NewBareIterGen(cnt.Bytes(), T0, aggSpan))
+				sumArchive = append(sumArchive, *chunk.NewBareIterGen(sum.Bytes(), T0, aggSpan))
 			}
 
 			cntId := api.AggMetricKey(metric.MetricData.Id, "cnt", aggSpan)
@@ -246,17 +258,17 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 				len(a.Chunks), archiveTTL, tableName, tableTTL, cntId, sumId,
 			))
 
-			s.insertChunk(tableName, cntId, tableTTL, cntArchive)
-			s.insertChunk(tableName, sumId, tableTTL, sumArchive)
+			s.insertChunks(tableName, cntId, tableTTL, cntArchive)
+			s.insertChunks(tableName, sumId, tableTTL, sumArchive)
 		}
 	}
 }
 
-func (s *Server) insertChunk(table, id string, ttl uint32, chunks archive.ArchiveOfChunks) {
+func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
-	for t0, chunk := range chunks {
-		rowKey := fmt.Sprintf("%s_%d", id, t0/mdata.Month_sec)
-		err := s.Session.Query(query, rowKey, t0, mdata.PrepareChunkData(chunk.ChunkSpan, chunk.Bytes)).Exec()
+	for _, ig := range itergens {
+		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
+		err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
 		if err != nil {
 			throwError(fmt.Sprintf("Error in query: %q", err))
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -164,13 +165,14 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			throwError(fmt.Sprintf("Failed to get metric: %q", err))
 			continue
 		}
-		b, err := met.Encode()
+
+		b, err := met.MarshalMsg(nil)
 		if err != nil {
 			throwError(fmt.Sprintf("Failed to encode metric: %q", err))
 			continue
 		}
 
-		req, err := http.NewRequest("POST", *httpEndpoint, b)
+		req, err := http.NewRequest("POST", *httpEndpoint, bytes.NewReader(b))
 		if err != nil {
 			panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
 		}
@@ -232,7 +234,7 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 		if archiveIdx > 0 {
 			rowKey = api.AggMetricKey(
 				md.Id,
-				w.Header.Metadata.AggregationMethod.String(),
+				whisper.AggregationMethod(w.Header.Metadata.AggregationMethod).String(),
 				archiveInfo.SecondsPerPoint,
 			)
 		} else {
@@ -244,7 +246,7 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 			continue
 		}
 
-		encodedChunks := make(archive.ArchiveOfChunks)
+		encodedChunks := make([]chunk.IterGen, 0)
 
 		if len(chunkSpans)-1 < archiveIdx {
 			// if we have more archives than chunk spans are specified, we simply use the last one
@@ -276,12 +278,9 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 				log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
 				c.Finish()
 
-				encodedChunks[c.T0] = archive.MetricChunk{
-					ChunkSpan: chunkSpan,
-					Bytes:     c.Series.Bytes(),
-				}
+				encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 
-				log(fmt.Sprintf("Create new chunk at t0: %d", t0))
+				log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
 				c = chunk.New(t0)
 				prevT0 = t0
 			}
@@ -301,24 +300,22 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 		if point.Timestamp == t0+chunkSpan-archiveInfo.SecondsPerPoint || !*skipUnfinishedChunks {
 			log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
 			c.Finish()
-			encodedChunks[c.T0] = archive.MetricChunk{
-				ChunkSpan: chunkSpan,
-				Bytes:     c.Series.Bytes(),
-			}
+			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 		}
 
 		log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
 		archives = append(archives, archive.Archive{
-			ArchiveInfo: archiveInfo,
-			Chunks:      encodedChunks,
-			RowKey:      rowKey,
+			SecondsPerPoint: archiveInfo.SecondsPerPoint,
+			Points:          archiveInfo.Points,
+			Chunks:          encodedChunks,
+			RowKey:          rowKey,
 		})
 	}
 
 	return &archive.Metric{
-		Metadata:   w.Header.Metadata,
-		MetricData: *md,
-		Archives:   archives,
+		AggregationMethod: uint32(w.Header.Metadata.AggregationMethod),
+		MetricData:        *md,
+		Archives:          archives,
 	}, nil
 }
 
