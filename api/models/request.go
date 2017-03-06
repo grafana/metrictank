@@ -53,6 +53,6 @@ func (r Req) String() string {
 }
 
 func (r Req) DebugString() string {
-	return fmt.Sprintf("%s %d - %d . points <= %d. %s - archive %d, rawInt %d, archInt %d, outInt %d, aggNum %d",
-		r.Key, r.From, r.To, r.MaxPoints, r.Consolidator, r.Archive, r.RawInterval, r.ArchInterval, r.OutInterval, r.AggNum)
+	return fmt.Sprintf("Req key=%s %d - %d maxPoints=%d rawInt=%d cons=%s schemaI=%d aggI=%d archive=%d archInt=%d ttl=%d outInt=%d aggNum=%d",
+		r.Key, r.From, r.To, r.MaxPoints, r.RawInterval, r.Consolidator, r.SchemaI, r.AggI, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
 }
