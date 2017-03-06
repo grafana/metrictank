@@ -88,7 +88,7 @@ type partitionCandidates struct {
 // If partitions are assinged to nodes in groups
 // (a[0,1], b[0,1], c[2,3], d[2,3] as opposed to a[0,1], b[0,2], c[1,3], d[2,3]),
 // only 1 member per partition is returned.
-// The nodes are selected based on priority, prefering thisNode if it
+// The nodes are selected based on priority, preferring thisNode if it
 // has the lowest prio, otherwise using a random selection from all
 // nodes with the lowest prio.
 func MembersForQuery() []Node {

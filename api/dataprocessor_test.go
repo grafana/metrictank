@@ -598,7 +598,7 @@ func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator co
 
 // return true if a and b are equal. Equal means that all of the struct
 // fields are equal.  For the req.Node, we just compare the node.Name rather
-// then doing a deep comparision.
+// then doing a deep comparison.
 func compareReqEqual(a, b models.Req) bool {
 	if a.Key != b.Key {
 		return false

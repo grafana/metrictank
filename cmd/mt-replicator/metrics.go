@@ -115,7 +115,7 @@ func (r *MetricsReplicator) Consume() {
 			buf = buf[:0]
 			r.consumer.MarkPartitionOffset(m.Topic, m.Partition, m.Offset, "")
 		case t := <-accountingTicker.C:
-			log.Info("%d metrics procesed in last %.1fseconds.", counter, t.Sub(counterTs).Seconds())
+			log.Info("%d metrics processed in last %.1fseconds.", counter, t.Sub(counterTs).Seconds())
 			counter = 0
 			counterTs = t
 		}

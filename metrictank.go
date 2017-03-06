@@ -260,7 +260,7 @@ func main() {
 	runtime.MemProfileRate = *memProfileRate
 
 	/************************************
-	    handle interupt signals
+	    handle interrupt signals
 	************************************/
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

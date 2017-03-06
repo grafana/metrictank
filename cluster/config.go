@@ -42,7 +42,7 @@ func ConfigProcess() {
 
 	addr, err := net.ResolveTCPAddr("tcp", clusterBindAddr)
 	if err != nil {
-		log.Fatal(4, "CLU Config: cluster-bind-addres is not a valid TCP address: %s", err.Error())
+		log.Fatal(4, "CLU Config: bind-addr is not a valid TCP address: %s", err.Error())
 	}
 
 	if httpTimeout == 0 {

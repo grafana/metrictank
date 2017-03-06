@@ -242,7 +242,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	if currentOffset >= 0 {
 		// we cant set the offsetMetrics until we know what offset we are at.
 		partitionOffsetMetric.Set(int(currentOffset))
-		// we need the currentLogSize to be able to record our inital Lag.
+		// we need the currentLogSize to be able to record our initial Lag.
 		if err == nil {
 			partitionLagMetric.Set(int(offset - currentOffset))
 		}

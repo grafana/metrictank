@@ -56,7 +56,7 @@ var (
 	// metric store.cassandra.to_iter is the duration of converting chunks to iterators
 	cassToIterDuration = stats.NewLatencyHistogram15s32("store.cassandra.to_iter")
 
-	// metric store.cassandra.chunk_operations.save_ok is counter of successfull saves
+	// metric store.cassandra.chunk_operations.save_ok is counter of successful saves
 	chunkSaveOk = stats.NewCounter32("store.cassandra.chunk_operations.save_ok")
 	// metric store.cassandra.chunk_operations.save_fail is counter of failed saves
 	chunkSaveFail = stats.NewCounter32("store.cassandra.chunk_operations.save_fail")

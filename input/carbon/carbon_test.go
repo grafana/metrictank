@@ -105,7 +105,7 @@ func test_handleMessage(worker int, t *testing.T) map[string]int {
 		}
 	}
 	// as soon as this function ends, the server will close the socket.  We need to sleep here
-	// to ensure that the packets have time to be procesed by the kernel and passed to the server.
+	// to ensure that the packets have time to be processed by the kernel and passed to the server.
 	time.Sleep(time.Millisecond * 100)
 	return metrics
 }

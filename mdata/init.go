@@ -28,7 +28,7 @@ var (
 	// metric mem.to_iter is how long it takes to transform in-memory chunks to iterators
 	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")
 
-	// metric tank.persist is how long it takes to persist a chunk (and chunks preceeding it)
+	// metric tank.persist is how long it takes to persist a chunk (and chunks preceding it)
 	// this is subject to backpressure from the store when the store's queue runs full
 	persistDuration = stats.NewLatencyHistogram15s32("tank.persist")
 

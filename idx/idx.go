@@ -67,7 +67,7 @@ Interface
   the given OrgId and OrgId -1.  The pattern should be handled in the same way
   Graphite would. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
   And the unix stimestamp is used to ignore series that have been stale since
-  the timestmap.
+  the timestamp.
 
 * Delete(int, string) ([]schema.MetricDefinition, error):
   This method is used for deleting items from the index. The method is passed

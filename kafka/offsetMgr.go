@@ -82,7 +82,7 @@ func (o *OffsetMgr) Open() {
 }
 
 func (o *OffsetMgr) Close() {
-	// aquire the package lock to prevent a possible deadlock if
+	// acquire the package lock to prevent a possible deadlock if
 	// NewOffsetMgr is called at the same time.
 	mu.Lock()
 
@@ -106,7 +106,7 @@ func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
 	if err := binary.Write(data, binary.LittleEndian, offset); err != nil {
 		return err
 	}
-	log.Debug("commiting offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
+	log.Debug("committing offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
 	return o.db.Put(key.Bytes(), data.Bytes(), &opt.WriteOptions{Sync: true})
 }
 

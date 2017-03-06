@@ -48,5 +48,5 @@ func (k *Kafka) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, e
 		// to allow horizontal scalability
 		return m.KeyBySeries(b), nil
 	}
-	return b, fmt.Errorf("unkown partitionBy setting.")
+	return b, fmt.Errorf("unknown partitionBy setting.")
 }

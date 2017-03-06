@@ -239,7 +239,7 @@ func TestDelete(t *testing.T) {
 		Convey("series should not be present in the metricDef index", func() {
 			_, ok := ix.Get(org1Series[0].Id)
 			So(ok, ShouldEqual, false)
-			Convey("series should not be present in searchs", func() {
+			Convey("series should not be present in searches", func() {
 				nodes := strings.Split(org1Series[0].Name, ".")
 				branch := strings.Join(nodes[0:len(nodes)-2], ".")
 				found, err := ix.Find(1, branch+".*.*", 0)
@@ -262,7 +262,7 @@ func TestDelete(t *testing.T) {
 				_, ok := ix.Get(def.Id)
 				So(ok, ShouldEqual, false)
 			}
-			Convey("series should not be present in searchs", func() {
+			Convey("series should not be present in searches", func() {
 				for _, def := range org1Series {
 					nodes := strings.Split(def.Name, ".")
 					branch := strings.Join(nodes[0:len(nodes)-1], ".")
