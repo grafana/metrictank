@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -166,13 +166,13 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			continue
 		}
 
-		b, err := met.MarshalMsg(nil)
+		b, err := met.MarshalCompressed()
 		if err != nil {
 			throwError(fmt.Sprintf("Failed to encode metric: %q", err))
 			continue
 		}
 
-		req, err := http.NewRequest("POST", *httpEndpoint, bytes.NewReader(b))
+		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 		if err != nil {
 			panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
 		}
@@ -271,7 +271,6 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 
 			t0 = point.Timestamp - (point.Timestamp % chunkSpan)
 			if prevT0 == 0 {
-				log(fmt.Sprintf("Create new chunk at t0: %d", t0))
 				c = chunk.New(t0)
 				prevT0 = t0
 			} else if prevT0 != t0 {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -160,14 +159,8 @@ func log(msg string) {
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
-	b, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		throwError(fmt.Sprintf("Error reading body: %q", err))
-		return
-	}
-
 	metric := &archive.Metric{}
-	_, err = metric.UnmarshalMsg(b)
+	err := metric.UnmarshalCompressed(req.Body)
 	if err != nil {
 		throwError(fmt.Sprintf("Error decoding metric stream: %q", err))
 		return
