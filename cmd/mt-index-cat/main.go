@@ -35,7 +35,7 @@ func main() {
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
-	globalFlags.StringVar(&from, "from", "30min", "from. eg '30min', '5h', '14d', etc. or a unix timestamp")
+	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
