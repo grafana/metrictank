@@ -59,7 +59,8 @@ func main() {
 		fmt.Printf("cass config flags:\n\n")
 		cassFlags.PrintDefaults()
 		fmt.Println()
-		fmt.Printf("output: %v\n\n\n", strings.Join(outputs, "|"))
+		fmt.Printf("output: either presets like %v\n", strings.Join(outputs, "|"))
+		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 list")
 	}
@@ -74,16 +75,20 @@ func main() {
 		os.Exit(-1)
 	}
 
-	last := os.Args[len(os.Args)-1]
+	format := os.Args[len(os.Args)-1]
 	var found bool
-	for _, output := range outputs {
-		if last == output {
-			found = true
-			break
+	if strings.Contains(format, "{{") {
+		found = true
+	} else {
+		for _, output := range outputs {
+			if format == output {
+				found = true
+				break
+			}
 		}
 	}
 	if !found {
-		log.Printf("invalid output %q", last)
+		log.Printf("invalid output %q", format)
 		flag.Usage()
 		os.Exit(-1)
 	}
@@ -105,7 +110,7 @@ func main() {
 
 	var show func(d schema.MetricDefinition)
 
-	switch os.Args[len(os.Args)-1] {
+	switch format {
 	case "dump":
 		show = out.Dump
 	case "list":
@@ -115,7 +120,7 @@ func main() {
 	case "vegeta-render-patterns":
 		show = out.GetVegetaRenderPattern(addr, from)
 	default:
-		panic("this should never happen. we already validated the output type")
+		show = out.Template(format)
 	}
 
 	idx := cassandra.New()
