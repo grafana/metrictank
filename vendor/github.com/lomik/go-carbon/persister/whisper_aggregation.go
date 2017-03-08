@@ -16,7 +16,7 @@ import (
 )
 
 type WhisperAggregationItem struct {
-	name                 string
+	Name                 string
 	pattern              *regexp.Regexp
 	XFilesFactor         float64
 	aggregationMethodStr string
@@ -34,7 +34,7 @@ func NewWhisperAggregation() WhisperAggregation {
 	return WhisperAggregation{
 		Data: make([]WhisperAggregationItem, 0),
 		Default: WhisperAggregationItem{
-			name:                 "default",
+			Name:                 "default",
 			pattern:              nil,
 			XFilesFactor:         0.5,
 			aggregationMethodStr: "average",
@@ -61,23 +61,23 @@ func ReadWhisperAggregation(file string) (WhisperAggregation, error) {
 		item := WhisperAggregationItem{}
 		// this is mildly stupid, but I don't feel like forking
 		// configparser just for this
-		item.name =
+		item.Name =
 			strings.Trim(strings.SplitN(s.String(), "\n", 2)[0], " []")
-		if item.name == "" || strings.HasPrefix(item.name, "#") {
+		if item.Name == "" || strings.HasPrefix(item.Name, "#") {
 			continue
 		}
 
 		item.pattern, err = regexp.Compile(s.ValueOf("pattern"))
 		if err != nil {
 			logrus.Errorf("[persister] Failed to parse pattern '%s'for [%s]: %s",
-				s.ValueOf("pattern"), item.name, err.Error())
+				s.ValueOf("pattern"), item.Name, err.Error())
 			return WhisperAggregation{}, err
 		}
 
 		item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
 		if err != nil {
 			logrus.Errorf("failed to parse xFilesFactor '%s' in %s: %s",
-				s.ValueOf("xFilesFactor"), item.name, err.Error())
+				s.ValueOf("xFilesFactor"), item.Name, err.Error())
 			return WhisperAggregation{}, err
 		}
 
@@ -102,7 +102,7 @@ func ReadWhisperAggregation(file string) (WhisperAggregation, error) {
 		}
 
 		logrus.Debugf("[persister] Adding aggregation [%s] pattern = %s aggregationMethod = %s xFilesFactor = %f",
-			item.name, s.ValueOf("pattern"),
+			item.Name, s.ValueOf("pattern"),
 			item.aggregationMethodStr, item.XFilesFactor)
 
 		result.Data = append(result.Data, item)
