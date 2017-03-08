@@ -115,7 +115,7 @@ func store(p *Whisper, values *points.Points) {
 		logrus.WithFields(logrus.Fields{
 			"retention":    schema.RetentionStr,
 			"schema":       schema.Name,
-			"aggregation":  aggr.name,
+			"aggregation":  aggr.Name,
 			"xFilesFactor": aggr.XFilesFactor,
 			"method":       aggr.aggregationMethodStr,
 		}).Debugf("[persister] Creating %s", path)
