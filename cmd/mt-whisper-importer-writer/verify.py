@@ -15,13 +15,14 @@
 # $> ./verify.py /tmp/whisper_dump /tmp/mt_store_dump
 #
 #
-# averaged aggregations are a special case. the whisper importer utility
-# converts avg archives into a sum and a cnt archive and inserts them as such.
-# the cnt archive only gets the aggregation span at each timestamp, the sum
-# archive gets the value from whisper * aggregation span, out of these two
-# series metrictank calculcates the average on the fly when it's queried.
-# so to verify the data we need to use the multiplicator parameter, let's say
-# the aggregation span is 600, then we compare the series like this:
+# averaged aggregations are a special case. mt-store-cat only dumps raw series
+# such as sum/cnt/max, but it cannot return an avg series like metrictank does
+# because that data is not kept as a raw series in metrictank. given this
+# limitation the closest thing we can get to validating avg series is getting
+# mt-store-cat to dump the sum series and then divide it by the count to turn
+# it into an average again.
+# since mt-store-cat has no way to divide we pass a number to this script and
+# divide in this script.
 #
 # $> ./verify.py /tmp/whisper_dump /tmp/mt_store_dump 600
 
@@ -32,16 +33,16 @@ import re
 if len(sys.argv) < 3:
     print(
         'required arguments: {cmd} whisper-dump-output '
-        'mt-store-cat-output [multiplicator]'
+        'mt-store-cat-output [factor]'
         .format(cmd=sys.argv[0])
     )
     exit(1)
 
 
 if len(sys.argv) == 4:
-    multiplicator = float(sys.argv[3])
+    factor = float(sys.argv[3])
 else:
-    multiplicator = float(1)
+    factor = float(1)
 
 
 def get_data(path, regex):
@@ -75,7 +76,7 @@ if len(whisper_data) < len(mt_store_data):
     src = whisper_data
     dst = mt_store_data
 else:
-    multiplicator = 1/multiplicator
+    factor = 1/factor
     src = mt_store_data
     dst = whisper_data
 
@@ -87,7 +88,7 @@ for ts, val1 in src.items():
         continue
 
     val2 = dst[ts]
-    val1 = val1 * multiplicator
+    val1 = val1 * factor
 
     # round the floats to 3 decimals
     if int(val1*1000) == int(val2*1000):

@@ -96,7 +96,7 @@ func main() {
 	cassandra.ConfigSetup()
 	flag.Parse()
 
-	cassCluster := gocql.NewCluster(*cassandraAddrs)
+	cassCluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
 	cassCluster.Consistency = gocql.ParseConsistency("one")
 	cassCluster.Timeout = time.Second
 	cassCluster.NumConns = 2

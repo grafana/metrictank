@@ -53,7 +53,7 @@ func TestGetTTLTables(t *testing.T) {
 			t.Fatalf("%s expected 1 result, got %d", logPrefix, len(result))
 		}
 		if result[tc.ttl].Table != tc.expectedTableName {
-			t.Fatalf("%s expected table name '%s', got '%s'", logPrefix, tc.expectedTableName, result[tc.ttl].Table)
+			t.Fatalf("%s expected table name %q, got %q", logPrefix, tc.expectedTableName, result[tc.ttl].Table)
 		}
 		if result[tc.ttl].windowSize != tc.expectedWindowSize {
 			t.Fatalf("%s expected window size %d, got %d", logPrefix, tc.expectedWindowSize, result[tc.ttl].windowSize)
