@@ -98,9 +98,9 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 				if interval == archInterval && ret.Ready {
 					// we're in luck. this will be more efficient than runtime consolidation
 					req.Archive = req.Archive + 1 + i
-					req.ArchInterval = uint32(ret.SecondsPerPoint())
+					req.ArchInterval = archInterval
 					req.TTL = uint32(ret.MaxRetention())
-					req.OutInterval = req.ArchInterval
+					req.OutInterval = archInterval
 					req.AggNum = 1
 					break
 				}
