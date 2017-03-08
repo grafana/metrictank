@@ -277,6 +277,8 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 				Path:        n.Path,
 				Leaf:        n.Leaf(),
 				HasChildren: n.HasChildren(),
+				SchemaI:     n.SchemaI,
+				AggI:        n.AggI,
 			}
 			if idxNode.Leaf {
 				idxNode.Defs = make([]schema.MetricDefinition, 0, len(n.Defs))
