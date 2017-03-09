@@ -72,13 +72,8 @@ print(
     .format(whisper=len(whisper_data), mt_store=len(mt_store_data))
 )
 
-if len(whisper_data) < len(mt_store_data):
-    src = whisper_data
-    dst = mt_store_data
-else:
-    factor = 1/factor
-    src = mt_store_data
-    dst = whisper_data
+src = whisper_data
+dst = mt_store_data
 
 misses, correct, wrong = 0, 0, 0
 
@@ -91,7 +86,7 @@ for ts, val1 in src.items():
     val1 = val1 * factor
 
     # round the floats to 3 decimals
-    if int(val1*1000) == int(val2*1000):
+    if int(val1*100) == int(val2*100):
         correct += 1
     else:
         print('wrong: {src} != {dst}'.format(src=val1, dst=val2))
