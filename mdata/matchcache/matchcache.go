@@ -1,11 +1,8 @@
 package matchcache
 
 import (
-	"fmt"
 	"sync"
 	"time"
-
-	"github.com/raintank/metrictank/stats"
 )
 
 // Cache caches key to uint16 lookups (for schemas and aggregations)
@@ -18,8 +15,6 @@ type Cache struct {
 
 	cleanInterval time.Duration
 	expireAfter   time.Duration
-	hits          *stats.Counter32
-	miss          *stats.Counter32
 }
 
 type Item struct {
@@ -27,13 +22,11 @@ type Item struct {
 	seen int64
 }
 
-func New(name string, cleanInterval, expireAfter time.Duration) *Cache {
+func New(cleanInterval, expireAfter time.Duration) *Cache {
 	m := &Cache{
 		data:          make(map[string]Item),
 		cleanInterval: cleanInterval,
 		expireAfter:   expireAfter,
-		hits:          stats.NewCounter32(fmt.Sprintf("idx.matchcache.%s.ops.hit", name)),
-		miss:          stats.NewCounter32(fmt.Sprintf("idx.matchcache.%s.ops.miss", name)),
 	}
 	go m.maintain()
 	return m
@@ -45,10 +38,7 @@ type AddFunc func(key string) uint16
 func (m *Cache) Get(key string, fn AddFunc) uint16 {
 	m.Lock()
 	item, ok := m.data[key]
-	if ok {
-		m.hits.Inc()
-	} else {
-		m.miss.Inc()
+	if !ok {
 		item.val = fn(key)
 	}
 	item.seen = time.Now().Unix()
