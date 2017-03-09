@@ -53,10 +53,10 @@ var (
 		10,
 		"Number of workers threads to process .wsp files",
 	)
-	skipUnfinishedChunks = flag.Bool(
-		"skip-unfinished-chunks",
-		true,
-		"Chunks that have not completed their chunk span should be skipped",
+	writeUnfinishedChunks = flag.Bool(
+		"write-unfinished-chunks",
+		false,
+		"Defines if chunks that have not completed their chunk span should be written",
 	)
 	orgId = flag.Int(
 		"orgid",
@@ -317,8 +317,8 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 		}
 
 		// if the last written point was also the last one of the current chunk,
-		// or if skipUnfinishedChunks is on, we close the chunk and
-		if point.Timestamp == t0+chunkSpan-archiveInfo.SecondsPerPoint || !*skipUnfinishedChunks {
+		// or if writeUnfinishedChunks is on, we close the chunk and
+		if point.Timestamp == t0+chunkSpan-archiveInfo.SecondsPerPoint || *writeUnfinishedChunks {
 			log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
 			c.Finish()
 			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
