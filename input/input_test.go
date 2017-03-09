@@ -21,6 +21,7 @@ func BenchmarkProcess(b *testing.B) {
 
 	mdata.SetSingleSchema(whisper.NewRetentionMT(10, 10000, 600, 10, true))
 	mdata.SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	mdata.Cache(time.Minute, time.Hour)
 
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 800, 8000, 0)
 	metricIndex := memory.New()

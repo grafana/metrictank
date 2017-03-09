@@ -11,14 +11,21 @@ import (
 // MatchSchema returns the schema for the given metric key, and the index of the schema (to efficiently reference it)
 // it will always find the schema because we made sure there is a catchall '.*' pattern
 func MatchSchema(key string) (uint16, persister.Schema) {
-	i, schema, _ := Schemas.Match(key)
-	return i, schema
+	i := schemasCache.Get(key, func(key string) uint16 {
+		i, _, _ := Schemas.Match(key)
+		return i
+	})
+	return i, Schemas[i]
 }
 
 // MatchAgg returns the aggregation definition for the given metric key, and the index of it (to efficiently reference it)
 // i may be 1 more than the last defined by user, in which case it's the default.
 func MatchAgg(key string) (uint16, persister.WhisperAggregationItem) {
-	return Aggregations.Match(key)
+	i := aggsCache.Get(key, func(key string) uint16 {
+		i, _ := Aggregations.Match(key)
+		return i
+	})
+	return i, GetAgg(i)
 }
 
 // caller must assure i is valid
