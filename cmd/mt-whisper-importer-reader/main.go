@@ -144,12 +144,12 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%q': %q\n", file, err))
+			throwError(fmt.Sprintf("ERROR: Failed to open whisper file %q: %q\n", file, err))
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file '%q': %q\n", file, err))
+			throwError(fmt.Sprintf("ERROR: Failed to open whisper file %q: %q\n", file, err))
 			continue
 		}
 
@@ -206,6 +206,23 @@ func sortPoints(points pointSorter) pointSorter {
 	return points
 }
 
+func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
+	switch aggMethod {
+	case whisper.AggregationAverage:
+		return "avg"
+	case whisper.AggregationSum:
+		return "sum"
+	case whisper.AggregationMin:
+		return "min"
+	case whisper.AggregationMax:
+		return "max"
+	case whisper.AggregationLast:
+		return "lst"
+	default:
+		return ""
+	}
+}
+
 func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 	if len(w.Header.Archives) == 0 {
 		return nil, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
@@ -214,6 +231,7 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 	archives := make([]archive.Archive, 0, len(w.Header.Archives))
 	var chunkSpan uint32
 	var rowKey string
+	var aggMethodStr string
 	name := getMetricName(file)
 
 	// md gets generated from the first archive in the whisper file
@@ -221,9 +239,24 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 
 	for archiveIdx, archiveInfo := range w.Header.Archives {
 		if archiveIdx > 0 {
+
+			// on the first aggregation we determin the aggregation method as string
+			if aggMethodStr == "" {
+				aggMethodStr = shortAggMethodString(w.Header.Metadata.AggregationMethod)
+
+				if aggMethodStr == "" {
+					return nil, errors.New(fmt.Sprintf(
+						"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
+						file,
+						w.Header.Metadata.AggregationMethod,
+						whisper.AggregationMethod(w.Header.Metadata.AggregationMethod).String(),
+					))
+				}
+			}
+
 			rowKey = api.AggMetricKey(
 				md.Id,
-				whisper.AggregationMethod(w.Header.Metadata.AggregationMethod).String(),
+				aggMethodStr,
 				archiveInfo.SecondsPerPoint,
 			)
 		} else {
