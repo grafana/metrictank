@@ -7,9 +7,11 @@ import (
 	"io/ioutil"
 	"log"
 	"regexp"
+	"time"
 
 	"github.com/lomik/go-carbon/persister"
 	whisper "github.com/lomik/go-whisper"
+	"github.com/raintank/metrictank/mdata/matchcache"
 	"github.com/raintank/metrictank/stats"
 )
 
@@ -49,6 +51,8 @@ var (
 	// set either via ConfigProcess or from the unit tests. other code should not touch
 	Schemas      persister.WhisperSchemas
 	Aggregations persister.WhisperAggregation
+	schemasCache *matchcache.Cache
+	aggsCache    *matchcache.Cache
 
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
@@ -92,5 +96,10 @@ func ConfigProcess() {
 	if err != nil {
 		log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
 	}
+	Cache(time.Hour, time.Hour)
+}
 
+func Cache(cleanInterval, expireAfter time.Duration) {
+	schemasCache = matchcache.New(cleanInterval, expireAfter)
+	aggsCache = matchcache.New(cleanInterval, expireAfter)
 }
