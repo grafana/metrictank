@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
@@ -568,8 +568,8 @@ func TestGetSeriesFixed(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewDevnullStore()
 
-	mdata.SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
-	mdata.SetSingleSchema(whisper.NewRetentionMT(10, 100, 600, 10, true))
+	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
 
 	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
 	srv, _ := NewServer()

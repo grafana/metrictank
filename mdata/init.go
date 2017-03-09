@@ -6,11 +6,9 @@ package mdata
 import (
 	"io/ioutil"
 	"log"
-	"regexp"
 	"time"
 
-	"github.com/lomik/go-carbon/persister"
-	whisper "github.com/lomik/go-whisper"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata/matchcache"
 	"github.com/raintank/metrictank/stats"
 )
@@ -49,8 +47,8 @@ var (
 	gcMetric = stats.NewCounter32("tank.gc_metric")
 
 	// set either via ConfigProcess or from the unit tests. other code should not touch
-	Schemas      persister.WhisperSchemas
-	Aggregations persister.WhisperAggregation
+	Schemas      conf.Schemas
+	Aggregations conf.Aggregations
 	schemasCache *matchcache.Cache
 	aggsCache    *matchcache.Cache
 
@@ -67,15 +65,10 @@ func ConfigProcess() {
 	// at the end, add a default schema of 7 days of minutely data.
 	// we are stricter and don't tolerate any errors, that seems in the user's best interest.
 
-	Schemas, err = persister.ReadWhisperSchemas(schemasFile)
+	Schemas, err = conf.ReadSchemas(schemasFile)
 	if err != nil {
 		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
 	}
-	Schemas = append(Schemas, persister.Schema{
-		Name:       "default",
-		Pattern:    regexp.MustCompile(""),
-		Retentions: whisper.Retentions([]whisper.Retention{whisper.NewRetentionMT(60, 3600*24*7, 120*60, 2, true)}),
-	})
 
 	// === read storage-aggregation.conf ===
 
@@ -86,15 +79,13 @@ func ConfigProcess() {
 
 	// since we can't distinguish errors reading vs parsing, we'll just try a read separately first
 	_, err = ioutil.ReadFile(aggFile)
-	if err != nil {
-		// this will add the default case we need
-		Aggregations = persister.NewWhisperAggregation()
-		return
-	}
-	// note: in this case, the library will include the default setting
-	Aggregations, err = persister.ReadWhisperAggregation(aggFile)
-	if err != nil {
-		log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
+	if err == nil {
+		Aggregations, err = conf.ReadAggregations(aggFile)
+		if err != nil {
+			log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
+		}
+	} else {
+		Aggregations = conf.NewAggregations()
 	}
 	Cache(time.Hour, time.Hour)
 }

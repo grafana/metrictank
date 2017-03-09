@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata/cache"
 )
 
@@ -94,7 +94,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	mockCache.CacheIfHotCb = func() { calledCb <- true }
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
-	ret := []whisper.Retention{whisper.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
 	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
@@ -130,7 +130,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	ret := []whisper.Retention{whisper.NewRetentionMT(1, 1, 100, 5, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
 	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil))
 
 	// basic case, single range
@@ -211,10 +211,10 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	// we will store 10s metrics in 5 chunks of 2 hours
 	// aggregate them in 5min buckets, stored in 1 chunk of 24hours
-	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	SetSingleSchema(
-		whisper.NewRetentionMT(1, 84600, 2*3600, 5, true),
-		whisper.NewRetentionMT(300, 30*84600, 24*3600, 1, true),
+		conf.NewRetentionMT(1, 84600, 2*3600, 5, true),
+		conf.NewRetentionMT(300, 30*84600, 24*3600, 1, true),
 	)
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
@@ -240,10 +240,10 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	SetSingleSchema(
-		whisper.NewRetentionMT(1, 84600, 600, 5, true),
-		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+		conf.NewRetentionMT(1, 84600, 600, 5, true),
+		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
 	)
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
@@ -269,10 +269,10 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	SetSingleSchema(
-		whisper.NewRetentionMT(1, 84600, 600, 5, true),
-		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+		conf.NewRetentionMT(1, 84600, 600, 5, true),
+		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
 	)
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
@@ -298,10 +298,10 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	SetSingleSchema(
-		whisper.NewRetentionMT(1, 84600, 600, 5, true),
-		whisper.NewRetentionMT(300, 84600, 24*3600, 2, true),
+		conf.NewRetentionMT(1, 84600, 600, 5, true),
+		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
 	)
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)

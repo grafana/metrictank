@@ -255,7 +255,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			def := locdef.def
 			// set consolidator that will be used to normalize raw data before feeding into processing functions
 			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
-			fn := mdata.GetAgg(locdef.AggI).AggregationMethod[0]
+			fn := mdata.Aggregations.Get(locdef.AggI).AggregationMethod[0]
 			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
 			// pattern is like foo.bar or foo.*

@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lomik/go-carbon/persister"
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -43,7 +42,7 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsability to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions whisper.Retentions, agg *persister.WhisperAggregationItem) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, agg *conf.Aggregation) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
