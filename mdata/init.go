@@ -91,6 +91,6 @@ func ConfigProcess() {
 }
 
 func Cache(cleanInterval, expireAfter time.Duration) {
-	schemasCache = matchcache.New(cleanInterval, expireAfter)
-	aggsCache = matchcache.New(cleanInterval, expireAfter)
+	schemasCache = matchcache.New("schemas", cleanInterval, expireAfter)
+	aggsCache = matchcache.New("aggs", cleanInterval, expireAfter)
 }
