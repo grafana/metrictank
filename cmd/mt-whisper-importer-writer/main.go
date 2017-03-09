@@ -209,10 +209,6 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 			// mt reconstructs the averages on the fly from the sum and cnt series, so we need
 			// to generate these two series out of raw averaged data by multiplying each point
 			// with the aggregation span and storing the result as sum, cnt is the aggregation span.
-			type sumCntChunks struct {
-				sum *chunk.Chunk
-				cnt *chunk.Chunk
-			}
 
 			// seconds per point is assumed to be the aggregation span
 			aggSpan := a.SecondsPerPoint
