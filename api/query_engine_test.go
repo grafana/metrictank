@@ -4,24 +4,23 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/lomik/go-carbon/persister"
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 )
 
 // testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
-func testAlign(reqs []models.Req, retentions [][]whisper.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
-	var schemas []persister.Schema
+func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
+	var schemas []conf.Schema
 	for _, ret := range retentions {
-		schemas = append(schemas, persister.Schema{
+		schemas = append(schemas, conf.Schema{
 			Pattern:    regexp.MustCompile(".*"),
-			Retentions: whisper.Retentions(ret),
+			Retentions: conf.Retentions(ret),
 		})
 	}
 
-	mdata.Schemas = persister.WhisperSchemas(schemas)
+	mdata.Schemas = conf.Schemas(schemas)
 	out, err := alignRequests(now, reqs)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
@@ -43,9 +42,9 @@ func TestAlignRequestsBasic(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 0, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
 			},
 		},
 		[]models.Req{
@@ -64,12 +63,12 @@ func TestAlignRequestsBasicDiff(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
 			},
 		},
 		[]models.Req{
@@ -89,10 +88,10 @@ func TestAlignRequestsAlerting(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{{
-			whisper.NewRetentionMT(10, 1200, 0, 0, true),
+		[][]conf.Retention{{
+			conf.NewRetentionMT(10, 1200, 0, 0, true),
 		}, {
-			whisper.NewRetentionMT(60, 1200, 0, 0, true),
+			conf.NewRetentionMT(60, 1200, 0, 0, true),
 		},
 		},
 		[]models.Req{
@@ -111,11 +110,11 @@ func TestAlignRequestsBasicBestEffort(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 800, 0, 0, true),
+				conf.NewRetentionMT(10, 800, 0, 0, true),
 			}, {
-				whisper.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
 			},
 		},
 		[]models.Req{
@@ -134,12 +133,12 @@ func TestAlignRequestsHalfGood(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 800, 0, 0, true),
+				conf.NewRetentionMT(10, 800, 0, 0, true),
 			}, {
-				whisper.NewRetentionMT(60, 1100, 0, 0, true),
-				whisper.NewRetentionMT(120, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1200, 0, 0, true),
 			},
 		},
 		[]models.Req{
@@ -158,14 +157,14 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
 			},
 		},
 		[]models.Req{
@@ -184,14 +183,14 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(100, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(100, 1200, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(600, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(600, 1200, 600, 2, true),
 			},
 		},
 		[]models.Req{
@@ -210,13 +209,13 @@ func TestAlignRequestsWeird(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1199, 0, 0, true),
-				whisper.NewRetentionMT(60, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
 			},
 		},
 		[]models.Req{
@@ -235,14 +234,14 @@ func TestAlignRequestsWeird2(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
 			},
 		},
 		[]models.Req{
@@ -261,14 +260,14 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1100, 0, 0, true),
-				whisper.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(10, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1100, 0, 0, true),
-				whisper.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
 			},
 		},
 		[]models.Req{
@@ -287,15 +286,15 @@ func TestAlignRequests3rdBand(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(1, 1100, 0, 0, true),
-				whisper.NewRetentionMT(120, 1199, 600, 2, true),
-				whisper.NewRetentionMT(240, 1200, 600, 2, true),
+				conf.NewRetentionMT(1, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, true),
 			},
 			{
-				whisper.NewRetentionMT(60, 1100, 0, 0, true),
-				whisper.NewRetentionMT(240, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, true),
 			},
 		},
 		[]models.Req{
@@ -314,15 +313,15 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(120, 1199, 600, 2, false),
-				whisper.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1199, 600, 2, false),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
 			},
 			{
-				whisper.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
-				whisper.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
 			},
 		},
 		[]models.Req{
@@ -339,15 +338,15 @@ func TestAlignRequestsHuh(t *testing.T) {
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]whisper.Retention{
+		[][]conf.Retention{
 			{
-				whisper.NewRetentionMT(1, 1000, 0, 0, true),
-				whisper.NewRetentionMT(120, 1080, 600, 2, true),
-				whisper.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(1, 1000, 0, 0, true),
+				conf.NewRetentionMT(120, 1080, 600, 2, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
 			},
 			{
-				whisper.NewRetentionMT(60, 1100, 0, 0, true),
-				whisper.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
 			},
 		},
 		[]models.Req{
@@ -369,35 +368,35 @@ func BenchmarkAlignRequests(b *testing.B) {
 		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg, 1, 0),
 		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg, 2, 0),
 	}
-	mdata.Schemas = persister.WhisperSchemas([]persister.Schema{
+	mdata.Schemas = conf.Schemas([]conf.Schema{
 		{
 			Pattern: regexp.MustCompile("a"),
-			Retentions: whisper.Retentions(
-				[]whisper.Retention{
-					whisper.NewRetentionMT(10, 35*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(10, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
 				}),
 		},
 		{
 			Pattern: regexp.MustCompile("b"),
-			Retentions: whisper.Retentions(
-				[]whisper.Retention{
-					whisper.NewRetentionMT(30, 35*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(30, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
 				}),
 		},
 		{
 			Pattern: regexp.MustCompile(".*"),
-			Retentions: whisper.Retentions(
-				[]whisper.Retention{
-					whisper.NewRetentionMT(60, 35*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					whisper.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(60, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
 				}),
 		},
 	})

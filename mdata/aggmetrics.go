@@ -83,8 +83,8 @@ func (ms *AggMetrics) GetOrCreate(key, name string, schemaI, aggI uint16) Metric
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		agg := GetAgg(aggI)
-		m = NewAggMetric(ms.store, ms.cachePusher, key, GetRetentions(schemaI), &agg)
+		agg := Aggregations.Get(aggI)
+		m = NewAggMetric(ms.store, ms.cachePusher, key, Schemas.Get(schemaI).Retentions, &agg)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}

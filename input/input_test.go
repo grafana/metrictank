@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
@@ -20,8 +20,8 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 
 	store := mdata.NewDevnullStore()
 
-	mdata.SetSingleSchema(whisper.NewRetentionMT(10, 10000, 600, 10, true))
-	mdata.SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
+	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	mdata.Cache(time.Minute, time.Hour)
 
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 800, 8000, 0)
@@ -60,8 +60,8 @@ func BenchmarkProcessSameMetric(b *testing.B) {
 
 	store := mdata.NewDevnullStore()
 
-	mdata.SetSingleSchema(whisper.NewRetentionMT(10, 10000, 600, 10, true))
-	mdata.SetOnlyDefaultAgg(whisper.Average, whisper.Min, whisper.Max)
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
+	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	mdata.Cache(time.Minute, time.Hour)
 
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 800, 8000, 0)

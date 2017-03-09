@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	whisper "github.com/lomik/go-whisper"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata/cache"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -65,8 +65,11 @@ func TestAggregator(t *testing.T) {
 		}
 		cluster.Manager.SetPrimary(false)
 	}
-	ret := whisper.NewRetentionMT(60, 86400, 120, 10, true)
-	aggs := AllAggregations()
+	ret := conf.NewRetentionMT(60, 86400, 120, 10, true)
+	aggs := conf.Aggregation{
+		AggregationMethod: []conf.Method{conf.Avg, conf.Min, conf.Max, conf.Sum, conf.Lst},
+	}
+
 	agg := NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)

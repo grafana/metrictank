@@ -3,8 +3,7 @@ package mdata
 import (
 	"fmt"
 
-	"github.com/lomik/go-carbon/persister"
-	whisper "github.com/lomik/go-whisper"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata/cache"
 )
 
@@ -32,11 +31,11 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret whisper.Retention, agg persister.WhisperAggregationItem) *Aggregator {
+func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret conf.Retention, agg conf.Aggregation) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
 		panic("NewAggregator called without aggregations. this should never happen")
 	}
-	span := uint32(ret.SecondsPerPoint())
+	span := uint32(ret.SecondsPerPoint)
 	aggregator := &Aggregator{
 		key:  key,
 		span: span,
@@ -44,28 +43,28 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret w
 	}
 	for _, agg := range agg.AggregationMethod {
 		switch agg {
-		case whisper.Average:
+		case conf.Avg:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil)
 			}
 			if aggregator.cntMetric == nil {
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), conf.Retentions{ret}, nil)
 			}
-		case whisper.Sum:
+		case conf.Sum:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil)
 			}
-		case whisper.Last:
+		case conf.Lst:
 			if aggregator.lstMetric == nil {
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_lst_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.lstMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_lst_%d", key, span), conf.Retentions{ret}, nil)
 			}
-		case whisper.Max:
+		case conf.Max:
 			if aggregator.maxMetric == nil {
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), conf.Retentions{ret}, nil)
 			}
-		case whisper.Min:
+		case conf.Min:
 			if aggregator.minMetric == nil {
-				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), whisper.Retentions{ret}, nil)
+				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), conf.Retentions{ret}, nil)
 			}
 		}
 	}

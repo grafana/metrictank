@@ -40,7 +40,7 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 
 	for i := range reqs {
 		req := &reqs[i]
-		retentions := mdata.GetRetentions(req.SchemaI)
+		retentions := mdata.Schemas.Get(req.SchemaI).Retentions
 		req.Archive = -1
 
 		for i, ret := range retentions {
@@ -51,7 +51,7 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 
 			req.Archive = i
 			req.TTL = uint32(ret.MaxRetention())
-			req.ArchInterval = uint32(ret.SecondsPerPoint())
+			req.ArchInterval = uint32(ret.SecondsPerPoint)
 
 			if now-req.TTL <= req.From {
 				break
@@ -92,9 +92,9 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 			// we have to deliver an interval higher than what we originally came up with
 
 			// let's see first if we can deliver it via lower-res rollup archives, if we have any
-			retentions := mdata.GetRetentions(req.SchemaI)
+			retentions := mdata.Schemas.Get(req.SchemaI).Retentions
 			for i, ret := range retentions[req.Archive+1:] {
-				archInterval := uint32(ret.SecondsPerPoint())
+				archInterval := uint32(ret.SecondsPerPoint)
 				if interval == archInterval && ret.Ready {
 					// we're in luck. this will be more efficient than runtime consolidation
 					req.Archive = req.Archive + 1 + i
