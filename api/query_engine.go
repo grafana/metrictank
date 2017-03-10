@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
@@ -15,84 +17,111 @@ var (
 	reqRenderPointsFetched = stats.NewMeter32("api.request.render.points_fetched", false)
 	// metric api.request.render.series is the number of points the request will return.
 	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
+
+	errUnSatisfiable = errors.New("request cannot be satisfied due to lack of available retentions")
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
-// luckily, all metrics still use the same aggSettings, making this a bit simpler
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
-func alignRequests(now uint32, reqs []models.Req, s mdata.AggSettings) ([]models.Req, error) {
+func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 
 	tsRange := (reqs[0].To - reqs[0].From)
 
-	// prefer raw first and foremost.
-	// if raw interval doesn't retain data long enough, we must
-	// find the highest res rollup archive that retains all the data we need.
+	var listIntervals []uint32
+	var seenIntervals = make(map[uint32]struct{})
+
+	// set preliminary settings. may be adjusted further down
+	// but for now:
+	// for each req, find the highest res archive
+	// (starting with raw, then rollups in decreasing precision)
+	// that retains all the data we need.
 	// fallback to lowest res option (which *should* have the longest TTL)
 
-	archive := 0
-	ttl := s.RawTTL
+	for i := range reqs {
+		req := &reqs[i]
+		retentions := mdata.Schemas.Get(req.SchemaI).Retentions
+		req.Archive = -1
 
-	if now-s.RawTTL > reqs[0].From {
-		for i, agg := range s.Aggs {
+		for i, ret := range retentions {
 			// skip non-ready option.
-			if !agg.Ready {
+			if !ret.Ready {
 				continue
 			}
-			archive = i + 1
-			ttl = agg.TTL
-			if now-agg.TTL <= reqs[0].From {
+
+			req.Archive = i
+			req.TTL = uint32(ret.MaxRetention())
+			req.ArchInterval = uint32(ret.SecondsPerPoint)
+
+			if now-req.TTL <= req.From {
 				break
 			}
 		}
 
-	}
-
-	var interval uint32
-	var listRawIntervals []uint32 // note: only populated when archive 0
-	// the first (raw) uses the LCM of different raw intervals, since that's what needed to fulfill a raw request.
-	// in edge cases (poorly configured setups) this might make raw interval > 1st rollup
-	if archive == 0 {
-		seenRawIntervals := make(map[uint32]struct{})
-		for _, req := range reqs {
-			if _, ok := seenRawIntervals[req.RawInterval]; !ok {
-				listRawIntervals = append(listRawIntervals, req.RawInterval)
-				seenRawIntervals[req.RawInterval] = struct{}{}
-			}
+		if req.Archive == -1 {
+			return nil, errUnSatisfiable
 		}
-		interval = util.Lcm(listRawIntervals)
-	} else {
-		interval = s.Aggs[archive-1].Span
+
+		if _, ok := seenIntervals[req.ArchInterval]; !ok {
+			listIntervals = append(listIntervals, req.ArchInterval)
+			seenIntervals[req.ArchInterval] = struct{}{}
+		}
 	}
 
-	/* we now just need to update the following properties for each req:
-	   archive      int    // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
-	   archInterval uint32 // the interval corresponding to the archive we'll fetch
-	   outInterval  uint32 // the interval of the output data, after any runtime consolidation
-	   aggNum       uint32 // how many points to consolidate together at runtime, after fetching from the archive
-	*/
+	// due to different retentions coming into play, different requests may end up with different resolutions
+	// we all need to emit them at the same interval, the LCM interval >= interval of the req
 
-	// only apply runtime consolidation (pre data processing in graphite api) if we have to due to non uniform raw intervals
-	runtimeConsolidate := archive == 0 && len(listRawIntervals) > 1
+	interval := util.Lcm(listIntervals)
+
+	// now, for all our requests, set all their properties.  we may have to apply runtime consolidation to get the
+	// correct output interval if out interval != native.  In that case, we also check whether we can fulfill
+	// the request by reading from an archive instead (i.e. whether it has the correct interval.
+	// the TTL of lower resolution archives is always assumed to be at least as long so we don't have to check that)
+
 	var pointsFetch uint32
 	for i := range reqs {
 		req := &reqs[i]
-		req.Archive = archive
-		req.TTL = ttl
-		req.OutInterval = interval
+		if req.ArchInterval == interval {
+			// the easy case. we can satisfy this req with what we already found
+			// just have to set a few more options
+			req.OutInterval = req.ArchInterval
+			req.AggNum = 1
 
-		req.ArchInterval = interval
-		req.AggNum = 1
-		if runtimeConsolidate {
-			req.ArchInterval = req.RawInterval
-			req.AggNum = req.OutInterval / req.RawInterval
+		} else {
+			// the harder case. due to other reqs with different retention settings
+			// we have to deliver an interval higher than what we originally came up with
+
+			// let's see first if we can deliver it via lower-res rollup archives, if we have any
+			retentions := mdata.Schemas.Get(req.SchemaI).Retentions
+			for i, ret := range retentions[req.Archive+1:] {
+				archInterval := uint32(ret.SecondsPerPoint)
+				if interval == archInterval && ret.Ready {
+					// we're in luck. this will be more efficient than runtime consolidation
+					req.Archive = req.Archive + 1 + i
+					req.ArchInterval = archInterval
+					req.TTL = uint32(ret.MaxRetention())
+					req.OutInterval = archInterval
+					req.AggNum = 1
+					break
+				}
+
+			}
+			if req.ArchInterval != interval {
+				// we have not been able to find an archive matching the desired output interval
+				// we will have to apply runtime consolidation
+				// we use the initially found archive as starting point. there could be some cases - if you have exotic settings -
+				// where it may be more efficient to pick a lower res archive as starting point (it would still require an interval
+				// divisible by the output interval) but let's not worry about that edge case.
+				req.OutInterval = interval
+				req.AggNum = interval / req.ArchInterval
+			}
 		}
 		pointsFetch += tsRange / req.ArchInterval
+		reqRenderChosenArchive.Value(req.Archive)
 	}
 
 	reqRenderPointsFetched.ValueUint32(pointsFetch)
 	reqRenderPointsReturned.ValueUint32(uint32(len(reqs)) * tsRange / interval)
-	reqRenderChosenArchive.Values(archive, len(reqs))
 
 	return reqs, nil
 }

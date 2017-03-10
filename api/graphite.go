@@ -15,6 +15,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -209,12 +210,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	reqs := make([]models.Req, 0)
 
-	// consolidatorForPattern[<pattern>]<consolidateBy>
-	consolidatorForPattern := make(map[string]string)
 	patterns := make([]string, 0)
 	type locatedDef struct {
-		def  schema.MetricDefinition
-		node cluster.Node
+		def     schema.MetricDefinition
+		node    cluster.Node
+		SchemaI uint16
+		AggI    uint16
 	}
 
 	//locatedDefs[<pattern>][<def.id>]locatedDef
@@ -222,12 +223,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	//targetForPattern[<pattern>]<target>
 	targetForPattern := make(map[string]string)
 	for _, target := range targets {
-		pattern, consolidateBy, err := parseTarget(target)
+		pattern, _, err := parseTarget(target)
 		if err != nil {
 			ctx.Error(http.StatusBadRequest, err.Error())
 			return
 		}
-		consolidatorForPattern[pattern] = consolidateBy
 		patterns = append(patterns, pattern)
 		targetForPattern[pattern] = target
 		locatedDefs[pattern] = make(map[string]locatedDef)
@@ -245,7 +245,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				continue
 			}
 			for _, def := range metric.Defs {
-				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
+				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node, metric.SchemaI, metric.AggI}
 			}
 		}
 	}
@@ -253,17 +253,16 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	for pattern, ldefs := range locatedDefs {
 		for _, locdef := range ldefs {
 			def := locdef.def
-			consolidator, err := consolidation.GetConsolidator(&def, consolidatorForPattern[pattern])
-			if err != nil {
-				response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-				return
-			}
+			// set consolidator that will be used to normalize raw data before feeding into processing functions
+			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
+			fn := mdata.Aggregations.Get(locdef.AggI).AggregationMethod[0]
+			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
 			// pattern is like foo.bar or foo.*
 			// def.Name is like foo.concretebar
 			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
 			target := strings.Replace(targetForPattern[pattern], pattern, def.Name, -1)
-			reqs = append(reqs, models.NewReq(def.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator, locdef.node))
+			reqs = append(reqs, models.NewReq(def.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator, locdef.node, locdef.SchemaI, locdef.AggI))
 		}
 	}
 
@@ -279,7 +278,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
 	}
 
-	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs, s.MemoryStore.AggSettings())
+	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
 		response.Write(ctx, response.WrapError(err))

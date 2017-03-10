@@ -13,10 +13,11 @@ VERSION=$(git describe --long --always)
 ## debian wheezy
 BUILD=${BUILD_ROOT}/sysvinit
 mkdir -p ${BUILD}/usr/sbin
-mkdir -p ${BUILD}/etc/raintank
+mkdir -p ${BUILD}/etc/metrictank
 
-cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
-cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
+cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
@@ -33,10 +34,11 @@ BUILD=${BUILD_ROOT}/upstart
 
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/etc/init
-mkdir -p ${BUILD}/etc/raintank
+mkdir -p ${BUILD}/etc/metrictank
 
-cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
-cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
+cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
@@ -52,18 +54,19 @@ BUILD=${BUILD_ROOT}/systemd
 
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/lib/systemd/system/
-mkdir -p ${BUILD}/etc/raintank
+mkdir -p ${BUILD}/etc/metrictank
 mkdir -p ${BUILD}/var/run/raintank
 
-cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
-cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
+cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
-  --config-files /etc/raintank/ \
+  --config-files /etc/metrictank/ \
   -m "Raintank Inc. <hello@raintank.io>" --vendor "raintank.io" \
   --license "Apache2.0" -C ${BUILD} -p ${PACKAGE_NAME} .
 
@@ -71,18 +74,19 @@ BUILD=${BUILD_ROOT}/systemd-centos7
 
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/lib/systemd/system/
-mkdir -p ${BUILD}/etc/raintank
+mkdir -p ${BUILD}/etc/metrictank
 mkdir -p ${BUILD}/var/run/raintank
 
-cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
-cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
+cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
-  --config-files /etc/raintank/ \
+  --config-files /etc/metrictank/ \
   -m "Raintank Inc. <hello@raintank.io>" --vendor "raintank.io" \
   --license "Apache2.0" -C ${BUILD} -p ${PACKAGE_NAME} .
 
@@ -91,10 +95,11 @@ BUILD=${BUILD_ROOT}/upstart-0.6.5
 
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/etc/init
-mkdir -p ${BUILD}/etc/raintank
+mkdir -p ${BUILD}/etc/metrictank
 
-cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/raintank/metrictank.ini
-cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/raintank/
+cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
+cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
+cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init
 

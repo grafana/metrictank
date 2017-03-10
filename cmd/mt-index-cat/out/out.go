@@ -3,7 +3,9 @@ package out
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"strings"
+	"text/template"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -48,4 +50,15 @@ func pattern(in string) string {
 	}
 	// mode 3: do nothing :)
 	return in
+}
+
+func Template(format string) func(d schema.MetricDefinition) {
+	tpl := template.Must(template.New("format").Parse(format + "\n"))
+
+	return func(d schema.MetricDefinition) {
+		err := tpl.Execute(os.Stdout, d)
+		if err != nil {
+			panic(err)
+		}
+	}
 }

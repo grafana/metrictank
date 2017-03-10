@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
@@ -39,21 +40,27 @@ type AggMetric struct {
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, chunkSpan, numChunks uint32, ttl uint32, aggsetting ...AggSetting) *AggMetric {
+// the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
+// it's the callers responsability to make sure agg is not nil in that case!
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, agg *conf.Aggregation) *AggMetric {
+
+	// note: during parsing of retentions, we assure there's at least 1.
+	ret := retentions[0]
+
 	m := AggMetric{
 		cachePusher: cachePusher,
 		store:       store,
 		Key:         key,
-		ChunkSpan:   chunkSpan,
-		NumChunks:   numChunks,
-		Chunks:      make([]*chunk.Chunk, 0, numChunks),
-		ttl:         ttl,
+		ChunkSpan:   ret.ChunkSpan,
+		NumChunks:   ret.NumChunks,
+		Chunks:      make([]*chunk.Chunk, 0, ret.NumChunks),
+		ttl:         uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
 	}
-	for _, as := range aggsetting {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, as.Span, as.ChunkSpan, as.NumChunks, as.TTL))
+	for _, ret := range retentions[1:] {
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg))
 	}
 
 	return &m
@@ -119,6 +126,8 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 				panic("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
 				return a.cntMetric.Get(from, to)
+			case consolidation.Lst:
+				return a.lstMetric.Get(from, to)
 			case consolidation.Min:
 				return a.minMetric.Get(from, to)
 			case consolidation.Max:

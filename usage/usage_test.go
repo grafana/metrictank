@@ -30,7 +30,7 @@ func (f *FakeAggMetrics) Get(key string) (mdata.Metric, bool) {
 	f.Unlock()
 	return m, ok
 }
-func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
+func (f *FakeAggMetrics) GetOrCreate(key, name string, schemaI, aggI uint16) mdata.Metric {
 	f.Lock()
 	m, ok := f.Metrics[key]
 	if !ok {
@@ -39,12 +39,6 @@ func (f *FakeAggMetrics) GetOrCreate(key string) mdata.Metric {
 	}
 	f.Unlock()
 	return m
-}
-func (f *FakeAggMetrics) AggSettings() mdata.AggSettings {
-	return mdata.AggSettings{
-		35 * 24 * 60 * 60,
-		[]mdata.AggSetting{},
-	}
 }
 
 type FakeAggMetric struct {

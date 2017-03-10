@@ -2,19 +2,21 @@ package api
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
-	"math"
-	"math/rand"
-	"reflect"
-	"testing"
-	"time"
 )
 
 type testCase struct {
@@ -154,6 +156,20 @@ func TestConsolidationFunctions(t *testing.T) {
 				{Val: 2, Ts: 1449178141},
 				{Val: 3, Ts: 1449178151},
 				{Val: 4, Ts: 1449178161},
+			},
+			consolidation.Lst,
+			2,
+			[]schema.Point{
+				{2, 1449178141},
+				{4, 1449178161},
+			},
+		},
+		{
+			[]schema.Point{
+				{1, 1449178131},
+				{2, 1449178141},
+				{3, 1449178151},
+				{4, 1449178161},
 			},
 			consolidation.Min,
 			2,
@@ -542,19 +558,23 @@ func TestPrevBoundary(t *testing.T) {
 }
 
 // TestGetSeriesFixed assures that series data is returned in proper form.
+// for each case, we generate a new series of 5 points to cover every possible combination of:
+// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
+// * every possible `from` offset (against its quantized query results) e.g. offset between 0 and interval-1
+// * every possible `to`   offset (against its quantized query results) e.g. offset between 0 and interval-1
+// and asserts that we get the appropriate data back in all possible query (based on to/from) of the raw data
+
 func TestGetSeriesFixed(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewDevnullStore()
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 600, 10, 0, 0, 0, 0, []mdata.AggSetting{})
+
+	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
+
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
-
-	// the tests below cycles through every possible combination of:
-	// * every possible data   offset (against its quantized version)       e.g. offset between 0 and interval-1
-	// * every possible `from` offset (against its quantized query results) e.g. offset between 0 and interval-1
-	// * every possible `to`   offset (against its quantized query results) e.g. offset between 0 and interval-1
-	// and asserts that we get the appropriate data back in all possible scenarios.
 
 	expected := []schema.Point{
 		{Val: 20, Ts: 20},
@@ -566,13 +586,13 @@ func TestGetSeriesFixed(t *testing.T) {
 			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
 				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
 
-				metric := metrics.GetOrCreate(name)
+				metric := metrics.GetOrCreate(name, name, 0, 0)
 				metric.Add(offset, 10)    // this point will always be quantized to 10
 				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.Manager.ThisNode())
+				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
 				points := srv.getSeriesFixed(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
@@ -583,14 +603,15 @@ func TestGetSeriesFixed(t *testing.T) {
 	}
 }
 
-func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode())
+func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaI, aggI uint16) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaI, aggI)
 	return req
 }
-func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, archive int, archInterval, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode())
+func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaI, aggI uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaI, aggI)
 	req.Archive = archive
 	req.ArchInterval = archInterval
+	req.TTL = ttl
 	req.OutInterval = outInterval
 	req.AggNum = aggNum
 	return req
@@ -686,7 +707,7 @@ func TestMergeSeries(t *testing.T) {
 func TestRequestContextWithoutConsolidator(t *testing.T) {
 	metric := "metric1"
 	archInterval := uint32(10)
-	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None)
+	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
 	ctx := newRequestContext(&req, consolidation.None)
 
@@ -711,7 +732,7 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	archInterval := uint32(10)
 	from := uint32(44)
 	to := uint32(88)
-	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum)
+	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum, 0, 0)
 	req.ArchInterval = archInterval
 	ctx := newRequestContext(&req, consolidation.Sum)
 
@@ -778,7 +799,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	srv, _ := NewServer()
 	store := mdata.NewMockStore()
 	srv.BindBackendStore(store)
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 1, 1, 0, 0, 0, 0, []mdata.AggSetting{})
+
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
 	srv.BindMemoryStore(metrics)
 	metric := "metric1"
 	var c *cache.CCache
@@ -837,7 +859,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				}
 
 				// create a request for the current range
-				req := reqRaw(metric, from, to, span, 1, consolidation.None)
+				req := reqRaw(metric, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
 				ctx := newRequestContext(&req, consolidation.None)
 				iters := srv.getSeriesCachedStore(ctx, to)
@@ -952,9 +974,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 func TestGetSeriesAggMetrics(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewMockStore()
-	chunkSpan := uint32(600)
-	numChunks := uint32(10)
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, chunkSpan, numChunks, 0, 0, 0, 0, []mdata.AggSetting{})
+
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
@@ -962,11 +983,11 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	to := uint32(1888)
 	metricKey := "metric1"
 	archInterval := uint32(10)
-	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None)
+	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
 	ctx := newRequestContext(&req, consolidation.None)
 
-	metric := metrics.GetOrCreate(metricKey)
+	metric := metrics.GetOrCreate(metricKey, metricKey, 0, 0)
 	for i := uint32(50); i < 3000; i++ {
 		metric.Add(i, float64(i^2))
 	}

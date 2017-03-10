@@ -207,12 +207,6 @@
 			"revisionTime": "2016-12-13T23:44:46Z"
 		},
 		{
-			"checksumSHA1": "IJBXyoVO+uyqCrCYiNO/djnlcNk=",
-			"path": "github.com/hydrogen18/stalecucumber",
-			"revision": "9b38526d4bdf8e197c31344777fc28f7f48d250d",
-			"revisionTime": "2015-11-02T14:43:22Z"
-		},
-		{
 			"checksumSHA1": "tewA7jXVGCw1zb5mA0BDecWi4iQ=",
 			"path": "github.com/jtolds/gls",
 			"revision": "8ddce2a84170772b95dd5d576c48d517b22cac63",
@@ -241,30 +235,6 @@
 			"path": "github.com/klauspost/crc32",
 			"revision": "6834731faf32e62a2dd809d99fb24d1e4ae5a92d",
 			"revisionTime": "2016-01-12T14:50:11Z"
-		},
-		{
-			"checksumSHA1": "wxF2QM5J2Q5EleD8R43dpsD8fWI=",
-			"path": "github.com/lomik/go-carbon/helper",
-			"revision": "12b15c57fff585e38a965de347c4f8ecad1f9321",
-			"revisionTime": "2016-05-05T22:09:32Z"
-		},
-		{
-			"checksumSHA1": "eXXSyNEcJ1/cd9433icwB6SME4I=",
-			"path": "github.com/lomik/go-carbon/persister",
-			"revision": "12b15c57fff585e38a965de347c4f8ecad1f9321",
-			"revisionTime": "2016-05-05T22:09:32Z"
-		},
-		{
-			"checksumSHA1": "QhIV0ZGviP8XU4Nd8CxDD6j6cqc=",
-			"path": "github.com/lomik/go-carbon/points",
-			"revision": "12b15c57fff585e38a965de347c4f8ecad1f9321",
-			"revisionTime": "2016-05-05T22:09:32Z"
-		},
-		{
-			"checksumSHA1": "FWzBDjjSx/OaoGNNK/MTamWEr8M=",
-			"path": "github.com/lomik/go-whisper",
-			"revision": "537ebed0a597c2262dfe1b2eaa1ac68efd5804fb",
-			"revisionTime": "2016-05-05T07:06:08Z"
 		},
 		{
 			"checksumSHA1": "03SwtyHKqhFk9IT7ZboF4I1S5Bw=",

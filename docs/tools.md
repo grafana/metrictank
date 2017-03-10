@@ -45,7 +45,7 @@ cass config flags:
   -auth
     	enable cassandra user authentication
   -ca-path string
-    	cassandra CA certficate path when using SSL (default "/etc/raintank/ca.pem")
+    	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -enabled
@@ -151,7 +151,7 @@ Inspects what's flowing through kafka (in mdm format) and reports it to you
 Flags:
 
   -config string
-    	configuration file path (default "/etc/raintank/metrictank.ini")
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
   -format string
     	template to render the data with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
 ```
@@ -200,7 +200,7 @@ Flags:
   -cassandra-auth
     	enable cassandra authentication
   -cassandra-ca-path string
-    	cassandra CA certificate path when using SSL (default "/etc/raintank/ca.pem")
+    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-host-selection-policy string
@@ -246,7 +246,7 @@ Flags:
   -cassandra-auth
     	enable cassandra authentication
   -cassandra-ca-path string
-    	cassandra CA certificate path when using SSL (default "/etc/raintank/ca.pem")
+    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-host-selection-policy string
@@ -270,7 +270,7 @@ Flags:
   -cassandra-username string
     	username for authentication (default "cassandra")
   -config string
-    	configuration file path (default "/etc/raintank/metrictank.ini")
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
   -cql-protocol-version int
     	cql protocol version to use (default 4)
   -fix int
@@ -305,7 +305,7 @@ Flags:
   -cassandra-auth
     	enable cassandra authentication
   -cassandra-ca-path string
-    	cassandra CA certificate path when using SSL (default "/etc/raintank/ca.pem")
+    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-concurrency int
     	max number of concurrent reads to cassandra. (default 20)
   -cassandra-consistency string

@@ -29,13 +29,11 @@ import (
 	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
-	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/notifierKafka"
 	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/stats"
 	statsConfig "github.com/raintank/metrictank/stats/config"
 	"github.com/raintank/metrictank/usage"
-	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -52,21 +50,15 @@ var (
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
-	confFile    = flag.String("config", "/etc/raintank/metrictank.ini", "configuration file path")
+	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Data:
-	chunkSpanStr = flag.String("chunkspan", "10min", "duration of raw chunks")
-	numChunksInt = flag.Int("numchunks", 7, "number of raw chunks to keep in in-memory ring buffer. See https://github.com/raintank/metrictank/blob/master/docs/memory-server.md for details and trade-offs, especially when compared to chunk-cache")
-	ttlStr       = flag.String("ttl", "35d", "minimum wait before metrics are removed from storage")
-
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
-
-	aggSettingsStr = flag.String("agg-settings", "", "aggregation settings: <agg span in seconds>:<agg chunkspan in seconds>:<agg numchunks>:<ttl in seconds>[:<ready as bool. default true>] (may be given multiple times as comma-separated list)")
 
 	// Cassandra:
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -83,7 +75,7 @@ var (
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/raintank/ca.pem", "cassandra CA certificate path when using SSL")
+	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
 	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
 
 	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
@@ -211,6 +203,7 @@ func main() {
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
+	mdata.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
@@ -219,24 +212,9 @@ func main() {
 	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
-	chunkSpan := dur.MustParseUNsec("chunkspan", *chunkSpanStr)
-	numChunks := uint32(*numChunksInt)
 	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
 	metricMaxStale := dur.MustParseUNsec("metric-max-stale", *metricMaxStaleStr)
 	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
-	ttl := dur.MustParseUNsec("ttl", *ttlStr)
-	if (mdata.Month_sec % chunkSpan) != 0 {
-		log.Fatal(4, "chunkSpan must fit without remainders into month_sec (28*24*60*60)")
-	}
-	_, ok := chunk.RevChunkSpans[chunkSpan]
-	if !ok {
-		log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", *chunkSpanStr)
-	}
-
-	aggSettings, err := mdata.ParseAggSettings(*aggSettingsStr)
-	if err != nil {
-		log.Fatal(4, "invalid agg-settings: %s", err)
-	}
 
 	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
 	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
@@ -273,11 +251,7 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	ttls := []uint32{ttl}
-	for _, agg := range aggSettings {
-		ttls = append(ttls, agg.TTL)
-	}
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, mdata.TTLs())
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -290,7 +264,7 @@ func main() {
 	/***********************************
 		Initialize our MemoryStore
 	***********************************/
-	metrics = mdata.NewAggMetrics(store, ccache, chunkSpan, numChunks, chunkMaxStale, metricMaxStale, ttl, gcInterval, aggSettings)
+	metrics = mdata.NewAggMetrics(store, ccache, chunkMaxStale, metricMaxStale, gcInterval)
 
 	/***********************************
 		Initialize our Inputs
@@ -371,7 +345,7 @@ func main() {
 	}
 
 	if notifierNsq.Enabled {
-		handlers = append(handlers, notifierNsq.New(*instance, metrics))
+		handlers = append(handlers, notifierNsq.New(*instance, metrics, metricIndex))
 	}
 
 	mdata.InitPersistNotifier(handlers...)
@@ -392,11 +366,8 @@ func main() {
 	// When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
 	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
-	highestChunkSpan := chunkSpan
-	for _, agg := range aggSettings {
-		highestChunkSpan = util.Max(chunkSpan, agg.ChunkSpan)
-	}
-	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/highestChunkSpan+1)*highestChunkSpan)
+	maxChunkSpan := mdata.MaxChunkSpan()
+	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/maxChunkSpan+1)*maxChunkSpan)
 
 	/***********************************
 		Set our status so we can accept

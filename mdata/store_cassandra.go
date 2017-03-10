@@ -81,8 +81,8 @@ type ttlTable struct {
 	windowSize uint32
 }
 
-type cassandraStore struct {
-	session     *gocql.Session
+type CassandraStore struct {
+	Session     *gocql.Session
 	writeQueues []chan *ChunkWriteRequest
 	readQueue   chan *ChunkReadRequest
 	ttlTables   ttlTables
@@ -137,7 +137,7 @@ func getTTLTables(ttls []uint32, windowFactor int, nameFormat string) ttlTables 
 	return tables
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor int, ssl, auth, hostVerification bool, ttls []uint32) (*cassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor int, ssl, auth, hostVerification bool, ttls []uint32) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -217,8 +217,8 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		return nil, err
 	}
 	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
-	c := &cassandraStore{
-		session:     session,
+	c := &CassandraStore{
+		Session:     session,
 		writeQueues: make([]chan *ChunkWriteRequest, writers),
 		readQueue:   make(chan *ChunkReadRequest, readqsize),
 		ttlTables:   ttlTables,
@@ -236,7 +236,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 
 	return c, err
 }
-func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
+func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
 	sum := 0
 	for _, char := range cwr.key {
 		sum += int(char)
@@ -247,7 +247,7 @@ func (c *cassandraStore) Add(cwr *ChunkWriteRequest) {
 
 /* process writeQueue.
  */
-func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter *stats.Range32) {
+func (c *CassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter *stats.Range32) {
 	tick := time.Tick(time.Duration(1) * time.Second)
 	for {
 		select {
@@ -301,7 +301,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 	}
 }
 
-func (c *cassandraStore) GetTableNames() []string {
+func (c *CassandraStore) GetTableNames() []string {
 	names := make([]string, 0)
 	for _, table := range c.ttlTables {
 		names = append(names, table.table)
@@ -309,7 +309,7 @@ func (c *cassandraStore) GetTableNames() []string {
 	return names
 }
 
-func (c *cassandraStore) getTable(ttl uint32) (string, error) {
+func (c *CassandraStore) getTable(ttl uint32) (string, error) {
 	entry, ok := c.ttlTables[ttl]
 	if !ok {
 		return "", errTableNotFound
@@ -322,9 +322,9 @@ func (c *cassandraStore) getTable(ttl uint32) (string, error) {
 // key: is the metric_id
 // ts: is the start of the aggregated time range.
 // data: is the payload as bytes.
-func (c *cassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) error {
+func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) error {
 	// for unit tests
-	if c.session == nil {
+	if c.Session == nil {
 		return nil
 	}
 
@@ -336,7 +336,7 @@ func (c *cassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
-	ret := c.session.Query(query, row_key, t0, data).Exec()
+	ret := c.Session.Query(query, row_key, t0, data).Exec()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
 }
@@ -352,11 +352,11 @@ func (o asc) Len() int           { return len(o) }
 func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
 func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
-func (c *cassandraStore) processReadQueue() {
+func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
 		cassGetWaitDuration.Value(time.Since(crr.timestamp))
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.session.Query(crr.q, crr.p...).Iter()}
+		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter()}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -364,7 +364,7 @@ func (c *cassandraStore) processReadQueue() {
 
 // Basic search of cassandra.
 // start inclusive, end exclusive
-func (c *cassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
 		return itgens, errStartBeforeEnd
@@ -472,6 +472,6 @@ func (c *cassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.Ite
 	return itgens, nil
 }
 
-func (c *cassandraStore) Stop() {
-	c.session.Close()
+func (c *CassandraStore) Stop() {
+	c.Session.Close()
 }
