@@ -3,19 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/raintank/schema.v1"
 )
 
 const tsFormat = "2006-01-02 15:04:05"
@@ -57,137 +54,6 @@ var (
 	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates")
 )
 
-func printNormal(igens []chunk.IterGen, from, to uint32) {
-	fmt.Println("number of chunks:", len(igens))
-	for i, ig := range igens {
-		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span)
-		iter, err := ig.Get()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
-			continue
-		}
-		for iter.Next() {
-			ts, val := iter.Values()
-			printRecord(ts, val, ts >= from && ts < to, math.IsNaN(val))
-		}
-	}
-}
-
-func printPointsNormal(points []schema.Point, from, to uint32) {
-	fmt.Println("number of points:", len(points))
-	for _, p := range points {
-		printRecord(p.Ts, p.Val, p.Ts >= from && p.Ts < to, math.IsNaN(p.Val))
-	}
-}
-
-func printRecord(ts uint32, val float64, in, nan bool) {
-	printTime := func(ts uint32) string {
-		if *printTs {
-			return fmt.Sprintf("%d", ts)
-		} else {
-			return time.Unix(int64(ts), 0).Format(tsFormat)
-		}
-	}
-	if in {
-		if nan {
-			fmt.Println("> ", printTime(ts), "NAN")
-		} else {
-			fmt.Println("> ", printTime(ts), val)
-		}
-	} else {
-		if nan {
-			fmt.Println("- ", printTime(ts), "NAN")
-		} else {
-			fmt.Println("- ", printTime(ts), val)
-		}
-	}
-}
-
-func printSummary(igens []chunk.IterGen, from, to uint32) {
-
-	var count int
-	first := true
-	var prevIn, prevNaN bool
-	var ts uint32
-	var val float64
-
-	var followup = func(count int, in, nan bool) {
-		fmt.Printf("... and %d more of in_range=%t nan=%t ...\n", count, in, nan)
-	}
-
-	for i, ig := range igens {
-		iter, err := ig.Get()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
-			continue
-		}
-		for iter.Next() {
-			ts, val = iter.Values()
-
-			nan := math.IsNaN(val)
-			in := (ts >= from && ts < to)
-
-			if first {
-				printRecord(ts, val, in, nan)
-			} else if nan == prevNaN && in == prevIn {
-				count++
-			} else {
-				followup(count, prevIn, prevNaN)
-				printRecord(ts, val, in, nan)
-				count = 0
-			}
-
-			prevNaN = nan
-			prevIn = in
-			first = false
-		}
-	}
-	if count > 0 {
-		followup(count, prevIn, prevNaN)
-		fmt.Println("last value was:")
-		printRecord(ts, val, prevIn, prevNaN)
-	}
-}
-
-func printPointsSummary(points []schema.Point, from, to uint32) {
-
-	var count int
-	first := true
-	var prevIn, prevNaN bool
-	var ts uint32
-	var val float64
-
-	var followup = func(count int, in, nan bool) {
-		fmt.Printf("... and %d more of in_range=%t nan=%t ...\n", count, in, nan)
-	}
-
-	for _, p := range points {
-		ts, val = p.Ts, p.Val
-
-		nan := math.IsNaN(val)
-		in := (ts >= from && ts < to)
-
-		if first {
-			printRecord(ts, val, in, nan)
-		} else if nan == prevNaN && in == prevIn {
-			count++
-		} else {
-			followup(count, prevIn, prevNaN)
-			printRecord(ts, val, in, nan)
-			count = 0
-		}
-
-		prevNaN = nan
-		prevIn = in
-		first = false
-	}
-	if count > 0 {
-		followup(count, prevIn, prevNaN)
-		fmt.Println("last value was:")
-		printRecord(ts, val, prevIn, prevNaN)
-	}
-}
-
 func main() {
 	flag.Usage = func() {
 		fmt.Println("mt-store-cat")
@@ -197,6 +63,7 @@ func main() {
 		fmt.Println("Usage:")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
+		fmt.Printf("	mt-store-cat [flags] <normal|summary> full [roundTTL. defaults to 3600] [prefix match]\n")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 		fmt.Println("Notes:")
@@ -208,8 +75,7 @@ func main() {
 		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
-
-	if flag.NArg() < 4 {
+	if flag.NArg() < 2 {
 		flag.Usage()
 		os.Exit(-1)
 	}
@@ -217,13 +83,37 @@ func main() {
 	selector := flag.Arg(1)
 	var id string
 	var ttl uint32
+	var roundTTL = 3600
+	var prefix string
 	// var query string
 	// var org int
 
 	switch selector {
 	case "id":
+		if flag.NArg() < 4 {
+			flag.Usage()
+			os.Exit(-1)
+		}
+
 		id = flag.Arg(2)
 		ttl = dur.MustParseUNsec("ttl", flag.Arg(3))
+	case "full":
+		if flag.NArg() >= 3 {
+			var err error
+			roundTTL, err = strconv.Atoi(flag.Arg(2))
+			if err != nil {
+				flag.Usage()
+				os.Exit(-1)
+			}
+		}
+		if flag.NArg() == 4 {
+			prefix = flag.Arg(3)
+		}
+		if flag.NArg() > 4 {
+			flag.Usage()
+			os.Exit(-1)
+		}
+
 	case "query":
 		//		if flag.NArg() < 4 {
 		//			flag.Usage()
@@ -240,21 +130,6 @@ func main() {
 	default:
 		flag.Usage()
 		os.Exit(-1)
-	}
-
-	now := time.Now()
-
-	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
-
-	fromUnix, err := dur.ParseTSpec(*from, now, defaultFrom)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	toUnix, err := dur.ParseTSpec(*to, now, defaultTo)
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	// Only try and parse the conf file if it exists
@@ -278,77 +153,33 @@ func main() {
 		return
 	}
 
+	mode := flag.Arg(0)
+	if mode != "normal" && mode != "summary" {
+		panic("unsupported mode " + mode)
+	}
+
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, []uint32{ttl})
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 
-	// if we're gonna mimic MT, then it would be:
-	/*
-		target, consolidateBy, err := parseTarget(query)
-		consolidator, err := consolidation.GetConsolidator(&def, parsedTargets[target])
+	switch selector {
+	case "id":
+		now := time.Now()
+		defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+		defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
+
+		fromUnix, err := dur.ParseTSpec(*from, now, defaultFrom)
 		if err != nil {
+			log.Fatal(err)
 		}
-		query := strings.Replace(queryForTarget[target], target, def.Name, -1)
-		reqs = append(reqs, models.NewReq(def.Id, query, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator))
-		reqs, err = alignRequests(reqs, s.MemoryStore.AggSettings())
-		points, interval, err := s.getTarget(req)
-		// ...
-		merged := mergeSeries(out)
-	*/
 
-	mode := flag.Arg(0)
-
-	if *fix != 0 {
-		points := getSeries(id, ttl, fromUnix, toUnix, uint32(*fix), store)
-
-		switch mode {
-		case "normal":
-			printPointsNormal(points, fromUnix, toUnix)
-		case "summary":
-			printPointsSummary(points, fromUnix, toUnix)
-		default:
-			panic("unsupported mode")
-		}
-	} else {
-
-		igens, err := store.Search(id, ttl, fromUnix, toUnix)
+		toUnix, err := dur.ParseTSpec(*to, now, defaultTo)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
-
-		switch mode {
-		case "normal":
-			printNormal(igens, fromUnix, toUnix)
-		case "summary":
-			printSummary(igens, fromUnix, toUnix)
-		default:
-			panic("unsupported mode")
-		}
+		catId(id, ttl, fromUnix, toUnix, uint32(*fix), mode, store)
+	case "full":
+		Dump(*cassandraKeyspace, prefix, store, roundTTL)
 	}
-
-}
-
-func getSeries(id string, ttl, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
-	itgens, err := store.Search(id, ttl, fromUnix, toUnix)
-	if err != nil {
-		panic(err)
-	}
-
-	var points []schema.Point
-
-	for i, itgen := range itgens {
-		iter, err := itgen.Get()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
-			continue
-		}
-		for iter.Next() {
-			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
-				points = append(points, schema.Point{Val: val, Ts: ts})
-			}
-		}
-	}
-	return api.Fix(points, fromUnix, toUnix, interval)
 }
