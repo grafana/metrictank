@@ -287,6 +287,8 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 		var c *chunk.Chunk
 
 		for _, point = range sortPoints(points) {
+			// this shouldn't happen, but if it would we better catch it here because Metrictank wouldn't handle it well:
+			// https://github.com/raintank/metrictank/blob/f1868cccfb92fc82cd853914af958f6d187c5f74/mdata/aggmetric.go#L378
 			if point.Timestamp == 0 {
 				continue
 			}
