@@ -210,7 +210,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 			// to generate these two series out of raw averaged data by multiplying each point
 			// with the aggregation span and storing the result as sum, cnt is the aggregation span.
 
-			// seconds per point is assumed to be the aggregation span
+			// aggCount is the aggregation span of this archive divided by the raw interval
+			aggCount := a.SecondsPerPoint / metric.Archives[0].SecondsPerPoint
 			aggSpan := a.SecondsPerPoint
 
 			sumArchive := make([]chunk.IterGen, 0, len(a.Chunks))
@@ -228,8 +229,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 				for it.Next() {
 					ts, val := it.Values()
-					cnt.Push(ts, float64(aggSpan))
-					sum.Push(ts, val*float64(aggSpan))
+					cnt.Push(ts, float64(aggCount))
+					sum.Push(ts, val*float64(aggCount))
 				}
 
 				cnt.Finish()
