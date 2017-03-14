@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,9 +15,11 @@ import (
 	"github.com/raintank/metrictank/api/response"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/expr"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -38,34 +41,6 @@ type Series struct {
 	Pattern string
 	Series  []idx.Node
 	Node    cluster.Node
-}
-
-func parseTarget(target string) (string, string, error) {
-	var consolidateBy string
-	// yes, i am aware of the arguably grossness of the below.
-	// however, it is solid based on the documented allowed input format.
-	// once we need to support several functions, we can implement
-	// a proper expression parser
-	if strings.HasPrefix(target, "consolidateBy(") {
-		var q1, q2 int
-		t := target
-		if t[len(t)-2:] == "')" && (strings.Contains(t, ",'") || strings.Contains(t, ", '")) && strings.Count(t, "'") == 2 {
-			q1 = strings.Index(t, "'")
-			q2 = strings.LastIndex(t, "'")
-		} else if t[len(t)-2:] == "\")" && (strings.Contains(t, ",\"") || strings.Contains(t, ", \"")) && strings.Count(t, "\"") == 2 {
-			q1 = strings.Index(t, "\"")
-			q2 = strings.LastIndex(t, "\"")
-		} else {
-			return "", "", response.NewError(http.StatusBadRequest, "target parse error")
-		}
-		consolidateBy = t[q1+1 : q2]
-		err := consolidation.Validate(consolidateBy)
-		if err != nil {
-			return "", "", err
-		}
-		target = t[strings.Index(t, "(")+1 : strings.LastIndex(t, ",")]
-	}
-	return target, consolidateBy, nil
 }
 
 func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
@@ -189,102 +164,27 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	reqs := make([]models.Req, 0)
-
-	patterns := make([]string, 0)
-	type locatedDef struct {
-		def  idx.Archive
-		node cluster.Node
-	}
-
-	//locatedDefs[<pattern>][<def.id>]locatedDef
-	locatedDefs := make(map[string]map[string]locatedDef)
-	//targetForPattern[<pattern>]<target>
-	targetForPattern := make(map[string]string)
-	for _, target := range targets {
-		pattern, _, err := parseTarget(target)
-		if err != nil {
-			ctx.Error(http.StatusBadRequest, err.Error())
-			return
-		}
-		patterns = append(patterns, pattern)
-		targetForPattern[pattern] = target
-		locatedDefs[pattern] = make(map[string]locatedDef)
-
-	}
-
-	series, err := s.findSeries(ctx.OrgId, patterns, int64(fromUnix))
+	exprs, err := expr.ParseMany(targets)
 	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-	}
-
-	for _, s := range series {
-		for _, metric := range s.Series {
-			if !metric.Leaf {
-				continue
-			}
-			for _, def := range metric.Defs {
-				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
-			}
-		}
-	}
-
-	for pattern, ldefs := range locatedDefs {
-		for _, locdef := range ldefs {
-			archive := locdef.def
-			// set consolidator that will be used to normalize raw data before feeding into processing functions
-			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
-			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
-			// pattern is like foo.bar or foo.*
-			// def.Name is like foo.concretebar
-			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-			target := strings.Replace(targetForPattern[pattern], pattern, archive.Name, -1)
-			reqs = append(reqs, models.NewReq(archive.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
-		}
-	}
-
-	reqRenderSeriesCount.Value(len(reqs))
-	reqRenderTargetCount.Value(len(request.Targets))
-
-	if len(reqs) == 0 {
-		if request.Format == "msgp" {
-			var series models.SeriesByTarget
-			response.Write(ctx, response.NewMsgp(200, series))
-		} else {
-			response.Write(ctx, response.NewJson(200, []string{}, ""))
-		}
+		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if (toUnix - fromUnix) >= logMinDur {
-		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q target cnt: %d, maxDataPoints: %d",
-			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
-	}
+	reqRenderTargetCount.Value(len(targets))
 
-	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs)
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, nil)
 	if err != nil {
-		log.Error(3, "HTTP Render alignReq error: %s", err)
-		response.Write(ctx, response.WrapError(err))
+		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if LogLevel < 2 {
-		for _, req := range reqs {
-			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.Name)
-		}
-	}
-
-	out, err := s.getTargets(reqs)
+	out, err := s.executePlan(ctx.OrgId, plan)
 	if err != nil {
-		log.Error(3, "HTTP Render %s", err.Error())
-		response.Write(ctx, response.WrapError(err))
+		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
+	sort.Sort(models.SeriesByTarget(out))
 
-	merged := mergeSeries(out)
-	sort.Sort(models.SeriesByTarget(merged))
 	defer func() {
 		for _, serie := range out {
 			pointSlicePool.Put(serie.Datapoints[:0])
@@ -292,9 +192,9 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}()
 
 	if request.Format == "msgp" {
-		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(merged)))
+		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
 	} else {
-		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(merged)))
+		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}
 }
 
@@ -556,4 +456,82 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 	}
 
 	return resp.DeletedDefs, nil
+}
+
+// note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
+// we will collect all the indidividual series from the peer, and then sum here. that could be optimized
+func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
+
+	type locatedDef struct {
+		def  idx.Archive
+		node cluster.Node
+	}
+	minFrom := uint32(math.MaxUint32)
+	var maxTo uint32
+	//locatedDefs[request][<def.id>]locatedDef
+	locatedDefs := make(map[expr.Req]map[string]locatedDef)
+
+	// note that different patterns to query can have different from / to, so they require different index lookups
+	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
+	// note that in this case we fetch foo.* twice. can be optimized later
+	for _, r := range plan.Reqs {
+		series, err := s.findSeries(orgId, []string{r.Query}, int64(r.From))
+		if err != nil {
+			return nil, err
+		}
+
+		locatedDefs[r] = make(map[string]locatedDef)
+
+		minFrom = util.Min(minFrom, r.From)
+		maxTo = util.Max(maxTo, r.To)
+
+		for _, s := range series {
+			for _, metric := range s.Series {
+				if !metric.Leaf {
+					continue
+				}
+				for _, def := range metric.Defs {
+					locatedDefs[r][def.Id] = locatedDef{def, s.Node}
+				}
+			}
+		}
+	}
+
+	var reqs []models.Req
+	for r, ldefs := range locatedDefs {
+		for _, locdef := range ldefs {
+			archive := locdef.def
+			// set consolidator that will be used to normalize raw data before feeding into processing functions
+			// not to be confused with runtime consolidation which happens after all processing.
+			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+			reqs = append(reqs, models.NewReq(
+				archive.Id, archive.Name, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
+		}
+	}
+	reqRenderSeriesCount.Value(len(reqs))
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
+	reqs, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	if err != nil {
+		log.Error(3, "HTTP Render alignReq error: %s", err)
+		return nil, err
+	}
+
+	if LogLevel < 2 {
+		for _, req := range reqs {
+			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.Name)
+		}
+	}
+
+	out, err := s.getTargets(reqs)
+	if err != nil {
+		log.Error(3, "HTTP Render %s", err.Error())
+		return nil, err
+	}
+
+	merged := mergeSeries(out)
+	return merged, nil
 }

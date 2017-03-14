@@ -26,8 +26,8 @@ var (
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
-func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
-	tsRange := (reqs[0].To - reqs[0].From)
+func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, error) {
+	tsRange := to - from
 
 	var listIntervals []uint32
 	var seenIntervals = make(map[uint32]struct{})
