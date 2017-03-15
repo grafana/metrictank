@@ -235,6 +235,8 @@ func (c *CasIdx) Stop() {
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
+	updateIdx := false
+	stat := statUpdateDuration
 
 	if inMemory {
 		if existing.Partition == partition {
@@ -245,42 +247,38 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 				oldest = time.Now()
 			}
 			if existing.LastUpdate < oldest.Unix() {
-				def := schema.MetricDefinitionFromMetricData(data)
-				def.Partition = partition
-				c.MemoryIdx.AddOrUpdateDef(def)
-				if updateCassIdx {
-					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
-				}
-				statUpdateDuration.Value(time.Since(pre))
+				updateIdx = true
 			}
-			return
+		} else {
+			if updateCassIdx {
+				// the partition of the metric has changed. So we need to delete
+				// the current metricDef from cassandra.  We do this in a separate
+				// goroutine as we dont want to block waiting for the delete to succeed.
+				go func() {
+					if err := c.deleteDef(&existing); err != nil {
+						log.Error(3, err.Error())
+					}
+				}()
+			}
+			updateIdx = true
 		}
-		if updateCassIdx {
-			// the partition of the metric has changed. So we need to delete
-			// the current metricDef from cassandra.  We do this in a separate
-			// goroutine as we dont want to block waiting for the delete to succeed.
-			go func() {
-				if err := c.deleteDef(&existing); err != nil {
-					log.Error(3, err.Error())
-				}
-			}()
-		}
+	} else {
+		updateIdx = true
+		stat = statAddDuration
+	}
+
+	if updateIdx {
 		def := schema.MetricDefinitionFromMetricData(data)
 		def.Partition = partition
 		c.MemoryIdx.AddOrUpdateDef(def)
 		if updateCassIdx {
+			log.Debug("cassandra-idx updating def in index.")
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		}
-		statUpdateDuration.Value(time.Since(pre))
-		return
+		stat.Value(time.Since(pre))
 	}
-	def := schema.MetricDefinitionFromMetricData(data)
-	def.Partition = partition
-	c.MemoryIdx.AddOrUpdateDef(def)
-	if updateCassIdx {
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
-	}
-	statAddDuration.Value(time.Since(pre))
+
+	return
 }
 
 func (c *CasIdx) rebuildIndex() {
