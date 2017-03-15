@@ -63,7 +63,7 @@ func Init() {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1, 0, 0)
+		ix.AddOrUpdate(data, 1)
 	}
 	for _, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -73,7 +73,7 @@ func Init() {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1, 0, 0)
+		ix.AddOrUpdate(data, 1)
 	}
 	// orgId has 1,680,000 series
 
@@ -85,7 +85,7 @@ func Init() {
 			OrgId:    2,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1, 0, 0)
+		ix.AddOrUpdate(data, 1)
 	}
 	for _, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
@@ -95,7 +95,7 @@ func Init() {
 			OrgId:    2,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1, 0, 0)
+		ix.AddOrUpdate(data, 1)
 	}
 	//orgId 2 has 168,000 mertics
 

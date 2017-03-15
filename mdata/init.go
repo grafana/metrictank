@@ -6,10 +6,8 @@ package mdata
 import (
 	"io/ioutil"
 	"log"
-	"time"
 
 	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/mdata/matchcache"
 	"github.com/raintank/metrictank/stats"
 )
 
@@ -49,8 +47,6 @@ var (
 	// set either via ConfigProcess or from the unit tests. other code should not touch
 	Schemas      conf.Schemas
 	Aggregations conf.Aggregations
-	schemasCache *matchcache.Cache
-	aggsCache    *matchcache.Cache
 
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
@@ -87,10 +83,4 @@ func ConfigProcess() {
 	} else {
 		Aggregations = conf.NewAggregations()
 	}
-	Cache(time.Hour, time.Hour)
-}
-
-func Cache(cleanInterval, expireAfter time.Duration) {
-	schemasCache = matchcache.New(cleanInterval, expireAfter)
-	aggsCache = matchcache.New(cleanInterval, expireAfter)
 }

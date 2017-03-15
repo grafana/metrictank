@@ -18,7 +18,6 @@ import (
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
@@ -212,10 +211,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	patterns := make([]string, 0)
 	type locatedDef struct {
-		def     schema.MetricDefinition
-		node    cluster.Node
-		SchemaI uint16
-		AggI    uint16
+		def  idx.Archive
+		node cluster.Node
 	}
 
 	//locatedDefs[<pattern>][<def.id>]locatedDef
@@ -245,24 +242,24 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				continue
 			}
 			for _, def := range metric.Defs {
-				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node, metric.SchemaI, metric.AggI}
+				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
 			}
 		}
 	}
 
 	for pattern, ldefs := range locatedDefs {
 		for _, locdef := range ldefs {
-			def := locdef.def
+			archive := locdef.def
 			// set consolidator that will be used to normalize raw data before feeding into processing functions
 			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
-			fn := mdata.Aggregations.Get(locdef.AggI).AggregationMethod[0]
+			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
 			// pattern is like foo.bar or foo.*
 			// def.Name is like foo.concretebar
 			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-			target := strings.Replace(targetForPattern[pattern], pattern, def.Name, -1)
-			reqs = append(reqs, models.NewReq(def.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(def.Interval), consolidator, locdef.node, locdef.SchemaI, locdef.AggI))
+			target := strings.Replace(targetForPattern[pattern], pattern, archive.Name, -1)
+			reqs = append(reqs, models.NewReq(archive.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
 		}
 	}
 
@@ -350,20 +347,20 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	response.Write(ctx, response.NewJson(200, b, request.Jsonp))
 }
 
-func (s *Server) listLocal(orgId int) []schema.MetricDefinition {
+func (s *Server) listLocal(orgId int) []idx.Archive {
 	return s.MetricIndex.List(orgId)
 }
 
-func (s *Server) listRemote(orgId int, peer cluster.Node) ([]schema.MetricDefinition, error) {
+func (s *Server) listRemote(orgId int, peer cluster.Node) ([]idx.Archive, error) {
 	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.Name, orgId)
 	buf, err := peer.Post("/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
 		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.Name, err)
 		return nil, err
 	}
-	result := make([]schema.MetricDefinition, 0)
+	result := make([]idx.Archive, 0)
 	for len(buf) != 0 {
-		var def schema.MetricDefinition
+		var def idx.Archive
 		buf, err = def.UnmarshalMsg(buf)
 		if err != nil {
 			log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/index/list: %q", peer.Name, err)
@@ -377,7 +374,7 @@ func (s *Server) listRemote(orgId int, peer cluster.Node) ([]schema.MetricDefini
 func (s *Server) metricsIndex(ctx *middleware.Context) {
 	peers := cluster.MembersForQuery()
 	errors := make([]error, 0)
-	series := make([]schema.MetricDefinition, 0)
+	series := make([]idx.Archive, 0)
 	seenDefs := make(map[string]struct{})
 	var mu sync.Mutex
 	var wg sync.WaitGroup

@@ -172,7 +172,7 @@ func (c *Carbon) handle(conn net.Conn) {
 			continue
 		}
 		name := string(key)
-		_, s := mdata.MatchSchema(name) // note: also called by metrictank DefaultHandler.Process. maybe can be optimized
+		_, s := mdata.MatchSchema(name) // note: also called in idx.AddOrUpdate via metrictank DefaultHandler.Process. maybe can be optimized
 		interval := s.Retentions[0].SecondsPerPoint
 		md := &schema.MetricData{
 			Name:     name,

@@ -85,9 +85,9 @@ func (cl Notifier) Handle(data []byte) {
 				}
 			}
 			if cl.CreateMissingMetrics {
-				schemaI, _ := MatchSchema(c.Name)
-				aggI, _ := MatchAgg(c.Name)
-				agg := cl.Metrics.GetOrCreate(key[0], c.Name, schemaI, aggI)
+				schemaId, _ := MatchSchema(c.Name)
+				aggId, _ := MatchAgg(c.Name)
+				agg := cl.Metrics.GetOrCreate(key[0], c.Name, schemaId, aggId)
 				if len(key) == 3 {
 					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
 				} else {
@@ -112,9 +112,9 @@ func (cl Notifier) Handle(data []byte) {
 		messagesReceived.Add(1)
 		// get metric
 		if cl.CreateMissingMetrics {
-			schemaI, _ := MatchSchema(ms.Name)
-			aggI, _ := MatchAgg(ms.Name)
-			agg := cl.Metrics.GetOrCreate(ms.Key, ms.Name, schemaI, aggI)
+			schemaId, _ := MatchSchema(ms.Name)
+			aggId, _ := MatchAgg(ms.Name)
+			agg := cl.Metrics.GetOrCreate(ms.Key, ms.Name, schemaId, aggId)
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
 		} else if agg, ok := cl.Metrics.Get(ms.Key); ok {
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)

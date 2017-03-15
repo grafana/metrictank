@@ -81,7 +81,7 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.AddOrUpdate(s, 1, 0, 0)
+				ix.AddOrUpdate(s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -99,7 +99,7 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.AddOrUpdate(series, 1, 0, 0)
+			ix.AddOrUpdate(series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -112,19 +112,19 @@ func TestFind(t *testing.T) {
 	ix := New()
 	ix.Init()
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
-		ix.AddOrUpdate(s, 1, 0, 0)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
-		ix.AddOrUpdate(s, 1, 0, 0)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
-		ix.AddOrUpdate(s, 1, 0, 0)
+		ix.AddOrUpdate(s, 1)
 		s.Interval = 60
 		s.SetId()
-		ix.AddOrUpdate(s, 1, 0, 0)
+		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
-		ix.AddOrUpdate(s, 1, 0, 0)
+		ix.AddOrUpdate(s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -248,7 +248,7 @@ func insertDefs(ix idx.MetricIndex, i int) {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1, 0, 0)
+		ix.AddOrUpdate(data, 1)
 	}
 }
 

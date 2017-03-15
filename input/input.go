@@ -67,15 +67,12 @@ func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 		return
 	}
 
-	schemaI, _ := mdata.MatchSchema(metric.Name)
-	aggI, _ := mdata.MatchAgg(metric.Name)
-
 	pre := time.Now()
-	in.metricIndex.AddOrUpdate(metric, partition, schemaI, aggI)
+	archive := in.metricIndex.AddOrUpdate(metric, partition)
 	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 	pre = time.Now()
-	m := in.metrics.GetOrCreate(metric.Id, metric.Name, schemaI, aggI)
+	m := in.metrics.GetOrCreate(metric.Id, metric.Name, archive.SchemaId, archive.AggId)
 	m.Add(uint32(metric.Time), metric.Value)
 	if in.usage != nil {
 		in.usage.Add(metric.OrgId, metric.Id)

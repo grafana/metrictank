@@ -11,6 +11,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -221,7 +222,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, aggI uint16) {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
@@ -230,13 +231,12 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, 
 			oldest := time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100)/100)))
 			if existing.LastUpdate < oldest.Unix() {
 				log.Debug("cassandra-idx def hasn't been seen for a while, updating index.")
-				def := schema.MetricDefinitionFromMetricData(data)
-				def.Partition = partition
-				c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
-				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+				archive := c.MemoryIdx.AddOrUpdate(data, partition)
+				c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 				statUpdateDuration.Value(time.Since(pre))
+				return archive
 			}
-			return
+			return existing
 		}
 		// the partition of the metric has changed. So we need to delete
 		// the current metricDef from cassandra.  We do this is a separate
@@ -246,18 +246,15 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32, schemaI, 
 				log.Error(3, err.Error())
 			}
 		}()
-		def := schema.MetricDefinitionFromMetricData(data)
-		def.Partition = partition
-		c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+		archive := c.MemoryIdx.AddOrUpdate(data, partition)
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		statUpdateDuration.Value(time.Since(pre))
-		return
+		return archive
 	}
-	def := schema.MetricDefinitionFromMetricData(data)
-	def.Partition = partition
-	c.MemoryIdx.AddOrUpdateDef(def, schemaI, aggI)
-	c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+	archive := c.MemoryIdx.AddOrUpdate(data, partition)
+	c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 	statAddDuration.Value(time.Since(pre))
+	return archive
 }
 
 func (c *CasIdx) rebuildIndex() {
@@ -361,7 +358,7 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	pre := time.Now()
 	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
@@ -377,7 +374,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 	return defs, err
 }
 
-func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
+func (c *CasIdx) deleteDef(def *idx.Archive) error {
 	pre := time.Now()
 	attempts := 0
 	for attempts < 5 {
@@ -397,7 +394,7 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
 }
 
-func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	pre := time.Now()
 	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
 	// if an error was encountered then pruned is probably a partial list of metricDefs

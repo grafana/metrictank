@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
+	"github.com/raintank/metrictank/idx"
 	"gopkg.in/macaron.v1"
-	"gopkg.in/raintank/schema.v1"
 )
 
 type GraphiteRender struct {
@@ -51,7 +51,7 @@ type MetricsDelete struct {
 	Query string `json:"query" form:"query" binding:"Required"`
 }
 
-type MetricNames []schema.MetricDefinition
+type MetricNames []idx.Archive
 
 func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	seen := make(map[string]struct{})

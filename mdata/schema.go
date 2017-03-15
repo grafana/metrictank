@@ -40,21 +40,13 @@ func MaxChunkSpan() uint32 {
 // MatchSchema returns the schema for the given metric key, and the index of the schema (to efficiently reference it)
 // it will always find the schema because Schemas has a catchall default
 func MatchSchema(key string) (uint16, conf.Schema) {
-	i := schemasCache.Get(key, func(key string) uint16 {
-		i, _ := Schemas.Match(key)
-		return i
-	})
-	return i, Schemas.Get(i)
+	return Schemas.Match(key)
 }
 
 // MatchAgg returns the aggregation definition for the given metric key, and the index of it (to efficiently reference it)
 // it will always find the aggregation definition because Aggregations has a catchall default
 func MatchAgg(key string) (uint16, conf.Aggregation) {
-	i := aggsCache.Get(key, func(key string) uint16 {
-		i, _ := Aggregations.Match(key)
-		return i
-	})
-	return i, Aggregations.Get(i)
+	return Aggregations.Match(key)
 }
 
 func SetSingleSchema(ret ...conf.Retention) {

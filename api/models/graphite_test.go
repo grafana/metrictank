@@ -4,42 +4,35 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/metrictank/idx"
 )
 
 func TestGraphiteNames(t *testing.T) {
+
 	cases := []struct {
-		in  []schema.MetricDefinition
+		in  []idx.Archive
 		out string
 	}{
 		{
-			in:  []schema.MetricDefinition{},
+			in:  []idx.Archive{},
 			out: `[]`,
 		},
 		{
-			in: []schema.MetricDefinition{
-				{
-					Name: "foo",
-				},
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
 			},
 			out: `["foo"]`,
 		},
 		{
-			in: []schema.MetricDefinition{
-				{
-					Name: "foo",
-				},
-				{
-					Name: "bar",
-				},
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
+				idx.NewArchiveBare("bar"),
 			},
 			out: `["bar","foo"]`,
 		},
 		{
-			in: []schema.MetricDefinition{
-				{
-					Name: `a\b`,
-				},
+			in: []idx.Archive{
+				idx.NewArchiveBare(`a\b`),
 			},
 			out: `["a\\b"]`,
 		},

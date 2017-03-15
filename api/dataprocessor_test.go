@@ -603,12 +603,12 @@ func TestGetSeriesFixed(t *testing.T) {
 	}
 }
 
-func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaI, aggI uint16) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaI, aggI)
+func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
 	return req
 }
-func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaI, aggI uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaI, aggI)
+func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
+	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.TTL = ttl
