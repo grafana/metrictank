@@ -307,7 +307,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 	}()
 
-	response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(merged)))
+	if request.Format == "msgp" {
+		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(merged)))
+	} else {
+		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(merged)))
+	}
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {

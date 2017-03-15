@@ -15,7 +15,7 @@ type GraphiteRender struct {
 	From          string   `json:"from" form:"from"`
 	Until         string   `json:"until" form:"until"`
 	To            string   `json:"to" form:"to"`
-	Format        string   `json:"format" form:"format" binding:"In(,json)"`
+	Format        string   `json:"format" form:"format" binding:"In(,json,msgp)"`
 }
 
 func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) binding.Errors {
