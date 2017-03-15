@@ -233,7 +233,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
 				err := c.MemoryIdx.AddOrUpdateDef(def)
-				if err != nil {
+				if err == nil {
 					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				}
 				statUpdateDuration.Value(time.Since(pre))
