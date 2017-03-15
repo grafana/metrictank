@@ -133,11 +133,9 @@ time inserts spent in queue before being executed
 * `idx.cassandra.update`:  
 the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
 * `idx.memory.add`:  
-the duration of a (successful) add of a metric to the memory idx
-* `idx.memory.add.fail`:  
-the number of failed additions to the memory idx
-* `idx.memory.add.ok`:  
-the number of successful additions to the memory idx
+the duration of an add of a metric to the memory idx
+* `idx.memory.ops.add`:  
+the number of additions to the memory idx
 * `idx.memory.delete`:  
 the duration of a delete of one or more metrics from the memory idx
 * `idx.memory.find`:  
@@ -150,8 +148,8 @@ the duration of memory idx listings
 the duration of successful memory idx prunes
 * `idx.memory.update`:  
 the duration of (successful) update of a metric to the memory idx
-* `idx.memory.update.ok`:  
-the number of successful updates to the memory idx
+* `idx.memory.update`:  
+the number of updates to the memory idx
 * `idx.metrics_active`:  
 the number of currently known metrics in the index
 * `idx.memory.filtered`:  

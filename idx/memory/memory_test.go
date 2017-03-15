@@ -307,12 +307,10 @@ func TestMixedBranchLeaf(t *testing.T) {
 
 	Convey("when adding the first metric", t, func() {
 
-		err := ix.AddOrUpdate(first, 1)
-		So(err, ShouldBeNil)
+		ix.AddOrUpdate(first, 1)
 		Convey("we should be able to add a leaf under another leaf", func() {
 
-			err = ix.AddOrUpdate(second, 1)
-			So(err, ShouldBeNil)
+			ix.AddOrUpdate(second, 1)
 			_, ok := ix.Get(second.Id)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)
@@ -320,8 +318,7 @@ func TestMixedBranchLeaf(t *testing.T) {
 		})
 		Convey("we should be able to add a leaf that collides with an existing branch", func() {
 
-			err = ix.AddOrUpdate(third, 1)
-			So(err, ShouldBeNil)
+			ix.AddOrUpdate(third, 1)
 			_, ok := ix.Get(third.Id)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)

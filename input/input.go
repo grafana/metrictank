@@ -68,11 +68,8 @@ func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	}
 
 	pre := time.Now()
-	err = in.metricIndex.AddOrUpdate(metric, partition)
+	in.metricIndex.AddOrUpdate(metric, partition)
 	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
-	if err != nil {
-		return
-	}
 
 	pre = time.Now()
 	m := in.metrics.GetOrCreate(metric.Id)

@@ -2157,7 +2157,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.*.{ok,fail}.counter32), 5, 6, 7)",
+              "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.ops.*.counter32), 5, 7)",
               "textEditor": false
             }
           ],
