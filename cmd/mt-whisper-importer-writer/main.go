@@ -172,10 +172,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	avg := false
-	if whisper.AggregationMethod(metric.AggregationMethod) == whisper.AggregationAverage {
-		avg = true
-	}
+	avg := (whisper.AggregationMethod(metric.AggregationMethod) == whisper.AggregationAverage)
 
 	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
 	err = s.Index.AddOrUpdate(&metric.MetricData, partition)

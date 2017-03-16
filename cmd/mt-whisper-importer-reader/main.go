@@ -249,7 +249,7 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 						"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
 						file,
 						w.Header.Metadata.AggregationMethod,
-						whisper.AggregationMethod(w.Header.Metadata.AggregationMethod).String(),
+						aggMethodStr,
 					))
 				}
 			}
