@@ -360,7 +360,7 @@ func logLoad(typ, key string, from, to uint32) {
 	}
 }
 
-func aggMetricKey(key, archive string, aggSpan uint32) string {
+func AggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
@@ -454,7 +454,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 
 	for _, itgen := range cacheRes.Start {
 		iter, err := itgen.Get()
-		prevts = itgen.Ts()
+		prevts = itgen.Ts
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
 			log.Error(3, "itergen: error getting iter from Start list %+v", err)
@@ -481,7 +481,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 				// it's important that the itgens get added in chronological order,
 				// currently we rely on cassandra returning results in order
 				go s.Cache.Add(key, prevts, itgen)
-				prevts = itgen.Ts()
+				prevts = itgen.Ts
 				iters = append(iters, *it)
 			}
 		}
@@ -573,7 +573,7 @@ func newRequestContext(req *models.Req, consolidator consolidation.Consolidator)
 	} else {
 		rc.From = req.From
 		rc.To = req.To
-		rc.AggKey = aggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+		rc.AggKey = AggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
 	}
 
 	return &rc

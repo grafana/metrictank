@@ -54,12 +54,13 @@ var (
 	mdp          = flag.Int("mdp", 0, "max data points to return")
 	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization")
 	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates")
 )
 
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Println("## chunk", i)
+		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span)
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
@@ -80,17 +81,24 @@ func printPointsNormal(points []schema.Point, from, to uint32) {
 }
 
 func printRecord(ts uint32, val float64, in, nan bool) {
+	printTime := func(ts uint32) string {
+		if *printTs {
+			return fmt.Sprintf("%d", ts)
+		} else {
+			return time.Unix(int64(ts), 0).Format(tsFormat)
+		}
+	}
 	if in {
 		if nan {
-			fmt.Println("> ", time.Unix(int64(ts), 0).Format(tsFormat), "NAN")
+			fmt.Println("> ", printTime(ts), "NAN")
 		} else {
-			fmt.Println("> ", time.Unix(int64(ts), 0).Format(tsFormat), val)
+			fmt.Println("> ", printTime(ts), val)
 		}
 	} else {
 		if nan {
-			fmt.Println("- ", time.Unix(int64(ts), 0).Format(tsFormat), "NAN")
+			fmt.Println("- ", printTime(ts), "NAN")
 		} else {
-			fmt.Println("- ", time.Unix(int64(ts), 0).Format(tsFormat), val)
+			fmt.Println("- ", printTime(ts), val)
 		}
 	}
 }

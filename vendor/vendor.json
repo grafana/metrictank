@@ -237,6 +237,12 @@
 			"revisionTime": "2016-03-02T07:53:16Z"
 		},
 		{
+			"checksumSHA1": "o7abpsEIXBLz5n/khgI2QPRqSQA=",
+			"path": "github.com/kisielk/whisper-go/whisper",
+			"revision": "82e8091afdea241119c34a452fe24fcc2a0b962e",
+			"revisionTime": "2014-01-12T13:57:52Z"
+		},
+		{
 			"checksumSHA1": "7ttJJBMDGKL63tX23fNmW7r7NvQ=",
 			"path": "github.com/klauspost/crc32",
 			"revision": "6834731faf32e62a2dd809d99fb24d1e4ae5a92d",
