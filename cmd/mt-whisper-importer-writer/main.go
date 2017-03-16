@@ -175,11 +175,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	avg := (whisper.AggregationMethod(metric.AggregationMethod) == whisper.AggregationAverage)
 
 	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
-	err = s.Index.AddOrUpdate(&metric.MetricData, partition)
-	if err != nil {
-		throwError(fmt.Sprintf("Error updating metric index: %q", err))
-		return
-	}
+	s.Index.AddOrUpdate(&metric.MetricData, partition)
 
 	for archiveIdx, a := range metric.Archives {
 		archiveTTL := a.SecondsPerPoint * a.Points
