@@ -16,12 +16,10 @@ import (
 )
 
 var (
-	// metric idx.memory.update.ok is the number of successful updates to the memory idx
-	statUpdateOk = stats.NewCounter32("idx.memory.update.ok")
-	// metric idx.memory.add.ok is the number of successful additions to the memory idx
-	statAddOk = stats.NewCounter32("idx.memory.add.ok")
-	// metric idx.memory.add.fail is the number of failed additions to the memory idx
-	statAddFail = stats.NewCounter32("idx.memory.add.fail")
+	// metric idx.memory.update is the number of updates to the memory idx
+	statUpdate = stats.NewCounter32("idx.memory.ops.update")
+	// metric idx.memory.add is the number of additions to the memory idx
+	statAdd = stats.NewCounter32("idx.memory.ops.add")
 	// metric idx.memory.add is the duration of a (successful) add of a metric to the memory idx
 	statAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")
 	// metric idx.memory.update is the duration of (successful) update of a metric to the memory idx
@@ -80,16 +78,14 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	FailedAdds map[string]error // by metric id
-	DefById    map[string]*schema.MetricDefinition
-	Tree       map[int]*Tree
+	DefById map[string]*schema.MetricDefinition
+	Tree    map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		FailedAdds: make(map[string]error),
-		DefById:    make(map[string]*schema.MetricDefinition),
-		Tree:       make(map[int]*Tree),
+		DefById: make(map[string]*schema.MetricDefinition),
+		Tree:    make(map[int]*Tree),
 	}
 }
 
@@ -101,82 +97,62 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	err, ok := m.FailedAdds[data.Id]
-	if ok {
-		// if it failed before, it would fail again.
-		// there's not much point in doing the work of trying over
-		// and over again, and flooding the logs with the same failure.
-		// so just trigger the stats metric as if we tried again
-		statAddFail.Inc()
-		return err
-	}
 	existing, ok := m.DefById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
-		statUpdateOk.Inc()
+		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
-		return nil
+		return
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	err = m.add(def)
-	if err == nil {
-		statMetricsActive.Inc()
-	}
+	m.add(def)
+	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
-	return err
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (m *MemoryIdx) Load(defs []schema.MetricDefinition) (int, error) {
+func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	m.Lock()
 	var pre time.Time
 	var num int
-	var firstErr error
 	for i := range defs {
 		def := &defs[i]
 		pre = time.Now()
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
-		err := m.add(def)
-		if err == nil {
-			num++
-			statMetricsActive.Inc()
-		} else if firstErr == nil {
-			firstErr = err
-		}
+		m.add(def)
+		num++
+		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
 	}
 	m.Unlock()
-	return num, firstErr
+	return num
 }
 
-func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
 	if _, ok := m.DefById[def.Id]; ok {
 		log.Debug("memory-idx: metricDef with id %s already in index.", def.Id)
 		m.DefById[def.Id] = def
-		statUpdateOk.Inc()
+		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
-		return nil
+		return
 	}
-	err := m.add(def)
-	if err == nil {
-		statMetricsActive.Inc()
-	}
+	m.add(def)
+	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
-	return err
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
+func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 	path := def.Name
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
@@ -199,8 +175,8 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 			log.Debug("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
 			node.Defs = append(node.Defs, def.Id)
 			m.DefById[def.Id] = def
-			statAddOk.Inc()
-			return nil
+			statAdd.Inc()
+			return
 		}
 	}
 	// now walk backwards through the node path to find the first branch which exists that
@@ -253,8 +229,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) error {
 		Defs:     []string{def.Id},
 	}
 	m.DefById[def.Id] = def
-	statAddOk.Inc()
-	return nil
+	statAdd.Inc()
 }
 
 func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, bool) {
@@ -484,11 +459,6 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	if err != nil {
 		return nil, err
 	}
-
-	// by deleting one or more nodes in the tree, any defs that previously failed may now
-	// be able to be added. An easy way to support this is just reset this map and give them
-	// all a chance again
-	m.FailedAdds = make(map[string]error)
 
 	for _, f := range found {
 		deleted := m.delete(orgId, f)

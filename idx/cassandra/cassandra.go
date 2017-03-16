@@ -221,7 +221,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 
@@ -232,14 +232,11 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 				log.Debug("cassandra-idx def hasn't been seen for a while, updating index.")
 				def := schema.MetricDefinitionFromMetricData(data)
 				def.Partition = partition
-				err := c.MemoryIdx.AddOrUpdateDef(def)
-				if err == nil {
-					c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
-				}
+				c.MemoryIdx.AddOrUpdateDef(def)
+				c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 				statUpdateDuration.Value(time.Since(pre))
-				return err
 			}
-			return nil
+			return
 		}
 		// the partition of the metric has changed. So we need to delete
 		// the current metricDef from cassandra.  We do this is a separate
@@ -251,21 +248,16 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) error {
 		}()
 		def := schema.MetricDefinitionFromMetricData(data)
 		def.Partition = partition
-		err := c.MemoryIdx.AddOrUpdateDef(def)
-		if err == nil {
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
-		}
+		c.MemoryIdx.AddOrUpdateDef(def)
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 		statUpdateDuration.Value(time.Since(pre))
-		return err
+		return
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	err := c.MemoryIdx.AddOrUpdateDef(def)
-	if err == nil {
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
-	}
+	c.MemoryIdx.AddOrUpdateDef(def)
+	c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
 	statAddDuration.Value(time.Since(pre))
-	return err
 }
 
 func (c *CasIdx) rebuildIndex() {
@@ -275,12 +267,8 @@ func (c *CasIdx) rebuildIndex() {
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = c.LoadPartition(partition, defs)
 	}
-	num, err := c.MemoryIdx.Load(defs)
-	if err != nil {
-		log.Error(4, "cassandra-idx Rebuilding Memory Index partial failure. Imported %d out of %d. Took %s. First error: %s", num, len(defs), time.Since(pre), err)
-	} else {
-		log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
-	}
+	num := c.MemoryIdx.Load(defs)
+	log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
