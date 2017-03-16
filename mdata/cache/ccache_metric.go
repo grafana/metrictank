@@ -56,7 +56,7 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 }
 
 func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
-	ts := itergen.Ts()
+	ts := itergen.Ts
 
 	mc.Lock()
 	defer mc.Unlock()
@@ -123,7 +123,7 @@ func (mc *CCacheMetric) generateKeys() {
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	chunk := mc.chunks[ts]
-	span := chunk.Itgen.Span()
+	span := chunk.Itgen.Span
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
 		return chunk.Ts + span

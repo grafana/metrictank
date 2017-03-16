@@ -11,10 +11,11 @@ var (
 	errUnknownSpanCode    = errors.New("corrupt data, chunk span code is not known")
 )
 
+//go:generate msgp
 type IterGen struct {
-	b    []byte
-	ts   uint32
-	span uint32
+	B    []byte
+	Ts   uint32
+	Span uint32
 }
 
 func NewGen(b []byte, ts uint32) (*IterGen, error) {
@@ -45,8 +46,8 @@ func NewBareIterGen(b []byte, ts uint32, span uint32) *IterGen {
 }
 
 func (ig *IterGen) Get() (*Iter, error) {
-	b := make([]byte, len(ig.b), len(ig.b))
-	copy(b, ig.b)
+	b := make([]byte, len(ig.B), len(ig.B))
+	copy(b, ig.B)
 	it, err := tsz.NewIterator(b)
 	if err != nil {
 		return nil, err
@@ -56,18 +57,14 @@ func (ig *IterGen) Get() (*Iter, error) {
 }
 
 func (ig *IterGen) Size() uint64 {
-	return uint64(len(ig.b))
+	return uint64(len(ig.B))
 }
 
-func (ig IterGen) Ts() uint32 {
-	return ig.ts
-}
-
-func (ig IterGen) Span() uint32 {
-	return ig.span
+func (ig IterGen) Bytes() []byte {
+	return ig.B
 }
 
 // end of itergen (exclusive)
 func (ig IterGen) EndTs() uint32 {
-	return ig.ts + ig.span
+	return ig.Ts + ig.Span
 }

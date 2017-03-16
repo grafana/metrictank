@@ -55,7 +55,7 @@ func (c *MockStore) Search(metric string, ttl, start, end uint32) ([]chunk.IterG
 
 	for _, itgen := range itgens {
 		// start is inclusive, end is exclusive
-		if itgen.Ts() < end && itgen.EndTs() > start && start < end {
+		if itgen.Ts < end && itgen.EndTs() > start && start < end {
 			res = append(res, itgen)
 		}
 	}

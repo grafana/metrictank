@@ -31,7 +31,7 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
 ) WITH CLUSTERING ORDER BY (ts DESC)
     AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d' }
     AND compression = { 'class': 'LZ4Compressor' }`
-const table_name_format = `metric_%d`
+const Table_name_format = `metric_%d`
 
 var (
 	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
@@ -75,9 +75,9 @@ It's safe for concurrent use by multiple goroutines and a typical usage scenario
 object to interact with the whole Cassandra cluster.
 */
 
-type ttlTables map[uint32]ttlTable
+type TTLTables map[uint32]ttlTable
 type ttlTable struct {
-	table      string
+	Table      string
 	windowSize uint32
 }
 
@@ -85,7 +85,7 @@ type cassandraStore struct {
 	session     *gocql.Session
 	writeQueues []chan *ChunkWriteRequest
 	readQueue   chan *ChunkReadRequest
-	ttlTables   ttlTables
+	ttlTables   TTLTables
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -93,8 +93,24 @@ func ttlUnits(ttl uint32) float64 {
 	return float64(ttl) / (60 * 60)
 }
 
-func getTTLTables(ttls []uint32, windowFactor int, nameFormat string) ttlTables {
-	tables := make(ttlTables)
+func PrepareChunkData(span uint32, data []byte) []byte {
+	chunkSizeAtSave.Value(len(data))
+	version := chunk.FormatStandardGoTszWithSpan
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, version)
+
+	spanCode, ok := chunk.RevChunkSpans[span]
+	if !ok {
+		// it's probably better to panic than to persist the chunk with a wrong length
+		panic(fmt.Sprintf("Chunk span invalid: %d", span))
+	}
+	binary.Write(buf, binary.LittleEndian, spanCode)
+	buf.Write(data)
+	return buf.Bytes()
+}
+
+func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables {
+	tables := make(TTLTables)
 	for _, ttl := range ttls {
 		/*
 		 * the purpose of this loop is to bucket metrics of similar TTLs.
@@ -130,7 +146,7 @@ func getTTLTables(ttls []uint32, windowFactor int, nameFormat string) ttlTables 
 		preFactorWindow := uint32(math.Exp2(math.Floor(math.Log2(ttlUnits(ttl)))))
 		tableName := fmt.Sprintf(nameFormat, preFactorWindow)
 		tables[ttl] = ttlTable{
-			table:      tableName,
+			Table:      tableName,
 			windowSize: preFactorWindow/uint32(windowFactor) + 1,
 		}
 	}
@@ -170,9 +186,9 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		return nil, err
 	}
 
-	ttlTables := getTTLTables(ttls, windowFactor, table_name_format)
+	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
 	for _, result := range ttlTables {
-		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.table, result.windowSize)).Exec()
+		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.windowSize)).Exec()
 		if err != nil {
 			return nil, err
 		}
@@ -259,23 +275,11 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.timestamp))
 
-			data := cwr.chunk.Series.Bytes()
-			chunkSizeAtSave.Value(len(data))
-			version := chunk.FormatStandardGoTszWithSpan
-			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, version)
-
-			spanCode, ok := chunk.RevChunkSpans[cwr.span]
-			if !ok {
-				// it's probably better to panic than to persist the chunk with a wrong length
-				panic(fmt.Sprintf("Chunk span invalid: %d", cwr.span))
-			}
-			binary.Write(buf, binary.LittleEndian, spanCode)
-			buf.Write(data)
+			buf := PrepareChunkData(cwr.span, cwr.chunk.Series.Bytes())
 			success := false
 			attempts := 0
 			for !success {
-				err := c.insertChunk(cwr.key, cwr.chunk.T0, cwr.ttl, buf.Bytes())
+				err := c.insertChunk(cwr.key, cwr.chunk.T0, cwr.ttl, buf)
 
 				if err == nil {
 					success = true
@@ -304,7 +308,7 @@ func (c *cassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 func (c *cassandraStore) GetTableNames() []string {
 	names := make([]string, 0)
 	for _, table := range c.ttlTables {
-		names = append(names, table.table)
+		names = append(names, table.Table)
 	}
 	return names
 }
@@ -314,7 +318,7 @@ func (c *cassandraStore) getTable(ttl uint32) (string, error) {
 	if !ok {
 		return "", errTableNotFound
 	}
-	return entry.table, nil
+	return entry.Table, nil
 }
 
 // Insert Chunks into Cassandra.

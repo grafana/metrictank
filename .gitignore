@@ -12,3 +12,5 @@ build/
 /cmd/mt-store-cat/mt-store-cat
 /cmd/mt-update-ttl/mt-update-ttl
 /cmd/mt-view-boundaries/mt-view-boundaries
+/cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
+/cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
