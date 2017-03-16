@@ -109,12 +109,14 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32, schema
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
+		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
 		return
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
+	def.Partition = partition
 	m.add(def, schemaI, aggI)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
