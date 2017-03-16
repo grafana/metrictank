@@ -92,8 +92,8 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
 	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
-	casIdx.BoolVar(&updateCassIdx, "update-cassandra-index", true, "disable cassandra index updates (for read nodes)")
-	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field.")
+	casIdx.BoolVar(&updateCassIdx, "update-cassandra-index", true, "synchronize index changes to cassandra. not all your nodes need to do this.")
+	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
 	casIdx.Float64Var(&updateFuzzyness, "update-fuzzyness", 0.5, "fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.")
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
@@ -202,8 +202,8 @@ func (c *CasIdx) Init() error {
 	}
 
 	if updateCassIdx {
+		c.wg.Add(numConns)
 		for i := 0; i < numConns; i++ {
-			c.wg.Add(1)
 			go c.processWriteQueue()
 		}
 	}
@@ -246,9 +246,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 			} else {
 				oldest = time.Now()
 			}
-			if existing.LastUpdate < oldest.Unix() {
-				updateIdx = true
-			}
+			updateIdx = (existing.LastUpdate < oldest.Unix())
 		} else {
 			if updateCassIdx {
 				// the partition of the metric has changed. So we need to delete
@@ -277,8 +275,6 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 		}
 		stat.Value(time.Since(pre))
 	}
-
-	return
 }
 
 func (c *CasIdx) rebuildIndex() {
