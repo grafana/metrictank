@@ -359,6 +359,9 @@ func main() {
 		Start our inputs
 	***********************************/
 	for _, plugin := range inputs {
+		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
+			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
+		}
 		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, usg, plugin.Name()))
 	}
 

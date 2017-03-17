@@ -12,7 +12,6 @@ import (
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/input"
-	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -33,6 +32,7 @@ type Carbon struct {
 	handlerWaitGroup sync.WaitGroup
 	quit             chan struct{}
 	connTrack        *ConnTrack
+	intervalGetter   IntervalGetter
 }
 
 type ConnTrack struct {
@@ -99,6 +99,10 @@ func New() *Carbon {
 		addr:      addrT,
 		connTrack: NewConnTrack(),
 	}
+}
+
+func (c *Carbon) IntervalGetter(i IntervalGetter) {
+	c.intervalGetter = i
 }
 
 func (c *Carbon) Start(handler input.Handler) {
@@ -172,12 +176,10 @@ func (c *Carbon) handle(conn net.Conn) {
 			continue
 		}
 		name := string(key)
-		_, s := mdata.MatchSchema(name) // note: also called in idx.AddOrUpdate via metrictank DefaultHandler.Process. maybe can be optimized
-		interval := s.Retentions[0].SecondsPerPoint
 		md := &schema.MetricData{
 			Name:     name,
 			Metric:   name,
-			Interval: interval,
+			Interval: c.intervalGetter.GetInterval(name),
 			Value:    val,
 			Unit:     "unknown",
 			Time:     int64(ts),
