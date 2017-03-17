@@ -33,7 +33,7 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Migrate metric index from one cassandra keyspace to another.")
 		fmt.Fprintln(os.Stderr, "This tool can be used for moving data to a different keyspace or cassandra cluster")
-		fmt.Fprintln(os.Stderr, "or for resetting partition information when the number of paritions being used has changed.")
+		fmt.Fprintln(os.Stderr, "or for resetting partition information when the number of partitions being used has changed.")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}

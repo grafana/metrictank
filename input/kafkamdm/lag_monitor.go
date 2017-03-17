@@ -111,13 +111,13 @@ func newRateLogger() *rateLogger {
    We periodically collect the lag for each partition, keeping the last N
    measurements in a moving window. We also collect the ingest rate of each
    partition. Using these measurements we can then compute a overall score
-   for this each parition. The score is just the minimum  lag seen in the last
+   for this each partition. The score is just the minimum lag seen in the last
    N measurements divided by the ingest rate. So if the ingest rate is 1k/second
    and the lag is 10000 messages. Then our reported lag is 10, meaning 10seconds.
    If the rate is 1k/second and the lag is 200 then our lag is reported as 0, meaning
    the node is less then 1second behind.
 
-   The node's overall lag is then the highest lag of all paritions.
+   The node's overall lag is then the highest lag of all partitions.
 */
 type LagMonitor struct {
 	lag  map[int32]*lagLogger
