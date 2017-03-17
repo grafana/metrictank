@@ -125,7 +125,6 @@ type CasIdx struct {
 	writeQueue chan writeReq
 	shutdown   chan struct{}
 	wg         sync.WaitGroup
-	GetNow     func() int64
 }
 
 func New() *CasIdx {
@@ -187,7 +186,6 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	c.session = session
-	c.GetNow = func() int64 { return time.Now().Unix() }
 
 	return nil
 }
@@ -235,6 +233,15 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
+func (c *CasIdx) shouldIdxUpdate(def *schema.MetricDefinition, now int64) bool {
+	if updateInterval == 0 {
+		return def.LastUpdate < now
+	}
+	updateIntervalInt64 := int64(updateInterval)
+	idHash := int64(murmur.Murmur3([]byte(def.Id)))
+	return now > (def.LastUpdate + (updateIntervalInt64 - (def.LastUpdate % updateIntervalInt64)) + (idHash % updateIntervalInt64))
+}
+
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
@@ -243,14 +250,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 
 	if inMemory {
 		if existing.Partition == partition {
-			now := c.GetNow()
-			if updateInterval > 0 {
-				updateIntervalInt64 := int64(updateInterval)
-				idHash := int64(murmur.Murmur3([]byte(data.Id)))
-				updateIdx = now > (existing.LastUpdate + (updateIntervalInt64 - (existing.LastUpdate % updateIntervalInt64)) + (idHash % updateIntervalInt64))
-			} else {
-				updateIdx = existing.LastUpdate < now
-			}
+			updateIdx = c.shouldIdxUpdate(&existing.MetricDefinition, time.Now().Unix())
 		} else {
 			if updateCassIdx {
 				// the partition of the metric has changed. So we need to delete

@@ -108,6 +108,67 @@ func TestGetAddKey(t *testing.T) {
 	})
 }
 
+func TestShouldIdxUpdateWithIntervalZero(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	originalUpdateInterval := updateInterval
+	defer func() { updateInterval = originalUpdateInterval }()
+	updateInterval = 0
+
+	def := schema.MetricDefinition{}
+	decision := ix.shouldIdxUpdate(&def, def.LastUpdate+1)
+
+	Convey("When updateInterval is 0 and time>LastUpdate the decision", t, func() {
+		So(decision, ShouldBeTrue)
+	})
+}
+
+func TestShouldIdxUpdateWithVariousTimeRanges(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	originalUpdateInterval := updateInterval
+	defer func() { updateInterval = originalUpdateInterval }()
+	updateInterval = 10
+
+	getResults := func(from, to int64) []bool {
+		results := make([]bool, 0, int(to-from)*(int(updateInterval)))
+		def := schema.MetricDefinition{
+			Id: "someString",
+		}
+
+		for now := from; now < to; now++ {
+			for lastUpdate := now - int64(updateInterval); lastUpdate < now; lastUpdate++ {
+				def.LastUpdate = lastUpdate
+				results = append(results, ix.shouldIdxUpdate(&def, now))
+			}
+		}
+
+		return results
+	}
+
+	results1 := getResults(10000, 10100)
+	results2 := getResults(10050, 10150)
+	results3 := getResults(90, 190)
+
+	equal := true
+	for i := 0; i < len(results1); i++ {
+		if results1[i] != results2[i] {
+			equal = false
+			break
+		}
+		if results2[i] != results3[i] {
+			equal = false
+			break
+		}
+	}
+
+	Convey("When iterating over full updateIntervals the true/false sets comparison", t, func() {
+		So(equal, ShouldBeTrue)
+	})
+}
+
 func TestFind(t *testing.T) {
 	ix := New()
 	ix.Init()
