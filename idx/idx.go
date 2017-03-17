@@ -73,6 +73,9 @@ Interface
 * Get(string) (Archive, bool):
   This method should return the MetricDefintion with the passed Id.
 
+* GetPath(string) (Archive, bool) []Archive:
+  This method should return the archives under the given path
+
 * List(int) []Archive:
   This method should return all MetricDefinitions for the passed OrgId.  If the
   passed OrgId is "-1", then all metricDefinitions across all organisations
@@ -105,6 +108,7 @@ type MetricIndex interface {
 	Stop()
 	AddOrUpdate(*schema.MetricData, int32) Archive
 	Get(string) (Archive, bool)
+	GetPath(int, string) []Archive
 	Delete(int, string) ([]Archive, error)
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive

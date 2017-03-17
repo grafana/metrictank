@@ -21,16 +21,11 @@ func NewIndexIntervalGetter(idx idx.MetricIndex) IntervalGetter {
 }
 
 func (i IndexIntervalGetter) GetInterval(name string) int {
-	nodes, err := i.idx.Find(1, name, 0)
-	if err != nil {
-		panic(err)
-	}
-	for _, n := range nodes {
+	archives := i.idx.GetPath(1, name)
+	for _, a := range archives {
 		// since the schema rules can't change at runtime and are the schemas are determined at runtime for new entries, they will be the same
-		// for any def/archive with the given name. so the first one we find is enough.
-		if n.Leaf {
-			return mdata.Schemas.Get(n.Defs[0].SchemaId).Retentions[0].SecondsPerPoint
-		}
+		// for any archive with the given name. so the first one we find is enough.
+		return a.Interval
 	}
 	// if it's the first time we're seeing this series, do the more expensive matching
 	// note that the index will also do this matching again first time it sees the metric
