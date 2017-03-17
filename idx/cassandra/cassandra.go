@@ -3,12 +3,12 @@ package cassandra
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/huichen/murmur"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/idx"
@@ -125,6 +125,7 @@ type CasIdx struct {
 	writeQueue chan writeReq
 	shutdown   chan struct{}
 	wg         sync.WaitGroup
+	GetNow     func() int64
 }
 
 func New() *CasIdx {
@@ -186,6 +187,7 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	c.session = session
+	c.GetNow = func() int64 { return time.Now().Unix() }
 
 	return nil
 }
@@ -241,13 +243,14 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 
 	if inMemory {
 		if existing.Partition == partition {
-			var oldest time.Time
+			now := c.GetNow()
 			if updateInterval > 0 {
-				oldest = time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100)/100)))
+				updateIntervalInt64 := int64(updateInterval)
+				idHash := int64(murmur.Murmur3([]byte(data.Id)))
+				updateIdx = now > (existing.LastUpdate + (updateIntervalInt64 - (existing.LastUpdate % updateIntervalInt64)) + (idHash % updateIntervalInt64))
 			} else {
-				oldest = time.Now()
+				updateIdx = existing.LastUpdate < now
 			}
-			updateIdx = (existing.LastUpdate < oldest.Unix())
 		} else {
 			if updateCassIdx {
 				// the partition of the metric has changed. So we need to delete
