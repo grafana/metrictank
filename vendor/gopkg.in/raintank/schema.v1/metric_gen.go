@@ -524,6 +524,11 @@ func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
+		case "LastSave":
+			z.LastSave, err = dc.ReadInt64()
+			if err != nil {
+				return
+			}
 		case "Partition":
 			z.Partition, err = dc.ReadInt32()
 			if err != nil {
@@ -541,9 +546,9 @@ func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 10
+	// map header, size 11
 	// write "Id"
-	err = en.Append(0x8a, 0xa2, 0x49, 0x64)
+	err = en.Append(0x8b, 0xa2, 0x49, 0x64)
 	if err != nil {
 		return err
 	}
@@ -629,6 +634,15 @@ func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
+	// write "LastSave"
+	err = en.Append(0xa8, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x61, 0x76, 0x65)
+	if err != nil {
+		return err
+	}
+	err = en.WriteInt64(z.LastSave)
+	if err != nil {
+		return
+	}
 	// write "Partition"
 	err = en.Append(0xa9, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	if err != nil {
@@ -644,9 +658,9 @@ func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *MetricDefinition) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 10
+	// map header, size 11
 	// string "Id"
-	o = append(o, 0x8a, 0xa2, 0x49, 0x64)
+	o = append(o, 0x8b, 0xa2, 0x49, 0x64)
 	o = msgp.AppendString(o, z.Id)
 	// string "OrgId"
 	o = append(o, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
@@ -675,6 +689,9 @@ func (z *MetricDefinition) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "LastUpdate"
 	o = append(o, 0xaa, 0x4c, 0x61, 0x73, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65)
 	o = msgp.AppendInt64(o, z.LastUpdate)
+	// string "LastSave"
+	o = append(o, 0xa8, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x61, 0x76, 0x65)
+	o = msgp.AppendInt64(o, z.LastSave)
 	// string "Partition"
 	o = append(o, 0xa9, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	o = msgp.AppendInt32(o, z.Partition)
@@ -754,6 +771,11 @@ func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "LastSave":
+			z.LastSave, bts, err = msgp.ReadInt64Bytes(bts)
+			if err != nil {
+				return
+			}
 		case "Partition":
 			z.Partition, bts, err = msgp.ReadInt32Bytes(bts)
 			if err != nil {
@@ -776,6 +798,6 @@ func (z *MetricDefinition) Msgsize() (s int) {
 	for zjfb := range z.Tags {
 		s += msgp.StringPrefixSize + len(z.Tags[zjfb])
 	}
-	s += 11 + msgp.Int64Size + 10 + msgp.Int32Size
+	s += 11 + msgp.Int64Size + 9 + msgp.Int64Size + 10 + msgp.Int32Size
 	return
 }

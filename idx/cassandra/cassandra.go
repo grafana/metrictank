@@ -246,7 +246,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 			} else {
 				oldest = time.Now()
 			}
-			updateIdx = (existing.LastUpdate < oldest.Unix())
+			updateIdx = (existing.LastSave < oldest.Unix())
 		} else {
 			if updateCassIdx {
 				// the partition of the metric has changed. So we need to delete
@@ -266,8 +266,14 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	}
 
 	if updateIdx {
+		// set the new metricdef based on the data, however if this data will go back in time
+		// it'll be rejected data, and we should stick to the higher LastUpdate we already had.
 		def := schema.MetricDefinitionFromMetricData(data)
+		if inMemory && existing.LastUpdate > def.LastUpdate {
+			def.LastUpdate = existing.LastUpdate
+		}
 		def.Partition = partition
+		def.LastSave = time.Now().Unix()
 		c.MemoryIdx.AddOrUpdateDef(def)
 		if updateCassIdx {
 			log.Debug("cassandra-idx updating def in index.")
@@ -316,6 +322,7 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema
 		mdef.Mtype = mtype
 		mdef.Tags = tags
 		mdef.LastUpdate = lastupdate
+		mdef.LastSave = lastupdate
 		defs = append(defs, mdef)
 	}
 	if err := iter.Close(); err != nil {

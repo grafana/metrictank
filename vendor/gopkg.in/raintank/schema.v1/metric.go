@@ -117,7 +117,8 @@ type MetricDefinition struct {
 	Unit       string   `json:"unit"`
 	Mtype      string   `json:"mtype"`
 	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
-	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
+	LastUpdate int64    `json:"lastUpdate"` // unix timestamp of last data point seen
+	LastSave   int64    `json:"lastSave"`   // unix timestamp of last time we updated our index
 	Partition  int32    `json:"partition"`
 }
 

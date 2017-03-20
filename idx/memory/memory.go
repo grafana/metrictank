@@ -579,7 +579,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinitio
 			}
 			staleCount := 0
 			for _, id := range n.Defs {
-				if m.DefById[id].LastUpdate < oldestUnix {
+				if m.DefById[id].LastSave < oldestUnix {
 					staleCount++
 				}
 			}
