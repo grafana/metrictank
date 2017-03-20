@@ -30,7 +30,6 @@ const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
     mtype text,
     tags set<text>,
     lastupdate int,
-    lastsave int,
     PRIMARY KEY (partition, id)
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
@@ -274,6 +273,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 			def.LastUpdate = existing.LastUpdate
 		}
 		def.Partition = partition
+		def.LastSave = time.Now().Unix()
 		c.MemoryIdx.AddOrUpdateDef(def)
 		if updateCassIdx {
 			log.Debug("cassandra-idx updating def in index.")
@@ -295,12 +295,12 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate, lastsave from metric_idx").Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter)
 }
 
 func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate, lastsave from metric_idx where partition=?", partition).Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
 	return c.load(defs, iter)
 }
 
@@ -309,9 +309,9 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema
 	var id, name, metric, unit, mtype string
 	var orgId, interval int
 	var partition int32
-	var lastupdate, lastsave int64
+	var lastupdate int64
 	var tags []string
-	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate, &lastsave) {
+	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mdef.Id = id
 		mdef.OrgId = orgId
 		mdef.Partition = partition
@@ -322,7 +322,7 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema
 		mdef.Mtype = mtype
 		mdef.Tags = tags
 		mdef.LastUpdate = lastupdate
-		mdef.LastSave = lastsave
+		mdef.LastSave = lastupdate
 		defs = append(defs, mdef)
 	}
 	if err := iter.Close(); err != nil {
@@ -337,7 +337,7 @@ func (c *CasIdx) processWriteQueue() {
 	var attempts int
 	var err error
 	var req writeReq
-	qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate, lastsave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
@@ -360,8 +360,7 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Unit,
 				req.def.Mtype,
 				req.def.Tags,
-				req.def.LastUpdate,
-				req.def.LastSave).Exec(); err != nil {
+				req.def.LastUpdate).Exec(); err != nil {
 
 				statQueryInsertFail.Inc()
 				errmetrics.Inc(err)
