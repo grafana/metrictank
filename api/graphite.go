@@ -263,13 +263,19 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		}
 	}
 
+	reqRenderSeriesCount.Value(len(reqs))
+	reqRenderTargetCount.Value(len(request.Targets))
+
 	if len(reqs) == 0 {
-		response.Write(ctx, response.NewJson(200, []string{}, ""))
+		if request.Format == "msgp" {
+			var series models.SeriesByTarget
+			response.Write(ctx, response.NewMsgp(200, series))
+		} else {
+			response.Write(ctx, response.NewJson(200, []string{}, ""))
+		}
 		return
 	}
 
-	reqRenderSeriesCount.Value(len(reqs))
-	reqRenderTargetCount.Value(len(request.Targets))
 	if (toUnix - fromUnix) >= logMinDur {
 		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q target cnt: %d, maxDataPoints: %d",
 			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
