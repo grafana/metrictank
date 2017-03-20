@@ -69,6 +69,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 
 * [Clustering](https://github.com/raintank/metrictank/blob/master/docs/clustering.md)
 * [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
+* [Multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md)
 * [HTTP api](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
 * [Metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 * [Tags](https://github.com/raintank/metrictank/blob/master/docs/tags.md)

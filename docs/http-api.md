@@ -2,8 +2,7 @@
 
 This documents endpoints aimed to be used by users. For internal clustering http endpoints, which may change, refer to the source.
 
-- Note that some of the endpoints rely on being a fed a proper Org-Id. You may not want to expose directly to people if they can control that header. Instead, you may want to run [graphite-metrictank](https://github.com/raintank/graphite-metrictank) in front,
-which will authenticate the request and set the proper header, assuring security.
+- Note that some of the endpoints rely on being a fed a proper Org-Id.  See [Multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md).
 
 - For GET requests, any parameters not specified as a header can be passed as an HTTP query string parameter.
 
@@ -27,7 +26,7 @@ curl "http://localhost:6060"
 ```
 
 
-## Walk the metrics tree and return every metric found as a sorted JSON array, for the given org (or public)
+## Walk the metrics tree and return every metric found that is visible to the org as a sorted JSON array
 
 ```
 GET /metrics/index.json
@@ -36,8 +35,8 @@ POST /metrics/index.json
 
 * header `X-Org-Id` required
 
-If orgId is -1, returns the metrics for all orgs. (but you can't neccessarily distinguish which org they're from)
-If it is not, returns metrics for the given org, as well as org -1.
+Returns metrics stored under the given org, as well as public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
+If orgId is -1, returns the metrics for all orgs. (but you can't neccessarily distinguish which org a metric is from)
 
 #### Example
 
@@ -46,7 +45,7 @@ If it is not, returns metrics for the given org, as well as org -1.
 curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/index.json"
 ```
 
-## Find all metrics visible to the given org (or public)
+## Find all metrics visible to the given org
 
 ```
 GET /metrics/find
@@ -58,6 +57,7 @@ POST /metrics/find
 * format: json, treejson, completer. (defaults to json)
 * jsonp
 
+Returns metrics which match the query and are stored under the given org or are public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
 the completer format is for completion UI's such as graphite-web.
 json and treejson are the same.
 
@@ -104,6 +104,8 @@ POST /render
   [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
+
+Data queried for must be stored under the given org or be public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
 
 #### Example
 
