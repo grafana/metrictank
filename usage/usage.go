@@ -101,10 +101,11 @@ func (u *Usage) Report() {
 		met.Value = val
 		met.SetId()
 
-		m := metrics.GetOrCreate(met.Id)
-		m.Add(uint32(met.Time), met.Value)
 		//TODO: how to set the partition of the metric?  We probably just need to publish the metric to our Input Plugin
-		metricIndex.AddOrUpdate(met, 0)
+		archive := metricIndex.AddOrUpdate(met, 0)
+
+		m := metrics.GetOrCreate(met.Id, met.Metric, archive.SchemaId, archive.AggId)
+		m.Add(uint32(met.Time), met.Value)
 	}
 	for {
 		ticker := tick()

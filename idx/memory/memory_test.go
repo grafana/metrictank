@@ -457,11 +457,16 @@ func TestPrune(t *testing.T) {
 	Convey("after purge", t, func() {
 		defs := ix.List(-1)
 		So(defs, ShouldHaveLength, 5)
-		newDef := defs[0]
-		newDef.Interval = 30
-		newDef.LastUpdate = 100
-		newDef.SetId()
-		ix.AddOrUpdateDef(&newDef)
+		data := &schema.MetricData{
+			Name:     defs[0].Name,
+			Metric:   defs[0].Metric,
+			Id:       defs[0].Id,
+			OrgId:    1,
+			Interval: 30,
+			Time:     100,
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 0)
 		Convey("When purging old series", func() {
 			purged, err := ix.Prune(1, time.Unix(12, 0))
 			So(err, ShouldBeNil)

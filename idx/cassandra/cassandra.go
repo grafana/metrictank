@@ -11,6 +11,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -100,7 +101,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
-	casIdx.StringVar(&capath, "ca-path", "/etc/raintank/ca.pem", "cassandra CA certficate path when using SSL")
+	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
 	casIdx.BoolVar(&hostverification, "host-verification", true, "host (hostname and server cert) verification when using SSL")
 
 	casIdx.BoolVar(&auth, "auth", false, "enable cassandra user authentication")
@@ -232,7 +233,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
+func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 	updateIdx := false
@@ -266,15 +267,15 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	}
 
 	if updateIdx {
-		def := schema.MetricDefinitionFromMetricData(data)
-		def.Partition = partition
-		c.MemoryIdx.AddOrUpdateDef(def)
+		archive := c.MemoryIdx.AddOrUpdate(data, partition)
 		if updateCassIdx {
 			log.Debug("cassandra-idx updating def in index.")
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: def}
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		}
 		stat.Value(time.Since(pre))
+		return archive
 	}
+	return existing
 }
 
 func (c *CasIdx) rebuildIndex() {
@@ -378,7 +379,7 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
+func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	pre := time.Now()
 	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {
@@ -396,7 +397,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, e
 	return defs, err
 }
 
-func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
+func (c *CasIdx) deleteDef(def *idx.Archive) error {
 	pre := time.Now()
 	attempts := 0
 	for attempts < 5 {
@@ -416,7 +417,7 @@ func (c *CasIdx) deleteDef(def *schema.MetricDefinition) error {
 	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
 }
 
-func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	pre := time.Now()
 	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
 	if updateCassIdx {

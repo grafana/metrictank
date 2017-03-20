@@ -1,11 +1,13 @@
 package mdata
 
 import (
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/mdata/cache"
-	"gopkg.in/raintank/schema.v1"
 	"testing"
 	"time"
+
+	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
+	"github.com/raintank/metrictank/mdata/cache"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type testcase struct {
@@ -63,13 +65,18 @@ func TestAggregator(t *testing.T) {
 		}
 		cluster.Manager.SetPrimary(false)
 	}
-	agg := NewAggregator(dnstore, &cache.MockCache{}, "test", 60, 120, 10, 86400)
+	ret := conf.NewRetentionMT(60, 86400, 120, 10, true)
+	aggs := conf.Aggregation{
+		AggregationMethod: []conf.Method{conf.Avg, conf.Min, conf.Max, conf.Sum, conf.Lst},
+	}
+
+	agg := NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	expected := []schema.Point{}
 	compare("simple-min-unfinished", agg.minMetric, expected)
 
-	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", 60, 120, 10, 86400)
+	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
@@ -78,7 +85,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
 
-	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", 60, 120, 10, 86400)
+	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(120, 4)
@@ -87,7 +94,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", 60, 120, 10, 86400)
+	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(150, 1.123)
@@ -98,7 +105,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-two-blocks-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", 60, 120, 10, 86400)
+	agg = NewAggregator(dnstore, &cache.MockCache{}, "test", ret, aggs)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(190, 2451.123)
@@ -116,6 +123,10 @@ func TestAggregator(t *testing.T) {
 	compare("simple-cnt-skip-a-block", agg.cntMetric, []schema.Point{
 		{Val: 2, Ts: 120},
 		{Val: 3, Ts: 240},
+	})
+	compare("simple-lst-skip-a-block", agg.lstMetric, []schema.Point{
+		{Val: 5, Ts: 120},
+		{Val: 978894.445, Ts: 240},
 	})
 	compare("simple-sum-skip-a-block", agg.sumMetric, []schema.Point{
 		{Val: 128.4, Ts: 120},

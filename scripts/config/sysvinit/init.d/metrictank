@@ -20,7 +20,7 @@ export PATH
 
 name=metrictank
 program=/usr/sbin/metrictank
-args=-config\\\=/etc/raintank/metrictank.ini
+args=-config\\\=/etc/metrictank/metrictank.ini
 pidfile="/var/run/$name.pid"
 
 [ -r /etc/default/$name ] && . /etc/default/$name

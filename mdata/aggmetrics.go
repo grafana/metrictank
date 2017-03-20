@@ -13,22 +13,16 @@ type AggMetrics struct {
 	cachePusher cache.CachePusher
 	sync.RWMutex
 	Metrics        map[string]*AggMetric
-	chunkSpan      uint32
-	numChunks      uint32
-	aggSettings    AggSettings // for now we apply the same settings to all AggMetrics. later we may want to have different settings.
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
 }
 
-func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkSpan, numChunks, chunkMaxStale, metricMaxStale uint32, ttl uint32, gcInterval time.Duration, aggSettings []AggSetting) *AggMetrics {
+func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		cachePusher:    cachePusher,
 		Metrics:        make(map[string]*AggMetric),
-		chunkSpan:      chunkSpan,
-		numChunks:      numChunks,
-		aggSettings:    AggSettings{ttl, aggSettings},
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
 		gcInterval:     gcInterval,
@@ -49,8 +43,8 @@ func (ms *AggMetrics) GC() {
 		time.Sleep(diff + time.Minute)
 		log.Info("checking for stale chunks that need persisting.")
 		now := uint32(time.Now().Unix())
-		chunkMinTs := now - (now % ms.chunkSpan) - uint32(ms.chunkMaxStale)
-		metricMinTs := now - (now % ms.chunkSpan) - uint32(ms.metricMaxStale)
+		chunkMinTs := now - uint32(ms.chunkMaxStale)
+		metricMinTs := now - uint32(ms.metricMaxStale)
 
 		// as this is the only goroutine that can delete from ms.Metrics
 		// we only need to lock long enough to get the list of actives metrics.
@@ -85,18 +79,15 @@ func (ms *AggMetrics) Get(key string) (Metric, bool) {
 	return m, ok
 }
 
-func (ms *AggMetrics) GetOrCreate(key string) Metric {
+func (ms *AggMetrics) GetOrCreate(key, name string, schemaId, aggId uint16) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
-		m = NewAggMetric(ms.store, ms.cachePusher, key, ms.chunkSpan, ms.numChunks, ms.aggSettings.RawTTL, ms.aggSettings.Aggs...)
+		agg := Aggregations.Get(aggId)
+		m = NewAggMetric(ms.store, ms.cachePusher, key, Schemas.Get(schemaId).Retentions, &agg)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}
 	ms.Unlock()
 	return m
-}
-
-func (ms *AggMetrics) AggSettings() AggSettings {
-	return ms.aggSettings
 }

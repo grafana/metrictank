@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -78,13 +79,13 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]*schema.MetricDefinition
+	DefById map[string]*idx.Archive
 	Tree    map[int]*Tree
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]*schema.MetricDefinition),
+		DefById: make(map[string]*idx.Archive),
 		Tree:    make(map[int]*Tree),
 	}
 }
@@ -97,7 +98,7 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
+func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -105,15 +106,18 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) {
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
+		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
-		return
+		return *existing
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
-	m.add(def)
+	def.Partition = partition
+	archive := m.add(def)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
+	return archive
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -136,24 +140,16 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
-func (m *MemoryIdx) AddOrUpdateDef(def *schema.MetricDefinition) {
-	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
-	if _, ok := m.DefById[def.Id]; ok {
-		log.Debug("memory-idx: metricDef with id %s already in index.", def.Id)
-		m.DefById[def.Id] = def
-		statUpdate.Inc()
-		statUpdateDuration.Value(time.Since(pre))
-		return
-	}
-	m.add(def)
-	statMetricsActive.Inc()
-	statAddDuration.Value(time.Since(pre))
-}
-
-func (m *MemoryIdx) add(def *schema.MetricDefinition) {
+func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.Name
+	schemaId, _ := mdata.MatchSchema(def.Name)
+	aggId, _ := mdata.MatchAgg(def.Name)
+	archive := &idx.Archive{
+		*def,
+		schemaId,
+		aggId,
+	}
+
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.Tree[def.OrgId]
 	if !ok || len(tree.Items) == 0 {
@@ -174,9 +170,9 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 		if node, ok := tree.Items[path]; ok {
 			log.Debug("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
 			node.Defs = append(node.Defs, def.Id)
-			m.DefById[def.Id] = def
+			m.DefById[def.Id] = archive
 			statAdd.Inc()
-			return
+			return *archive
 		}
 	}
 	// now walk backwards through the node path to find the first branch which exists that
@@ -228,11 +224,12 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) {
 		Children: []string{},
 		Defs:     []string{def.Id},
 	}
-	m.DefById[def.Id] = def
+	m.DefById[def.Id] = archive
 	statAdd.Inc()
+	return *archive
 }
 
-func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, bool) {
+func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -241,7 +238,26 @@ func (m *MemoryIdx) Get(id string) (schema.MetricDefinition, bool) {
 	if ok {
 		return *def, ok
 	}
-	return schema.MetricDefinition{}, ok
+	return idx.Archive{}, ok
+}
+
+// GetPath returns the node under the given org and path.
+// this is an alternative to Find for when you have a path, not a pattern, and want to lookup in a specific org tree only.
+func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
+	tree, ok := m.Tree[orgId]
+	if !ok {
+		return nil
+	}
+	node := tree.Items[path]
+	if node == nil {
+		return nil
+	}
+	archives := make([]idx.Archive, len(node.Defs))
+	for i, def := range node.Defs {
+		archive := m.DefById[def]
+		archives[i] = *archive
+	}
+	return archives
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
@@ -270,7 +286,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 				HasChildren: n.HasChildren(),
 			}
 			if idxNode.Leaf {
-				idxNode.Defs = make([]schema.MetricDefinition, 0, len(n.Defs))
+				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
 				for _, id := range n.Defs {
 					def := m.DefById[id]
 					if from != 0 && def.LastUpdate < from {
@@ -416,7 +432,7 @@ func match(pattern string, candidates []string) ([]string, error) {
 	return results, nil
 }
 
-func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
+func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -430,7 +446,7 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 			i++
 		}
 	}
-	defs := make([]schema.MetricDefinition, 0)
+	defs := make([]idx.Archive, 0)
 	for _, org := range orgs {
 		tree, ok := m.Tree[org]
 		if !ok {
@@ -450,8 +466,8 @@ func (m *MemoryIdx) List(orgId int) []schema.MetricDefinition {
 	return defs
 }
 
-func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition, error) {
-	var deletedDefs []schema.MetricDefinition
+func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
+	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
@@ -469,9 +485,9 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]schema.MetricDefinition
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
+func (m *MemoryIdx) delete(orgId int, n *Node) []idx.Archive {
 	tree := m.Tree[orgId]
-	deletedDefs := make([]schema.MetricDefinition, 0)
+	deletedDefs := make([]idx.Archive, 0)
 	if n.HasChildren() {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
@@ -549,9 +565,9 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []schema.MetricDefinition {
 }
 
 // delete series from the index if they have not been seen since "oldest"
-func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]schema.MetricDefinition, error) {
+func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
-	pruned := make([]schema.MetricDefinition, 0)
+	var pruned []idx.Archive
 	pre := time.Now()
 	m.RLock()
 	orgs := []int{orgId}

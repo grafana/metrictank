@@ -1,209 +1,362 @@
 package api
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 )
 
-type alignCase struct {
-	reqs        []models.Req
-	aggSettings mdata.AggSettings
-	outReqs     []models.Req
-	outErr      error
-	now         uint32
-}
-
-func TestAlignRequests(t *testing.T) {
-	input := []alignCase{
-		{
-			// a basic case with uniform raw intervals
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 60, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				1000, // need TTL of 1000 to read back from ts=0 if now=1000
-				[]mdata.AggSetting{},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// real example seen with alerting queries
-			// need to consolidate to bring them to the same step
-			// because raw intervals are not uniform
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				1000, // need TTL of 1000 to read back from ts=0 if now=1000
-				[]mdata.AggSetting{},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 10, 60, 6),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// same but now raw TTL is not long enough but we don't have a rollup so best effort from raw
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				800,
-				[]mdata.AggSetting{},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 10, 60, 6),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now raw TTL is not long and we have a rollup we can use instead
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				999, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(120, 600, 2, 1000, true),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 1, 120, 120, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 120, 120, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now raw TTL is not long and we have a rollup we can use instead, at same interval as one of the raws
-			// i suppose our engine could be a bit smarter and see for the 2nd one which it has more in memory of.
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				999, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(60, 600, 2, 1000, true),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 1, 60, 60, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 60, 60, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now TTL of first rollup is *just* enough
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				900, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(120, 600, 2, 1000, true),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 1, 120, 120, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 120, 120, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now TTL of first rollup is not enough but we have no other choice but to use it
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				900, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(120, 600, 2, 999, true),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 1, 120, 120, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 120, 120, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now TTL of first rollup is not enough and we have a 3rd band to use
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				900, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(120, 600, 2, 999, true),
-					mdata.NewAggSetting(240, 600, 2, 1000, true),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 2, 240, 240, 1),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 240, 240, 1),
-			},
-			nil,
-			1000,
-		},
-		{
-			// now TTL of raw/first rollup is not enough but the two rollups are disabled, so must use raw
-			[]models.Req{
-				reqRaw("a", 0, 30, 800, 10, consolidation.Avg),
-				reqRaw("b", 0, 30, 800, 60, consolidation.Avg),
-			},
-			mdata.AggSettings{
-				900, // just not long enough
-				[]mdata.AggSetting{
-					mdata.NewAggSetting(120, 600, 2, 999, false),
-					mdata.NewAggSetting(240, 600, 2, 1000, false),
-				},
-			},
-			[]models.Req{
-				reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 10, 60, 6),
-				reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 60, 60, 1),
-			},
-			nil,
-			1000,
-		},
+// testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
+func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
+	var schemas []conf.Schema
+	for _, ret := range retentions {
+		schemas = append(schemas, conf.Schema{
+			Pattern:    regexp.MustCompile(".*"),
+			Retentions: conf.Retentions(ret),
+		})
 	}
-	for i, ac := range input {
-		out, err := alignRequests(ac.now, ac.reqs, ac.aggSettings)
-		if err != ac.outErr {
-			t.Errorf("different err value for testcase %d  expected: %v, got: %v", i, ac.outErr, err)
-		}
-		if len(out) != len(ac.outReqs) {
-			t.Errorf("different number of requests for testcase %d  expected: %v, got: %v", i, len(ac.outReqs), len(out))
-		} else {
-			for r, exp := range ac.outReqs {
-				if !compareReqEqual(exp, out[r]) {
-					t.Errorf("testcase %d, request %d:\nexpected: %v\n     got: %v", i, r, exp.DebugString(), out[r].DebugString())
-				}
+
+	mdata.Schemas = conf.Schemas(schemas)
+	out, err := alignRequests(now, reqs)
+	if err != outErr {
+		t.Errorf("different err value expected: %v, got: %v", outErr, err)
+	}
+	if len(out) != len(outReqs) {
+		t.Errorf("different number of requests expected: %v, got: %v", len(outReqs), len(out))
+	} else {
+		for r, exp := range outReqs {
+			if !compareReqEqual(exp, out[r]) {
+				t.Errorf("request %d:\nexpected: %v\n     got: %v", r, exp.DebugString(), out[r].DebugString())
 			}
 		}
 	}
+}
+
+// 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it
+func TestAlignRequestsBasic(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 60, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 0, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with equal raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it
+func TestAlignRequestsBasicDiff(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 60, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it, but needs normalizing
+// (real example seen with alerting queries)
+func TestAlignRequestsAlerting(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{{
+			conf.NewRetentionMT(10, 1200, 0, 0, true),
+		}, {
+			conf.NewRetentionMT(60, 1200, 0, 0, true),
+		},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 1200, 60, 6),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. neither has long enough archive. no rollups, so best effort from raw
+func TestAlignRequestsBasicBestEffort(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 800, 0, 0, true),
+			}, {
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 60, 6),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. one has short raw. other has short raw + good rollup
+func TestAlignRequestsHalfGood(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 800, 0, 0, true),
+			}, {
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1200, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 120, 12),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
+func TestAlignRequestsGoodRollup(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals, and rollup intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
+func TestAlignRequestsDiffGoodRollup(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(100, 1200, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(600, 1200, 600, 2, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 100, 1200, 600, 6),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 600, 1200, 600, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// now raw is short and we have a rollup we can use instead, at same interval as one of the raws
+func TestAlignRequestsWeird(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1199, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 60, 1200, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// now TTL of first rollup is *just* enough
+func TestAlignRequestsWeird2(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// now TTL of first rollup is not enough but we have no other choice but to use it
+func TestAlignRequestsNoOtherChoice(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1199, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1199, 120, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// now TTL of first rollup is not enough and we have a 3rd band to use
+func TestAlignRequests3rdBand(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(1, 1100, 0, 0, true),
+				conf.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, true),
+			},
+			{
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 2, 240, 1200, 240, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 240, 1200, 240, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// now TTL of raw/first rollup is not enough but the two rollups are disabled, so must use raw
+func TestAlignRequests2RollupsDisabled(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(120, 1199, 600, 2, false),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
+			},
+			{
+				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 1100, 60, 6),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+func TestAlignRequestsHuh(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(1, 1000, 0, 0, true),
+				conf.NewRetentionMT(120, 1080, 600, 2, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
+			},
+			{
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(240, 1200, 600, 2, false),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1080, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 120, 2),
+		},
+		nil,
+		1200,
+		t,
+	)
 }
 
 var result []models.Req
@@ -211,21 +364,45 @@ var result []models.Req
 func BenchmarkAlignRequests(b *testing.B) {
 	var res []models.Req
 	reqs := []models.Req{
-		reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg),
-		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg),
-		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg),
+		reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg, 1, 0),
+		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg, 2, 0),
 	}
-	aggSettings := mdata.AggSettings{
-		35 * 24 * 60 * 60,
-		[]mdata.AggSetting{
-			mdata.NewAggSetting(600, 21600, 1, 2*30*24*3600, true),
-			mdata.NewAggSetting(7200, 21600, 1, 6*30*24*3600, true),
-			mdata.NewAggSetting(21600, 21600, 1, 2*365*24*3600, true),
+	mdata.Schemas = conf.Schemas([]conf.Schema{
+		{
+			Pattern: regexp.MustCompile("a"),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(10, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+				}),
 		},
-	}
+		{
+			Pattern: regexp.MustCompile("b"),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(30, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+				}),
+		},
+		{
+			Pattern: regexp.MustCompile(".*"),
+			Retentions: conf.Retentions(
+				[]conf.Retention{
+					conf.NewRetentionMT(60, 35*24*3600, 0, 0, true),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+				}),
+		},
+	})
 
 	for n := 0; n < b.N; n++ {
-		res, _ = alignRequests(14*24*3600, reqs, aggSettings)
+		res, _ = alignRequests(14*24*3600, reqs)
 	}
 	result = res
 }

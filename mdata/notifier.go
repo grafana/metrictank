@@ -28,6 +28,7 @@ const PersistMessageBatchV1 = 1
 type PersistMessage struct {
 	Instance string `json:"instance"`
 	Key      string `json:"key"`
+	Name     string `json:"name"`
 	T0       uint32 `json:"t0"`
 }
 
@@ -39,6 +40,8 @@ type PersistMessageBatch struct {
 type SavedChunk struct {
 	Key string `json:"key"`
 	T0  uint32 `json:"t0"`
+
+	Name string `json:"name"` // filled in when handler does index lookup
 }
 
 func SendPersistMessage(key string, t0 uint32) {
@@ -82,7 +85,9 @@ func (cl Notifier) Handle(data []byte) {
 				}
 			}
 			if cl.CreateMissingMetrics {
-				agg := cl.Metrics.GetOrCreate(key[0])
+				schemaId, _ := MatchSchema(c.Name)
+				aggId, _ := MatchAgg(c.Name)
+				agg := cl.Metrics.GetOrCreate(key[0], c.Name, schemaId, aggId)
 				if len(key) == 3 {
 					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
 				} else {
@@ -107,7 +112,9 @@ func (cl Notifier) Handle(data []byte) {
 		messagesReceived.Add(1)
 		// get metric
 		if cl.CreateMissingMetrics {
-			agg := cl.Metrics.GetOrCreate(ms.Key)
+			schemaId, _ := MatchSchema(ms.Name)
+			aggId, _ := MatchAgg(ms.Name)
+			agg := cl.Metrics.GetOrCreate(ms.Key, ms.Name, schemaId, aggId)
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
 		} else if agg, ok := cl.Metrics.Get(ms.Key); ok {
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)

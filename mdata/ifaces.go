@@ -1,12 +1,13 @@
 package mdata
 
-import "github.com/raintank/metrictank/consolidation"
-import "github.com/raintank/metrictank/mdata/chunk"
+import (
+	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/mdata/chunk"
+)
 
 type Metrics interface {
 	Get(key string) (Metric, bool)
-	GetOrCreate(key string) Metric
-	AggSettings() AggSettings
+	GetOrCreate(key, name string, schemaId, aggId uint16) Metric
 }
 
 type Metric interface {

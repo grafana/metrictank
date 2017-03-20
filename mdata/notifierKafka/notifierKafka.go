@@ -238,6 +238,7 @@ func (c *NotifierKafka) flush() {
 		buf := bytes.NewBuffer(c.bPool.Get())
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		encoder := json.NewEncoder(buf)
+		c.buf[i].Name = def.Name
 		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
 		err := encoder.Encode(&pMsg)
 		if err != nil {

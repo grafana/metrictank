@@ -41,6 +41,19 @@ func Cnt(in []schema.Point) float64 {
 	return valid
 }
 
+func Lst(in []schema.Point) float64 {
+	if len(in) == 0 {
+		panic("last() called in aggregator with 0 terms")
+	}
+	lst := math.NaN()
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			lst = v.Val
+		}
+	}
+	return lst
+}
+
 func Min(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("min() called in aggregator with 0 terms")

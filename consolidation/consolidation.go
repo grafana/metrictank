@@ -4,8 +4,8 @@ package consolidation
 import (
 	"errors"
 	"fmt"
+
 	"github.com/raintank/metrictank/batch"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // consolidator is a highlevel description of a point consolidation method
@@ -17,10 +17,11 @@ var errUnknownConsolidationFunction = errors.New("unknown consolidation function
 const (
 	None Consolidator = iota
 	Avg
-	Cnt // not available through http api
-	Min
-	Max
 	Sum
+	Lst
+	Max
+	Min
+	Cnt // not available through http api
 )
 
 // String provides human friendly names
@@ -32,6 +33,8 @@ func (c Consolidator) String() string {
 		return "AverageConsolidator"
 	case Cnt:
 		return "CountConsolidator"
+	case Lst:
+		return "LastConsolidator"
 	case Min:
 		return "MinimumConsolidator"
 	case Max:
@@ -52,6 +55,8 @@ func (c Consolidator) Archive() string {
 		panic("avg consolidator has no matching Archive(). you need sum and cnt")
 	case Cnt:
 		return "cnt"
+	case Lst:
+		return "lst"
 	case Min:
 		return "min"
 	case Max:
@@ -66,6 +71,8 @@ func FromArchive(archive string) Consolidator {
 	switch archive {
 	case "cnt":
 		return Cnt
+	case "lst":
+		return Lst
 	case "min":
 		return Min
 	case "max":
@@ -84,6 +91,8 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 		consFunc = batch.Avg
 	case Cnt:
 		consFunc = batch.Cnt
+	case Lst:
+		consFunc = batch.Lst
 	case Min:
 		consFunc = batch.Min
 	case Max:
@@ -94,33 +103,8 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 	return consFunc
 }
 
-func GetConsolidator(def *schema.MetricDefinition, pref string) (Consolidator, error) {
-	consolidateBy := pref
-
-	if consolidateBy == "" {
-		consolidateBy = "avg"
-		if def.Mtype == "counter" {
-			consolidateBy = "max"
-		}
-	}
-	var consolidator Consolidator
-	switch consolidateBy {
-	case "avg", "average":
-		consolidator = Avg
-	case "min":
-		consolidator = Min
-	case "max":
-		consolidator = Max
-	case "sum":
-		consolidator = Sum
-	default:
-		return consolidator, errUnknownConsolidationFunction
-	}
-	return consolidator, nil
-}
-
 func Validate(fn string) error {
-	if fn == "avg" || fn == "average" || fn == "min" || fn == "max" || fn == "sum" {
+	if fn == "avg" || fn == "average" || fn == "last" || fn == "min" || fn == "max" || fn == "sum" {
 		return nil
 	}
 	return errUnknownConsolidationFunction
