@@ -411,9 +411,7 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 	}
 	ix.Init()
 	insertDefs(ix, b.N)
-
-	b.ReportAllocs()
-	b.ResetTimer()
+	updates := make([]*schema.MetricData, b.N)
 	var series string
 	var data *schema.MetricData
 	for n := 0; n < b.N; n++ {
@@ -426,7 +424,13 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 			Time:     10,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		updates[n] = data
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		ix.AddOrUpdate(updates[n], 1)
 	}
 	ix.Stop()
 }
