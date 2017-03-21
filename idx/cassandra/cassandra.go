@@ -59,7 +59,9 @@ var (
 	statPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune")
 	// metric idx.cassandra.delete is the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
 	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
-	errmetrics         = cassandra.NewErrMetrics("idx.cassandra")
+	// metric idx.cassandra.save.skipped is how many saves have been skipped due to the writeQueue being full
+	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
+	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
 	Enabled          bool
 	ssl              bool
@@ -290,6 +292,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 			archive.LastSave = now
 			c.MemoryIdx.Update(archive)
 		default:
+			statSaveSkipped.Inc()
 			log.Debug("writeQueue is full, update not saved.")
 		}
 	}
