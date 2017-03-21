@@ -3,7 +3,6 @@ package cassandra
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -80,7 +79,7 @@ var (
 	pruneInterval    time.Duration
 	updateCassIdx    bool
 	updateInterval   time.Duration
-	updateFuzzyness  float64
+	updateInterval32 uint32
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -95,7 +94,6 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
 	casIdx.BoolVar(&updateCassIdx, "update-cassandra-index", true, "synchronize index changes to cassandra. not all your nodes need to do this.")
 	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
-	casIdx.Float64Var(&updateFuzzyness, "update-fuzzyness", 0.5, "fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.")
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
@@ -154,6 +152,7 @@ func New() *CasIdx {
 	if updateCassIdx {
 		idx.writeQueue = make(chan writeReq, writeQueueSize)
 	}
+	updateInterval32 = uint32(updateInterval.Nanoseconds() / int64(time.Second))
 	return idx
 }
 
@@ -236,46 +235,67 @@ func (c *CasIdx) Stop() {
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
-	updateIdx := false
+	archive := c.MemoryIdx.AddOrUpdate(data, partition)
 	stat := statUpdateDuration
-
-	if inMemory {
-		if existing.Partition == partition {
-			var oldest time.Time
-			if updateInterval > 0 {
-				oldest = time.Now().Add(-1 * updateInterval).Add(-1 * time.Duration(rand.Int63n(updateInterval.Nanoseconds()*int64(updateFuzzyness*100)/100)))
-			} else {
-				oldest = time.Now()
-			}
-			updateIdx = (existing.LastUpdate < oldest.Unix())
-		} else {
-			if updateCassIdx {
-				// the partition of the metric has changed. So we need to delete
-				// the current metricDef from cassandra.  We do this in a separate
-				// goroutine as we dont want to block waiting for the delete to succeed.
-				go func() {
-					if err := c.deleteDef(&existing); err != nil {
-						log.Error(3, err.Error())
-					}
-				}()
-			}
-			updateIdx = true
-		}
-	} else {
-		updateIdx = true
+	if !inMemory {
 		stat = statAddDuration
 	}
-
-	if updateIdx {
-		archive := c.MemoryIdx.AddOrUpdate(data, partition)
-		if updateCassIdx {
-			log.Debug("cassandra-idx updating def in index.")
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
-		}
+	if !updateCassIdx {
 		stat.Value(time.Since(pre))
 		return archive
 	}
-	return existing
+
+	now := uint32(time.Now().Unix())
+
+	// Cassandra uses partition id asthe partitionin key, so an "update" that changes the partition for
+	// an existing metricDef will just create a new row in the table and wont remove the old row.
+	// So we need to explicitly delete the old entry.
+	if inMemory && existing.Partition != partition {
+		go func() {
+			if err := c.deleteDef(&existing); err != nil {
+				log.Error(3, err.Error())
+			}
+		}()
+	}
+
+	// check if we need to save to cassandra.
+	if archive.LastSave >= (now - updateInterval32) {
+		stat.Value(time.Since(pre))
+		return archive
+	}
+
+	// This is just a safety precaution to prevent corrupt index entries.
+	// This ensures that the index entry always contains the correct metricDefinition data.
+	if inMemory {
+		archive.MetricDefinition = *schema.MetricDefinitionFromMetricData(data)
+		archive.MetricDefinition.Partition = partition
+	}
+
+	// if the entry has not been saved for 1.5x updateInterval
+	// then perform a blocking save. (bit shifting to the right 1 bit, divides by 2)
+	if archive.LastSave < (now - updateInterval32 - (updateInterval32 >> 1)) {
+		log.Debug("cassandra-idx updating def in index.")
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
+		archive.LastSave = now
+		c.MemoryIdx.Update(archive)
+	} else {
+		// perform a non-blocking write to the writeQueue. If the queue is full, then
+		// this will fail and we wont update the LastSave timestamp. The next time
+		// the metric is seen, the previous lastSave timestamp will still be in place and so
+		// we will try and save again.  This will continue until we are successful or the
+		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
+		// do a blocking write to the queue.
+		select {
+		case c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
+			archive.LastSave = now
+			c.MemoryIdx.Update(archive)
+		default:
+			log.Debug("writeQueue is full, update not saved.")
+		}
+	}
+
+	stat.Value(time.Since(pre))
+	return archive
 }
 
 func (c *CasIdx) rebuildIndex() {

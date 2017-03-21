@@ -120,6 +120,16 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	return archive
 }
 
+func (m *MemoryIdx) Update(entry idx.Archive) {
+	m.Lock()
+	if _, ok := m.DefById[entry.Id]; !ok {
+		m.Unlock()
+		return
+	}
+	*(m.DefById[entry.Id]) = entry
+	m.Unlock()
+}
+
 // Used to rebuild the index from an existing set of metricDefinitions.
 func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	m.Lock()
@@ -132,6 +142,9 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 			continue
 		}
 		m.add(def)
+		// as we are loading the metricDefs from a persistant store, set the lastSave
+		// to the lastUpdate timestamp.
+		m.DefById[def.Id].LastSave = uint32(def.LastUpdate)
 		num++
 		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
@@ -145,9 +158,9 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	schemaId, _ := mdata.MatchSchema(def.Name)
 	aggId, _ := mdata.MatchAgg(def.Name)
 	archive := &idx.Archive{
-		*def,
-		schemaId,
-		aggId,
+		MetricDefinition: *def,
+		SchemaId:         schemaId,
+		AggId:            aggId,
 	}
 
 	//first check to see if a tree has been created for this OrgId
