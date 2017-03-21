@@ -172,7 +172,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	reqRenderTargetCount.Value(len(targets))
 
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, nil)
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, request.Stable, nil)
 	if err != nil {
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
@@ -506,7 +506,7 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 			reqs = append(reqs, models.NewReq(
-				archive.Id, archive.Name, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
+				archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
 		}
 	}
 	reqRenderSeriesCount.Value(len(reqs))
@@ -531,7 +531,20 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 		log.Error(3, "HTTP Render %s", err.Error())
 		return nil, err
 	}
+	out = mergeSeries(out)
 
-	merged := mergeSeries(out)
-	return merged, nil
+	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
+	// if we need to cancel the request due to a fetch error
+
+	data := make(map[expr.Req][]models.Series)
+	for _, serie := range out {
+		q := expr.Req{
+			serie.QueryPatt,
+			serie.QueryFrom,
+			serie.QueryTo,
+		}
+		data[q] = append(data[q], serie)
+	}
+
+	return plan.Run(data)
 }

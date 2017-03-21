@@ -14,9 +14,9 @@ var (
 	ErrTooManyArguments   = errors.New("too many arguments")
 )
 
-type errUnknownFunction string
+type ErrUnknownFunction string
 
-func (e errUnknownFunction) Error() string {
+func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
 
 }

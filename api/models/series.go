@@ -12,6 +12,9 @@ type Series struct {
 	Target     string // will be set to the target attribute of the given request
 	Datapoints []schema.Point
 	Interval   uint32
+	QueryPatt  string // to tie the series back to the request it came from
+	QueryFrom  uint32 // to tie the series back to the request it came from
+	QueryTo    uint32 // to tie the series back to the request it came from
 }
 
 type SeriesByTarget []Series

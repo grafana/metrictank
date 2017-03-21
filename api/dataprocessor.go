@@ -290,6 +290,9 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 					Target:     req.Target,
 					Datapoints: points,
 					Interval:   interval,
+					QueryPatt:  req.Pattern,
+					QueryFrom:  req.From,
+					QueryTo:    req.To,
 				}
 			}
 			wg.Done()
@@ -501,11 +504,23 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	return iters
 }
 
-// check for duplicate series names. If found merge the results.
+// check for duplicate series names for the same query. If found merge the results.
 func mergeSeries(in []models.Series) []models.Series {
-	seriesByTarget := make(map[string][]models.Series)
+	type segment struct {
+		target string
+		query  string
+		from   uint32
+		to     uint32
+	}
+	seriesByTarget := make(map[segment][]models.Series)
 	for _, series := range in {
-		seriesByTarget[series.Target] = append(seriesByTarget[series.Target], series)
+		s := segment{
+			series.Target,
+			series.QueryPatt,
+			series.QueryFrom,
+			series.QueryTo,
+		}
+		seriesByTarget[s] = append(seriesByTarget[s], series)
 	}
 	merged := make([]models.Series, len(seriesByTarget))
 	i := 0

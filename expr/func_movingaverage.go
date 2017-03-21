@@ -41,3 +41,7 @@ func (s *FuncMovingAverage) Init(args []*expr) error {
 func (s *FuncMovingAverage) Depends(from, to uint32) (uint32, uint32) {
 	return from - s.window, to
 }
+
+func (s *FuncMovingAverage) Exec(in ...interface{}) ([]interface{}, error) {
+	return nil, nil
+}

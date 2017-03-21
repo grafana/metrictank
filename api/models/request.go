@@ -9,8 +9,9 @@ import (
 
 type Req struct {
 	// these fields can be set straight away:
-	Key          string                     `json:"key"`    // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
-	Target       string                     `json:"target"` // the target we should return either to graphite or as if we're graphite.  this is usually the original input string like consolidateBy(key,'sum') except when it's a pattern than it becomes the concrete value like consolidateBy(foo.b*,'sum') -> consolidateBy(foo.bar,'sum') etc
+	Key          string                     `json:"key"`     // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
+	Target       string                     `json:"target"`  // the target we should return either to graphite or as if we're graphite.  this is usually the original input string like consolidateBy(key,'sum') except when it's a pattern than it becomes the concrete value like consolidateBy(foo.b*,'sum') -> consolidateBy(foo.bar,'sum') etc
+	Pattern      string                     `json:"pattern"` // the original query pattern used. e.g. `foo.b*`. To be able to tie the result data back to the data need as requested
 	From         uint32                     `json:"from"`
 	To           uint32                     `json:"to"`
 	MaxPoints    uint32                     `json:"maxPoints"`
@@ -28,10 +29,11 @@ type Req struct {
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key, target string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
+func NewReq(key, target, patt string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
 	return Req{
 		key,
 		target,
+		patt,
 		from,
 		to,
 		maxPoints,

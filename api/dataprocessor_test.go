@@ -592,7 +592,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(name, name, from, to, 1000, 10, consolidation.Avg, cluster.Manager.ThisNode(), 0, 0)
+				req := models.NewReq(name, name, name, from, to, 1000, 10, consolidation.Avg, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
 				points := srv.getSeriesFixed(req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
@@ -604,11 +604,11 @@ func TestGetSeriesFixed(t *testing.T) {
 }
 
 func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
+	req := models.NewReq(key, key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
 	return req
 }
 func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
+	req := models.NewReq(key, key, key, from, to, maxPoints, rawInterval, consolidator, cluster.Manager.ThisNode(), schemaId, aggId)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.TTL = ttl

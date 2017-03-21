@@ -15,8 +15,9 @@ func main() {
 		return
 	}
 	spew.Dump(exps)
+	stable := false
 
-	plan, err := expr.NewPlan(exps, 1000, 1200, nil)
+	plan, err := expr.NewPlan(exps, 1000, 1200, 800, stable, nil)
 	if err != nil {
 		fmt.Println("Error while planning", err)
 		return

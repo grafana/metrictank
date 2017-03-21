@@ -20,3 +20,7 @@ func (s FuncConsolidateBy) Init(args []*expr) error {
 func (s FuncConsolidateBy) Depends(from, to uint32) (uint32, uint32) {
 	return from, to
 }
+
+func (s FuncConsolidateBy) Exec(in ...interface{}) ([]interface{}, error) {
+	return nil, nil
+}
