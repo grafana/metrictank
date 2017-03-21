@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	maxPointsPerReq int
-	maxDaysPerReq   int
-	logMinDurStr    string
-	logMinDur       uint32
+	maxPointsPerReq    int
+	maxPointsPerTarget int
+	maxDaysPerReq      int
+	logMinDurStr       string
+	logMinDur          uint32
 
 	Addr     string
 	UseSSL   bool
@@ -25,6 +26,7 @@ var (
 func ConfigSetup() {
 	apiCfg := flag.NewFlagSet("http", flag.ExitOnError)
 	apiCfg.IntVar(&maxDaysPerReq, "max-days-per-req", 365000, "max number of days range for one request. the default allows 500 series of 2 year each. (0 disables limit")
+	apiCfg.IntVar(&maxPointsPerTarget, "max-points-per-target", 60*60*24, "max number of data points to be returned per target")
 	apiCfg.IntVar(&maxPointsPerReq, "max-points-per-req", 1000000, "max points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)")
 	apiCfg.StringVar(&logMinDurStr, "log-min-dur", "5min", "only log incoming requests if their timerange is at least this duration. Use 0 to disable")
 

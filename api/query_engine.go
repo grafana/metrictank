@@ -18,7 +18,8 @@ var (
 	// metric api.request.render.series is the number of points the request will return.
 	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
 
-	errUnSatisfiable = errors.New("request cannot be satisfied due to lack of available retentions")
+	errUnSatisfiable      = errors.New("request cannot be satisfied due to lack of available retentions")
+	errMaxPointsPerTarget = errors.New("request exceeds max-points-per-target limit. Reduce the time range or ask your admin to increase the limit.")
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
@@ -42,6 +43,7 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 		req := &reqs[i]
 		retentions := mdata.Schemas.Get(req.SchemaId).Retentions
 		req.Archive = -1
+		var points int
 
 		for i, ret := range retentions {
 			// skip non-ready option.
@@ -54,12 +56,18 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 			if i == 0 {
 				// The first retention is raw data, so use its native interval
 				req.ArchInterval = req.RawInterval
+				points = int(tsRange) / int(req.RawInterval)
 			} else {
 				req.ArchInterval = uint32(ret.SecondsPerPoint)
+				points = int(tsRange) / ret.SecondsPerPoint
 			}
-			if now-req.TTL <= req.From {
+
+			if now-req.TTL <= req.From && points <= maxPointsPerTarget {
 				break
 			}
+		}
+		if points > maxPointsPerTarget {
+			return nil, errMaxPointsPerTarget
 		}
 
 		if req.Archive == -1 {

@@ -171,6 +171,8 @@ cert-file = /etc/ssl/certs/ssl-cert-snakeoil.pem
 key-file = /etc/ssl/private/ssl-cert-snakeoil.key
 # limit on how many points could be requested in one request. 1M allows 500 series at a MaxDataPoints of 2000. (0 disables limit)
 max-points-per-req = 1000000
+# max number of data points to be returned per target
+max-points-per-target = 86400
 # limit on what kind of time range can be requested in one request. the default allows 500 series of 2 years. (0 disables limit)
 max-days-per-req = 365000
 # only log incoming requests if their timerange is at least this duration. Use 0 to disable
