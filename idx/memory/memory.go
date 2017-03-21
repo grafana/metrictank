@@ -244,6 +244,8 @@ func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
 // GetPath returns the node under the given org and path.
 // this is an alternative to Find for when you have a path, not a pattern, and want to lookup in a specific org tree only.
 func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
+	m.RLock()
+	defer m.RUnlock()
 	tree, ok := m.Tree[orgId]
 	if !ok {
 		return nil
