@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -27,6 +28,7 @@ var MissingOrgHeaderErr = errors.New("orgId not set in headers")
 var MissingQueryErr = errors.New("missing query param")
 var InvalidFormatErr = errors.New("invalid format specified")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
+var renderReqProxied = stats.NewCounter32("api.request.render.proxied")
 
 var (
 	// metric api.request.render.series is the number of series a /render request is handling.  This is the number
@@ -174,6 +176,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, request.Stable, nil)
 	if err != nil {
+		if e, ok := err.(expr.ErrUnknownFunction); ok {
+			fmt.Println("unsupported function", e, "proxying...")
+			ctx.Req.Request.Body = ctx.Body
+			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+			renderReqProxied.Inc()
+			return
+		}
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}

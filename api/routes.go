@@ -20,6 +20,7 @@ func (s *Server) RegisterRoutes() {
 
 	bind := binding.Bind
 	withOrg := middleware.RequireOrg()
+	cBody := middleware.CaptureBody
 
 	r.Get("/", s.appStatus)
 	r.Get("/node", s.getNodeStatus)
@@ -39,7 +40,7 @@ func (s *Server) RegisterRoutes() {
 	})
 
 	// Graphite endpoints
-	r.Combo("/render", withOrg, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
+	r.Combo("/render", cBody, withOrg, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
 	r.Combo("/metrics/find", withOrg, bind(models.GraphiteFind{})).Get(s.metricsFind).Post(s.metricsFind)
 	r.Get("/metrics/index.json", withOrg, s.metricsIndex)
 	r.Post("/metrics/delete", withOrg, bind(models.MetricsDelete{}), s.metricsDelete)

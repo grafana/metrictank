@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -12,6 +13,7 @@ import (
 type Context struct {
 	*macaron.Context
 	OrgId int
+	Body  io.ReadCloser
 }
 
 func OrgMiddleware() macaron.Handler {
