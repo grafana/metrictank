@@ -143,6 +143,9 @@ func main() {
 	// stats
 	statsConfig.ConfigSetup()
 
+	// storage-schemas, storage-aggregation files
+	mdata.ConfigSetup()
+
 	conf.ParseAll()
 
 	/***********************************

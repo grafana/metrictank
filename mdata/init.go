@@ -4,11 +4,13 @@
 package mdata
 
 import (
+	"flag"
 	"io/ioutil"
 	"log"
 
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/stats"
+	"github.com/rakyll/globalconf"
 )
 
 var (
@@ -51,6 +53,13 @@ var (
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
 )
+
+func ConfigSetup() {
+	retentionConf := flag.NewFlagSet("retention", flag.ExitOnError)
+	retentionConf.StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
+	retentionConf.StringVar(&aggFile, "aggrgations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
+	globalconf.Register("retention", retentionConf)
+}
 
 func ConfigProcess() {
 	var err error
