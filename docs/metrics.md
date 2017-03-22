@@ -132,6 +132,8 @@ how many insert queries for a metric failed (triggered by an add or an update)
 time inserts spent in queue before being executed
 * `idx.cassandra.update`:  
 the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
+* `idx.cassandra.save.skipped`:  
+how many saves have been skipped due to the writeQueue being full
 * `idx.memory.add`:  
 the duration of an add of a metric to the memory idx
 * `idx.memory.ops.add`:  

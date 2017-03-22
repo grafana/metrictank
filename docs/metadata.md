@@ -25,7 +25,7 @@ enabled = true
 This is the recommended option because it persists.
 
 * type: Memory-Idx for search queries, backed by Cassandra for persistence
-* persistence:  persists new metricDefinitions as they are seen.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
+* persistence:  persists new metricDefinitions as they are seen and every update-interval.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
 * efficiency: On low end hardware the index rebuilds at about 70000 metricDefinitions per second. Saving new metrics works pretty fast.
 
 Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suit your deployment.
@@ -51,8 +51,6 @@ num-conns = 10
 write-queue-size = 100000
 ```
 
-Note:
-* All metrictanks write to Cassandra.  this is not very efficient.
 
 ## The anatomy of a metricdef
 
@@ -65,16 +63,15 @@ The schema is as follows:
 ```
 type MetricDefinition struct {
 	Id         string            
-	OrgId      int               
+	OrgId      int       
+	Partition  int        
 	Name       string            // graphite format
 	Metric     string            // kairosdb format (like graphite, but not including some tags)
 	Interval   int               
 	Unit       string            
 	Mtype      string            
 	Tags       []string          
-	LastUpdate int64             
-	Nodes      map[string]string 
-	NodeCount  int               
+	LastUpdate int64                        
 }
 ```
 

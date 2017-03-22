@@ -22,8 +22,16 @@ func init() {
 	numConns = 1
 	writeQueueSize = 1000
 	protoVer = 4
+	updateCassIdx = false
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
+}
+
+func initForTests(c *CasIdx) error {
+	if err := c.MemoryIdx.Init(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func getSeriesNames(depth, count int, prefix string) []string {
@@ -71,7 +79,7 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 
 func TestGetAddKey(t *testing.T) {
 	ix := New()
-	ix.Init()
+	initForTests(ix)
 
 	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
@@ -108,9 +116,104 @@ func TestGetAddKey(t *testing.T) {
 	})
 }
 
+func TestAddToWriteQueue(t *testing.T) {
+	originalUpdateCassIdx := updateCassIdx
+	originalUpdateInterval := updateInterval
+	originalWriteQSize := writeQueueSize
+
+	defer func() {
+		updateCassIdx = originalUpdateCassIdx
+		updateInterval = originalUpdateInterval
+		writeQueueSize = originalWriteQSize
+	}()
+
+	updateCassIdx = true
+	updateInterval = 10
+	writeQueueSize = 5
+	ix := New()
+	initForTests(ix)
+	metrics := getMetricData(1, 2, 5, 10, "metric.demo")
+	Convey("When writeQueue is enabled", t, func() {
+		Convey("When new metrics being added", func() {
+			for _, s := range metrics {
+				ix.AddOrUpdate(s, 1)
+				select {
+				case wr := <-ix.writeQueue:
+					So(wr.def.Id, ShouldEqual, s.Id)
+					archive, inMem := ix.Get(wr.def.Id)
+					So(inMem, ShouldBeTrue)
+					now := uint32(time.Now().Unix())
+					So(archive.LastSave, ShouldBeBetweenOrEqual, now-1, now+1)
+				case <-time.After(time.Second):
+					t.Fail()
+				}
+			}
+		})
+		Convey("When existing metrics are added and lastSave is recent", func() {
+			for _, s := range metrics {
+				s.Time = time.Now().Unix()
+				ix.AddOrUpdate(s, 1)
+			}
+			wrCount := 0
+
+		LOOP_WR:
+			for {
+				select {
+				case <-ix.writeQueue:
+					wrCount++
+				default:
+					break LOOP_WR
+				}
+			}
+			So(wrCount, ShouldEqual, 0)
+		})
+		Convey("When existing metrics are added and lastSave is old", func() {
+			for _, s := range metrics {
+				s.Time = time.Now().Unix()
+				archive, _ := ix.Get(s.Id)
+				archive.LastSave = uint32(time.Now().Unix() - 100)
+				ix.Update(archive)
+			}
+			for _, s := range metrics {
+				ix.AddOrUpdate(s, 1)
+				select {
+				case wr := <-ix.writeQueue:
+					So(wr.def.Id, ShouldEqual, s.Id)
+					archive, inMem := ix.Get(wr.def.Id)
+					So(inMem, ShouldBeTrue)
+					now := uint32(time.Now().Unix())
+					So(archive.LastSave, ShouldBeBetweenOrEqual, now-1, now+1)
+				case <-time.After(time.Second):
+					t.Fail()
+				}
+			}
+		})
+		Convey("When new metrics are added and writeQueue is full", func() {
+			newMetrics := getMetricData(1, 2, 6, 10, "metric.demo2")
+			pre := time.Now()
+			go func() {
+				time.Sleep(time.Second)
+				//drain the writeQueue
+				for range ix.writeQueue {
+					continue
+				}
+			}()
+
+			for _, s := range newMetrics {
+				ix.AddOrUpdate(s, 1)
+			}
+			//it should take at least 1 second to add the defs, as the queue will be full
+			// until the above goroutine empties it, leading to a blocking write.
+			So(time.Now(), ShouldHappenAfter, pre.Add(time.Second))
+		})
+	})
+	ix.MemoryIdx.Stop()
+	close(ix.writeQueue)
+}
+
 func TestFind(t *testing.T) {
 	ix := New()
-	ix.Init()
+	initForTests(ix)
 	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
 		ix.AddOrUpdate(s, 1)
 	}
@@ -217,7 +320,7 @@ func BenchmarkIndexing(b *testing.B) {
 	writeQueueSize = 10
 	protoVer = 4
 	updateInterval = time.Hour
-	updateFuzzyness = 1.0
+	updateCassIdx = true
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
@@ -262,7 +365,7 @@ func BenchmarkLoad(b *testing.B) {
 	writeQueueSize = 10
 	protoVer = 4
 	updateInterval = time.Hour
-	updateFuzzyness = 1.0
+	updateCassIdx = true
 	ix := New()
 
 	tmpSession, err := ix.cluster.CreateSession()
@@ -275,7 +378,6 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't initialize cassandra: %s", err)
 	}
-
 	insertDefs(ix, b.N)
 	ix.Stop()
 
@@ -283,5 +385,52 @@ func BenchmarkLoad(b *testing.B) {
 	b.ResetTimer()
 	ix = New()
 	ix.Init()
+	ix.Stop()
+}
+
+func BenchmarkIndexingWithUpdates(b *testing.B) {
+	cluster.Manager.SetPartitions([]int32{1})
+	keyspace = "metrictank"
+	hosts = "localhost:9042"
+	consistency = "one"
+	timeout = time.Second
+	numConns = 10
+	writeQueueSize = 10
+	protoVer = 4
+	updateInterval = time.Hour
+	updateCassIdx = true
+	ix := New()
+	tmpSession, err := ix.cluster.CreateSession()
+	if err != nil {
+		b.Skipf("can't connect to cassandra: %s", err)
+	}
+	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Close()
+	if err != nil {
+		b.Skipf("can't connect to cassandra: %s", err)
+	}
+	ix.Init()
+	insertDefs(ix, b.N)
+	updates := make([]*schema.MetricData, b.N)
+	var series string
+	var data *schema.MetricData
+	for n := 0; n < b.N; n++ {
+		series = "some.metric." + strconv.Itoa(n)
+		data = &schema.MetricData{
+			Name:     series,
+			Metric:   series,
+			Interval: 10,
+			OrgId:    1,
+			Time:     10,
+		}
+		data.SetId()
+		updates[n] = data
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		ix.AddOrUpdate(updates[n], 1)
+	}
 	ix.Stop()
 }

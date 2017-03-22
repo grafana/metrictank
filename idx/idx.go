@@ -26,16 +26,15 @@ type Archive struct {
 	schema.MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
+	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
 }
 
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	return Archive{
-		schema.MetricDefinition{
+		MetricDefinition: schema.MetricDefinition{
 			Name: name,
 		},
-		0,
-		0,
 	}
 }
 

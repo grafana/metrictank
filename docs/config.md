@@ -297,10 +297,8 @@ max-stale = 0
 prune-interval = 3h
 # synchronize index changes to cassandra. not all your nodes need to do this.
 update-cassandra-index = true
-#frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates
+#frequency at which we should update flush changes to cassandra. only relevant if update-cassandra-index is true.
 update-interval = 4h
-#fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours.
-update-fuzzyness = 0.5
 # enable SSL connection to cassandra
 ssl = false
 # cassandra CA certficate path when using SSL
