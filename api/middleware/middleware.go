@@ -16,9 +16,9 @@ type Context struct {
 	Body  io.ReadCloser
 }
 
-func OrgMiddleware() macaron.Handler {
+func OrgMiddleware(multiTenant bool) macaron.Handler {
 	return func(c *macaron.Context) {
-		org, err := getOrg(c.Req.Request)
+		org, err := getOrg(c.Req.Request, multiTenant)
 		if err != nil {
 			c.PlainText(400, []byte(err.Error()))
 			return
@@ -31,7 +31,10 @@ func OrgMiddleware() macaron.Handler {
 	}
 }
 
-func getOrg(req *http.Request) (int, error) {
+func getOrg(req *http.Request, multiTenant bool) (int, error) {
+	if !multiTenant {
+		return 1, nil
+	}
 	orgStr := req.Header.Get("x-org-id")
 	if orgStr == "" {
 		return 0, nil

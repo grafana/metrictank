@@ -22,6 +22,7 @@ var (
 	useGzip          bool
 	certFile         string
 	keyFile          string
+	multiTenant      bool
 	fallbackGraphite string
 
 	graphiteProxy *httputil.ReverseProxy
@@ -38,6 +39,7 @@ func ConfigSetup() {
 	apiCfg.BoolVar(&useGzip, "gzip", true, "use GZIP compression of all responses")
 	apiCfg.StringVar(&certFile, "cert-file", "", "SSL certificate file")
 	apiCfg.StringVar(&keyFile, "key-file", "", "SSL key file")
+	apiCfg.BoolVar(&multiTenant, "multi-tenant", true, "require x-org-id authentication to auth as a specific org. otherwise orgId 1 is assumed")
 	apiCfg.StringVar(&fallbackGraphite, "fallback-graphite-addr", "http://localhost:8080", "in case our /render endpoint does not support the requested processing, proxy the request to this graphite")
 	globalconf.Register("http", apiCfg)
 }
