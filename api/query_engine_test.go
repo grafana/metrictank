@@ -13,11 +13,18 @@ import (
 // testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
 func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
+	origMaxPointsPerTarget := maxPointsPerTarget
+
 	for _, ret := range retentions {
 		schemas = append(schemas, conf.Schema{
 			Pattern:    regexp.MustCompile(".*"),
 			Retentions: conf.Retentions(ret),
 		})
+		// make sure maxPointsPerTarget is high enough
+		points := int(reqs[0].To-reqs[0].From) / ret[0].SecondsPerPoint
+		if points > maxPointsPerTarget {
+			maxPointsPerTarget = points
+		}
 	}
 
 	mdata.Schemas = conf.Schemas(schemas)
@@ -34,6 +41,8 @@ func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []model
 			}
 		}
 	}
+
+	maxPointsPerTarget = origMaxPointsPerTarget
 }
 
 // 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it
@@ -357,6 +366,72 @@ func TestAlignRequestsHuh(t *testing.T) {
 		1200,
 		t,
 	)
+}
+
+var hour uint32 = 60 * 60
+var day uint32 = 24 * hour
+
+func testMaxPointsPerTarget(maxPoints int, reqs []models.Req, t *testing.T) ([]models.Req, error) {
+	origMaxPointsPerTarget := maxPointsPerTarget
+	maxPointsPerTarget = maxPoints
+
+	mdata.Schemas = []conf.Schema{{
+		Pattern: regexp.MustCompile(".*"),
+		Retentions: conf.Retentions([]conf.Retention{
+			conf.NewRetentionMT(1, 2*day, 600, 2, true),
+			conf.NewRetentionMT(60, 7*day, 600, 2, true),
+			conf.NewRetentionMT(3600, 30*day, 600, 2, true),
+		}),
+	}}
+
+	out, err := alignRequests(30*day, reqs)
+	maxPointsPerTarget = origMaxPointsPerTarget
+	return out, err
+}
+
+func TestGettingOneNextBiggerAgg(t *testing.T) {
+	reqs := []models.Req{
+		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
+	}
+
+	// without maxPointsPerTarget = 23*hour we'd get archive 0 for this request,
+	// with it we expect the aggregation to get bumped to the next one
+	out, err := testMaxPointsPerTarget(int(23*hour), reqs, t)
+	if err != nil {
+		t.Fatalf("expected to get no error")
+	}
+	if out[0].Archive != 1 {
+		t.Errorf("expected archive %d, but got archive %d", 1, out[0].Archive)
+	}
+}
+
+func TestGettingTwoNextBiggerAgg(t *testing.T) {
+	reqs := []models.Req{
+		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
+	}
+
+	// maxPointsPerTarget only allows 24 points, so the aggregation 2 with
+	// 3600 SecondsPerPoint should be chosen for our request of 1 day
+	out, err := testMaxPointsPerTarget(24, reqs, t)
+	if err != nil {
+		t.Fatalf("expected to get no error")
+	}
+	if out[0].Archive != 2 {
+		t.Errorf("expected archive %d, but got archive %d", 2, out[0].Archive)
+	}
+}
+
+func TestGettingError(t *testing.T) {
+	reqs := []models.Req{
+		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
+	}
+
+	// we're requesting one day and the lowest resolution aggregation has 3600 seconds per point,
+	// so there should be an error because we only allow max 23 points per target
+	_, err := testMaxPointsPerTarget(23, reqs, t)
+	if err != errMaxPointsPerTarget {
+		t.Fatalf("expected to get an error")
+	}
 }
 
 var result []models.Req
