@@ -32,6 +32,8 @@ func init() {
 	funcs = map[string]funcDef{
 		"sum":           funcDef{NewSumSeries, true},
 		"sumSeries":     funcDef{NewSumSeries, true},
+		"avg":           funcDef{NewAvgSeries, true},
+		"averageSeries": funcDef{NewAvgSeries, true},
 		"movingAverage": funcDef{NewMovingAverage, true},
 		"consolidateBy": funcDef{NewConsolidateBy, false},
 	}
