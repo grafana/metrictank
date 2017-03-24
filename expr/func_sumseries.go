@@ -1,6 +1,9 @@
 package expr
 
-import "github.com/raintank/metrictank/api/models"
+import (
+	"github.com/raintank/metrictank/api/models"
+	"gopkg.in/raintank/schema.v1"
+)
 
 type FuncSumSeries struct {
 }
@@ -29,11 +32,17 @@ func (s FuncSumSeries) Exec(in ...interface{}) ([]interface{}, error) {
 	if len(series) == 1 {
 		return []interface{}{series[0]}, nil
 	}
+	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
-		for j := 1; j < len(series); j++ {
-			series[0].Datapoints[i].Val += series[j].Datapoints[i].Val
+		point := schema.Point{
+			Ts:  series[0].Datapoints[i].Ts,
+			Val: 0,
 		}
+		for j := 1; j < len(series); j++ {
+			point.Val += series[j].Datapoints[i].Val
+		}
+		out = append(out, point)
 	}
 
-	return []interface{}{series[0]}, nil
+	return []interface{}{out}, nil
 }

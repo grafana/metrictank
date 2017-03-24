@@ -1,0 +1,17 @@
+regarding when to allocate models.Series (or more precisely, their []schema.Point attribute), there's 2 main choices:
+
+1) copy-on-write:
+- each function does not modify data in their inputs, they allocate new slices (or better: get from pool) etc to save output computations
+- storing data into new slice can be done in same pass as processing the data
+- potentially many of these steps in a sequence if you have lots of processing steps in a row
+- getting a slice from the pool may cause a stall if it's not large enough and runtime needs to re-allocate and copy
+- allows us to pass the same data into multiple processing steps
+
+2)copy in advance:
+- give each processing step a copied slice in which they can do whatever they want (e.g. modify in place)
+- works well if you have many processing steps in a row that can just modify in place
+- copying up front, in a separate pass. also causes a stall
+- often copying may be unnessary, but we can't know that in advance (unless we expand the expr tree to mark whether it'll do a write)
+
+
+I'm going to assume that multi-steps in a row is not that common, and COW seems more commonly the best approach

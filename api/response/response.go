@@ -9,7 +9,7 @@ import (
 
 var ErrMetricNotFound = errors.New("metric not found")
 
-var BufferPool = util.NewBufferPool()
+var BufferPool = util.NewBufferPool() // used by fastjson and mspg responses to serialize into
 
 func Write(w http.ResponseWriter, resp Response) {
 	defer resp.Close()
