@@ -3,7 +3,6 @@ package api
 import (
 	"flag"
 	"net"
-	"net/http"
 	"net/http/httputil"
 	"net/url"
 
@@ -58,12 +57,5 @@ func ConfigProcess() {
 	if err != nil {
 		log.Fatal(4, "API Cannot parse fallback-graphite-addr: %s", err)
 	}
-	graphiteProxy = httputil.NewSingleHostReverseProxy(u)
-	// remove these headers from upstream
-	// we will set our own correct ones (and duplicate headers are illegal)
-	graphiteProxy.ModifyResponse = func(resp *http.Response) error {
-		resp.Header.Del("access-control-allow-credentials")
-		resp.Header.Del("Access-Control-Allow-Origin")
-		return nil
-	}
+	graphiteProxy = NewGraphiteProxy(u)
 }
