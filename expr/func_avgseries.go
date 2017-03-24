@@ -26,7 +26,7 @@ func (s FuncAvgSeries) Depends(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncAvgSeries) Exec(in ...interface{}) ([]interface{}, error) {
+func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	series, ok := in[0].([]models.Series)
 	if !ok {
 		return nil, ErrArgumentBadType
@@ -56,6 +56,7 @@ func (s FuncAvgSeries) Exec(in ...interface{}) ([]interface{}, error) {
 		}
 		out = append(out, point)
 	}
+	cache[Req{}] = append(cache[Req{}], out)
 
 	return []interface{}{series[0]}, nil
 }

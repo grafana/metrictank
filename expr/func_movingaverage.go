@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/raintank/dur"
+	"github.com/raintank/metrictank/api/models"
 )
 
 type FuncMovingAverage struct {
@@ -42,6 +43,7 @@ func (s *FuncMovingAverage) Depends(from, to uint32) (uint32, uint32) {
 	return from - s.window, to
 }
 
-func (s *FuncMovingAverage) Exec(in ...interface{}) ([]interface{}, error) {
+func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
+	cache[Req{}] = append(cache[Req{}], out)
 	return nil, nil
 }

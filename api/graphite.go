@@ -193,17 +193,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 	sort.Sort(models.SeriesByTarget(out))
 
-	defer func() {
-		for _, serie := range out {
-			pointSlicePool.Put(serie.Datapoints[:0])
-		}
-	}()
-
 	if request.Format == "msgp" {
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
 	} else {
 		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}
+	plan.Clean()
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {

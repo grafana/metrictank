@@ -1,6 +1,9 @@
 package expr
 
-import "github.com/raintank/metrictank/consolidation"
+import (
+	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/consolidation"
+)
 
 type FuncConsolidateBy struct {
 }
@@ -21,6 +24,6 @@ func (s FuncConsolidateBy) Depends(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncConsolidateBy) Exec(in ...interface{}) ([]interface{}, error) {
+func (s FuncConsolidateBy) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	return nil, nil
 }

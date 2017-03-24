@@ -15,3 +15,17 @@ regarding when to allocate models.Series (or more precisely, their []schema.Poin
 
 
 I'm going to assume that multi-steps in a row is not that common, and COW seems more commonly the best approach
+
+
+This leaves the problem of effectively managing allocations and using a sync.Pool.
+Note that the expr library can be called by different clients (MT, grafana, graphite-ng, ...)
+It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
+The client can then of course use this pool to store series, which it then feeds to expr.
+expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.
+Once the data is returned to the client, and the client is done using the returned data, it should call plan.Clean(),
+which returns all data back to the pool  (both input data or newly generated series, whether they made it into the final output or not).
+
+note that individual processing functions only request slices from the pool, they don't put anything on it.
+e.g. an avg of 3 series will create 1 new series (from pool), but won't put the 3 inputs back in the pool, because
+another processing step may require the same input data.
+

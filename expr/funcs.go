@@ -1,5 +1,7 @@
 package expr
 
+import "github.com/raintank/metrictank/api/models"
+
 type argType uint8
 
 // argument type. potentially not as strict as reality (e.g. movingAverage windowsize is categorized as a str) that's why we have the extra validation step
@@ -16,7 +18,7 @@ type Func interface {
 	// what can be assumed to have been pre-validated: len of args, and basic types (e.g. seriesList)
 	Init([]*expr) error                       // initialize and validate arguments, for functions that have specific requirements
 	Depends(from, to uint32) (uint32, uint32) // allows a func to express its dependencies
-	Exec(...interface{}) ([]interface{}, error)
+	Exec(map[Req][]models.Series, ...interface{}) ([]interface{}, error)
 }
 
 type funcConstructor func() Func

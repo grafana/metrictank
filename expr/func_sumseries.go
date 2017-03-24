@@ -24,7 +24,7 @@ func (s FuncSumSeries) Depends(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncSumSeries) Exec(in ...interface{}) ([]interface{}, error) {
+func (s FuncSumSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	series, ok := in[0].([]models.Series)
 	if !ok {
 		return nil, ErrArgumentBadType
@@ -43,6 +43,6 @@ func (s FuncSumSeries) Exec(in ...interface{}) ([]interface{}, error) {
 		}
 		out = append(out, point)
 	}
-
+	cache[Req{}] = append(cache[Req{}], out)
 	return []interface{}{out}, nil
 }
