@@ -32,6 +32,7 @@ var funcs map[string]funcDef
 
 func init() {
 	funcs = map[string]funcDef{
+		"alias":         funcDef{NewAlias, true},
 		"sum":           funcDef{NewSumSeries, true},
 		"sumSeries":     funcDef{NewSumSeries, true},
 		"avg":           funcDef{NewAvgSeries, true},
