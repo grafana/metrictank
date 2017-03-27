@@ -3,22 +3,39 @@ package expr
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
 var (
-	ErrArgumentBadType    = errors.New("argument bad type")
-	ErrMissingArgument    = errors.New("argument missing")
+	ErrMissingArg         = errors.New("argument missing")
+	ErrTooManyArg         = errors.New("too many arguments")
 	ErrMissingTimeseries  = errors.New("missing time series argument")
 	ErrWildcardNotAllowed = errors.New("found wildcard where series expected")
-	ErrTooManyArguments   = errors.New("too many arguments")
 )
+
+type ErrBadArgument struct {
+	exp reflect.Type
+	got reflect.Type
+}
+
+func (e ErrBadArgument) Error() string {
+	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
+}
+
+type ErrBadArgumentStr struct {
+	exp string
+	got string
+}
+
+func (e ErrBadArgumentStr) Error() string {
+	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
+}
 
 type ErrUnknownFunction string
 
 func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
-
 }
 
 type MetricRequest struct {
@@ -65,7 +82,7 @@ func Parse(e string) (*expr, string, error) {
 	name, e := parseName(e)
 
 	if name == "" {
-		return nil, e, ErrMissingArgument
+		return nil, e, ErrMissingArg
 	}
 
 	if e != "" && e[0] == '(' {
@@ -75,7 +92,6 @@ func Parse(e string) (*expr, string, error) {
 		exp.argString = argString
 		exp.args = posArgs
 		exp.namedArgs = namedArgs
-		fmt.Println("> func call", argString, posArgs, namedArgs)
 
 		return exp, e, err
 	}
@@ -134,7 +150,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 			}
 
 			if argCont.etype != etConst && argCont.etype != etName && argCont.etype != etString {
-				return "", nil, nil, eCont, ErrArgumentBadType
+				return "", nil, nil, eCont, ErrBadArgumentStr{"const, name or string", string(argCont.etype)}
 			}
 
 			if namedArgs == nil {
@@ -197,7 +213,6 @@ func parseConst(s string) (float64, string, string, error) {
 	if err != nil {
 		return 0, "", "", err
 	}
-	fmt.Println("> const", v, s[:i])
 
 	return v, s[:i], s[i:], err
 }
@@ -236,7 +251,6 @@ FOR:
 		return s, ""
 	}
 
-	fmt.Println("> name", s[:i])
 
 	return s[:i], s[i:]
 }
@@ -260,14 +274,14 @@ func parseString(s string) (string, string, error) {
 		return "", "", ErrMissingQuote
 
 	}
-	fmt.Println("> string", s[:i])
+	//fmt.Println("> string", s[:i])
 
 	return s[:i], s[i+1:], nil
 }
 
 func getStringArg(e *expr, n int) (string, error) {
 	if len(e.args) <= n {
-		return "", ErrMissingArgument
+		return "", ErrMissingArg
 	}
 
 	return doGetStringArg(e.args[n])
@@ -291,7 +305,7 @@ func getStringNamedOrPosArgDefault(e *expr, k string, n int, s string) (string, 
 
 func doGetStringArg(e *expr) (string, error) {
 	if e.etype != etString {
-		return "", ErrArgumentBadType
+		return "", ErrBadArgumentStr{"string", string(e.etype)}
 	}
 
 	return e.valStr, nil
@@ -300,16 +314,16 @@ func doGetStringArg(e *expr) (string, error) {
 /*
 func getIntervalArg(e *expr, n int, defaultSign int) (int32, error) {
 	if len(e.args) <= n {
-		return 0, ErrMissingArgument
+		return 0, ErrMissingArg
 	}
 
 	if e.args[n].etype != etString {
-		return 0, ErrArgumentBadType
+		return 0, ErrBadArgumentStr{"string", string(e.etype)}
 	}
 
 	seconds, err := IntervalString(e.args[n].valStr, defaultSign)
 	if err != nil {
-		return 0, ErrArgumentBadType
+		return 0, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
 	return seconds, nil
@@ -318,7 +332,7 @@ func getIntervalArg(e *expr, n int, defaultSign int) (int32, error) {
 
 func getFloatArg(e *expr, n int) (float64, error) {
 	if len(e.args) <= n {
-		return 0, ErrMissingArgument
+		return 0, ErrMissingArg
 	}
 
 	return doGetFloatArg(e.args[n])
@@ -342,7 +356,7 @@ func getFloatNamedOrPosArgDefault(e *expr, k string, n int, v float64) (float64,
 
 func doGetFloatArg(e *expr) (float64, error) {
 	if e.etype != etConst {
-		return 0, ErrArgumentBadType
+		return 0, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
 	return e.val, nil
@@ -350,7 +364,7 @@ func doGetFloatArg(e *expr) (float64, error) {
 
 func getIntArg(e *expr, n int) (int, error) {
 	if len(e.args) <= n {
-		return 0, ErrMissingArgument
+		return 0, ErrMissingArg
 	}
 
 	return doGetIntArg(e.args[n])
@@ -359,7 +373,7 @@ func getIntArg(e *expr, n int) (int, error) {
 func getIntArgs(e *expr, n int) ([]int, error) {
 
 	if len(e.args) <= n {
-		return nil, ErrMissingArgument
+		return nil, ErrMissingArg
 	}
 
 	var ints []int
@@ -393,7 +407,7 @@ func getIntNamedOrPosArgDefault(e *expr, k string, n int, d int) (int, error) {
 
 func doGetIntArg(e *expr) (int, error) {
 	if e.etype != etConst {
-		return 0, ErrArgumentBadType
+		return 0, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
 	return int(e.val), nil
@@ -417,7 +431,7 @@ func getBoolArgDefault(e *expr, n int, b bool) (bool, error) {
 
 func doGetBoolArg(e *expr) (bool, error) {
 	if e.etype != etName {
-		return false, ErrArgumentBadType
+		return false, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
 	// names go into 'target'
@@ -428,7 +442,7 @@ func doGetBoolArg(e *expr) (bool, error) {
 		return true, nil
 	}
 
-	return false, ErrArgumentBadType
+	return false, ErrBadArgumentStr{"const", string(e.etype)}
 }
 
 /*

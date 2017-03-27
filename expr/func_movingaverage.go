@@ -44,6 +44,6 @@ func (s *FuncMovingAverage) Depends(from, to uint32) (uint32, uint32) {
 }
 
 func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
-	cache[Req{}] = append(cache[Req{}], out)
+	//cache[Req{}] = append(cache[Req{}], out)
 	return nil, nil
 }

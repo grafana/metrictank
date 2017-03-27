@@ -1,5 +1,6 @@
 package expr
 
+//go:generate stringer -type=exprType
 type exprType int
 
 const (

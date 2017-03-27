@@ -1,6 +1,10 @@
 package expr
 
-import "github.com/raintank/metrictank/api/models"
+import (
+	"reflect"
+
+	"github.com/raintank/metrictank/api/models"
+)
 
 type FuncAlias struct {
 	alias string
@@ -26,7 +30,7 @@ func (s FuncAlias) Depends(from, to uint32) (uint32, uint32) {
 func (s FuncAlias) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	series, ok := in[0].([]models.Series)
 	if !ok {
-		return nil, ErrArgumentBadType
+		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
 	}
 	var out []interface{}
 	for _, serie := range series {

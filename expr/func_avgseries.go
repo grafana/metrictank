@@ -1,7 +1,9 @@
 package expr
 
 import (
+	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
@@ -29,7 +31,7 @@ func (s FuncAvgSeries) Depends(from, to uint32) (uint32, uint32) {
 func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	series, ok := in[0].([]models.Series)
 	if !ok {
-		return nil, ErrArgumentBadType
+		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
 	}
 	if len(series) == 1 {
 		return []interface{}{series[0]}, nil
@@ -56,7 +58,12 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([
 		}
 		out = append(out, point)
 	}
-	cache[Req{}] = append(cache[Req{}], out)
+	output := models.Series{
+		Target:     fmt.Sprintf("averageSeries(%s)", "foo"),
+		Datapoints: out,
+		Interval:   series[0].Interval,
+	}
+	cache[Req{}] = append(cache[Req{}], output)
 
-	return []interface{}{series[0]}, nil
+	return []interface{}{output}, nil
 }

@@ -2,7 +2,6 @@ package expr
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/raintank/metrictank/api/models"
 )
@@ -51,7 +50,6 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 }
 
 func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
-	fmt.Println("HUH PLAN GOT", e)
 	if e.etype != etFunc && e.etype != etName {
 		return nil, errors.New("request must be a function call or metric pattern")
 	}
@@ -76,8 +74,11 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	fn := fdef.constr()
 
 	args, _ := fn.Signature()
-	if len(e.args) != len(args) {
-		return nil, ErrArgumentBadType
+	if len(e.args) < len(args) {
+		return nil, ErrMissingArg
+	}
+	if len(e.args) > len(args) {
+		return nil, ErrTooManyArg
 	}
 	for i, argGot := range e.args {
 		// we can't do extensive, accurate validation here because what the output from a function we depend on
@@ -86,23 +87,23 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 		switch argExp {
 		case series:
 			if argGot.etype != etName && argGot.etype != etFunc {
-				return nil, ErrArgumentBadType
+				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
 			}
 		case seriesList:
 			if argGot.etype != etName && argGot.etype != etFunc {
-				return nil, ErrArgumentBadType
+				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
 			}
 		case integer:
 			if argGot.etype != etConst {
-				return nil, ErrArgumentBadType
+				return nil, ErrBadArgumentStr{"int", string(argGot.etype)}
 			}
 		case float:
 			if argGot.etype != etConst {
-				return nil, ErrArgumentBadType
+				return nil, ErrBadArgumentStr{"float", string(argGot.etype)}
 			}
 		case str:
 			if argGot.etype != etString {
-				return nil, ErrArgumentBadType
+				return nil, ErrBadArgumentStr{"string", string(argGot.etype)}
 			}
 		}
 	}

@@ -1,6 +1,9 @@
 package expr
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -27,7 +30,7 @@ func (s FuncSumSeries) Depends(from, to uint32) (uint32, uint32) {
 func (s FuncSumSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
 	series, ok := in[0].([]models.Series)
 	if !ok {
-		return nil, ErrArgumentBadType
+		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
 	}
 	if len(series) == 1 {
 		return []interface{}{series[0]}, nil
@@ -38,11 +41,16 @@ func (s FuncSumSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([
 			Ts:  series[0].Datapoints[i].Ts,
 			Val: 0,
 		}
-		for j := 1; j < len(series); j++ {
+		for j := 0; j < len(series); j++ {
 			point.Val += series[j].Datapoints[i].Val
 		}
 		out = append(out, point)
 	}
-	cache[Req{}] = append(cache[Req{}], out)
-	return []interface{}{out}, nil
+	output := models.Series{
+		Target:     fmt.Sprintf("sumSeries(%s)", "foo"),
+		Datapoints: out,
+		Interval:   series[0].Interval,
+	}
+	cache[Req{}] = append(cache[Req{}], output)
+	return []interface{}{output}, nil
 }
