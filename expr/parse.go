@@ -251,7 +251,6 @@ FOR:
 		return s, ""
 	}
 
-
 	return s[:i], s[i:]
 }
 
