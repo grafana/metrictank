@@ -40,8 +40,7 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([
 	for i := 0; i < len(series[0].Datapoints); i++ {
 		num := 0
 		sum := float64(0)
-		var j int
-		for j = 0; j < len(series); j++ {
+		for j := 0; j < len(series); j++ {
 			p := series[j].Datapoints[i].Val
 			if !math.IsNaN(p) {
 				num++
@@ -49,7 +48,7 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([
 			}
 		}
 		point := schema.Point{
-			Ts: series[j].Datapoints[i].Ts,
+			Ts: series[0].Datapoints[i].Ts,
 		}
 		if num == 0 {
 			point.Val = math.NaN()

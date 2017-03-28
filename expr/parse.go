@@ -44,6 +44,8 @@ type MetricRequest struct {
 	Until  int32
 }
 
+// ParseMany parses a slice of strings into a slice of expressions (recursively)
+// not included: validation that requested functions exist, correct args are passed, etc.
 func ParseMany(targets []string) ([]*expr, error) {
 	var out []*expr
 	for _, target := range targets {

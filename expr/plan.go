@@ -42,11 +42,12 @@ func (p Plan) Dump(w io.Writer) {
 	fmt.Fprintf(w, "To: %d\n", p.To)
 }
 
-// Plan validates the expression and comes up with the initial (potentially non-optimal) execution plan
+// Plan validates the expressions and comes up with the initial (potentially non-optimal) execution plan
+// which is just a list of requests and the expressions.
 // traverse tree and as we go down:
-// make sure function exists
-// * tentative validation pre function call,
-// * let function validate input arguments further
+// * make sure function exists
+// * tentative validation pre function call (number of args and type of args, to the extent it can be done in advance),
+// * let function validate input arguments further (to the extend it can be done in advance)
 // * allow functions to extend the notion of which data is required
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
 func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan, error) {
@@ -143,6 +144,7 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	return reqs, nil
 }
 
+// Run invokes all processing as specified in the plan (expressions, from/to) with the input as input
 func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 	var out []models.Series
 	p.input = input
@@ -173,8 +175,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 	// here e.type is guaranteed to be etFunc
 	fdef, ok := funcs[e.target]
 	if !ok {
-		// this case should never happen since should have been validated before
-		panic(ErrUnknownFunction(e.target))
+		panic(fmt.Sprintf("cannot find func %q. this should never happen as we should have validated function existence earlier", e.target))
 	}
 	fn := fdef.constr()
 	err := fn.Init(e.args)
@@ -193,6 +194,11 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 				return nil, err
 			}
 			results[i] = result
+		} else if arg.etype == etString {
+			results[i] = arg.valStr
+		} else {
+			// etype == etConst
+			results[i] = arg.val
 		}
 	}
 	// we now have all our args and can process the data and return

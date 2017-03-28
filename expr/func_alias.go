@@ -7,7 +7,6 @@ import (
 )
 
 type FuncAlias struct {
-	alias string
 }
 
 func NewAlias() Func {
@@ -19,7 +18,6 @@ func (s FuncAlias) Signature() ([]argType, []argType) {
 }
 
 func (s FuncAlias) Init(args []*expr) error {
-	s.alias = args[1].valStr
 	return nil
 }
 
@@ -34,8 +32,8 @@ func (s FuncAlias) Exec(cache map[Req][]models.Series, in ...interface{}) ([]int
 	}
 	var out []interface{}
 	for _, serie := range series {
-		serie.Target = s.alias
-		out = append(out, s)
+		serie.Target = in[1].(string)
+		out = append(out, serie)
 	}
 	return out, nil
 }

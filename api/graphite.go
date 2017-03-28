@@ -461,6 +461,7 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 	return resp.DeletedDefs, nil
 }
 
+// executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
 func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
