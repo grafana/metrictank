@@ -51,8 +51,12 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 
 			req.Archive = i
 			req.TTL = uint32(ret.MaxRetention())
-			req.ArchInterval = uint32(ret.SecondsPerPoint)
-
+			if i == 0 {
+				// The first retention is raw data, so use its native interval
+				req.ArchInterval = req.RawInterval
+			} else {
+				req.ArchInterval = uint32(ret.SecondsPerPoint)
+			}
 			if now-req.TTL <= req.From {
 				break
 			}
