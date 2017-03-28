@@ -16,7 +16,7 @@ func NewSumSeries() Func {
 }
 
 func (s FuncSumSeries) Signature() ([]argType, []argType) {
-	return []argType{seriesList}, []argType{series}
+	return []argType{seriesLists}, []argType{series}
 }
 
 func (s FuncSumSeries) Init(args []*expr) error {
@@ -27,12 +27,18 @@ func (s FuncSumSeries) Depends(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncSumSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
-	series, ok := in[0].([]models.Series)
-	if !ok {
-		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
+func (s FuncSumSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}) ([]interface{}, error) {
+	var series []models.Series
+	for _, input := range inputs {
+		seriesList, ok := input.([]models.Series)
+		if !ok {
+			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
+		}
+		series = append(series, seriesList...)
+
 	}
 	if len(series) == 1 {
+		series[0].Target = fmt.Sprintf("sumSeries(%s)", series[0].QueryPatt)
 		return []interface{}{series[0]}, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
@@ -47,7 +53,7 @@ func (s FuncSumSeries) Exec(cache map[Req][]models.Series, in ...interface{}) ([
 		out = append(out, point)
 	}
 	output := models.Series{
-		Target:     fmt.Sprintf("sumSeries(%s)", "foo"),
+		Target:     fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series)),
 		Datapoints: out,
 		Interval:   series[0].Interval,
 	}

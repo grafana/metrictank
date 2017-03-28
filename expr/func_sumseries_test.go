@@ -5,96 +5,119 @@ import (
 	"testing"
 
 	"github.com/raintank/metrictank/api/models"
-	"gopkg.in/raintank/schema.v1"
 )
 
 func TestSumSeriesIdentity(t *testing.T) {
 	testSumSeries(
 		"identity",
-		[]models.Series{
+		[][]models.Series{
 			{
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: 10, Ts: 20},
-					{Val: 100, Ts: 30},
-					{Val: 5.5, Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: 1234567890, Ts: 60},
+				{
+					QueryPatt:  "single",
+					Datapoints: getCopy(a),
 				},
 			},
 		},
 		models.Series{
-			Datapoints: []schema.Point{
-				{Val: 0, Ts: 10},
-				{Val: 10, Ts: 20},
-				{Val: 100, Ts: 30},
-				{Val: 5.5, Ts: 40},
-				{Val: math.NaN(), Ts: 50},
-				{Val: 1234567890, Ts: 60},
-			},
+			Target:     "sumSeries(single)",
+			Datapoints: getCopy(a),
 		},
 		t,
 	)
 }
-func TestSumSeriesMultiple(t *testing.T) {
+func TestSumSeriesQueryToSingle(t *testing.T) {
 	testSumSeries(
-		"sum-multiple",
-		[]models.Series{
+		"query-to-single",
+		[][]models.Series{
 			{
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: 10, Ts: 20},
-					{Val: 100, Ts: 30},
-					{Val: 5.5, Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-					{Val: 0, Ts: 70},
-				},
-			},
-			{
-				Datapoints: []schema.Point{
-					{Val: 20, Ts: 10},
-					{Val: 10, Ts: 20},
-					{Val: 155.5, Ts: 30},
-					{Val: 5.5, Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: 1234567890, Ts: 60},
-					{Val: math.NaN(), Ts: 70},
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(a),
 				},
 			},
 		},
 		models.Series{
-			Datapoints: []schema.Point{
-				{Val: 20, Ts: 10},
-				{Val: 20, Ts: 20},
-				{Val: 255.5, Ts: 30},
-				{Val: 11, Ts: 40},
-				{Val: math.NaN(), Ts: 50},
-				{Val: math.NaN(), Ts: 60},
-				{Val: math.NaN(), Ts: 70},
+			Target:     "sumSeries(foo.*)",
+			Datapoints: getCopy(a),
+		},
+		t,
+	)
+}
+func TestSumSeriesMultipleSameQuery(t *testing.T) {
+	testSumSeries(
+		"sum-multiple-series",
+		[][]models.Series{
+			{
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(a),
+				},
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(b),
+				},
 			},
+		},
+		models.Series{
+			Target:     "sumSeries(foo.*)",
+			Datapoints: getCopy(sumab),
+		},
+		t,
+	)
+}
+func TestSumSeriesMultipleDiffQuery(t *testing.T) {
+	testSumSeries(
+		"sum-multiple-serieslists",
+		[][]models.Series{
+			{
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(a),
+				},
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(b),
+				},
+			},
+			{
+				{
+					QueryPatt:  "movingAverage(bar, '1min')",
+					Datapoints: getCopy(c),
+				},
+			},
+		},
+		models.Series{
+			Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
+			Datapoints: getCopy(sumabc),
 		},
 		t,
 	)
 }
 
-func testSumSeries(name string, in []models.Series, out models.Series, t *testing.T) {
+func testSumSeries(name string, in [][]models.Series, out models.Series, t *testing.T) {
 	f := NewSumSeries()
-	got, err := f.Exec(make(map[Req][]models.Series), interface{}(in))
+	var input []interface{}
+	for _, i := range in {
+		input = append(input, i)
+	}
+	got, err := f.Exec(make(map[Req][]models.Series), input...)
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
-	o, ok := got[0].(models.Series)
+	g, ok := got[0].(models.Series)
 	if !ok {
 		t.Fatalf("case %q: expected sum output of models.Series type", name)
 	}
-	if len(o.Datapoints) != len(out.Datapoints) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(o.Datapoints))
+	if g.Target != out.Target {
+		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
 	}
-	for j, p := range o.Datapoints {
+	if len(g.Datapoints) != len(out.Datapoints) {
+		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
+	}
+	for j, p := range g.Datapoints {
 		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out.Datapoints[j].Val)
 		if (bothNaN || p.Val == out.Datapoints[j].Val) && p.Ts == out.Datapoints[j].Ts {
 			continue

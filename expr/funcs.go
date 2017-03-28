@@ -8,9 +8,10 @@ type argType uint8
 const (
 	series argType = iota
 	seriesList
-	integer // number without decimals
-	float   // number potentially with decimals
-	str     // string
+	seriesLists // one or multiple seriesLists
+	integer     // number without decimals
+	float       // number potentially with decimals
+	str         // string
 )
 
 type Func interface {

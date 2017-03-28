@@ -91,17 +91,21 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 
 	fn := fdef.constr()
 
-	args, _ := fn.Signature()
-	if len(e.args) < len(args) {
+	// note that signature may have seriesLists in it, which means one or more args of type seriesList
+	// so it's legal to have more e.args then (signature) args in that case.
+	argsExp, _ := fn.Signature()
+	if len(e.args) < len(argsExp) {
 		return nil, ErrMissingArg
 	}
-	if len(e.args) > len(args) {
-		return nil, ErrTooManyArg
-	}
-	for i, argGot := range e.args {
-		// we can't do extensive, accurate validation here because what the output from a function we depend on
-		// might be dynamically typed.
-		argExp := args[i]
+	// j tracks pos in e.args of next given arg to process
+	j := 0
+	for _, argExp := range argsExp {
+		// we can't do extensive, accurate validation of the type here because what the output from a function we depend on
+		// might be dynamically typed. e.g. movingAvg returns 1..N series depending on how many it got as input
+		if len(e.args) <= j {
+			return nil, ErrMissingArg
+		}
+		argGot := e.args[j]
 		switch argExp {
 		case series:
 			if argGot.etype != etName && argGot.etype != etFunc {
@@ -110,6 +114,14 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 		case seriesList:
 			if argGot.etype != etName && argGot.etype != etFunc {
 				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
+			}
+		case seriesLists:
+			if argGot.etype != etName && argGot.etype != etFunc {
+				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
+			}
+			// special case! consume all subsequent args (if any) in e.args that will also yield a seriesList
+			for len(e.args) > j+1 && (e.args[j+1].etype == etName || e.args[j+1].etype == etFunc) {
+				j += 1
 			}
 		case integer:
 			if argGot.etype != etConst {
@@ -124,6 +136,11 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 				return nil, ErrBadArgumentStr{"string", string(argGot.etype)}
 			}
 		}
+		j += 1
+	}
+	// when we stop iterating, j should be a non-existant pos
+	if len(e.args) > j {
+		return nil, ErrTooManyArg
 	}
 	err := fn.Init(e.args)
 	if err != nil {
