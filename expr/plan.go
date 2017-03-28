@@ -2,6 +2,8 @@ package expr
 
 import (
 	"errors"
+	"fmt"
+	"io"
 
 	"github.com/raintank/metrictank/api/models"
 )
@@ -23,6 +25,21 @@ type Plan struct {
 	// 1) reuse partial calculations e.g. queries like target=movingAvg(sum(foo), 10)&target=sum(foo)A (TODO)
 	// 2) central place to return data back to pool when we're done.
 	generated map[Req][]models.Series
+}
+
+func (p Plan) Dump(w io.Writer) {
+	fmt.Fprintf(w, "Plan:\n")
+	fmt.Fprintf(w, "* Exprs:\n")
+	for _, e := range p.exprs {
+		fmt.Fprintln(w, e.Print(2))
+	}
+	fmt.Fprintf(w, "* Reqs:\n")
+	for _, r := range p.Reqs {
+		fmt.Fprintln(w, "   ", r)
+	}
+	fmt.Fprintf(w, "MaxDataPoints: %d\n", p.MaxDataPoints)
+	fmt.Fprintf(w, "From: %d\n", p.From)
+	fmt.Fprintf(w, "To: %d\n", p.To)
 }
 
 // Plan validates the expression and comes up with the initial (potentially non-optimal) execution plan
