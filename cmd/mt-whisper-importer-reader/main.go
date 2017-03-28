@@ -173,11 +173,13 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 
-		_, err = client.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
 			continue
 		}
+
+		resp.Body.Close()
 	}
 	wg.Done()
 }
