@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
@@ -43,12 +44,19 @@ func (s FuncSumSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
+		nan := true
 		point := schema.Point{
 			Ts:  series[0].Datapoints[i].Ts,
 			Val: 0,
 		}
 		for j := 0; j < len(series); j++ {
-			point.Val += series[j].Datapoints[i].Val
+			if !math.IsNaN(series[j].Datapoints[i].Val) {
+				point.Val += series[j].Datapoints[i].Val
+				nan = false
+			}
+		}
+		if nan {
+			point.Val = math.NaN()
 		}
 		out = append(out, point)
 	}

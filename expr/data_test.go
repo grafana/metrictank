@@ -38,17 +38,17 @@ var sumab = []schema.Point{
 	{Val: math.MaxFloat64, Ts: 20},
 	{Val: math.MaxFloat64 - 14.5, Ts: 30},
 	{Val: math.NaN(), Ts: 40},
-	{Val: math.NaN(), Ts: 50},
-	{Val: math.NaN(), Ts: 60},
+	{Val: 1234567890, Ts: 50}, // graphite says 5+null=5 not null
+	{Val: 1234567890, Ts: 60},
 }
 
 var sumabc = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64, Ts: 20},
 	{Val: math.MaxFloat64 - 13.5, Ts: 30},
-	{Val: math.NaN(), Ts: 40},
-	{Val: math.NaN(), Ts: 50},
-	{Val: math.NaN(), Ts: 60},
+	{Val: 2, Ts: 40},
+	{Val: 1234567893, Ts: 50},
+	{Val: 1234567894, Ts: 60},
 }
 
 var avgab = []schema.Point{
