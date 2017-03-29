@@ -13,17 +13,17 @@ import (
 // testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
 func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
-	origMaxPointsPerTarget := maxPointsPerTarget
+	oriMaxPointsPerReqSoft := maxPointsPerReqSoft
 
 	for _, ret := range retentions {
 		schemas = append(schemas, conf.Schema{
 			Pattern:    regexp.MustCompile(".*"),
 			Retentions: conf.Retentions(ret),
 		})
-		// make sure maxPointsPerTarget is high enough
+		// make sure maxPointsPerReqSoft is high enough
 		points := int(reqs[0].To-reqs[0].From) / ret[0].SecondsPerPoint
-		if points > maxPointsPerTarget {
-			maxPointsPerTarget = points
+		if points > maxPointsPerReqSoft {
+			maxPointsPerReqSoft = points
 		}
 	}
 
@@ -42,7 +42,7 @@ func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []model
 		}
 	}
 
-	maxPointsPerTarget = origMaxPointsPerTarget
+	maxPointsPerReqSoft = oriMaxPointsPerReqSoft
 }
 
 // 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it
@@ -371,9 +371,11 @@ func TestAlignRequestsHuh(t *testing.T) {
 var hour uint32 = 60 * 60
 var day uint32 = 24 * hour
 
-func testMaxPointsPerTarget(maxPoints int, reqs []models.Req, t *testing.T) ([]models.Req, error) {
-	origMaxPointsPerTarget := maxPointsPerTarget
-	maxPointsPerTarget = maxPoints
+func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t *testing.T) ([]models.Req, error) {
+	origMaxPointsPerReqSoft := maxPointsPerReqSoft
+	origMaxPointsPerReqHard := maxPointsPerReqHard
+	maxPointsPerReqSoft = maxPointsSoft
+	maxPointsPerReqHard = maxPointsHard
 
 	mdata.Schemas = []conf.Schema{{
 		Pattern: regexp.MustCompile(".*"),
@@ -385,7 +387,8 @@ func testMaxPointsPerTarget(maxPoints int, reqs []models.Req, t *testing.T) ([]m
 	}}
 
 	out, err := alignRequests(30*day, reqs)
-	maxPointsPerTarget = origMaxPointsPerTarget
+	maxPointsPerReqSoft = origMaxPointsPerReqSoft
+	maxPointsPerReqHard = origMaxPointsPerReqHard
 	return out, err
 }
 
@@ -394,9 +397,9 @@ func TestGettingOneNextBiggerAgg(t *testing.T) {
 		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
 	}
 
-	// without maxPointsPerTarget = 23*hour we'd get archive 0 for this request,
+	// without maxPointsPerReqSoft = 23*hour we'd get archive 0 for this request,
 	// with it we expect the aggregation to get bumped to the next one
-	out, err := testMaxPointsPerTarget(int(23*hour), reqs, t)
+	out, err := testMaxPointsPerReq(int(23*hour), 0, reqs, t)
 	if err != nil {
 		t.Fatalf("expected to get no error")
 	}
@@ -410,9 +413,9 @@ func TestGettingTwoNextBiggerAgg(t *testing.T) {
 		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
 	}
 
-	// maxPointsPerTarget only allows 24 points, so the aggregation 2 with
+	// maxPointsPerReqSoft only allows 24 points, so the aggregation 2 with
 	// 3600 SecondsPerPoint should be chosen for our request of 1 day
-	out, err := testMaxPointsPerTarget(24, reqs, t)
+	out, err := testMaxPointsPerReq(24, 0, reqs, t)
 	if err != nil {
 		t.Fatalf("expected to get no error")
 	}
@@ -421,15 +424,14 @@ func TestGettingTwoNextBiggerAgg(t *testing.T) {
 	}
 }
 
-func TestGettingError(t *testing.T) {
+func TestMaxPointsPerReqHardLimit(t *testing.T) {
 	reqs := []models.Req{
 		reqOut("a", 29*day, 30*day, 30*day, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
 	}
-
 	// we're requesting one day and the lowest resolution aggregation has 3600 seconds per point,
-	// so there should be an error because we only allow max 23 points per target
-	_, err := testMaxPointsPerTarget(23, reqs, t)
-	if err != errMaxPointsPerTarget {
+	// so there should be an error because we only allow max 23 points per request
+	_, err := testMaxPointsPerReq(22, 23, reqs, t)
+	if err != errMaxPointsPerReq {
 		t.Fatalf("expected to get an error")
 	}
 }
