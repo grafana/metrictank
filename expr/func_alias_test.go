@@ -2,6 +2,7 @@ package expr
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/raintank/metrictank/api/models"
@@ -98,5 +99,37 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 			}
 			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, p, g.Datapoints[j])
 		}
+	}
+}
+
+func BenchmarkAlias1M_1(b *testing.B) {
+	benchmarkAlias1M(b, 1)
+}
+func BenchmarkAlias1M_10(b *testing.B) {
+	benchmarkAlias1M(b, 10)
+}
+func BenchmarkAlias1M_100(b *testing.B) {
+	benchmarkAlias1M(b, 100)
+}
+func BenchmarkAlias1M_1000(b *testing.B) {
+	benchmarkAlias1M(b, 1000)
+}
+
+func benchmarkAlias1M(b *testing.B, numSeries int) {
+	var input []models.Series
+	for i := 0; i < numSeries; i++ {
+		series := models.Series{
+			Target: strconv.Itoa(i),
+		}
+		input = append(input, series)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f := NewAlias()
+		got, err := f.Exec(make(map[Req][]models.Series), interface{}(input), "new-name")
+		if err != nil {
+			b.Fatalf("%s", err)
+		}
+		results = got
 	}
 }

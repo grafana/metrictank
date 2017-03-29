@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"reflect"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/metrictank/test"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -1038,139 +1038,105 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	}
 }
 
-// these serve as a "cache" of clean points we can use instead of regenerating all the time
-var randFloatsWithNullsBuf []schema.Point
-var randFloatsBuf []schema.Point
-
-func randFloats() []schema.Point {
-	if len(randFloatsBuf) == 0 {
-		// let's just do the "odd" case, since the non-odd will be sufficiently close
-		randFloatsBuf = make([]schema.Point, 1000001)
-		for i := 0; i < len(randFloatsBuf); i++ {
-			randFloatsBuf[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
-		}
-	}
-	out := make([]schema.Point, len(randFloatsBuf))
-	copy(out, randFloatsBuf)
-	return out
-}
-
-func randFloatsWithNulls() []schema.Point {
-	if len(randFloatsWithNullsBuf) == 0 {
-		// let's just do the "odd" case, since the non-odd will be sufficiently close
-		randFloatsWithNullsBuf = make([]schema.Point, 1000001)
-		for i := 0; i < len(randFloatsWithNullsBuf); i++ {
-			if i%2 == 0 {
-				randFloatsWithNullsBuf[i] = schema.Point{Val: math.NaN(), Ts: uint32(i)}
-			} else {
-				randFloatsWithNullsBuf[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
-			}
-		}
-	}
-	out := make([]schema.Point, len(randFloatsBuf))
-	copy(out, randFloatsWithNullsBuf)
-	return out
-}
-
 // each "operation" is a consolidation of 1M+1 points
 func BenchmarkConsolidateAvgRand1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloats, 1, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloats1M, 1, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRandWithNulls1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 1, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRand1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloats, 2, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloats1M, 2, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRandWithNulls1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 2, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRand1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloats, 25, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloats1M, 25, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRandWithNulls1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 25, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRand1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloats, 100, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloats1M, 100, consolidation.Avg, b)
 }
 func BenchmarkConsolidateAvgRandWithNulls1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Avg, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 100, consolidation.Avg, b)
 }
 
 func BenchmarkConsolidateMinRand1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloats, 1, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloats1M, 1, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRandWithNulls1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 1, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRand1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloats, 2, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloats1M, 2, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRandWithNulls1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 2, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRand1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloats, 25, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloats1M, 25, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRandWithNulls1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 25, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRand1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloats, 100, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloats1M, 100, consolidation.Min, b)
 }
 func BenchmarkConsolidateMinRandWithNulls1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Min, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 100, consolidation.Min, b)
 }
 
 func BenchmarkConsolidateMaxRand1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloats, 1, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloats1M, 1, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRandWithNulls1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 1, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRand1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloats, 2, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloats1M, 2, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRandWithNulls1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 2, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRand1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloats, 25, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloats1M, 25, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRandWithNulls1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 25, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRand1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloats, 100, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloats1M, 100, consolidation.Max, b)
 }
 func BenchmarkConsolidateMaxRandWithNulls1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Max, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 100, consolidation.Max, b)
 }
 
 func BenchmarkConsolidateSumRand1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloats, 1, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloats1M, 1, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRandWithNulls1M_1(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 1, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 1, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRand1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloats, 2, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloats1M, 2, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRandWithNulls1M_2(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 2, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 2, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRand1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloats, 25, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloats1M, 25, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRandWithNulls1M_25(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 25, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 25, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRand1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloats, 100, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloats1M, 100, consolidation.Sum, b)
 }
 func BenchmarkConsolidateSumRandWithNulls1M_100(b *testing.B) {
-	benchmarkConsolidate(randFloatsWithNulls, 100, consolidation.Sum, b)
+	benchmarkConsolidate(test.RandFloatsWithNulls1M, 100, consolidation.Sum, b)
 }
 
 var dummy []schema.Point
@@ -1192,7 +1158,7 @@ func BenchmarkFix1M(b *testing.B) {
 	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		in := randFloats()
+		in := test.RandFloats1M()
 		l = len(in)
 		b.StartTimer()
 		out := Fix(in, 0, 1000001, 1)
@@ -1205,8 +1171,8 @@ func BenchmarkDivide1M(b *testing.B) {
 	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		ina := randFloats()
-		inb := randFloats()
+		ina := test.RandFloats1M()
+		inb := test.RandFloats1M()
 		l = len(ina)
 		b.StartTimer()
 		out := divide(ina, inb)

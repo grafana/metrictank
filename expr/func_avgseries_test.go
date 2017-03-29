@@ -2,9 +2,12 @@ package expr
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/test"
+	"gopkg.in/raintank/schema.v1"
 )
 
 func TestAvgSeriesIdentity(t *testing.T) {
@@ -124,4 +127,68 @@ func testAvgSeries(name string, in [][]models.Series, out models.Series, t *test
 		}
 		t.Fatalf("case %q: output point %d - expected %v got %v", name, j, out.Datapoints[j], p)
 	}
+}
+
+func BenchmarkAvgSeries1M_1NoNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1, test.RandFloats1M, test.RandFloats1M)
+}
+func BenchmarkAvgSeries1M_10NoNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 10, test.RandFloats1M, test.RandFloats1M)
+}
+func BenchmarkAvgSeries1M_100NoNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 100, test.RandFloats1M, test.RandFloats1M)
+}
+func BenchmarkAvgSeries1M_1000NoNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1000, test.RandFloats1M, test.RandFloats1M)
+}
+
+func BenchmarkAvgSeries1M_1SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1, test.RandFloats1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_10SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 10, test.RandFloats1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_100SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 100, test.RandFloats1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_1000SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1000, test.RandFloats1M, test.RandFloatsWithNulls1M)
+}
+
+func BenchmarkAvgSeries1M_1AllSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_10AllSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 10, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_100AllSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 100, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+}
+func BenchmarkAvgSeries1M_1000AllSeriesHalfNulls(b *testing.B) {
+	benchmarkAvgSeries1M(b, 1000, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+}
+
+func benchmarkAvgSeries1M(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+	var input []models.Series
+	for i := 0; i < numSeries; i++ {
+		series := models.Series{
+			Target: strconv.Itoa(i),
+		}
+		if i%1 == 0 {
+			series.Datapoints = fn0()
+		} else {
+			series.Datapoints = fn1()
+		}
+		input = append(input, series)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f := NewAvgSeries()
+		got, err := f.Exec(make(map[Req][]models.Series), interface{}(input))
+		if err != nil {
+			b.Fatalf("%s", err)
+		}
+		results = got
+	}
+	b.SetBytes(int64(numSeries * 1000000 * 12))
 }
