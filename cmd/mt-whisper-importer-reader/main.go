@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -139,7 +140,10 @@ func log(msg string) {
 }
 
 func processFromChan(files chan string, wg *sync.WaitGroup) {
-	client := &http.Client{}
+	transport := http.Transport{DisableKeepAlives: false}
+	client := http.Client{
+		Transport: &transport,
+	}
 
 	for file := range files {
 		fd, err := os.Open(file)
@@ -173,13 +177,20 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 
-		resp, err := client.Do(req)
+		res, err := client.Do(req)
 		if err != nil {
 			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
 			continue
 		}
 
-		resp.Body.Close()
+		io.Copy(ioutil.Discard, res.Body)
+		res.Body.Close()
+
+		if res.Status[:3] != "200" {
+			throwError(fmt.Sprintf("Http endpoint's response code is not 200: %q", res.Status))
+			continue
+		}
+
 	}
 	wg.Done()
 }
