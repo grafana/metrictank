@@ -1,9 +1,10 @@
 package api
 
 import (
-	"errors"
+	"math"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/api/response"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/metrictank/util"
@@ -18,37 +19,52 @@ var (
 	// metric api.request.render.series is the number of points the request will return.
 	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
 
-	errUnSatisfiable = errors.New("request cannot be satisfied due to lack of available retentions")
+	errUnSatisfiable   = response.NewError(404, "request cannot be satisfied due to lack of available retentions")
+	errMaxPointsPerReq = response.NewError(413, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
 func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
-
 	tsRange := (reqs[0].To - reqs[0].From)
 
 	var listIntervals []uint32
 	var seenIntervals = make(map[uint32]struct{})
+	var targets = make(map[string]struct{})
+
+	for i := range reqs {
+		req := &reqs[i]
+		req.Archive = -1
+		targets[req.Target] = struct{}{}
+	}
+	numTargets := uint32(len(targets))
+	minTTL := now - reqs[0].From
+
+	minIntervalSoft := uint32(0)
+	minIntervalHard := uint32(0)
+
+	if maxPointsPerReqSoft > 0 {
+		minIntervalSoft = uint32(math.Ceil(float64(tsRange) / (float64(maxPointsPerReqSoft) / float64(numTargets))))
+	}
+	if maxPointsPerReqHard > 0 {
+		minIntervalHard = uint32(math.Ceil(float64(tsRange) / (float64(maxPointsPerReqHard) / float64(numTargets))))
+	}
 
 	// set preliminary settings. may be adjusted further down
 	// but for now:
 	// for each req, find the highest res archive
 	// (starting with raw, then rollups in decreasing precision)
-	// that retains all the data we need.
+	// that retains all the data we need and does not exceed minIntervalSoft.
 	// fallback to lowest res option (which *should* have the longest TTL)
-
 	for i := range reqs {
 		req := &reqs[i]
 		retentions := mdata.Schemas.Get(req.SchemaId).Retentions
-		req.Archive = -1
-
 		for i, ret := range retentions {
 			// skip non-ready option.
 			if !ret.Ready {
 				continue
 			}
-
 			req.Archive = i
 			req.TTL = uint32(ret.MaxRetention())
 			if i == 0 {
@@ -57,11 +73,11 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 			} else {
 				req.ArchInterval = uint32(ret.SecondsPerPoint)
 			}
-			if now-req.TTL <= req.From {
+
+			if req.TTL >= minTTL && req.ArchInterval >= minIntervalSoft {
 				break
 			}
 		}
-
 		if req.Archive == -1 {
 			return nil, errUnSatisfiable
 		}
@@ -74,8 +90,11 @@ func alignRequests(now uint32, reqs []models.Req) ([]models.Req, error) {
 
 	// due to different retentions coming into play, different requests may end up with different resolutions
 	// we all need to emit them at the same interval, the LCM interval >= interval of the req
-
 	interval := util.Lcm(listIntervals)
+
+	if interval < minIntervalHard {
+		return nil, errMaxPointsPerReq
+	}
 
 	// now, for all our requests, set all their properties.  we may have to apply runtime consolidation to get the
 	// correct output interval if out interval != native.  In that case, we also check whether we can fulfill

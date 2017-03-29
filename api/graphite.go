@@ -23,8 +23,6 @@ import (
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
 var MissingQueryErr = errors.New("missing query param")
 var InvalidFormatErr = errors.New("invalid format specified")
-var MaxPointsPerReqErr = errors.New("request exceeds max-points-per-req limit. Reduce the number of series and or maxDataPoints requested or ask your admin to increase the limit.")
-var MaxDaysPerReqErr = errors.New("request exceeds max-days-per-req limit. Reduce the number of series and or time range requested or ask your admin to increase the limit.")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
 
 var (
@@ -164,11 +162,6 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
 	targets := request.Targets
-	if maxPointsPerReq != 0 && len(targets)*int(request.MaxDataPoints) > maxPointsPerReq {
-		response.Write(ctx, response.NewError(http.StatusForbidden, MaxPointsPerReqErr.Error()))
-		return
-	}
-
 	now := time.Now()
 
 	from := request.From
@@ -200,10 +193,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	if fromUnix >= toUnix {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
-		return
-	}
-	if maxDaysPerReq != 0 && len(targets)*int(toUnix-fromUnix) > maxDaysPerReq*(3600*24) {
-		response.Write(ctx, response.NewError(http.StatusForbidden, MaxDaysPerReqErr.Error()))
 		return
 	}
 
