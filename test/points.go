@@ -8,36 +8,45 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-// these serve as a "cache" of clean points we can use instead of regenerating all the time
-var randFloatsWithNullsBuf []schema.Point
-var randFloatsBuf []schema.Point
+// these serve as a "cache" of clean point slices - grouped by size -
+// which we can use instead of regenerating all the time
+var randFloats = make(map[int][]schema.Point)
+var randFloatsWithNulls = make(map[int][]schema.Point)
 
-func RandFloats1M() []schema.Point {
-	if len(randFloatsBuf) == 0 {
-		// let's just do the "odd" case, since the non-odd will be sufficiently close
-		randFloatsBuf = make([]schema.Point, 1000001)
-		for i := 0; i < len(randFloatsBuf); i++ {
-			randFloatsBuf[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
+func RandFloats10k() []schema.Point { return RandFloats(10000) }
+func RandFloats1M() []schema.Point  { return RandFloats(1000000) }
+
+func RandFloats(size int) []schema.Point {
+	data, ok := randFloats[size]
+	if !ok {
+		data = make([]schema.Point, size)
+		for i := 0; i < size; i++ {
+			data[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
 		}
+		randFloats[size] = data
 	}
-	out := make([]schema.Point, len(randFloatsBuf))
-	copy(out, randFloatsBuf)
+	out := make([]schema.Point, size)
+	copy(out, data)
 	return out
 }
 
-func RandFloatsWithNulls1M() []schema.Point {
-	if len(randFloatsWithNullsBuf) == 0 {
-		// let's just do the "odd" case, since the non-odd will be sufficiently close
-		randFloatsWithNullsBuf = make([]schema.Point, 1000001)
-		for i := 0; i < len(randFloatsWithNullsBuf); i++ {
+func RandFloatsWithNulls10k() []schema.Point { return RandFloatsWithNulls(10000) }
+func RandFloatsWithNulls1M() []schema.Point  { return RandFloatsWithNulls(1000000) }
+
+func RandFloatsWithNulls(size int) []schema.Point {
+	data, ok := randFloatsWithNulls[size]
+	if !ok {
+		data = make([]schema.Point, size)
+		for i := 0; i < size; i++ {
 			if i%2 == 0 {
-				randFloatsWithNullsBuf[i] = schema.Point{Val: math.NaN(), Ts: uint32(i)}
+				data[i] = schema.Point{Val: math.NaN(), Ts: uint32(i)}
 			} else {
-				randFloatsWithNullsBuf[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
+				data[i] = schema.Point{Val: rand.Float64(), Ts: uint32(i)}
 			}
 		}
+		randFloatsWithNulls[size] = data
 	}
-	out := make([]schema.Point, len(randFloatsBuf))
-	copy(out, randFloatsWithNullsBuf)
+	out := make([]schema.Point, size)
+	copy(out, data)
 	return out
 }

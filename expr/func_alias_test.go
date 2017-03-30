@@ -102,20 +102,20 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 	}
 }
 
-func BenchmarkAlias1M_1(b *testing.B) {
-	benchmarkAlias1M(b, 1)
+func BenchmarkAlias_1(b *testing.B) {
+	benchmarkAlias(b, 1)
 }
-func BenchmarkAlias1M_10(b *testing.B) {
-	benchmarkAlias1M(b, 10)
+func BenchmarkAlias_10(b *testing.B) {
+	benchmarkAlias(b, 10)
 }
-func BenchmarkAlias1M_100(b *testing.B) {
-	benchmarkAlias1M(b, 100)
+func BenchmarkAlias_100(b *testing.B) {
+	benchmarkAlias(b, 100)
 }
-func BenchmarkAlias1M_1000(b *testing.B) {
-	benchmarkAlias1M(b, 1000)
+func BenchmarkAlias_1000(b *testing.B) {
+	benchmarkAlias(b, 1000)
 }
 
-func benchmarkAlias1M(b *testing.B, numSeries int) {
+func benchmarkAlias(b *testing.B, numSeries int) {
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{

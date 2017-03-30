@@ -129,46 +129,46 @@ func testSumSeries(name string, in [][]models.Series, out models.Series, t *test
 	}
 }
 
-func BenchmarkSumSeries1M_1NoNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1, test.RandFloats1M, test.RandFloats1M)
+func BenchmarkSumSeries10k_1NoNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1, test.RandFloats10k, test.RandFloats10k)
 }
-func BenchmarkSumSeries1M_10NoNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 10, test.RandFloats1M, test.RandFloats1M)
+func BenchmarkSumSeries10k_10NoNulls(b *testing.B) {
+	benchmarkSumSeries(b, 10, test.RandFloats10k, test.RandFloats10k)
 }
-func BenchmarkSumSeries1M_100NoNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 100, test.RandFloats1M, test.RandFloats1M)
+func BenchmarkSumSeries10k_100NoNulls(b *testing.B) {
+	benchmarkSumSeries(b, 100, test.RandFloats10k, test.RandFloats10k)
 }
-func BenchmarkSumSeries1M_1000NoNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1000, test.RandFloats1M, test.RandFloats1M)
-}
-
-func BenchmarkSumSeries1M_1SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1, test.RandFloats1M, test.RandFloatsWithNulls1M)
-}
-func BenchmarkSumSeries1M_10SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 10, test.RandFloats1M, test.RandFloatsWithNulls1M)
-}
-func BenchmarkSumSeries1M_100SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 100, test.RandFloats1M, test.RandFloatsWithNulls1M)
-}
-func BenchmarkSumSeries1M_1000SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1000, test.RandFloats1M, test.RandFloatsWithNulls1M)
+func BenchmarkSumSeries10k_1000NoNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1000, test.RandFloats10k, test.RandFloats10k)
 }
 
-func BenchmarkSumSeries1M_1AllSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+func BenchmarkSumSeries10k_1SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1, test.RandFloats10k, test.RandFloatsWithNulls10k)
 }
-func BenchmarkSumSeries1M_10AllSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 10, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+func BenchmarkSumSeries10k_10SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 10, test.RandFloats10k, test.RandFloatsWithNulls10k)
 }
-func BenchmarkSumSeries1M_100AllSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 100, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+func BenchmarkSumSeries10k_100SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 100, test.RandFloats10k, test.RandFloatsWithNulls10k)
 }
-func BenchmarkSumSeries1M_1000AllSeriesHalfNulls(b *testing.B) {
-	benchmarkSumSeries1M(b, 1000, test.RandFloatsWithNulls1M, test.RandFloatsWithNulls1M)
+func BenchmarkSumSeries10k_1000SomeSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1000, test.RandFloats10k, test.RandFloatsWithNulls10k)
 }
 
-func benchmarkSumSeries1M(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func BenchmarkSumSeries10k_1AllSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
+}
+func BenchmarkSumSeries10k_10AllSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 10, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
+}
+func BenchmarkSumSeries10k_100AllSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 100, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
+}
+func BenchmarkSumSeries10k_1000AllSeriesHalfNulls(b *testing.B) {
+	benchmarkSumSeries(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
+}
+
+func benchmarkSumSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
@@ -190,5 +190,5 @@ func benchmarkSumSeries1M(b *testing.B, numSeries int, fn0, fn1 func() []schema.
 		}
 		results = got
 	}
-	b.SetBytes(int64(numSeries * 1000000 * 12))
+	b.SetBytes(int64(numSeries * len(input[0].Datapoints) * 12))
 }
