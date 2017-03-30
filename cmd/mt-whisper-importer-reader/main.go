@@ -163,6 +163,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			throwError(fmt.Sprintf("Failed to get metric: %q", err))
 			continue
 		}
+		w.Close()
 
 		b, err := met.MarshalCompressed()
 		if err != nil {
