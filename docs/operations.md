@@ -111,3 +111,30 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 
 4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads
 from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparant with large ingest rates where metrictank gets closer to saturation
+
+## Metrictank uses too much memory
+
+If metrictank consumes too much memory and you want to know why. There are a few usual suspects:
+* the ringbuffers, especially if you have high values for numchunks, chunkspan, especially for rollup archives that use many aggregation functions.
+* chunk-cache (see your max-size setting)
+* metadata index, especially if you have many series.
+
+To get insights into memory usage:
+1) use the grafana dashboard.  If memory grows significantly at a given point, figure out what happened at that point (were new metrics ingested into the system?)
+2) use the profiletrigger: this automatically collects profiles when memory usage reaches a certain point (see `proftrigger-*` settings)
+3) if you want to understand memory usage "right now", you can take a live profile. This is fairly easy and only requires you have the `go` tool installed.
+   It has a very low, usually insignificant resource impact. Unless you have set up a low, non-default value for `mem-profile-rate` in your config. 
+
+Taking a profile:
+```
+wget http://localhost:6060/debug/pprof/heap
+go tool pprof <path-to-binary> heap
+```
+It is very important that you use the correct metrictank binary. It should not be a different version.
+
+The `go tool pprof` command will give you a command prompt.  
+* type `top30` to get a good idea of where memory is spent. The first columns (`flat` and `flat%`) show memory used by just that code. The last colum (`cum` and `cum%` show memory used by that code and everything called from it. (which is why certain things like the input plugins use a lot of memory cumulatively, because all data being added to the memory cache originates from that code path)
+* type `web` to see a visual representation in the browser, which can show how code calls each other
+* type `list <regex matching type and function name>` to see a breakdown of lines of code of a function, along with the memory allocated by each line. (e.g. `list chunk.New`)
+Type exit (or ctrl-D) to exit the prompt.
+For more information on profiling see the excellent [Profiling Go Programs](https://blog.golang.org/profiling-go-programs) article.
