@@ -39,7 +39,7 @@ mkdir -p ${BUILD}/etc/metrictank
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
@@ -60,8 +60,8 @@ mkdir -p ${BUILD}/var/run/raintank
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
@@ -80,8 +80,8 @@ mkdir -p ${BUILD}/var/run/raintank
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
@@ -100,8 +100,8 @@ mkdir -p ${BUILD}/etc/metrictank
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/metrictank ${BUILD}/usr/sbin/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
 PACKAGE_NAME="${BUILD}/metrictank-${VERSION}.el6.${ARCH}.rpm"
 fpm -s dir -t rpm \
