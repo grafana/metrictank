@@ -8,7 +8,7 @@ cd ${DIR}
 VERSION=`git describe --always`
 
 mkdir -p build
-cp ../build/metrictank build/
+cp ../build/* build/
 
 docker build -t raintank/metrictank .
 docker tag raintank/metrictank raintank/metrictank:latest
