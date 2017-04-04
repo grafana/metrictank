@@ -26,7 +26,6 @@ type NotifierNSQ struct {
 	buf      []mdata.SavedChunk
 	instance string
 	mdata.Notifier
-	idx idx.MetricIndex
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierNSQ {
@@ -57,8 +56,8 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 		Notifier: mdata.Notifier{
 			Instance: instance,
 			Metrics:  metrics,
+			Idx:      idx,
 		},
-		idx: idx,
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
@@ -82,7 +81,7 @@ func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
 }
 
 func (c *NotifierNSQ) Send(sc mdata.SavedChunk) {
-	def, ok := c.idx.Get(strings.SplitN(sc.Key, "_", 2)[0])
+	def, ok := c.Idx.Get(strings.SplitN(sc.Key, "_", 2)[0])
 	if !ok {
 		log.Error(3, "nsq-cluster: failed to lookup metricDef with id %s", sc.Key)
 		return

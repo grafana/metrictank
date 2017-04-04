@@ -21,13 +21,13 @@ func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []model
 			Retentions: conf.Retentions(ret),
 		})
 		// make sure maxPointsPerReqSoft is high enough
-		points := int(reqs[0].To-reqs[0].From) / ret[0].SecondsPerPoint
+		points := (int(reqs[0].To-reqs[0].From) / ret[0].SecondsPerPoint) * len(reqs)
 		if points > maxPointsPerReqSoft {
 			maxPointsPerReqSoft = points
 		}
 	}
 
-	mdata.Schemas = conf.Schemas(schemas)
+	mdata.Schemas = conf.NewSchemas(schemas)
 	out, err := alignRequests(now, reqs)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
@@ -136,6 +136,50 @@ func TestAlignRequestsBasicBestEffort(t *testing.T) {
 	)
 }
 
+// 2 series requested with different raw intervals from the same schemas. Both requests should use the 60second rollups
+func TestAlignRequestsMultipleIntervalsPerSchema(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(1, 800, 0, 0, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 60, 800, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
+		},
+		nil,
+		1200,
+		t,
+	)
+}
+
+// 2 series requested with different raw intervals from the same schemas. Both requests should use raw
+func TestAlignRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
+		reqRaw("b", 0, 30, 800, 30, consolidation.Avg, 0, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(10, 800, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, true),
+			},
+		},
+		[]models.Req{
+			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 30, 3),
+			reqOut("b", 0, 30, 800, 30, consolidation.Avg, 0, 0, 0, 30, 800, 30, 1),
+		},
+		nil,
+		800,
+		t,
+	)
+}
+
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. one has short raw. other has short raw + good rollup
 func TestAlignRequestsHalfGood(t *testing.T) {
 	testAlign([]models.Req{
@@ -164,7 +208,7 @@ func TestAlignRequestsHalfGood(t *testing.T) {
 func TestAlignRequestsGoodRollup(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -178,7 +222,7 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 0, 1, 120, 1200, 120, 1),
 		},
 		nil,
 		1200,
@@ -190,7 +234,7 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -204,7 +248,7 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 100, 1200, 600, 6),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 600, 1200, 600, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 0, 1, 600, 1200, 600, 1),
 		},
 		nil,
 		1200,
@@ -216,7 +260,7 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 func TestAlignRequestsWeird(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -229,7 +273,7 @@ func TestAlignRequestsWeird(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 60, 1200, 60, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 0, 0, 60, 1200, 60, 1),
 		},
 		nil,
 		1200,
@@ -241,7 +285,7 @@ func TestAlignRequestsWeird(t *testing.T) {
 func TestAlignRequestsWeird2(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -255,7 +299,7 @@ func TestAlignRequestsWeird2(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 0, 1, 120, 1200, 120, 1),
 		},
 		nil,
 		1200,
@@ -267,7 +311,7 @@ func TestAlignRequestsWeird2(t *testing.T) {
 func TestAlignRequestsNoOtherChoice(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -281,7 +325,7 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1199, 120, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 120, 1199, 120, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 2, 0, 1, 120, 1199, 120, 1),
 		},
 		nil,
 		1200,
@@ -293,7 +337,7 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 func TestAlignRequests3rdBand(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -308,7 +352,7 @@ func TestAlignRequests3rdBand(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 2, 240, 1200, 240, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 1, 240, 1200, 240, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 3, 0, 1, 240, 1200, 240, 1),
 		},
 		nil,
 		1200,
@@ -320,7 +364,7 @@ func TestAlignRequests3rdBand(t *testing.T) {
 func TestAlignRequests2RollupsDisabled(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -335,7 +379,7 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 1100, 60, 6),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 3, 0, 0, 60, 1100, 60, 1),
 		},
 		nil,
 		1200,
@@ -345,7 +389,7 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 func TestAlignRequestsHuh(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw("a", 0, 30, 800, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 1, 0),
+		reqRaw("b", 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
 		[][]conf.Retention{
 			{
@@ -360,7 +404,7 @@ func TestAlignRequestsHuh(t *testing.T) {
 		},
 		[]models.Req{
 			reqOut("a", 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1080, 120, 1),
-			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 120, 2),
+			reqOut("b", 0, 30, 800, 60, consolidation.Avg, 3, 0, 0, 60, 1100, 120, 2),
 		},
 		nil,
 		1200,
@@ -377,14 +421,14 @@ func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t 
 	maxPointsPerReqSoft = maxPointsSoft
 	maxPointsPerReqHard = maxPointsHard
 
-	mdata.Schemas = []conf.Schema{{
+	mdata.Schemas = conf.NewSchemas([]conf.Schema{{
 		Pattern: regexp.MustCompile(".*"),
 		Retentions: conf.Retentions([]conf.Retention{
 			conf.NewRetentionMT(1, 2*day, 600, 2, true),
 			conf.NewRetentionMT(60, 7*day, 600, 2, true),
 			conf.NewRetentionMT(3600, 30*day, 600, 2, true),
 		}),
-	}}
+	}})
 
 	out, err := alignRequests(30*day, reqs)
 	maxPointsPerReqSoft = origMaxPointsPerReqSoft
@@ -442,10 +486,10 @@ func BenchmarkAlignRequests(b *testing.B) {
 	var res []models.Req
 	reqs := []models.Req{
 		reqRaw("a", 0, 3600*24*7, 1000, 10, consolidation.Avg, 0, 0),
-		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg, 1, 0),
-		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg, 2, 0),
+		reqRaw("b", 0, 3600*24*7, 1000, 30, consolidation.Avg, 4, 0),
+		reqRaw("c", 0, 3600*24*7, 1000, 60, consolidation.Avg, 8, 0),
 	}
-	mdata.Schemas = conf.Schemas([]conf.Schema{
+	mdata.Schemas = conf.NewSchemas([]conf.Schema{
 		{
 			Pattern: regexp.MustCompile("a"),
 			Retentions: conf.Retentions(

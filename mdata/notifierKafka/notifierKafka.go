@@ -29,7 +29,6 @@ type NotifierKafka struct {
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
 	mdata.Notifier
-	idx   idx.MetricIndex
 	bPool *util.BufferPool
 }
 
@@ -65,10 +64,10 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 			Instance:             instance,
 			Metrics:              metrics,
 			CreateMissingMetrics: true,
+			Idx:                  idx,
 		},
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
-		idx:           idx,
 		bPool:         util.NewBufferPool(),
 	}
 	c.start()
@@ -230,7 +229,7 @@ func (c *NotifierKafka) flush() {
 	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
 	var pMsg mdata.PersistMessageBatch
 	for i, msg := range c.buf {
-		def, ok := c.idx.Get(strings.SplitN(msg.Key, "_", 2)[0])
+		def, ok := c.Idx.Get(strings.SplitN(msg.Key, "_", 2)[0])
 		if !ok {
 			log.Error(3, "kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
 			continue
@@ -239,6 +238,7 @@ func (c *NotifierKafka) flush() {
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		encoder := json.NewEncoder(buf)
 		c.buf[i].Name = def.Name
+		c.buf[i].Interval = def.Interval
 		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
 		err := encoder.Encode(&pMsg)
 		if err != nil {

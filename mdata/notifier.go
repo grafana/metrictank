@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -30,6 +31,7 @@ type PersistMessage struct {
 	Key      string `json:"key"`
 	Name     string `json:"name"`
 	T0       uint32 `json:"t0"`
+	Interval int    `json:"interval"`
 }
 
 type PersistMessageBatch struct {
@@ -41,7 +43,8 @@ type SavedChunk struct {
 	Key string `json:"key"`
 	T0  uint32 `json:"t0"`
 
-	Name string `json:"name"` // filled in when handler does index lookup
+	Name     string `json:"name"`     // filled in when handler does index lookup
+	Interval int    `json:"interval"` // filled in when handler does index lookup
 }
 
 func SendPersistMessage(key string, t0 uint32) {
@@ -59,6 +62,7 @@ type Notifier struct {
 	Instance             string
 	Metrics              Metrics
 	CreateMissingMetrics bool
+	Idx                  idx.MetricIndex
 }
 
 func (cl Notifier) Handle(data []byte) {
@@ -84,8 +88,17 @@ func (cl Notifier) Handle(data []byte) {
 					continue
 				}
 			}
+			if c.Name == "" || c.Interval == 0 {
+				def, ok := cl.Idx.Get(key[0])
+				if !ok {
+					log.Error(3, "notifier: failed to lookup metricDef with id %s", key[0])
+					continue
+				}
+				c.Name = def.Name
+				c.Interval = def.Interval
+			}
 			if cl.CreateMissingMetrics {
-				schemaId, _ := MatchSchema(c.Name)
+				schemaId, _ := MatchSchema(c.Name, c.Interval)
 				aggId, _ := MatchAgg(c.Name)
 				agg := cl.Metrics.GetOrCreate(key[0], c.Name, schemaId, aggId)
 				if len(key) == 3 {
@@ -109,10 +122,20 @@ func (cl Notifier) Handle(data []byte) {
 			log.Error(3, "notifier: skipping message due to parsing failure. %s", err)
 			return
 		}
+		if ms.Name == "" || ms.Interval == 0 {
+			key := strings.SplitN(ms.Key, "_", 2)[0]
+			def, ok := cl.Idx.Get(key)
+			if !ok {
+				log.Error(3, "notifier: failed to lookup metricDef with id %s", key)
+				return
+			}
+			ms.Name = def.Name
+			ms.Interval = def.Interval
+		}
 		messagesReceived.Add(1)
 		// get metric
 		if cl.CreateMissingMetrics {
-			schemaId, _ := MatchSchema(ms.Name)
+			schemaId, _ := MatchSchema(ms.Name, ms.Interval)
 			aggId, _ := MatchAgg(ms.Name)
 			agg := cl.Metrics.GetOrCreate(ms.Key, ms.Name, schemaId, aggId)
 			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
