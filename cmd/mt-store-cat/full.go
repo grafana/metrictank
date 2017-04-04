@@ -21,38 +21,19 @@ func (t TablesByTTL) Less(i, j int) bool {
 	return iTTL < jTTL
 }
 
-type Metric struct {
-	id   string
-	name string
-}
-
-type MetricsByName []Metric
-
-func (m MetricsByName) Len() int           { return len(m) }
-func (m MetricsByName) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
-func (m MetricsByName) Less(i, j int) bool { return m[i].name < m[j].name }
-
 func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) error {
-	var targets []Metric
-
+	var metrics []Metric
+	var err error
 	if prefix == "" {
 		fmt.Println("# Looking for ALL metrics")
 	} else {
 		fmt.Println("# Looking for these metrics:")
-		iter := store.Session.Query("select id,metric from metric_idx").Iter()
-		var id, metric string
-		for iter.Scan(&id, &metric) {
-			if strings.HasPrefix(metric, prefix) {
-				targets = append(targets, Metric{id, metric})
-			}
-		}
-		err := iter.Close()
+		metrics, err := getMetrics(store, prefix)
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
 			return err
 		}
-		sort.Sort(MetricsByName(targets))
-		for _, m := range targets {
+		for _, m := range metrics {
 			fmt.Println(m.id, m.name)
 		}
 	}
@@ -87,9 +68,9 @@ func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) er
 			iter := store.Session.Query(query).Iter()
 			showKeyTTL(iter, roundTTL)
 		} else {
-			for _, t := range targets {
+			for _, metric := range metrics {
 				for month := start_month; month <= end_month; month++ {
-					row_key := fmt.Sprintf("%s_%d", t.id, month/mdata.Month_sec)
+					row_key := fmt.Sprintf("%s_%d", metric.id, month/mdata.Month_sec)
 					query := fmt.Sprintf("select key, ttl(data) from %s where key=?", tbl)
 					iter := store.Session.Query(query, row_key).Iter()
 					showKeyTTL(iter, roundTTL)
