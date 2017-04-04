@@ -62,6 +62,7 @@ func main() {
 		fmt.Println("Retrieves timeseries data from the cassandra store. Either raw or with minimal processing")
 		fmt.Println()
 		fmt.Println("Usage:")
+		fmt.Printf("	mt-store-cat [flags] tables\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> full [roundTTL. defaults to 3600] [prefix match]\n")
@@ -76,9 +77,13 @@ func main() {
 		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
 		return
 	}
-	if flag.NArg() < 2 {
+	if flag.NArg() < 1 {
 		flag.Usage()
 		os.Exit(-1)
+	}
+	mode := flag.Arg(0)
+	if mode != "tables" && mode != "normal" && mode != "summary" {
+		panic("unsupported mode " + mode)
 	}
 
 	selector := flag.Arg(1)
@@ -127,8 +132,10 @@ func main() {
 		//		query = flag.Arg(4)
 		panic("sorry, queries not supported yet")
 	default:
-		flag.Usage()
-		os.Exit(-1)
+		if mode != "tables" {
+			flag.Usage()
+			os.Exit(-1)
+		}
 	}
 
 	// Only try and parse the conf file if it exists
@@ -152,11 +159,6 @@ func main() {
 		return
 	}
 
-	mode := flag.Arg(0)
-	if mode != "normal" && mode != "summary" {
-		panic("unsupported mode " + mode)
-	}
-
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
@@ -165,6 +167,13 @@ func main() {
 	tables, err := getTables(store, *cassandraKeyspace, *table)
 	if err != nil {
 		log.Fatal(4, "%s", err)
+	}
+	if mode == "tables" {
+		fmt.Printf("tables found for selector %q\n", *table)
+		for _, tbl := range tables {
+			fmt.Println(tbl)
+		}
+		return
 	}
 
 	switch selector {
