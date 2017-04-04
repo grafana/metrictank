@@ -22,11 +22,12 @@ var (
 )
 
 type NotifierNSQ struct {
-	in       chan mdata.SavedChunk
-	buf      []mdata.SavedChunk
-	instance string
-	mdata.Notifier
-	idx idx.MetricIndex
+	instance      string
+	in            chan mdata.SavedChunk
+	buf           []mdata.SavedChunk
+	metrics       mdata.Metrics
+	idx           idx.MetricIndex
+	createMissing bool
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierNSQ {
@@ -52,13 +53,11 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
 	c := &NotifierNSQ{
-		in:       make(chan mdata.SavedChunk),
-		instance: instance,
-		Notifier: mdata.Notifier{
-			Instance: instance,
-			Metrics:  metrics,
-		},
-		idx: idx,
+		instance:      instance,
+		in:            make(chan mdata.SavedChunk),
+		metrics:       metrics,
+		idx:           idx,
+		createMissing: true,
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
@@ -77,7 +76,7 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 }
 
 func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
-	c.Handle(m.Body)
+	mdata.Handle(c.metrics, m.Body, c.idx, c.createMissing)
 	return nil
 }
 
