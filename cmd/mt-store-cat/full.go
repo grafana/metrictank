@@ -6,29 +6,10 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/raintank/metrictank/mdata"
 )
 
-func Dump(store *mdata.CassandraStore, tables []string, keyspace, prefix string, roundTTL int) error {
-	var metrics []Metric
-	var err error
-	if prefix == "" {
-		fmt.Println("# Looking for ALL metrics")
-	} else {
-		fmt.Println("# Looking for these metrics:")
-		metrics, err = getMetrics(store, prefix)
-		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
-			return err
-		}
-		for _, m := range metrics {
-			fmt.Println(m.id, m.name)
-		}
-	}
-
-	fmt.Printf("# Keyspace %q contents:\n", keyspace)
-
+func chunkSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, keyspace string, roundTTL int) error {
 	now := uint32(time.Now().Unix())
 	end_month := now - (now % mdata.Month_sec)
 
@@ -39,7 +20,7 @@ func Dump(store *mdata.CassandraStore, tables []string, keyspace, prefix string,
 		start := now - uint32(4*TTLHours)
 		start_month := start - (start % mdata.Month_sec)
 		fmt.Println("## Table", tbl)
-		if prefix == "" {
+		if len(metrics) == 0 {
 			query := fmt.Sprintf("select key, ttl(data) from %s", tbl)
 			iter := store.Session.Query(query).Iter()
 			showKeyTTL(iter, roundTTL)

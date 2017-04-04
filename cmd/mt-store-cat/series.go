@@ -12,53 +12,61 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-// mode must be normal or summary
-func catId(store *mdata.CassandraStore, tables []string, id string, fromUnix, toUnix, fix uint32, mode string) {
-	if fix != 0 {
-		points := getSeries(store, id, tables, fromUnix, toUnix, fix)
-
-		switch mode {
-		case "normal":
-			printPointsNormal(points, fromUnix, toUnix)
-		case "summary":
-			printPointsSummary(points, fromUnix, toUnix)
-		}
-	} else {
+func points(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+	for _, metric := range metrics {
+		fmt.Println("## Metric", metric)
 		for _, table := range tables {
-			igens, err := store.SearchTable(id, table, fromUnix, toUnix)
-			if err != nil {
-				panic(err)
-			}
-
-			switch mode {
-			case "normal":
+			fmt.Println("### Table", table)
+			if fix != 0 {
+				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				printPointsNormal(points, fromUnix, toUnix)
+			} else {
+				igens, err := store.SearchTable(metric.id, table, fromUnix, toUnix)
+				if err != nil {
+					panic(err)
+				}
 				printNormal(igens, fromUnix, toUnix)
-			case "summary":
+			}
+		}
+	}
+}
+
+func pointSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+	for _, metric := range metrics {
+		fmt.Println("## Metric", metric)
+		for _, table := range tables {
+			fmt.Println("### Table", table)
+			if fix != 0 {
+				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				printPointsSummary(points, fromUnix, toUnix)
+			} else {
+				igens, err := store.SearchTable(metric.id, table, fromUnix, toUnix)
+				if err != nil {
+					panic(err)
+				}
 				printSummary(igens, fromUnix, toUnix)
 			}
 		}
 	}
 }
 
-func getSeries(store *mdata.CassandraStore, id string, tables []string, fromUnix, toUnix, interval uint32) []schema.Point {
+func getSeries(store *mdata.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
-	for _, table := range tables {
-		itgens, err := store.SearchTable(id, table, fromUnix, toUnix)
-		if err != nil {
-			panic(err)
-		}
+	itgens, err := store.SearchTable(id, table, fromUnix, toUnix)
+	if err != nil {
+		panic(err)
+	}
 
-		for i, itgen := range itgens {
-			iter, err := itgen.Get()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
-				continue
-			}
-			for iter.Next() {
-				ts, val := iter.Values()
-				if ts >= fromUnix && ts < toUnix {
-					points = append(points, schema.Point{Val: val, Ts: ts})
-				}
+	for i, itgen := range itgens {
+		iter, err := itgen.Get()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
+			continue
+		}
+		for iter.Next() {
+			ts, val := iter.Values()
+			if ts >= fromUnix && ts < toUnix {
+				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
 	}
@@ -68,7 +76,7 @@ func getSeries(store *mdata.CassandraStore, id string, tables []string, fromUnix
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span)
+		fmt.Printf("#### chunk %d (span %d)\n", i, ig.Span)
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
