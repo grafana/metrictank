@@ -18,7 +18,7 @@ func showKeyTTL(iter *gocql.Iter, roundTTL int) {
 			cnt += 1
 		} else {
 			if prevKey != "" && prevTTL != 0 {
-				fmt.Println(prevKey, prevTTL, cnt)
+				fmt.Println(prevKey, roundTTL*prevTTL, cnt)
 			}
 			cnt = 0
 			prevTTL = ttl
@@ -26,7 +26,7 @@ func showKeyTTL(iter *gocql.Iter, roundTTL int) {
 		}
 	}
 	if cnt != 0 {
-		fmt.Println(prevKey, prevTTL, cnt)
+		fmt.Println(prevKey, roundTTL*prevTTL, cnt)
 	}
 	err := iter.Close()
 	if err != nil {
