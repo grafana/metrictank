@@ -13,9 +13,9 @@ import (
 )
 
 // mode must be normal or summary
-func catId(id string, ttl, fromUnix, toUnix, fix uint32, mode string, store mdata.Store) {
+func catId(store *mdata.CassandraStore, tables []string, id string, fromUnix, toUnix, fix uint32, mode string) {
 	if fix != 0 {
-		points := getSeries(id, ttl, fromUnix, toUnix, fix, store)
+		points := getSeries(store, id, tables, fromUnix, toUnix, fix)
 
 		switch mode {
 		case "normal":
@@ -24,38 +24,41 @@ func catId(id string, ttl, fromUnix, toUnix, fix uint32, mode string, store mdat
 			printPointsSummary(points, fromUnix, toUnix)
 		}
 	} else {
-		igens, err := store.Search(id, ttl, fromUnix, toUnix)
-		if err != nil {
-			panic(err)
-		}
+		for _, table := range tables {
+			igens, err := store.SearchTable(id, table, fromUnix, toUnix)
+			if err != nil {
+				panic(err)
+			}
 
-		switch mode {
-		case "normal":
-			printNormal(igens, fromUnix, toUnix)
-		case "summary":
-			printSummary(igens, fromUnix, toUnix)
+			switch mode {
+			case "normal":
+				printNormal(igens, fromUnix, toUnix)
+			case "summary":
+				printSummary(igens, fromUnix, toUnix)
+			}
 		}
 	}
 }
 
-func getSeries(id string, ttl, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
-	itgens, err := store.Search(id, ttl, fromUnix, toUnix)
-	if err != nil {
-		panic(err)
-	}
-
+func getSeries(store *mdata.CassandraStore, id string, tables []string, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
-
-	for i, itgen := range itgens {
-		iter, err := itgen.Get()
+	for _, table := range tables {
+		itgens, err := store.SearchTable(id, table, fromUnix, toUnix)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
-			continue
+			panic(err)
 		}
-		for iter.Next() {
-			ts, val := iter.Values()
-			if ts >= fromUnix && ts < toUnix {
-				points = append(points, schema.Point{Val: val, Ts: ts})
+
+		for i, itgen := range itgens {
+			iter, err := itgen.Get()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
+				continue
+			}
+			for iter.Next() {
+				ts, val := iter.Values()
+				if ts >= fromUnix && ts < toUnix {
+					points = append(points, schema.Point{Val: val, Ts: ts})
+				}
 			}
 		}
 	}

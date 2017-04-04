@@ -10,14 +10,14 @@ import (
 	"github.com/raintank/metrictank/mdata"
 )
 
-func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) error {
+func Dump(store *mdata.CassandraStore, tables []string, keyspace, prefix string, roundTTL int) error {
 	var metrics []Metric
 	var err error
 	if prefix == "" {
 		fmt.Println("# Looking for ALL metrics")
 	} else {
 		fmt.Println("# Looking for these metrics:")
-		metrics, err := getMetrics(store, prefix)
+		metrics, err = getMetrics(store, prefix)
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
 			return err
@@ -28,11 +28,6 @@ func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) er
 	}
 
 	fmt.Printf("# Keyspace %q contents:\n", keyspace)
-
-	tables, err := getTables(store, keyspace)
-	if err != nil {
-		return err
-	}
 
 	now := uint32(time.Now().Unix())
 	end_month := now - (now % mdata.Month_sec)

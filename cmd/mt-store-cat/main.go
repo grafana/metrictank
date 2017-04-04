@@ -48,6 +48,7 @@ var (
 	// our own flags
 	from         = flag.String("from", "-24h", "get data from (inclusive)")
 	to           = flag.String("to", "now", "get data until (exclusive)")
+	table        = flag.String("table", "*", "which table to query.  e.g. 'metric_128'. '*' means all of them")
 	mdp          = flag.Int("mdp", 0, "max data points to return")
 	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization")
 	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
@@ -61,7 +62,7 @@ func main() {
 		fmt.Println("Retrieves timeseries data from the cassandra store. Either raw or with minimal processing")
 		fmt.Println()
 		fmt.Println("Usage:")
-		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl>\n")
+		fmt.Printf("	mt-store-cat [flags] <normal|summary> id <metric-id>\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)\n")
 		fmt.Printf("	mt-store-cat [flags] <normal|summary> full [roundTTL. defaults to 3600] [prefix match]\n")
 		fmt.Println("Flags:")
@@ -82,7 +83,6 @@ func main() {
 
 	selector := flag.Arg(1)
 	var id string
-	var ttl uint32
 	var roundTTL = 3600
 	var prefix string
 	// var query string
@@ -90,13 +90,12 @@ func main() {
 
 	switch selector {
 	case "id":
-		if flag.NArg() < 4 {
+		if flag.NArg() < 3 {
 			flag.Usage()
 			os.Exit(-1)
 		}
 
 		id = flag.Arg(2)
-		ttl = dur.MustParseUNsec("ttl", flag.Arg(3))
 	case "full":
 		if flag.NArg() >= 3 {
 			var err error
@@ -158,9 +157,14 @@ func main() {
 		panic("unsupported mode " + mode)
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, []uint32{ttl})
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
+	}
+
+	tables, err := getTables(store, *cassandraKeyspace, *table)
+	if err != nil {
+		log.Fatal(4, "%s", err)
 	}
 
 	switch selector {
@@ -178,8 +182,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		catId(id, ttl, fromUnix, toUnix, uint32(*fix), mode, store)
+		catId(store, tables, id, fromUnix, toUnix, uint32(*fix), mode)
 	case "full":
-		Dump(*cassandraKeyspace, prefix, store, roundTTL)
+		Dump(store, tables, *cassandraKeyspace, prefix, roundTTL)
 	}
 }

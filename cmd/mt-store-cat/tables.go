@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,19 +19,26 @@ func (t TablesByTTL) Less(i, j int) bool {
 	return iTTL < jTTL
 }
 
-func getTables(store *mdata.CassandraStore, keyspace string) ([]string, error) {
+func getTables(store *mdata.CassandraStore, keyspace string, match string) ([]string, error) {
 	var tables []string
 	meta, err := store.Session.KeyspaceMetadata(keyspace)
 	if err != nil {
 		return tables, err
 	}
-	for tbl := range meta.Tables {
-		if tbl == "metric_idx" || !strings.HasPrefix(tbl, "metric_") {
-			continue
+	if match == "*" || match == "" {
+		for tbl := range meta.Tables {
+			if tbl == "metric_idx" || !strings.HasPrefix(tbl, "metric_") {
+				continue
+			}
+			tables = append(tables, tbl)
 		}
-		tables = append(tables, tbl)
-	}
 
-	sort.Sort(TablesByTTL(tables))
+		sort.Sort(TablesByTTL(tables))
+	} else {
+		if _, ok := meta.Tables[match]; !ok {
+			return nil, fmt.Errorf("table %q not found", match)
+		}
+		tables = append(tables, match)
+	}
 	return tables, nil
 }
