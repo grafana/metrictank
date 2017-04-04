@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -10,16 +9,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/raintank/metrictank/mdata"
 )
-
-type TablesByTTL []string
-
-func (t TablesByTTL) Len() int      { return len(t) }
-func (t TablesByTTL) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
-func (t TablesByTTL) Less(i, j int) bool {
-	iTTL, _ := strconv.Atoi(strings.Split(t[i], "_")[1])
-	jTTL, _ := strconv.Atoi(strings.Split(t[j], "_")[1])
-	return iTTL < jTTL
-}
 
 func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) error {
 	var metrics []Metric
@@ -40,19 +29,11 @@ func Dump(keyspace, prefix string, store *mdata.CassandraStore, roundTTL int) er
 
 	fmt.Printf("# Keyspace %q contents:\n", keyspace)
 
-	meta, err := store.Session.KeyspaceMetadata(keyspace)
+	tables, err := getTables(store, keyspace)
 	if err != nil {
 		return err
 	}
-	var tables []string
-	for tbl := range meta.Tables {
-		if tbl == "metric_idx" || !strings.HasPrefix(tbl, "metric_") {
-			continue
-		}
-		tables = append(tables, tbl)
-	}
 
-	sort.Sort(TablesByTTL(tables))
 	now := uint32(time.Now().Unix())
 	end_month := now - (now % mdata.Month_sec)
 
