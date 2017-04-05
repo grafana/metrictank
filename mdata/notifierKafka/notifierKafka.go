@@ -17,20 +17,21 @@ import (
 )
 
 type NotifierKafka struct {
-	in        chan mdata.SavedChunk
-	buf       []mdata.SavedChunk
-	wg        sync.WaitGroup
-	instance  string
-	consumer  sarama.Consumer
-	client    sarama.Client
-	producer  sarama.SyncProducer
-	offsetMgr *kafka.OffsetMgr
-	StopChan  chan int
+	instance      string
+	in            chan mdata.SavedChunk
+	buf           []mdata.SavedChunk
+	wg            sync.WaitGroup
+	idx           idx.MetricIndex
+	metrics       mdata.Metrics
+	createMissing bool
+	bPool         *util.BufferPool
+	client        sarama.Client
+	consumer      sarama.Consumer
+	producer      sarama.SyncProducer
+	offsetMgr     *kafka.OffsetMgr
+	StopChan      chan int
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
-	mdata.Notifier
-	idx   idx.MetricIndex
-	bPool *util.BufferPool
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
@@ -55,21 +56,19 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 	}
 
 	c := NotifierKafka{
-		in:        make(chan mdata.SavedChunk),
-		offsetMgr: offsetMgr,
-		client:    client,
-		consumer:  consumer,
-		producer:  producer,
-		instance:  instance,
-		Notifier: mdata.Notifier{
-			Instance:             instance,
-			Metrics:              metrics,
-			CreateMissingMetrics: true,
-		},
+		instance:      instance,
+		in:            make(chan mdata.SavedChunk),
+		idx:           idx,
+		metrics:       metrics,
+		createMissing: true,
+		bPool:         util.NewBufferPool(),
+		client:        client,
+		consumer:      consumer,
+		producer:      producer,
+		offsetMgr:     offsetMgr,
+
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
-		idx:           idx,
-		bPool:         util.NewBufferPool(),
 	}
 	c.start()
 	go c.produce()
@@ -149,7 +148,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			if mdata.LogLevel < 2 {
 				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
-			c.Handle(msg.Value)
+			mdata.Handle(c.metrics, msg.Value, c.idx, c.createMissing)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
