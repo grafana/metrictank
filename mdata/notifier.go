@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -25,13 +26,6 @@ type NotifierHandler interface {
 //PersistMessage format version
 const PersistMessageBatchV1 = 1
 
-type PersistMessage struct {
-	Instance string `json:"instance"`
-	Key      string `json:"key"`
-	Name     string `json:"name"`
-	T0       uint32 `json:"t0"`
-}
-
 type PersistMessageBatch struct {
 	Instance    string       `json:"instance"`
 	SavedChunks []SavedChunk `json:"saved_chunks"`
@@ -40,8 +34,6 @@ type PersistMessageBatch struct {
 type SavedChunk struct {
 	Key string `json:"key"`
 	T0  uint32 `json:"t0"`
-
-	Name string `json:"name"` // filled in when handler does index lookup
 }
 
 func SendPersistMessage(key string, t0 uint32) {
@@ -55,16 +47,9 @@ func InitPersistNotifier(handlers ...NotifierHandler) {
 	notifierHandlers = handlers
 }
 
-type Notifier struct {
-	Instance             string
-	Metrics              Metrics
-	CreateMissingMetrics bool
-}
-
-func (cl Notifier) Handle(data []byte) {
+func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 	version := uint8(data[0])
 	if version == uint8(PersistMessageBatchV1) {
-		// new batch format.
 		batch := PersistMessageBatch{}
 		err := json.Unmarshal(data[1:], &batch)
 		if err != nil {
@@ -84,41 +69,22 @@ func (cl Notifier) Handle(data []byte) {
 					continue
 				}
 			}
-			if cl.CreateMissingMetrics {
-				schemaId, _ := MatchSchema(c.Name)
-				aggId, _ := MatchAgg(c.Name)
-				agg := cl.Metrics.GetOrCreate(key[0], c.Name, schemaId, aggId)
-				if len(key) == 3 {
-					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
-				} else {
-					agg.(*AggMetric).SyncChunkSaveState(c.T0)
-				}
-			} else if agg, ok := cl.Metrics.Get(key[0]); ok {
-				if len(key) > 1 {
-					agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
-				} else {
-					agg.(*AggMetric).SyncChunkSaveState(c.T0)
-				}
+			// we only need to handle saves for series that we know about.
+			// if the series is not in the index, then we dont need to worry about it.
+			def, ok := idx.Get(key[0])
+			if !ok {
+				log.Debug("notifier: skipping metric with id %s as it is not in the index", key[0])
+				continue
+			}
+			agg := metrics.GetOrCreate(key[0], def.Name, def.SchemaId, def.AggId)
+			if len(key) == 3 {
+				agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
+			} else {
+				agg.(*AggMetric).SyncChunkSaveState(c.T0)
 			}
 		}
 	} else {
-		// assume the old format.
-		ms := PersistMessage{}
-		err := json.Unmarshal(data, &ms)
-		if err != nil {
-			log.Error(3, "notifier: skipping message due to parsing failure. %s", err)
-			return
-		}
-		messagesReceived.Add(1)
-		// get metric
-		if cl.CreateMissingMetrics {
-			schemaId, _ := MatchSchema(ms.Name)
-			aggId, _ := MatchAgg(ms.Name)
-			agg := cl.Metrics.GetOrCreate(ms.Key, ms.Name, schemaId, aggId)
-			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
-		} else if agg, ok := cl.Metrics.Get(ms.Key); ok {
-			agg.(*AggMetric).SyncChunkSaveState(ms.T0)
-		}
+		log.Error(3, "notifier: unknown version %d", version)
 	}
 	return
 }

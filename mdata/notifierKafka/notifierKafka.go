@@ -17,20 +17,21 @@ import (
 )
 
 type NotifierKafka struct {
+	instance  string
 	in        chan mdata.SavedChunk
 	buf       []mdata.SavedChunk
 	wg        sync.WaitGroup
-	instance  string
-	consumer  sarama.Consumer
+	idx       idx.MetricIndex
+	metrics   mdata.Metrics
+	bPool     *util.BufferPool
 	client    sarama.Client
+	consumer  sarama.Consumer
 	producer  sarama.SyncProducer
 	offsetMgr *kafka.OffsetMgr
 	StopChan  chan int
+
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
-	mdata.Notifier
-	idx   idx.MetricIndex
-	bPool *util.BufferPool
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
@@ -55,21 +56,18 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 	}
 
 	c := NotifierKafka{
+		instance:  instance,
 		in:        make(chan mdata.SavedChunk),
-		offsetMgr: offsetMgr,
+		idx:       idx,
+		metrics:   metrics,
+		bPool:     util.NewBufferPool(),
 		client:    client,
 		consumer:  consumer,
 		producer:  producer,
-		instance:  instance,
-		Notifier: mdata.Notifier{
-			Instance:             instance,
-			Metrics:              metrics,
-			CreateMissingMetrics: true,
-		},
+		offsetMgr: offsetMgr,
+
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
-		idx:           idx,
-		bPool:         util.NewBufferPool(),
 	}
 	c.start()
 	go c.produce()
@@ -149,7 +147,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			if mdata.LogLevel < 2 {
 				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
-			c.Handle(msg.Value)
+			mdata.Handle(c.metrics, msg.Value, c.idx)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
@@ -238,7 +236,6 @@ func (c *NotifierKafka) flush() {
 		buf := bytes.NewBuffer(c.bPool.Get())
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		encoder := json.NewEncoder(buf)
-		c.buf[i].Name = def.Name
 		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
 		err := encoder.Encode(&pMsg)
 		if err != nil {

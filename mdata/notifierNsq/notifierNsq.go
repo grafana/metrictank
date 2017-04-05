@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/bitly/go-hostpool"
@@ -22,11 +21,11 @@ var (
 )
 
 type NotifierNSQ struct {
+	instance string
 	in       chan mdata.SavedChunk
 	buf      []mdata.SavedChunk
-	instance string
-	mdata.Notifier
-	idx idx.MetricIndex
+	metrics  mdata.Metrics
+	idx      idx.MetricIndex
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierNSQ {
@@ -52,13 +51,10 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
 	}
 	c := &NotifierNSQ{
-		in:       make(chan mdata.SavedChunk),
 		instance: instance,
-		Notifier: mdata.Notifier{
-			Instance: instance,
-			Metrics:  metrics,
-		},
-		idx: idx,
+		in:       make(chan mdata.SavedChunk),
+		metrics:  metrics,
+		idx:      idx,
 	}
 	consumer.AddConcurrentHandlers(c, 2)
 
@@ -77,17 +73,11 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 }
 
 func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
-	c.Handle(m.Body)
+	mdata.Handle(c.metrics, m.Body, c.idx)
 	return nil
 }
 
 func (c *NotifierNSQ) Send(sc mdata.SavedChunk) {
-	def, ok := c.idx.Get(strings.SplitN(sc.Key, "_", 2)[0])
-	if !ok {
-		log.Error(3, "nsq-cluster: failed to lookup metricDef with id %s", sc.Key)
-		return
-	}
-	sc.Name = def.Name
 	c.in <- sc
 }
 

@@ -9,16 +9,10 @@ import (
 	"github.com/alyu/configparser"
 )
 
-var DefaultAggregation = Aggregation{
-	Name:              "default",
-	Pattern:           nil,
-	XFilesFactor:      0.5,
-	AggregationMethod: []Method{Avg},
-}
-
 // Aggregations holds the aggregation definitions
 type Aggregations struct {
-	Data []Aggregation
+	Data               []Aggregation
+	DefaultAggregation Aggregation
 }
 
 type Aggregation struct {
@@ -32,6 +26,12 @@ type Aggregation struct {
 func NewAggregations() Aggregations {
 	return Aggregations{
 		Data: make([]Aggregation, 0),
+		DefaultAggregation: Aggregation{
+			Name:              "default",
+			Pattern:           regexp.MustCompile(".*"),
+			XFilesFactor:      0.5,
+			AggregationMethod: []Method{Avg},
+		},
 	}
 }
 
@@ -100,13 +100,13 @@ func (a Aggregations) Match(metric string) (uint16, Aggregation) {
 			return uint16(i), s
 		}
 	}
-	return uint16(len(a.Data)), DefaultAggregation
+	return uint16(len(a.Data)), a.DefaultAggregation
 }
 
 // Get returns the aggregation setting corresponding to the given index
 func (a Aggregations) Get(i uint16) Aggregation {
 	if i+1 > uint16(len(a.Data)) {
-		return DefaultAggregation
+		return a.DefaultAggregation
 	}
 	return a.Data[i]
 }
