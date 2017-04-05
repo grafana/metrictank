@@ -50,7 +50,7 @@ var (
 	to           = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
 	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
 	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
-	roundTTL     = flag.Int("roundTTL", 3600, "group chunks in buckets based on rounded TTL with this modulo. only for chunk-summary format")
+	groupTTL     = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
 )
 
@@ -70,13 +70,13 @@ func main() {
 		fmt.Printf("	                     format:\n")
 		fmt.Printf("	                            - points\n")
 		fmt.Printf("	                            - point-summary\n")
-		fmt.Printf("	                            - chunk-summary (shows TTL's in seconds, subject to roundTTL)\n")
+		fmt.Printf("	                            - chunk-summary (shows TTL's, optionally bucketed. See groupTTL flag)\n")
 		fmt.Println()
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points")
 		fmt.Println("mt-store-cat -cassandra-keyspace metrictank -from='-1month' '*' 'prefix:fake' point-summary")
 		fmt.Println("mt-store-cat -cassandra-keyspace metrictank '*' 'prefix:fake' chunk-summary")
-		fmt.Println("mt-store-cat -roundTTL 1000000 -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary")
+		fmt.Println("mt-store-cat -groupTTL h -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 		fmt.Println("Notes:")
@@ -129,6 +129,11 @@ func main() {
 	}
 
 	conf.ParseAll()
+
+	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
+		log.Fatal(4, "groupTTL must be one of s/m/h/d")
+		os.Exit(1)
+	}
 
 	if *showVersion {
 		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
@@ -218,6 +223,6 @@ func main() {
 	case "point-summary":
 		pointSummary(store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
-		chunkSummary(store, tables, metrics, *cassandraKeyspace, *roundTTL)
+		chunkSummary(store, tables, metrics, *cassandraKeyspace, *groupTTL)
 	}
 }

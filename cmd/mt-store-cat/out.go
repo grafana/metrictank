@@ -9,7 +9,16 @@ import (
 
 // shows an overview of all keys and their ttls and closes the iter
 // iter must return rows of key and ttl.
-func showKeyTTL(iter *gocql.Iter, roundTTL int) {
+func showKeyTTL(iter *gocql.Iter, groupTTL string) {
+	roundTTL := 1
+	switch groupTTL {
+	case "m":
+		roundTTL = 60
+	case "h":
+		roundTTL = 60 * 60
+	case "d":
+		roundTTL = 60 * 60 * 24
+	}
 	var key, prevKey string
 	var ttl, prevTTL, cnt int
 	for iter.Scan(&key, &ttl) {
@@ -18,7 +27,7 @@ func showKeyTTL(iter *gocql.Iter, roundTTL int) {
 			cnt += 1
 		} else {
 			if prevKey != "" && prevTTL != 0 {
-				fmt.Println(prevKey, roundTTL*prevTTL, cnt)
+				fmt.Printf("%s %d%s %d\n", prevKey, prevTTL, groupTTL, cnt)
 			}
 			cnt = 0
 			prevTTL = ttl
@@ -26,7 +35,7 @@ func showKeyTTL(iter *gocql.Iter, roundTTL int) {
 		}
 	}
 	if cnt != 0 {
-		fmt.Println(prevKey, roundTTL*prevTTL, cnt)
+		fmt.Printf("%s %d%s %d\n", prevKey, prevTTL, groupTTL, cnt)
 	}
 	err := iter.Close()
 	if err != nil {
