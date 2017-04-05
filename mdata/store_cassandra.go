@@ -366,17 +366,22 @@ func (c *CassandraStore) processReadQueue() {
 	}
 }
 
-// Basic search of cassandra.
+// Basic search of cassandra in the table for given ttl
 // start inclusive, end exclusive
 func (c *CassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+	table, err := c.getTable(ttl)
+	if err != nil {
+		return nil, err
+	}
+	return c.SearchTable(key, table, start, end)
+}
+
+// Basic search of cassandra in given table
+// start inclusive, end exclusive
+func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]chunk.IterGen, error) {
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
 		return itgens, errStartBeforeEnd
-	}
-
-	table, err := c.getTable(ttl)
-	if err != nil {
-		return itgens, err
 	}
 
 	pre := time.Now()

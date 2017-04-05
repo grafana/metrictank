@@ -12,39 +12,50 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-// mode must be normal or summary
-func catId(id string, ttl, fromUnix, toUnix, fix uint32, mode string, store mdata.Store) {
-	if fix != 0 {
-		points := getSeries(id, ttl, fromUnix, toUnix, fix, store)
-
-		switch mode {
-		case "normal":
-			printPointsNormal(points, fromUnix, toUnix)
-		case "summary":
-			printPointsSummary(points, fromUnix, toUnix)
-		}
-	} else {
-		igens, err := store.Search(id, ttl, fromUnix, toUnix)
-		if err != nil {
-			panic(err)
-		}
-
-		switch mode {
-		case "normal":
-			printNormal(igens, fromUnix, toUnix)
-		case "summary":
-			printSummary(igens, fromUnix, toUnix)
+func points(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+	for _, metric := range metrics {
+		fmt.Println("## Metric", metric)
+		for _, table := range tables {
+			fmt.Println("### Table", table)
+			if fix != 0 {
+				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				printPointsNormal(points, fromUnix, toUnix)
+			} else {
+				igens, err := store.SearchTable(metric.id, table, fromUnix, toUnix)
+				if err != nil {
+					panic(err)
+				}
+				printNormal(igens, fromUnix, toUnix)
+			}
 		}
 	}
 }
 
-func getSeries(id string, ttl, fromUnix, toUnix, interval uint32, store mdata.Store) []schema.Point {
-	itgens, err := store.Search(id, ttl, fromUnix, toUnix)
+func pointSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+	for _, metric := range metrics {
+		fmt.Println("## Metric", metric)
+		for _, table := range tables {
+			fmt.Println("### Table", table)
+			if fix != 0 {
+				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				printPointsSummary(points, fromUnix, toUnix)
+			} else {
+				igens, err := store.SearchTable(metric.id, table, fromUnix, toUnix)
+				if err != nil {
+					panic(err)
+				}
+				printSummary(igens, fromUnix, toUnix)
+			}
+		}
+	}
+}
+
+func getSeries(store *mdata.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
+	var points []schema.Point
+	itgens, err := store.SearchTable(id, table, fromUnix, toUnix)
 	if err != nil {
 		panic(err)
 	}
-
-	var points []schema.Point
 
 	for i, itgen := range itgens {
 		iter, err := itgen.Get()
@@ -65,7 +76,7 @@ func getSeries(id string, ttl, fromUnix, toUnix, interval uint32, store mdata.St
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Printf("## chunk %d (span %d)\n", i, ig.Span)
+		fmt.Printf("#### chunk %d (span %d)\n", i, ig.Span)
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)

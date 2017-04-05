@@ -238,8 +238,22 @@ mt-store-cat
 Retrieves timeseries data from the cassandra store. Either raw or with minimal processing
 
 Usage:
-	mt-store-cat [flags] <normal|summary> id <metric-id> <ttl>
-	mt-store-cat [flags] <normal|summary> query <org-id> <graphite query> (not supported yet)
+
+	mt-store-cat [flags] tables
+
+	mt-store-cat [flags] <table-selector> <metric-selector> <format>
+	                     table-selector: '*' or name of a table. e.g. 'metric_128'
+	                     metric-selector: '*' or an id or prefix:<prefix>
+	                     format:
+	                            - points
+	                            - point-summary
+	                            - chunk-summary (shows TTL's in seconds, subject to roundTTL)
+
+EXAMPLES:
+mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points
+mt-store-cat -cassandra-keyspace metrictank -from='-1month' '*' 'prefix:fake' point-summary
+mt-store-cat -cassandra-keyspace metrictank '*' 'prefix:fake' chunk-summary
+mt-store-cat -roundTTL 1000000 -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary
 Flags:
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
@@ -274,19 +288,24 @@ Flags:
   -cql-protocol-version int
     	cql protocol version to use (default 4)
   -fix int
-    	fix data to this interval like metrictank does quantization
+    	fix data to this interval like metrictank does quantization. only for points and points-summary format
   -from string
-    	get data from (inclusive) (default "-24h")
-  -mdp int
-    	max data points to return
+    	get data from (inclusive). only for points and points-summary format (default "-24h")
+  -print-ts
+    	print time stamps instead of formatted dates. only for points and poins-summary format
+  -roundTTL int
+    	group chunks in buckets based on rounded TTL with this modulo. only for chunk-summary format (default 3600)
   -to string
-    	get data until (exclusive) (default "now")
+    	get data until (exclusive). only for points and points-summary format (default "now")
   -version
     	print version string
   -window-factor int
     	the window factor be used when creating the metric table schema (default 20)
 Notes:
+ * Using `*` as metric-selector may bring down your cassandra. Especially chunk-summary ignores from/to and queries all data.
+   With great power comes great responsability
  * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`
+ * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it
 ```
 
 
