@@ -165,7 +165,7 @@ func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 			// The schema is then the previous retention.
 			for j, ret := range schema.Retentions {
 				if interval < ret.SecondsPerPoint {
-					// if there are no retentions with SecondsPerPoint >= interval (j==0)
+					// if there are no retentions with SecondsPerPoint <= interval (j==0)
 					// then we need to use the first retention. Otherwise, the retention
 					// we want to use is the previous one.
 					if j > 0 {
