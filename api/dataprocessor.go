@@ -366,12 +366,12 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 
 func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
 	ctx := newRequestContext(&req, consolidator)
-	iters := s.getSeries(ctx, consolidator)
+	iters := s.getSeries(ctx)
 	points := s.itersToPoints(ctx, iters)
 	return Fix(points, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx *requestContext, consolidator consolidation.Consolidator) []chunk.Iter {
+func (s *Server) getSeries(ctx *requestContext) []chunk.Iter {
 
 	oldest, memIters := s.getSeriesAggMetrics(ctx)
 	log.Debug("oldest from aggmetrics is %d", oldest)
