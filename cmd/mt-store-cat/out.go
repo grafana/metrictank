@@ -2,10 +2,28 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
 )
+
+type bucket struct {
+	key string
+	ttl int
+}
+
+type bucketWithCount struct {
+	key string
+	ttl int
+	c   int
+}
+
+type byTTL []bucketWithCount
+
+func (a byTTL) Len() int           { return len(a) }
+func (a byTTL) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byTTL) Less(i, j int) bool { return a[i].ttl < a[j].ttl }
 
 // shows an overview of all keys and their ttls and closes the iter
 // iter must return rows of key and ttl.
@@ -19,23 +37,26 @@ func showKeyTTL(iter *gocql.Iter, groupTTL string) {
 	case "d":
 		roundTTL = 60 * 60 * 24
 	}
-	var key, prevKey string
-	var ttl, prevTTL, cnt int
-	for iter.Scan(&key, &ttl) {
-		ttl = ttl / roundTTL
-		if ttl == prevTTL && key == prevKey {
-			cnt += 1
-		} else {
-			if prevKey != "" && prevTTL != 0 {
-				fmt.Printf("%s %d%s %d\n", prevKey, prevTTL, groupTTL, cnt)
-			}
-			cnt = 0
-			prevTTL = ttl
-			prevKey = key
-		}
+
+	var b bucket
+	bucketMap := make(map[bucket]int)
+	for iter.Scan(&b.key, &b.ttl) {
+		b.ttl /= roundTTL
+		bucketMap[b] += 1
 	}
-	if cnt != 0 {
-		fmt.Printf("%s %d%s %d\n", prevKey, prevTTL, groupTTL, cnt)
+
+	var bucketList []bucketWithCount
+	for b, count := range bucketMap {
+		bucketList = append(bucketList, bucketWithCount{
+			b.key,
+			b.ttl,
+			count,
+		})
+	}
+
+	sort.Sort(byTTL(bucketList))
+	for _, b := range bucketList {
+		fmt.Printf("%s %d%s %d\n", b.key, b.ttl, groupTTL, b.c)
 	}
 	err := iter.Close()
 	if err != nil {
