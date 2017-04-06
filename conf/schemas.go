@@ -45,6 +45,10 @@ func NewSchemas(schemas []Schema) Schemas {
 	return s
 }
 
+func (s Schemas) List() []Schema {
+	return s.raw
+}
+
 func (s *Schemas) BuildIndex() {
 	s.index = make([]Schema, 0)
 	for _, schema := range s.raw {

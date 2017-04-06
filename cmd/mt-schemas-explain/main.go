@@ -49,7 +49,7 @@ func main() {
 		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
 	}
 
-	for _, schema := range schemas {
+	for _, schema := range schemas.List() {
 		fmt.Println("#", schema.Name)
 		fmt.Printf("pattern:   %10s\n", schema.Pattern)
 		fmt.Printf("priority:  %10d\n", schema.Priority)
