@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"crypto/sha256"
 	"math/rand"
 	"strings"
 	"time"
@@ -55,6 +56,9 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 	cfg.AdvertisePort = clusterPort
 	cfg.Events = Manager
 	cfg.Delegate = Manager
+	h := sha256.New()
+	h.Write([]byte(ClusterName))
+	cfg.SecretKey = h.Sum(nil)
 }
 
 func Stop() {
