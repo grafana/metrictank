@@ -26,7 +26,7 @@ global config flags:
   -addr string
     	graphite/metrictank address (default "http://localhost:6060")
   -from string
-    	from. eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
+    	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
     	only show this many metrics.  use 0 to disable
   -max-age string
@@ -49,7 +49,7 @@ cass config flags:
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -enabled
-    	
+    	 (default true)
   -host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -hosts string
@@ -70,20 +70,51 @@ cass config flags:
     	enable SSL connection to cassandra
   -timeout duration
     	cassandra request timeout (default 1s)
-  -update-fuzzyness float
-    	fuzzyness factor for update-interval. should be in the range 0 > fuzzyness <= 1. With an updateInterval of 4hours and fuzzyness of 0.5, metricDefs will be updated every 4-6hours. (default 0.5)
+  -update-cassandra-index
+    	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
   -update-interval duration
-    	frequency at which we should update the metricDef lastUpdate field. (default 3h0m0s)
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
   -username string
     	username for authentication (default "cassandra")
   -write-queue-size int
     	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
 
-output: dump|list|vegeta-render|vegeta-render-patterns
+output: either presets like dump|list|vegeta-render|vegeta-render-patterns
+output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
 
 
 EXAMPLES:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
+```
+
+
+## mt-index-migrate
+
+```
+mt-index-migrate
+
+Migrate metric index from one cassandra keyspace to another.
+This tool can be used for moving data to a different keyspace or cassandra cluster
+or for resetting partition information when the number of partitions being used has changed.
+
+Flags:
+
+  -dry-run
+    	run in dry-run mode. No changes will be made. (default true)
+  -dst-cass-addr string
+    	Address of cassandra host to migrate to. (default "localhost")
+  -dst-keyspace string
+    	Cassandra keyspace in use on destination. (default "raintank")
+  -log-level int
+    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+  -num-partitions int
+    	number of partitions in cluster (default 1)
+  -partition-scheme string
+    	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
+  -src-cass-addr string
+    	Address of cassandra host to migrate from. (default "localhost")
+  -src-keyspace string
+    	Cassandra keyspace in use on source. (default "raintank")
 ```
 
 
@@ -154,6 +185,10 @@ Flags:
     	configuration file path (default "/etc/metrictank/metrictank.ini")
   -format string
     	template to render the data with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+  -prefix string
+    	only show metrics that have this prefix
+  -substr string
+    	only show metrics that have this substring
 ```
 
 
@@ -167,23 +202,51 @@ Replicates a kafka mdm topic on a given cluster to a topic on another
 Flags:
 
   -compression string
-    	compression: none|gzip|snappy (default "none")
+    	compression: none|gzip|snappy (default "snappy")
   -dst-brokers string
     	tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -dst-topic string
-    	topic name on destination cluster (default "mdm")
   -group string
     	Kafka consumer group (default "mt-replicator")
+  -initial-offset int
+    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
   -log-level int
     	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+  -metric-dst-topic string
+    	metrics topic name on destination cluster (default "mdm")
+  -metric-src-topic string
+    	metrics topic name on source cluster (default "mdm")
+  -metrics
+    	replicate metrics
   -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
+    	method used for partitioning metrics. (byOrg|bySeries) (default "bySeries")
+  -persist
+    	replicate persistMetrics
+  -persist-dst-topic string
+    	metricPersist topic name on destination cluster (default "metricpersist")
+  -persist-src-topic string
+    	metricPersist topic name on source cluster (default "metricpersist")
   -src-brokers string
     	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -src-topic string
-    	topic name on source cluster (default "mdm")
   -version
     	print version string
+```
+
+
+## mt-schemas-explain
+
+```
+mt-schemas-explain
+
+Usage:
+
+	mt-schemas-explain [flags] [config-file]
+           (config file defaults to /etc/metrictank/storage-schemas.conf)
+
+Flags:
+  -version
+    	print version string
+  -window-factor int
+    	size of compaction window relative to TTL (default 20)
 ```
 
 
@@ -243,17 +306,17 @@ Usage:
 
 	mt-store-cat [flags] <table-selector> <metric-selector> <format>
 	                     table-selector: '*' or name of a table. e.g. 'metric_128'
-	                     metric-selector: '*' or an id or prefix:<prefix>
+	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix>
 	                     format:
 	                            - points
 	                            - point-summary
-	                            - chunk-summary (shows TTL's in seconds, subject to roundTTL)
+	                            - chunk-summary (shows TTL's, optionally bucketed. See groupTTL flag)
 
 EXAMPLES:
 mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points
 mt-store-cat -cassandra-keyspace metrictank -from='-1month' '*' 'prefix:fake' point-summary
 mt-store-cat -cassandra-keyspace metrictank '*' 'prefix:fake' chunk-summary
-mt-store-cat -roundTTL 1000000 -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary
+mt-store-cat -groupTTL h -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary
 Flags:
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
@@ -291,10 +354,10 @@ Flags:
     	fix data to this interval like metrictank does quantization. only for points and points-summary format
   -from string
     	get data from (inclusive). only for points and points-summary format (default "-24h")
+  -groupTTL string
+    	group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
   -print-ts
     	print time stamps instead of formatted dates. only for points and poins-summary format
-  -roundTTL int
-    	group chunks in buckets based on rounded TTL with this modulo. only for chunk-summary format (default 3600)
   -to string
     	get data until (exclusive). only for points and points-summary format (default "now")
   -version
@@ -306,6 +369,8 @@ Notes:
    With great power comes great responsability
  * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`
  * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it
+ * Doesn't automatically return data for aggregated series. It's up to you to query for id_<rollup>_<span> when appropriate
+ * (rollup is one of sum, cnt, lst, max, min and span is a number in seconds)
 ```
 
 
@@ -364,5 +429,61 @@ to see UTC times, just prefix command with TZ=UTC
     	see boundaries for chunks of this span
   -version
     	print version string
+```
+
+
+## mt-whisper-importer-reader
+
+```
+Usage of ./mt-whisper-importer-reader:
+  -chunkspans string
+    	List of chunk spans separated by ':'. The 1st whisper archive gets the 1st span, 2nd the 2nd, etc (default "10min")
+  -exit-on-error
+    	Exit with a message when there's an error (default true)
+  -http-endpoint string
+    	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
+  -name-prefix string
+    	Prefix to prepend before every metric name, should include the '.' if necessary
+  -orgid int
+    	Organization ID the data belongs to  (default 1)
+  -read-archives string
+    	Comma separated list of positive integers or '*' for all archives (default "*")
+  -threads int
+    	Number of workers threads to process .wsp files (default 10)
+  -verbose
+    	Write logs to terminal
+  -whisper-directory string
+    	The directory that contains the whisper file structure (default "/opt/graphite/storage/whisper")
+  -write-unfinished-chunks
+    	Defines if chunks that have not completed their chunk span should be written
+```
+
+
+## mt-whisper-importer-writer
+
+```
+Usage of ./mt-whisper-importer-writer:
+  -cassandra-addrs string
+    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -cassandra-keyspace string
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+  -exit-on-error
+    	Exit with a message when there's an error (default true)
+  -fake-avg-aggregates
+    	Generate sum/cnt series out of avg series to accomodate metrictank (default true)
+  -http-endpoint string
+    	The http endpoint to listen on (default "127.0.0.1:8080")
+  -num-partitions int
+    	Number of Partitions (default 1)
+  -partition-scheme string
+    	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries) (default "bySeries")
+  -ttls string
+    	list of ttl strings used by MT separated by ',' (default "35d")
+  -uri-path string
+    	the URI on which we expect chunks to get posted (default "/chunks")
+  -verbose
+    	Write logs to terminal
+  -window-factor int
+    	the window factor be used when creating the metric table schema (default 20)
 ```
 
