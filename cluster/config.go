@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ClusterName     string
 	primary         bool
 	peersStr        string
 	mode            string
@@ -26,6 +27,7 @@ var (
 
 func ConfigSetup() {
 	clusterCfg := flag.NewFlagSet("cluster", flag.ExitOnError)
+	clusterCfg.StringVar(&ClusterName, "name", "metrictank", "Unique name of the cluster.")
 	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
 	clusterCfg.StringVar(&clusterBindAddr, "bind-addr", "0.0.0.0:7946", "TCP Address to listen on for cluster communication")
 	clusterCfg.StringVar(&peersStr, "peers", "", "TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")

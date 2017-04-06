@@ -44,8 +44,9 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
-		NodeName: cluster.Manager.ThisNode().Name,
-		Members:  cluster.Manager.MemberList(),
+		ClusterName: cluster.ClusterName,
+		NodeName:    cluster.Manager.ThisNode().Name,
+		Members:     cluster.Manager.MemberList(),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
 }
