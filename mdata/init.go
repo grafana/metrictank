@@ -6,10 +6,10 @@ package mdata
 import (
 	"flag"
 	"io/ioutil"
-	"log"
 
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
@@ -72,7 +72,7 @@ func ConfigProcess() {
 
 	Schemas, err = conf.ReadSchemas(schemasFile)
 	if err != nil {
-		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
+		log.Fatal(3, "can't read schemas file %q: %s", schemasFile, err.Error())
 	}
 
 	// === read storage-aggregation.conf ===
@@ -87,9 +87,10 @@ func ConfigProcess() {
 	if err == nil {
 		Aggregations, err = conf.ReadAggregations(aggFile)
 		if err != nil {
-			log.Fatalf("can't read storage-aggregation file %q: %s", aggFile, err.Error())
+			log.Fatal(3, "can't read storage-aggregation file %q: %s", aggFile, err.Error())
 		}
 	} else {
+		log.Info("Could not read %s: %s: using defaults", aggFile, err)
 		Aggregations = conf.NewAggregations()
 	}
 }
