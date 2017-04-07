@@ -57,7 +57,7 @@ var (
 func ConfigSetup() {
 	retentionConf := flag.NewFlagSet("retention", flag.ExitOnError)
 	retentionConf.StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
-	retentionConf.StringVar(&aggFile, "aggrgations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
+	retentionConf.StringVar(&aggFile, "aggregations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
 	globalconf.Register("retention", retentionConf)
 }
 
