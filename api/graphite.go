@@ -112,13 +112,6 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 }
 
 func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
-	// metricDefs only get updated periodically, so we add a 1day (86400seconds) buffer when
-	// filtering by our From timestamp.  This should be moved to a configuration option,
-	// but that will require significant refactoring to expose the updateInterval used
-	// in the MetricIdx.
-	if seenAfter != 0 {
-		seenAfter -= 86400
-	}
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
 		nodes, err := s.MetricIndex.Find(orgId, pattern, seenAfter)
