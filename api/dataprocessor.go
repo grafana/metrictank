@@ -321,9 +321,9 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 
 	if LogLevel < 2 {
 		if normalize {
-			log.Debug("DP getTarget() %s normalize: true. agg factor: %d -> output interval: %d", req, req.AggNum, req.OutInterval)
+			log.Debug("DP getTarget() %s normalize:true", req.DebugString())
 		} else {
-			log.Debug("DP getTarget() %s normalize: false. output interval: %d", req, req.OutInterval)
+			log.Debug("DP getTarget() %s normalize:false", req.DebugString())
 		}
 	}
 
