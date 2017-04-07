@@ -16,6 +16,8 @@ var (
 	GitHash      = "(none)"
 	showVersion  = flag.Bool("version", false, "print version string")
 	windowFactor = flag.Int("window-factor", 20, "size of compaction window relative to TTL")
+	metric       = flag.String("metric", "", "specify a metric name to see which schema it matches")
+	interval     = flag.Int("int", 0, "specify an interval to apply interval-based matching in addition to metric matching (e.g. to simulate kafka-mdm input)")
 )
 
 func main() {
@@ -47,6 +49,13 @@ func main() {
 	schemas, err := conf.ReadSchemas(schemasFile)
 	if err != nil {
 		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
+	}
+
+	if *metric != "" {
+		schemaI, s := schemas.Match(*metric, *interval)
+		fmt.Printf("metric %q with interval %d gets schemaI %d\n", *metric, *interval, schemaI)
+		fmt.Printf("## [%q] pattern=%q prio=%d retentions=%v\n", s.Name, s.Pattern, s.Priority, s.Retentions)
+		fmt.Println()
 	}
 
 	for _, schema := range schemas.List() {
