@@ -388,7 +388,7 @@ Flags:
     	the window factor be used when creating the metric table schema (default 20)
 Notes:
  * Using `*` as metric-selector may bring down your cassandra. Especially chunk-summary ignores from/to and queries all data.
-   With great power comes great responsability
+   With great power comes great responsibility
  * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`
  * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it
  * Doesn't automatically return data for aggregated series. It's up to you to query for id_<rollup>_<span> when appropriate
@@ -492,7 +492,7 @@ Usage of ./mt-whisper-importer-writer:
   -exit-on-error
     	Exit with a message when there's an error (default true)
   -fake-avg-aggregates
-    	Generate sum/cnt series out of avg series to accomodate metrictank (default true)
+    	Generate sum/cnt series out of avg series to accommodate metrictank (default true)
   -http-endpoint string
     	The http endpoint to listen on (default "127.0.0.1:8080")
   -num-partitions int

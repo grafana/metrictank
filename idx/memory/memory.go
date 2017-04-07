@@ -142,7 +142,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 			continue
 		}
 		m.add(def)
-		// as we are loading the metricDefs from a persistant store, set the lastSave
+		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This wont exactly match the true lastSave Timstamp,
 		// but it will be close enough and it will always be true that the lastSave was at
 		// or after this time.  For metrics that are sent at or close to real time (the typical

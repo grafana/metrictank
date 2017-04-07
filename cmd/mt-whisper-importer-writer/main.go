@@ -38,7 +38,7 @@ var (
 	fakeAvgAggregates = flag.Bool(
 		"fake-avg-aggregates",
 		true,
-		"Generate sum/cnt series out of avg series to accomodate metrictank",
+		"Generate sum/cnt series out of avg series to accommodate metrictank",
 	)
 	httpEndpoint = flag.String(
 		"http-endpoint",

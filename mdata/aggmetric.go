@@ -41,7 +41,7 @@ type AggMetric struct {
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
-// it's the callers responsability to make sure agg is not nil in that case!
+// it's the callers responsibility to make sure agg is not nil in that case!
 func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, agg *conf.Aggregation) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.

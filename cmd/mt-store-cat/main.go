@@ -81,7 +81,7 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Println("Notes:")
 		fmt.Println(" * Using `*` as metric-selector may bring down your cassandra. Especially chunk-summary ignores from/to and queries all data.")
-		fmt.Println("   With great power comes great responsability")
+		fmt.Println("   With great power comes great responsibility")
 		fmt.Println(" * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`")
 		fmt.Println(" * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it")
 		fmt.Println(" * Doesn't automatically return data for aggregated series. It's up to you to query for id_<rollup>_<span> when appropriate")
