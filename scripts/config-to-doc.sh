@@ -54,7 +54,7 @@ cat << EOF
 
 Metrictank comes with an [example main config file](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini),
 a [storage-schemas.conf file](https://github.com/raintank/metrictank/blob/master/scripts/config/storage-schemas.conf) and
-a [storage-aggregations.conf file](https://github.com/raintank/metrictank/blob/master/scripts/config/storage-aggregation.conf)
+a [storage-aggregation.conf file](https://github.com/raintank/metrictank/blob/master/scripts/config/storage-aggregation.conf)
 
 The files themselves are well documented, but for your convenience, they are replicated below.  
 

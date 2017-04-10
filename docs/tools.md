@@ -17,7 +17,7 @@ mt-aggs-explain
 Usage:
 
 	mt-aggs-explain [flags] [config-file]
-           (config file defaults to /etc/metrictank/storage-aggregations.conf)
+           (config file defaults to /etc/metrictank/storage-aggregation.conf)
 
 Flags:
   -metric string

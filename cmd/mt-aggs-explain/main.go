@@ -24,7 +24,7 @@ func main() {
 		fmt.Println("Usage:")
 		fmt.Println()
 		fmt.Printf("	mt-aggs-explain [flags] [config-file]\n")
-		fmt.Println("           (config file defaults to /etc/metrictank/storage-aggregations.conf)")
+		fmt.Println("           (config file defaults to /etc/metrictank/storage-aggregation.conf)")
 		fmt.Println()
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
@@ -39,7 +39,7 @@ func main() {
 		flag.Usage()
 		os.Exit(-1)
 	}
-	aggsFile := "/etc/metrictank/storage-aggregations.conf"
+	aggsFile := "/etc/metrictank/storage-aggregation.conf"
 	if flag.NArg() == 1 {
 		aggsFile = flag.Arg(0)
 	}
