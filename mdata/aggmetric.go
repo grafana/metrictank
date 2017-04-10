@@ -66,6 +66,12 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 	return &m
 }
 
+func (a *AggMetric) maybeSyncChunkSaveState(ts uint32) {
+	if a != nil {
+		a.SyncChunkSaveState(ts)
+	}
+}
+
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	a.Lock()
@@ -92,17 +98,22 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 			case consolidation.Avg:
 				panic("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
-				a.cntMetric.SyncChunkSaveState(ts)
+				a.cntMetric.maybeSyncChunkSaveState(ts)
 				return
 			case consolidation.Min:
-				a.minMetric.SyncChunkSaveState(ts)
+				a.minMetric.maybeSyncChunkSaveState(ts)
 				return
 			case consolidation.Max:
-				a.maxMetric.SyncChunkSaveState(ts)
+				a.maxMetric.maybeSyncChunkSaveState(ts)
 				return
 			case consolidation.Sum:
-				a.sumMetric.SyncChunkSaveState(ts)
+				a.sumMetric.maybeSyncChunkSaveState(ts)
 				return
+			case consolidation.Lst:
+				a.lstMetric.maybeSyncChunkSaveState(ts)
+				return
+			default:
+				panic(fmt.Sprintf("internal error: no such consolidator %q with span %d", consolidator, aggSpan))
 			}
 		}
 	}
