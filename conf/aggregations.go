@@ -35,7 +35,7 @@ func NewAggregations() Aggregations {
 	}
 }
 
-// ReadAggregations returns the defined aggregations from a storage-aggregations.conf file
+// ReadAggregations returns the defined aggregations from a storage-aggregation.conf file
 // and adds the default
 func ReadAggregations(file string) (Aggregations, error) {
 	config, err := configparser.Read(file)
