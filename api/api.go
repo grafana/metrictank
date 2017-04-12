@@ -101,7 +101,8 @@ func (s *Server) Run() {
 		Handler: s.Macaron,
 	}
 	if s.SSL {
-		cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
+		var cert tls.Certificate
+		cert, err = tls.LoadX509KeyPair(s.certFile, s.keyFile)
 		if err != nil {
 			log.Fatal(4, "API Failed to start server: %v", err)
 		}
