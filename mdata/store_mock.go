@@ -26,9 +26,8 @@ func NewMockStore() *MockStore {
 
 // add a chunk to be returned on Search()
 func (c *MockStore) AddMockResult(metric string, itgen chunk.IterGen) {
-	if itgens, ok := c.results[metric]; !ok {
-		itgens = make([]chunk.IterGen, 0)
-		c.results[metric] = itgens
+	if _, ok := c.results[metric]; !ok {
+		c.results[metric] = make([]chunk.IterGen, 0)
 	}
 
 	c.results[metric] = append(c.results[metric], itgen)

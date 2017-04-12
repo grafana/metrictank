@@ -242,7 +242,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[string][]models.Req) ([]models.
 				return
 			}
 			var resp models.GetDataResp
-			buf, err = resp.UnmarshalMsg(buf)
+			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.Name, err)
 				errorsChan <- err

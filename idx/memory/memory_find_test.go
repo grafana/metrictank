@@ -152,12 +152,11 @@ func BenchmarkFind(b *testing.B) {
 		Init()
 	}
 	queryCount := len(queries)
-	org := 1
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org = (n % 2) + 1
+		org := (n % 2) + 1
 		ixFind(org, q)
 	}
 }
@@ -176,7 +175,6 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-	org := 1
 
 	ch := make(chan testQ)
 	for i := 0; i < 4; i++ {
@@ -190,7 +188,7 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org = (n % 2) + 1
+		org := (n % 2) + 1
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
@@ -205,7 +203,6 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-	org := 1
 
 	ch := make(chan testQ)
 	for i := 0; i < 8; i++ {
@@ -219,7 +216,7 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org = (n % 2) + 1
+		org := (n % 2) + 1
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
