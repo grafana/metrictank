@@ -136,7 +136,7 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 		return nil, err
 	}
 	resp := models.NewIndexFindResp()
-	buf, err = resp.UnmarshalMsg(buf)
+	_, err = resp.UnmarshalMsg(buf)
 	if err != nil {
 		log.Error(4, "HTTP Find() error unmarshaling body from %s/index/find: %q", peer.Name, err)
 		return nil, err
@@ -549,7 +549,7 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 		return 0, err
 	}
 	resp := models.MetricsDeleteResp{}
-	buf, err = resp.UnmarshalMsg(buf)
+	_, err = resp.UnmarshalMsg(buf)
 	if err != nil {
 		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/index/delete: %q", peer.Name, err)
 		return 0, err
