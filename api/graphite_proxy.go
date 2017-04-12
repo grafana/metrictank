@@ -37,11 +37,13 @@ func (s *graphiteProxyStats) Miss(fun string) {
 
 func NewGraphiteProxy(u *url.URL) *httputil.ReverseProxy {
 	graphiteProxy := httputil.NewSingleHostReverseProxy(u)
-	// remove these headers from upstream
-	// we will set our own correct ones (and duplicate headers are illegal)
+	// remove these headers from upstream. we will set our own correct ones
 	graphiteProxy.ModifyResponse = func(resp *http.Response) error {
+		// if kept, would be duplicated. and duplicated headers are illegal)
 		resp.Header.Del("access-control-allow-credentials")
 		resp.Header.Del("Access-Control-Allow-Origin")
+		// if kept, would errorously stick around and be invalid because we gzip responses
+		resp.Header.Del("Content-length")
 		return nil
 	}
 	return graphiteProxy
