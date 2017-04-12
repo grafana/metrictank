@@ -92,17 +92,32 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 			case consolidation.Avg:
 				panic("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
-				a.cntMetric.SyncChunkSaveState(ts)
+				if a.cntMetric != nil {
+					a.cntMetric.SyncChunkSaveState(ts)
+				}
 				return
 			case consolidation.Min:
-				a.minMetric.SyncChunkSaveState(ts)
+				if a.minMetric != nil {
+					a.minMetric.SyncChunkSaveState(ts)
+				}
 				return
 			case consolidation.Max:
-				a.maxMetric.SyncChunkSaveState(ts)
+				if a.maxMetric != nil {
+					a.maxMetric.SyncChunkSaveState(ts)
+				}
 				return
 			case consolidation.Sum:
-				a.sumMetric.SyncChunkSaveState(ts)
+				if a.sumMetric != nil {
+					a.sumMetric.SyncChunkSaveState(ts)
+				}
 				return
+			case consolidation.Lst:
+				if a.lstMetric != nil {
+					a.lstMetric.SyncChunkSaveState(ts)
+				}
+				return
+			default:
+				panic(fmt.Sprintf("internal error: no such consolidator %q with span %d", consolidator, aggSpan))
 			}
 		}
 	}
