@@ -29,6 +29,8 @@ func (s *Server) RegisterRoutes() {
 	r.Get("/cluster", s.getClusterStatus)
 
 	r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
+	// equivalent to /render but used by graphite-metrictank so we can keep the stats separate
+	r.Combo("/get", withOrg, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
 
 	r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
 	r.Combo("/index/list", bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
