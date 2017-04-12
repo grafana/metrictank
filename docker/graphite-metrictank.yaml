@@ -10,19 +10,19 @@ logging:
   version: 1
   handlers:
     raw:
-      level: DEBUG
+      level: INFO
       class: logging.StreamHandler
       formatter: raw
   loggers:
     root:
       handlers:
         - raw
-      level: DEBUG
+      level: INFO
       propagate: false
     graphite_api:
       handlers:
         - raw
-      level: DEBUG
+      level: INFO
   formatters:
     default:
       format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
