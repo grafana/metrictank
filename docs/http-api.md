@@ -88,7 +88,7 @@ curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.
 
 ## Graphite query api
 
-This is the early beginning of a graphite-web/graphite-api replacement. It only returns JSON output
+This is the early beginning of a graphite-web/graphite-api replacement. It can return JSON or messagepack output
 This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-metrictank in front of metrictank, for now.
 
 ```
@@ -104,6 +104,7 @@ POST /render
   [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
+* format: json or msgp (default: json)
 
 Data queried for must be stored under the given org or be public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
 
