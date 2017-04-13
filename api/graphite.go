@@ -154,16 +154,16 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	// in MT, both the external and internal api, from is inclusive, to is exclusive
-	// in graphite, from is exclusive and to inclusive
-	// so in this case, adjust for internal api.
-	fromUnix += 1
-	toUnix += 1
-
 	if fromUnix >= toUnix {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
 		return
 	}
+
+	// render API is modeled after graphite, so from exclusive, to inclusive.
+	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
+	// so we must adjust
+	fromUnix += 1
+	toUnix += 1
 
 	exprs, err := expr.ParseMany(targets)
 	if err != nil {
