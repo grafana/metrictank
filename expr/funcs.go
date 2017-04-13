@@ -38,7 +38,7 @@ func init() {
 		"sumSeries":     {NewSumSeries, true},
 		"avg":           {NewAvgSeries, true},
 		"averageSeries": {NewAvgSeries, true},
-		"movingAverage": {NewMovingAverage, true},
-		"consolidateBy": {NewConsolidateBy, false},
+		"movingAverage": {NewMovingAverage, false},
+		"consolidateBy": {NewConsolidateBy, true},
 	}
 }

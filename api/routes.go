@@ -30,6 +30,9 @@ func (s *Server) RegisterRoutes() {
 
 	r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
 	// equivalent to /render but used by graphite-metrictank so we can keep the stats separate
+	// note, you should not request anything from this endpoint that may trigger a loop
+	// (where MT proxies the req to graphite, graphite hits /get again, and so on).
+	// just don't request any function processing, or maybe just some of the stable functions
 	r.Combo("/get", withOrg, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
 
 	r.Combo("/index/find", bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
