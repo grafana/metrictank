@@ -173,7 +173,16 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	reqRenderTargetCount.Value(len(targets))
 
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, request.Stable, nil)
+	if request.Process == "none" {
+		ctx.Req.Request.Body = ctx.Body
+		graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+		renderReqProxied.Inc()
+		return
+	}
+
+	stable := request.Process == "stable"
+
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			ctx.Req.Request.Body = ctx.Body
