@@ -140,7 +140,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
+	defaultTo := uint32(now.Unix())
 
 	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
 	if err != nil {
