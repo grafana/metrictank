@@ -41,9 +41,9 @@ func NewGraphiteProxy(u *url.URL) *httputil.ReverseProxy {
 	graphiteProxy.ModifyResponse = func(resp *http.Response) error {
 		// if kept, would be duplicated. and duplicated headers are illegal)
 		resp.Header.Del("access-control-allow-credentials")
-		resp.Header.Del("Access-Control-Allow-Origin")
+		resp.Header.Del("access-control-allow-origin")
 		// if kept, would errorously stick around and be invalid because we gzip responses
-		resp.Header.Del("Content-length")
+		resp.Header.Del("content-length")
 		return nil
 	}
 	return graphiteProxy
