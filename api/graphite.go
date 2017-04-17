@@ -475,14 +475,9 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
 func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
 
-	type locatedDef struct {
-		def  idx.Archive
-		node cluster.Node
-	}
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
-	//locatedDefs[request][<def.id>]locatedDef
-	locatedDefs := make(map[expr.Req]map[string]locatedDef)
+	var reqs []models.Req
 
 	// note that different patterns to query can have different from / to, so they require different index lookups
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
@@ -493,39 +488,28 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 			return nil, err
 		}
 
-		locatedDefs[r] = make(map[string]locatedDef)
-
 		minFrom = util.Min(minFrom, r.From)
 		maxTo = util.Max(maxTo, r.To)
 
 		for _, s := range series {
 			for _, metric := range s.Series {
-				if !metric.Leaf {
-					continue
-				}
-				for _, def := range metric.Defs {
-					locatedDefs[r][def.Id] = locatedDef{def, s.Node}
+				for _, archive := range metric.Defs {
+					// set consolidator that will be used to normalize raw data before feeding into processing functions
+					// not to be confused with runtime consolidation which happens after all processing.
+					fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+					consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+					reqs = append(reqs, models.NewReq(
+						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, s.Node, archive.SchemaId, archive.AggId))
 				}
 			}
 		}
 	}
 
-	var reqs []models.Req
-	for r, ldefs := range locatedDefs {
-		for _, locdef := range ldefs {
-			archive := locdef.def
-			// set consolidator that will be used to normalize raw data before feeding into processing functions
-			// not to be confused with runtime consolidation which happens after all processing.
-			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-			reqs = append(reqs, models.NewReq(
-				archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
-		}
-	}
 	reqRenderSeriesCount.Value(len(reqs))
 	if len(reqs) == 0 {
 		return nil, nil
 	}
+
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	reqs, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
 	if err != nil {
