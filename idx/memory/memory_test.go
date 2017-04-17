@@ -279,6 +279,30 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestDeleteWithLotsOfSeries(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	var data *schema.MetricData
+	var key string
+	for i := 1; i <= 100000; i++ {
+		key = fmt.Sprintf("some.metric.%d.%d", i, i)
+		data = &schema.MetricData{
+			Name:     key,
+			Metric:   key,
+			OrgId:    1,
+			Interval: 10,
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 1)
+	}
+	Convey("when deleting 1 million series", t, func() {
+		defs, err := ix.Delete(1, "some.*")
+		So(err, ShouldBeNil)
+		So(defs, ShouldHaveLength, 100000)
+	})
+}
+
 func TestMixedBranchLeaf(t *testing.T) {
 	ix := New()
 	ix.Init()
@@ -498,4 +522,27 @@ func BenchmarkIndexing(b *testing.B) {
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
+}
+
+func BenchmarkDeletes(b *testing.B) {
+	ix := New()
+	ix.Init()
+
+	var data *schema.MetricData
+	var key string
+	for i := 1; i <= b.N; i++ {
+		key = fmt.Sprintf("some.metric.%d.%d", i, i)
+		data = &schema.MetricData{
+			Name:     key,
+			Metric:   key,
+			OrgId:    1,
+			Interval: 10,
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 1)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	ix.Delete(1, "some.*")
 }

@@ -496,7 +496,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	}
 
 	for _, f := range found {
-		deleted := m.delete(orgId, f)
+		deleted := m.delete(orgId, f, true)
 		statMetricsActive.DecUint32(uint32(len(deleted)))
 		deletedDefs = append(deletedDefs, deleted...)
 	}
@@ -504,7 +504,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node) []idx.Archive {
+func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Archive {
 	tree := m.Tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
 	if n.HasChildren() {
@@ -517,7 +517,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []idx.Archive {
 				continue
 			}
 			log.Debug("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
-			deleted := m.delete(orgId, node)
+			deleted := m.delete(orgId, node, false)
 			deletedDefs = append(deletedDefs, deleted...)
 		}
 	}
@@ -531,6 +531,10 @@ func (m *MemoryIdx) delete(orgId int, n *Node) []idx.Archive {
 
 	// delete the node.
 	delete(tree.Items, n.Path)
+
+	if !deleteEmptyParents {
+		return deletedDefs
+	}
 
 	// delete node from the branches
 	// e.g. for foo.bar.baz
@@ -621,7 +625,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 			if staleCount == len(n.Defs) {
 				log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 				//we need to delete this node.
-				defs := m.delete(org, n)
+				defs := m.delete(org, n, true)
 				statMetricsActive.Dec()
 				pruned = append(pruned, defs...)
 			}
