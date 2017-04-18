@@ -8,21 +8,23 @@ import (
 //go:generate stringer -type=exprType
 type exprType int
 
+// the following types let the parser express the type it parsed from the input targets
 const (
-	etName exprType = iota // e.g. a metric query pattern like foo.bar or foo.*.baz
-	etFunc
-	etConst
-	etString
+	etName   exprType = iota // a string without quotes, e.g. metric.name, metric.*.query.patt* or special values like True or None which some functions expect
+	etFunc                   // a function call like movingAverage(foo, bar)
+	etConst                  // any number, parsed as a float64 value
+	etString                 // anything that was between '' or ""
 )
 
+// expr represents a parsed expression
 type expr struct {
 	target    string // the name of a etName, or func name for etFunc. not used for etConst
 	etype     exprType
-	val       float64 // for etConst
-	valStr    string  // for etString, and to store original input for etConst
-	args      []*expr // positional
-	namedArgs map[string]*expr
-	argString string // for etFunc: literal string of how all the args were specified
+	val       float64          // for etConst
+	valStr    string           // for etString and etConst (in which case it holds the original input value)
+	args      []*expr          // for etFunc: positional args which itself are expressions
+	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
+	argString string           // for etFunc: literal string of how all the args were specified
 }
 
 func (e expr) Print(indent int) string {

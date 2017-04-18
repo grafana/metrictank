@@ -21,7 +21,7 @@ func (s FuncAlias) Init(args []*expr) error {
 	return nil
 }
 
-func (s FuncAlias) Depends(from, to uint32) (uint32, uint32) {
+func (s FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 

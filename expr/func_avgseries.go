@@ -24,7 +24,7 @@ func (s FuncAvgSeries) Init(args []*expr) error {
 	return nil
 }
 
-func (s FuncAvgSeries) Depends(from, to uint32) (uint32, uint32) {
+func (s FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 

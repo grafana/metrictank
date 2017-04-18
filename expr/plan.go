@@ -89,11 +89,14 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 		return nil, ErrUnknownFunction(e.target)
 	}
 
+	// now comes the interesting task of validating the arguments as specified by the function,
+	// against the arguments that were parsed.
+
 	fn := fdef.constr()
+	argsExp, _ := fn.Signature()
 
 	// note that signature may have seriesLists in it, which means one or more args of type seriesList
 	// so it's legal to have more e.args then (signature) args in that case.
-	argsExp, _ := fn.Signature()
 	if len(e.args) < len(argsExp) {
 		return nil, ErrMissingArg
 	}
@@ -146,7 +149,7 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	if err != nil {
 		return nil, err
 	}
-	from, to = fn.Depends(from, to)
+	from, to = fn.NeedRange(from, to)
 	// look at which arguments are requested
 	// if the args are series, they are to be requested with the potentially extended to/from
 	// if they are not, keep traversing the tree until we find out which metrics to fetch and for which durations
@@ -199,7 +202,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	from, to = fn.Depends(from, to)
+	from, to = fn.NeedRange(from, to)
 	// look at which arguments are requested
 	// if the args are series, they are to be requested with the potentially extended to/from
 	// if they are not, keep traversing the tree until we find out which metrics to fetch and for which durations

@@ -39,7 +39,7 @@ func (s *FuncMovingAverage) Init(args []*expr) error {
 	}
 }
 
-func (s *FuncMovingAverage) Depends(from, to uint32) (uint32, uint32) {
+func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {
 	return from - s.window, to
 }
 

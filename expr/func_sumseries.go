@@ -24,7 +24,7 @@ func (s FuncSumSeries) Init(args []*expr) error {
 	return nil
 }
 
-func (s FuncSumSeries) Depends(from, to uint32) (uint32, uint32) {
+func (s FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 

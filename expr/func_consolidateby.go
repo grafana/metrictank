@@ -23,7 +23,7 @@ func (s FuncConsolidateBy) Init(args []*expr) error {
 	return consolidation.Validate(args[1].valStr)
 }
 
-func (s FuncConsolidateBy) Depends(from, to uint32) (uint32, uint32) {
+func (s FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
