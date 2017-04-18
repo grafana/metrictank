@@ -73,7 +73,7 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	}
 	if e.etype == etName {
 		reqs = append(reqs, Req{
-			e.target,
+			e.str,
 			from,
 			to,
 		})
@@ -81,12 +81,12 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	}
 
 	// here e.type is guaranteed to be etFunc
-	fdef, ok := funcs[e.target]
+	fdef, ok := funcs[e.str]
 	if !ok {
-		return nil, ErrUnknownFunction(e.target)
+		return nil, ErrUnknownFunction(e.str)
 	}
 	if stable && !fdef.stable {
-		return nil, ErrUnknownFunction(e.target)
+		return nil, ErrUnknownFunction(e.str)
 	}
 
 	// now comes the interesting task of validating the arguments as specified by the function,
@@ -185,7 +185,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 	}
 	if e.etype == etName {
 		req := Req{
-			e.target,
+			e.str,
 			from,
 			to,
 		}
@@ -193,9 +193,9 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 	}
 
 	// here e.type is guaranteed to be etFunc
-	fdef, ok := funcs[e.target]
+	fdef, ok := funcs[e.str]
 	if !ok {
-		panic(fmt.Sprintf("cannot find func %q. this should never happen as we should have validated function existence earlier", e.target))
+		panic(fmt.Sprintf("cannot find func %q. this should never happen as we should have validated function existence earlier", e.str))
 	}
 	fn := fdef.constr()
 	err := fn.Init(e.args)
@@ -215,10 +215,10 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 			}
 			results[i] = result
 		} else if arg.etype == etString {
-			results[i] = arg.valStr
+			results[i] = arg.str
 		} else {
 			// etype == etConst
-			results[i] = arg.val
+			results[i] = arg.float
 		}
 	}
 	// we now have all our args and can process the data and return

@@ -14,263 +14,263 @@ func TestParse(t *testing.T) {
 		e *expr
 	}{
 		{"metric",
-			&expr{target: "metric"},
+			&expr{str: "metric"},
 		},
 		{
 			"metric.foo",
-			&expr{target: "metric.foo"},
+			&expr{str: "metric.foo"},
 		},
 		{"metric.*.foo",
-			&expr{target: "metric.*.foo"},
+			&expr{str: "metric.*.foo"},
 		},
 		{
 			"func(metric)",
 			&expr{
-				target:    "func",
-				etype:     etFunc,
-				args:      []*expr{{target: "metric"}},
-				argString: "metric",
+				str:     "func",
+				etype:   etFunc,
+				args:    []*expr{{str: "metric"}},
+				argsStr: "metric",
 			},
 		},
 		{
 			"func(metric1,metric2,metric3)",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{target: "metric2"},
-					{target: "metric3"}},
-				argString: "metric1,metric2,metric3",
+					{str: "metric1"},
+					{str: "metric2"},
+					{str: "metric3"}},
+				argsStr: "metric1,metric2,metric3",
 			},
 		},
 		{
 			"func1(metric1,func2(metricA, metricB),metric3)",
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{target: "func2",
-						etype:     etFunc,
-						args:      []*expr{{target: "metricA"}, {target: "metricB"}},
-						argString: "metricA, metricB",
+					{str: "metric1"},
+					{str: "func2",
+						etype:   etFunc,
+						args:    []*expr{{str: "metricA"}, {str: "metricB"}},
+						argsStr: "metricA, metricB",
 					},
-					{target: "metric3"}},
-				argString: "metric1,func2(metricA, metricB),metric3",
+					{str: "metric3"}},
+				argsStr: "metric1,func2(metricA, metricB),metric3",
 			},
 		},
 
 		{
 			"3",
-			&expr{val: 3, valStr: "3", etype: etConst},
+			&expr{float: 3, str: "3", etype: etConst},
 		},
 		{
 			"3.1",
-			&expr{val: 3.1, valStr: "3.1", etype: etConst},
+			&expr{float: 3.1, str: "3.1", etype: etConst},
 		},
 		{
 			"func1(metric1, 3, 1e2, 2e-3)",
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{val: 3, valStr: "3", etype: etConst},
-					{val: 100, valStr: "1e2", etype: etConst},
-					{val: 0.002, valStr: "2e-3", etype: etConst},
+					{str: "metric1"},
+					{float: 3, str: "3", etype: etConst},
+					{float: 100, str: "1e2", etype: etConst},
+					{float: 0.002, str: "2e-3", etype: etConst},
 				},
-				argString: "metric1, 3, 1e2, 2e-3",
+				argsStr: "metric1, 3, 1e2, 2e-3",
 			},
 		},
 		{
 			"func1(metric1, 'stringconst')",
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{valStr: "stringconst", etype: etString},
+					{str: "metric1"},
+					{str: "stringconst", etype: etString},
 				},
-				argString: "metric1, 'stringconst'",
+				argsStr: "metric1, 'stringconst'",
 			},
 		},
 		{
 			`func1(metric1, "stringconst")`,
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{valStr: "stringconst", etype: etString},
+					{str: "metric1"},
+					{str: "stringconst", etype: etString},
 				},
-				argString: `metric1, "stringconst"`,
+				argsStr: `metric1, "stringconst"`,
 			},
 		},
 		{
 			"func1(metric1, -3)",
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{val: -3, valStr: "-3", etype: etConst},
+					{str: "metric1"},
+					{float: -3, str: "-3", etype: etConst},
 				},
-				argString: "metric1, -3",
+				argsStr: "metric1, -3",
 			},
 		},
 
 		{
 			"func1(metric1, -3 , 'foo' )",
 			&expr{
-				target: "func1",
-				etype:  etFunc,
+				str:   "func1",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric1"},
-					{val: -3, valStr: "-3", etype: etConst},
-					{valStr: "foo", etype: etString},
+					{str: "metric1"},
+					{float: -3, str: "-3", etype: etConst},
+					{str: "foo", etype: etString},
 				},
-				argString: "metric1, -3 , 'foo' ",
+				argsStr: "metric1, -3 , 'foo' ",
 			},
 		},
 
 		{
 			"func(metric, key='value')",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etString, valStr: "value"},
+					"key": {etype: etString, str: "value"},
 				},
-				argString: "metric, key='value'",
+				argsStr: "metric, key='value'",
 			},
 		},
 		{
 			"func(metric, key=true)",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etName, target: "true"},
+					"key": {etype: etName, str: "true"},
 				},
-				argString: "metric, key=true",
+				argsStr: "metric, key=true",
 			},
 		},
 		{
 			"func(metric, key=1)",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etConst, valStr: "1", val: 1},
+					"key": {etype: etConst, str: "1", float: 1},
 				},
-				argString: "metric, key=1",
+				argsStr: "metric, key=1",
 			},
 		},
 		{
 			"func(metric, key=0.1)",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etConst, valStr: "0.1", val: 0.1},
+					"key": {etype: etConst, str: "0.1", float: 0.1},
 				},
-				argString: "metric, key=0.1",
+				argsStr: "metric, key=0.1",
 			},
 		},
 
 		{
 			"func(metric, 1, key='value')",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
-					{etype: etConst, valStr: "1", val: 1},
+					{str: "metric"},
+					{etype: etConst, str: "1", float: 1},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etString, valStr: "value"},
+					"key": {etype: etString, str: "value"},
 				},
-				argString: "metric, 1, key='value'",
+				argsStr: "metric, 1, key='value'",
 			},
 		},
 		{
 			"func(metric, key='value', 1)",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
-					{etype: etConst, valStr: "1", val: 1},
+					{str: "metric"},
+					{etype: etConst, str: "1", float: 1},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etString, valStr: "value"},
+					"key": {etype: etString, str: "value"},
 				},
-				argString: "metric, key='value', 1",
+				argsStr: "metric, key='value', 1",
 			},
 		},
 		{
 			"func(metric, key1='value1', key2='value two is here')",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key1": {etype: etString, valStr: "value1"},
-					"key2": {etype: etString, valStr: "value two is here"},
+					"key1": {etype: etString, str: "value1"},
+					"key2": {etype: etString, str: "value two is here"},
 				},
-				argString: "metric, key1='value1', key2='value two is here'",
+				argsStr: "metric, key1='value1', key2='value two is here'",
 			},
 		},
 		{
 			"func(metric, key2='value2', key1='value1')",
 			&expr{
-				target: "func",
-				etype:  etFunc,
+				str:   "func",
+				etype: etFunc,
 				args: []*expr{
-					{target: "metric"},
+					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key2": {etype: etString, valStr: "value2"},
-					"key1": {etype: etString, valStr: "value1"},
+					"key2": {etype: etString, str: "value2"},
+					"key1": {etype: etString, str: "value1"},
 				},
-				argString: "metric, key2='value2', key1='value1'",
+				argsStr: "metric, key2='value2', key1='value1'",
 			},
 		},
 
 		{
 			`foo.{bar,baz}.qux`,
 			&expr{
-				target: "foo.{bar,baz}.qux",
-				etype:  etName,
+				str:   "foo.{bar,baz}.qux",
+				etype: etName,
 			},
 		},
 		{
 			`foo.b[0-9].qux`,
 			&expr{
-				target: "foo.b[0-9].qux",
-				etype:  etName,
+				str:   "foo.b[0-9].qux",
+				etype: etName,
 			},
 		},
 		{
 			`virt.v1.*.text-match:<foo.bar.qux>`,
 			&expr{
-				target: "virt.v1.*.text-match:<foo.bar.qux>",
-				etype:  etName,
+				str:   "virt.v1.*.text-match:<foo.bar.qux>",
+				etype: etName,
 			},
 		},
 	}

@@ -73,12 +73,12 @@ func Parse(e string) (*expr, string, error) {
 
 	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
 		val, valStr, e, err := parseConst(e)
-		return &expr{val: val, valStr: valStr, etype: etConst}, e, err
+		return &expr{float: val, str: valStr, etype: etConst}, e, err
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
 		val, e, err := parseString(e)
-		return &expr{valStr: val, etype: etString}, e, err
+		return &expr{str: val, etype: etString}, e, err
 	}
 
 	name, e := parseName(e)
@@ -88,17 +88,17 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if e != "" && e[0] == '(' {
-		exp := &expr{target: name, etype: etFunc}
+		exp := &expr{str: name, etype: etFunc}
 
 		argString, posArgs, namedArgs, e, err := parseArgList(e)
-		exp.argString = argString
+		exp.argsStr = argString
 		exp.args = posArgs
 		exp.namedArgs = namedArgs
 
 		return exp, e, err
 	}
 
-	return &expr{target: name}, e, nil
+	return &expr{str: name, etype: etName}, e, nil
 }
 
 var (
@@ -159,11 +159,10 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 				namedArgs = make(map[string]*expr)
 			}
 
-			namedArgs[arg.target] = &expr{
-				etype:  argCont.etype,
-				val:    argCont.val,
-				valStr: argCont.valStr,
-				target: argCont.target,
+			namedArgs[arg.str] = &expr{
+				etype: argCont.etype,
+				float: argCont.float,
+				str:   argCont.str,
 			}
 
 			e = eCont
@@ -309,7 +308,7 @@ func doGetStringArg(e *expr) (string, error) {
 		return "", ErrBadArgumentStr{"string", string(e.etype)}
 	}
 
-	return e.valStr, nil
+	return e.str, nil
 }
 
 /*
@@ -360,7 +359,7 @@ func doGetFloatArg(e *expr) (float64, error) {
 		return 0, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
-	return e.val, nil
+	return e.float, nil
 }
 
 func getIntArg(e *expr, n int) (int, error) {
@@ -411,7 +410,7 @@ func doGetIntArg(e *expr) (int, error) {
 		return 0, ErrBadArgumentStr{"const", string(e.etype)}
 	}
 
-	return int(e.val), nil
+	return int(e.float), nil
 }
 
 func getBoolNamedOrPosArgDefault(e *expr, k string, n int, b bool) (bool, error) {
@@ -436,7 +435,7 @@ func doGetBoolArg(e *expr) (bool, error) {
 	}
 
 	// names go into 'target'
-	switch e.target {
+	switch e.str {
 	case "False", "false":
 		return false, nil
 	case "True", "true":

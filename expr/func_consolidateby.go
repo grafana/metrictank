@@ -20,7 +20,7 @@ func (s FuncConsolidateBy) Signature() ([]argType, []argType) {
 }
 
 func (s FuncConsolidateBy) Init(args []*expr) error {
-	return consolidation.Validate(args[1].valStr)
+	return consolidation.Validate(args[1].str)
 }
 
 func (s FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {

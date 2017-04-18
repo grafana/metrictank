@@ -22,7 +22,7 @@ func (s *FuncMovingAverage) Signature() ([]argType, []argType) {
 
 func (s *FuncMovingAverage) Init(args []*expr) error {
 	if args[1].etype == etConst {
-		points, err := strconv.Atoi(args[1].valStr)
+		points, err := strconv.Atoi(args[1].str)
 		// TODO this is not correct. what really needs to happen here is figure out the interval of the data we will consume
 		// and request from -= interval * points
 		// interestingly the from adjustment might mean the archive TTL is no longer sufficient and push the request into a different rollup archive, which we should probably
@@ -33,7 +33,7 @@ func (s *FuncMovingAverage) Init(args []*expr) error {
 		if args[1].etype != etString {
 			panic("internal error: MovingAverage cannot parse windowSize, should already have been validated")
 		}
-		window, err := dur.ParseUsec(args[1].valStr)
+		window, err := dur.ParseUsec(args[1].str)
 		s.window = window
 		return err
 	}

@@ -18,20 +18,19 @@ const (
 
 // expr represents a parsed expression
 type expr struct {
-	target    string // the name of a etName, or func name for etFunc. not used for etConst
 	etype     exprType
-	val       float64          // for etConst
-	valStr    string           // for etString and etConst (in which case it holds the original input value)
+	float     float64          // for etConst
+	str       string           // for etName, etFunc (func name), etString and etConst (unparsed input value)
 	args      []*expr          // for etFunc: positional args which itself are expressions
 	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
-	argString string           // for etFunc: literal string of how all the args were specified
+	argsStr   string           // for etFunc: literal string of how all the args were specified
 }
 
 func (e expr) Print(indent int) string {
 	space := strings.Repeat(" ", indent)
 	switch e.etype {
 	case etName:
-		return fmt.Sprintf("%sexpr-target %q", space, e.target)
+		return fmt.Sprintf("%sexpr-target %q", space, e.str)
 	case etFunc:
 		var args string
 		for _, a := range e.args {
@@ -40,11 +39,11 @@ func (e expr) Print(indent int) string {
 		for k, v := range e.namedArgs {
 			args += strings.Repeat(" ", indent+2) + k + "=" + v.Print(0) + ",\n"
 		}
-		return fmt.Sprintf("%sexpr-func %s(\n%s%s)", space, e.target, args, space)
+		return fmt.Sprintf("%sexpr-func %s(\n%s%s)", space, e.str, args, space)
 	case etConst:
-		return fmt.Sprintf("%sexpr-const %v", space, e.val)
+		return fmt.Sprintf("%sexpr-const %v", space, e.float)
 	case etString:
-		return fmt.Sprintf("%sexpr-string %q", space, e.valStr)
+		return fmt.Sprintf("%sexpr-string %q", space, e.str)
 	}
 	return "HUH-SHOULD-NEVER-HAPPEN"
 }
