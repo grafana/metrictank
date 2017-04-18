@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	//"github.com/raintank/metrictank/idx"
+	"github.com/raintank/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -279,7 +279,7 @@ func TestDelete(t *testing.T) {
 	})
 }
 
-func TestDeleteWithLotsOfSeries(t *testing.T) {
+func TestDeleteNodeWith100kChildren(t *testing.T) {
 	ix := New()
 	ix.Init()
 
@@ -296,10 +296,28 @@ func TestDeleteWithLotsOfSeries(t *testing.T) {
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
-	Convey("when deleting 1 million series", t, func() {
-		defs, err := ix.Delete(1, "some.*")
-		So(err, ShouldBeNil)
-		So(defs, ShouldHaveLength, 100000)
+
+	Convey("when deleting 100k series", t, func() {
+		type resp struct {
+			defs []idx.Archive
+			err  error
+		}
+		done := make(chan *resp)
+		go func() {
+			defs, err := ix.Delete(1, "some.*")
+			done <- &resp{
+				defs: defs,
+				err:  err,
+			}
+		}()
+
+		select {
+		case <-time.After(time.Second * 10):
+			t.Fatal("deleting series took more then 10seconds.")
+		case response := <-done:
+			So(response.err, ShouldBeNil)
+			So(response.defs, ShouldHaveLength, 100000)
+		}
 	})
 }
 
