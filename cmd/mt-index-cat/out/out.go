@@ -53,7 +53,13 @@ func pattern(in string) string {
 }
 
 func Template(format string) func(d schema.MetricDefinition) {
-	tpl := template.Must(template.New("format").Parse(format + "\n"))
+	funcs := make(map[string]interface{})
+	funcs["pattern"] = pattern
+
+	// replace '\n' in the format string with actual newlines.
+	format = strings.Replace(format, "\\n", "\n", -1)
+
+	tpl := template.Must(template.New("format").Funcs(funcs).Parse(format))
 
 	return func(d schema.MetricDefinition) {
 		err := tpl.Execute(os.Stdout, d)

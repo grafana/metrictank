@@ -3,6 +3,8 @@ package api
 import (
 	"flag"
 	"net"
+	"net/http/httputil"
+	"net/url"
 
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -15,11 +17,15 @@ var (
 	logMinDurStr        string
 	logMinDur           uint32
 
-	Addr     string
-	UseSSL   bool
-	useGzip  bool
-	certFile string
-	keyFile  string
+	Addr             string
+	UseSSL           bool
+	useGzip          bool
+	certFile         string
+	keyFile          string
+	multiTenant      bool
+	fallbackGraphite string
+
+	graphiteProxy *httputil.ReverseProxy
 )
 
 func ConfigSetup() {
@@ -33,6 +39,8 @@ func ConfigSetup() {
 	apiCfg.BoolVar(&useGzip, "gzip", true, "use GZIP compression of all responses")
 	apiCfg.StringVar(&certFile, "cert-file", "", "SSL certificate file")
 	apiCfg.StringVar(&keyFile, "key-file", "", "SSL key file")
+	apiCfg.BoolVar(&multiTenant, "multi-tenant", true, "require x-org-id authentication to auth as a specific org. otherwise orgId 1 is assumed")
+	apiCfg.StringVar(&fallbackGraphite, "fallback-graphite-addr", "http://localhost:8080", "in case our /render endpoint does not support the requested processing, proxy the request to this graphite")
 	globalconf.Register("http", apiCfg)
 }
 
@@ -44,4 +52,10 @@ func ConfigProcess() {
 	if err != nil {
 		log.Fatal(4, "API listen address is not a valid TCP address.")
 	}
+
+	u, err := url.Parse(fallbackGraphite)
+	if err != nil {
+		log.Fatal(4, "API Cannot parse fallback-graphite-addr: %s", err)
+	}
+	graphiteProxy = NewGraphiteProxy(u)
 }

@@ -1,0 +1,7 @@
+{
+  "name":"mt-graphite-api",
+  "type":"graphite",
+  "url":"http://localhost:8080",
+  "access":"direct",
+  "isDefault":true
+}

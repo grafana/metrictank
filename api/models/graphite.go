@@ -16,6 +16,7 @@ type GraphiteRender struct {
 	Until         string   `json:"until" form:"until"`
 	To            string   `json:"to" form:"to"`
 	Format        string   `json:"format" form:"format" binding:"In(,json,msgp)"`
+	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
 }
 
 func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) binding.Errors {

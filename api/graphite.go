@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,9 +15,11 @@ import (
 	"github.com/raintank/metrictank/api/response"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/expr"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -24,6 +27,7 @@ var MissingOrgHeaderErr = errors.New("orgId not set in headers")
 var MissingQueryErr = errors.New("missing query param")
 var InvalidFormatErr = errors.New("invalid format specified")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
+var renderReqProxied = stats.NewCounter32("api.request.render.proxied")
 
 var (
 	// metric api.request.render.series is the number of series a /render request is handling.  This is the number
@@ -38,34 +42,6 @@ type Series struct {
 	Pattern string
 	Series  []idx.Node
 	Node    cluster.Node
-}
-
-func parseTarget(target string) (string, string, error) {
-	var consolidateBy string
-	// yes, i am aware of the arguably grossness of the below.
-	// however, it is solid based on the documented allowed input format.
-	// once we need to support several functions, we can implement
-	// a proper expression parser
-	if strings.HasPrefix(target, "consolidateBy(") {
-		var q1, q2 int
-		t := target
-		if t[len(t)-2:] == "')" && (strings.Contains(t, ",'") || strings.Contains(t, ", '")) && strings.Count(t, "'") == 2 {
-			q1 = strings.Index(t, "'")
-			q2 = strings.LastIndex(t, "'")
-		} else if t[len(t)-2:] == "\")" && (strings.Contains(t, ",\"") || strings.Contains(t, ", \"")) && strings.Count(t, "\"") == 2 {
-			q1 = strings.Index(t, "\"")
-			q2 = strings.LastIndex(t, "\"")
-		} else {
-			return "", "", response.NewError(http.StatusBadRequest, "target parse error")
-		}
-		consolidateBy = t[q1+1 : q2]
-		err := consolidation.Validate(consolidateBy)
-		if err != nil {
-			return "", "", err
-		}
-		target = t[strings.Index(t, "(")+1 : strings.LastIndex(t, ",")]
-	}
-	return target, consolidateBy, nil
 }
 
 func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
@@ -164,7 +140,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
+	defaultTo := uint32(now.Unix())
 
 	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
 	if err != nil {
@@ -178,124 +154,60 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	// in MT, both the external and internal api, from is inclusive, to is exclusive
-	// in graphite, from is exclusive and to inclusive
-	// so in this case, adjust for internal api.
-	fromUnix += 1
-	toUnix += 1
-
 	if fromUnix >= toUnix {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
 		return
 	}
 
-	reqs := make([]models.Req, 0)
+	// render API is modeled after graphite, so from exclusive, to inclusive.
+	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
+	// so we must adjust
+	fromUnix += 1
+	toUnix += 1
 
-	patterns := make([]string, 0)
-	type locatedDef struct {
-		def  idx.Archive
-		node cluster.Node
+	exprs, err := expr.ParseMany(targets)
+	if err != nil {
+		ctx.Error(http.StatusBadRequest, err.Error())
+		return
 	}
 
-	//locatedDefs[<pattern>][<def.id>]locatedDef
-	locatedDefs := make(map[string]map[string]locatedDef)
-	//targetForPattern[<pattern>]<target>
-	targetForPattern := make(map[string]string)
-	for _, target := range targets {
-		pattern, _, err := parseTarget(target)
-		if err != nil {
-			ctx.Error(http.StatusBadRequest, err.Error())
+	reqRenderTargetCount.Value(len(targets))
+
+	if request.Process == "none" {
+		ctx.Req.Request.Body = ctx.Body
+		graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+		renderReqProxied.Inc()
+		return
+	}
+
+	stable := request.Process == "stable"
+
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
+	if err != nil {
+		if fun, ok := err.(expr.ErrUnknownFunction); ok {
+			ctx.Req.Request.Body = ctx.Body
+			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+			proxyStats.Miss(string(fun))
+			renderReqProxied.Inc()
 			return
 		}
-		patterns = append(patterns, pattern)
-		targetForPattern[pattern] = target
-		locatedDefs[pattern] = make(map[string]locatedDef)
-
-	}
-
-	series, err := s.findSeries(ctx.OrgId, patterns, int64(fromUnix))
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-	}
-
-	for _, s := range series {
-		for _, metric := range s.Series {
-			if !metric.Leaf {
-				continue
-			}
-			for _, def := range metric.Defs {
-				locatedDefs[s.Pattern][def.Id] = locatedDef{def, s.Node}
-			}
-		}
-	}
-
-	for pattern, ldefs := range locatedDefs {
-		for _, locdef := range ldefs {
-			archive := locdef.def
-			// set consolidator that will be used to normalize raw data before feeding into processing functions
-			// not to be confused with runtime consolidation which happens in the graphite api, after all processing.
-			fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-			consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-			// target is like foo.bar or foo.* or consolidateBy(foo.*,'sum')
-			// pattern is like foo.bar or foo.*
-			// def.Name is like foo.concretebar
-			// so we want target to contain the concrete graphite name, potentially wrapped with consolidateBy().
-			target := strings.Replace(targetForPattern[pattern], pattern, archive.Name, -1)
-			reqs = append(reqs, models.NewReq(archive.Id, target, fromUnix, toUnix, request.MaxDataPoints, uint32(archive.Interval), consolidator, locdef.node, archive.SchemaId, archive.AggId))
-		}
-	}
-
-	reqRenderSeriesCount.Value(len(reqs))
-	reqRenderTargetCount.Value(len(request.Targets))
-
-	if len(reqs) == 0 {
-		if request.Format == "msgp" {
-			var series models.SeriesByTarget
-			response.Write(ctx, response.NewMsgp(200, series))
-		} else {
-			response.Write(ctx, response.NewJson(200, []string{}, ""))
-		}
+		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	if (toUnix - fromUnix) >= logMinDur {
-		log.Info("HTTP Render: INCOMING REQ %q from: %q, to: %q target cnt: %d, maxDataPoints: %d",
-			ctx.Req.Method, from, to, len(request.Targets), request.MaxDataPoints)
-	}
-
-	reqs, err = alignRequests(uint32(time.Now().Unix()), reqs)
+	out, err := s.executePlan(ctx.OrgId, plan)
 	if err != nil {
-		log.Error(3, "HTTP Render alignReq error: %s", err)
-		response.Write(ctx, response.WrapError(err))
+		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
-
-	if LogLevel < 2 {
-		for _, req := range reqs {
-			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.Name)
-		}
-	}
-
-	out, err := s.getTargets(reqs)
-	if err != nil {
-		log.Error(3, "HTTP Render %s", err.Error())
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-
-	merged := mergeSeries(out)
-	sort.Sort(models.SeriesByTarget(merged))
-	defer func() {
-		for _, serie := range out {
-			pointSlicePool.Put(serie.Datapoints[:0])
-		}
-	}()
+	sort.Sort(models.SeriesByTarget(out))
 
 	if request.Format == "msgp" {
-		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(merged)))
+		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
 	} else {
-		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(merged)))
+		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}
+	plan.Clean()
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
@@ -556,4 +468,80 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 	}
 
 	return resp.DeletedDefs, nil
+}
+
+// executePlan looks up the needed data, retrieves it, and then invokes the processing
+// note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
+// we will collect all the indidividual series from the peer, and then sum here. that could be optimized
+func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
+
+	minFrom := uint32(math.MaxUint32)
+	var maxTo uint32
+	var reqs []models.Req
+
+	// note that different patterns to query can have different from / to, so they require different index lookups
+	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
+	// note that in this case we fetch foo.* twice. can be optimized later
+	for _, r := range plan.Reqs {
+		series, err := s.findSeries(orgId, []string{r.Query}, int64(r.From))
+		if err != nil {
+			return nil, err
+		}
+
+		minFrom = util.Min(minFrom, r.From)
+		maxTo = util.Max(maxTo, r.To)
+
+		for _, s := range series {
+			for _, metric := range s.Series {
+				for _, archive := range metric.Defs {
+					// set consolidator that will be used to normalize raw data before feeding into processing functions
+					// not to be confused with runtime consolidation which happens after all processing.
+					fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+					consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+					reqs = append(reqs, models.NewReq(
+						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, s.Node, archive.SchemaId, archive.AggId))
+				}
+			}
+		}
+	}
+
+	reqRenderSeriesCount.Value(len(reqs))
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+
+	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
+	reqs, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	if err != nil {
+		log.Error(3, "HTTP Render alignReq error: %s", err)
+		return nil, err
+	}
+
+	if LogLevel < 2 {
+		for _, req := range reqs {
+			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.Name)
+		}
+	}
+
+	out, err := s.getTargets(reqs)
+	if err != nil {
+		log.Error(3, "HTTP Render %s", err.Error())
+		return nil, err
+	}
+	out = mergeSeries(out)
+
+	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
+	// if we need to cancel the request due to a fetch error
+
+	data := make(map[expr.Req][]models.Series)
+	for _, serie := range out {
+		q := expr.Req{
+			serie.QueryPatt,
+			serie.QueryFrom,
+			serie.QueryTo,
+		}
+		data[q] = append(data[q], serie)
+	}
+
+	return plan.Run(data)
 }

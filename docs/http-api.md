@@ -88,7 +88,7 @@ curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.
 
 ## Graphite query api
 
-This is the early beginning of a graphite-web/graphite-api replacement. It only returns JSON output
+This is the early beginning of a graphite-web/graphite-api replacement. It can return JSON or messagepack output
 This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-metrictank in front of metrictank, for now.
 
 ```
@@ -102,8 +102,16 @@ POST /render
   note: **no graphite functions are currently supported** except that
   you can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
   [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
-* from: see [timespec format](#tspec) (default: 24 ago) (exclusive)
+* from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
+* format: json or msgp (default: json)
+* process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions 
+  (as opposed to proxing to the fallback graphite).
+  - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
+  - stable: process request without fallback if we have all the needed functions and they are marked as stable.
+  - none: always defer to graphite for processing.
+
+  If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
 
 Data queried for must be stored under the given org or be public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
 

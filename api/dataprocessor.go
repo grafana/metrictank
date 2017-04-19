@@ -16,14 +16,6 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-const defaultPointSliceSize = 2000
-
-var pointSlicePool = sync.Pool{
-	// default size is probably bigger than what most responses need, but it saves [re]allocations
-	// also it's possible that occasionnally more size is needed, causing a realloc of underlying array, and that extra space will stick around until next GC run.
-	New: func() interface{} { return make([]schema.Point, 0, defaultPointSliceSize) },
-}
-
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
 func doRecover(errp *error) {
 	e := recover()
@@ -290,6 +282,9 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 					Target:     req.Target,
 					Datapoints: points,
 					Interval:   interval,
+					QueryPatt:  req.Pattern,
+					QueryFrom:  req.From,
+					QueryTo:    req.To,
 				}
 			}
 			wg.Done()
@@ -501,11 +496,23 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	return iters
 }
 
-// check for duplicate series names. If found merge the results.
+// check for duplicate series names for the same query. If found merge the results.
 func mergeSeries(in []models.Series) []models.Series {
-	seriesByTarget := make(map[string][]models.Series)
+	type segment struct {
+		target string
+		query  string
+		from   uint32
+		to     uint32
+	}
+	seriesByTarget := make(map[segment][]models.Series)
 	for _, series := range in {
-		seriesByTarget[series.Target] = append(seriesByTarget[series.Target], series)
+		s := segment{
+			series.Target,
+			series.QueryPatt,
+			series.QueryFrom,
+			series.QueryTo,
+		}
+		seriesByTarget[s] = append(seriesByTarget[s], series)
 	}
 	merged := make([]models.Series, len(seriesByTarget))
 	i := 0
