@@ -103,7 +103,7 @@ func testSumSeries(name string, in [][]models.Series, out models.Series, t *test
 	for _, i := range in {
 		input = append(input, i)
 	}
-	got, err := f.Exec(make(map[Req][]models.Series), input...)
+	got, err := f.Exec(make(map[Req][]models.Series), nil, input...)
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
@@ -184,7 +184,7 @@ func benchmarkSumSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f := NewSumSeries()
-		got, err := f.Exec(make(map[Req][]models.Series), interface{}(input))
+		got, err := f.Exec(make(map[Req][]models.Series), nil, interface{}(input))
 		if err != nil {
 			b.Fatalf("%s", err)
 		}

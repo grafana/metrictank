@@ -67,6 +67,86 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 	}, nil
 }
 
+// consumeArg verifies that the argument at pos j matches the expected argType
+// it's up to the caller to assure that j is valid before calling.
+// if argType allows for multiple arguments, j is advanced to cover all accepted arguments.
+// the returned j is always the index where the next argument should be.
+func consumeArg(args []*expr, j int, exp argType) (int, error) {
+	got := args[j]
+	switch exp {
+	case series:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+	case seriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+	case seriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(args) > j+1 && (args[j+1].etype == etName || args[j+1].etype == etFunc) {
+			j += 1
+		}
+	case integer:
+		if got.etype != etConst {
+			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+		}
+	case float:
+		if got.etype != etConst {
+			return 0, ErrBadArgumentStr{"float", string(got.etype)}
+		}
+	case str:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+		}
+	}
+	j += 1
+	return j, nil
+}
+
+// consumeKwarg consumes the kwarg (by key k) and verifies it
+// it's the callers responsability that k exists within namedArgs
+// it also makes sure the kwarg has not been consumed already via the kwargs map
+// (it would be an error to provide an argument twice via the same keyword,
+// or once positionally and once via keyword)
+func consumeKwarg(optArgs []optArg, namedArgs map[string]*expr, k string, seenKwargs map[string]struct{}) error {
+	var found bool
+	var exp optArg
+	for _, exp = range optArgs {
+		if exp.key == k {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrUnknownKwarg{k}
+	}
+	_, ok := seenKwargs[k]
+	if ok {
+		return ErrKwargSpecifiedTwice{k}
+	}
+	seenKwargs[k] = struct{}{}
+	got := namedArgs[k]
+	switch exp.val {
+	case integer:
+		if got.etype != etConst {
+			return ErrBadKwarg{k, integer, got.etype}
+		}
+	case float:
+		if got.etype != etConst {
+			return ErrBadKwarg{k, float, got.etype}
+		}
+	case str:
+		if got.etype != etString {
+			return ErrBadKwarg{k, str, got.etype}
+		}
+	}
+	return nil
+}
+
 func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	if e.etype != etFunc && e.etype != etName {
 		return nil, errors.New("request must be a function call or metric pattern")
@@ -93,59 +173,58 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	// against the arguments that were parsed.
 
 	fn := fdef.constr()
-	argsExp, _ := fn.Signature()
+	argsExp, argsOptExp, _ := fn.Signature()
+	var err error
 
-	// note that signature may have seriesLists in it, which means one or more args of type seriesList
-	// so it's legal to have more e.args then (signature) args in that case.
-	if len(e.args) < len(argsExp) {
-		return nil, ErrMissingArg
-	}
-	// j tracks pos in e.args of next given arg to process
-	j := 0
+	// note:
+	// * signature may have seriesLists in it, which means one or more args of type seriesList
+	//   so it's legal to have more e.args than signature args in that case.
+	// * we can't do extensive, accurate validation of the type here because what the output from a function we depend on
+	//   might be dynamically typed. e.g. movingAvg returns 1..N series depending on how many it got as input
+
+	// first validate the mandatory args
+
+	j := 0 // pos in args of next given arg to process
 	for _, argExp := range argsExp {
-		// we can't do extensive, accurate validation of the type here because what the output from a function we depend on
-		// might be dynamically typed. e.g. movingAvg returns 1..N series depending on how many it got as input
 		if len(e.args) <= j {
 			return nil, ErrMissingArg
 		}
-		argGot := e.args[j]
-		switch argExp {
-		case series:
-			if argGot.etype != etName && argGot.etype != etFunc {
-				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
-			}
-		case seriesList:
-			if argGot.etype != etName && argGot.etype != etFunc {
-				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
-			}
-		case seriesLists:
-			if argGot.etype != etName && argGot.etype != etFunc {
-				return nil, ErrBadArgumentStr{"func or name", string(argGot.etype)}
-			}
-			// special case! consume all subsequent args (if any) in e.args that will also yield a seriesList
-			for len(e.args) > j+1 && (e.args[j+1].etype == etName || e.args[j+1].etype == etFunc) {
-				j += 1
-			}
-		case integer:
-			if argGot.etype != etConst {
-				return nil, ErrBadArgumentStr{"int", string(argGot.etype)}
-			}
-		case float:
-			if argGot.etype != etConst {
-				return nil, ErrBadArgumentStr{"float", string(argGot.etype)}
-			}
-		case str:
-			if argGot.etype != etString {
-				return nil, ErrBadArgumentStr{"string", string(argGot.etype)}
-			}
+		j, err = consumeArg(e.args, j, argExp)
+		if err != nil {
+			return nil, err
 		}
-		j += 1
 	}
-	// when we stop iterating, j should be a non-existent pos
+
+	// we stopped iterating the mandatory args.
+	// any remaining args should be due to optional args otherwise there's too many
+	// we also track here which keywords can also be used for the given optional args
+	// so that those args should not be specified via their keys anymore.
+
+	seenKwargs := make(map[string]struct{})
+	for _, argOpt := range argsOptExp {
+		if len(e.args) <= j {
+			break // no more args specified. we're done.
+		}
+		j, err = consumeArg(e.args, j, argOpt.val)
+		if err != nil {
+			return nil, err
+		}
+		seenKwargs[argOpt.key] = struct{}{}
+	}
 	if len(e.args) > j {
 		return nil, ErrTooManyArg
 	}
-	err := fn.Init(e.args)
+
+	// for any provided keyword args, verify that they are what the function stipulated
+	// and that they have not already been specified via their position
+	for k := range e.namedArgs {
+		err = consumeKwarg(argsOptExp, e.namedArgs, k, seenKwargs)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	err = fn.Init(e.args, e.namedArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +277,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 		panic(fmt.Sprintf("cannot find func %q. this should never happen as we should have validated function existence earlier", e.str))
 	}
 	fn := fdef.constr()
-	err := fn.Init(e.args)
+	err := fn.Init(e.args, e.namedArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -221,8 +300,19 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 			results[i] = arg.float
 		}
 	}
+	named := make(map[string]interface{})
+	for k, arg := range e.namedArgs {
+		if arg.etype == etString {
+			named[k] = arg.str
+		} else if arg.etype == etConst {
+			named[k] = arg.float
+		} else {
+			panic(fmt.Sprintf("named arg cannot be of type %q", arg.etype))
+		}
+	}
+
 	// we now have all our args and can process the data and return
-	rets, err := fn.Exec(p.generated, results...)
+	rets, err := fn.Exec(p.generated, named, results...)
 	if err != nil {
 		return nil, err
 	}

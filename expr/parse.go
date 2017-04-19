@@ -42,6 +42,32 @@ func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
 }
 
+type ErrUnknownKwarg struct {
+	key string
+}
+
+func (e ErrUnknownKwarg) Error() string {
+	return fmt.Sprintf("unknown keyword argument %q", e)
+}
+
+type ErrBadKwarg struct {
+	key string
+	exp argType
+	got exprType
+}
+
+func (e ErrBadKwarg) Error() string {
+	return fmt.Sprintf("keyword argument %q bad type. expected %s - got %s", e.key, e.exp, e.got)
+}
+
+type ErrKwargSpecifiedTwice struct {
+	key string
+}
+
+func (e ErrKwargSpecifiedTwice) Error() string {
+	return fmt.Sprintf("keyword argument %q specified twice", e.key)
+}
+
 type MetricRequest struct {
 	Metric string
 	From   int32

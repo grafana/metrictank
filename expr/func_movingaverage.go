@@ -16,11 +16,11 @@ func NewMovingAverage() Func {
 }
 
 // note if input is 1 series, then output is too. not sure how to communicate that
-func (s *FuncMovingAverage) Signature() ([]argType, []argType) {
-	return []argType{seriesList, str}, []argType{seriesList}
+func (s *FuncMovingAverage) Signature() ([]argType, []optArg, []argType) {
+	return []argType{seriesList, str}, nil, []argType{seriesList}
 }
 
-func (s *FuncMovingAverage) Init(args []*expr) error {
+func (s *FuncMovingAverage) Init(args []*expr, namedArgs map[string]*expr) error {
 	if args[1].etype == etConst {
 		points, err := strconv.Atoi(args[1].str)
 		// TODO this is not correct. what really needs to happen here is figure out the interval of the data we will consume
@@ -43,7 +43,7 @@ func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {
 	return from - s.window, to
 }
 
-func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series, in ...interface{}) ([]interface{}, error) {
+func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series, named map[string]interface{}, in ...interface{}) ([]interface{}, error) {
 	//cache[Req{}] = append(cache[Req{}], out)
 	return nil, nil
 }

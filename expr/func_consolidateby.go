@@ -15,11 +15,11 @@ func NewConsolidateBy() Func {
 	return FuncConsolidateBy{}
 }
 
-func (s FuncConsolidateBy) Signature() ([]argType, []argType) {
-	return []argType{seriesList, str}, []argType{seriesList}
+func (s FuncConsolidateBy) Signature() ([]argType, []optArg, []argType) {
+	return []argType{seriesList, str}, nil, []argType{seriesList}
 }
 
-func (s FuncConsolidateBy) Init(args []*expr) error {
+func (s FuncConsolidateBy) Init(args []*expr, namedArgs map[string]*expr) error {
 	return consolidation.Validate(args[1].str)
 }
 
@@ -27,7 +27,7 @@ func (s FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncConsolidateBy) Exec(cache map[Req][]models.Series, inputs ...interface{}) ([]interface{}, error) {
+func (s FuncConsolidateBy) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
 	var out []interface{}
 	input := inputs[0]
 	seriesList, ok := input.([]models.Series)
