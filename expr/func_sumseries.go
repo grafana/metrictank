@@ -16,11 +16,11 @@ func NewSumSeries() Func {
 	return FuncSumSeries{}
 }
 
-func (s FuncSumSeries) Signature() ([]argType, []argType) {
-	return []argType{seriesLists}, []argType{series}
+func (s FuncSumSeries) Signature() ([]argType, []optArg, []argType) {
+	return []argType{seriesLists}, nil, []argType{series}
 }
 
-func (s FuncSumSeries) Init(args []*expr) error {
+func (s FuncSumSeries) Init(args []*expr, namedArgs map[string]*expr) error {
 	return nil
 }
 
@@ -28,7 +28,7 @@ func (s FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncSumSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}) ([]interface{}, error) {
+func (s FuncSumSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
 	var series []models.Series
 	for _, input := range inputs {
 		seriesList, ok := input.([]models.Series)

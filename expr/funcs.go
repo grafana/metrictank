@@ -15,23 +15,37 @@ const (
 	str                        // string
 )
 
+type optArg struct {
+	key string
+	val argType
+}
+
 type Func interface {
-	// Signature returns the list of argument types that must be provided as input, and those that will be returned
+	// Signature returns argument types for:
+	// * mandatory input arguments
+	// * optional, named input arguments. (they can be specified positionally or via keys if you want to specify params that come after un-specified optional params)
+	// * output (return values)
 	// NewPlan() will only create the plan of the expressions it parsed correspond to the signatures provided by the function
-	Signature() ([]argType, []argType)
-	// Init passes in the expressions parsed (they are pre-validated to correspond to the given signature via Signature() in terms of number and type)
+	Signature() ([]argType, []optArg, []argType)
+	// Init passes in the expressions parsed, both the mandatory arguments as well as the optional keyword arguments.
+	// they are pre-validated to correspond to the given signature via Signature() in terms of number and type.
 	// So that you can initialize internal state and perform deeper validation of arguments for functions that have specific requirements (e.g. a number argument that can only be even)
-	Init([]*expr) error
+	Init([]*expr, map[string]*expr) error
 	// NeedRange allows a func to express that to be able to return data in the given from to, it will need input data in the returned from-to window.
 	// (e.g. movingAverage of 5min needs data as of from-5min)
 	NeedRange(from, to uint32) (uint32, uint32)
 	// Exec executes the function with its arguments.
-	// it is passed in a map of all input data it may need as well as:
-	// etConst (number) -> float64
-	// etString -> str
-	// etName/etFunc -> []models.Series or models.Series if the previous function returned a series
+	// it is passed in:
+	// * a map of all input data it may need
+	// * a map of values for optional keyword arguments, in the following types:
+	//   etConst (number) -> float64
+	//   etString         -> str
+	// * mandatory arguments, in the following types:
+	//   etConst (number) -> float64
+	//   etString         -> str
+	//   etName/etFunc    -> []models.Series or models.Series if the previous function returned a series
 	// supported return values: models.Series, []models.Series
-	Exec(map[Req][]models.Series, ...interface{}) ([]interface{}, error)
+	Exec(map[Req][]models.Series, map[string]interface{}, ...interface{}) ([]interface{}, error)
 }
 
 type funcConstructor func() Func
