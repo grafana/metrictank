@@ -117,6 +117,10 @@ func (c *Carbon) Start(handler input.Handler) {
 	go c.accept()
 }
 
+// MaintainPriority is a no-op. priority for carbon not implemented
+func (c *Carbon) MaintainPriority() {
+}
+
 func (c *Carbon) accept() {
 	for {
 		conn, err := c.listener.AcceptTCP()
