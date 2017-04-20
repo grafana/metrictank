@@ -2,7 +2,7 @@
 
 env=$1
 
-WAIT_HOSTS=localhost:3000 ../../scripts/wait_for_endpoint.sh
+WAIT_HOSTS=localhost:3000 WAIT_TIMEOUT=120 ../../scripts/wait_for_endpoint.sh
 
 for file in $env/datasources/*; do
   echo "> adding datasources $file"

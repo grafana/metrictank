@@ -213,6 +213,18 @@
 			"revisionTime": "2016-01-05T22:08:40Z"
 		},
 		{
+			"checksumSHA1": "6s2IAJ1smhtl7YePdwZZ1J2zqeA=",
+			"path": "github.com/kisielk/og-rek",
+			"revision": "ec792bc6e6aa06a6c490e8d292e15cca173c8bd3",
+			"revisionTime": "2017-04-05T22:37:46Z"
+		},
+		{
+			"checksumSHA1": "o7abpsEIXBLz5n/khgI2QPRqSQA=",
+			"path": "github.com/kisielk/whisper-go/whisper",
+			"revision": "82e8091afdea241119c34a452fe24fcc2a0b962e",
+			"revisionTime": "2014-01-12T13:57:52Z"
+		},
+		{
 			"checksumSHA1": "+CqJGh7NIDMnHgScq9sl9tPrnVM=",
 			"path": "github.com/klauspost/compress/flate",
 			"revision": "14c9a76e3c95e47f8ccce949bba2c1101a8b85e6",
@@ -229,12 +241,6 @@
 			"path": "github.com/klauspost/cpuid",
 			"revision": "09cded8978dc9e80714c4d85b0322337b0a1e5e0",
 			"revisionTime": "2016-03-02T07:53:16Z"
-		},
-		{
-			"checksumSHA1": "o7abpsEIXBLz5n/khgI2QPRqSQA=",
-			"path": "github.com/kisielk/whisper-go/whisper",
-			"revision": "82e8091afdea241119c34a452fe24fcc2a0b962e",
-			"revisionTime": "2014-01-12T13:57:52Z"
 		},
 		{
 			"checksumSHA1": "7ttJJBMDGKL63tX23fNmW7r7NvQ=",

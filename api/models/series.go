@@ -56,3 +56,31 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 func (series SeriesByTarget) MarshalJSON() ([]byte, error) {
 	return series.MarshalJSONFast(nil)
 }
+
+type SeriesForPickle struct {
+	Name           string    `pickle:"name"`
+	Start          uint32    `pickle:"start"`
+	End            uint32    `pickle:"end"`
+	Step           uint32    `pickle:"step"`
+	Values         []float64 `pickle:"values"`
+	PathExpression string    `pickle:"pathExpression"`
+}
+
+func SeriesPickleFormat(data []Series) []SeriesForPickle {
+	result := make([]SeriesForPickle, len(data))
+	for i, s := range data {
+		datapoints := make([]float64, len(s.Datapoints))
+		for i, p := range s.Datapoints {
+			datapoints[i] = p.Val
+		}
+		result[i] = SeriesForPickle{
+			Name:           s.Target,
+			Start:          s.QueryFrom,
+			End:            s.QueryTo,
+			Step:           s.Interval,
+			Values:         datapoints,
+			PathExpression: s.QueryPatt,
+		}
+	}
+	return result
+}

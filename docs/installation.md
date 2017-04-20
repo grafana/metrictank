@@ -11,5 +11,5 @@ In-depth guides that guide you you through setting things up component by compon
 
 There are also some alternative approaches, such as:
 * [Installation from source](https://github.com/raintank/metrictank/blob/master/docs/installation-source.md)
-* [chef_metric_tank](https://github.com/raintank/chef_metric_tank)
+
 

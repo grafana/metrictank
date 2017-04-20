@@ -4,12 +4,10 @@
 
 We'll go over these in more detail below.
 
-* Cassandra. We run and recommend 3.0.8 .
+* Cassandra. We run and recommend 3.8 or newer
   See [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
-* Our [graphite-raintank finder plugin](https://github.com/raintank/graphite-metrictank)
-  and our [graphite-api fork](https://github.com/raintank/graphite-api/) (installed as 1 component)
-  We're working toward simplifying this much more.
-* Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite-api.
+* The latest (1.0.1 or newer) version of [Graphite](http://graphite.readthedocs.io/en/latest/install.html)
+* Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite.
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
   [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
 
@@ -25,8 +23,8 @@ instance or a cluster.  Metrictank will also respond to queries: if the data is 
 RAM, and older data is fetched from cassandra.  This happens transparantly.
 Metrictank maintains an index of metrics metadata, for all series it sees.  
 You can use an index entirely in memory, or backed by Cassandra for persistence.
-You'll typically query metrictank by querying graphite-api which uses the graphite-metrictank plugin to talk
-to metrictank.  You can also query metrictank directly but this is experimental and too early for anything useful.
+You can query metrictank directly (it has fast, but limited built-in processing and will fallback to graphite when needed)
+or you can also just query graphite which will always use graphite's processing but use metrictank as a datastore.
 
 ## Get a machine with root access
 
@@ -34,32 +32,7 @@ We recommend a server with at least 8GB RAM and a few CPU's.
 You need root access. All the commands shown assume you're root.
 
 
-## Metrictank and graphite-metrictank
-
-### Short version
-
-You can enable our repository and install the packages like so:
-
-```
-curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | bash
-apt-get install metrictank graphite-metrictank
-```
-
-Then just start it:
-
-```
-systemctl start graphite-metrictank
-```
-
-Or:
-
-```
-service graphite-metrictank start
-```
-
-Logs - if you need them - will be at /var/log/graphite/graphite-metrictank.log
-
-### Long version
+## Metrictank and graphite
 
 We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
 These packages are pushed to packagecloud.
@@ -67,7 +40,6 @@ These packages are pushed to packagecloud.
 You need to install these packages:
 
 * metrictank
-* graphite-metrictank (includes both our graphite-api variant as well as the graphite-metrictank finder plugin)
 
 Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/raintank/metrictank/releases)),
 whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
@@ -81,8 +53,38 @@ Supported distributions:
 * Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
 
+### Install Metrictank
+You can enable our repository and install the metrictank package like so:
+
+```
+curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.deb.sh | bash
+apt-get install metrictank
+```
 [more info](https://packagecloud.io/raintank/raintank/install)
 
+
+### Install Graphite
+
+Install Graphite via your prefered method as detailed at http://graphite.readthedocs.io/en/latest/install.html
+(We hope to provide Debian and Ubuntu packages in the near future.)
+
+Configure graphite with the following settings in local_settings.py
+```
+CLUSTER_SERVERS = ['localhost:6060']
+REMOTE_EXCLUDE_LOCAL = False
+USE_WORKER_POOL = True
+POOL_WORKERS_PER_BACKEND = 8
+POOL_WORKERS = 1
+REMOTE_FIND_TIMEOUT = 30.0
+REMOTE_FETCH_TIMEOUT = 60.0
+REMOTE_RETRY_DELAY = 60.0
+MAX_FETCH_RETRIES = 2
+FIND_CACHE_DURATION = 300
+REMOTE_STORE_USE_POST = True
+REMOTE_STORE_FORWARD_HEADERS = ["x-org-id"]
+REMOTE_PREFETCH_DATA = True
+STORAGE_FINDERS = ()
+```
 
 ## Set up cassandra
 
@@ -115,7 +117,7 @@ The log - should you need it - is at /var/log/cassandra/system.log
 
 ## Set up statsd
 
-You can optionally statsd or a statsd-compatible agent for instrumentation of graphite-api.
+You can optionally statsd or a statsd-compatible agent for instrumentation of graphite and optionally any of your other applications.
 
 You can install the official [statsd](https://github.com/etsy/statsd) (see its installation instructions)
 or an alternative. We recommend [raintank/statsdaemon](https://github.com/raintank/statsdaemon).
