@@ -571,7 +571,7 @@ func TestGetSeriesFixed(t *testing.T) {
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
 
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)
@@ -800,7 +800,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	store := mdata.NewMockStore()
 	srv.BindBackendStore(store)
 
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv.BindMemoryStore(metrics)
 	metric := "metric1"
 	var c *cache.CCache
@@ -975,7 +975,7 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	store := mdata.NewMockStore()
 
-	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 0, 0, 0)
+	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv, _ := NewServer()
 	srv.BindBackendStore(store)
 	srv.BindMemoryStore(metrics)

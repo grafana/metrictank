@@ -31,7 +31,7 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret conf.Retention, agg conf.Aggregation) *Aggregator {
+func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
 		panic("NewAggregator called without aggregations. this should never happen")
 	}
@@ -45,26 +45,26 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret c
 		switch agg {
 		case conf.Avg:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 			if aggregator.cntMetric == nil {
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 		case conf.Sum:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 		case conf.Lst:
 			if aggregator.lstMetric == nil {
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_lst_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.lstMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_lst_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 		case conf.Max:
 			if aggregator.maxMetric == nil {
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 		case conf.Min:
 			if aggregator.minMetric == nil {
-				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), conf.Retentions{ret}, nil)
+				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), conf.Retentions{ret}, nil, dropFirstChunk)
 			}
 		}
 	}

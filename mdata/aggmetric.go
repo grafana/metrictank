@@ -31,6 +31,7 @@ type AggMetric struct {
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*chunk.Chunk
 	aggregators     []*Aggregator
+	dropFirstChunk  bool
 	firstChunkT0    uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
@@ -42,25 +43,26 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, agg *conf.Aggregation) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
 
 	m := AggMetric{
-		cachePusher: cachePusher,
-		store:       store,
-		Key:         key,
-		ChunkSpan:   ret.ChunkSpan,
-		NumChunks:   ret.NumChunks,
-		Chunks:      make([]*chunk.Chunk, 0, ret.NumChunks),
-		ttl:         uint32(ret.MaxRetention()),
+		cachePusher:    cachePusher,
+		store:          store,
+		Key:            key,
+		ChunkSpan:      ret.ChunkSpan,
+		NumChunks:      ret.NumChunks,
+		Chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
+		dropFirstChunk: dropFirstChunk,
+		ttl:            uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	for _, ret := range retentions[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg))
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk))
 	}
 
 	return &m
@@ -314,6 +316,7 @@ func (a *AggMetric) persist(pos int) {
 		// a) there are 2 primary MT nodes both saving chunks to Cassandra
 		// b) a primary failed and this node was promoted to be primary but metric consuming is lagging.
 		// c) chunk was persisted by GC (stale) and then new data triggered another persist call
+		// d) dropFirstChunk is enabled and this is the first chunk
 		log.Debug("AM persist(): duplicate persist call for chunk.")
 		return
 	}
@@ -406,6 +409,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
 		a.lastWrite = uint32(time.Now().Unix())
+		if a.dropFirstChunk {
+			a.lastSaveStart = t0
+			a.lastSaveFinish = t0
+		}
 		a.addAggregators(ts, val)
 		return
 	}
