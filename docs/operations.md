@@ -138,3 +138,13 @@ The `go tool pprof` command will give you a command prompt.
 * type `list <regex matching type and function name>` to see a breakdown of lines of code of a function, along with the memory allocated by each line. (e.g. `list chunk.New`)
 Type exit (or ctrl-D) to exit the prompt.
 For more information on profiling see the excellent [Profiling Go Programs](https://blog.golang.org/profiling-go-programs) article.
+
+
+## data doesn't show up
+
+* make sure you specify a correct interval. sending minutely data with interval specified as 10s will result in 5 nulls for each point, which in combination with certain grafana display settings ("like nulls connected") may not show anything
+* make sure consumption from input works fine and is not lagging (see dashboard)
+* check if any points are being rejected, using the ingest chart on the dashboard (e.g. out of order, invalid)
+* can use debug logging to trace data throughout the pipeline. mt-store-cat to see what's in cassandra, mt-kafka-mdm-sniff, etc.
+* if it's old data, make sure you have a primary that can save data to cassandra, that the write queue can drain
+* check `metric-max-stale` and `chunk-max-stale` settings, make sure chunks are not being prematurely sealed (happens in some rare cases if you send data very infrequently. see `tank.add_to_closed_chunk` metric)
