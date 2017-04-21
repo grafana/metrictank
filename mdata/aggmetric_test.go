@@ -199,6 +199,33 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(true, 800, 1299, 1299, 1299)
 }
 
+func TestAggMetricDropFirstChunk(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	store := NewMockStore()
+	chunkSpan := uint32(10)
+	numChunks := uint32(5)
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, nil, true)
+	m.Add(10, 10)
+	m.Add(11, 11)
+	m.Add(12, 12)
+	m.Add(20, 20)
+	m.Add(21, 21)
+	m.Add(22, 22)
+	m.Add(30, 30)
+	m.Add(31, 31)
+	m.Add(32, 32)
+	m.Add(40, 40)
+	itgens, err := store.Search("foo", 0, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(itgens) != 2 || itgens[0].Ts != 20 || itgens[1].Ts != 30 {
+		t.Fatalf("expected 2 itgens for chunks 20 and 30 since the first one should be dropped. Got %v", itgens)
+	}
+}
+
 // basic expected RAM usage for 1 iteration (= 1 days)
 // 1000 metrics * (3600 * 24 / 10 ) points per metric * 1.3 B/point = 11 MB
 // 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
