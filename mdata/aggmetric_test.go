@@ -95,7 +95,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil)
+	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -131,7 +131,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil, false))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -224,7 +224,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
@@ -253,7 +253,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -282,7 +282,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -311,7 +311,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {

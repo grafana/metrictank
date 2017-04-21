@@ -55,6 +55,7 @@ var (
 	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Data:
+	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
@@ -267,7 +268,7 @@ func main() {
 	/***********************************
 		Initialize our MemoryStore
 	***********************************/
-	metrics = mdata.NewAggMetrics(store, ccache, chunkMaxStale, metricMaxStale, gcInterval)
+	metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, chunkMaxStale, metricMaxStale, gcInterval)
 
 	/***********************************
 		Initialize our Inputs
