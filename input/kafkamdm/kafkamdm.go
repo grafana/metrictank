@@ -216,8 +216,6 @@ func (k *KafkaMdm) Start(handler input.Handler) {
 			go k.consumePartition(topic, partition, offset)
 		}
 	}
-
-	go k.setClusterPrio()
 }
 
 // this will continually consume from the topic until k.stopConsuming is triggered.
@@ -313,14 +311,16 @@ func (k *KafkaMdm) Stop() {
 	offsetMgr.Close()
 }
 
-func (k *KafkaMdm) setClusterPrio() {
-	ticker := time.NewTicker(time.Second * 10)
-	for {
-		select {
-		case <-k.stopConsuming:
-			return
-		case <-ticker.C:
-			cluster.Manager.SetPriority(k.lagMonitor.Metric())
+func (k *KafkaMdm) MaintainPriority() {
+	go func() {
+		ticker := time.NewTicker(time.Second * 10)
+		for {
+			select {
+			case <-k.stopConsuming:
+				return
+			case <-ticker.C:
+				cluster.Manager.SetPriority(k.lagMonitor.Metric())
+			}
 		}
-	}
+	}()
 }

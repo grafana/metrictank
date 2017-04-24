@@ -366,6 +366,7 @@ func main() {
 			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
 		}
 		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, usg, plugin.Name()))
+		plugin.MaintainPriority()
 	}
 
 	// metric cluster.self.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary
