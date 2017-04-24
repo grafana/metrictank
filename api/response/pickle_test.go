@@ -111,3 +111,28 @@ func BenchmarkHttpRespPickleNulls(b *testing.B) {
 		resp.Close()
 	}
 }
+
+var foo []models.SeriesForPickle
+
+func BenchmarkConvertSeriesToPickleFormat10k(b *testing.B) {
+	points := make([]schema.Point, 10000)
+	baseTs := 1500000000
+	for i := 0; i < 10000; i++ {
+		points[i] = schema.Point{Val: 1.2345 * float64(i), Ts: uint32(baseTs + 10*i)}
+	}
+	data := []models.Series{
+		{
+			Target:     "foo",
+			Datapoints: points,
+			Interval:   10,
+		},
+	}
+	b.SetBytes(int64(len(points) * 12))
+
+	b.ResetTimer()
+	var bar []models.SeriesForPickle
+	for n := 0; n < b.N; n++ {
+		bar = models.SeriesPickleFormat(data)
+	}
+	foo = bar
+}
