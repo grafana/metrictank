@@ -210,7 +210,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	case "msgp":
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
 	case "pickle":
-		response.Write(ctx, response.NewPickle(200, models.SeriesPickleFormat(out)))
+		response.Write(ctx, response.NewPickle(200, models.SeriesByTarget(out)))
 	default:
 		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}

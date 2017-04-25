@@ -1,9 +1,11 @@
 package models
 
 import (
+	"bytes"
 	"math"
 	"strconv"
 
+	pickle "github.com/kisielk/og-rek"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -57,23 +59,18 @@ func (series SeriesByTarget) MarshalJSON() ([]byte, error) {
 	return series.MarshalJSONFast(nil)
 }
 
-type SeriesForPickle struct {
-	Name           string    `pickle:"name"`
-	Start          uint32    `pickle:"start"`
-	End            uint32    `pickle:"end"`
-	Step           uint32    `pickle:"step"`
-	Values         []float64 `pickle:"values"`
-	PathExpression string    `pickle:"pathExpression"`
-}
-
-func SeriesPickleFormat(data []Series) []SeriesForPickle {
-	result := make([]SeriesForPickle, len(data))
-	for i, s := range data {
-		datapoints := make([]float64, len(s.Datapoints))
-		for i, p := range s.Datapoints {
-			datapoints[i] = p.Val
+func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
+	data := make([]seriesForPickle, len(series))
+	for i, s := range series {
+		datapoints := make([]interface{}, len(s.Datapoints))
+		for j, p := range s.Datapoints {
+			if math.IsNaN(p.Val) {
+				datapoints[j] = pickle.None{}
+			} else {
+				datapoints[j] = p.Val
+			}
 		}
-		result[i] = SeriesForPickle{
+		data[i] = seriesForPickle{
 			Name:           s.Target,
 			Start:          s.QueryFrom,
 			End:            s.QueryTo,
@@ -82,5 +79,17 @@ func SeriesPickleFormat(data []Series) []SeriesForPickle {
 			PathExpression: s.QueryPatt,
 		}
 	}
-	return result
+	buffer := bytes.NewBuffer(buf)
+	encoder := pickle.NewEncoder(buffer)
+	err := encoder.Encode(data)
+	return buffer.Bytes(), err
+}
+
+type seriesForPickle struct {
+	Name           string        `pickle:"name"`
+	Start          uint32        `pickle:"start"`
+	End            uint32        `pickle:"end"`
+	Step           uint32        `pickle:"step"`
+	Values         []interface{} `pickle:"values"`
+	PathExpression string        `pickle:"pathExpression"`
 }
