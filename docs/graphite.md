@@ -1,4 +1,4 @@
-# Graphite-api
+# Graphite
 
 Metrictank aims to be able to provide as much processing power as it can: we're in the process
 of implementing [Graphite's extensive processing api](http://graphite.readthedocs.io/en/latest/functions.html) into metrictank itself.

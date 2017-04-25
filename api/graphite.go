@@ -185,6 +185,10 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
+			if request.NoProxy {
+				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
+				return
+			}
 			ctx.Req.Request.Body = ctx.Body
 			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
 			proxyStats.Miss(string(fun))
@@ -202,9 +206,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 	sort.Sort(models.SeriesByTarget(out))
 
-	if request.Format == "msgp" {
+	switch request.Format {
+	case "msgp":
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
-	} else {
+	case "pickle":
+		response.Write(ctx, response.NewPickle(200, models.SeriesPickleFormat(out)))
+	default:
 		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}
 	plan.Clean()
@@ -232,19 +239,14 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		}
 	}
 
-	var b interface{}
 	switch request.Format {
 	case "", "treejson", "json":
-		b, err = findTreejson(request.Query, nodes)
+		response.Write(ctx, response.NewJson(200, findTreejson(request.Query, nodes), request.Jsonp))
 	case "completer":
-		b, err = findCompleter(nodes)
+		response.Write(ctx, response.NewJson(200, findCompleter(nodes), request.Jsonp))
+	case "pickle":
+		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request)))
 	}
-
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-	response.Write(ctx, response.NewJson(200, b, request.Jsonp))
 }
 
 func (s *Server) listLocal(orgId int) []idx.Archive {
@@ -326,7 +328,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	response.Write(ctx, response.NewFastJson(200, models.MetricNames(series)))
 }
 
-func findCompleter(nodes []idx.Node) (models.SeriesCompleter, error) {
+func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 	var result = models.NewSeriesCompleter()
 	for _, g := range nodes {
 		c := models.SeriesCompleterItem{
@@ -347,12 +349,24 @@ func findCompleter(nodes []idx.Node) (models.SeriesCompleter, error) {
 		result.Add(c)
 	}
 
-	return result, nil
+	return result
+}
+
+func findPickle(nodes []idx.Node, request models.GraphiteFind) models.SeriesPickle {
+	result := make([]models.SeriesPickleItem, len(nodes))
+	var intervals [][]int64
+	if request.From != 0 && request.Until != 0 {
+		intervals = [][]int64{{request.From, request.Until}}
+	}
+	for i, g := range nodes {
+		result[i] = models.NewSeriesPickleItem(g.Path, g.Leaf, intervals)
+	}
+	return result
 }
 
 var treejsonContext = make(map[string]int)
 
-func findTreejson(query string, nodes []idx.Node) (models.SeriesTree, error) {
+func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	tree := models.NewSeriesTree()
 	seen := make(map[string]struct{})
 
@@ -392,7 +406,7 @@ func findTreejson(query string, nodes []idx.Node) (models.SeriesTree, error) {
 		}
 		tree.Add(&t)
 	}
-	return *tree, nil
+	return *tree
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {

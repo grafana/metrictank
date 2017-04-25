@@ -31,7 +31,7 @@ The stack will listen on the following ports:
 * 2003 tcp (metrictank's carbon input)
 * 3000 tcp (grafana's http port)
 * 6060 tcp (metrictank's internal endpoint)
-* 8080 tcp (the graphite api query endpoint)
+* 8080 tcp (the graphite query endpoint)
 * 8125 udp (statsd endpoint)
 * 9042 tcp (cassandra)
 
@@ -85,14 +85,15 @@ Add a new data source with with these settings:
 * Name: `metrictank`
 * Default: `yes`
 * Type: `Graphite`
-* Url: `http://localhost:8080`
-* Access: `direct` (not `proxy`)
+* Url: `http://metrictank:6060`
+* Access: `proxy`
 
 When you hit save, Grafana should succeed in talking to the data source.
 
 ![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/add-datasource-docker.png)
 
-Note: it also works with `proxy` mode but then you have to enter `http://graphite-api:8080` as uri.
+-Note: it also works with `direct` mode but then you have to enter `http://localhost:6060` as url.
+
 
 Now let's see some data.  If you go to `Dashboards`, `New` and add a new graph panel.
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
@@ -102,7 +103,8 @@ In the metrics tab you should see a bunch of metrics already in the root hierarc
 * `metrictank.usage`: usage metrics reported by metrictank.  See
 [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
 It may take a few minutes for the usage metrics to show up.
-* `stats`: these are metrics coming from graphite-api, aggregated by statsdaemon and sent back to metrictank every second.
+* `stats`: metrics aggregated by statsdaemon and sent into metrictank every second. Will only show up if something actually sends
+  metrics into statsdaemon (e.g. if graphite receives requests directly, you send stats to statsdaemon, etc)
 
 
 Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,

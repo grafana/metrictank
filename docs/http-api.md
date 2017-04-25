@@ -88,8 +88,8 @@ curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.
 
 ## Graphite query api
 
-This is the early beginning of a graphite-web/graphite-api replacement. It can return JSON or messagepack output
-This section of the api is **very early stages**.  Your best bet is to use graphite-api + graphite-metrictank in front of metrictank, for now.
+This is the early beginning of a graphite-web replacement. It can return JSON, pickle or messagepack output
+This section of the api is **very early stages**.  Your best bet is to use graphite in front of metrictank, for now.
 
 ```
 GET /render

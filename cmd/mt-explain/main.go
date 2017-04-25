@@ -58,7 +58,7 @@ func main() {
 	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
-			fmt.Printf("Unsupported function %q: must defer query to graphite-api\n", string(fun))
+			fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))
 			plan.Dump(os.Stdout)
 			return
 		}

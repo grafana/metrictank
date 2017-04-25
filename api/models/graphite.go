@@ -15,7 +15,8 @@ type GraphiteRender struct {
 	From          string   `json:"from" form:"from"`
 	Until         string   `json:"until" form:"until"`
 	To            string   `json:"to" form:"to"`
-	Format        string   `json:"format" form:"format" binding:"In(,json,msgp)"`
+	Format        string   `json:"format" form:"format" binding:"In(,json,msgp,pickle)"`
+	NoProxy       bool     `json:"local" form:"local"` //this is set to true by graphite-web when it passes request to cluster servers
 	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
 }
 
@@ -44,7 +45,7 @@ type GraphiteFind struct {
 	Query  string `json:"query" form:"query" binding:"Required"`
 	From   int64  `json:"from" form:"from"`
 	Until  int64  `json:"until" form:"until"`
-	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson)"`
+	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,pickle)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
 }
 
@@ -97,6 +98,22 @@ type SeriesCompleterItem struct {
 	Path   string `json:"path"`
 	Name   string `json:"name"`
 	IsLeaf string `json:"is_leaf"`
+}
+
+type SeriesPickle []SeriesPickleItem
+
+type SeriesPickleItem struct {
+	Path      string    `pickle:"path"`
+	IsLeaf    bool      `pickle:"isLeaf"`
+	Intervals [][]int64 `pickle:"intervals"` // list of (start,end) tuples
+}
+
+func NewSeriesPickleItem(path string, isLeaf bool, intervals [][]int64) SeriesPickleItem {
+	return SeriesPickleItem{
+		Path:      path,
+		IsLeaf:    isLeaf,
+		Intervals: intervals,
+	}
 }
 
 type SeriesTree []SeriesTreeItem

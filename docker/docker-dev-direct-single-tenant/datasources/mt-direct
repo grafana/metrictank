@@ -1,7 +1,0 @@
-{
-  "name":"mt-direct",
-  "type":"graphite",
-  "url":"http://localhost:6060",
-  "access":"direct",
-  "isDefault":false
-}

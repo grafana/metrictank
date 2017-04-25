@@ -1,0 +1,7 @@
+{
+  "name":"graphite",
+  "type":"graphite",
+  "url":"http://graphite:80",
+  "access":"proxy",
+  "isDefault":false
+}

@@ -15,6 +15,7 @@ services:
     environment:
      WAIT_HOSTS: cassandra:9042
      WAIT_TIMEOUT: 60
+     MT_HTTP_MULTI_TENANT: "false"
     links:
      - cassandra
 
@@ -27,16 +28,16 @@ services:
     ports:
      - "9042:9042"
 
-  graphite-api:
-    hostname: graphite-api
-    image: raintank/graphite-metrictank
+  graphite:
+    hostname: graphite
+    image: raintank/graphite-mt
     ports:
-     - "8080:8080"
-    links:
-     - metrictank
-     - statsdaemon
-    volumes:
-     - "../graphite-metrictank.yaml:/etc/graphite-metrictank/graphite-metrictank.yaml"
+     - "8080:80"
+    environment:
+      GRAPHITE_CLUSTER_SERVERS: metrictank:6060
+      GRAPHITE_STATSD_HOST: statsdaemon
+      WSGI_PROCESSES: 4
+      WSGI_THREADS: 25
 
   grafana:
     hostname: grafana

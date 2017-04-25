@@ -19,7 +19,7 @@ and bugs to fix.  It should be considered an *alpha* project.
 
 * no performance/availability isolation between tenants per instance. (only data isolation)
 * clustering is basic: statically defined peers, master promotions are manual, etc. See [clustering](https://github.com/raintank/metrictank/blob/master/docs/clustering.md) for more.
-* no computation locality: we move the data from storage to processing code, which is both metrictank and graphite-api.
+* minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
 * the datastructures can use performance engineering.   [A Go GC issue may occassionally inflate response times](https://github.com/golang/go/issues/14812).
 * the native input protocol is inefficient.  Should not send all metadata with each point.
 * we use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/raintank/metrictank/blob/master/docs/tags.md).
@@ -37,8 +37,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 ## main features
 
 * 100% open source
-* graphite is a first class citizen (note: currently requires a [fork of graphite-api](https://github.com/raintank/graphite-api/)
-  and the [graphite-metrictank](https://github.com/raintank/graphite-metrictank) plugin)
+* graphite is a first class citizen. As of graphite-1.0.1, metrictank can be used as a graphite CLUSTER_SERVER.
 * accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
@@ -71,7 +70,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
 * [Multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md)
 * [HTTP api](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
-* [Graphite-api](https://github.com/raintank/metrictank/blob/master/docs/graphite-api.md)
+* [Graphite](https://github.com/raintank/metrictank/blob/master/docs/graphite.md)
 * [Metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 * [Tags](https://github.com/raintank/metrictank/blob/master/docs/tags.md)
 * [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)

@@ -30,9 +30,8 @@ function run () {
 run '1A: MT simple series requests'                      6060 '{{.Name}}'                      1h 10   50s 10s
 run '1B: graphite simple series requests'                8080 '{{.Name}}'                      1h 10   50s 10s
 
-run '2A MT sumSeries(patterns.*) (no proxying)'          6060 'sumSeries({{.Name | pattern}})' 1h 250  25s 5s
-run '2B same but lower load since graphite cant do much' 6060 'sumSeries({{.Name | pattern}})' 1h 5    25s 5s
-run '2C graphite sumSeries(patterns.*)'                  8080 'sumSeries({{.Name | pattern}})' 1h 5    50s 10s
+run '2A MT sumSeries(patterns.*) (no proxying)'          6060 'sumSeries({{.Name | pattern}})' 1h 100  25s 5s
+run '2B graphite sumSeries(patterns.*)'                  8080 'sumSeries({{.Name | pattern}})' 1h 100  25s 5s
 
-run '3A MT load needing proxying'                        6060 'aliasByNode({{.Name}})'         1h 5    50s 10s
-run '3B graphite directly to see proxying overhead'      8080 'aliasByNode({{.Name}})'         1h 5    50s 10s
+run '3A MT load needing proxying'                        6060 'aliasByNode({{.Name}})'         1h 100  50s 10s
+run '3B graphite directly to see proxying overhead'      8080 'aliasByNode({{.Name}})'         1h 100  50s 10s
