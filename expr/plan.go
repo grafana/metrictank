@@ -102,6 +102,10 @@ func consumeArg(args []*expr, j int, exp argType) (int, error) {
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
+	case boolean:
+		if got.etype != etBool {
+			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+		}
 	}
 	j += 1
 	return j, nil
@@ -147,6 +151,7 @@ func consumeKwarg(optArgs []optArg, namedArgs map[string]*expr, k string, seenKw
 	return nil
 }
 
+// newplan adds requests as needed for the given expr, resolving function calls as needed
 func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	if e.etype != etFunc && e.etype != etName {
 		return nil, errors.New("request must be a function call or metric pattern")
@@ -169,10 +174,16 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 		return nil, ErrUnknownFunction(e.str)
 	}
 
-	// now comes the interesting task of validating the arguments as specified by the function,
+	fn := fdef.constr()
+	return newplanFunc(e, fn, from, to, stable, reqs)
+}
+
+// newplanFunc adds requests as needed for the given expr, and validates the function input
+// provided you already know the expression is a function call to the given function
+func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
+	// first comes the interesting task of validating the arguments as specified by the function,
 	// against the arguments that were parsed.
 
-	fn := fdef.constr()
 	argsExp, argsOptExp, _ := fn.Signature()
 	var err error
 
