@@ -2,6 +2,7 @@ package expr
 
 import "github.com/raintank/metrictank/api/models"
 
+//go:generate stringer -type=argType
 type argType uint8
 
 // argument types. to let functions describe their inputs and outputs
@@ -13,6 +14,7 @@ const (
 	integer                    // number without decimals
 	float                      // number potentially with decimals
 	str                        // string
+	boolean                    // True or False
 )
 
 type optArg struct {
@@ -59,12 +61,13 @@ var funcs map[string]funcDef
 
 func init() {
 	funcs = map[string]funcDef{
-		"alias":         {NewAlias, true},
-		"sum":           {NewSumSeries, true},
-		"sumSeries":     {NewSumSeries, true},
-		"avg":           {NewAvgSeries, true},
-		"averageSeries": {NewAvgSeries, true},
-		"movingAverage": {NewMovingAverage, false},
-		"consolidateBy": {NewConsolidateBy, true},
+		"alias":          {NewAlias, true},
+		"sum":            {NewSumSeries, true},
+		"sumSeries":      {NewSumSeries, true},
+		"avg":            {NewAvgSeries, true},
+		"averageSeries":  {NewAvgSeries, true},
+		"movingAverage":  {NewMovingAverage, false},
+		"consolidateBy":  {NewConsolidateBy, true},
+		"smartSummarize": {NewSmartSummarize, false},
 	}
 }

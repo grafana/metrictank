@@ -157,10 +157,23 @@ func TestParse(t *testing.T) {
 					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etName, str: "true"},
+					"key": {etype: etBool, str: "true", b: true},
 				},
 				argsStr: "metric, key=true",
 			},
+		},
+		{
+			"func(metric, False)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric"},
+					{etype: etBool, str: "False", b: false},
+				},
+				argsStr: "metric, False",
+			},
+			nil,
 		},
 		{
 			"func(metric, key=1)",

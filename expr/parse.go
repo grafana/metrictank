@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -91,6 +92,8 @@ func ParseMany(targets []string) ([]*expr, error) {
 	return out, nil
 }
 
+// Parses an expression string and turns it into an expression
+// also returns any leftover data that could not be parsed
 func Parse(e string) (*expr, string, error) {
 	// skip whitespace
 	for len(e) > 1 && e[0] == ' ' {
@@ -104,6 +107,14 @@ func Parse(e string) (*expr, string, error) {
 	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
 		val, valStr, e, err := parseConst(e)
 		return &expr{float: val, str: valStr, etype: etConst}, e, err
+	}
+
+	if strings.HasPrefix(e, "True") || strings.HasPrefix(e, "true") {
+		return &expr{b: true, str: e[:4], etype: etBool}, e[4:], nil
+	}
+
+	if strings.HasPrefix(e, "False") || strings.HasPrefix(e, "false") {
+		return &expr{b: false, str: e[:5], etype: etBool}, e[5:], nil
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
@@ -170,19 +181,15 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 				return "", nil, nil, "", ErrMissingComma
 			}
 
-			if argCont.etype != etConst && argCont.etype != etName && argCont.etype != etString {
-				return "", nil, nil, eCont, ErrBadArgumentStr{"const, name or string", string(argCont.etype)}
+			if argCont.etype != etConst && argCont.etype != etName && argCont.etype != etString && argCont.etype != etBool {
+				return "", nil, nil, eCont, ErrBadArgumentStr{"const, name, bool or string", string(argCont.etype)}
 			}
 
 			if namedArgs == nil {
 				namedArgs = make(map[string]*expr)
 			}
 
-			namedArgs[arg.str] = &expr{
-				etype: argCont.etype,
-				float: argCont.float,
-				str:   argCont.str,
-			}
+			namedArgs[arg.str] = argCont
 
 			e = eCont
 		} else {
