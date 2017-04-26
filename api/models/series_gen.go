@@ -52,6 +52,21 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
+		case "QueryPatt":
+			z.QueryPatt, err = dc.ReadString()
+			if err != nil {
+				return
+			}
+		case "QueryFrom":
+			z.QueryFrom, err = dc.ReadUint32()
+			if err != nil {
+				return
+			}
+		case "QueryTo":
+			z.QueryTo, err = dc.ReadUint32()
+			if err != nil {
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -64,9 +79,9 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 3
+	// map header, size 6
 	// write "Target"
-	err = en.Append(0x83, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	err = en.Append(0x86, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	if err != nil {
 		return err
 	}
@@ -98,15 +113,42 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
+	// write "QueryPatt"
+	err = en.Append(0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x74, 0x74)
+	if err != nil {
+		return err
+	}
+	err = en.WriteString(z.QueryPatt)
+	if err != nil {
+		return
+	}
+	// write "QueryFrom"
+	err = en.Append(0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x46, 0x72, 0x6f, 0x6d)
+	if err != nil {
+		return err
+	}
+	err = en.WriteUint32(z.QueryFrom)
+	if err != nil {
+		return
+	}
+	// write "QueryTo"
+	err = en.Append(0xa7, 0x51, 0x75, 0x65, 0x72, 0x79, 0x54, 0x6f)
+	if err != nil {
+		return err
+	}
+	err = en.WriteUint32(z.QueryTo)
+	if err != nil {
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 3
+	// map header, size 6
 	// string "Target"
-	o = append(o, 0x83, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	o = append(o, 0x86, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	o = msgp.AppendString(o, z.Target)
 	// string "Datapoints"
 	o = append(o, 0xaa, 0x44, 0x61, 0x74, 0x61, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x73)
@@ -120,6 +162,15 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Interval"
 	o = append(o, 0xa8, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
 	o = msgp.AppendUint32(o, z.Interval)
+	// string "QueryPatt"
+	o = append(o, 0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x74, 0x74)
+	o = msgp.AppendString(o, z.QueryPatt)
+	// string "QueryFrom"
+	o = append(o, 0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x46, 0x72, 0x6f, 0x6d)
+	o = msgp.AppendUint32(o, z.QueryFrom)
+	// string "QueryTo"
+	o = append(o, 0xa7, 0x51, 0x75, 0x65, 0x72, 0x79, 0x54, 0x6f)
+	o = msgp.AppendUint32(o, z.QueryTo)
 	return
 }
 
@@ -166,6 +217,21 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "QueryPatt":
+			z.QueryPatt, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				return
+			}
+		case "QueryFrom":
+			z.QueryFrom, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				return
+			}
+		case "QueryTo":
+			z.QueryTo, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -183,7 +249,7 @@ func (z *Series) Msgsize() (s int) {
 	for zxvk := range z.Datapoints {
 		s += z.Datapoints[zxvk].Msgsize()
 	}
-	s += 9 + msgp.Uint32Size
+	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size
 	return
 }
 
