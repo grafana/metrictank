@@ -8,10 +8,14 @@ import (
 )
 
 var (
-	ErrMissingArg         = errors.New("argument missing")
-	ErrTooManyArg         = errors.New("too many arguments")
-	ErrMissingTimeseries  = errors.New("missing time series argument")
-	ErrWildcardNotAllowed = errors.New("found wildcard where series expected")
+	ErrMissingArg          = errors.New("argument missing")
+	ErrTooManyArg          = errors.New("too many arguments")
+	ErrMissingTimeseries   = errors.New("missing time series argument")
+	ErrWildcardNotAllowed  = errors.New("found wildcard where series expected")
+	ErrMissingExpr         = errors.New("missing expression")
+	ErrMissingComma        = errors.New("missing comma")
+	ErrMissingQuote        = errors.New("missing quote")
+	ErrUnexpectedCharacter = errors.New("unexpected character")
 )
 
 type ErrBadArgument struct {
@@ -100,17 +104,6 @@ func Parse(e string) (*expr, string, error) {
 
 	return &expr{str: name, etype: etName}, e, nil
 }
-
-var (
-	// ErrMissingExpr is a parse error returned when an expression is missing.
-	ErrMissingExpr = errors.New("missing expression")
-	// ErrMissingComma is a parse error returned when an expression is missing a comma.
-	ErrMissingComma = errors.New("missing comma")
-	// ErrMissingQuote is a parse error returned when an expression is missing a quote.
-	ErrMissingQuote = errors.New("missing quote")
-	// ErrUnexpectedCharacter is a parse error returned when an expression contains an unexpected character.
-	ErrUnexpectedCharacter = errors.New("unexpected character")
-)
 
 func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 
@@ -274,7 +267,6 @@ func parseString(s string) (string, string, error) {
 		return "", "", ErrMissingQuote
 
 	}
-	//fmt.Println("> string", s[:i])
 
 	return s[:i], s[i+1:], nil
 }
