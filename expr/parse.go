@@ -17,6 +17,7 @@ var (
 	ErrMissingComma        = errors.New("missing comma")
 	ErrMissingQuote        = errors.New("missing quote")
 	ErrUnexpectedCharacter = errors.New("unexpected character")
+	ErrIllegalCharacter    = errors.New("illegal character for function name")
 )
 
 type ErrBadArgument struct {
@@ -129,6 +130,12 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if e != "" && e[0] == '(' {
+		for i := range name {
+			if !isFnChar(name[i]) {
+				return nil, "", ErrIllegalCharacter
+			}
+		}
+
 		exp := &expr{str: name, etype: etFunc}
 
 		argString, posArgs, namedArgs, e, err := parseArgList(e)
@@ -221,6 +228,13 @@ func isNameChar(r byte) bool {
 		r == '.' || r == '_' || r == '-' || r == '*' || r == '?' || r == ':' ||
 		r == '[' || r == ']' ||
 		r == '<' || r == '>'
+}
+
+func isFnChar(r byte) bool {
+	return false ||
+		'a' <= r && r <= 'z' ||
+		'A' <= r && r <= 'Z' ||
+		'0' <= r && r <= '9'
 }
 
 func isDigit(r byte) bool {

@@ -3,25 +3,27 @@ package expr
 import (
 	"reflect"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func TestParse(t *testing.T) {
 
 	tests := []struct {
-		s string
-		e *expr
+		s   string
+		e   *expr
+		err error
 	}{
 		{"metric",
 			&expr{str: "metric"},
+			nil,
 		},
 		{
 			"metric.foo",
 			&expr{str: "metric.foo"},
+			nil,
 		},
 		{"metric.*.foo",
 			&expr{str: "metric.*.foo"},
+			nil,
 		},
 		{
 			"func(metric)",
@@ -31,6 +33,7 @@ func TestParse(t *testing.T) {
 				args:    []*expr{{str: "metric"}},
 				argsStr: "metric",
 			},
+			nil,
 		},
 		{
 			"func(metric1,metric2,metric3)",
@@ -43,6 +46,7 @@ func TestParse(t *testing.T) {
 					{str: "metric3"}},
 				argsStr: "metric1,metric2,metric3",
 			},
+			nil,
 		},
 		{
 			"func1(metric1,func2(metricA, metricB),metric3)",
@@ -59,15 +63,18 @@ func TestParse(t *testing.T) {
 					{str: "metric3"}},
 				argsStr: "metric1,func2(metricA, metricB),metric3",
 			},
+			nil,
 		},
 
 		{
 			"3",
 			&expr{float: 3, str: "3", etype: etConst},
+			nil,
 		},
 		{
 			"3.1",
 			&expr{float: 3.1, str: "3.1", etype: etConst},
+			nil,
 		},
 		{
 			"func1(metric1, 3, 1e2, 2e-3)",
@@ -82,6 +89,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric1, 3, 1e2, 2e-3",
 			},
+			nil,
 		},
 		{
 			"func1(metric1, 'stringconst')",
@@ -94,6 +102,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric1, 'stringconst'",
 			},
+			nil,
 		},
 		{
 			`func1(metric1, "stringconst")`,
@@ -106,6 +115,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: `metric1, "stringconst"`,
 			},
+			nil,
 		},
 		{
 			"func1(metric1, -3)",
@@ -118,6 +128,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric1, -3",
 			},
+			nil,
 		},
 
 		{
@@ -132,6 +143,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric1, -3 , 'foo' ",
 			},
+			nil,
 		},
 
 		{
@@ -147,6 +159,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key='value'",
 			},
+			nil,
 		},
 		{
 			"func(metric, key=true)",
@@ -161,6 +174,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key=true",
 			},
+			nil,
 		},
 		{
 			"func(metric, False)",
@@ -188,6 +202,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key=1",
 			},
+			nil,
 		},
 		{
 			"func(metric, key=0.1)",
@@ -202,6 +217,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key=0.1",
 			},
+			nil,
 		},
 
 		{
@@ -218,6 +234,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, 1, key='value'",
 			},
+			nil,
 		},
 		{
 			"func(metric, key='value', 1)",
@@ -233,6 +250,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key='value', 1",
 			},
+			nil,
 		},
 		{
 			"func(metric, key1='value1', key2='value two is here')",
@@ -248,6 +266,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key1='value1', key2='value two is here'",
 			},
+			nil,
 		},
 		{
 			"func(metric, key2='value2', key1='value1')",
@@ -263,6 +282,7 @@ func TestParse(t *testing.T) {
 				},
 				argsStr: "metric, key2='value2', key1='value1'",
 			},
+			nil,
 		},
 
 		{
@@ -271,6 +291,7 @@ func TestParse(t *testing.T) {
 				str:   "foo.{bar,baz}.qux",
 				etype: etName,
 			},
+			nil,
 		},
 		{
 			`foo.b[0-9].qux`,
@@ -278,6 +299,7 @@ func TestParse(t *testing.T) {
 				str:   "foo.b[0-9].qux",
 				etype: etName,
 			},
+			nil,
 		},
 		{
 			`virt.v1.*.text-match:<foo.bar.qux>`,
@@ -285,17 +307,33 @@ func TestParse(t *testing.T) {
 				str:   "virt.v1.*.text-match:<foo.bar.qux>",
 				etype: etName,
 			},
+			nil,
+		},
+		{
+			`foo.()`,
+			nil,
+			ErrIllegalCharacter,
+		},
+		{
+			`foo.*()`,
+			nil,
+			ErrIllegalCharacter,
+		},
+		{
+			`foo.{bar,baz}.qux()`,
+			nil,
+			ErrIllegalCharacter,
 		},
 	}
 
 	for _, tt := range tests {
 		e, _, err := Parse(tt.s)
-		if err != nil {
-			t.Errorf("parse for %+v failed: err=%v", tt.s, err)
+		if err != tt.err {
+			t.Errorf("case %+v expected err %v, got %v", tt.s, tt.err, err)
 			continue
 		}
 		if !reflect.DeepEqual(e, tt.e) {
-			t.Errorf("parse for %+v failed:\ngot  %+s\nwant %+v", tt.s, spew.Sdump(e), spew.Sdump(tt.e))
+			t.Errorf("case %+v\nexp %+v\ngot %+s", tt.s, tt.e, e)
 		}
 	}
 }
