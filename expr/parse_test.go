@@ -3,6 +3,9 @@ package expr
 import (
 	"reflect"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 func TestParse(t *testing.T) {
@@ -333,7 +336,23 @@ func TestParse(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(e, tt.e) {
-			t.Errorf("case %+v\nexp %+v\ngot %+s", tt.s, tt.e, e)
+			spew.Config.DisablePointerAddresses = true
+			exp := spew.Sdump(tt.e)
+			got := spew.Sdump(e)
+			spew.Config.DisablePointerAddresses = false
+			dmp := diffmatchpatch.New()
+			diffs := dmp.DiffMain(exp, got, false)
+			format := `##### case %+v #####
+### expected ###
+%+v
+
+### got ###
+%s
+
+###diff ###
+%s`
+			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs))
 		}
+
 	}
 }
