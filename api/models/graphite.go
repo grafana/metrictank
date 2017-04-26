@@ -1,10 +1,12 @@
 package models
 
 import (
+	"bytes"
 	"sort"
 	"strconv"
 
 	"github.com/go-macaron/binding"
+	pickle "github.com/kisielk/og-rek"
 	"github.com/raintank/metrictank/idx"
 	"gopkg.in/macaron.v1"
 )
@@ -101,6 +103,13 @@ type SeriesCompleterItem struct {
 }
 
 type SeriesPickle []SeriesPickleItem
+
+func (s SeriesPickle) Pickle(buf []byte) ([]byte, error) {
+	buffer := bytes.NewBuffer(buf)
+	encoder := pickle.NewEncoder(buffer)
+	err := encoder.Encode(s)
+	return buffer.Bytes(), err
+}
 
 type SeriesPickleItem struct {
 	Path      string    `pickle:"path"`

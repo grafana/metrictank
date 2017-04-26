@@ -1,17 +1,16 @@
 package response
 
-import (
-	"bytes"
-	pickle "github.com/kisielk/og-rek"
-)
+type Picklable interface {
+	Pickle([]byte) ([]byte, error)
+}
 
 type Pickle struct {
 	code int
-	body interface{}
+	body Picklable
 	buf  []byte
 }
 
-func NewPickle(code int, body interface{}) *Pickle {
+func NewPickle(code int, body Picklable) *Pickle {
 	return &Pickle{
 		code: code,
 		body: body,
@@ -28,10 +27,9 @@ func (r *Pickle) Close() {
 }
 
 func (r *Pickle) Body() ([]byte, error) {
-	buffer := bytes.NewBuffer(r.buf)
-	encoder := pickle.NewEncoder(buffer)
-	err := encoder.Encode(r.body)
-	return buffer.Bytes(), err
+	var err error
+	r.buf, err = r.body.Pickle(r.buf)
+	return r.buf, err
 }
 
 func (r *Pickle) Headers() (headers map[string]string) {
