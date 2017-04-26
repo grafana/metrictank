@@ -75,10 +75,10 @@
 			"revisionTime": "2016-12-06T10:26:25Z"
 		},
 		{
-			"checksumSHA1": "jqSVRDK7dGg6E/NikVq1Kw6gdbA=",
+			"checksumSHA1": "dvabztWVQX8f6oMLRyv4dLH+TGY=",
 			"path": "github.com/davecgh/go-spew/spew",
-			"revision": "2df174808ee097f90d259e432cc04442cf60be21",
-			"revisionTime": "2015-06-18T03:34:22Z"
+			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
+			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
 			"checksumSHA1": "vwGGesK6k8uQgnwew609k9Jvcb8=",
