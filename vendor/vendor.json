@@ -129,12 +129,6 @@
 			"revisionTime": "2016-11-15T07:09:50Z"
 		},
 		{
-			"checksumSHA1": "haRuqyqK+tqXfyDqweX/hcaqWI0=",
-			"path": "github.com/go-macaron/gzip",
-			"revision": "74c0253ab1a1d77875291292fdd5116bb1d701ba",
-			"revisionTime": "2017-04-27T06:52:10Z"
-		},
-		{
 			"checksumSHA1": "y0olVbiMQ6/UOa/eh52XYnies90=",
 			"path": "github.com/go-macaron/inject",
 			"revision": "d8a0b8677191f4380287cfebd08e462217bac7ad",
@@ -295,6 +289,12 @@
 			"path": "github.com/raintank/dur",
 			"revision": "7b06fb4cf9324a785c2dedea9aa4e47769d54b92",
 			"revisionTime": "2016-07-13T16:23:06Z"
+		},
+		{
+			"checksumSHA1": "HOW65XEROtNmi5JnrjupZ2c/kEE=",
+			"path": "github.com/raintank/gziper",
+			"revision": "0b090e87c62876f0000068faac251d77b74e0ef0",
+			"revisionTime": "2017-04-27T18:40:40Z"
 		},
 		{
 			"checksumSHA1": "G5q2mryb77aa5RqtRSIiIXZpTcA=",
