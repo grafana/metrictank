@@ -72,6 +72,10 @@ func Gziper(options ...Options) macaron.Handler {
 		}
 
 		headers := ctx.Resp.Header()
+		if headers.Get(_HEADER_CONTENT_ENCODING) == "gzip" {
+			// the response has already been compressed.
+			return
+		}
 		headers.Set(_HEADER_CONTENT_ENCODING, "gzip")
 		headers.Set(_HEADER_VARY, _HEADER_ACCEPT_ENCODING)
 
