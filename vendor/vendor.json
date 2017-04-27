@@ -129,10 +129,10 @@
 			"revisionTime": "2016-11-15T07:09:50Z"
 		},
 		{
-			"checksumSHA1": "Rp4MJ0xFAy00EC0zlnwCpTEdYY8=",
+			"checksumSHA1": "haRuqyqK+tqXfyDqweX/hcaqWI0=",
 			"path": "github.com/go-macaron/gzip",
-			"revision": "cad1c6580a07c56f5f6bc52d66002a05985c5854",
-			"revisionTime": "2016-02-22T04:36:47Z"
+			"revision": "74c0253ab1a1d77875291292fdd5116bb1d701ba",
+			"revisionTime": "2017-04-27T06:52:10Z"
 		},
 		{
 			"checksumSHA1": "y0olVbiMQ6/UOa/eh52XYnies90=",
