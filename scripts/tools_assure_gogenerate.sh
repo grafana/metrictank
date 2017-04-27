@@ -4,7 +4,8 @@ go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp
 cd $GOPATH/src/github.com/raintank/metrictank/
 # stringer needs all packages to be installed to work
 # see https://github.com/golang/go/issues/10249
-go install ./...
+#go install ./...
+go install github.com/raintank/metrictank/vendor/github.com/hashicorp/memberlist github.com/raintank/metrictank/vendor/github.com/dgryski/go-tsz 
 go generate $(go list ./... | grep -v /vendor/)
 out=$(git status --short)
 if [ -n "$out" ]; then
