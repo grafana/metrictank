@@ -828,7 +828,7 @@
             },
             {
               "refId": "C",
-              "target": "alias(metrictank.stats.$environment.$instance.api.request.render.latency.max.gauge32, 'max')"
+              "target": "alias(consolidateBy(metrictank.stats.$environment.$instance.api.request.render.latency.max.gauge32, 'max'), 'max')"
             },
             {
               "refId": "D",
@@ -1243,10 +1243,6 @@
             {
               "alias": "/limit/",
               "linewidth": 1
-            },
-            {
-              "alias": "stats.production.timers.metrictank.metric-tank-3-prod.persist.latency.max",
-              "yaxis": 2
             }
           ],
           "span": 4,
@@ -1271,7 +1267,7 @@
             {
               "hide": false,
               "refId": "D",
-              "target": "alias(consolidateBy(metrictank.stats.$environment.$instance.persist.latency.max.gauge32, 'sum'), 'persist-duration max')"
+              "target": "alias(consolidateBy(metrictank.stats.$environment.$instance.persist.latency.max.gauge32, 'max'), 'persist-duration max')"
             }
           ],
           "thresholds": [],
@@ -2165,11 +2161,20 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.latency.{mean,p90,max}.gauge32, 5, 6, 8)"
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.latency.mean.gauge32, 5, 6, 8)"
             },
             {
               "refId": "B",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.*.latency.{mean,p90,max}.gauge32, 5, 6, 7, 9)",
+              "target": "aliasByNode(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.latency.{p90,max}.gauge32, 'max'), 5, 6, 8)"
+            },
+            {
+              "refId": "C",
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.*.latency.mean.gauge32, 5, 6, 7, 9)",
+              "textEditor": false
+            },
+            {
+              "refId": "D",
+              "target": "aliasByNode(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.*.latency.{p90,max}.gauge32, 'max'), 5, 6, 7, 9)",
               "textEditor": false
             }
           ],
