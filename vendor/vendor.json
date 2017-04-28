@@ -333,6 +333,12 @@
 			"revisionTime": "2016-06-18T19:32:21Z"
 		},
 		{
+			"checksumSHA1": "v7C+aJ1D/z3MEeCte6bxvpoGjM4=",
+			"path": "github.com/sergi/go-diff/diffmatchpatch",
+			"revision": "feef008d51ad2b3778f85d387ccf91735543008d",
+			"revisionTime": "2017-04-09T07:17:39Z"
+		},
+		{
 			"checksumSHA1": "r8yq1UeCPjRb4GO2NyHqEyFxb1w=",
 			"path": "github.com/smartystreets/assertions",
 			"revision": "443d812296a84445c202c085f19e18fc238f8250",
