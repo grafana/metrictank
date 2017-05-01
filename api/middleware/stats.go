@@ -72,6 +72,12 @@ func RequestStats() macaron.Handler {
 		ctx.Next()
 		status := rw.Status()
 		path := pathSlug(ctx.Req.URL.Path)
+		// graphite cluster requests use local=1
+		// this way we can differentiate "full" render requests from client to MT (encompassing data processing, proxing to graphite, etc)
+		// from "subrequests" where metrictank is called by graphite and graphite does the processing and returns to the client
+		if ctx.Req.Request.Form.Get("local") == "1" {
+			path += "-local"
+		}
 		stats.PathStatusCount(path, status)
 		stats.PathLatency(path, time.Since(start))
 		// only record the request size if the request succeeded.
