@@ -141,7 +141,7 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 		}
 		j += 1
 	}
-	// when we stop iterating, j should be a non-existant pos
+	// when we stop iterating, j should be a non-existent pos
 	if len(e.args) > j {
 		return nil, ErrTooManyArg
 	}
