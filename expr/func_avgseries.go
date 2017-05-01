@@ -16,11 +16,11 @@ func NewAvgSeries() Func {
 	return FuncAvgSeries{}
 }
 
-func (s FuncAvgSeries) Signature() ([]argType, []argType) {
-	return []argType{seriesLists}, []argType{series}
+func (s FuncAvgSeries) Signature() ([]argType, []optArg, []argType) {
+	return []argType{seriesLists}, nil, []argType{series}
 }
 
-func (s FuncAvgSeries) Init(args []*expr) error {
+func (s FuncAvgSeries) Init(args []*expr, namedArgs map[string]*expr) error {
 	return nil
 }
 
@@ -28,7 +28,7 @@ func (s FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}) ([]interface{}, error) {
+func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
 	var series []models.Series
 	for _, input := range inputs {
 		seriesList, ok := input.([]models.Series)

@@ -10,7 +10,8 @@ type exprType int
 
 // the following types let the parser express the type it parsed from the input targets
 const (
-	etName   exprType = iota // a string without quotes, e.g. metric.name, metric.*.query.patt* or special values like True or None which some functions expect
+	etName   exprType = iota // a string without quotes, e.g. metric.name, metric.*.query.patt* or special values like None which some functions expect
+	etBool                   // True or False
 	etFunc                   // a function call like movingAverage(foo, bar)
 	etConst                  // any number, parsed as a float64 value
 	etString                 // anything that was between '' or ""
@@ -20,7 +21,8 @@ const (
 type expr struct {
 	etype     exprType
 	float     float64          // for etConst
-	str       string           // for etName, etFunc (func name), etString and etConst (unparsed input value)
+	str       string           // for etName, etFunc (func name), etString, etBool and etConst (unparsed input value)
+	b         bool             // for etBool
 	args      []*expr          // for etFunc: positional args which itself are expressions
 	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
 	argsStr   string           // for etFunc: literal string of how all the args were specified
