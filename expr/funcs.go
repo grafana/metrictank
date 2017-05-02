@@ -71,5 +71,6 @@ func init() {
 		"smartSummarize": {NewSmartSummarize, false},
 		"sum":            {NewSumSeries, true},
 		"sumSeries":      {NewSumSeries, true},
+		"transformNull":  {NewTransformNull, true},
 	}
 }
