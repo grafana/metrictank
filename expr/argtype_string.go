@@ -4,9 +4,9 @@ package expr
 
 import "fmt"
 
-const _argType_name = "seriesseriesListseriesListsintegerfloatstrboolean"
+const _argType_name = "seriesseriesListseriesListsintegerintegersfloatstrboolean"
 
-var _argType_index = [...]uint8{0, 6, 16, 27, 34, 39, 42, 49}
+var _argType_index = [...]uint8{0, 6, 16, 27, 34, 42, 47, 50, 57}
 
 func (i argType) String() string {
 	if i >= argType(len(_argType_index)-1) {

@@ -356,3 +356,45 @@ func TestParse(t *testing.T) {
 
 	}
 }
+
+func TestExtractMetric(t *testing.T) {
+	var tests = []struct {
+		in  string
+		out string
+	}{
+		{
+			"foo",
+			"foo",
+		},
+		{
+			"perSecond(foo)",
+			"foo",
+		},
+		{
+			"foo.bar",
+			"foo.bar",
+		},
+		{
+			"perSecond(foo.bar",
+			"foo.bar",
+		},
+		{
+			"movingAverage(foo.bar,10)",
+			"foo.bar",
+		},
+		{
+			"scale(scaleToSeconds(nonNegativeDerivative(foo.bar),60),60)",
+			"foo.bar",
+		},
+		{
+			"divideSeries(foo.bar,baz.quux)",
+			"foo.bar",
+		},
+	}
+
+	for _, tt := range tests {
+		if m := extractMetric(tt.in); m != tt.out {
+			t.Errorf("extractMetric(%q)=%q, want %q", tt.in, m, tt.out)
+		}
+	}
+}
