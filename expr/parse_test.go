@@ -71,12 +71,12 @@ func TestParse(t *testing.T) {
 
 		{
 			"3",
-			&expr{float: 3, str: "3", etype: etConst},
+			&expr{i: 3, str: "3", etype: etInt},
 			nil,
 		},
 		{
 			"3.1",
-			&expr{float: 3.1, str: "3.1", etype: etConst},
+			&expr{float: 3.1, str: "3.1", etype: etFloat},
 			nil,
 		},
 		{
@@ -86,9 +86,9 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 				args: []*expr{
 					{str: "metric1"},
-					{float: 3, str: "3", etype: etConst},
-					{float: 100, str: "1e2", etype: etConst},
-					{float: 0.002, str: "2e-3", etype: etConst},
+					{i: 3, str: "3", etype: etInt},
+					{float: 100, str: "1e2", etype: etFloat},
+					{float: 0.002, str: "2e-3", etype: etFloat},
 				},
 				argsStr: "metric1, 3, 1e2, 2e-3",
 			},
@@ -127,7 +127,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 				args: []*expr{
 					{str: "metric1"},
-					{float: -3, str: "-3", etype: etConst},
+					{i: -3, str: "-3", etype: etInt},
 				},
 				argsStr: "metric1, -3",
 			},
@@ -141,7 +141,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 				args: []*expr{
 					{str: "metric1"},
-					{float: -3, str: "-3", etype: etConst},
+					{i: -3, str: "-3", etype: etInt},
 					{str: "foo", etype: etString},
 				},
 				argsStr: "metric1, -3 , 'foo' ",
@@ -201,7 +201,7 @@ func TestParse(t *testing.T) {
 					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etConst, str: "1", float: 1},
+					"key": {etype: etInt, str: "1", i: 1},
 				},
 				argsStr: "metric, key=1",
 			},
@@ -216,7 +216,7 @@ func TestParse(t *testing.T) {
 					{str: "metric"},
 				},
 				namedArgs: map[string]*expr{
-					"key": {etype: etConst, str: "0.1", float: 0.1},
+					"key": {etype: etFloat, str: "0.1", float: 0.1},
 				},
 				argsStr: "metric, key=0.1",
 			},
@@ -230,7 +230,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 				args: []*expr{
 					{str: "metric"},
-					{etype: etConst, str: "1", float: 1},
+					{etype: etInt, str: "1", i: 1},
 				},
 				namedArgs: map[string]*expr{
 					"key": {etype: etString, str: "value"},
@@ -246,7 +246,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 				args: []*expr{
 					{str: "metric"},
-					{etype: etConst, str: "1", float: 1},
+					{etype: etInt, str: "1", i: 1},
 				},
 				namedArgs: map[string]*expr{
 					"key": {etype: etString, str: "value"},

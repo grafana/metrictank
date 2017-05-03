@@ -13,15 +13,17 @@ const (
 	etName   exprType = iota // a string without quotes, e.g. metric.name, metric.*.query.patt* or special values like None which some functions expect
 	etBool                   // True or False
 	etFunc                   // a function call like movingAverage(foo, bar)
-	etConst                  // any number, parsed as a float64 value
+	etInt                    // any number with no decimal numbers, parsed as a float64 value
+	etFloat                  // any number with decimals, parsed as a float64 value
 	etString                 // anything that was between '' or ""
 )
 
 // expr represents a parsed expression
 type expr struct {
 	etype     exprType
-	float     float64          // for etConst
-	str       string           // for etName, etFunc (func name), etString, etBool and etConst (unparsed input value)
+	float     float64          // for etFloat
+	i         int64            // for etInt
+	str       string           // for etName, etFunc (func name), etString, etBool, etInt and etFloat (unparsed input value)
 	b         bool             // for etBool
 	args      []*expr          // for etFunc: positional args which itself are expressions
 	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
@@ -42,8 +44,10 @@ func (e expr) Print(indent int) string {
 			args += strings.Repeat(" ", indent+2) + k + "=" + v.Print(0) + ",\n"
 		}
 		return fmt.Sprintf("%sexpr-func %s(\n%s%s)", space, e.str, args, space)
-	case etConst:
-		return fmt.Sprintf("%sexpr-const %v", space, e.float)
+	case etFloat:
+		return fmt.Sprintf("%sexpr-float %v", space, e.float)
+	case etInt:
+		return fmt.Sprintf("%sexpr-int %v", space, e.i)
 	case etString:
 		return fmt.Sprintf("%sexpr-string %q", space, e.str)
 	}

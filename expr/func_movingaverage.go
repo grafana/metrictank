@@ -1,8 +1,6 @@
 package expr
 
 import (
-	"strconv"
-
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api/models"
 )
@@ -21,14 +19,13 @@ func (s *FuncMovingAverage) Signature() ([]argType, []optArg, []argType) {
 }
 
 func (s *FuncMovingAverage) Init(args []*expr, namedArgs map[string]*expr) error {
-	if args[1].etype == etConst {
-		points, err := strconv.Atoi(args[1].str)
+	if args[1].etype == etInt {
+		s.window = uint32(args[1].i)
 		// TODO this is not correct. what really needs to happen here is figure out the interval of the data we will consume
 		// and request from -= interval * points
 		// interestingly the from adjustment might mean the archive TTL is no longer sufficient and push the request into a different rollup archive, which we should probably
 		// account for. let's solve all of this later.
-		s.window = uint32(points)
-		return err
+		return nil
 	} else {
 		if args[1].etype != etString {
 			panic("internal error: MovingAverage cannot parse windowSize, should already have been validated")
