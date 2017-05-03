@@ -23,8 +23,12 @@ func (s *FuncTransformNull) Signature() ([]argType, []optArg, []argType) {
 
 func (s *FuncTransformNull) Init(args []*expr, kwargs map[string]*expr) error {
 	lastArg := args[len(args)-1]
-	if lastArg.etype != etFunc && lastArg.etype != etName {
+	if lastArg.etype == etFloat {
 		s.def = lastArg.float
+		s.explicit = true
+	}
+	if lastArg.etype == etInt {
+		s.def = float64(lastArg.i)
 		s.explicit = true
 	}
 	if a, ok := kwargs["default"]; ok {

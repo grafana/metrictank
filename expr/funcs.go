@@ -40,12 +40,14 @@ type Func interface {
 	// it is passed in:
 	// * a map of all input data it may need
 	// * a map of values for optional keyword arguments, in the following types:
-	//   etConst (number) -> float64
-	//   etString         -> str
+	//   etFloat  -> float64
+	//   etInt    -> int64
+	//   etString -> str
 	// * mandatory arguments, in the following types:
-	//   etConst (number) -> float64
-	//   etString         -> str
-	//   etName/etFunc    -> []models.Series or models.Series if the previous function returned a series
+	//   etFloat       -> float64
+	//   etInt         -> int64
+	//   etString      -> str
+	//   etName/etFunc -> []models.Series or models.Series if the previous function returned a series
 	// supported return values: models.Series, []models.Series
 	Exec(map[Req][]models.Series, map[string]interface{}, ...interface{}) ([]interface{}, error)
 }

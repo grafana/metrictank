@@ -4,9 +4,9 @@ package expr
 
 import "fmt"
 
-const _exprType_name = "etNameetBooletFuncetConstetString"
+const _exprType_name = "etNameetBooletFuncetIntetFloatetString"
 
-var _exprType_index = [...]uint8{0, 6, 12, 18, 25, 33}
+var _exprType_index = [...]uint8{0, 6, 12, 18, 23, 30, 38}
 
 func (i exprType) String() string {
 	if i < 0 || i >= exprType(len(_exprType_index)-1) {
