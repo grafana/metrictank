@@ -12,6 +12,7 @@ const (
 	seriesList                 // a list of series
 	seriesLists                // one or multiple seriesLists
 	integer                    // number without decimals
+	integers                   // one or multiple numbers without decimals
 	float                      // number potentially with decimals
 	str                        // string
 	boolean                    // True or False
@@ -65,6 +66,7 @@ func init() {
 	// keys must be sorted alphabetically. but functions with aliases can go together, in which case they are sorted by the first of their aliases
 	funcs = map[string]funcDef{
 		"alias":          {NewAlias, true},
+		"aliasByNode":    {NewAliasByNode, true},
 		"avg":            {NewAvgSeries, true},
 		"averageSeries":  {NewAvgSeries, true},
 		"consolidateBy":  {NewConsolidateBy, true},

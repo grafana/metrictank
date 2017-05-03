@@ -94,6 +94,14 @@ func consumeArg(args []*expr, j int, exp argType) (int, error) {
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
 		}
+	case integers:
+		if got.etype != etInt {
+			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield an integer
+		for len(args) > j+1 && args[j+1].etype == etInt {
+			j += 1
+		}
 	case float:
 		if got.etype != etFloat && got.etype != etInt {
 			return 0, ErrBadArgumentStr{"float", string(got.etype)}
