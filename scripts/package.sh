@@ -27,6 +27,7 @@ fpm -s dir -t deb \
   --deb-default ${BASE}/config/sysvinit/default/metrictank \
   --replaces metric-tank --provides metric-tank \
   --conflicts metric-tank \
+  --config-files /etc/metrictank/ \
   -C ${BUILD} -p ${PACKAGE_NAME} .
 
 ## ubuntu 14.04
@@ -47,6 +48,7 @@ fpm -s dir -t deb \
   --deb-upstart ${BASE}/config/upstart/metrictank \
   --replaces metric-tank --provides metric-tank \
   --conflicts metric-tank \
+  --config-files /etc/metrictank/ \
   -C ${BUILD} -p ${PACKAGE_NAME} .
 
 ## ubuntu 16.04, Debian 8, CentOS 7
@@ -108,4 +110,5 @@ fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --replaces metric-tank --provides metric-tank \
   --conflicts metric-tank \
+  --config-files /etc/metrictank/ \
   -C ${BUILD} -p ${PACKAGE_NAME} .
