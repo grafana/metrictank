@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
@@ -12,35 +11,45 @@ import (
 type FuncSumSeries struct {
 }
 
-func NewSumSeries() Func {
+func NewSumSeries() GraphiteFunc {
 	return FuncSumSeries{}
 }
 
-func (s FuncSumSeries) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesLists}, nil, []argType{series}
-}
-
-func (s FuncSumSeries) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
-}
-
-func (s FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
-}
-
-func (s FuncSumSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
-		}
-		series = append(series, seriesList...)
-
+// sumSeries(*seriesLists)
+func (s FuncSumSeries) Plan(args []*expr, namedArgs map[string]*expr, plan *Plan) (execHandler, error) {
+	// Validate arguments //
+	if len(args) < 1 {
+		return nil, ErrMissingArg
 	}
+	if len(namedArgs) > 0 {
+		return nil, ErrTooManyArg
+	}
+	handlers := make([]execHandler, len(args))
+	for i, expr := range args {
+		handler, err := plan.GetHandler(expr)
+		if err != nil {
+			return nil, err
+		}
+		handlers[i] = handler
+	}
+
+	return func(cache map[Req][]models.Series) ([]models.Series, error) {
+		var series []models.Series
+		for _, h := range handlers {
+			s, err := h(cache)
+			if err != nil {
+				return nil, err
+			}
+			series = append(series, s...)
+		}
+		return s.Exec(cache, series)
+	}, nil
+}
+
+func (s FuncSumSeries) Exec(cache map[Req][]models.Series, series []models.Series) ([]models.Series, error) {
 	if len(series) == 1 {
 		series[0].Target = fmt.Sprintf("sumSeries(%s)", series[0].QueryPatt)
-		return []interface{}{series[0]}, nil
+		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
@@ -66,5 +75,5 @@ func (s FuncSumSeries) Exec(cache map[Req][]models.Series, named map[string]inte
 		Interval:   series[0].Interval,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
-	return []interface{}{output}, nil
+	return []models.Series{output}, nil
 }

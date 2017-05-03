@@ -69,6 +69,8 @@ func (c Consolidator) Archive() string {
 
 func FromArchive(archive string) Consolidator {
 	switch archive {
+	case "avg":
+		return Avg
 	case "cnt":
 		return Cnt
 	case "lst":

@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -164,47 +165,60 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	// so we must adjust
 	fromUnix += 1
 	toUnix += 1
+	plans := make([]*expr.Plan, len(targets))
 
-	exprs, err := expr.ParseMany(targets)
-	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
-		return
+	stable := request.Process == "stable"
+	mustProxy := request.Process == "none"
+
+	for i, target := range targets {
+		if mustProxy {
+			continue
+		}
+		e, leftover, err := expr.Parse(target)
+		if err != nil {
+			ctx.Error(http.StatusBadRequest, err.Error())
+			return
+		}
+		if leftover != "" {
+			ctx.Error(http.StatusBadRequest, fmt.Sprintf("failed to parse %q fully. got leftover %q", target, leftover))
+			return
+		}
+		plan, err := expr.NewPlan(e, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
+		if err != nil {
+			if fun, ok := err.(expr.ErrUnknownFunction); ok {
+				if request.NoProxy {
+					ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
+					return
+				}
+				proxyStats.Miss(string(fun))
+				mustProxy = true
+			} else {
+				ctx.Error(http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+		plans[i] = plan
 	}
 
 	reqRenderTargetCount.Value(len(targets))
 
-	if request.Process == "none" {
+	if mustProxy {
 		ctx.Req.Request.Body = ctx.Body
 		graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
 		renderReqProxied.Inc()
 		return
 	}
 
-	stable := request.Process == "stable"
-
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
-	if err != nil {
-		if fun, ok := err.(expr.ErrUnknownFunction); ok {
-			if request.NoProxy {
-				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
-				return
-			}
-			ctx.Req.Request.Body = ctx.Body
-			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
-			proxyStats.Miss(string(fun))
-			renderReqProxied.Inc()
+	out := make([]models.Series, 0)
+	for _, plan := range plans {
+		targetOut, err := s.executePlan(ctx.OrgId, plan)
+		if err != nil {
+			ctx.Error(http.StatusBadRequest, err.Error())
 			return
 		}
-		ctx.Error(http.StatusBadRequest, err.Error())
-		return
+		sort.Sort(models.SeriesByTarget(targetOut))
+		out = append(out, targetOut...)
 	}
-
-	out, err := s.executePlan(ctx.OrgId, plan)
-	if err != nil {
-		ctx.Error(http.StatusBadRequest, err.Error())
-		return
-	}
-	sort.Sort(models.SeriesByTarget(out))
 
 	switch request.Format {
 	case "msgp":
@@ -214,7 +228,9 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	default:
 		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 	}
-	plan.Clean()
+	for _, plan := range plans {
+		plan.Clean()
+	}
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
@@ -487,7 +503,7 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
-func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
+func (s *Server) executePlan(orgId int, plan *expr.Plan) ([]models.Series, error) {
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32

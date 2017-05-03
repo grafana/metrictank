@@ -47,13 +47,11 @@ var dPerSecondMax255 = []schema.Point{
 func TestPerSecondSingle(t *testing.T) {
 	testPerSecond(
 		"identity",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					Interval:   10,
-					Target:     "a",
-					Datapoints: getCopy(a),
-				},
+				Interval:   10,
+				Target:     "a",
+				Datapoints: getCopy(a),
 			},
 		},
 		[]models.Series{
@@ -71,13 +69,11 @@ func TestPerSecondSingle(t *testing.T) {
 func TestPerSecondSingleMaxValue(t *testing.T) {
 	testPerSecond(
 		"identity-counter8bit",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					Interval:   10,
-					Target:     "counter8bit",
-					Datapoints: getCopy(d),
-				},
+				Interval:   10,
+				Target:     "counter8bit",
+				Datapoints: getCopy(d),
 			},
 		},
 		[]models.Series{
@@ -95,18 +91,16 @@ func TestPerSecondSingleMaxValue(t *testing.T) {
 func TestPerSecondMulti(t *testing.T) {
 	testPerSecond(
 		"multiple-series",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					Interval:   10,
-					Target:     "a",
-					Datapoints: getCopy(a),
-				},
-				{
-					Interval:   10,
-					Target:     "b.*",
-					Datapoints: getCopy(b),
-				},
+				Interval:   10,
+				Target:     "a",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				Target:     "b.*",
+				Datapoints: getCopy(b),
 			},
 		},
 		[]models.Series{
@@ -126,25 +120,22 @@ func TestPerSecondMulti(t *testing.T) {
 func TestPerSecondMultiMulti(t *testing.T) {
 	testPerSecond(
 		"multiple-serieslists",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					Interval:   10,
-					Target:     "a",
-					Datapoints: getCopy(a),
-				},
-				{
-					Interval:   10,
-					Target:     "b.foo{bar,baz}",
-					Datapoints: getCopy(b),
-				},
+				Interval:   10,
+				Target:     "a",
+				Datapoints: getCopy(a),
 			},
 			{
-				{
-					Interval:   10,
-					Target:     "movingAverage(bar, '1min')",
-					Datapoints: getCopy(c),
-				},
+				Interval:   10,
+				Target:     "b.foo{bar,baz}",
+				Datapoints: getCopy(b),
+			},
+
+			{
+				Interval:   10,
+				Target:     "movingAverage(bar, '1min')",
+				Datapoints: getCopy(c),
 			},
 		},
 		[]models.Series{
@@ -166,33 +157,17 @@ func TestPerSecondMultiMulti(t *testing.T) {
 	)
 }
 
-func testPerSecond(name string, in [][]models.Series, out []models.Series, max float64, t *testing.T) {
-	f := NewPerSecond()
-	var input []interface{}
-	for _, i := range in {
-		input = append(input, i)
-	}
-	if max != 0 {
-		kwargs := map[string]*expr{
-			"maxValue": {
-				float: max,
-			},
-		}
-		f.Init([]*expr{{etype: etName}}, kwargs)
-	}
-	gots, err := f.Exec(make(map[Req][]models.Series), nil, input...)
+func testPerSecond(name string, input []models.Series, out []models.Series, max float64, t *testing.T) {
+	f := FuncPerSecond{}
+	gots, err := f.Exec(make(map[Req][]models.Series), max, input)
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(gots) != len(out) {
 		t.Fatalf("case %q: perSecond len output expected %d, got %d", name, len(out), len(gots))
 	}
-	for i, got := range gots {
+	for i, g := range gots {
 		exp := out[i]
-		g, ok := got.(models.Series)
-		if !ok {
-			t.Fatalf("case %q: expected output of models.Series type", name)
-		}
 		if g.Target != exp.Target {
 			t.Fatalf("case %q: expected target %q, got %q", name, exp.Target, g.Target)
 		}

@@ -1,38 +1,50 @@
 package expr
 
 import (
-	"reflect"
-
 	"github.com/raintank/metrictank/api/models"
 )
 
 type FuncAlias struct {
 }
 
-func NewAlias() Func {
+func NewAlias() GraphiteFunc {
 	return FuncAlias{}
 }
 
-func (s FuncAlias) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesList, str}, nil, []argType{seriesList}
-}
-
-func (s FuncAlias) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
-}
-
-func (s FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
-}
-
-func (s FuncAlias) Exec(cache map[Req][]models.Series, named map[string]interface{}, in ...interface{}) ([]interface{}, error) {
-	series, ok := in[0].([]models.Series)
-	if !ok {
-		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
+// alias(seriesList, newName)
+func (s FuncAlias) Plan(args []*expr, namedArgs map[string]*expr, plan *Plan) (execHandler, error) {
+	// Validate arguments ///
+	if len(args) > 2 || len(namedArgs) > 0 {
+		return nil, ErrTooManyArg
 	}
-	var out []interface{}
+	if len(args) < 1 {
+		return nil, ErrMissingArg
+	}
+
+	if args[1].etype != etString {
+		return nil, ErrBadArgumentStr{"string", string(args[1].etype)}
+	}
+
+	alias := args[1].str
+
+	handler, err := plan.GetHandler(args[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return func(cache map[Req][]models.Series) ([]models.Series, error) {
+		series, err := handler(cache)
+		if err != nil {
+			return nil, err
+		}
+		return s.Exec(cache, alias, series)
+	}, nil
+}
+
+func (s FuncAlias) Exec(cache map[Req][]models.Series, alias string, series []models.Series) ([]models.Series, error) {
+	var out []models.Series
 	for _, serie := range series {
-		serie.Target = in[1].(string)
+		serie.Target = alias
 		out = append(out, serie)
 	}
 	return out, nil

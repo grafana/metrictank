@@ -13,17 +13,17 @@ import (
 func TestSumSeriesIdentity(t *testing.T) {
 	testSumSeries(
 		"identity",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					QueryPatt:  "single",
-					Datapoints: getCopy(a),
-				},
+				QueryPatt:  "single",
+				Datapoints: getCopy(a),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(single)",
-			Datapoints: getCopy(a),
+		[]models.Series{
+			{
+				Target:     "sumSeries(single)",
+				Datapoints: getCopy(a),
+			},
 		},
 		t,
 	)
@@ -31,17 +31,17 @@ func TestSumSeriesIdentity(t *testing.T) {
 func TestSumSeriesQueryToSingle(t *testing.T) {
 	testSumSeries(
 		"query-to-single",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(a),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(foo.*)",
-			Datapoints: getCopy(a),
+		[]models.Series{
+			{
+				Target:     "sumSeries(foo.*)",
+				Datapoints: getCopy(a),
+			},
 		},
 		t,
 	)
@@ -49,21 +49,21 @@ func TestSumSeriesQueryToSingle(t *testing.T) {
 func TestSumSeriesMultipleSameQuery(t *testing.T) {
 	testSumSeries(
 		"sum-multiple-series",
-		[][]models.Series{
+		[]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(b),
-				},
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(a),
+			},
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(b),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(foo.*)",
-			Datapoints: getCopy(sumab),
+		[]models.Series{
+			{
+				Target:     "sumSeries(foo.*)",
+				Datapoints: getCopy(sumab),
+			},
 		},
 		t,
 	)
@@ -71,49 +71,42 @@ func TestSumSeriesMultipleSameQuery(t *testing.T) {
 func TestSumSeriesMultipleDiffQuery(t *testing.T) {
 	testSumSeries(
 		"sum-multiple-serieslists",
-		[][]models.Series{
+		[]models.Series{
+
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(b),
-				},
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(a),
 			},
 			{
-				{
-					QueryPatt:  "movingAverage(bar, '1min')",
-					Datapoints: getCopy(c),
-				},
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(b),
+			},
+			{
+				QueryPatt:  "movingAverage(bar, '1min')",
+				Datapoints: getCopy(c),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
-			Datapoints: getCopy(sumabc),
+		[]models.Series{
+			{
+				Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
+				Datapoints: getCopy(sumabc),
+			},
 		},
 		t,
 	)
 }
 
-func testSumSeries(name string, in [][]models.Series, out models.Series, t *testing.T) {
-	f := NewSumSeries()
-	var input []interface{}
-	for _, i := range in {
-		input = append(input, i)
-	}
-	got, err := f.Exec(make(map[Req][]models.Series), nil, input...)
+func testSumSeries(name string, input []models.Series, output []models.Series, t *testing.T) {
+	f := FuncSumSeries{}
+	got, err := f.Exec(make(map[Req][]models.Series), input)
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
-	g, ok := got[0].(models.Series)
-	if !ok {
-		t.Fatalf("case %q: expected sum output of models.Series type", name)
-	}
+	g := got[0]
+	out := output[0]
 	if g.Target != out.Target {
 		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
 	}
@@ -183,8 +176,8 @@ func benchmarkSumSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f := NewSumSeries()
-		got, err := f.Exec(make(map[Req][]models.Series), nil, interface{}(input))
+		f := FuncSumSeries{}
+		got, err := f.Exec(make(map[Req][]models.Series), input)
 		if err != nil {
 			b.Fatalf("%s", err)
 		}

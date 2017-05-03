@@ -10,59 +10,72 @@ import (
 )
 
 type FuncPerSecond struct {
-	maxValue float64
 }
 
-func NewPerSecond() Func {
-	return &FuncPerSecond{}
+func NewPerSecond() GraphiteFunc {
+	return FuncPerSecond{}
 }
 
-func (s *FuncPerSecond) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesList}, []optArg{{"maxValue", integer}}, []argType{series}
-}
-
-func (s *FuncPerSecond) Init(args []*expr, kwargs map[string]*expr) error {
-	s.maxValue = math.NaN()
+// perSecond(seriesList, maxValue=None)
+func (s FuncPerSecond) Plan(args []*expr, namedArgs map[string]*expr, plan *Plan) (execHandler, error) {
+	// Validate arguments ///
+	if len(args) > 2 || len(namedArgs) > 1 {
+		return nil, ErrTooManyArg
+	}
+	if len(args) < 1 {
+		return nil, ErrMissingArg
+	}
+	maxValue := math.NaN()
 	lastArg := args[len(args)-1]
 	if lastArg.etype != etFunc && lastArg.etype != etName {
-		s.maxValue = lastArg.float
-		if s.maxValue <= 0 {
-			return errors.New("maxValue must be integer > 0")
+		maxValue = lastArg.float
+		if maxValue <= 0 {
+			return nil, errors.New("maxValue must be integer > 0")
 		}
-		frac := math.Mod(s.maxValue, 1)
+		frac := math.Mod(maxValue, 1)
 		if frac != 0 {
-			return errors.New("maxValue must be integer > 0")
+			return nil, errors.New("maxValue must be integer > 0")
 		}
 	}
-	if a, ok := kwargs["maxValue"]; ok {
-		s.maxValue = a.float
-		if s.maxValue <= 0 {
-			return errors.New("maxValue must be integer > 0")
+	if a, ok := namedArgs["maxValue"]; ok {
+		maxValue = a.float
+		if maxValue <= 0 {
+			return nil, errors.New("maxValue must be integer > 0")
 		}
-		frac := math.Mod(s.maxValue, 1)
+		frac := math.Mod(maxValue, 1)
 		if frac != 0 {
-			return errors.New("maxValue must be integer > 0")
+			return nil, errors.New("maxValue must be integer > 0")
+		}
+	} else if len(args) == 2 {
+		if args[1].etype != etConst {
+			return nil, ErrBadArgumentStr{"const", string(args[1].etype)}
+		}
+		maxValue = args[1].float
+		if maxValue <= 0 {
+			return nil, errors.New("maxValue must be integer > 0")
+		}
+		frac := math.Mod(maxValue, 1)
+		if frac != 0 {
+			return nil, errors.New("maxValue must be integer > 0")
 		}
 	}
 
-	return nil
+	handler, err := plan.GetHandler(args[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return func(cache map[Req][]models.Series) ([]models.Series, error) {
+		series, err := handler(cache)
+		if err != nil {
+			return nil, err
+		}
+		return s.Exec(cache, maxValue, series)
+	}, nil
 }
 
-func (s *FuncPerSecond) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
-}
-
-func (s *FuncPerSecond) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
-	var outputs []interface{}
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			break // no more series on input. we hit maxValue parameter
-		}
-		series = append(series, seriesList...)
-
-	}
+func (s FuncPerSecond) Exec(cache map[Req][]models.Series, maxValue float64, series []models.Series) ([]models.Series, error) {
+	var outputs []models.Series
 	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for i, v := range serie.Datapoints {
@@ -74,8 +87,8 @@ func (s *FuncPerSecond) Exec(cache map[Req][]models.Series, named map[string]int
 			diff := v.Val - serie.Datapoints[i-1].Val
 			if diff >= 0 {
 				out[i].Val = diff / float64(serie.Interval)
-			} else if !math.IsNaN(s.maxValue) && s.maxValue >= v.Val {
-				out[i].Val = (s.maxValue + diff + 1) / float64(serie.Interval)
+			} else if !math.IsNaN(maxValue) && maxValue >= v.Val {
+				out[i].Val = (maxValue + diff + 1) / float64(serie.Interval)
 			} else {
 				out[i].Val = math.NaN()
 			}

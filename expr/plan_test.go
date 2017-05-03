@@ -10,7 +10,7 @@ func TestNewPlan(t *testing.T) {
 
 	from := uint32(1000)
 	to := uint32(2000)
-	stable := true
+	stable := false
 
 	cases := []struct {
 		name      string
@@ -143,7 +143,7 @@ func TestNewPlan(t *testing.T) {
 		},
 	}
 
-	fn := NewSmartSummarize()
+	//fn := NewSmartSummarize()
 	for i, c := range cases {
 		e := &expr{
 			etype:     etFunc,
@@ -151,12 +151,15 @@ func TestNewPlan(t *testing.T) {
 			args:      c.args,
 			namedArgs: c.namedArgs,
 		}
-		req, err := newplanFunc(e, fn, from, to, stable, nil)
+		p, err := NewPlan(e, from, to, 0, stable, nil)
 		if !reflect.DeepEqual(err, c.expErr) {
 			t.Errorf("case %d: %q, expected error %v - got %v", i, c.name, c.expErr, err)
 		}
-		if !reflect.DeepEqual(req, c.expReq) {
-			t.Errorf("case %d: %q, expected req %v - got %v", i, c.name, c.expReq, req)
+		if p == nil {
+			p = &Plan{}
+		}
+		if !reflect.DeepEqual(p.Reqs, c.expReq) {
+			t.Errorf("case %d: %q, expected req %v - got %v", i, c.name, c.expReq, p.Reqs)
 		}
 	}
 }

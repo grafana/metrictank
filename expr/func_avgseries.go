@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
@@ -12,36 +11,42 @@ import (
 type FuncAvgSeries struct {
 }
 
-func NewAvgSeries() Func {
+func NewAvgSeries() GraphiteFunc {
 	return FuncAvgSeries{}
 }
 
-func (s FuncAvgSeries) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesLists}, nil, []argType{series}
-}
-
-func (s FuncAvgSeries) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
-}
-
-func (s FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
-}
-
-func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
+// averageSeries(*seriesLists)
+func (s FuncAvgSeries) Plan(args []*expr, namedArgs map[string]*expr, plan *Plan) (execHandler, error) {
+	// Validate arguments //
+	if len(args) < 1 {
+		return nil, ErrMissingArg
+	}
+	if len(namedArgs) > 0 {
+		return nil, ErrTooManyArg
+	}
+	handlers := make([]execHandler, len(args))
+	for i, expr := range args {
+		handler, err := plan.GetHandler(expr)
+		if err != nil {
+			return nil, err
 		}
-		series = append(series, seriesList...)
+		handlers[i] = handler
+	}
 
-	}
-	if len(series) == 1 {
-		series[0].Target = fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
-		return []interface{}{series[0]}, nil
-	}
+	return func(cache map[Req][]models.Series) ([]models.Series, error) {
+		var series []models.Series
+		for _, h := range handlers {
+			s, err := h(cache)
+			if err != nil {
+				return nil, err
+			}
+			series = append(series, s...)
+		}
+		return s.Exec(cache, series)
+	}, nil
+}
+
+func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, series []models.Series) ([]models.Series, error) {
 	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
 		num := 0
@@ -70,5 +75,5 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, named map[string]inte
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 
-	return []interface{}{output}, nil
+	return []models.Series{output}, nil
 }

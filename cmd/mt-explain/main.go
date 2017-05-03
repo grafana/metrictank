@@ -49,21 +49,26 @@ func main() {
 		log.Fatal(err)
 	}
 
-	exps, err := expr.ParseMany(targets)
-	if err != nil {
-		fmt.Println("Error while parsing:", err)
-		return
-	}
-
-	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, nil)
-	if err != nil {
-		if fun, ok := err.(expr.ErrUnknownFunction); ok {
-			fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))
-			plan.Dump(os.Stdout)
+	for _, target := range targets {
+		e, leftOver, err := expr.Parse(target)
+		if err != nil {
+			fmt.Println("Error while parsing:", err)
 			return
 		}
-		fmt.Println("Error while planning", err)
-		return
+		if leftOver != "" {
+			fmt.Printf("Error while parsing: failed to parse %q fully. got leftover %q", target, leftOver)
+			return
+		}
+
+		plan, err := expr.NewPlan(e, fromUnix, toUnix, uint32(*mdp), *stable, nil)
+		if err != nil {
+			if fun, ok := err.(expr.ErrUnknownFunction); ok {
+				fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))
+				return
+			}
+			fmt.Println("Error while planning", err)
+			return
+		}
+		plan.Dump(os.Stdout)
 	}
-	plan.Dump(os.Stdout)
 }
