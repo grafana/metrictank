@@ -28,7 +28,7 @@ func (s *FuncTransformNull) Init(args []*expr, kwargs map[string]*expr) error {
 		s.explicit = true
 	}
 	if lastArg.etype == etInt {
-		s.def = float64(lastArg.i)
+		s.def = float64(lastArg.int)
 		s.explicit = true
 	}
 	if a, ok := kwargs["default"]; ok {

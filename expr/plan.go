@@ -316,7 +316,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 		} else if arg.etype == etString {
 			results[i] = arg.str
 		} else if arg.etype == etInt {
-			results[i] = arg.i
+			results[i] = arg.int
 		} else {
 			// etype == etFloat
 			results[i] = arg.float
@@ -327,7 +327,7 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 		if arg.etype == etString {
 			named[k] = arg.str
 		} else if arg.etype == etInt {
-			named[k] = arg.i
+			named[k] = arg.int
 		} else if arg.etype == etFloat {
 			named[k] = arg.float
 		} else {

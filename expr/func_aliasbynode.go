@@ -20,7 +20,7 @@ func (s *FuncAliasByNode) Signature() ([]argType, []optArg, []argType) {
 
 func (s *FuncAliasByNode) Init(args []*expr, namedArgs map[string]*expr) error {
 	for _, i := range args[1:] {
-		s.nodes = append(s.nodes, int(i.i))
+		s.nodes = append(s.nodes, int(i.int))
 	}
 	return nil
 }

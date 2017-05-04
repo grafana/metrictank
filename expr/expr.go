@@ -22,9 +22,9 @@ const (
 type expr struct {
 	etype     exprType
 	float     float64          // for etFloat
-	i         int64            // for etInt
+	int       int64            // for etInt
 	str       string           // for etName, etFunc (func name), etString, etBool, etInt and etFloat (unparsed input value)
-	b         bool             // for etBool
+	bool      bool             // for etBool
 	args      []*expr          // for etFunc: positional args which itself are expressions
 	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
 	argsStr   string           // for etFunc: literal string of how all the args were specified
@@ -47,7 +47,7 @@ func (e expr) Print(indent int) string {
 	case etFloat:
 		return fmt.Sprintf("%sexpr-float %v", space, e.float)
 	case etInt:
-		return fmt.Sprintf("%sexpr-int %v", space, e.i)
+		return fmt.Sprintf("%sexpr-int %v", space, e.int)
 	case etString:
 		return fmt.Sprintf("%sexpr-string %q", space, e.str)
 	}
