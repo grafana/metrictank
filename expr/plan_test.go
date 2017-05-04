@@ -37,7 +37,7 @@ func TestNewPlan(t *testing.T) {
 				{etype: etName, str: "foo.bar.*"},
 				{etype: etString, str: "1hour"},
 				{etype: etString, str: "sum"},
-				{etype: etBool, b: true},
+				{etype: etBool, bool: true},
 			},
 			nil,
 			[]Req{
@@ -53,7 +53,7 @@ func TestNewPlan(t *testing.T) {
 			},
 			map[string]*expr{
 				"func":        {etype: etString, str: "sum"},
-				"alignToFrom": {etype: etBool, b: true},
+				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
 				{"foo.bar.*", from, to},
@@ -68,7 +68,7 @@ func TestNewPlan(t *testing.T) {
 				{etype: etString, str: "sum"},
 			},
 			map[string]*expr{
-				"alignToFrom": {etype: etBool, b: true},
+				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
 				{"foo.bar.*", from, to},
@@ -81,11 +81,11 @@ func TestNewPlan(t *testing.T) {
 				{etype: etName, str: "foo.bar.*"},
 				{etype: etString, str: "1hour"},
 				{etype: etString, str: "sum"},
-				{etype: etBool, b: true},
+				{etype: etBool, bool: true},
 			},
 			map[string]*expr{
 				"func":        {etype: etString, str: "sum"},
-				"alignToFrom": {etype: etBool, b: true},
+				"alignToFrom": {etype: etBool, bool: true},
 			},
 			nil,
 			ErrKwargSpecifiedTwice{"func"},
@@ -99,7 +99,7 @@ func TestNewPlan(t *testing.T) {
 			},
 			map[string]*expr{
 				"func":        {etype: etString, str: "sum"},
-				"alignToFrom": {etype: etBool, b: true},
+				"alignToFrom": {etype: etBool, bool: true},
 			},
 			nil,
 			ErrKwargSpecifiedTwice{"func"},
@@ -125,7 +125,7 @@ func TestNewPlan(t *testing.T) {
 				{etype: etString, str: "1hour"},
 			},
 			map[string]*expr{
-				"alignToFrom": {etype: etBool, b: true},
+				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
 				{"foo.bar.*", from, to},

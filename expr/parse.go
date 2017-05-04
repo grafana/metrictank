@@ -110,11 +110,11 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if strings.HasPrefix(e, "True") || strings.HasPrefix(e, "true") {
-		return &expr{b: true, str: e[:4], etype: etBool}, e[4:], nil
+		return &expr{bool: true, str: e[:4], etype: etBool}, e[4:], nil
 	}
 
 	if strings.HasPrefix(e, "False") || strings.HasPrefix(e, "false") {
-		return &expr{b: false, str: e[:5], etype: etBool}, e[5:], nil
+		return &expr{bool: false, str: e[:5], etype: etBool}, e[5:], nil
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
@@ -261,7 +261,7 @@ func parseConst(s string) (*expr, string, error) {
 		return &expr{float: v, str: s[:i], etype: etFloat}, s[i:], err
 	}
 	v, err := strconv.ParseInt(s[:i], 10, 64)
-	return &expr{i: v, str: s[:i], etype: etInt}, s[i:], err
+	return &expr{int: v, str: s[:i], etype: etInt}, s[i:], err
 }
 
 func parseName(s string) (string, string) {
