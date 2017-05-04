@@ -91,11 +91,19 @@ func consumeArg(args []*expr, j int, exp argType) (int, error) {
 			j += 1
 		}
 	case integer:
-		if got.etype != etConst {
+		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
 		}
+	case integers:
+		if got.etype != etInt {
+			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield an integer
+		for len(args) > j+1 && args[j+1].etype == etInt {
+			j += 1
+		}
 	case float:
-		if got.etype != etConst {
+		if got.etype != etFloat && got.etype != etInt {
 			return 0, ErrBadArgumentStr{"float", string(got.etype)}
 		}
 	case str:
@@ -136,11 +144,12 @@ func consumeKwarg(optArgs []optArg, namedArgs map[string]*expr, k string, seenKw
 	got := namedArgs[k]
 	switch exp.val {
 	case integer:
-		if got.etype != etConst {
+		if got.etype != etInt {
 			return ErrBadKwarg{k, integer, got.etype}
 		}
 	case float:
-		if got.etype != etConst {
+		// integer is also a valid float, just happened to have no decimals
+		if got.etype != etInt && got.etype != etFloat {
 			return ErrBadKwarg{k, float, got.etype}
 		}
 	case str:
@@ -306,8 +315,10 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 			results[i] = result
 		} else if arg.etype == etString {
 			results[i] = arg.str
+		} else if arg.etype == etInt {
+			results[i] = arg.int
 		} else {
-			// etype == etConst
+			// etype == etFloat
 			results[i] = arg.float
 		}
 	}
@@ -315,7 +326,9 @@ func (p Plan) run(from, to uint32, e *expr) ([]models.Series, error) {
 	for k, arg := range e.namedArgs {
 		if arg.etype == etString {
 			named[k] = arg.str
-		} else if arg.etype == etConst {
+		} else if arg.etype == etInt {
+			named[k] = arg.int
+		} else if arg.etype == etFloat {
 			named[k] = arg.float
 		} else {
 			panic(fmt.Sprintf("named arg cannot be of type %q", arg.etype))

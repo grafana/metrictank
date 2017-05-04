@@ -17,3 +17,4 @@ averageSeries(seriesLists) series                    | avg          | Stable
 consolidateBy(seriesList, func) seriesList           |              | Stable
 movingAverage(seriesLists, windowSize) seriesList    |              | Unstable
 sumSeries(seriesLists) series                        | sum          | Stable
+transformNull(seriesList, default=0) seriesList      |              | Stable

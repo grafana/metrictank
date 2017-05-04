@@ -12,6 +12,7 @@ const (
 	seriesList                 // a list of series
 	seriesLists                // one or multiple seriesLists
 	integer                    // number without decimals
+	integers                   // one or multiple numbers without decimals
 	float                      // number potentially with decimals
 	str                        // string
 	boolean                    // True or False
@@ -40,12 +41,14 @@ type Func interface {
 	// it is passed in:
 	// * a map of all input data it may need
 	// * a map of values for optional keyword arguments, in the following types:
-	//   etConst (number) -> float64
-	//   etString         -> str
+	//   etFloat  -> float64
+	//   etInt    -> int64
+	//   etString -> str
 	// * mandatory arguments, in the following types:
-	//   etConst (number) -> float64
-	//   etString         -> str
-	//   etName/etFunc    -> []models.Series or models.Series if the previous function returned a series
+	//   etFloat       -> float64
+	//   etInt         -> int64
+	//   etString      -> str
+	//   etName/etFunc -> []models.Series or models.Series if the previous function returned a series
 	// supported return values: models.Series, []models.Series
 	Exec(map[Req][]models.Series, map[string]interface{}, ...interface{}) ([]interface{}, error)
 }
@@ -63,6 +66,7 @@ func init() {
 	// keys must be sorted alphabetically. but functions with aliases can go together, in which case they are sorted by the first of their aliases
 	funcs = map[string]funcDef{
 		"alias":          {NewAlias, true},
+		"aliasByNode":    {NewAliasByNode, true},
 		"avg":            {NewAvgSeries, true},
 		"averageSeries":  {NewAvgSeries, true},
 		"consolidateBy":  {NewConsolidateBy, true},
@@ -71,5 +75,6 @@ func init() {
 		"smartSummarize": {NewSmartSummarize, false},
 		"sum":            {NewSumSeries, true},
 		"sumSeries":      {NewSumSeries, true},
+		"transformNull":  {NewTransformNull, true},
 	}
 }

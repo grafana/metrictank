@@ -106,16 +106,15 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
-		val, valStr, e, err := parseConst(e)
-		return &expr{float: val, str: valStr, etype: etConst}, e, err
+		return parseConst(e)
 	}
 
 	if strings.HasPrefix(e, "True") || strings.HasPrefix(e, "true") {
-		return &expr{b: true, str: e[:4], etype: etBool}, e[4:], nil
+		return &expr{bool: true, str: e[:4], etype: etBool}, e[4:], nil
 	}
 
 	if strings.HasPrefix(e, "False") || strings.HasPrefix(e, "false") {
-		return &expr{b: false, str: e[:5], etype: etBool}, e[5:], nil
+		return &expr{bool: false, str: e[:5], etype: etBool}, e[5:], nil
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
@@ -188,8 +187,8 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 				return "", nil, nil, "", ErrMissingComma
 			}
 
-			if argCont.etype != etConst && argCont.etype != etName && argCont.etype != etString && argCont.etype != etBool {
-				return "", nil, nil, eCont, ErrBadArgumentStr{"const, name, bool or string", string(argCont.etype)}
+			if argCont.etype != etInt && argCont.etype != etFloat && argCont.etype != etName && argCont.etype != etString && argCont.etype != etBool {
+				return "", nil, nil, eCont, ErrBadArgumentStr{"int, float, name, bool or string", string(argCont.etype)}
 			}
 
 			if namedArgs == nil {
@@ -241,21 +240,28 @@ func isDigit(r byte) bool {
 	return '0' <= r && r <= '9'
 }
 
-func parseConst(s string) (float64, string, string, error) {
+func parseConst(s string) (*expr, string, error) {
 
 	var i int
+	var float bool
 	// All valid characters for a floating-point constant
 	// Just slurp them all in and let ParseFloat sort 'em out
 	for i < len(s) && (isDigit(s[i]) || s[i] == '.' || s[i] == '+' || s[i] == '-' || s[i] == 'e' || s[i] == 'E') {
+		// note that exponent syntax results into a float value.
+		// so even values like 1e3 (1000) or 2000e-3 (2) which can be expressed as integers,
+		// are considered floating point values.  if a function expets an int, then just don't use 'e' syntax.
+		if s[i] == '.' || s[i] == 'e' || s[i] == 'E' {
+			float = true
+		}
 		i++
 	}
 
-	v, err := strconv.ParseFloat(s[:i], 64)
-	if err != nil {
-		return 0, "", "", err
+	if float {
+		v, err := strconv.ParseFloat(s[:i], 64)
+		return &expr{float: v, str: s[:i], etype: etFloat}, s[i:], err
 	}
-
-	return v, s[:i], s[i:], err
+	v, err := strconv.ParseInt(s[:i], 10, 64)
+	return &expr{int: v, str: s[:i], etype: etInt}, s[i:], err
 }
 
 func parseName(s string) (string, string) {
@@ -316,4 +322,27 @@ func parseString(s string) (string, string, error) {
 	}
 
 	return s[:i], s[i+1:], nil
+}
+
+// exctractMetric searches for a metric name in `m'
+// metric name is defined to be a series of name characters terminated by a comma
+func extractMetric(m string) string {
+	start := 0
+	end := 0
+	curlyBraces := 0
+	for end < len(m) {
+		if m[end] == '{' {
+			curlyBraces++
+		} else if m[end] == '}' {
+			curlyBraces--
+		} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
+			return m[start:end]
+		} else if !(isNameChar(m[end]) || m[end] == ',') {
+			start = end + 1
+		}
+
+		end++
+	}
+
+	return m[start:end]
 }
