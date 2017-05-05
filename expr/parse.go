@@ -54,12 +54,12 @@ func (e ErrUnknownKwarg) Error() string {
 
 type ErrBadKwarg struct {
 	key string
-	exp argType
+	exp arg
 	got exprType
 }
 
 func (e ErrBadKwarg) Error() string {
-	return fmt.Sprintf("keyword argument %q bad type. expected %s - got %s", e.key, e.exp, e.got)
+	return fmt.Sprintf("keyword argument %q bad type. expected %T - got %s", e.key, e.exp, e.got)
 }
 
 type ErrKwargSpecifiedTwice struct {

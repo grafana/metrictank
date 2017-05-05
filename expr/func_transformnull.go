@@ -9,33 +9,18 @@ import (
 )
 
 type FuncTransformNull struct {
-	def      float64
-	explicit bool
+	def float64
 }
 
 func NewTransformNull() Func {
-	return &FuncTransformNull{}
+	return &FuncTransformNull{math.NaN()}
 }
 
-func (s *FuncTransformNull) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesList}, []optArg{{"default", float}}, []argType{series}
-}
-
-func (s *FuncTransformNull) Init(args []*expr, kwargs map[string]*expr) error {
-	lastArg := args[len(args)-1]
-	if lastArg.etype == etFloat {
-		s.def = lastArg.float
-		s.explicit = true
-	}
-	if lastArg.etype == etInt {
-		s.def = float64(lastArg.int)
-		s.explicit = true
-	}
-	if a, ok := kwargs["default"]; ok {
-		s.def = a.float
-		s.explicit = true
-	}
-	return nil
+func (s *FuncTransformNull) Signature() ([]arg, []arg) {
+	return []arg{
+		argSeriesList{},
+		argFloat{key: "default", store: &s.def},
+	}, []arg{argSeriesList{}}
 }
 
 func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {
@@ -43,6 +28,12 @@ func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {
 }
 
 func (s *FuncTransformNull) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
+	custom := true
+	if math.IsNaN(s.def) {
+		s.def = 0
+		custom = false
+	}
+
 	var series []models.Series
 	var out []interface{}
 	for _, input := range inputs {
@@ -55,7 +46,7 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series, named map[string
 	}
 	for _, serie := range series {
 		var target string
-		if s.explicit {
+		if custom {
 			target = fmt.Sprintf("transFormNull(%s,%f)", serie.Target, s.def)
 		} else {
 			target = fmt.Sprintf("transFormNull(%s)", serie.Target)

@@ -12,6 +12,8 @@ also don't need to pass args anymore (which is currently redundant since they al
 * in general, while constructing the plan, we should probably build a different datastructure more tailored towards execution, currently we
   stick to the parse-time expr types in the planner and these concepts also make their way into the function implementations, which gets a bit dirty at times.
 
+movingAverage accepts arg as both int or string, how to handle properly?
+
 
 ## regarding when to allocate models.Series (or more precisely, their []schema.Point attribute)
 

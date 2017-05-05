@@ -16,12 +16,10 @@ func NewSumSeries() Func {
 	return FuncSumSeries{}
 }
 
-func (s FuncSumSeries) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesLists}, nil, []argType{series}
-}
-
-func (s FuncSumSeries) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
+func (s FuncSumSeries) Signature() ([]arg, []arg) {
+	return []arg{
+		argSeriesLists{},
+	}, []arg{argSeries{}}
 }
 
 func (s FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
