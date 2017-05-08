@@ -1,12 +1,11 @@
 package expr
 
 import (
-	"reflect"
-
 	"github.com/raintank/metrictank/api/models"
 )
 
 type FuncAlias struct {
+	in    []models.Series
 	alias string
 }
 
@@ -25,13 +24,9 @@ func (s *FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncAlias) Exec(cache map[Req][]models.Series, named map[string]interface{}, in ...interface{}) ([]interface{}, error) {
-	series, ok := in[0].([]models.Series)
-	if !ok {
-		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(in[0])}
-	}
+func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
 	var out []interface{}
-	for _, serie := range series {
+	for _, serie := range s.in {
 		serie.Target = s.alias
 		out = append(out, serie)
 	}

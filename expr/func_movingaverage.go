@@ -6,6 +6,7 @@ import (
 
 type FuncMovingAverage struct {
 	window int64
+	in     []models.Series
 }
 
 func NewMovingAverage() Func {
@@ -29,7 +30,7 @@ func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {
 	return from - uint32(s.window), to
 }
 
-func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series, named map[string]interface{}, in ...interface{}) ([]interface{}, error) {
+func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
 	//cache[Req{}] = append(cache[Req{}], out)
 	return nil, nil
 }

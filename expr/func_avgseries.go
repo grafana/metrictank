@@ -3,56 +3,47 @@ package expr
 import (
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
 )
 
 type FuncAvgSeries struct {
+	in []models.Series
 }
 
 func NewAvgSeries() Func {
-	return FuncAvgSeries{}
+	return &FuncAvgSeries{}
 }
 
-func (s FuncAvgSeries) Signature() ([]arg, []arg) {
+func (s *FuncAvgSeries) Signature() ([]arg, []arg) {
 	return []arg{
 		argSeriesLists{},
 	}, []arg{argSeries{}}
 }
 
-func (s FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
+func (s *FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
-		}
-		series = append(series, seriesList...)
-
-	}
-	if len(series) == 1 {
-		series[0].Target = fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
-		return []interface{}{series[0]}, nil
+func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
+	if len(s.in) == 1 {
+		s.in[0].Target = fmt.Sprintf("averageSeries(%s)", s.in[0].QueryPatt)
+		return []interface{}{s.in[0]}, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-	for i := 0; i < len(series[0].Datapoints); i++ {
+	for i := 0; i < len(s.in[0].Datapoints); i++ {
 		num := 0
 		sum := float64(0)
-		for j := 0; j < len(series); j++ {
-			p := series[j].Datapoints[i].Val
+		for j := 0; j < len(s.in); j++ {
+			p := s.in[j].Datapoints[i].Val
 			if !math.IsNaN(p) {
 				num++
 				sum += p
 			}
 		}
 		point := schema.Point{
-			Ts: series[0].Datapoints[i].Ts,
+			Ts: s.in[0].Datapoints[i].Ts,
 		}
 		if num == 0 {
 			point.Val = math.NaN()
@@ -62,9 +53,9 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, named map[string]inte
 		out = append(out, point)
 	}
 	output := models.Series{
-		Target:     fmt.Sprintf("averageSeries(%s)", patternsAsArgs(series)),
+		Target:     fmt.Sprintf("averageSeries(%s)", patternsAsArgs(s.in)),
 		Datapoints: out,
-		Interval:   series[0].Interval,
+		Interval:   s.in[0].Interval,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 

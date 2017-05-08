@@ -3,6 +3,7 @@ package expr
 import "github.com/raintank/metrictank/api/models"
 
 type FuncSmartSummarize struct {
+	in          []models.Series
 	interval    string
 	fn          string
 	alignToFrom bool
@@ -25,6 +26,6 @@ func (s *FuncSmartSummarize) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncSmartSummarize) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	return []interface{}{inputs[0]}, nil
+func (s *FuncSmartSummarize) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
+	return []interface{}{s.in[0]}, nil
 }
