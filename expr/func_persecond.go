@@ -9,7 +9,7 @@ import (
 )
 
 type FuncPerSecond struct {
-	in       Func
+	in       []Func
 	maxValue int64
 }
 
@@ -19,7 +19,7 @@ func NewPerSecond() Func {
 
 func (s *FuncPerSecond) Signature() ([]arg, []arg) {
 	return []arg{
-			argSeriesList{store: &s.in},
+			argSeriesLists{store: &s.in},
 			argInt{"maxValue", true, []validator{IntPositive}, &s.maxValue},
 		}, []arg{
 			argSeriesList{},
@@ -31,9 +31,13 @@ func (s *FuncPerSecond) NeedRange(from, to uint32) (uint32, uint32) {
 }
 
 func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
-	if err != nil {
-		return nil, err
+	var series []models.Series
+	for i := range s.in {
+		serie, err := s.in[i].Exec(cache)
+		if err != nil {
+			return nil, err
+		}
+		series = append(series, serie...)
 	}
 	maxValue := math.NaN()
 	if s.maxValue > 0 {
