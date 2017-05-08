@@ -7,6 +7,7 @@ import (
 )
 
 type FuncAliasByNode struct {
+	in    []models.Series
 	nodes []int64
 }
 
@@ -25,18 +26,9 @@ func (s *FuncAliasByNode) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
+func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
 	var out []interface{}
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			break
-		}
-		series = append(series, seriesList...)
-
-	}
-	for _, serie := range series {
+	for _, serie := range s.in {
 		metric := extractMetric(serie.Target)
 		parts := strings.Split(metric, ".")
 		var name []string

@@ -9,6 +9,7 @@ import (
 )
 
 type FuncPerSecond struct {
+	in       []models.Series
 	maxValue int64
 }
 
@@ -29,22 +30,13 @@ func (s *FuncPerSecond) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncPerSecond) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
+func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
 	maxValue := math.NaN()
 	if s.maxValue > 0 {
 		maxValue = float64(s.maxValue)
 	}
-	var series []models.Series
 	var outputs []interface{}
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			break // no more series on input. we hit maxValue parameter
-		}
-		series = append(series, seriesList...)
-
-	}
-	for _, serie := range series {
+	for _, serie := range s.in {
 		out := pointSlicePool.Get().([]schema.Point)
 		for i, v := range serie.Datapoints {
 			out = append(out, schema.Point{Ts: v.Ts})

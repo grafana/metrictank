@@ -2,13 +2,13 @@ package expr
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/consolidation"
 )
 
 type FuncConsolidateBy struct {
+	in []models.Series
 	by string
 }
 
@@ -30,15 +30,10 @@ func (s *FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
+func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
 	var out []interface{}
-	input := inputs[0]
-	seriesList, ok := input.([]models.Series)
-	if !ok {
-		return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
-	}
-	for _, series := range seriesList {
-		series.Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", series.Target, inputs[1].(string))
+	for _, series := range s.in {
+		series.Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", series.Target, s.by)
 		out = append(out, series)
 	}
 	return out, nil
