@@ -5,7 +5,7 @@ import (
 )
 
 type FuncAlias struct {
-	in    []models.Series
+	in    Func
 	alias string
 }
 
@@ -15,7 +15,7 @@ func NewAlias() Func {
 
 func (s *FuncAlias) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{},
+		argSeriesList{store: &s.in},
 		argString{store: &s.alias},
 	}, []arg{argSeriesList{}}
 }
@@ -24,11 +24,13 @@ func (s *FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
-	var out []interface{}
-	for _, serie := range s.in {
-		serie.Target = s.alias
-		out = append(out, serie)
+func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	for i := range series {
+		series[i].Target = s.alias
+	}
+	return series, nil
 }

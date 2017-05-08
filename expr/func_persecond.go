@@ -9,7 +9,7 @@ import (
 )
 
 type FuncPerSecond struct {
-	in       []models.Series
+	in       Func
 	maxValue int64
 }
 
@@ -19,7 +19,7 @@ func NewPerSecond() Func {
 
 func (s *FuncPerSecond) Signature() ([]arg, []arg) {
 	return []arg{
-			argSeriesList{},
+			argSeriesList{store: &s.in},
 			argInt{"maxValue", true, []validator{IntPositive}, &s.maxValue},
 		}, []arg{
 			argSeriesList{},
@@ -30,13 +30,17 @@ func (s *FuncPerSecond) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
+func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
+	}
 	maxValue := math.NaN()
 	if s.maxValue > 0 {
 		maxValue = float64(s.maxValue)
 	}
-	var outputs []interface{}
-	for _, serie := range s.in {
+	var outputs []models.Series
+	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for i, v := range serie.Datapoints {
 			out = append(out, schema.Point{Ts: v.Ts})

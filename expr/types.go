@@ -9,18 +9,20 @@ type arg interface {
 
 // a single series (not generally used as input, but to describe output)
 type argSeries struct {
-	key string
-	opt bool
+	key   string
+	opt   bool
+	store *Func
 }
 
 func (a argSeries) Key() string    { return a.key }
 func (a argSeries) Optional() bool { return a.opt }
-func (a argSeries) Store(e *expr)  {}
+func (a argSeries) Store(e *expr)  {} // because we need to store a Func, not an expr, can't use this method here
 
 // a list of series
 type argSeriesList struct {
-	key string
-	opt bool
+	key   string
+	opt   bool
+	store *Func
 }
 
 func (a argSeriesList) Key() string    { return a.key }
@@ -29,8 +31,9 @@ func (a argSeriesList) Store(e *expr)  {}
 
 // one or more lists of series
 type argSeriesLists struct {
-	key string
-	opt bool
+	key   string
+	opt   bool
+	store *[]Func
 }
 
 func (a argSeriesLists) Key() string    { return a.key }
