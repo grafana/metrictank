@@ -7,7 +7,7 @@ import (
 )
 
 type FuncAliasByNode struct {
-	in    []models.Series
+	in    Func
 	nodes []int64
 }
 
@@ -17,7 +17,7 @@ func NewAliasByNode() Func {
 
 func (s *FuncAliasByNode) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesLists{},
+		argSeriesList{store: &s.in},
 		argInts{store: &s.nodes},
 	}, []arg{argSeries{}}
 }
@@ -26,9 +26,12 @@ func (s *FuncAliasByNode) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
-	var out []interface{}
-	for _, serie := range s.in {
+func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
+	}
+	for i, serie := range series {
 		metric := extractMetric(serie.Target)
 		parts := strings.Split(metric, ".")
 		var name []string
@@ -42,12 +45,7 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]interface{}, er
 			}
 			name = append(name, parts[n])
 		}
-
-		out = append(out, models.Series{
-			Target:     strings.Join(name, "."),
-			Datapoints: serie.Datapoints,
-			Interval:   serie.Interval,
-		})
+		series[i].Target = strings.Join(name, ".")
 	}
-	return out, nil
+	return series, nil
 }

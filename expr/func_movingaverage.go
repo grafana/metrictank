@@ -6,7 +6,7 @@ import (
 
 type FuncMovingAverage struct {
 	window int64
-	in     []models.Series
+	in     Func
 }
 
 func NewMovingAverage() Func {
@@ -16,7 +16,7 @@ func NewMovingAverage() Func {
 // note if input is 1 series, then output is too. not sure how to communicate that
 func (s *FuncMovingAverage) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{},
+		argSeriesList{store: &s.in},
 		// this could be an int OR a string.
 		// we need to figure out the interval of the data we will consume
 		// and request from -= interval * points
@@ -30,7 +30,11 @@ func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {
 	return from - uint32(s.window), to
 }
 
-func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
+func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
+	}
 	//cache[Req{}] = append(cache[Req{}], out)
-	return nil, nil
+	return series, nil
 }

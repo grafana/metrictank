@@ -10,20 +10,8 @@ type Func interface {
 	// NeedRange allows a func to express that to be able to return data in the given from to, it will need input data in the returned from-to window.
 	// (e.g. movingAverage of 5min needs data as of from-5min)
 	NeedRange(from, to uint32) (uint32, uint32)
-	// Exec executes the function with its arguments.
-	// it is passed in:
-	// * a map of all input data it may need
-	// * a map of values for optional keyword arguments, in the following types:
-	//   etFloat  -> float64
-	//   etInt    -> int64
-	//   etString -> str
-	// * mandatory arguments, in the following types:
-	//   etFloat       -> float64
-	//   etInt         -> int64
-	//   etString      -> str
-	//   etName/etFunc -> []models.Series or models.Series if the previous function returned a series
-	// supported return values: models.Series, []models.Series
-	Exec(map[Req][]models.Series) ([]interface{}, error)
+	// Exec executes the function
+	Exec(map[Req][]models.Series) ([]models.Series, error)
 }
 
 type funcConstructor func() Func

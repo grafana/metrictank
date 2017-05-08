@@ -9,7 +9,7 @@ import (
 )
 
 type FuncTransformNull struct {
-	in  []models.Series
+	in  Func
 	def float64
 }
 
@@ -19,7 +19,7 @@ func NewTransformNull() Func {
 
 func (s *FuncTransformNull) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{},
+		argSeriesList{store: &s.in},
 		argFloat{key: "default", store: &s.def},
 	}, []arg{argSeriesList{}}
 }
@@ -28,15 +28,19 @@ func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]interface{}, error) {
+func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
+	}
 	custom := true
 	if math.IsNaN(s.def) {
 		s.def = 0
 		custom = false
 	}
 
-	var out []interface{}
-	for _, serie := range s.in {
+	var out []models.Series
+	for _, serie := range series {
 		var target string
 		if custom {
 			target = fmt.Sprintf("transFormNull(%s,%f)", serie.Target, s.def)
