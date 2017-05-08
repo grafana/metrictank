@@ -19,8 +19,8 @@ func NewTransformNull() Func {
 
 func (s *FuncTransformNull) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{store: &s.in},
-		argFloat{key: "default", store: &s.def},
+		argSeriesList{val: &s.in},
+		argFloat{key: "default", val: &s.def},
 	}, []arg{argSeriesList{}}
 }
 

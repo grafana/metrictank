@@ -15,8 +15,8 @@ func NewAlias() Func {
 
 func (s *FuncAlias) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{store: &s.in},
-		argString{store: &s.alias},
+		argSeriesList{val: &s.in},
+		argString{val: &s.alias},
 	}, []arg{argSeriesList{}}
 }
 

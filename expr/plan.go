@@ -101,12 +101,12 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
 			}
 		}
-		v.Store(got)
+		*v.val = got.int
 	case argInts:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
 		}
-		v.Store(got)
+		*v.val = append(*v.val, got.int)
 		// special case! consume all subsequent args (if any) in args that will also yield an integer
 		for len(args) > j+1 && args[j+1].etype == etInt {
 			j += 1
@@ -115,7 +115,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
 				}
 			}
-			v.Store(args[j])
+			*v.val = append(*v.val, args[j].int)
 		}
 	case argFloat:
 		if got.etype != etFloat && got.etype != etInt {
@@ -126,7 +126,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
 			}
 		}
-		v.Store(got)
+		*v.val = got.float
 	case argString:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
@@ -136,12 +136,12 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
 			}
 		}
-		v.Store(got)
+		*v.val = got.str
 	case argBool:
 		if got.etype != etBool {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
-		v.Store(got)
+		*v.val = got.bool
 	}
 	j += 1
 	return j, nil
@@ -175,18 +175,18 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwarg
 		if got.etype != etInt {
 			return ErrBadKwarg{k, exp, got.etype}
 		}
-		v.Store(got)
+		*v.val = got.int
 	case argFloat:
 		// integer is also a valid float, just happened to have no decimals
 		if got.etype != etInt && got.etype != etFloat {
 			return ErrBadKwarg{k, exp, got.etype}
 		}
-		v.Store(got)
+		*v.val = got.float
 	case argString:
 		if got.etype != etString {
 			return ErrBadKwarg{k, exp, got.etype}
 		}
-		v.Store(got)
+		*v.val = got.str
 	}
 	return nil
 }
@@ -204,7 +204,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 		if err != nil {
 			return 0, nil, err
 		}
-		*v.store = fn
+		*v.val = fn
 	case argSeriesList:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
@@ -213,7 +213,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 		if err != nil {
 			return 0, nil, err
 		}
-		*v.store = fn
+		*v.val = fn
 	case argSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
@@ -222,7 +222,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 		if err != nil {
 			return 0, nil, err
 		}
-		*v.store = append(*v.store, fn)
+		*v.val = append(*v.val, fn)
 		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
 		for len(args) > j+1 && (args[j+1].etype == etName || args[j+1].etype == etFunc) {
 			j += 1
@@ -230,7 +230,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 			if err != nil {
 				return 0, nil, err
 			}
-			*v.store = append(*v.store, fn)
+			*v.val = append(*v.val, fn)
 		}
 	default:
 		panic("unsupported type for consumeSeriesArg")

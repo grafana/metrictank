@@ -18,7 +18,7 @@ func NewAvgSeries() Func {
 
 func (s *FuncAvgSeries) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesLists{store: &s.in},
+		argSeriesLists{val: &s.in},
 	}, []arg{argSeries{}}
 }
 
