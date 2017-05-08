@@ -21,8 +21,8 @@ func (s *FuncConsolidateBy) Signature() ([]arg, []arg) {
 		return consolidation.Validate(e.str)
 	}
 	return []arg{
-		argSeriesList{store: &s.in},
-		argString{store: &s.by, validator: []validator{validConsol}},
+		argSeriesList{val: &s.in},
+		argString{val: &s.by, validator: []validator{validConsol}},
 	}, []arg{argSeriesList{}}
 }
 

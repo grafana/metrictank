@@ -16,13 +16,13 @@ func NewMovingAverage() Func {
 // note if input is 1 series, then output is too. not sure how to communicate that
 func (s *FuncMovingAverage) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{store: &s.in},
+		argSeriesList{val: &s.in},
 		// this could be an int OR a string.
 		// we need to figure out the interval of the data we will consume
 		// and request from -= interval * points
 		// interestingly the from adjustment might mean the archive TTL is no longer sufficient and push the request into a different rollup archive, which we should probably
 		// account for. let's solve all of this later.
-		argInt{store: &s.window},
+		argInt{val: &s.window},
 	}, []arg{argSeriesList{}}
 }
 

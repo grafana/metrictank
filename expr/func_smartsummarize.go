@@ -15,10 +15,10 @@ func NewSmartSummarize() Func {
 
 func (s *FuncSmartSummarize) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{store: &s.in},
-		argString{key: "interval", store: &s.interval},
-		argString{key: "func", opt: true, store: &s.fn},
-		argBool{key: "alignToFrom", opt: true, store: &s.alignToFrom},
+		argSeriesList{val: &s.in},
+		argString{key: "interval", val: &s.interval},
+		argString{key: "func", opt: true, val: &s.fn},
+		argBool{key: "alignToFrom", opt: true, val: &s.alignToFrom},
 	}, []arg{argSeries{}}
 }
 

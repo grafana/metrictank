@@ -17,8 +17,8 @@ func NewAliasByNode() Func {
 
 func (s *FuncAliasByNode) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesList{store: &s.in},
-		argInts{store: &s.nodes},
+		argSeriesList{val: &s.in},
+		argInts{val: &s.nodes},
 	}, []arg{argSeries{}}
 }
 

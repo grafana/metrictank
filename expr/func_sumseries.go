@@ -18,7 +18,7 @@ func NewSumSeries() Func {
 
 func (s *FuncSumSeries) Signature() ([]arg, []arg) {
 	return []arg{
-		argSeriesLists{store: &s.in},
+		argSeriesLists{val: &s.in},
 	}, []arg{argSeries{}}
 }
 
