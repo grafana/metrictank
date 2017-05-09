@@ -20,7 +20,7 @@ func NewTransformNull() Func {
 func (s *FuncTransformNull) Signature() ([]arg, []arg) {
 	return []arg{
 		argSeriesList{val: &s.in},
-		argFloat{key: "default", val: &s.def},
+		argFloat{key: "default", opt: true, val: &s.def},
 	}, []arg{argSeriesList{}}
 }
 

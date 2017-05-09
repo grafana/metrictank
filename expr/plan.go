@@ -118,6 +118,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 			*v.val = append(*v.val, args[j].int)
 		}
 	case argFloat:
+		// integer is also a valid float, just happened to have no decimals
 		if got.etype != etFloat && got.etype != etInt {
 			return 0, ErrBadArgumentStr{"float", string(got.etype)}
 		}
@@ -126,7 +127,11 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
 			}
 		}
-		*v.val = got.float
+		if got.etype == etInt {
+			*v.val = float64(got.int)
+		} else {
+			*v.val = got.float
+		}
 	case argString:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
@@ -177,11 +182,15 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwarg
 		}
 		*v.val = got.int
 	case argFloat:
-		// integer is also a valid float, just happened to have no decimals
-		if got.etype != etInt && got.etype != etFloat {
+		switch got.etype {
+		case etInt:
+			// integer is also a valid float, just happened to have no decimals
+			*v.val = float64(got.int)
+		case etFloat:
+			*v.val = got.float
+		default:
 			return ErrBadKwarg{k, exp, got.etype}
 		}
-		*v.val = got.float
 	case argString:
 		if got.etype != etString {
 			return ErrBadKwarg{k, exp, got.etype}
