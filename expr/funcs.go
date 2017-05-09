@@ -28,6 +28,7 @@ func init() {
 	funcs = map[string]funcDef{
 		"alias":          {NewAlias, true},
 		"aliasByNode":    {NewAliasByNode, true},
+		"aliasSub":       {NewAliasSub, true},
 		"avg":            {NewAvgSeries, true},
 		"averageSeries":  {NewAvgSeries, true},
 		"consolidateBy":  {NewConsolidateBy, true},

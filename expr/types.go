@@ -1,6 +1,8 @@
 // argument types. to let functions describe their inputs and outputs
 package expr
 
+import "regexp"
+
 type arg interface {
 	Key() string
 	Optional() bool
@@ -79,6 +81,17 @@ type argString struct {
 
 func (a argString) Key() string    { return a.key }
 func (a argString) Optional() bool { return a.opt }
+
+// like string, but should result in a regex
+type argRegex struct {
+	key       string
+	opt       bool
+	validator []validator
+	val       **regexp.Regexp
+}
+
+func (a argRegex) Key() string    { return a.key }
+func (a argRegex) Optional() bool { return a.opt }
 
 // True or False
 type argBool struct {
