@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/raintank/metrictank/api/models"
 )
@@ -369,6 +370,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 		if err != nil {
 			return nil, err
 		}
+		sort.Sort(models.SeriesByTarget(series))
 		out = append(out, series...)
 	}
 	return out, nil
