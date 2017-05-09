@@ -95,7 +95,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil)
+	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -131,7 +131,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil, false))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -199,6 +199,33 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(true, 800, 1299, 1299, 1299)
 }
 
+func TestAggMetricDropFirstChunk(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	store := NewMockStore()
+	chunkSpan := uint32(10)
+	numChunks := uint32(5)
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, nil, true)
+	m.Add(10, 10)
+	m.Add(11, 11)
+	m.Add(12, 12)
+	m.Add(20, 20)
+	m.Add(21, 21)
+	m.Add(22, 22)
+	m.Add(30, 30)
+	m.Add(31, 31)
+	m.Add(32, 32)
+	m.Add(40, 40)
+	itgens, err := store.Search("foo", 0, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(itgens) != 2 || itgens[0].Ts != 20 || itgens[1].Ts != 30 {
+		t.Fatalf("expected 2 itgens for chunks 20 and 30 since the first one should be dropped. Got %v", itgens)
+	}
+}
+
 // basic expected RAM usage for 1 iteration (= 1 days)
 // 1000 metrics * (3600 * 24 / 10 ) points per metric * 1.3 B/point = 11 MB
 // 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
@@ -224,7 +251,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := 3600 * 24 * uint32(b.N) // b.N in days
 	for t := uint32(1); t < maxT; t += 10 {
@@ -253,7 +280,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -282,7 +309,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {
@@ -311,7 +338,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
 	}
 
-	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, chunkMaxStale, metricMaxStale, 0)
+	metrics := NewAggMetrics(dnstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
 
 	maxT := uint32(1200)
 	for t := uint32(1); t < maxT; t += 10 {

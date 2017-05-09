@@ -9,8 +9,9 @@ import (
 )
 
 type AggMetrics struct {
-	store       Store
-	cachePusher cache.CachePusher
+	store          Store
+	cachePusher    cache.CachePusher
+	dropFirstChunk bool
 	sync.RWMutex
 	Metrics        map[string]*AggMetric
 	chunkMaxStale  uint32
@@ -18,10 +19,11 @@ type AggMetrics struct {
 	gcInterval     time.Duration
 }
 
-func NewAggMetrics(store Store, cachePusher cache.CachePusher, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
+func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bool, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		cachePusher:    cachePusher,
+		dropFirstChunk: dropFirstChunk,
 		Metrics:        make(map[string]*AggMetric),
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
@@ -84,7 +86,7 @@ func (ms *AggMetrics) GetOrCreate(key, name string, schemaId, aggId uint16) Metr
 	m, ok := ms.Metrics[key]
 	if !ok {
 		agg := Aggregations.Get(aggId)
-		m = NewAggMetric(ms.store, ms.cachePusher, key, Schemas.Get(schemaId).Retentions, &agg)
+		m = NewAggMetric(ms.store, ms.cachePusher, key, Schemas.Get(schemaId).Retentions, &agg, ms.dropFirstChunk)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}

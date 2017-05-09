@@ -23,3 +23,7 @@ type ChunkWriteRequest struct {
 	timestamp time.Time
 	span      uint32
 }
+
+func NewChunkWriteRequest(metric *AggMetric, key string, chunk *chunk.Chunk, ttl, span uint32, ts time.Time) ChunkWriteRequest {
+	return ChunkWriteRequest{metric, key, chunk, ttl, ts, span}
+}

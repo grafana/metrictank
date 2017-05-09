@@ -5,16 +5,7 @@ import (
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
-// a data store that satisfies the interface `mdata.Store`.
-//
-// it is intended to be used in unit tests where it is necessary
-// that the backend store returns values, but we don't want to
-// involve a real store like for example Cassandra.
-// the mockstore simply returns the results it has gotten added
-// via the AddMockResult() method.
-// this can be extended if future unit tests require the mock
-// store to be smarter, or for example if they require it to
-// keep what has been passed into Add().
+// MockStore is an in-memory Store implementation for unit tests
 type MockStore struct {
 	// the itgens to be searched and returned, indexed by metric
 	results map[string][]chunk.IterGen
@@ -24,22 +15,14 @@ func NewMockStore() *MockStore {
 	return &MockStore{make(map[string][]chunk.IterGen)}
 }
 
-// add a chunk to be returned on Search()
-func (c *MockStore) AddMockResult(metric string, itgen chunk.IterGen) {
-	if _, ok := c.results[metric]; !ok {
-		c.results[metric] = make([]chunk.IterGen, 0)
-	}
-
-	c.results[metric] = append(c.results[metric], itgen)
-}
-
 func (c *MockStore) ResetMock() {
 	c.results = make(map[string][]chunk.IterGen)
 }
 
-// currently that only exists to satisfy the interface
-// might be extended to be useful in the future
+// Add adds a chunk to the store
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
+	itgen := chunk.NewBareIterGen(cwr.chunk.Series.Bytes(), cwr.chunk.Series.T0, cwr.span)
+	c.results[cwr.key] = append(c.results[cwr.key], *itgen)
 }
 
 // searches through the mock results and returns the right ones according to start / end

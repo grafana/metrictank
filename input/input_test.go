@@ -23,7 +23,7 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
-	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 800, 8000, 0)
+	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
@@ -62,7 +62,7 @@ func BenchmarkProcessSameMetric(b *testing.B) {
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
-	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, 800, 8000, 0)
+	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
 	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
