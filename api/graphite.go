@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -204,7 +203,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
-	sort.Sort(models.SeriesByTarget(out))
 
 	switch request.Format {
 	case "msgp":
