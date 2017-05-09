@@ -1,6 +1,8 @@
 // argument types. to let functions describe their inputs and outputs
 package expr
 
+import "regexp"
+
 // Arg is an argument to a GraphiteFunc
 // note how every implementation has a val property.
 // this property should point to value accessible to the function.
@@ -88,6 +90,17 @@ type ArgString struct {
 
 func (a ArgString) Key() string    { return a.key }
 func (a ArgString) Optional() bool { return a.opt }
+
+// like string, but should result in a regex
+type ArgRegex struct {
+	key       string
+	opt       bool
+	validator []Validator
+	val       **regexp.Regexp
+}
+
+func (a ArgRegex) Key() string    { return a.key }
+func (a ArgRegex) Optional() bool { return a.opt }
 
 // True or False
 type ArgBool struct {
