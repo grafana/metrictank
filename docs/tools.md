@@ -210,6 +210,26 @@ Flags:
 ```
 
 
+## mt-kafka-mdm-sniff-out-of-order
+
+```
+mt-kafka-mdm-sniff-out-of-order
+
+Inspects what's flowing through kafka (in mdm format) and reports it to you
+
+Flags:
+
+  -config string
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
+  -format string
+    	template to render the data with (default "{{.First.Seen}} {{.First.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+  -prefix string
+    	only show metrics that have this prefix
+  -substr string
+    	only show metrics that have this substring
+```
+
+
 ## mt-replicator
 
 ```
