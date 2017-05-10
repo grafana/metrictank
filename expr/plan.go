@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"sort"
 
 	"github.com/raintank/metrictank/api/models"
 )
@@ -142,6 +144,20 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 			}
 		}
 		*v.val = got.str
+	case argRegex:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		re, err := regexp.Compile(got.str)
+		if err != nil {
+			return 0, err
+		}
+		*v.val = re
 	case argBool:
 		if got.etype != etBool {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
@@ -369,6 +385,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 		if err != nil {
 			return nil, err
 		}
+		sort.Sort(models.SeriesByTarget(series))
 		out = append(out, series...)
 	}
 	return out, nil
