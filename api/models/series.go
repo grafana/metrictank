@@ -72,11 +72,16 @@ func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
 		}
 		data[i] = seriesForPickle{
 			Name:           s.Target,
-			Start:          s.QueryFrom,
-			End:            s.QueryTo,
 			Step:           s.Interval,
 			Values:         datapoints,
 			PathExpression: s.QueryPatt,
+		}
+		if len(datapoints) > 0 {
+			data[i].Start = s.Datapoints[0].Ts
+			data[i].End = s.Datapoints[len(s.Datapoints)-1].Ts
+		} else {
+			data[i].Start = s.QueryFrom
+			data[i].End = s.QueryTo
 		}
 	}
 	buffer := bytes.NewBuffer(buf)
