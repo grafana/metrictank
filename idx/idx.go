@@ -22,6 +22,7 @@ type Node struct {
 	HasChildren bool
 }
 
+//msgp:ignore Archive
 type Archive struct {
 	schema.MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
