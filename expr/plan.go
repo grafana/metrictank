@@ -148,6 +148,8 @@ func consumeArg(args []*expr, j int, exp Arg) (int, error) {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
 		*v.val = got.bool
+	default:
+		return 0, fmt.Errorf("unsupported type %T for consumeArg", exp)
 	}
 	j += 1
 	return j, nil
@@ -197,6 +199,8 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []Arg, seenKwarg
 			return ErrBadKwarg{k, exp, got.etype}
 		}
 		*v.val = got.str
+	default:
+		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}
 	return nil
 }
@@ -243,7 +247,7 @@ func consumeSeriesArg(args []*expr, j int, exp Arg, from, to uint32, stable bool
 			*v.val = append(*v.val, fn)
 		}
 	default:
-		panic("unsupported type for consumeSeriesArg")
+		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
 	}
 	j += 1
 	return j, reqs, nil
