@@ -20,7 +20,7 @@ func NewPerSecond() Func {
 func (s *FuncPerSecond) Signature() ([]Arg, []Arg) {
 	return []Arg{
 			ArgSeriesLists{val: &s.in},
-			ArgInt{"maxValue", true, []Validator{IntPositive}, &s.maxValue},
+			ArgInt{key: "maxValue", opt: true, validator: []Validator{IntPositive}, val: &s.maxValue},
 		}, []Arg{
 			ArgSeriesList{},
 		}
