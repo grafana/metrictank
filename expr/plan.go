@@ -72,187 +72,6 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 	}, nil
 }
 
-// consumeArg verifies that the argument at pos j matches the expected arg
-// it's up to the caller to assure that j is valid before calling.
-// if arg allows for multiple arguments, j is advanced to cover all accepted arguments.
-// the returned j is always the index where the next argument should be.
-// it stores all passed arguments, except when series are requested, those will need a separate pass
-// after deducing the required from/to.
-func consumeArg(args []*expr, j int, exp Arg) (int, error) {
-	got := args[j]
-	switch v := exp.(type) {
-	case ArgSeries, ArgSeriesList:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
-		}
-	case ArgSeriesLists:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
-		}
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(args) > j+1 && (args[j+1].etype == etName || args[j+1].etype == etFunc) {
-			j += 1
-		}
-	case ArgInt:
-		if got.etype != etInt {
-			return 0, ErrBadArgumentStr{"int", string(got.etype)}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-			}
-		}
-		*v.val = got.int
-	case ArgInts:
-		if got.etype != etInt {
-			return 0, ErrBadArgumentStr{"int", string(got.etype)}
-		}
-		*v.val = append(*v.val, got.int)
-		// special case! consume all subsequent args (if any) in args that will also yield an integer
-		for len(args) > j+1 && args[j+1].etype == etInt {
-			j += 1
-			for _, va := range v.validator {
-				if err := va(args[j]); err != nil {
-					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-				}
-			}
-			*v.val = append(*v.val, args[j].int)
-		}
-	case ArgFloat:
-		// integer is also a valid float, just happened to have no decimals
-		if got.etype != etFloat && got.etype != etInt {
-			return 0, ErrBadArgumentStr{"float", string(got.etype)}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-			}
-		}
-		if got.etype == etInt {
-			*v.val = float64(got.int)
-		} else {
-			*v.val = got.float
-		}
-	case ArgString:
-		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string", string(got.etype)}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-			}
-		}
-		*v.val = got.str
-	case ArgBool:
-		if got.etype != etBool {
-			return 0, ErrBadArgumentStr{"string", string(got.etype)}
-		}
-		*v.val = got.bool
-	default:
-		return 0, fmt.Errorf("unsupported type %T for consumeArg", exp)
-	}
-	j += 1
-	return j, nil
-}
-
-// consumeKwarg consumes the kwarg (by key k) and verifies it
-// it's the callers responsability that k exists within namedArgs
-// it also makes sure the kwarg has not been consumed already via the kwargs map
-// (it would be an error to provide an argument twice via the same keyword,
-// or once positionally and once via keyword)
-func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []Arg, seenKwargs map[string]struct{}) error {
-	var found bool
-	var exp Arg
-	for _, exp = range optArgs {
-		if exp.Key() == k {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return ErrUnknownKwarg{k}
-	}
-	_, ok := seenKwargs[k]
-	if ok {
-		return ErrKwargSpecifiedTwice{k}
-	}
-	seenKwargs[k] = struct{}{}
-	got := namedArgs[k]
-	switch v := exp.(type) {
-	case ArgInt:
-		if got.etype != etInt {
-			return ErrBadKwarg{k, exp, got.etype}
-		}
-		*v.val = got.int
-	case ArgFloat:
-		switch got.etype {
-		case etInt:
-			// integer is also a valid float, just happened to have no decimals
-			*v.val = float64(got.int)
-		case etFloat:
-			*v.val = got.float
-		default:
-			return ErrBadKwarg{k, exp, got.etype}
-		}
-	case ArgString:
-		if got.etype != etString {
-			return ErrBadKwarg{k, exp, got.etype}
-		}
-		*v.val = got.str
-	default:
-		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
-	}
-	return nil
-}
-
-func consumeSeriesArg(args []*expr, j int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
-	got := args[j]
-	var err error
-	var fn Func
-	switch v := exp.(type) {
-	case ArgSeries:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
-		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
-		if err != nil {
-			return 0, nil, err
-		}
-		*v.val = fn
-	case ArgSeriesList:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
-		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
-		if err != nil {
-			return 0, nil, err
-		}
-		*v.val = fn
-	case ArgSeriesLists:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
-		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
-		if err != nil {
-			return 0, nil, err
-		}
-		*v.val = append(*v.val, fn)
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(args) > j+1 && (args[j+1].etype == etName || args[j+1].etype == etFunc) {
-			j += 1
-			fn, reqs, err = newplan(args[j], from, to, stable, reqs)
-			if err != nil {
-				return 0, nil, err
-			}
-			*v.val = append(*v.val, fn)
-		}
-	default:
-		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
-	}
-	j += 1
-	return j, reqs, nil
-}
-
 // newplan adds requests as needed for the given expr, resolving function calls as needed
 func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (Func, []Req, error) {
 	if e.etype != etFunc && e.etype != etName {
@@ -298,17 +117,17 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 	//   might be dynamically typed. e.g. movingAvg returns 1..N series depending on how many it got as input
 
 	// first validate the mandatory args
-	j := 0      // pos in args of next given arg to process
+	pos := 0    // pos in args of next given arg to process
 	cutoff := 0 // marks the index of the first optional point (if any)
 	var argExp Arg
 	for cutoff, argExp = range argsExp {
 		if argExp.Optional() {
 			break
 		}
-		if len(e.args) <= j {
+		if len(e.args) <= pos {
 			return nil, ErrMissingArg
 		}
-		j, err = consumeArg(e.args, j, argExp)
+		pos, err = e.consumeBasicArg(pos, argExp)
 		if err != nil {
 			return nil, err
 		}
@@ -324,27 +143,31 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 
 	seenKwargs := make(map[string]struct{})
 	for _, argOpt := range argsExp[cutoff:] {
-		if len(e.args) <= j {
+		if len(e.args) <= pos {
 			break // no more args specified. we're done.
 		}
-		j, err = consumeArg(e.args, j, argOpt)
+		pos, err = e.consumeBasicArg(pos, argOpt)
 		if err != nil {
 			return nil, err
 		}
 		seenKwargs[argOpt.Key()] = struct{}{}
 	}
-	if len(e.args) > j {
+	if len(e.args) > pos {
 		return nil, ErrTooManyArg
 	}
 
 	// for any provided keyword args, verify that they are what the function stipulated
 	// and that they have not already been specified via their position
-	for k := range e.namedArgs {
-		err = consumeKwarg(e.namedArgs, k, argsExp[cutoff:], seenKwargs)
+	for key := range e.namedArgs {
+		_, ok := seenKwargs[key]
+		if ok {
+			return nil, ErrKwargSpecifiedTwice{key}
+		}
+		err = e.consumeKwarg(key, argsExp[cutoff:])
 		if err != nil {
 			return nil, err
 		}
-
+		seenKwargs[key] = struct{}{}
 	}
 
 	// functions now have their non-series input args set,
@@ -353,11 +176,11 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 	// now that we know the needed timerange for the data coming into
 	// this function, we can set up the input arguments for the function
 	// that are series
-	j = 0
+	pos = 0
 	for _, argExp = range argsExp[:cutoff] {
 		switch argExp.(type) {
 		case ArgSeries, ArgSeriesList, ArgSeriesLists:
-			j, reqs, err = consumeSeriesArg(e.args, j, argExp, from, to, stable, reqs)
+			pos, reqs, err = e.consumeSeriesArg(pos, argExp, from, to, stable, reqs)
 			if err != nil {
 				return nil, err
 			}
