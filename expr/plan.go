@@ -78,14 +78,14 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 // the returned j is always the index where the next argument should be.
 // it stores all passed arguments, except when series are requested, those will need a separate pass
 // after deducing the required from/to.
-func consumeArg(args []*expr, j int, exp arg) (int, error) {
+func consumeArg(args []*expr, j int, exp Arg) (int, error) {
 	got := args[j]
 	switch v := exp.(type) {
-	case argSeries, argSeriesList:
+	case ArgSeries, ArgSeriesList:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
-	case argSeriesLists:
+	case ArgSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
@@ -93,7 +93,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 		for len(args) > j+1 && (args[j+1].etype == etName || args[j+1].etype == etFunc) {
 			j += 1
 		}
-	case argInt:
+	case ArgInt:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
 		}
@@ -103,7 +103,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 			}
 		}
 		*v.val = got.int
-	case argInts:
+	case ArgInts:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
 		}
@@ -118,7 +118,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 			}
 			*v.val = append(*v.val, args[j].int)
 		}
-	case argFloat:
+	case ArgFloat:
 		// integer is also a valid float, just happened to have no decimals
 		if got.etype != etFloat && got.etype != etInt {
 			return 0, ErrBadArgumentStr{"float", string(got.etype)}
@@ -133,7 +133,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 		} else {
 			*v.val = got.float
 		}
-	case argString:
+	case ArgString:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
@@ -143,7 +143,7 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 			}
 		}
 		*v.val = got.str
-	case argBool:
+	case ArgBool:
 		if got.etype != etBool {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
@@ -158,9 +158,9 @@ func consumeArg(args []*expr, j int, exp arg) (int, error) {
 // it also makes sure the kwarg has not been consumed already via the kwargs map
 // (it would be an error to provide an argument twice via the same keyword,
 // or once positionally and once via keyword)
-func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwargs map[string]struct{}) error {
+func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []Arg, seenKwargs map[string]struct{}) error {
 	var found bool
-	var exp arg
+	var exp Arg
 	for _, exp = range optArgs {
 		if exp.Key() == k {
 			found = true
@@ -177,12 +177,12 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwarg
 	seenKwargs[k] = struct{}{}
 	got := namedArgs[k]
 	switch v := exp.(type) {
-	case argInt:
+	case ArgInt:
 		if got.etype != etInt {
 			return ErrBadKwarg{k, exp, got.etype}
 		}
 		*v.val = got.int
-	case argFloat:
+	case ArgFloat:
 		switch got.etype {
 		case etInt:
 			// integer is also a valid float, just happened to have no decimals
@@ -192,7 +192,7 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwarg
 		default:
 			return ErrBadKwarg{k, exp, got.etype}
 		}
-	case argString:
+	case ArgString:
 		if got.etype != etString {
 			return ErrBadKwarg{k, exp, got.etype}
 		}
@@ -201,12 +201,12 @@ func consumeKwarg(namedArgs map[string]*expr, k string, optArgs []arg, seenKwarg
 	return nil
 }
 
-func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
+func consumeSeriesArg(args []*expr, j int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
 	got := args[j]
 	var err error
 	var fn Func
 	switch v := exp.(type) {
-	case argSeries:
+	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
@@ -215,7 +215,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 			return 0, nil, err
 		}
 		*v.val = fn
-	case argSeriesList:
+	case ArgSeriesList:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
@@ -224,7 +224,7 @@ func consumeSeriesArg(args []*expr, j int, exp arg, from, to uint32, stable bool
 			return 0, nil, err
 		}
 		*v.val = fn
-	case argSeriesLists:
+	case ArgSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
@@ -296,7 +296,7 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 	// first validate the mandatory args
 	j := 0      // pos in args of next given arg to process
 	cutoff := 0 // marks the index of the first optional point (if any)
-	var argExp arg
+	var argExp Arg
 	for cutoff, argExp = range argsExp {
 		if argExp.Optional() {
 			break
@@ -349,7 +349,7 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 	j = 0
 	for _, argExp = range argsExp[:cutoff] {
 		switch argExp.(type) {
-		case argSeries, argSeriesList, argSeriesLists:
+		case ArgSeries, ArgSeriesList, ArgSeriesLists:
 			j, reqs, err = consumeSeriesArg(e.args, j, argExp, from, to, stable, reqs)
 			if err != nil {
 				return nil, err

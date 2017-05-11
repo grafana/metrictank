@@ -16,10 +16,10 @@ func NewSumSeries() Func {
 	return &FuncSumSeries{}
 }
 
-func (s *FuncSumSeries) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesLists{val: &s.in},
-	}, []arg{argSeries{}}
+func (s *FuncSumSeries) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesLists{val: &s.in},
+	}, []Arg{ArgSeries{}}
 }
 
 func (s *FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {

@@ -54,7 +54,7 @@ func (e ErrUnknownKwarg) Error() string {
 
 type ErrBadKwarg struct {
 	key string
-	exp arg
+	exp Arg
 	got exprType
 }
 
@@ -137,8 +137,8 @@ func Parse(e string) (*expr, string, error) {
 
 		exp := &expr{str: name, etype: etFunc}
 
-		argString, posArgs, namedArgs, e, err := parseArgList(e)
-		exp.argsStr = argString
+		ArgString, posArgs, namedArgs, e, err := parseArgList(e)
+		exp.argsStr = ArgString
 		exp.args = posArgs
 		exp.namedArgs = namedArgs
 
@@ -159,7 +159,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		panic("arg list should start with paren")
 	}
 
-	argString := e[1:]
+	ArgString := e[1:]
 
 	e = e[1:]
 
@@ -208,7 +208,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		}
 
 		if e[0] == ')' {
-			return argString[:len(argString)-len(e)], posArgs, namedArgs, e[1:], nil
+			return ArgString[:len(ArgString)-len(e)], posArgs, namedArgs, e[1:], nil
 		}
 
 		if e[0] != ',' && e[0] != ' ' {

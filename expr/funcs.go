@@ -6,7 +6,7 @@ type Func interface {
 	// Signature declares input and output arguments (return values)
 	// input args can be optional in which case they can be specified positionally or via keys if you want to specify params that come after un-specified optional params
 	// NewPlan() will only create the plan of the expressions it parsed correspond to the signatures provided by the function
-	Signature() ([]arg, []arg)
+	Signature() ([]Arg, []Arg)
 	// NeedRange allows a func to express that to be able to return data in the given from to, it will need input data in the returned from-to window.
 	// (e.g. movingAverage of 5min needs data as of from-5min)
 	NeedRange(from, to uint32) (uint32, uint32)

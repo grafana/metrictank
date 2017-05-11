@@ -13,13 +13,13 @@ func NewSmartSummarize() Func {
 	return &FuncSmartSummarize{fn: "sum"}
 }
 
-func (s *FuncSmartSummarize) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesList{val: &s.in},
-		argString{key: "interval", val: &s.interval},
-		argString{key: "func", opt: true, val: &s.fn},
-		argBool{key: "alignToFrom", opt: true, val: &s.alignToFrom},
-	}, []arg{argSeries{}}
+func (s *FuncSmartSummarize) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgString{key: "interval", val: &s.interval},
+		ArgString{key: "func", opt: true, val: &s.fn},
+		ArgBool{key: "alignToFrom", opt: true, val: &s.alignToFrom},
+	}, []Arg{ArgSeries{}}
 }
 
 func (s *FuncSmartSummarize) NeedRange(from, to uint32) (uint32, uint32) {

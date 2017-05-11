@@ -16,14 +16,14 @@ func NewConsolidateBy() Func {
 	return &FuncConsolidateBy{}
 }
 
-func (s *FuncConsolidateBy) Signature() ([]arg, []arg) {
+func (s *FuncConsolidateBy) Signature() ([]Arg, []Arg) {
 	validConsol := func(e *expr) error {
 		return consolidation.Validate(e.str)
 	}
-	return []arg{
-		argSeriesList{val: &s.in},
-		argString{val: &s.by, validator: []validator{validConsol}},
-	}, []arg{argSeriesList{}}
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgString{val: &s.by, validator: []Validator{validConsol}},
+	}, []Arg{ArgSeriesList{}}
 }
 
 func (s *FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {

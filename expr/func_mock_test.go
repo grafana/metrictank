@@ -11,8 +11,8 @@ func NewMock(data []models.Series) Func {
 	return FuncMock{data}
 }
 
-func (s FuncMock) Signature() ([]arg, []arg) {
-	return nil, []arg{argSeries{}}
+func (s FuncMock) Signature() ([]Arg, []Arg) {
+	return nil, []Arg{ArgSeries{}}
 }
 
 func (s FuncMock) NeedRange(from, to uint32) (uint32, uint32) {
