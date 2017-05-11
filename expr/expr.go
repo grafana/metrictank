@@ -224,6 +224,11 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
 		*v.val = got.str
+	case ArgBool:
+		if got.etype != etBool {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.bool
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}
