@@ -57,9 +57,10 @@ func (e expr) Print(indent int) string {
 // consumeBasicArg verifies that the argument at given pos matches the expected arg
 // it's up to the caller to assure that given pos is valid before calling.
 // if arg allows for multiple arguments, pos is advanced to cover all accepted arguments.
+// if the arg is a "basic" arg (meaning not a series, seriesList or seriesLists) the
+// appropriate value(s) will be assigned to exp.val
+// for non-basic args, see consumeSeriesArg which should be called after deducing the required from/to.
 // the returned pos is always the index where the next argument should be.
-// it stores all passed arguments, except when series are requested:
-// those arguments need a pass with consumeSeriesArg after deducing the required from/to.
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	got := e.args[pos]
 	switch v := exp.(type) {
@@ -137,6 +138,13 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	return pos, nil
 }
 
+// consumeSeriesArg verifies that the argument at given pos matches the expected arg
+// it's up to the caller to assure that given pos is valid before calling.
+// if arg allows for multiple arguments, pos is advanced to cover all accepted arguments.
+// if the arg is a "basic", no value is saved (it's up to consumeBasicArg to do that)
+// but for non-basic args (meaning a series, seriesList or seriesLists) the
+// appropriate value(s) will be assigned to exp.val
+// the returned pos is always the index where the next argument should be.
 func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
 	got := e.args[pos]
 	var err error
@@ -186,10 +194,8 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, r
 }
 
 // consumeKwarg consumes the kwarg (by key k) and verifies it
-// it's the callers responsability that k exists within namedArgs
-// it also makes sure the kwarg has not been consumed already via the kwargs map
-// (it would be an error to provide an argument twice via the same keyword,
-// or once positionally and once via keyword)
+// if the specified argument is valid, it is saved in exp.val
+// where exp is the arg specified by the function that has the given key
 func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	var found bool
 	var exp Arg
