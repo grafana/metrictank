@@ -343,9 +343,12 @@ func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]
 
 	}
 
-	// functions now know all non-series input args -> they know the timerange they need
+	// functions now have their non-series input args set,
+	// so they should now be able to declare the timerange they need
 	from, to = fn.NeedRange(from, to)
-	// we know timerange -> set up input series
+	// now that we know the needed timerange for the data coming into
+	// this function, we can set up the input arguments for the function
+	// that are series
 	j = 0
 	for _, argExp = range argsExp[:cutoff] {
 		switch argExp.(type) {
