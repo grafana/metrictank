@@ -17,12 +17,12 @@ func NewPerSecond() Func {
 	return &FuncPerSecond{}
 }
 
-func (s *FuncPerSecond) Signature() ([]arg, []arg) {
-	return []arg{
-			argSeriesLists{val: &s.in},
-			argInt{"maxValue", true, []validator{IntPositive}, &s.maxValue},
-		}, []arg{
-			argSeriesList{},
+func (s *FuncPerSecond) Signature() ([]Arg, []Arg) {
+	return []Arg{
+			ArgSeriesLists{val: &s.in},
+			ArgInt{"maxValue", true, []Validator{IntPositive}, &s.maxValue},
+		}, []Arg{
+			ArgSeriesList{},
 		}
 }
 

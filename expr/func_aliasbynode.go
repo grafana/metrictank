@@ -15,11 +15,11 @@ func NewAliasByNode() Func {
 	return &FuncAliasByNode{}
 }
 
-func (s *FuncAliasByNode) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesList{val: &s.in},
-		argInts{val: &s.nodes},
-	}, []arg{argSeries{}}
+func (s *FuncAliasByNode) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgInts{val: &s.nodes},
+	}, []Arg{ArgSeries{}}
 }
 
 func (s *FuncAliasByNode) NeedRange(from, to uint32) (uint32, uint32) {

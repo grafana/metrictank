@@ -17,11 +17,11 @@ func NewTransformNull() Func {
 	return &FuncTransformNull{nil, math.NaN()}
 }
 
-func (s *FuncTransformNull) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesList{val: &s.in},
-		argFloat{key: "default", opt: true, val: &s.def},
-	}, []arg{argSeriesList{}}
+func (s *FuncTransformNull) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgFloat{key: "default", opt: true, val: &s.def},
+	}, []Arg{ArgSeriesList{}}
 }
 
 func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {

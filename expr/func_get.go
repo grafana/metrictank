@@ -11,8 +11,8 @@ func NewGet(req Req) Func {
 	return FuncGet{req}
 }
 
-func (s FuncGet) Signature() ([]arg, []arg) {
-	return nil, []arg{argSeries{}}
+func (s FuncGet) Signature() ([]Arg, []Arg) {
+	return nil, []Arg{ArgSeries{}}
 }
 
 func (s FuncGet) NeedRange(from, to uint32) (uint32, uint32) {

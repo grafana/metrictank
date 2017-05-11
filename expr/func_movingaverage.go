@@ -14,16 +14,16 @@ func NewMovingAverage() Func {
 }
 
 // note if input is 1 series, then output is too. not sure how to communicate that
-func (s *FuncMovingAverage) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesList{val: &s.in},
+func (s *FuncMovingAverage) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
 		// this could be an int OR a string.
 		// we need to figure out the interval of the data we will consume
 		// and request from -= interval * points
 		// interestingly the from adjustment might mean the archive TTL is no longer sufficient and push the request into a different rollup archive, which we should probably
 		// account for. let's solve all of this later.
-		argInt{val: &s.window},
-	}, []arg{argSeriesList{}}
+		ArgInt{val: &s.window},
+	}, []Arg{ArgSeriesList{}}
 }
 
 func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {

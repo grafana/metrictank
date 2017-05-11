@@ -16,10 +16,10 @@ func NewAvgSeries() Func {
 	return &FuncAvgSeries{}
 }
 
-func (s *FuncAvgSeries) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesLists{val: &s.in},
-	}, []arg{argSeries{}}
+func (s *FuncAvgSeries) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesLists{val: &s.in},
+	}, []Arg{ArgSeries{}}
 }
 
 func (s *FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {

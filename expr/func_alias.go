@@ -13,11 +13,11 @@ func NewAlias() Func {
 	return &FuncAlias{}
 }
 
-func (s *FuncAlias) Signature() ([]arg, []arg) {
-	return []arg{
-		argSeriesList{val: &s.in},
-		argString{val: &s.alias},
-	}, []arg{argSeriesList{}}
+func (s *FuncAlias) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgString{val: &s.alias},
+	}, []Arg{ArgSeriesList{}}
 }
 
 func (s *FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
