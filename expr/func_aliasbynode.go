@@ -7,44 +7,36 @@ import (
 )
 
 type FuncAliasByNode struct {
-	nodes []int
+	in    Func
+	nodes []int64
 }
 
 func NewAliasByNode() Func {
 	return &FuncAliasByNode{}
 }
 
-func (s *FuncAliasByNode) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesLists, integers}, nil, []argType{series}
-}
-
-func (s *FuncAliasByNode) Init(args []*expr, namedArgs map[string]*expr) error {
-	for _, i := range args[1:] {
-		s.nodes = append(s.nodes, int(i.int))
-	}
-	return nil
+func (s *FuncAliasByNode) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgInts{val: &s.nodes},
+	}, []Arg{ArgSeries{}}
 }
 
 func (s *FuncAliasByNode) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	var series []models.Series
-	var out []interface{}
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			break
-		}
-		series = append(series, seriesList...)
-
+func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	if err != nil {
+		return nil, err
 	}
-	for _, serie := range series {
+	for i, serie := range series {
 		metric := extractMetric(serie.Target)
 		parts := strings.Split(metric, ".")
 		var name []string
-		for _, n := range s.nodes {
+		for _, n64 := range s.nodes {
+			n := int(n64)
 			if n < 0 {
 				n += len(parts)
 			}
@@ -53,12 +45,7 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series, named map[string]i
 			}
 			name = append(name, parts[n])
 		}
-
-		out = append(out, models.Series{
-			Target:     strings.Join(name, "."),
-			Datapoints: serie.Datapoints,
-			Interval:   serie.Interval,
-		})
+		series[i].Target = strings.Join(name, ".")
 	}
-	return out, nil
+	return series, nil
 }

@@ -3,24 +3,30 @@ package expr
 import "github.com/raintank/metrictank/api/models"
 
 type FuncSmartSummarize struct {
+	in          Func
+	interval    string
+	fn          string
+	alignToFrom bool
 }
 
 func NewSmartSummarize() Func {
-	return FuncSmartSummarize{}
+	return &FuncSmartSummarize{fn: "sum"}
 }
 
-func (s FuncSmartSummarize) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesList, str}, []optArg{{key: "func", val: str}, {key: "alignToFrom", val: boolean}}, []argType{series}
+func (s *FuncSmartSummarize) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgString{key: "interval", val: &s.interval},
+		ArgString{key: "func", opt: true, val: &s.fn},
+		ArgBool{key: "alignToFrom", opt: true, val: &s.alignToFrom},
+	}, []Arg{ArgSeries{}}
 }
 
-func (s FuncSmartSummarize) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
-}
-
-func (s FuncSmartSummarize) NeedRange(from, to uint32) (uint32, uint32) {
+func (s *FuncSmartSummarize) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncSmartSummarize) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
-	return []interface{}{inputs[0]}, nil
+func (s *FuncSmartSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(cache)
+	return series, err
 }

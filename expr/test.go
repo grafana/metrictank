@@ -1,3 +1,5 @@
 package expr
 
-var results []interface{}
+import "github.com/raintank/metrictank/api/models"
+
+var results []models.Series

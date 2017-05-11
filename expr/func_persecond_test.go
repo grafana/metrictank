@@ -166,33 +166,22 @@ func TestPerSecondMultiMulti(t *testing.T) {
 	)
 }
 
-func testPerSecond(name string, in [][]models.Series, out []models.Series, max float64, t *testing.T) {
+func testPerSecond(name string, in [][]models.Series, out []models.Series, max int64, t *testing.T) {
 	f := NewPerSecond()
-	var input []interface{}
-	for _, i := range in {
-		input = append(input, i)
+	ps := f.(*FuncPerSecond)
+	for i := range in {
+		ps.in = append(ps.in, NewMock(in[i]))
+		ps.maxValue = max
 	}
-	if max != 0 {
-		kwargs := map[string]*expr{
-			"maxValue": {
-				float: max,
-			},
-		}
-		f.Init([]*expr{{etype: etName}}, kwargs)
-	}
-	gots, err := f.Exec(make(map[Req][]models.Series), nil, input...)
+	gots, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(gots) != len(out) {
 		t.Fatalf("case %q: perSecond len output expected %d, got %d", name, len(out), len(gots))
 	}
-	for i, got := range gots {
+	for i, g := range gots {
 		exp := out[i]
-		g, ok := got.(models.Series)
-		if !ok {
-			t.Fatalf("case %q: expected output of models.Series type", name)
-		}
 		if g.Target != exp.Target {
 			t.Fatalf("case %q: expected target %q, got %q", name, exp.Target, g.Target)
 		}

@@ -54,12 +54,12 @@ func (e ErrUnknownKwarg) Error() string {
 
 type ErrBadKwarg struct {
 	key string
-	exp argType
+	exp Arg
 	got exprType
 }
 
 func (e ErrBadKwarg) Error() string {
-	return fmt.Sprintf("keyword argument %q bad type. expected %s - got %s", e.key, e.exp, e.got)
+	return fmt.Sprintf("keyword argument %q bad type. expected %T - got %s", e.key, e.exp, e.got)
 }
 
 type ErrKwargSpecifiedTwice struct {
@@ -137,8 +137,8 @@ func Parse(e string) (*expr, string, error) {
 
 		exp := &expr{str: name, etype: etFunc}
 
-		argString, posArgs, namedArgs, e, err := parseArgList(e)
-		exp.argsStr = argString
+		ArgString, posArgs, namedArgs, e, err := parseArgList(e)
+		exp.argsStr = ArgString
 		exp.args = posArgs
 		exp.namedArgs = namedArgs
 
@@ -159,7 +159,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		panic("arg list should start with paren")
 	}
 
-	argString := e[1:]
+	ArgString := e[1:]
 
 	e = e[1:]
 
@@ -208,7 +208,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		}
 
 		if e[0] == ')' {
-			return argString[:len(argString)-len(e)], posArgs, namedArgs, e[1:], nil
+			return ArgString[:len(ArgString)-len(e)], posArgs, namedArgs, e[1:], nil
 		}
 
 		if e[0] != ',' && e[0] != ' ' {

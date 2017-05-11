@@ -74,7 +74,10 @@ func TestAliasMultiple(t *testing.T) {
 
 func testAlias(name string, in []models.Series, out []models.Series, t *testing.T) {
 	f := NewAlias()
-	got, err := f.Exec(make(map[Req][]models.Series), nil, interface{}(in), interface{}("bar"))
+	alias := f.(*FuncAlias)
+	alias.alias = "bar"
+	alias.in = NewMock(in)
+	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
@@ -82,10 +85,7 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 		t.Fatalf("case %q: alias output should be same amount of series as input: %d, not %d", name, len(in), len(got))
 	}
 	for i, o := range out {
-		g, ok := got[i].(models.Series)
-		if !ok {
-			t.Fatalf("case %q: expected alias output of models.Series type", name)
-		}
+		g := got[i]
 		if o.Target != g.Target {
 			t.Fatalf("case %q: expected target %q, got %q", name, o.Target, g.Target)
 		}
@@ -126,7 +126,10 @@ func benchmarkAlias(b *testing.B, numSeries int) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f := NewAlias()
-		got, err := f.Exec(make(map[Req][]models.Series), nil, interface{}(input), "new-name")
+		alias := f.(*FuncAlias)
+		alias.alias = "new-name"
+		alias.in = NewMock(input)
+		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
 		}

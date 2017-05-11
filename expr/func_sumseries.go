@@ -3,44 +3,42 @@ package expr
 import (
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
 )
 
 type FuncSumSeries struct {
+	in []Func
 }
 
 func NewSumSeries() Func {
-	return FuncSumSeries{}
+	return &FuncSumSeries{}
 }
 
-func (s FuncSumSeries) Signature() ([]argType, []optArg, []argType) {
-	return []argType{seriesLists}, nil, []argType{series}
+func (s *FuncSumSeries) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesLists{val: &s.in},
+	}, []Arg{ArgSeries{}}
 }
 
-func (s FuncSumSeries) Init(args []*expr, namedArgs map[string]*expr) error {
-	return nil
-}
-
-func (s FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
+func (s *FuncSumSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncSumSeries) Exec(cache map[Req][]models.Series, named map[string]interface{}, inputs ...interface{}) ([]interface{}, error) {
+func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	var series []models.Series
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
+	for i := range s.in {
+		in, err := s.in[i].Exec(cache)
+		if err != nil {
+			return nil, err
 		}
-		series = append(series, seriesList...)
-
+		series = append(series, in...)
 	}
+
 	if len(series) == 1 {
 		series[0].Target = fmt.Sprintf("sumSeries(%s)", series[0].QueryPatt)
-		return []interface{}{series[0]}, nil
+		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
@@ -66,5 +64,5 @@ func (s FuncSumSeries) Exec(cache map[Req][]models.Series, named map[string]inte
 		Interval:   series[0].Interval,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
-	return []interface{}{output}, nil
+	return []models.Series{output}, nil
 }

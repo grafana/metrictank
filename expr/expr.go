@@ -53,3 +53,184 @@ func (e expr) Print(indent int) string {
 	}
 	return "HUH-SHOULD-NEVER-HAPPEN"
 }
+
+// consumeBasicArg verifies that the argument at given pos matches the expected arg
+// it's up to the caller to assure that given pos is valid before calling.
+// if arg allows for multiple arguments, pos is advanced to cover all accepted arguments.
+// the returned pos is always the index where the next argument should be.
+// it stores all passed arguments, except when series are requested:
+// those arguments need a pass with consumeSeriesArg after deducing the required from/to.
+func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
+	got := e.args[pos]
+	switch v := exp.(type) {
+	case ArgSeries, ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+	case ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+			pos += 1
+		}
+	case ArgInt:
+		if got.etype != etInt {
+			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		*v.val = got.int
+	case ArgInts:
+		if got.etype != etInt {
+			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+		}
+		*v.val = append(*v.val, got.int)
+		// special case! consume all subsequent args (if any) in args that will also yield an integer
+		for len(e.args) > pos+1 && e.args[pos+1].etype == etInt {
+			pos += 1
+			for _, va := range v.validator {
+				if err := va(e.args[pos]); err != nil {
+					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				}
+			}
+			*v.val = append(*v.val, e.args[pos].int)
+		}
+	case ArgFloat:
+		// integer is also a valid float, just happened to have no decimals
+		if got.etype != etFloat && got.etype != etInt {
+			return 0, ErrBadArgumentStr{"float", string(got.etype)}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		if got.etype == etInt {
+			*v.val = float64(got.int)
+		} else {
+			*v.val = got.float
+		}
+	case ArgString:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		*v.val = got.str
+	case ArgBool:
+		if got.etype != etBool {
+			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+		}
+		*v.val = got.bool
+	default:
+		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
+	}
+	pos += 1
+	return pos, nil
+}
+
+func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
+	got := e.args[pos]
+	var err error
+	var fn Func
+	switch v := exp.(type) {
+	case ArgSeries:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		if err != nil {
+			return 0, nil, err
+		}
+		*v.val = fn
+	case ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		if err != nil {
+			return 0, nil, err
+		}
+		*v.val = fn
+	case ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		if err != nil {
+			return 0, nil, err
+		}
+		*v.val = append(*v.val, fn)
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+			pos += 1
+			fn, reqs, err = newplan(e.args[pos], from, to, stable, reqs)
+			if err != nil {
+				return 0, nil, err
+			}
+			*v.val = append(*v.val, fn)
+		}
+	default:
+		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
+	}
+	pos += 1
+	return pos, reqs, nil
+}
+
+// consumeKwarg consumes the kwarg (by key k) and verifies it
+// it's the callers responsability that k exists within namedArgs
+// it also makes sure the kwarg has not been consumed already via the kwargs map
+// (it would be an error to provide an argument twice via the same keyword,
+// or once positionally and once via keyword)
+func (e expr) consumeKwarg(key string, optArgs []Arg) error {
+	var found bool
+	var exp Arg
+	for _, exp = range optArgs {
+		if exp.Key() == key {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrUnknownKwarg{key}
+	}
+	got := e.namedArgs[key]
+	switch v := exp.(type) {
+	case ArgInt:
+		if got.etype != etInt {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.int
+	case ArgFloat:
+		switch got.etype {
+		case etInt:
+			// integer is also a valid float, just happened to have no decimals
+			*v.val = float64(got.int)
+		case etFloat:
+			*v.val = got.float
+		default:
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+	case ArgString:
+		if got.etype != etString {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.str
+	case ArgBool:
+		if got.etype != etBool {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.bool
+	default:
+		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
+	}
+	return nil
+}
