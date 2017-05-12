@@ -99,21 +99,18 @@ func TestAvgSeriesMultipleDiffQuery(t *testing.T) {
 
 func testAvgSeries(name string, in [][]models.Series, out models.Series, t *testing.T) {
 	f := NewAvgSeries()
-	var input []interface{}
+	avg := f.(*FuncAvgSeries)
 	for _, i := range in {
-		input = append(input, i)
+		avg.in = append(avg.in, NewMock(i))
 	}
-	got, err := f.Exec(make(map[Req][]models.Series), input...)
+	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("case %q: avgSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
-	g, ok := got[0].(models.Series)
-	if !ok {
-		t.Fatalf("case %q: expected avg output of models.Series type", name)
-	}
+	g := got[0]
 	if g.Target != out.Target {
 		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
 	}
@@ -182,13 +179,15 @@ func benchmarkAvgSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 		input = append(input, series)
 	}
 	b.ResetTimer()
+	var err error
 	for i := 0; i < b.N; i++ {
 		f := NewAvgSeries()
-		got, err := f.Exec(make(map[Req][]models.Series), interface{}(input))
+		avg := f.(*FuncAvgSeries)
+		avg.in = append(avg.in, NewMock(input))
+		results, err = f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
 		}
-		results = got
 	}
-	b.SetBytes(int64(numSeries * len(input[0].Datapoints) * 12))
+	b.SetBytes(int64(numSeries * len(results[0].Datapoints) * 12))
 }

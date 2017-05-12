@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 var (
-	ErrMissingArg         = errors.New("argument missing")
-	ErrTooManyArg         = errors.New("too many arguments")
-	ErrMissingTimeseries  = errors.New("missing time series argument")
-	ErrWildcardNotAllowed = errors.New("found wildcard where series expected")
+	ErrMissingArg          = errors.New("argument missing")
+	ErrTooManyArg          = errors.New("too many arguments")
+	ErrMissingTimeseries   = errors.New("missing time series argument")
+	ErrWildcardNotAllowed  = errors.New("found wildcard where series expected")
+	ErrMissingExpr         = errors.New("missing expression")
+	ErrMissingComma        = errors.New("missing comma")
+	ErrMissingQuote        = errors.New("missing quote")
+	ErrUnexpectedCharacter = errors.New("unexpected character")
+	ErrIllegalCharacter    = errors.New("illegal character for function name")
 )
 
 type ErrBadArgument struct {
@@ -38,6 +44,32 @@ func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
 }
 
+type ErrUnknownKwarg struct {
+	key string
+}
+
+func (e ErrUnknownKwarg) Error() string {
+	return fmt.Sprintf("unknown keyword argument %q", e)
+}
+
+type ErrBadKwarg struct {
+	key string
+	exp Arg
+	got exprType
+}
+
+func (e ErrBadKwarg) Error() string {
+	return fmt.Sprintf("keyword argument %q bad type. expected %T - got %s", e.key, e.exp, e.got)
+}
+
+type ErrKwargSpecifiedTwice struct {
+	key string
+}
+
+func (e ErrKwargSpecifiedTwice) Error() string {
+	return fmt.Sprintf("keyword argument %q specified twice", e.key)
+}
+
 type MetricRequest struct {
 	Metric string
 	From   int32
@@ -61,6 +93,8 @@ func ParseMany(targets []string) ([]*expr, error) {
 	return out, nil
 }
 
+// Parses an expression string and turns it into an expression
+// also returns any leftover data that could not be parsed
 func Parse(e string) (*expr, string, error) {
 	// skip whitespace
 	for len(e) > 1 && e[0] == ' ' {
@@ -72,8 +106,15 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
-		val, valStr, e, err := parseConst(e)
-		return &expr{float: val, str: valStr, etype: etConst}, e, err
+		return parseConst(e)
+	}
+
+	if strings.HasPrefix(e, "True") || strings.HasPrefix(e, "true") {
+		return &expr{bool: true, str: e[:4], etype: etBool}, e[4:], nil
+	}
+
+	if strings.HasPrefix(e, "False") || strings.HasPrefix(e, "false") {
+		return &expr{bool: false, str: e[:5], etype: etBool}, e[5:], nil
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
@@ -88,10 +129,16 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	if e != "" && e[0] == '(' {
+		for i := range name {
+			if !isFnChar(name[i]) {
+				return nil, "", ErrIllegalCharacter
+			}
+		}
+
 		exp := &expr{str: name, etype: etFunc}
 
-		argString, posArgs, namedArgs, e, err := parseArgList(e)
-		exp.argsStr = argString
+		ArgString, posArgs, namedArgs, e, err := parseArgList(e)
+		exp.argsStr = ArgString
 		exp.args = posArgs
 		exp.namedArgs = namedArgs
 
@@ -100,17 +147,6 @@ func Parse(e string) (*expr, string, error) {
 
 	return &expr{str: name, etype: etName}, e, nil
 }
-
-var (
-	// ErrMissingExpr is a parse error returned when an expression is missing.
-	ErrMissingExpr = errors.New("missing expression")
-	// ErrMissingComma is a parse error returned when an expression is missing a comma.
-	ErrMissingComma = errors.New("missing comma")
-	// ErrMissingQuote is a parse error returned when an expression is missing a quote.
-	ErrMissingQuote = errors.New("missing quote")
-	// ErrUnexpectedCharacter is a parse error returned when an expression contains an unexpected character.
-	ErrUnexpectedCharacter = errors.New("unexpected character")
-)
 
 func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 
@@ -123,7 +159,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		panic("arg list should start with paren")
 	}
 
-	argString := e[1:]
+	ArgString := e[1:]
 
 	e = e[1:]
 
@@ -151,19 +187,15 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 				return "", nil, nil, "", ErrMissingComma
 			}
 
-			if argCont.etype != etConst && argCont.etype != etName && argCont.etype != etString {
-				return "", nil, nil, eCont, ErrBadArgumentStr{"const, name or string", string(argCont.etype)}
+			if argCont.etype != etInt && argCont.etype != etFloat && argCont.etype != etName && argCont.etype != etString && argCont.etype != etBool {
+				return "", nil, nil, eCont, ErrBadArgumentStr{"int, float, name, bool or string", string(argCont.etype)}
 			}
 
 			if namedArgs == nil {
 				namedArgs = make(map[string]*expr)
 			}
 
-			namedArgs[arg.str] = &expr{
-				etype: argCont.etype,
-				float: argCont.float,
-				str:   argCont.str,
-			}
+			namedArgs[arg.str] = argCont
 
 			e = eCont
 		} else {
@@ -176,7 +208,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		}
 
 		if e[0] == ')' {
-			return argString[:len(argString)-len(e)], posArgs, namedArgs, e[1:], nil
+			return ArgString[:len(ArgString)-len(e)], posArgs, namedArgs, e[1:], nil
 		}
 
 		if e[0] != ',' && e[0] != ' ' {
@@ -197,25 +229,39 @@ func isNameChar(r byte) bool {
 		r == '<' || r == '>'
 }
 
+func isFnChar(r byte) bool {
+	return false ||
+		'a' <= r && r <= 'z' ||
+		'A' <= r && r <= 'Z' ||
+		'0' <= r && r <= '9'
+}
+
 func isDigit(r byte) bool {
 	return '0' <= r && r <= '9'
 }
 
-func parseConst(s string) (float64, string, string, error) {
+func parseConst(s string) (*expr, string, error) {
 
 	var i int
+	var float bool
 	// All valid characters for a floating-point constant
 	// Just slurp them all in and let ParseFloat sort 'em out
 	for i < len(s) && (isDigit(s[i]) || s[i] == '.' || s[i] == '+' || s[i] == '-' || s[i] == 'e' || s[i] == 'E') {
+		// note that exponent syntax results into a float value.
+		// so even values like 1e3 (1000) or 2000e-3 (2) which can be expressed as integers,
+		// are considered floating point values.  if a function expets an int, then just don't use 'e' syntax.
+		if s[i] == '.' || s[i] == 'e' || s[i] == 'E' {
+			float = true
+		}
 		i++
 	}
 
-	v, err := strconv.ParseFloat(s[:i], 64)
-	if err != nil {
-		return 0, "", "", err
+	if float {
+		v, err := strconv.ParseFloat(s[:i], 64)
+		return &expr{float: v, str: s[:i], etype: etFloat}, s[i:], err
 	}
-
-	return v, s[:i], s[i:], err
+	v, err := strconv.ParseInt(s[:i], 10, 64)
+	return &expr{int: v, str: s[:i], etype: etInt}, s[i:], err
 }
 
 func parseName(s string) (string, string) {
@@ -274,216 +320,29 @@ func parseString(s string) (string, string, error) {
 		return "", "", ErrMissingQuote
 
 	}
-	//fmt.Println("> string", s[:i])
 
 	return s[:i], s[i+1:], nil
 }
 
-func getStringArg(e *expr, n int) (string, error) {
-	if len(e.args) <= n {
-		return "", ErrMissingArg
-	}
-
-	return doGetStringArg(e.args[n])
-}
-
-func getStringArgDefault(e *expr, n int, s string) (string, error) {
-	if len(e.args) <= n {
-		return s, nil
-	}
-
-	return doGetStringArg(e.args[n])
-}
-
-func getStringNamedOrPosArgDefault(e *expr, k string, n int, s string) (string, error) {
-	if a := getNamedArg(e, k); a != nil {
-		return doGetStringArg(a)
-	}
-
-	return getStringArgDefault(e, n, s)
-}
-
-func doGetStringArg(e *expr) (string, error) {
-	if e.etype != etString {
-		return "", ErrBadArgumentStr{"string", string(e.etype)}
-	}
-
-	return e.str, nil
-}
-
-/*
-func getIntervalArg(e *expr, n int, defaultSign int) (int32, error) {
-	if len(e.args) <= n {
-		return 0, ErrMissingArg
-	}
-
-	if e.args[n].etype != etString {
-		return 0, ErrBadArgumentStr{"string", string(e.etype)}
-	}
-
-	seconds, err := IntervalString(e.args[n].valStr, defaultSign)
-	if err != nil {
-		return 0, ErrBadArgumentStr{"const", string(e.etype)}
-	}
-
-	return seconds, nil
-}
-*/
-
-func getFloatArg(e *expr, n int) (float64, error) {
-	if len(e.args) <= n {
-		return 0, ErrMissingArg
-	}
-
-	return doGetFloatArg(e.args[n])
-}
-
-func getFloatArgDefault(e *expr, n int, v float64) (float64, error) {
-	if len(e.args) <= n {
-		return v, nil
-	}
-
-	return doGetFloatArg(e.args[n])
-}
-
-func getFloatNamedOrPosArgDefault(e *expr, k string, n int, v float64) (float64, error) {
-	if a := getNamedArg(e, k); a != nil {
-		return doGetFloatArg(a)
-	}
-
-	return getFloatArgDefault(e, n, v)
-}
-
-func doGetFloatArg(e *expr) (float64, error) {
-	if e.etype != etConst {
-		return 0, ErrBadArgumentStr{"const", string(e.etype)}
-	}
-
-	return e.float, nil
-}
-
-func getIntArg(e *expr, n int) (int, error) {
-	if len(e.args) <= n {
-		return 0, ErrMissingArg
-	}
-
-	return doGetIntArg(e.args[n])
-}
-
-func getIntArgs(e *expr, n int) ([]int, error) {
-
-	if len(e.args) <= n {
-		return nil, ErrMissingArg
-	}
-
-	var ints []int
-
-	for i := n; i < len(e.args); i++ {
-		a, err := getIntArg(e, i)
-		if err != nil {
-			return nil, err
+// exctractMetric searches for a metric name in `m'
+// metric name is defined to be a series of name characters terminated by a comma
+func extractMetric(m string) string {
+	start := 0
+	end := 0
+	curlyBraces := 0
+	for end < len(m) {
+		if m[end] == '{' {
+			curlyBraces++
+		} else if m[end] == '}' {
+			curlyBraces--
+		} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
+			return m[start:end]
+		} else if !(isNameChar(m[end]) || m[end] == ',') {
+			start = end + 1
 		}
-		ints = append(ints, a)
+
+		end++
 	}
 
-	return ints, nil
-}
-
-func getIntArgDefault(e *expr, n int, d int) (int, error) {
-	if len(e.args) <= n {
-		return d, nil
-	}
-
-	return doGetIntArg(e.args[n])
-}
-
-func getIntNamedOrPosArgDefault(e *expr, k string, n int, d int) (int, error) {
-	if a := getNamedArg(e, k); a != nil {
-		return doGetIntArg(a)
-	}
-
-	return getIntArgDefault(e, n, d)
-}
-
-func doGetIntArg(e *expr) (int, error) {
-	if e.etype != etConst {
-		return 0, ErrBadArgumentStr{"const", string(e.etype)}
-	}
-
-	return int(e.float), nil
-}
-
-func getBoolNamedOrPosArgDefault(e *expr, k string, n int, b bool) (bool, error) {
-	if a := getNamedArg(e, k); a != nil {
-		return doGetBoolArg(a)
-	}
-
-	return getBoolArgDefault(e, n, b)
-}
-
-func getBoolArgDefault(e *expr, n int, b bool) (bool, error) {
-	if len(e.args) <= n {
-		return b, nil
-	}
-
-	return doGetBoolArg(e.args[n])
-}
-
-func doGetBoolArg(e *expr) (bool, error) {
-	if e.etype != etName {
-		return false, ErrBadArgumentStr{"const", string(e.etype)}
-	}
-
-	// names go into 'target'
-	switch e.str {
-	case "False", "false":
-		return false, nil
-	case "True", "true":
-		return true, nil
-	}
-
-	return false, ErrBadArgumentStr{"const", string(e.etype)}
-}
-
-/*
-func getSeriesArg(arg *expr, from, until int32, values map[MetricRequest][]*MetricData) ([]*MetricData, error) {
-	if arg.etype != etName && arg.etype != etFunc {
-		return nil, ErrMissingTimeseries
-	}
-
-	a, _ := EvalExpr(arg, from, until, values)
-
-	if len(a) == 0 {
-		return nil, ErrSeriesDoesNotExist
-	}
-
-	return a, nil
-}
-
-func getSeriesArgs(e []*expr, from, until int32, values map[MetricRequest][]*MetricData) ([]*MetricData, error) {
-
-	var args []*MetricData
-
-	for _, arg := range e {
-		a, err := getSeriesArg(arg, from, until, values)
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, a...)
-	}
-
-	if len(args) == 0 {
-		return nil, ErrSeriesDoesNotExist
-	}
-
-	return args, nil
-}
-*/
-
-func getNamedArg(e *expr, name string) *expr {
-	if a, ok := e.namedArgs[name]; ok {
-		return a
-	}
-
-	return nil
+	return m[start:end]
 }

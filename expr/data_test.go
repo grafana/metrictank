@@ -33,6 +33,16 @@ var c = []schema.Point{
 	{Val: 4, Ts: 60},
 }
 
+// emulate an 8 bit counter
+var d = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 33, Ts: 20},
+	{Val: 199, Ts: 30},
+	{Val: 29, Ts: 40}, // overflowed
+	{Val: 80, Ts: 50},
+	{Val: 250, Ts: 60},
+}
+
 var sumab = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64, Ts: 20},

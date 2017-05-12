@@ -99,21 +99,18 @@ func TestSumSeriesMultipleDiffQuery(t *testing.T) {
 
 func testSumSeries(name string, in [][]models.Series, out models.Series, t *testing.T) {
 	f := NewSumSeries()
-	var input []interface{}
+	sum := f.(*FuncSumSeries)
 	for _, i := range in {
-		input = append(input, i)
+		sum.in = append(sum.in, NewMock(i))
 	}
-	got, err := f.Exec(make(map[Req][]models.Series), input...)
+	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
-	g, ok := got[0].(models.Series)
-	if !ok {
-		t.Fatalf("case %q: expected sum output of models.Series type", name)
-	}
+	g := got[0]
 	if g.Target != out.Target {
 		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
 	}
@@ -184,7 +181,9 @@ func benchmarkSumSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f := NewSumSeries()
-		got, err := f.Exec(make(map[Req][]models.Series), interface{}(input))
+		sum := f.(*FuncSumSeries)
+		sum.in = append(sum.in, NewMock(input))
+		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
 		}

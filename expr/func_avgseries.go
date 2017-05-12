@@ -3,44 +3,41 @@ package expr
 import (
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
 )
 
 type FuncAvgSeries struct {
+	in []GraphiteFunc
 }
 
-func NewAvgSeries() Func {
-	return FuncAvgSeries{}
+func NewAvgSeries() GraphiteFunc {
+	return &FuncAvgSeries{}
 }
 
-func (s FuncAvgSeries) Signature() ([]argType, []argType) {
-	return []argType{seriesLists}, []argType{series}
+func (s *FuncAvgSeries) Signature() ([]Arg, []Arg) {
+	return []Arg{
+		ArgSeriesLists{val: &s.in},
+	}, []Arg{ArgSeries{}}
 }
 
-func (s FuncAvgSeries) Init(args []*expr) error {
-	return nil
-}
-
-func (s FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
+func (s *FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
 	return from, to
 }
 
-func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}) ([]interface{}, error) {
+func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	var series []models.Series
-	for _, input := range inputs {
-		seriesList, ok := input.([]models.Series)
-		if !ok {
-			return nil, ErrBadArgument{reflect.TypeOf([]models.Series{}), reflect.TypeOf(input)}
+	for i := range s.in {
+		in, err := s.in[i].Exec(cache)
+		if err != nil {
+			return nil, err
 		}
-		series = append(series, seriesList...)
-
+		series = append(series, in...)
 	}
 	if len(series) == 1 {
 		series[0].Target = fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
-		return []interface{}{series[0]}, nil
+		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	for i := 0; i < len(series[0].Datapoints); i++ {
@@ -70,5 +67,5 @@ func (s FuncAvgSeries) Exec(cache map[Req][]models.Series, inputs ...interface{}
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 
-	return []interface{}{output}, nil
+	return []models.Series{output}, nil
 }
