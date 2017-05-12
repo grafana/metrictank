@@ -19,7 +19,7 @@ type Arg interface {
 type ArgSeries struct {
 	key string
 	opt bool
-	val *Func
+	val *GraphiteFunc
 }
 
 func (a ArgSeries) Key() string    { return a.key }
@@ -29,7 +29,7 @@ func (a ArgSeries) Optional() bool { return a.opt }
 type ArgSeriesList struct {
 	key string
 	opt bool
-	val *Func
+	val *GraphiteFunc
 }
 
 func (a ArgSeriesList) Key() string    { return a.key }
@@ -39,7 +39,7 @@ func (a ArgSeriesList) Optional() bool { return a.opt }
 type ArgSeriesLists struct {
 	key string
 	opt bool
-	val *[]Func
+	val *[]GraphiteFunc
 }
 
 func (a ArgSeriesLists) Key() string    { return a.key }

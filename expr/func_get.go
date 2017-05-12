@@ -7,7 +7,7 @@ type FuncGet struct {
 	req Req
 }
 
-func NewGet(req Req) Func {
+func NewGet(req Req) GraphiteFunc {
 	return FuncGet{req}
 }
 

@@ -3,13 +3,13 @@ package expr
 import "github.com/raintank/metrictank/api/models"
 
 type FuncSmartSummarize struct {
-	in          Func
+	in          GraphiteFunc
 	interval    string
 	fn          string
 	alignToFrom bool
 }
 
-func NewSmartSummarize() Func {
+func NewSmartSummarize() GraphiteFunc {
 	return &FuncSmartSummarize{fn: "sum"}
 }
 

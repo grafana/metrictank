@@ -16,8 +16,8 @@ type Req struct {
 }
 
 type Plan struct {
-	Reqs          []Req  // data that needs to be fetched before functions can be executed
-	funcs         []Func // top-level funcs to execute, the head of each tree for each target
+	Reqs          []Req          // data that needs to be fetched before functions can be executed
+	funcs         []GraphiteFunc // top-level funcs to execute, the head of each tree for each target
 	exprs         []*expr
 	MaxDataPoints uint32
 	From          uint32                  // global request scoped from
@@ -53,9 +53,9 @@ func (p Plan) Dump(w io.Writer) {
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
 func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan, error) {
 	var err error
-	var funcs []Func
+	var funcs []GraphiteFunc
 	for _, e := range exprs {
-		var fn Func
+		var fn GraphiteFunc
 		fn, reqs, err = newplan(e, from, to, stable, reqs)
 		if err != nil {
 			return Plan{}, err
@@ -73,7 +73,7 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 }
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
-func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (Func, []Req, error) {
+func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
 	if e.etype != etFunc && e.etype != etName {
 		return nil, nil, errors.New("request must be a function call or metric pattern")
 	}
@@ -103,7 +103,7 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (Func, []Req, er
 
 // newplanFunc adds requests as needed for the given expr, and validates the function input
 // provided you already know the expression is a function call to the given function
-func newplanFunc(e *expr, fn Func, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
+func newplanFunc(e *expr, fn GraphiteFunc, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
 	// first comes the interesting task of validating the arguments as specified by the function,
 	// against the arguments that were parsed.
 

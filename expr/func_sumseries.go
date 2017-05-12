@@ -9,10 +9,10 @@ import (
 )
 
 type FuncSumSeries struct {
-	in []Func
+	in []GraphiteFunc
 }
 
-func NewSumSeries() Func {
+func NewSumSeries() GraphiteFunc {
 	return &FuncSumSeries{}
 }
 

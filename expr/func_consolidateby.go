@@ -8,11 +8,11 @@ import (
 )
 
 type FuncConsolidateBy struct {
-	in Func
+	in GraphiteFunc
 	by string
 }
 
-func NewConsolidateBy() Func {
+func NewConsolidateBy() GraphiteFunc {
 	return &FuncConsolidateBy{}
 }
 

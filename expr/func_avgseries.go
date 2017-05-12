@@ -9,10 +9,10 @@ import (
 )
 
 type FuncAvgSeries struct {
-	in []Func
+	in []GraphiteFunc
 }
 
-func NewAvgSeries() Func {
+func NewAvgSeries() GraphiteFunc {
 	return &FuncAvgSeries{}
 }
 

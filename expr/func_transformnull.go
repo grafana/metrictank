@@ -9,11 +9,11 @@ import (
 )
 
 type FuncTransformNull struct {
-	in  Func
+	in  GraphiteFunc
 	def float64
 }
 
-func NewTransformNull() Func {
+func NewTransformNull() GraphiteFunc {
 	return &FuncTransformNull{nil, math.NaN()}
 }
 

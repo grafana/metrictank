@@ -7,7 +7,7 @@ type FuncMock struct {
 	data []models.Series
 }
 
-func NewMock(data []models.Series) Func {
+func NewMock(data []models.Series) GraphiteFunc {
 	return FuncMock{data}
 }
 

@@ -5,11 +5,11 @@ import (
 )
 
 type FuncAlias struct {
-	in    Func
+	in    GraphiteFunc
 	alias string
 }
 
-func NewAlias() Func {
+func NewAlias() GraphiteFunc {
 	return &FuncAlias{}
 }
 

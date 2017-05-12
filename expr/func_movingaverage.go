@@ -6,10 +6,10 @@ import (
 
 type FuncMovingAverage struct {
 	window int64
-	in     Func
+	in     GraphiteFunc
 }
 
-func NewMovingAverage() Func {
+func NewMovingAverage() GraphiteFunc {
 	return &FuncMovingAverage{}
 }
 

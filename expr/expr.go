@@ -148,7 +148,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
 	got := e.args[pos]
 	var err error
-	var fn Func
+	var fn GraphiteFunc
 	switch v := exp.(type) {
 	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {

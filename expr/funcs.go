@@ -2,7 +2,7 @@ package expr
 
 import "github.com/raintank/metrictank/api/models"
 
-type Func interface {
+type GraphiteFunc interface {
 	// Signature declares input and output arguments (return values)
 	// input args can be optional in which case they can be specified positionally or via keys if you want to specify params that come after un-specified optional params
 	// the val pointers of each input Arg should point to a location accessible to the function,
@@ -23,7 +23,7 @@ type Func interface {
 	Exec(map[Req][]models.Series) ([]models.Series, error)
 }
 
-type funcConstructor func() Func
+type funcConstructor func() GraphiteFunc
 
 type funcDef struct {
 	constr funcConstructor

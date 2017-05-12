@@ -9,11 +9,11 @@ import (
 )
 
 type FuncPerSecond struct {
-	in       []Func
+	in       []GraphiteFunc
 	maxValue int64
 }
 
-func NewPerSecond() Func {
+func NewPerSecond() GraphiteFunc {
 	return &FuncPerSecond{}
 }
 

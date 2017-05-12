@@ -7,11 +7,11 @@ import (
 )
 
 type FuncAliasByNode struct {
-	in    Func
+	in    GraphiteFunc
 	nodes []int64
 }
 
-func NewAliasByNode() Func {
+func NewAliasByNode() GraphiteFunc {
 	return &FuncAliasByNode{}
 }
 
