@@ -309,7 +309,7 @@ Flags:
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-host-selection-policy string
-    	 (default "roundrobin")
+    	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
@@ -369,7 +369,7 @@ Flags:
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-host-selection-policy string
-    	 (default "roundrobin")
+    	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
@@ -437,7 +437,7 @@ Flags:
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-host-selection-policy string
-    	 (default "roundrobin")
+    	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
