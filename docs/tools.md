@@ -27,6 +27,23 @@ Flags:
 ```
 
 
+## mt-explain
+
+```
+mt-explain
+Explains the execution plan for a given query / set of targets
+
+Usage:
+
+  mt-explain
+
+Example:
+
+  mt-explain -from -24h -to now -mdp 1000 "movingAverage(sumSeries(foo.bar), '2min')" "alias(averageSeries(foo.*), 'foo-avg')"
+
+```
+
+
 ## mt-index-cat
 
 ```
@@ -101,8 +118,12 @@ output: either presets like dump|list|vegeta-render|vegeta-render-patterns
 output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
 
 
+You may also use processing functions in templates:
+pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
 EXAMPLES:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
+mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
+mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\nX-Org-Id: 1\n\n'
 ```
 
 
