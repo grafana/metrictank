@@ -160,7 +160,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 // but for non-basic args (meaning a series, seriesList or seriesLists) the
 // appropriate value(s) will be assigned to exp.val
 // the returned pos is always the index where the next argument should be.
-func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, reqs []Req) (int, []Req, error) {
+func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, reqs []Req) (int, []Req, error) {
 	got := e.args[pos]
 	var err error
 	var fn GraphiteFunc
@@ -169,7 +169,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, r
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -178,7 +178,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, r
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -187,7 +187,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, r
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
-		fn, reqs, err = newplan(got, from, to, stable, reqs)
+		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -195,7 +195,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, from, to uint32, stable bool, r
 		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
 		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
 			pos += 1
-			fn, reqs, err = newplan(e.args[pos], from, to, stable, reqs)
+			fn, reqs, err = newplan(e.args[pos], context, stable, reqs)
 			if err != nil {
 				return 0, nil, err
 			}

@@ -2,6 +2,11 @@ package expr
 
 import "github.com/raintank/metrictank/api/models"
 
+type Context struct {
+	from   uint32
+	to     uint32
+}
+
 type GraphiteFunc interface {
 	// Signature declares input and output arguments (return values)
 	// input args can be optional in which case they can be specified positionally or via keys if you want to specify params that come after un-specified optional params
@@ -9,12 +14,13 @@ type GraphiteFunc interface {
 	// so that the planner can set up the inputs for your function based on user input.
 	// NewPlan() will only create the plan if the expressions it parsed correspond to the signatures provided by the function
 	Signature() ([]Arg, []Arg)
-	// NeedRange allows a func to express that to be able to return data in the given from-to, it will need input data in the returned from-to window.
-	// (e.g. movingAverage of 5min needs data as of from-5min)
+
+	// Context allows a func to alter the context that will be passed down the expression tree.
 	// this function will be called after validating and setting up all non-series and non-serieslist parameters.
-	// this way a function can convey the needed range by leveraging any relevant integer, string, bool, etc parameters.
-	// after this function is called, series and serieslist inputs will be set up.
-	NeedRange(from, to uint32) (uint32, uint32)
+	// (as typically, context alterations require integer/string/bool/etc parameters, and shall affect series[list] parameters)
+	// examples:
+	// * movingAverage(foo,5min) -> the 5min arg will be parsed, so we can request 5min of earlier data, which will affect the request for foo.
+	Context(c Context) Context
 	// Exec executes the function. the function should call any input functions, do its processing, and return output.
 	// IMPORTANT: for performance and correctness, functions should
 	// * not modify slices of points that they get from their inputs

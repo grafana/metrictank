@@ -22,8 +22,8 @@ func (s *FuncSmartSummarize) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncSmartSummarize) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncSmartSummarize) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncSmartSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, error) {

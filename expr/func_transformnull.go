@@ -24,8 +24,8 @@ func (s *FuncTransformNull) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeriesList{}}
 }
 
-func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncTransformNull) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series, error) {

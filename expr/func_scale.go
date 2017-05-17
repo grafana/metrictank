@@ -25,8 +25,8 @@ func (s *FuncScale) Signature() ([]Arg, []Arg) {
 		}
 }
 
-func (s *FuncScale) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncScale) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
