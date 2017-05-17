@@ -1,20 +1,3 @@
-## future code quality improvements
-
-The code is a bit ugly in some places, there's a few items I'm not happy with and hope to change down the road, ideally after building out the feature more and getting a better understanding of requirements. In particular:
-
-* do all validation in planner, nothing should be needed in individual functions Init invocations
-  though often validation and storing a value are intertwined. should ideally feed function post-validation value (e.g. movingAverage windowsize)
-* in func Exec, uniform access to optional args, whether specified via kwarg or position.
-* Init and NeedRange could be 1 function, though not sure if they should
-* we instantiate and init functions twice (during creation of plan and running it). could do this only once if ...
-function invocations could be attached to expressions (when creating the plan). when executing them, we then
-also don't need to pass args anymore (which is currently redundant since they already got them via Init)
-* in general, while constructing the plan, we should probably build a different datastructure more tailored towards execution, currently we
-  stick to the parse-time expr types in the planner and these concepts also make their way into the function implementations, which gets a bit dirty at times.
-
-movingAverage accepts arg as both int or string, how to handle properly?
-
-
 ## regarding when to allocate models.Series (or more precisely, their []schema.Point attribute)
 
 there's 2 main choices:

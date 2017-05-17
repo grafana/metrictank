@@ -10,6 +10,7 @@ type FuncMovingAverage struct {
 }
 
 func NewMovingAverage() GraphiteFunc {
+	// TODO: allows both int and string as window. how to handle properly?
 	return &FuncMovingAverage{}
 }
 
