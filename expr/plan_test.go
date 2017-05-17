@@ -76,7 +76,7 @@ func TestNewPlan(t *testing.T) {
 			nil,
 		},
 		{
-			"2 args normal, 2 by position, 2 by keyword (duplicate!)",
+			"2 args normal, 2 by position, 1 by keyword (duplicate!)",
 			[]*expr{
 				{etype: etName, str: "foo.bar.*"},
 				{etype: etString, str: "1hour"},
@@ -84,11 +84,10 @@ func TestNewPlan(t *testing.T) {
 				{etype: etBool, bool: true},
 			},
 			map[string]*expr{
-				"func":        {etype: etString, str: "sum"},
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			nil,
-			ErrKwargSpecifiedTwice{"func"},
+			ErrKwargSpecifiedTwice{"alignToFrom"},
 		},
 		{
 			"2 args normal, 1 by position, 2 by keyword (duplicate!)",
