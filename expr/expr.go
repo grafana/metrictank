@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -126,6 +127,20 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			}
 		}
 		*v.val = got.str
+	case ArgRegex:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		re, err := regexp.Compile(got.str)
+		if err != nil {
+			return 0, err
+		}
+		*v.val = re
 	case ArgBool:
 		if got.etype != etBool {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
