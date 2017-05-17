@@ -27,6 +27,7 @@ func (s *FuncPerSecond) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncPerSecond) Context(context Context) Context {
+	context.consol = 0
 	return context
 }
 

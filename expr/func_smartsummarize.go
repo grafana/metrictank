@@ -23,6 +23,7 @@ func (s *FuncSmartSummarize) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncSmartSummarize) Context(context Context) Context {
+	context.consol = 0
 	return context
 }
 

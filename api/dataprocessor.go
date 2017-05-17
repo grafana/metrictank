@@ -279,12 +279,14 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
 				seriesChan <- models.Series{
-					Target:     req.Target,
-					Datapoints: points,
-					Interval:   interval,
-					QueryPatt:  req.Pattern,
-					QueryFrom:  req.From,
-					QueryTo:    req.To,
+					Target:       req.Target,
+					Datapoints:   points,
+					Interval:     interval,
+					QueryPatt:    req.Pattern,
+					QueryFrom:    req.From,
+					QueryTo:      req.To,
+					QueryCons:    req.ConsReq,
+					Consolidator: req.Consolidator,
 				}
 			}
 			wg.Done()

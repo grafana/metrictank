@@ -7,12 +7,25 @@ import (
 	"sort"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/consolidation"
 )
 
 type Req struct {
 	Query string
-	From  uint32 // from for this particular pattern
-	To    uint32 // to for this particular pattern
+	From  uint32
+	To    uint32
+	Cons  consolidation.Consolidator // can be 0 to mean undefined
+}
+
+// NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
+// leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
+func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req {
+	return Req{
+		Query: query,
+		From:  from,
+		To:    to,
+		Cons:  cons,
+	}
 }
 
 type Plan struct {
@@ -57,8 +70,8 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 	for _, e := range exprs {
 		var fn GraphiteFunc
 		context := Context{
-			from:   from,
-			to:     to,
+			from: from,
+			to:   to,
 		}
 		fn, reqs, err = newplan(e, context, stable, reqs)
 		if err != nil {
@@ -82,11 +95,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		return nil, nil, errors.New("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
-		req := Req{
-			e.str,
-			from,
-			to,
-		}
+		req := NewReq(e.str, context.from, context.to, context.consol)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	}
@@ -175,9 +184,9 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	}
 
 	// functions now have their non-series input args set,
-	// so they should now be able to declare the timerange they need
+	// so they should now be able to specify any context alterations
 	context = fn.Context(context)
-	// now that we know the needed timerange for the data coming into
+	// now that we know the needed context for the data coming into
 	// this function, we can set up the input arguments for the function
 	// that are series
 	pos = 0

@@ -27,7 +27,7 @@ func TestNewPlan(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -41,7 +41,7 @@ func TestNewPlan(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -56,7 +56,7 @@ func TestNewPlan(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -71,7 +71,7 @@ func TestNewPlan(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -113,7 +113,7 @@ func TestNewPlan(t *testing.T) {
 				"func": {etype: etString, str: "sum"},
 			},
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -127,7 +127,7 @@ func TestNewPlan(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				{"foo.bar.*", from, to},
+				NewReq("foo.bar.*", from, to, 0),
 			},
 			nil,
 		},
@@ -150,7 +150,7 @@ func TestNewPlan(t *testing.T) {
 			args:      c.args,
 			namedArgs: c.namedArgs,
 		}
-		req, err := newplanFunc(e, fn, from, to, stable, nil)
+		req, err := newplanFunc(e, fn, Context{from: from, to: to}, stable, nil)
 		if !reflect.DeepEqual(err, c.expErr) {
 			t.Errorf("case %d: %q, expected error %v - got %v", i, c.name, c.expErr, err)
 		}

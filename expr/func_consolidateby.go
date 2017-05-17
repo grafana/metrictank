@@ -27,6 +27,7 @@ func (s *FuncConsolidateBy) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncConsolidateBy) Context(context Context) Context {
+	context.consol = consolidation.FromConsolidateBy(s.by)
 	return context
 }
 

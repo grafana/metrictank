@@ -1,10 +1,14 @@
 package expr
 
-import "github.com/raintank/metrictank/api/models"
+import (
+	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/consolidation"
+)
 
 type Context struct {
 	from   uint32
 	to     uint32
+	consol consolidation.Consolidator // can be 0 to mean undefined
 }
 
 type GraphiteFunc interface {
@@ -20,6 +24,7 @@ type GraphiteFunc interface {
 	// (as typically, context alterations require integer/string/bool/etc parameters, and shall affect series[list] parameters)
 	// examples:
 	// * movingAverage(foo,5min) -> the 5min arg will be parsed, so we can request 5min of earlier data, which will affect the request for foo.
+	// * consolidateBy(bar, "sum") -> the "sum" arg will be parsed, so we can pass on the fact that bar needs to be sum-consolidated
 	Context(c Context) Context
 	// Exec executes the function. the function should call any input functions, do its processing, and return output.
 	// IMPORTANT: for performance and correctness, functions should
