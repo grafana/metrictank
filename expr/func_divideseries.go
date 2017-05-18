@@ -58,9 +58,11 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			out = append(out, p)
 		}
 		output := models.Series{
-			Target:     fmt.Sprintf("divideSeries(%s,%s)", dividend.Target, divisor.Target),
-			Datapoints: out,
-			Interval:   divisor.Interval,
+			Target:       fmt.Sprintf("divideSeries(%s,%s)", dividend.Target, divisor.Target),
+			Datapoints:   out,
+			Interval:     divisor.Interval,
+			Consolidator: dividend.Consolidator,
+			QueryCons:    dividend.QueryCons,
 		}
 		cache[Req{}] = append(cache[Req{}], output)
 		series = append(series, output)

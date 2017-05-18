@@ -216,6 +216,18 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 		sort.Sort(models.SeriesByTarget(series))
 		out = append(out, series...)
 	}
+	for i, o := range out {
+		if p.MaxDataPoints != 0 && len(o.Datapoints) > int(p.MaxDataPoints) {
+			// series may have been created by a function that didn't know which consolidation function to default to.
+			// in the future maybe we can do more clever things here. e.g. perSecond maybe consolidate by max.
+			if o.Consolidator == 0 {
+				o.Consolidator = consolidation.Avg
+			}
+			aggNum := consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
+			out[i].Datapoints = consolidation.Consolidate(o.Datapoints, aggNum, o.Consolidator)
+			out[i].Interval *= aggNum
+		}
+	}
 	return out, nil
 }
 

@@ -180,8 +180,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	stable := request.Process == "stable"
-
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
+	mdp := request.MaxDataPoints
+	if request.NoProxy {
+		// if this request is coming from graphite, we should not do runtime consolidation
+		// as graphite needs high-res data to perform its processing.
+		mdp = 0
+	}
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			if request.NoProxy {

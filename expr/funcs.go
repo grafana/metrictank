@@ -62,3 +62,14 @@ func init() {
 		"transformNull":  {NewTransformNull, true},
 	}
 }
+
+// summarizeCons returns the first explicitly specified Consolidator, QueryCons for the given set of input series,
+// or the first one, otherwise.
+func summarizeCons(series []models.Series) (consolidation.Consolidator, consolidation.Consolidator) {
+	for _, serie := range series {
+		if serie.QueryCons != 0 {
+			return serie.Consolidator, serie.QueryCons
+		}
+	}
+	return series[0].Consolidator, series[0].QueryCons
+}

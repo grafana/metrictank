@@ -41,9 +41,11 @@ func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 			out = append(out, schema.Point{Val: v.Val * s.factor, Ts: v.Ts})
 		}
 		s := models.Series{
-			Target:     fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
-			Datapoints: out,
-			Interval:   serie.Interval,
+			Target:       fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
+			Datapoints:   out,
+			Interval:     serie.Interval,
+			Consolidator: serie.Consolidator,
+			QueryCons:    serie.QueryCons,
 		}
 		outputs = append(outputs, s)
 		cache[Req{}] = append(cache[Req{}], s)

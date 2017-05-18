@@ -58,10 +58,13 @@ func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		out = append(out, point)
 	}
+	cons, queryCons := summarizeCons(series)
 	output := models.Series{
-		Target:     fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series)),
-		Datapoints: out,
-		Interval:   series[0].Interval,
+		Target:       fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series)),
+		Datapoints:   out,
+		Interval:     series[0].Interval,
+		Consolidator: cons,
+		QueryCons:    queryCons,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 	return []models.Series{output}, nil

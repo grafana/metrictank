@@ -19,7 +19,7 @@ type Series struct {
 	QueryFrom    uint32                     // to tie series back to request it came from
 	QueryTo      uint32                     // to tie series back to request it came from
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
-	Consolidator consolidation.Consolidator // consolidator to actually use (may not be 0, default must be resolved)
+	Consolidator consolidation.Consolidator // consolidator to actually use (if fetched series may not be 0, default must be resolved. if series created by function, may be 0)
 }
 
 type SeriesByTarget []Series

@@ -48,9 +48,11 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 			target = fmt.Sprintf("transFormNull(%s)", serie.Target)
 		}
 		transformed := models.Series{
-			Target:     target,
-			Datapoints: pointSlicePool.Get().([]schema.Point),
-			Interval:   serie.Interval,
+			Target:       target,
+			Datapoints:   pointSlicePool.Get().([]schema.Point),
+			Interval:     serie.Interval,
+			Consolidator: serie.Consolidator,
+			QueryCons:    serie.QueryCons,
 		}
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
