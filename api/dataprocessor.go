@@ -454,6 +454,7 @@ func mergeSeries(in []models.Series) []models.Series {
 		query  string
 		from   uint32
 		to     uint32
+		con    consolidation.Consolidator
 	}
 	seriesByTarget := make(map[segment][]models.Series)
 	for _, series := range in {
@@ -462,6 +463,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			series.QueryPatt,
 			series.QueryFrom,
 			series.QueryTo,
+			series.Consolidator,
 		}
 		seriesByTarget[s] = append(seriesByTarget[s], series)
 	}
