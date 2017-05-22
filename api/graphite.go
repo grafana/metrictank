@@ -38,7 +38,7 @@ var (
 )
 
 type Series struct {
-	Pattern string
+	Pattern string // pattern used for index lookup. typically user input like foo.{b,a}r.*
 	Series  []idx.Node
 	Node    cluster.Node
 }

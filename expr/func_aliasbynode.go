@@ -45,7 +45,9 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			}
 			name = append(name, parts[n])
 		}
-		series[i].Target = strings.Join(name, ".")
+		n := strings.Join(name, ".")
+		series[i].Target = n
+		series[i].QueryPatt = n
 	}
 	return series, nil
 }

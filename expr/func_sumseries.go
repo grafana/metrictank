@@ -37,7 +37,9 @@ func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if len(series) == 1 {
-		series[0].Target = fmt.Sprintf("sumSeries(%s)", series[0].QueryPatt)
+		name := fmt.Sprintf("sumSeries(%s)", series[0].QueryPatt)
+		series[0].Target = name
+		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
@@ -58,9 +60,11 @@ func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		out = append(out, point)
 	}
+	name := fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series))
 	cons, queryCons := summarizeCons(series)
 	output := models.Series{
-		Target:       fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series)),
+		Target:       name,
+		QueryPatt:    name,
 		Datapoints:   out,
 		Interval:     series[0].Interval,
 		Consolidator: cons,

@@ -228,10 +228,10 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
 				seriesChan <- models.Series{
-					Target:       req.Target,
+					Target:       req.Target, // always simply the metric name from index
 					Datapoints:   points,
 					Interval:     interval,
-					QueryPatt:    req.Pattern,
+					QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
 					QueryFrom:    req.From,
 					QueryTo:      req.To,
 					QueryCons:    req.ConsReq,

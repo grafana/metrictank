@@ -39,7 +39,9 @@ func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, err
 	}
 	for i := range series {
 		metric := extractMetric(series[i].Target)
-		series[i].Target = s.search.ReplaceAllString(metric, replace)
+		name := s.search.ReplaceAllString(metric, replace)
+		series[i].Target = name
+		series[i].QueryPatt = name
 	}
 	return series, err
 }

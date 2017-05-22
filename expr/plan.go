@@ -11,7 +11,7 @@ import (
 )
 
 type Req struct {
-	Query string
+	Query string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
 	From  uint32
 	To    uint32
 	Cons  consolidation.Consolidator // can be 0 to mean undefined

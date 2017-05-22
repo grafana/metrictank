@@ -31,6 +31,7 @@ func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 	}
 	for i := range series {
 		series[i].Target = s.alias
+		series[i].QueryPatt = s.alias
 	}
 	return series, nil
 }
