@@ -79,6 +79,7 @@ func Gziper() macaron.Handler {
 type gzipResponseWriter struct {
 	w io.WriteCloser
 	macaron.ResponseWriter
+	closed bool
 }
 
 func (grw *gzipResponseWriter) setup() {
@@ -86,7 +87,7 @@ func (grw *gzipResponseWriter) setup() {
 		return
 	}
 
-	if grw.Header().Get(_HEADER_CONTENT_ENCODING) == "gzip" {
+	if grw.closed || grw.Header().Get(_HEADER_CONTENT_ENCODING) == "gzip" {
 		// another handler has already set the content-type to gzip,
 		// so presumably they are going to write compressed data.
 		// We dont want to compress the data a second time, so lets
@@ -101,6 +102,10 @@ func (grw *gzipResponseWriter) setup() {
 }
 
 func (grw *gzipResponseWriter) close() {
+	grw.closed = true
+	if grw.w == nil {
+		return
+	}
 	grw.w.Close()
 }
 
