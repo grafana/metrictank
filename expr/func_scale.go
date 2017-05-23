@@ -25,8 +25,8 @@ func (s *FuncScale) Signature() ([]Arg, []Arg) {
 		}
 }
 
-func (s *FuncScale) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncScale) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -41,9 +41,12 @@ func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 			out = append(out, schema.Point{Val: v.Val * s.factor, Ts: v.Ts})
 		}
 		s := models.Series{
-			Target:     fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
-			Datapoints: out,
-			Interval:   serie.Interval,
+			Target:       fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
+			QueryPatt:    fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor),
+			Datapoints:   out,
+			Interval:     serie.Interval,
+			Consolidator: serie.Consolidator,
+			QueryCons:    serie.QueryCons,
 		}
 		outputs = append(outputs, s)
 		cache[Req{}] = append(cache[Req{}], s)

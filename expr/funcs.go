@@ -1,6 +1,15 @@
 package expr
 
-import "github.com/raintank/metrictank/api/models"
+import (
+	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/consolidation"
+)
+
+type Context struct {
+	from   uint32
+	to     uint32
+	consol consolidation.Consolidator // can be 0 to mean undefined
+}
 
 type GraphiteFunc interface {
 	// Signature declares input and output arguments (return values)
@@ -9,12 +18,14 @@ type GraphiteFunc interface {
 	// so that the planner can set up the inputs for your function based on user input.
 	// NewPlan() will only create the plan if the expressions it parsed correspond to the signatures provided by the function
 	Signature() ([]Arg, []Arg)
-	// NeedRange allows a func to express that to be able to return data in the given from-to, it will need input data in the returned from-to window.
-	// (e.g. movingAverage of 5min needs data as of from-5min)
+
+	// Context allows a func to alter the context that will be passed down the expression tree.
 	// this function will be called after validating and setting up all non-series and non-serieslist parameters.
-	// this way a function can convey the needed range by leveraging any relevant integer, string, bool, etc parameters.
-	// after this function is called, series and serieslist inputs will be set up.
-	NeedRange(from, to uint32) (uint32, uint32)
+	// (as typically, context alterations require integer/string/bool/etc parameters, and shall affect series[list] parameters)
+	// examples:
+	// * movingAverage(foo,5min) -> the 5min arg will be parsed, so we can request 5min of earlier data, which will affect the request for foo.
+	// * consolidateBy(bar, "sum") -> the "sum" arg will be parsed, so we can pass on the fact that bar needs to be sum-consolidated
+	Context(c Context) Context
 	// Exec executes the function. the function should call any input functions, do its processing, and return output.
 	// IMPORTANT: for performance and correctness, functions should
 	// * not modify slices of points that they get from their inputs
@@ -50,4 +61,15 @@ func init() {
 		"sumSeries":      {NewSumSeries, true},
 		"transformNull":  {NewTransformNull, true},
 	}
+}
+
+// summarizeCons returns the first explicitly specified Consolidator, QueryCons for the given set of input series,
+// or the first one, otherwise.
+func summarizeCons(series []models.Series) (consolidation.Consolidator, consolidation.Consolidator) {
+	for _, serie := range series {
+		if serie.QueryCons != 0 {
+			return serie.Consolidator, serie.QueryCons
+		}
+	}
+	return series[0].Consolidator, series[0].QueryCons
 }

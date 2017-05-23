@@ -24,8 +24,8 @@ func (s *FuncTransformNull) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeriesList{}}
 }
 
-func (s *FuncTransformNull) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncTransformNull) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -48,9 +48,12 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 			target = fmt.Sprintf("transFormNull(%s)", serie.Target)
 		}
 		transformed := models.Series{
-			Target:     target,
-			Datapoints: pointSlicePool.Get().([]schema.Point),
-			Interval:   serie.Interval,
+			Target:       target,
+			QueryPatt:    target,
+			Datapoints:   pointSlicePool.Get().([]schema.Point),
+			Interval:     serie.Interval,
+			Consolidator: serie.Consolidator,
+			QueryCons:    serie.QueryCons,
 		}
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {

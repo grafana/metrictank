@@ -6,17 +6,20 @@ import (
 	"strconv"
 
 	pickle "github.com/kisielk/og-rek"
+	"github.com/raintank/metrictank/consolidation"
 	"gopkg.in/raintank/schema.v1"
 )
 
 //go:generate msgp
 type Series struct {
-	Target     string // will be set to the target attribute of the given request
-	Datapoints []schema.Point
-	Interval   uint32
-	QueryPatt  string // to tie the series back to the request it came from
-	QueryFrom  uint32 // to tie the series back to the request it came from
-	QueryTo    uint32 // to tie the series back to the request it came from
+	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
+	Datapoints   []schema.Point
+	Interval     uint32
+	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
+	QueryFrom    uint32                     // to tie series back to request it came from
+	QueryTo      uint32                     // to tie series back to request it came from
+	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
+	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
 }
 
 type SeriesByTarget []Series

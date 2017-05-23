@@ -51,7 +51,7 @@ func TestPerSecondSingle(t *testing.T) {
 			{
 				{
 					Interval:   10,
-					Target:     "a",
+					QueryPatt:  "a",
 					Datapoints: getCopy(a),
 				},
 			},
@@ -59,7 +59,7 @@ func TestPerSecondSingle(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				Target:     "perSecond(a)",
+				QueryPatt:  "perSecond(a)",
 				Datapoints: getCopy(aPerSecond),
 			},
 		},
@@ -75,7 +75,7 @@ func TestPerSecondSingleMaxValue(t *testing.T) {
 			{
 				{
 					Interval:   10,
-					Target:     "counter8bit",
+					QueryPatt:  "counter8bit",
 					Datapoints: getCopy(d),
 				},
 			},
@@ -83,7 +83,7 @@ func TestPerSecondSingleMaxValue(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				Target:     "perSecond(counter8bit)",
+				QueryPatt:  "perSecond(counter8bit)",
 				Datapoints: getCopy(dPerSecondMax255),
 			},
 		},
@@ -99,23 +99,23 @@ func TestPerSecondMulti(t *testing.T) {
 			{
 				{
 					Interval:   10,
-					Target:     "a",
+					QueryPatt:  "a",
 					Datapoints: getCopy(a),
 				},
 				{
 					Interval:   10,
-					Target:     "b.*",
+					QueryPatt:  "b.*",
 					Datapoints: getCopy(b),
 				},
 			},
 		},
 		[]models.Series{
 			{
-				Target:     "perSecond(a)",
+				QueryPatt:  "perSecond(a)",
 				Datapoints: getCopy(aPerSecond),
 			},
 			{
-				Target:     "perSecond(b.*)",
+				QueryPatt:  "perSecond(b.*)",
 				Datapoints: getCopy(bPerSecond),
 			},
 		},
@@ -130,34 +130,34 @@ func TestPerSecondMultiMulti(t *testing.T) {
 			{
 				{
 					Interval:   10,
-					Target:     "a",
+					QueryPatt:  "a",
 					Datapoints: getCopy(a),
 				},
 				{
 					Interval:   10,
-					Target:     "b.foo{bar,baz}",
+					QueryPatt:  "b.foo{bar,baz}",
 					Datapoints: getCopy(b),
 				},
 			},
 			{
 				{
 					Interval:   10,
-					Target:     "movingAverage(bar, '1min')",
+					QueryPatt:  "movingAverage(bar, '1min')",
 					Datapoints: getCopy(c),
 				},
 			},
 		},
 		[]models.Series{
 			{
-				Target:     "perSecond(a)",
+				QueryPatt:  "perSecond(a)",
 				Datapoints: getCopy(aPerSecond),
 			},
 			{
-				Target:     "perSecond(b.foo{bar,baz})",
+				QueryPatt:  "perSecond(b.foo{bar,baz})",
 				Datapoints: getCopy(bPerSecond),
 			},
 			{
-				Target:     "perSecond(movingAverage(bar, '1min'))",
+				QueryPatt:  "perSecond(movingAverage(bar, '1min'))",
 				Datapoints: getCopy(cPerSecond),
 			},
 		},
@@ -182,8 +182,8 @@ func testPerSecond(name string, in [][]models.Series, out []models.Series, max i
 	}
 	for i, g := range gots {
 		exp := out[i]
-		if g.Target != exp.Target {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.Target, g.Target)
+		if g.QueryPatt != exp.QueryPatt {
+			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
 		}
 		if len(g.Datapoints) != len(exp.Datapoints) {
 			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))

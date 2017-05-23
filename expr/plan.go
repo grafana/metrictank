@@ -7,12 +7,25 @@ import (
 	"sort"
 
 	"github.com/raintank/metrictank/api/models"
+	"github.com/raintank/metrictank/consolidation"
 )
 
 type Req struct {
-	Query string
-	From  uint32 // from for this particular pattern
-	To    uint32 // to for this particular pattern
+	Query string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
+	From  uint32
+	To    uint32
+	Cons  consolidation.Consolidator // can be 0 to mean undefined
+}
+
+// NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
+// leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
+func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req {
+	return Req{
+		Query: query,
+		From:  from,
+		To:    to,
+		Cons:  cons,
+	}
 }
 
 type Plan struct {
@@ -56,7 +69,11 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 	var funcs []GraphiteFunc
 	for _, e := range exprs {
 		var fn GraphiteFunc
-		fn, reqs, err = newplan(e, from, to, stable, reqs)
+		context := Context{
+			from: from,
+			to:   to,
+		}
+		fn, reqs, err = newplan(e, context, stable, reqs)
 		if err != nil {
 			return Plan{}, err
 		}
@@ -73,16 +90,12 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 }
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
-func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
+func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
 	if e.etype != etFunc && e.etype != etName {
 		return nil, nil, errors.New("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
-		req := Req{
-			e.str,
-			from,
-			to,
-		}
+		req := NewReq(e.str, context.from, context.to, context.consol)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	}
@@ -97,13 +110,13 @@ func newplan(e *expr, from, to uint32, stable bool, reqs []Req) (GraphiteFunc, [
 	}
 
 	fn := fdef.constr()
-	reqs, err := newplanFunc(e, fn, from, to, stable, reqs)
+	reqs, err := newplanFunc(e, fn, context, stable, reqs)
 	return fn, reqs, err
 }
 
 // newplanFunc adds requests as needed for the given expr, and validates the function input
 // provided you already know the expression is a function call to the given function
-func newplanFunc(e *expr, fn GraphiteFunc, from, to uint32, stable bool, reqs []Req) ([]Req, error) {
+func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []Req) ([]Req, error) {
 	// first comes the interesting task of validating the arguments as specified by the function,
 	// against the arguments that were parsed.
 
@@ -171,16 +184,16 @@ func newplanFunc(e *expr, fn GraphiteFunc, from, to uint32, stable bool, reqs []
 	}
 
 	// functions now have their non-series input args set,
-	// so they should now be able to declare the timerange they need
-	from, to = fn.NeedRange(from, to)
-	// now that we know the needed timerange for the data coming into
+	// so they should now be able to specify any context alterations
+	context = fn.Context(context)
+	// now that we know the needed context for the data coming into
 	// this function, we can set up the input arguments for the function
 	// that are series
 	pos = 0
 	for _, argExp = range argsExp[:cutoff] {
 		switch argExp.(type) {
 		case ArgSeries, ArgSeriesList, ArgSeriesLists:
-			pos, reqs, err = e.consumeSeriesArg(pos, argExp, from, to, stable, reqs)
+			pos, reqs, err = e.consumeSeriesArg(pos, argExp, context, stable, reqs)
 			if err != nil {
 				return nil, err
 			}
@@ -202,6 +215,18 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 		}
 		sort.Sort(models.SeriesByTarget(series))
 		out = append(out, series...)
+	}
+	for i, o := range out {
+		if p.MaxDataPoints != 0 && len(o.Datapoints) > int(p.MaxDataPoints) {
+			// series may have been created by a function that didn't know which consolidation function to default to.
+			// in the future maybe we can do more clever things here. e.g. perSecond maybe consolidate by max.
+			if o.Consolidator == 0 {
+				o.Consolidator = consolidation.Avg
+			}
+			aggNum := consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
+			out[i].Datapoints = consolidation.Consolidate(o.Datapoints, aggNum, o.Consolidator)
+			out[i].Interval *= aggNum
+		}
 	}
 	return out, nil
 }

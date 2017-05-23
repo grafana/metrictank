@@ -20,8 +20,8 @@ func (s *FuncAlias) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeriesList{}}
 }
 
-func (s *FuncAlias) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncAlias) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -31,6 +31,7 @@ func (s *FuncAlias) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 	}
 	for i := range series {
 		series[i].Target = s.alias
+		series[i].QueryPatt = s.alias
 	}
 	return series, nil
 }

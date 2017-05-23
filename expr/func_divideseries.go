@@ -25,8 +25,8 @@ func (s *FuncDivideSeries) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncDivideSeries) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncDivideSeries) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -57,10 +57,14 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			}
 			out = append(out, p)
 		}
+		name := fmt.Sprintf("divideSeries(%s,%s)", dividend.QueryPatt, divisor.QueryPatt)
 		output := models.Series{
-			Target:     fmt.Sprintf("divideSeries(%s,%s)", dividend.Target, divisor.Target),
-			Datapoints: out,
-			Interval:   divisor.Interval,
+			Target:       name,
+			QueryPatt:    name,
+			Datapoints:   out,
+			Interval:     divisor.Interval,
+			Consolidator: dividend.Consolidator,
+			QueryCons:    dividend.QueryCons,
 		}
 		cache[Req{}] = append(cache[Req{}], output)
 		series = append(series, output)

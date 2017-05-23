@@ -38,7 +38,7 @@ var (
 )
 
 type Series struct {
-	Pattern string
+	Pattern string // pattern used for index lookup. typically user input like foo.{b,a}r.*
 	Series  []idx.Node
 	Node    cluster.Node
 }
@@ -180,8 +180,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 
 	stable := request.Process == "stable"
-
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, request.MaxDataPoints, stable, nil)
+	mdp := request.MaxDataPoints
+	if request.NoProxy {
+		// if this request is coming from graphite, we should not do runtime consolidation
+		// as graphite needs high-res data to perform its processing.
+		mdp = 0
+	}
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			if request.NoProxy {
@@ -506,12 +511,21 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 		for _, s := range series {
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
-					// set consolidator that will be used to normalize raw data before feeding into processing functions
-					// not to be confused with runtime consolidation which happens after all processing.
-					fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-					consolidator := consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-					reqs = append(reqs, models.NewReq(
-						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), consolidator, s.Node, archive.SchemaId, archive.AggId))
+					cons := r.Cons
+					consReq := r.Cons
+					if consReq == 0 {
+						// unless the user overrode the consolidation to use via a consolidateBy
+						// we will use the primary method dictated by the storage-aggregations rules
+						// note:
+						// * we can't just let the expr library take care of normalization, as we may have to fetch targets
+						//   from cluster peers; it's more efficient to have them normalize the data at the source.
+						// * a pattern may expand to multiple series, each of which can have their own aggregation method.
+						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+					}
+					newReq := models.NewReq(
+						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+					reqs = append(reqs, newReq)
 				}
 			}
 		}
@@ -547,11 +561,7 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 
 	data := make(map[expr.Req][]models.Series)
 	for _, serie := range out {
-		q := expr.Req{
-			serie.QueryPatt,
-			serie.QueryFrom,
-			serie.QueryTo,
-		}
+		q := expr.NewReq(serie.QueryPatt, serie.QueryFrom, serie.QueryTo, serie.QueryCons)
 		data[q] = append(data[q], serie)
 	}
 

@@ -83,6 +83,24 @@ func FromArchive(archive string) Consolidator {
 	return None
 }
 
+func FromConsolidateBy(c string) Consolidator {
+	switch c {
+	case "avg", "average":
+		return Avg
+	case "cnt":
+		return Cnt // bonus. not supported by graphite
+	case "lst", "last":
+		return Lst // bonus. not supported by graphite
+	case "min":
+		return Min
+	case "max":
+		return Max
+	case "sum":
+		return Sum
+	}
+	return None
+}
+
 // map the consolidation to the respective aggregation function, if applicable.
 func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 	var consFunc batch.AggFunc

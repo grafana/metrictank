@@ -22,8 +22,8 @@ func (s *FuncAliasByNode) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncAliasByNode) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncAliasByNode) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -45,7 +45,9 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			}
 			name = append(name, parts[n])
 		}
-		series[i].Target = strings.Join(name, ".")
+		n := strings.Join(name, ".")
+		series[i].Target = n
+		series[i].QueryPatt = n
 	}
 	return series, nil
 }

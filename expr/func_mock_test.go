@@ -15,8 +15,8 @@ func (s FuncMock) Signature() ([]Arg, []Arg) {
 	return nil, []Arg{ArgSeries{}}
 }
 
-func (s FuncMock) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s FuncMock) Context(context Context) Context {
+	return context
 }
 
 func (s FuncMock) Exec(cache map[Req][]models.Series) ([]models.Series, error) {

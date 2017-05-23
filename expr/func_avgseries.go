@@ -22,8 +22,8 @@ func (s *FuncAvgSeries) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncAvgSeries) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncAvgSeries) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -36,7 +36,9 @@ func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		series = append(series, in...)
 	}
 	if len(series) == 1 {
-		series[0].Target = fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
+		name := fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
+		series[0].Target = name
+		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
@@ -60,10 +62,16 @@ func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		out = append(out, point)
 	}
+
+	cons, queryCons := summarizeCons(series)
+	name := fmt.Sprintf("averageSeries(%s)", patternsAsArgs(series))
 	output := models.Series{
-		Target:     fmt.Sprintf("averageSeries(%s)", patternsAsArgs(series)),
-		Datapoints: out,
-		Interval:   series[0].Interval,
+		Target:       name,
+		QueryPatt:    name,
+		Datapoints:   out,
+		Interval:     series[0].Interval,
+		Consolidator: cons,
+		QueryCons:    queryCons,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 

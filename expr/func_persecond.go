@@ -26,8 +26,9 @@ func (s *FuncPerSecond) Signature() ([]Arg, []Arg) {
 		}
 }
 
-func (s *FuncPerSecond) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncPerSecond) Context(context Context) Context {
+	context.consol = 0
+	return context
 }
 
 func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -63,6 +64,7 @@ func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		s := models.Series{
 			Target:     fmt.Sprintf("perSecond(%s)", serie.Target),
+			QueryPatt:  fmt.Sprintf("perSecond(%s)", serie.QueryPatt),
 			Datapoints: out,
 			Interval:   serie.Interval,
 		}

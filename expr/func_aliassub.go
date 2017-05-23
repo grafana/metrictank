@@ -26,8 +26,8 @@ func (s *FuncAliasSub) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncAliasSub) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncAliasSub) Context(context Context) Context {
+	return context
 }
 
 func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -39,7 +39,9 @@ func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, err
 	}
 	for i := range series {
 		metric := extractMetric(series[i].Target)
-		series[i].Target = s.search.ReplaceAllString(metric, replace)
+		name := s.search.ReplaceAllString(metric, replace)
+		series[i].Target = name
+		series[i].QueryPatt = name
 	}
 	return series, err
 }

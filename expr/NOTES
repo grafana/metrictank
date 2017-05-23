@@ -34,3 +34,81 @@ another processing step may require the same input data.
 function implementations:
 * must not modify existing slices
 * should use the pool to get new slices in which to store their new/modified data. and add the new slice into the cache so it can later be cleaned
+
+## consolidateBy
+
+consolidateBy(<foo>, "fun") defines a consolidation function to be applied to "<foo>". there are some subtle behaviors we have to cater to, and we do it like so:
+
+consider `target=consolidateBy(divideSeries(consolidateBy(summarize(consolidateBy(foo, "min"), "5min", "min"), "avg"), bar.*), "max")`
+
+we can visualize this as a tree:
+
+```
+------------------------------------ root of tree
+|
+\/
+consolidateBy(
+    divideSeries(
+        consolidateBy(
+            summarize(
+                consolidateBy(
+                    foo, <---------- leaf
+	            "min"
+                ),
+		"5min",
+		"min"
+            ),
+            "avg"
+	),
+        bar.* <--------------------- leaf
+    ),
+    "max"
+)
+```
+
+parsing starts at the root and continues until leaves are resolved.
+Execution follows, and it happens the other way around (first leaves are fetched, then functions are applied until we hit the root)
+
+So:
+1) at parse time, consolidation settings encountered in consolidateBy calls are passed down the tree (e.g. via the context, typically until it hits the data request.
+   in some use cases, this would lead to confusing/incorrect results, so when we parse down and encounter special* functions the consolidator is reset to the default for the series
+2) when reading data, we always select as high resolution data as possible.
+   (this is good for functions like summarize etc but overkill in many cases where we only do basic/no processing. in such cases, if we then have to do runtime consolidation, there is room to optimize this by fetching lower resolution data in the beginning. TODO)
+   and if we select a rollup for reads then we select the right archive in this order of precedence:
+   - consolidateBy setting defined closest to the leaf without a special* function in between the setting and the leaf, if available
+   - determined via storage-aggregation.conf (defaults to average)
+3) at execution time, the consolidation settings encountered in consolidateBy calls travel up to the root because it is configured on the series, which is passed through the various layers of processing until it hits the root and the output step.  This becomes useful in two cases:
+   - when series need to be normalized at runtime, e.g. for sumSeries or divideSeries with series that have different steps; they need to be normalized (consolidated) so that the series get a compatible step, and the default of "avg" may not suffice.  (note that right now we have alignRequests which normalizes all series at fetch time, which can actually be a bit too eager, because some requests can use multiple targets with different processing - e.g. feed two different series into summarize(), so we actually don't need to normalize at runtime, but in the future we should make this better - TODO)
+   - when returning data back to the user via a json response and whatnot, we can consolidate down using the method requested by the user (or average, if not specified). Likewise here, when the setting encounters a special* function while traveling up to the root, the consolidation value is reset to the default (average)
+   Note: some functions combine multiple series into a new one (e.g. sumSeries, avgSeries, ...). Your input series may use different consolidateBy settings, some may be explicitly specified while others are not.  In this scenario, the output series will be given the first explicitly defined consolidateBy found by iterating the inputs, or the first default otherwise.
+
+By combining the pass-down and pass-up we can give the user max power and correctness. In particular it also solves the problem with Graphite where data can be read from a different consolidation archive than what it used for runtime consolidation. While this is sometimes desirable (e.g. using special* functions), often - for most/simple requests - it is not. See
+(see https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation) 
+
+[*] Special functions: e.g. summarize, perSecond, derivative, intergral. passing consolidate settings across these function calls would lead to bad results.
+
+see also https://github.com/raintank/metrictank/issues/463#issuecomment-275199880
+
+
+
+## naming
+
+note that when requesting series directly, we want to show the target (to uniquely identify them), not the queryPattern
+it follows that the output returned by plan.Run must always use Target attribute to show the proper name, and that any processing functions thus must set that attribute properly.
+but some functions (e.g. sumSeries) take queryPattern of their inputs, to show summary query pattern instead of each individual value.
+thus, to accomodate wrapping functions as well as lack of wrapping functions (e.g. generating json output), processing functions must set both Target and QueryPatt, and they
+should set it to the same value.
+
+in a future version we can probably refactor things to make this simpler: fetched data could result in a series with key attribute the graphite key (currently stored in target), and store the query pattern used in the target attribute.  functions only set target and only look at target, and at output phase, we just use target. there's only 1 special case of metrics returned without function processing. we could detect this case, or if we have multiple things with same target, print the metric name instead, or something
+
+examples: (series are in `series{target,querypatt}` form)
+
+input              => results in fetched series                                     output targets
+==================================================================================================================
+target=a&target=ab => series{a, a }, series{ab,ab}                                  a and ab
+target=a*          => series{a, a*}, series{ab,a*}                                  a and ab
+target=sum(a,ab)   => series{a, a }, series{ab,ab}                                  sum(a,ab)
+target=sum(a*)     => series{a, a*}, series{ab,a*}                                  sum(a*)
+target=sum(a,a,ab) => series{a, a }, series{a,a  }, series{ab, ab}                  sum(a,a,ab) (bug in graphite! it has sum(a,ab) )
+target=sum(a,a*)   => series{a, a }, series{a,a* }, series{ab, a*}                  sum(a,a*)
+target=sum(a,a,a*) => series{a, a }, series{a,a  }, series{a, ab*}, series{ab, ab*} sum(a,a,a*) (bug in graphite! it has sum(a,a*), doesn't even add the extra a)

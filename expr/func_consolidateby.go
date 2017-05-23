@@ -26,8 +26,9 @@ func (s *FuncConsolidateBy) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeriesList{}}
 }
 
-func (s *FuncConsolidateBy) NeedRange(from, to uint32) (uint32, uint32) {
-	return from, to
+func (s *FuncConsolidateBy) Context(context Context) Context {
+	context.consol = consolidation.FromConsolidateBy(s.by)
+	return context
 }
 
 func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -35,10 +36,15 @@ func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series) ([]models.Series
 	if err != nil {
 		return nil, err
 	}
+	consolidator := consolidation.FromConsolidateBy(s.by)
 	var out []models.Series
-	for _, series := range series {
-		series.Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", series.Target, s.by)
-		out = append(out, series)
+	for _, serie := range series {
+		name := fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.QueryPatt, s.by)
+		serie.Target = name
+		serie.QueryPatt = name
+		serie.Consolidator = consolidator
+		serie.QueryCons = consolidator
+		out = append(out, serie)
 	}
 	return out, nil
 }

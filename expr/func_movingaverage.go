@@ -27,8 +27,9 @@ func (s *FuncMovingAverage) Signature() ([]Arg, []Arg) {
 	}, []Arg{ArgSeriesList{}}
 }
 
-func (s *FuncMovingAverage) NeedRange(from, to uint32) (uint32, uint32) {
-	return from - uint32(s.window), to
+func (s *FuncMovingAverage) Context(context Context) Context {
+	context.from -= uint32(s.window)
+	return context
 }
 
 func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series) ([]models.Series, error) {

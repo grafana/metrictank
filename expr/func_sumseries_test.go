@@ -17,12 +17,13 @@ func TestSumSeriesIdentity(t *testing.T) {
 			{
 				{
 					QueryPatt:  "single",
+					Target:     "single",
 					Datapoints: getCopy(a),
 				},
 			},
 		},
 		models.Series{
-			Target:     "sumSeries(single)",
+			QueryPatt:  "sumSeries(single)",
 			Datapoints: getCopy(a),
 		},
 		t,
@@ -35,12 +36,13 @@ func TestSumSeriesQueryToSingle(t *testing.T) {
 			{
 				{
 					QueryPatt:  "foo.*",
+					Target:     "foo",
 					Datapoints: getCopy(a),
 				},
 			},
 		},
 		models.Series{
-			Target:     "sumSeries(foo.*)",
+			QueryPatt:  "sumSeries(foo.*)",
 			Datapoints: getCopy(a),
 		},
 		t,
@@ -53,16 +55,18 @@ func TestSumSeriesMultipleSameQuery(t *testing.T) {
 			{
 				{
 					QueryPatt:  "foo.*",
+					Target:     "foo.a",
 					Datapoints: getCopy(a),
 				},
 				{
 					QueryPatt:  "foo.*",
+					Target:     "foo.b",
 					Datapoints: getCopy(b),
 				},
 			},
 		},
 		models.Series{
-			Target:     "sumSeries(foo.*)",
+			QueryPatt:  "sumSeries(foo.*)",
 			Datapoints: getCopy(sumab),
 		},
 		t,
@@ -75,22 +79,25 @@ func TestSumSeriesMultipleDiffQuery(t *testing.T) {
 			{
 				{
 					QueryPatt:  "foo.*",
+					Target:     "foo.a",
 					Datapoints: getCopy(a),
 				},
 				{
 					QueryPatt:  "foo.*",
+					Target:     "foo.b",
 					Datapoints: getCopy(b),
 				},
 			},
 			{
 				{
 					QueryPatt:  "movingAverage(bar, '1min')",
+					Target:     "movingAverage(bar, '1min')",
 					Datapoints: getCopy(c),
 				},
 			},
 		},
 		models.Series{
-			Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
+			QueryPatt:  "sumSeries(foo.*,movingAverage(bar, '1min'))",
 			Datapoints: getCopy(sumabc),
 		},
 		t,
@@ -111,8 +118,8 @@ func testSumSeries(name string, in [][]models.Series, out models.Series, t *test
 		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
 	g := got[0]
-	if g.Target != out.Target {
-		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
+	if g.QueryPatt != out.QueryPatt {
+		t.Fatalf("case %q: expected target %q, got %q", name, out.QueryPatt, g.QueryPatt)
 	}
 	if len(g.Datapoints) != len(out.Datapoints) {
 		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
@@ -169,7 +176,7 @@ func benchmarkSumSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
-			Target: strconv.Itoa(i),
+			QueryPatt: strconv.Itoa(i),
 		}
 		if i%1 == 0 {
 			series.Datapoints = fn0()
