@@ -35,6 +35,11 @@ func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		series = append(series, in...)
 	}
+
+	if len(series) == 0 {
+		return series, nil
+	}
+
 	if len(series) == 1 {
 		name := fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
 		series[0].Target = name
