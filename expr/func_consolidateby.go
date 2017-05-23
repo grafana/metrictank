@@ -39,9 +39,8 @@ func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series) ([]models.Series
 	consolidator := consolidation.FromConsolidateBy(s.by)
 	var out []models.Series
 	for _, serie := range series {
-		name := fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.QueryPatt, s.by)
-		serie.Target = name
-		serie.QueryPatt = name
+		serie.Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.Target, s.by)
+		serie.QueryPatt = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.QueryPatt, s.by)
 		serie.Consolidator = consolidator
 		serie.QueryCons = consolidator
 		out = append(out, serie)
