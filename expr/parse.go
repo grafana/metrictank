@@ -86,7 +86,7 @@ func ParseMany(targets []string) ([]*expr, error) {
 			return nil, err
 		}
 		if leftover != "" {
-			panic(fmt.Sprintf("failed to parse %q fully. got leftover %q", target, leftover))
+			return nil, fmt.Errorf("failed to parse %q fully. got leftover %q", target, leftover)
 		}
 		out = append(out, e)
 	}
@@ -148,6 +148,7 @@ func Parse(e string) (*expr, string, error) {
 	return &expr{str: name, etype: etName}, e, nil
 }
 
+// caller must assure s starts with opening paren
 func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 
 	var (
@@ -156,7 +157,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	)
 
 	if e[0] != '(' {
-		panic("arg list should start with paren")
+		panic("arg list should start with paren. calling code should have asserted this")
 	}
 
 	ArgString := e[1:]
@@ -301,10 +302,11 @@ FOR:
 	return s[:i], s[i:]
 }
 
+// caller must assure s starts with a single or double quote
 func parseString(s string) (string, string, error) {
 
 	if s[0] != '\'' && s[0] != '"' {
-		panic("string should start with open quote")
+		panic("string should start with open quote. calling code should have asserted this")
 	}
 
 	match := s[0]
