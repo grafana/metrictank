@@ -81,7 +81,7 @@ func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
 		}
 		if len(datapoints) > 0 {
 			data[i].Start = s.Datapoints[0].Ts
-			data[i].End = s.Datapoints[len(s.Datapoints)-1].Ts
+			data[i].End = s.Datapoints[len(s.Datapoints)-1].Ts + s.Interval
 		} else {
 			data[i].Start = s.QueryFrom
 			data[i].End = s.QueryTo
