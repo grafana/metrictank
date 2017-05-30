@@ -27,6 +27,23 @@ Flags:
 ```
 
 
+## mt-explain
+
+```
+mt-explain
+Explains the execution plan for a given query / set of targets
+
+Usage:
+
+  mt-explain
+
+Example:
+
+  mt-explain -from -24h -to now -mdp 1000 "movingAverage(sumSeries(foo.bar), '2min')" "alias(averageSeries(foo.*), 'foo-avg')"
+
+```
+
+
 ## mt-index-cat
 
 ```
@@ -101,8 +118,12 @@ output: either presets like dump|list|vegeta-render|vegeta-render-patterns
 output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
 
 
+You may also use processing functions in templates:
+pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
 EXAMPLES:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
+mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
+mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\nX-Org-Id: 1\n\n'
 ```
 
 
@@ -265,6 +286,40 @@ Flags:
     	metricPersist topic name on source cluster (default "metricpersist")
   -src-brokers string
     	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
+  -version
+    	print version string
+```
+
+
+## mt-replicator-via-tsdb
+
+```
+mt-replicator-via-tsdb
+
+Replicates a kafka mdm topic on a given cluster to a remote tsdb-gw server
+
+Flags:
+
+  -batch-size int
+    	number of metrics to send in each batch. (default 10000)
+  -client-id string
+    	Kafka consumer group client id (default "mt-replicator")
+  -consumer-fetch-default int
+    	number of bytes to try and fetch from consumer (default 32768)
+  -destination-key string
+    	admin-key of destination tsdb-gw server (default "admin-key")
+  -destination-url string
+    	tsdb-gw address to send metrics to (default "http://localhost/metrics")
+  -group string
+    	Kafka consumer group (default "mt-replicator")
+  -initial-offset int
+    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
+  -log-level int
+    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+  -src-brokers string
+    	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
+  -src-topic string
+    	metrics topic name on source cluster (default "mdm")
   -version
     	print version string
 ```
