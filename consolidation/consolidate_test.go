@@ -193,6 +193,163 @@ func TestConsolidationFunctions(t *testing.T) {
 	}
 	validate(cases, t)
 }
+func TestConsolidateStableNoAgg(t *testing.T) {
+	testConsolidateStable(
+		[]schema.Point{
+			{Val: 1, Ts: 10},
+			{Val: 2, Ts: 20},
+			{Val: 3, Ts: 30},
+			{Val: 4, Ts: 40},
+		},
+		10,
+		1,
+		[]schema.Point{
+			{Val: 10, Ts: 40},
+		},
+		40,
+		t)
+}
+
+func TestConsolidateStableNoTrimDueToNotManyPoints(t *testing.T) {
+	testConsolidateStable(
+		[]schema.Point{
+			{Val: 1, Ts: 20},
+			{Val: 2, Ts: 30},
+			{Val: 3, Ts: 40},
+			{Val: 4, Ts: 50},
+		},
+		10,
+		1,
+		[]schema.Point{
+			{Val: 10, Ts: 50},
+		},
+		40,
+		t)
+}
+func TestConsolidateStableShouldTrim(t *testing.T) {
+	testConsolidateStable(
+		// more points, we should trim to get proper alignment
+		[]schema.Point{
+			{Val: 1, Ts: 20},
+			{Val: 2, Ts: 30},
+			{Val: 3, Ts: 40},
+			{Val: 4, Ts: 50},
+			{Val: 5, Ts: 60},
+			{Val: 6, Ts: 70},
+		},
+		10,
+		3,
+		[]schema.Point{
+			{Val: 5, Ts: 40},
+			{Val: 9, Ts: 60},
+			{Val: 6, Ts: 80},
+		},
+		20,
+		t)
+}
+func TestConsolidateStableShouldBeStableWithPrevious(t *testing.T) {
+	testConsolidateStable(
+		// and now we learn why
+		// one point out of the window and a new one at the back
+		// should result in the same consolidated points for everything in the middle
+		// as compared to the previous test
+		[]schema.Point{
+			{Val: 2, Ts: 30},
+			{Val: 3, Ts: 40},
+			{Val: 4, Ts: 50},
+			{Val: 5, Ts: 60},
+			{Val: 6, Ts: 70},
+			{Val: 7, Ts: 80},
+		},
+		10,
+		3,
+		[]schema.Point{
+			{Val: 5, Ts: 40},
+			{Val: 9, Ts: 60},
+			{Val: 13, Ts: 80},
+		},
+		20,
+		t)
+}
+
+func TestConsolidateStableABitMoreData(t *testing.T) {
+	testConsolidateStable(
+		// another trimming example with a bit more data
+		// logic is as follows: 13 points, mdp 3 => aggregate every 5
+		// so first agg point should be 10,20,30,40,50, which is incomplete
+		// so nudge it away.
+		// this actually leaves us with only 9 points, so in theory we could
+		// use more and smaller buckets of 3 or 4 points,
+		// but this would lead to the problem again
+		// of data jumping around across refreshes (as subsequent requests may not
+		// nudge as much data, and require larger buckets), so this is better.
+		[]schema.Point{
+			{Val: 2, Ts: 20},   // incomplete. shall be nudged out
+			{Val: 3, Ts: 30},   // incomplete. shall be nudged out
+			{Val: 4, Ts: 40},   // incomplete. shall be nudged out
+			{Val: 5, Ts: 50},   // incomplete. shall be nudged out
+			{Val: 6, Ts: 60},   // bucket 1
+			{Val: 7, Ts: 70},   // bucket 1
+			{Val: 8, Ts: 80},   // bucket 1
+			{Val: 9, Ts: 90},   // bucket 1
+			{Val: 10, Ts: 100}, // bucket 1
+			{Val: 11, Ts: 110}, // bucket 2
+			{Val: 12, Ts: 120}, // bucket 2
+			{Val: 13, Ts: 130}, // bucket 2
+			{Val: 14, Ts: 140}, // bucket 2
+		},
+		10,
+		3,
+		[]schema.Point{
+			{Val: 40, Ts: 100},
+			{Val: 50, Ts: 150},
+		},
+		50,
+		t)
+}
+func TestConsolidateStableABitMoreDataEven(t *testing.T) {
+	testConsolidateStable(
+		// now we actually have a clean start at 10, so we can incorporate it
+		[]schema.Point{
+			{Val: 1, Ts: 10},   // bucket 1
+			{Val: 2, Ts: 20},   // bucket 1
+			{Val: 3, Ts: 30},   // bucket 1
+			{Val: 4, Ts: 40},   // bucket 1
+			{Val: 5, Ts: 50},   // bucket 1
+			{Val: 6, Ts: 60},   // bucket 2
+			{Val: 7, Ts: 70},   // bucket 2
+			{Val: 8, Ts: 80},   // bucket 2
+			{Val: 9, Ts: 90},   // bucket 2
+			{Val: 10, Ts: 100}, // bucket 2
+			{Val: 11, Ts: 110}, // bucket 3
+			{Val: 12, Ts: 120}, // bucket 3
+			{Val: 13, Ts: 130}, // bucket 3
+			{Val: 14, Ts: 140}, // bucket 3
+		},
+		10,
+		3,
+		[]schema.Point{
+			{Val: 15, Ts: 50},
+			{Val: 40, Ts: 100},
+			{Val: 50, Ts: 150},
+		},
+		50,
+		t)
+}
+func testConsolidateStable(in []schema.Point, inInt uint32, mdp uint32, expOut []schema.Point, expOutInt uint32, t *testing.T) {
+	out, outInt := ConsolidateStable(in, inInt, mdp, Sum)
+	if outInt != expOutInt {
+		t.Fatalf("output interval mismatch: expected: %v, got: %v", expOutInt, outInt)
+	}
+	if len(out) != len(expOut) {
+		t.Fatalf("output mismatch: expected: %v, got: %v", expOut, out)
+	}
+	for j := 0; j < len(out); j++ {
+		if out[j] != expOut[j] {
+			t.Fatalf("output mismatch: expected: %v, got: %v", expOut, out)
+		}
+	}
+}
 
 type c struct {
 	numPoints     uint32
