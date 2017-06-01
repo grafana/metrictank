@@ -136,7 +136,7 @@ func ConfigProcess(instance string) {
 	for _, part := range partitions {
 		offset, err := client.GetOffset(topic, part, sarama.OffsetNewest)
 		if err != nil {
-			log.Fatal(4, "kakfa-cluster: failed to get newest offset for %s:%d. %s", topic, part)
+			log.Fatal(4, "kakfa-cluster: failed to get newest offset for topic %s part %d: %s", topic, part, err)
 		}
 		bootTimeOffsets[part] = offset
 		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
