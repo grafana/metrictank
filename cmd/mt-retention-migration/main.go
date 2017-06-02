@@ -141,11 +141,25 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		c.id = def.Id
 
 		m.chunkChan <- &c
+		return
 	}
 
-	/*for _, itgen := range itgens {
+	if def.Interval < 60 {
+		// create one min rollup
+	}
+
+	// chunks older than 60 days can be dropped
+	dropBefore := time.now().unix() - 60*60*24*60
+	for _, itgen := range itgens {
+		if itgen.Ts < dropBefore {
+			continue
+		}
+
+		if itgen.Ts < noRawBefore {
+			continue
+		}
 		ts, val := iter.Values()
-	}*/
+	}
 	m.chunkChan <- &c
 }
 
