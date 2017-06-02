@@ -98,8 +98,34 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 func (m *migrater) process(it *gocql.Iter) {
 	var b []byte
 	var ts int
+	var iters []chunk.Iter
+
 	for it.Scan(&ts, &b) {
+		itgen, err := chunk.NewGen(b, uint32(ts))
+		if err != nil {
+			throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+		}
+
+		iter, err := itgen.Get()
+		if err != nil {
+			throwError(fmt.Sprintf("itergen: error getting iter %+v", err))
+			continue
+		}
+		iters = append(iters, *iter)
+		m.readChunkCount++
 	}
+
+	m.generateChunks(iters)
+}
+
+func (m *migrater) generateChunks(iters []chunk.Iter) {
+	//c := chunkWithMeta{}
+	for _, iter := range iters {
+		for iter.Next() {
+			//ts, val := iter.Values()
+		}
+	}
+	//m.chunkChan <- &c
 }
 
 func (m *migrater) write() {
@@ -118,5 +144,7 @@ func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.I
 
 func throwError(msg string) {
 	msg = fmt.Sprintf("%s\n", msg)
+	printLock.Lock()
 	fmt.Fprintln(os.Stderr, msg)
+	printLock.Unlock()
 }
