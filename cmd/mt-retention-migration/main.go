@@ -35,6 +35,7 @@ type migrater struct {
 type chunkWithMeta struct {
 	tableName string
 	id        string
+	ttl       uint32
 	itergens  []chunk.IterGen
 }
 
@@ -92,7 +93,6 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 		it := m.session.Query(query).Iter()
 		m.process(it)
 	}
-
 }
 
 func (m *migrater) process(it *gocql.Iter) {
@@ -119,16 +119,24 @@ func (m *migrater) process(it *gocql.Iter) {
 }
 
 func (m *migrater) generateChunks(iters []chunk.Iter) {
-	//c := chunkWithMeta{}
+	c := chunkWithMeta{}
 	for _, iter := range iters {
 		for iter.Next() {
 			//ts, val := iter.Values()
 		}
 	}
-	//m.chunkChan <- &c
+	m.chunkChan <- &c
 }
 
 func (m *migrater) write() {
+	for {
+		chunk, more := <-m.chunkChan
+		if !more {
+			return
+		}
+
+		m.insertChunks(chunk.tableName, chunk.id, chunk.ttl, chunk.itergens)
+	}
 }
 
 func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
