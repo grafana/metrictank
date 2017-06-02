@@ -30,6 +30,8 @@ type migrater struct {
 	metricCount     int
 	readChunkCount  int
 	writeChunkCount int
+	ttlTables       mdata.TTLTables
+	ttls            []uint32
 }
 
 type chunkWithMeta struct {
@@ -46,10 +48,24 @@ func main() {
 	err := casIdx.InitBare()
 	throwError(err.Error())
 
+	ttls := make([]uint32, 3)
+	// 1s:1d:1h:2,1m:60d:6h:2,30m:3y:6h:2
+	ttls[0] = 60 * 60 * 24
+	ttls[1] = 60 * 60 * 24 * 60
+	ttls[2] = 60 * 60 * 24 * 365 * 3
+
+	ttlTables := mdata.GetTTLTables(
+		ttls,
+		20,
+		mdata.Table_name_format,
+	)
+
 	m := &migrater{
 		casIdx:    casIdx,
 		session:   casIdx.Session,
 		chunkChan: make(chan *chunkWithMeta, *bufferSize),
+		ttlTables: ttlTables,
+		ttls:      ttls,
 	}
 
 	m.Start()
@@ -95,10 +111,10 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	}
 }
 
-func (m *migrater) process(it *gocql.Iter) []chunk.Iter {
+func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 	var b []byte
 	var ts int
-	var iters []chunk.Iter
+	var itgens []chunk.IterGen
 
 	for it.Scan(&ts, &b) {
 		itgen, err := chunk.NewGen(b, uint32(ts))
@@ -106,25 +122,30 @@ func (m *migrater) process(it *gocql.Iter) []chunk.Iter {
 			throwError(fmt.Sprintf("Error generating Itgen: %q", err))
 		}
 
-		iter, err := itgen.Get()
-		if err != nil {
-			throwError(fmt.Sprintf("itergen: error getting iter %+v", err))
-			continue
-		}
-		iters = append(iters, *iter)
+		itgens = append(itgens, *itgen)
 		m.readChunkCount++
 	}
 
-	return iters
+	return itgens
 }
 
-func (m *migrater) generateChunks(iters []chunk.Iter, def *schema.MetricDefinition) {
+func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
 	c := chunkWithMeta{}
-	for _, iter := range iters {
-		for iter.Next() {
-			//ts, val := iter.Values()
-		}
+
+	// if interval is larger than 30min we can directly write the chunk to
+	// the highest retention table
+	if def.Interval > 60*30 {
+		c.itergens = itgens
+		c.ttl = m.ttls[2]
+		c.tableName = m.ttlTables[m.ttls[2]].Table
+		c.id = def.Id
+
+		m.chunkChan <- &c
 	}
+
+	/*for _, itgen := range itgens {
+		ts, val := iter.Values()
+	}*/
 	m.chunkChan <- &c
 }
 
