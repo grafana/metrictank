@@ -121,7 +121,7 @@ type writeReq struct {
 type CasIdx struct {
 	memory.MemoryIdx
 	cluster    *gocql.ClusterConfig
-	session    *gocql.Session
+	Session    *gocql.Session
 	writeQueue chan writeReq
 	shutdown   chan struct{}
 	wg         sync.WaitGroup
@@ -186,7 +186,7 @@ func (c *CasIdx) InitBare() error {
 		return err
 	}
 
-	c.session = session
+	c.Session = session
 
 	return nil
 }
@@ -231,7 +231,7 @@ func (c *CasIdx) Stop() {
 		close(c.writeQueue)
 	}
 	c.wg.Wait()
-	c.session.Close()
+	c.Session.Close()
 }
 
 func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
@@ -313,12 +313,12 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
+	iter := c.Session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter)
 }
 
 func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
+	iter := c.Session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
 	return c.load(defs, iter)
 }
 
@@ -366,7 +366,7 @@ func (c *CasIdx) processWriteQueue() {
 		attempts = 0
 
 		for !success {
-			if err := c.session.Query(
+			if err := c.Session.Query(
 				qry,
 				req.def.Id,
 				req.def.OrgId,
@@ -425,7 +425,7 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 	attempts := 0
 	for attempts < 5 {
 		attempts++
-		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
+		err := c.Session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)

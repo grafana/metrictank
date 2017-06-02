@@ -18,3 +18,4 @@ build/
 /cmd/mt-view-boundaries/mt-view-boundaries
 /cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
 /cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
+/cmd/mt-retention-migration/mt-retention-migration
