@@ -91,11 +91,11 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 			row_key,
 		)
 		it := m.session.Query(query).Iter()
-		m.process(it)
+		m.generateChunks(m.process(it), def)
 	}
 }
 
-func (m *migrater) process(it *gocql.Iter) {
+func (m *migrater) process(it *gocql.Iter) []chunk.Iter {
 	var b []byte
 	var ts int
 	var iters []chunk.Iter
@@ -115,10 +115,10 @@ func (m *migrater) process(it *gocql.Iter) {
 		m.readChunkCount++
 	}
 
-	m.generateChunks(iters)
+	return iters
 }
 
-func (m *migrater) generateChunks(iters []chunk.Iter) {
+func (m *migrater) generateChunks(iters []chunk.Iter, def *schema.MetricDefinition) {
 	c := chunkWithMeta{}
 	for _, iter := range iters {
 		for iter.Next() {
@@ -136,6 +136,7 @@ func (m *migrater) write() {
 		}
 
 		m.insertChunks(chunk.tableName, chunk.id, chunk.ttl, chunk.itergens)
+		m.writeChunkCount++
 	}
 }
 
