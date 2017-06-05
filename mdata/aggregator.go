@@ -71,8 +71,8 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret c
 	return aggregator
 }
 
-// flush adds points to the aggregation-series and resets aggregation state
-func (agg *Aggregator) flush() {
+// Flush adds points to the aggregation-series and resets aggregation state
+func (agg *Aggregator) Flush() {
 	if agg.minMetric != nil {
 		agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
 	}
@@ -98,17 +98,37 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(val)
 		if ts == boundary {
-			agg.flush()
+			agg.Flush()
 		}
 	} else if boundary > agg.currentBoundary {
 		// store current totals as a new point in their series
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
 		if agg.agg.cnt != 0 {
-			agg.flush()
+			agg.Flush()
 		}
 		agg.currentBoundary = boundary
 		agg.agg.Add(val)
 	} else {
 		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
+}
+
+func (agg *Aggregator) GetAggMetrics() []*AggMetric {
+	aggMetrics := make([]*AggMetric, 0)
+	if agg.minMetric != nil {
+		aggMetrics = append(aggMetrics, agg.minMetric)
+	}
+	if agg.maxMetric != nil {
+		aggMetrics = append(aggMetrics, agg.maxMetric)
+	}
+	if agg.sumMetric != nil {
+		aggMetrics = append(aggMetrics, agg.sumMetric)
+	}
+	if agg.cntMetric != nil {
+		aggMetrics = append(aggMetrics, agg.cntMetric)
+	}
+	if agg.lstMetric != nil {
+		aggMetrics = append(aggMetrics, agg.lstMetric)
+	}
+	return aggMetrics
 }

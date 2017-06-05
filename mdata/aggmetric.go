@@ -308,6 +308,10 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
+func (a *AggMetric) GetAggregators() []*Aggregator {
+	return a.aggregators
+}
+
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	// push into cache
 	go a.cachePusher.CacheIfHot(

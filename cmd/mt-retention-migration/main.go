@@ -141,12 +141,13 @@ func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 }
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
-	cd := chunkDay{}
+	cd := chunkDay{
+		itergens: itgens,
+	}
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
 	if def.Interval > 60*30 {
-		cd.itergens = itgens
 		cd.ttl = m.ttls[2]
 		cd.tableName = m.ttlTables[m.ttls[2]].Table
 		cd.id = def.Id
@@ -159,12 +160,12 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	// chunks older than 60 days can be dropped
 	dropBefore := now - 60*60*24*60
 	// don't need raw older than 1 day
-	//noRawBefore := now - 60*60*24
+	noRawBefore := now - 60*60*24
 
+	// if interval <1min, then create one min rollup
 	if def.Interval < 60 {
 		outChunkSpan := 6 * 60 * 60
 
-		// create one min rollup (assumes chunk span is >1min)
 		am := mdata.NewAggMetric(
 			&mdata.MockStore{},
 			&cache.MockCache{},
@@ -197,20 +198,36 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 			}
 		}
 
-		itgensNew := make([]chunk.IterGen, len(am.Chunks))
-		for _, c := range am.Chunks {
-			if !c.Closed {
-				c.Finish()
+		for _, agg := range am.GetAggregators() {
+			agg.Flush()
+			for _, aggMetric := range agg.GetAggMetrics() {
+				itgensNew := make([]chunk.IterGen, len(am.Chunks))
+				for _, c := range aggMetric.Chunks {
+					if !c.Closed {
+						c.Finish()
+					}
+					itgensNew = append(itgensNew, *chunk.NewBareIterGen(
+						c.Bytes(),
+						c.T0,
+						aggMetric.ChunkSpan,
+					))
+				}
+
+				rollupChunkDay := chunkDay{
+					ttl:       m.ttls[1],
+					tableName: m.ttlTables[m.ttls[1]].Table,
+					id:        aggMetric.Key,
+					itergens:  itgensNew,
+				}
+				m.chunkChan <- &rollupChunkDay
 			}
-			itgensNew = append(itgensNew, *chunk.NewBareIterGen(
-				c.Bytes(),
-				c.T0,
-				am.ChunkSpan,
-			))
 		}
+	}
 
-		itgens = itgensNew
-
+	for _, itgen := range cd.itergens {
+		if itgen.Ts+itgen.Span < noRawBefore {
+			continue
+		}
 	}
 	m.chunkChan <- &cd
 }
