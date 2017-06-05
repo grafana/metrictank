@@ -162,7 +162,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	// don't need raw older than 1 day
 	noRawBefore := now - 60*60*24
 
-	// if interval <1min, then create one min rollup
+	// if interval <1min, then create one min rollups
 	if def.Interval < 60 {
 		outChunkSpan := 6 * 60 * 60
 
@@ -182,6 +182,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 			},
 			false,
 		)
+
 		for _, itgen := range itgens {
 			if itgen.Ts < dropBefore {
 				continue
@@ -199,7 +200,6 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		}
 
 		for _, agg := range am.GetAggregators() {
-			agg.Flush()
 			for _, aggMetric := range agg.GetAggMetrics() {
 				itgensNew := make([]chunk.IterGen, len(am.Chunks))
 				for _, c := range aggMetric.Chunks {
@@ -209,7 +209,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 					itgensNew = append(itgensNew, *chunk.NewBareIterGen(
 						c.Bytes(),
 						c.T0,
-						aggMetric.ChunkSpan,
+						c.LastTs-c.T0,
 					))
 				}
 
