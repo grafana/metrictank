@@ -4,11 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gocql/gocql"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/mdata"
+	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 	"os"
+	"regexp"
 	//"strings"
 	"sync"
 	"time"
@@ -95,6 +98,8 @@ func (m *migrater) read() {
 		m.processMetric(&metric)
 		m.metricCount++
 	}
+
+	close(m.chunkChan)
 }
 
 func (m *migrater) processMetric(def *schema.MetricDefinition) {
@@ -136,37 +141,78 @@ func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 }
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
-	c := chunkDay{}
+	cd := chunkDay{}
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
 	if def.Interval > 60*30 {
-		c.itergens = itgens
-		c.ttl = m.ttls[2]
-		c.tableName = m.ttlTables[m.ttls[2]].Table
-		c.id = def.Id
+		cd.itergens = itgens
+		cd.ttl = m.ttls[2]
+		cd.tableName = m.ttlTables[m.ttls[2]].Table
+		cd.id = def.Id
 
-		m.chunkChan <- &c
+		m.chunkChan <- &cd
 		return
 	}
 
-	if def.Interval < 60 {
-		// create one min rollup
-	}
-
+	now := uint32(time.Now().Unix())
 	// chunks older than 60 days can be dropped
-	dropBefore := uint32(time.Now().Unix() - 60*60*24*60)
-	for _, itgen := range itgens {
-		if itgen.Ts < dropBefore {
-			continue
+	dropBefore := now - 60*60*24*60
+	// don't need raw older than 1 day
+	//noRawBefore := now - 60*60*24
+
+	if def.Interval < 60 {
+		outChunkSpan := 6 * 60 * 60
+
+		// create one min rollup (assumes chunk span is >1min)
+		am := mdata.NewAggMetric(
+			&mdata.MockStore{},
+			&cache.MockCache{},
+			def.Id,
+			[]conf.Retention{
+				conf.NewRetention(60, outChunkSpan/60),
+			},
+			&conf.Aggregation{
+				"default",
+				regexp.MustCompile(".*"),
+				0.5,
+				// sum should not be necessary because that comes with Avg
+				[]conf.Method{conf.Avg, conf.Lst, conf.Max, conf.Min},
+			},
+			false,
+		)
+		for _, itgen := range itgens {
+			if itgen.Ts < dropBefore {
+				continue
+			}
+			iter, err := itgen.Get()
+			if err != nil {
+				throwError(
+					fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
+				)
+			}
+			for iter.Next() {
+				ts, val := iter.Values()
+				am.Add(ts, val)
+			}
 		}
 
-		/*if itgen.Ts < noRawBefore {
-			continue
+		itgensNew := make([]chunk.IterGen, len(am.Chunks))
+		for _, c := range am.Chunks {
+			if !c.Closed {
+				c.Finish()
+			}
+			itgensNew = append(itgensNew, *chunk.NewBareIterGen(
+				c.Bytes(),
+				c.T0,
+				am.ChunkSpan,
+			))
 		}
-		ts, val := iter.Values()*/
+
+		itgens = itgensNew
+
 	}
-	m.chunkChan <- &c
+	m.chunkChan <- &cd
 }
 
 func (m *migrater) write() {
