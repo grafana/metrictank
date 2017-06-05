@@ -20,13 +20,15 @@ var (
 		1000,
 		"number of chunks to buffer before reading blocks and waits for write",
 	)
-	printLock = sync.Mutex{}
+	printLock    = sync.Mutex{}
+	source_table = "metrics_1024"
 )
+var day_sec int64 = 60 * 60 * 24
 
 type migrater struct {
 	casIdx          *cassandra.CasIdx
 	session         *gocql.Session
-	chunkChan       chan *chunkWithMeta
+	chunkChan       chan *chunkDay
 	metricCount     int
 	readChunkCount  int
 	writeChunkCount int
@@ -34,7 +36,7 @@ type migrater struct {
 	ttls            []uint32
 }
 
-type chunkWithMeta struct {
+type chunkDay struct {
 	tableName string
 	id        string
 	ttl       uint32
@@ -63,7 +65,7 @@ func main() {
 	m := &migrater{
 		casIdx:    casIdx,
 		session:   casIdx.Session,
-		chunkChan: make(chan *chunkWithMeta, *bufferSize),
+		chunkChan: make(chan *chunkDay, *bufferSize),
 		ttlTables: ttlTables,
 		ttls:      ttls,
 	}
@@ -97,17 +99,21 @@ func (m *migrater) read() {
 
 func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	now := time.Now().Unix()
-	start_month := now % mdata.Month_sec
-	end_month := (now - 1) - ((now - 1) % mdata.Month_sec)
+	start := (now - (68 * day_sec))
+	start_month := start / mdata.Month_sec
+	end_month := (now - 1) / mdata.Month_sec
 
 	for month := start_month; month <= end_month; month++ {
-		row_key := fmt.Sprintf("%s_%d", def.Id, start_month/mdata.Month_sec)
-		query := fmt.Sprintf(
-			"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC",
-			row_key,
-		)
-		it := m.session.Query(query).Iter()
-		m.generateChunks(m.process(it), def)
+		row_key := fmt.Sprintf("%s_%d", def.Id, start_month)
+		for from := start_month * mdata.Month_sec; from <= month+(28*day_sec); from += day_sec {
+			to := from + day_sec
+			query := fmt.Sprintf(
+				"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts <= ? ORDER BY ts ASC",
+				source_table,
+			)
+			it := m.session.Query(query, row_key, from, to).Iter()
+			m.generateChunks(m.process(it), def)
+		}
 	}
 }
 
@@ -130,7 +136,7 @@ func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 }
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
-	c := chunkWithMeta{}
+	c := chunkDay{}
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
@@ -149,16 +155,16 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	}
 
 	// chunks older than 60 days can be dropped
-	dropBefore := time.now().unix() - 60*60*24*60
+	dropBefore := uint32(time.Now().Unix() - 60*60*24*60)
 	for _, itgen := range itgens {
 		if itgen.Ts < dropBefore {
 			continue
 		}
 
-		if itgen.Ts < noRawBefore {
+		/*if itgen.Ts < noRawBefore {
 			continue
 		}
-		ts, val := iter.Values()
+		ts, val := iter.Values()*/
 	}
 	m.chunkChan <- &c
 }
