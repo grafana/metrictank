@@ -155,10 +155,16 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
-	if def.Interval > 60*30 {
+	if def.Interval > 60*30 && len(itgens) > 0 {
 		cd.ttl = m.ttls[2]
 		cd.tableName = m.ttlTables[m.ttls[2]].Table
-		cd.id = def.Id
+		cd.id = fmt.Sprintf(
+			"%s_%d_%d",
+			def.Id,
+			def.Interval,
+			// itgens will always be of the same day
+			itgens[0].Ts/mdata.Month_sec,
+		)
 
 		m.chunkChan <- &cd
 		return
@@ -255,8 +261,7 @@ func (m *migrater) write() {
 func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
 	for _, ig := range itergens {
-		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
-		err := m.session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+		err := m.session.Query(query, id, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
 		if err != nil {
 			throwError(fmt.Sprintf("Error in query: %q", err))
 		}
