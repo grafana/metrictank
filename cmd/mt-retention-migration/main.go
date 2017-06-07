@@ -58,11 +58,7 @@ func main() {
 	ttls[1] = 60 * 60 * 24 * 60
 	ttls[2] = 60 * 60 * 24 * 365 * 3
 
-	ttlTables := mdata.GetTTLTables(
-		ttls,
-		20,
-		mdata.Table_name_format,
-	)
+	ttlTables := mdata.GetTTLTables(ttls, 20, mdata.Table_name_format)
 
 	m := &migrater{
 		casIdx:    casIdx,
@@ -92,6 +88,7 @@ func (m *migrater) Start() {
 
 func (m *migrater) read() {
 	defs := m.casIdx.Load(nil)
+	fmt.Println(fmt.Sprintf("received %d metrics", len(defs)))
 
 	for _, metric := range defs {
 		m.processMetric(&metric)
@@ -108,8 +105,9 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	end_month := (now - 1) / mdata.Month_sec
 
 	for month := start_month; month <= end_month; month++ {
-		row_key := fmt.Sprintf("%s_%d", def.Id, start_month)
-		for from := start_month * mdata.Month_sec; from <= month+(28*day_sec); from += day_sec {
+		row_key := fmt.Sprintf("%s_%d", def.Id, month)
+		fmt.Println(fmt.Sprintf("select for row_key %s", row_key))
+		for from := start_month * mdata.Month_sec; from <= (month+1)*mdata.Month_sec; from += day_sec {
 			to := from + day_sec
 			query := fmt.Sprintf(
 				"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts <= ? ORDER BY ts ASC",
