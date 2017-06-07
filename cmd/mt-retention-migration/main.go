@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/mdata"
@@ -19,7 +20,7 @@ import (
 var (
 	bufferSize   = 1000
 	printLock    = sync.Mutex{}
-	source_table = "metrics_1024"
+	source_table = "metric_1024"
 )
 var day_sec int64 = 60 * 60 * 24
 
@@ -47,6 +48,8 @@ func main() {
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
 	cassandra.Enabled = true
+	cluster.Init("migrator", "0", time.Now(), "", -1)
+	cluster.Manager.SetPrimary(true)
 	casIdx := cassandra.New()
 	err := casIdx.InitBare()
 	if err != nil {
@@ -107,6 +110,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	for month := start_month; month <= end_month; month++ {
 		row_key := fmt.Sprintf("%s_%d", def.Id, month)
 		fmt.Println(fmt.Sprintf("select for row_key %s", row_key))
+		itgenCount := 0
 		for from := start_month * mdata.Month_sec; from <= (month+1)*mdata.Month_sec; from += day_sec {
 			to := from + day_sec
 			query := fmt.Sprintf(
@@ -114,8 +118,11 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 				source_table,
 			)
 			it := m.session.Query(query, row_key, from, to).Iter()
-			m.generateChunks(m.process(it), def)
+			itgens := m.process(it)
+			itgenCount += len(itgens)
+			m.generateChunks(itgens, def)
 		}
+		fmt.Println(fmt.Sprintf("%d chunks for row_key %s", itgenCount, row_key))
 	}
 }
 
@@ -131,7 +138,10 @@ func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 		}
 
 		itgens = append(itgens, *itgen)
-		m.readChunkCount++
+	}
+	err := it.Close()
+	if err != nil {
+		throwError(fmt.Sprintf("cassandra query error. %s", err))
 	}
 
 	return itgens
@@ -141,6 +151,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	cd := chunkDay{
 		itergens: itgens,
 	}
+	m.readChunkCount += len(itgens)
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
@@ -161,14 +172,14 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 
 	// if interval <1min, then create one min rollups
 	if def.Interval < 60 {
-		outChunkSpan := 6 * 60 * 60
+		outChunkSpan := uint32(6 * 60 * 60)
 
 		am := mdata.NewAggMetric(
-			&mdata.MockStore{},
+			mdata.NewMockStore(),
 			&cache.MockCache{},
 			def.Id,
 			[]conf.Retention{
-				conf.NewRetention(60, outChunkSpan/60),
+				conf.NewRetentionMT(60, m.ttls[1], outChunkSpan, 2, true),
 			},
 			&conf.Aggregation{
 				"default",
