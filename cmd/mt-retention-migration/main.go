@@ -1,8 +1,12 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"os"
+	"regexp"
+	"sync"
+	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx/cassandra"
@@ -10,19 +14,10 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
-	"os"
-	"regexp"
-	//"strings"
-	"sync"
-	"time"
 )
 
 var (
-	bufferSize = flag.Int(
-		"buffer-size",
-		1000,
-		"number of chunks to buffer before reading blocks and waits for write",
-	)
+	bufferSize   = 1000
 	printLock    = sync.Mutex{}
 	source_table = "metrics_1024"
 )
@@ -47,14 +42,18 @@ type chunkDay struct {
 }
 
 func main() {
-	cassandra.ConfigSetup()
+	cassFlags := cassandra.ConfigSetup()
+	fmt.Println(fmt.Sprintf("%+v", os.Args[1:]))
+	cassFlags.Parse(os.Args[1:])
+	cassFlags.Usage = cassFlags.PrintDefaults
 	cassandra.Enabled = true
 	casIdx := cassandra.New()
 	err := casIdx.InitBare()
-	throwError(err.Error())
+	if err != nil {
+		throwError(err.Error())
+	}
 
 	ttls := make([]uint32, 3)
-	// 1s:1d:1h:2,1m:60d:6h:2,30m:3y:6h:2
 	ttls[0] = 60 * 60 * 24
 	ttls[1] = 60 * 60 * 24 * 60
 	ttls[2] = 60 * 60 * 24 * 365 * 3
@@ -68,7 +67,7 @@ func main() {
 	m := &migrater{
 		casIdx:    casIdx,
 		session:   casIdx.Session,
-		chunkChan: make(chan *chunkDay, *bufferSize),
+		chunkChan: make(chan *chunkDay, bufferSize),
 		ttlTables: ttlTables,
 		ttls:      ttls,
 	}
