@@ -35,13 +35,6 @@ type migrater struct {
 	ttls            []uint32
 }
 
-type chunkDay struct {
-	tableName string
-	id        string
-	ttl       uint32
-	itergens  []chunk.IterGen
-}
-
 func main() {
 	cassFlags := cassandra.ConfigSetup()
 	fmt.Println(fmt.Sprintf("%+v", os.Args[1:]))
@@ -147,26 +140,35 @@ func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
 	return itgens
 }
 
+// represents one day of chunks of one metric aggregate
+type chunkDay struct {
+	tableName string
+	id        string
+	ttl       uint32
+	itergens  []chunk.IterGen
+}
+
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
-	cd := chunkDay{
-		itergens: itgens,
+	if len(itgens) == 0 {
+		return
 	}
+
 	m.readChunkCount += len(itgens)
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
-	if def.Interval > 60*30 && len(itgens) > 0 {
-		cd.ttl = m.ttls[2]
-		cd.tableName = m.ttlTables[m.ttls[2]].Table
-		cd.id = fmt.Sprintf(
-			"%s_%d_%d",
-			def.Id,
-			def.Interval,
-			// itgens will always be of the same day
-			itgens[0].Ts/mdata.Month_sec,
-		)
-
-		m.chunkChan <- &cd
+	if def.Interval > 60*30 {
+		m.chunkChan <- &chunkDay{
+			itergens:  itgens,
+			ttl:       m.ttls[2],
+			tableName: m.ttlTables[m.ttls[2]].Table,
+			id: fmt.Sprintf(
+				"%s_%d",
+				def.Id,
+				// itgens will always be of the same day
+				itgens[0].Ts/mdata.Month_sec,
+			),
+		}
 		return
 	}
 
@@ -238,12 +240,24 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		}
 	}
 
-	for _, itgen := range cd.itergens {
+	cd := &chunkDay{
+		itergens:  make([]chunk.IterGen, 0),
+		ttl:       m.ttls[0],
+		tableName: m.ttlTables[m.ttls[0]].Table,
+		id: fmt.Sprintf(
+			"%s_%d",
+			def.Id,
+			// itgens will always be of the same day
+			itgens[0].Ts/mdata.Month_sec,
+		),
+	}
+	for _, itgen := range itgens {
 		if itgen.Ts+itgen.Span < noRawBefore {
 			continue
 		}
+		cd.itergens = append(cd.itergens, itgen)
 	}
-	m.chunkChan <- &cd
+	m.chunkChan <- cd
 }
 
 func (m *migrater) write() {
