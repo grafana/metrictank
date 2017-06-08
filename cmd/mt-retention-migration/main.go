@@ -95,7 +95,7 @@ func (m *migrater) Start() {
 
 func (m *migrater) read() {
 	defs := m.casIdx.Load(nil)
-	fmt.Println(fmt.Sprintf("received %d metrics", len(defs)))
+	fmt.Println(fmt.Sprintf("Received %d metrics", len(defs)))
 
 	for _, metric := range defs {
 		m.processMetric(&metric)
@@ -119,11 +119,11 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	for month := start_month; month <= end_month; month++ {
 		row_key := fmt.Sprintf("%s_%d", def.Id, month)
 		itgenCount := 0
-		for from := start_month * mdata.Month_sec; from <= (month+1)*mdata.Month_sec; from += day_sec {
+		for from := month * mdata.Month_sec; from < (month+1)*mdata.Month_sec; from += day_sec {
 			fmt.Println(fmt.Sprintf("Day number %d", (from-(start_month*mdata.Month_sec))/day_sec))
 			to := from + day_sec
 			query := fmt.Sprintf(
-				"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts <= ? ORDER BY ts ASC",
+				"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
 				m.sourceTable,
 			)
 			it := m.session.Query(query, row_key, from, to).Iter()
@@ -174,12 +174,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 			itergens:  itgens,
 			ttl:       m.ttls[2],
 			tableName: m.ttlTables[m.ttls[2]].Table,
-			id: fmt.Sprintf(
-				"%s_%d",
-				def.Id,
-				// itgens will always be of the same day
-				itgens[0].Ts/mdata.Month_sec,
-			),
+			id:        def.Id,
 		}
 		return
 	} else {
@@ -232,12 +227,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		itergens:  make([]chunk.IterGen, 0),
 		ttl:       m.ttls[0],
 		tableName: m.ttlTables[m.ttls[0]].Table,
-		id: fmt.Sprintf(
-			"%s_%d",
-			def.Id,
-			// itgens will always be of the same day
-			itgens[0].Ts/mdata.Month_sec,
-		),
+		id:        def.Id,
 	}
 	for _, itgen := range itgens {
 		if itgen.Ts+itgen.Span < noRawBefore {
@@ -310,12 +300,12 @@ func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uin
 
 func (m *migrater) write() {
 	for {
-		chunk, more := <-m.chunkChan
-		if !more {
+		cd, more := <-m.chunkChan
+		if !more || len(cd.itergens) == 0 {
 			return
 		}
 
-		m.insertChunks(chunk.tableName, chunk.id, chunk.ttl, chunk.itergens)
+		m.insertChunks(cd.tableName, cd.id, cd.ttl, cd.itergens)
 		m.writeChunkCount++
 	}
 }
@@ -323,7 +313,13 @@ func (m *migrater) write() {
 func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
 	for _, ig := range itergens {
-		err := m.session.Query(query, id, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+		idMonth := fmt.Sprintf(
+			"%s_%d",
+			id,
+			// itgens will always be of the same day for each chunkDay
+			ig.Ts/mdata.Month_sec,
+		)
+		err := m.session.Query(query, idMonth, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
 		if err != nil {
 			throwError(fmt.Sprintf("Error in query: %q", err))
 		}
