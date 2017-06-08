@@ -141,7 +141,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 			itgenCount += len(itgens)
 			m.generateChunks(itgens, def)
 		}
-		fmt.Println(fmt.Sprintf("Processed %d chunks for row_key %s", itgenCount, row_key))
+		fmt.Println(fmt.Sprintf("Processed %d chunks of table %s for row_key %s", itgenCount, m.sourceTable, row_key))
 	}
 }
 
@@ -178,7 +178,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		}
 		return
 	} else {
-		fmt.Println(fmt.Sprintf("Generating %d-rollup", 30*60))
+		fmt.Println(fmt.Sprintf("Generating %d-rollups", 30*60))
 		am := m.getAggMetric(def.Id, 30*60, m.ttls[2], outChunkSpan)
 		for _, itgen := range itgens {
 			iter, err := itgen.Get()
@@ -235,7 +235,13 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		}
 		cd.itergens = append(cd.itergens, itgen)
 	}
-	m.chunkChan <- cd
+	if len(cd.itergens) > 0 {
+		fmt.Println(fmt.Sprintf(
+			"Writing %d chunks with ttl %d (%dd) to table %s",
+			len(cd.itergens), m.ttls[0], int64(m.ttls[0])/day_sec, m.ttlTables[m.ttls[0]].Table,
+		))
+		m.chunkChan <- cd
+	}
 }
 
 func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
@@ -245,7 +251,7 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 			aggs = append(aggs, aggMetric.Key)
 		}
 	}
-	fmt.Println(fmt.Sprintf("Processing rollup with keys %s", aggs))
+	fmt.Println(fmt.Sprintf("Processing rollups with keys %s", aggs))
 
 	for _, agg := range am.GetAggregators() {
 		for _, aggMetric := range agg.GetAggMetrics() {
@@ -271,8 +277,8 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 			}
 			m.chunkChan <- &rollupChunkDay
 			fmt.Println(fmt.Sprintf(
-				"Wrote rollup of %d chunks to table %s with ttl %d for key %s",
-				chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], aggMetric.Key,
+				"Wrote rollup of %d chunks to table %s with ttl %d (%dd) for key %s",
+				chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], int64(m.ttls[ttlId])/day_sec, aggMetric.Key,
 			))
 		}
 	}
@@ -301,8 +307,11 @@ func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uin
 func (m *migrater) write() {
 	for {
 		cd, more := <-m.chunkChan
-		if !more || len(cd.itergens) == 0 {
+		if !more {
 			return
+		}
+		if len(cd.itergens) == 0 {
+			continue
 		}
 
 		m.insertChunks(cd.tableName, cd.id, cd.ttl, cd.itergens)
