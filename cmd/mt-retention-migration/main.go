@@ -141,7 +141,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 			itgenCount += len(itgens)
 			m.generateChunks(itgens, def)
 		}
-		fmt.Println(fmt.Sprintf("processed %d chunks for row_key %s", itgenCount, row_key))
+		fmt.Println(fmt.Sprintf("Processed %d chunks for row_key %s", itgenCount, row_key))
 	}
 }
 
@@ -285,7 +285,7 @@ func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uin
 		id,
 		[]conf.Retention{
 			conf.NewRetentionMT(1, outChunkSpan, outChunkSpan, 2, true),
-			conf.NewRetentionMT(rollupSpan, ttl, outChunkSpan, 2, true),
+			conf.NewRetentionMT(rollupSpan, ttl, outChunkSpan, uint32(day_sec)/outChunkSpan, true),
 		},
 		&conf.Aggregation{
 			"default",
