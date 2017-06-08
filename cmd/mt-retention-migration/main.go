@@ -114,11 +114,13 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	start_month := start / mdata.Month_sec
 	end_month := (now - 1) / mdata.Month_sec
 
+	fmt.Println(fmt.Sprintf("-- Processing metric with id %s and interval %d (months %d-%d)", def.Id, def.Interval, start_month, end_month))
+
 	for month := start_month; month <= end_month; month++ {
 		row_key := fmt.Sprintf("%s_%d", def.Id, month)
-		fmt.Println(fmt.Sprintf("select for row_key %s", row_key))
 		itgenCount := 0
 		for from := start_month * mdata.Month_sec; from <= (month+1)*mdata.Month_sec; from += day_sec {
+			fmt.Println(fmt.Sprintf("Day number %d", (from-(start_month*mdata.Month_sec))/day_sec))
 			to := from + day_sec
 			query := fmt.Sprintf(
 				"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts <= ? ORDER BY ts ASC",
@@ -139,7 +141,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 			itgenCount += len(itgens)
 			m.generateChunks(itgens, def)
 		}
-		fmt.Println(fmt.Sprintf("%d chunks for row_key %s", itgenCount, row_key))
+		fmt.Println(fmt.Sprintf("processed %d chunks for row_key %s", itgenCount, row_key))
 	}
 }
 
@@ -153,6 +155,7 @@ type chunkDay struct {
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
 	if len(itgens) == 0 {
+		fmt.Println("0 chunks")
 		return
 	}
 
@@ -162,6 +165,11 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
 	if def.Interval > 60*30 {
+		fmt.Println(fmt.Sprintf(
+			"Interval >30min, directly writing %d chunks to ttl %d",
+			len(itgens), m.ttls[2],
+		))
+
 		m.chunkChan <- &chunkDay{
 			itergens:  itgens,
 			ttl:       m.ttls[2],
@@ -175,6 +183,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		}
 		return
 	} else {
+		fmt.Println(fmt.Sprintf("Generating %d-rollup", 30*60))
 		am := m.getAggMetric(def.Id, 30*60, m.ttls[2], outChunkSpan)
 		for _, itgen := range itgens {
 			iter, err := itgen.Get()
@@ -240,10 +249,18 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 }
 
 func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
-	chunkCount := int(0)
+	var aggs []string
 	for _, agg := range am.GetAggregators() {
 		for _, aggMetric := range agg.GetAggMetrics() {
-			itgensNew := make([]chunk.IterGen, len(am.Chunks))
+			aggs = append(aggs, aggMetric.Key)
+		}
+	}
+	fmt.Println(fmt.Sprintf("Processing rollup with keys %s", aggs))
+
+	for _, agg := range am.GetAggregators() {
+		for _, aggMetric := range agg.GetAggMetrics() {
+			chunkCount := int(0)
+			itgensNew := make([]chunk.IterGen, 0, len(am.Chunks))
 			for _, c := range aggMetric.Chunks {
 				if !c.Closed {
 					c.Finish()
@@ -251,7 +268,7 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 				itgensNew = append(itgensNew, *chunk.NewBareIterGen(
 					c.Bytes(),
 					c.T0,
-					c.LastTs-c.T0,
+					aggMetric.ChunkSpan,
 				))
 			}
 			chunkCount += len(itgensNew)
@@ -263,21 +280,22 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 				itergens:  itgensNew,
 			}
 			m.chunkChan <- &rollupChunkDay
+			fmt.Println(fmt.Sprintf(
+				"Wrote rollup of %d chunks to table %s with ttl %d for key %s",
+				chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], aggMetric.Key,
+			))
 		}
 	}
-	fmt.Println(fmt.Sprintf(
-		"Wrote rollup of %d chunks to table %s with ttl %d for key %s",
-		chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], am.Key,
-	))
 }
 
-func (m *migrater) getAggMetric(id string, retention int, ttl, outChunkSpan uint32) *mdata.AggMetric {
+func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uint32) *mdata.AggMetric {
 	return mdata.NewAggMetric(
 		mdata.NewMockStore(),
 		&cache.MockCache{},
 		id,
 		[]conf.Retention{
-			conf.NewRetentionMT(retention, ttl, outChunkSpan, 2, true),
+			conf.NewRetentionMT(1, outChunkSpan, outChunkSpan, 2, true),
+			conf.NewRetentionMT(rollupSpan, ttl, outChunkSpan, 2, true),
 		},
 		&conf.Aggregation{
 			"default",
