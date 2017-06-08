@@ -18,9 +18,8 @@ import (
 )
 
 var (
-	bufferSize   = 1000
-	printLock    = sync.Mutex{}
-	source_table = "metric_1024"
+	bufferSize = 1000
+	printLock  = sync.Mutex{}
 )
 var day_sec int64 = 60 * 60 * 24
 
@@ -33,13 +32,14 @@ type migrater struct {
 	writeChunkCount int
 	ttlTables       mdata.TTLTables
 	ttls            []uint32
+	sourceTable     string
 }
 
 func main() {
 	cassFlags := cassandra.ConfigSetup()
-	fmt.Println(fmt.Sprintf("%+v", os.Args[1:]))
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
+
 	cassandra.Enabled = true
 	cluster.Init("migrator", "0", time.Now(), "", -1)
 	cluster.Manager.SetPrimary(true)
@@ -49,6 +49,16 @@ func main() {
 		throwError(err.Error())
 	}
 
+	sourceTTL := uint32(60 * 60 * 24 * 68)
+	sourceTTLTable := mdata.GetTTLTables(
+		[]uint32{sourceTTL},
+		20,
+		mdata.Table_name_format,
+	)
+	fmt.Println(
+		fmt.Sprintf("Using %s as source table", sourceTTLTable[sourceTTL].Table))
+
+	// output retentions
 	ttls := make([]uint32, 3)
 	ttls[0] = 60 * 60 * 24
 	ttls[1] = 60 * 60 * 24 * 60
@@ -57,11 +67,12 @@ func main() {
 	ttlTables := mdata.GetTTLTables(ttls, 20, mdata.Table_name_format)
 
 	m := &migrater{
-		casIdx:    casIdx,
-		session:   casIdx.Session,
-		chunkChan: make(chan *chunkDay, bufferSize),
-		ttlTables: ttlTables,
-		ttls:      ttls,
+		casIdx:      casIdx,
+		session:     casIdx.Session,
+		chunkChan:   make(chan *chunkDay, bufferSize),
+		ttlTables:   ttlTables,
+		ttls:        ttls,
+		sourceTable: sourceTTLTable[sourceTTL].Table,
 	}
 
 	m.Start()
@@ -95,6 +106,9 @@ func (m *migrater) read() {
 }
 
 func (m *migrater) processMetric(def *schema.MetricDefinition) {
+	var b []byte
+	var ts int
+	var itgens []chunk.IterGen
 	now := time.Now().Unix()
 	start := (now - (68 * day_sec))
 	start_month := start / mdata.Month_sec
@@ -108,36 +122,25 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 			to := from + day_sec
 			query := fmt.Sprintf(
 				"SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts <= ? ORDER BY ts ASC",
-				source_table,
+				m.sourceTable,
 			)
 			it := m.session.Query(query, row_key, from, to).Iter()
-			itgens := m.process(it)
+			for it.Scan(&ts, &b) {
+				itgen, err := chunk.NewGen(b, uint32(ts))
+				if err != nil {
+					throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+				}
+				itgens = append(itgens, *itgen)
+			}
+			err := it.Close()
+			if err != nil {
+				throwError(fmt.Sprintf("cassandra query error. %s", err))
+			}
 			itgenCount += len(itgens)
 			m.generateChunks(itgens, def)
 		}
 		fmt.Println(fmt.Sprintf("%d chunks for row_key %s", itgenCount, row_key))
 	}
-}
-
-func (m *migrater) process(it *gocql.Iter) []chunk.IterGen {
-	var b []byte
-	var ts int
-	var itgens []chunk.IterGen
-
-	for it.Scan(&ts, &b) {
-		itgen, err := chunk.NewGen(b, uint32(ts))
-		if err != nil {
-			throwError(fmt.Sprintf("Error generating Itgen: %q", err))
-		}
-
-		itgens = append(itgens, *itgen)
-	}
-	err := it.Close()
-	if err != nil {
-		throwError(fmt.Sprintf("cassandra query error. %s", err))
-	}
-
-	return itgens
 }
 
 // represents one day of chunks of one metric aggregate
@@ -154,6 +157,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	}
 
 	m.readChunkCount += len(itgens)
+	outChunkSpan := uint32(6 * 60 * 60)
 
 	// if interval is larger than 30min we can directly write the chunk to
 	// the highest retention table
@@ -170,6 +174,21 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 			),
 		}
 		return
+	} else {
+		am := m.getAggMetric(def.Id, 30*60, m.ttls[2], outChunkSpan)
+		for _, itgen := range itgens {
+			iter, err := itgen.Get()
+			if err != nil {
+				throwError(
+					fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
+				)
+			}
+			for iter.Next() {
+				ts, val := iter.Values()
+				am.Add(ts, val)
+			}
+		}
+		m.writeRollup(am, 2)
 	}
 
 	now := uint32(time.Now().Unix())
@@ -180,24 +199,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 
 	// if interval <1min, then create one min rollups
 	if def.Interval < 60 {
-		outChunkSpan := uint32(6 * 60 * 60)
-
-		am := mdata.NewAggMetric(
-			mdata.NewMockStore(),
-			&cache.MockCache{},
-			def.Id,
-			[]conf.Retention{
-				conf.NewRetentionMT(60, m.ttls[1], outChunkSpan, 2, true),
-			},
-			&conf.Aggregation{
-				"default",
-				regexp.MustCompile(".*"),
-				0.5,
-				// sum should not be necessary because that comes with Avg
-				[]conf.Method{conf.Avg, conf.Lst, conf.Max, conf.Min},
-			},
-			false,
-		)
+		am := m.getAggMetric(def.Id, 60, m.ttls[1], outChunkSpan)
 
 		for _, itgen := range itgens {
 			if itgen.Ts < dropBefore {
@@ -214,30 +216,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 				am.Add(ts, val)
 			}
 		}
-
-		for _, agg := range am.GetAggregators() {
-			for _, aggMetric := range agg.GetAggMetrics() {
-				itgensNew := make([]chunk.IterGen, len(am.Chunks))
-				for _, c := range aggMetric.Chunks {
-					if !c.Closed {
-						c.Finish()
-					}
-					itgensNew = append(itgensNew, *chunk.NewBareIterGen(
-						c.Bytes(),
-						c.T0,
-						c.LastTs-c.T0,
-					))
-				}
-
-				rollupChunkDay := chunkDay{
-					ttl:       m.ttls[1],
-					tableName: m.ttlTables[m.ttls[1]].Table,
-					id:        aggMetric.Key,
-					itergens:  itgensNew,
-				}
-				m.chunkChan <- &rollupChunkDay
-			}
-		}
+		m.writeRollup(am, 1)
 	}
 
 	cd := &chunkDay{
@@ -258,6 +237,57 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		cd.itergens = append(cd.itergens, itgen)
 	}
 	m.chunkChan <- cd
+}
+
+func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
+	chunkCount := int(0)
+	for _, agg := range am.GetAggregators() {
+		for _, aggMetric := range agg.GetAggMetrics() {
+			itgensNew := make([]chunk.IterGen, len(am.Chunks))
+			for _, c := range aggMetric.Chunks {
+				if !c.Closed {
+					c.Finish()
+				}
+				itgensNew = append(itgensNew, *chunk.NewBareIterGen(
+					c.Bytes(),
+					c.T0,
+					c.LastTs-c.T0,
+				))
+			}
+			chunkCount += len(itgensNew)
+
+			rollupChunkDay := chunkDay{
+				ttl:       m.ttls[ttlId],
+				tableName: m.ttlTables[m.ttls[ttlId]].Table,
+				id:        aggMetric.Key,
+				itergens:  itgensNew,
+			}
+			m.chunkChan <- &rollupChunkDay
+		}
+	}
+	fmt.Println(fmt.Sprintf(
+		"Wrote rollup of %d chunks to table %s with ttl %d for key %s",
+		chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], am.Key,
+	))
+}
+
+func (m *migrater) getAggMetric(id string, retention int, ttl, outChunkSpan uint32) *mdata.AggMetric {
+	return mdata.NewAggMetric(
+		mdata.NewMockStore(),
+		&cache.MockCache{},
+		id,
+		[]conf.Retention{
+			conf.NewRetentionMT(retention, ttl, outChunkSpan, 2, true),
+		},
+		&conf.Aggregation{
+			"default",
+			regexp.MustCompile(".*"),
+			0.5,
+			// sum should not be necessary because that comes with Avg
+			[]conf.Method{conf.Avg, conf.Lst, conf.Max, conf.Min},
+		},
+		false,
+	)
 }
 
 func (m *migrater) write() {
