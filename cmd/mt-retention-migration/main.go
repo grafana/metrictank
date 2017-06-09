@@ -60,9 +60,8 @@ func main() {
 
 	// output retentions
 	ttls := make([]uint32, 3)
-	ttls[0] = 60 * 60 * 24
-	ttls[1] = 60 * 60 * 24 * 60
-	ttls[2] = 60 * 60 * 24 * 365 * 3
+	ttls[0] = 60 * 60 * 24 * 68
+	ttls[1] = 60 * 60 * 24 * 365 * 3
 
 	ttlTables := mdata.GetTTLTables(ttls, 20, mdata.Table_name_format)
 
@@ -155,93 +154,45 @@ type chunkDay struct {
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
 	if len(itgens) == 0 {
-		fmt.Println("0 chunks")
+		fmt.Println("0 chunks, nothing to do")
 		return
 	}
 
 	m.readChunkCount += len(itgens)
 	outChunkSpan := uint32(6 * 60 * 60)
 
-	// if interval is larger than 30min we can directly write the chunk to
-	// the highest retention table
-	if def.Interval > 60*30 {
+	// if interval is larger than or equal to 1h we can directly write the chunk to
+	// the higher retention table
+	if def.Interval >= 60*60 {
 		fmt.Println(fmt.Sprintf(
-			"Interval >30min, directly writing %d chunks to ttl %d",
-			len(itgens), m.ttls[2],
+			"Interval is %dmin, directly writing to large interval table. Chunks:%d TTL: %d (%dd)",
+			def.Interval/60, len(itgens), m.ttls[1], m.ttls[1]/(60*60*24),
 		))
 
 		m.chunkChan <- &chunkDay{
 			itergens:  itgens,
-			ttl:       m.ttls[2],
-			tableName: m.ttlTables[m.ttls[2]].Table,
+			ttl:       m.ttls[1],
+			tableName: m.ttlTables[m.ttls[1]].Table,
 			id:        def.Id,
 		}
 		return
-	} else {
-		fmt.Println(fmt.Sprintf("Generating %d-rollups", 30*60))
-		am := m.getAggMetric(def.Id, 30*60, m.ttls[2], outChunkSpan)
-		for _, itgen := range itgens {
-			iter, err := itgen.Get()
-			if err != nil {
-				throwError(
-					fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
-				)
-			}
-			for iter.Next() {
-				ts, val := iter.Values()
-				am.Add(ts, val)
-			}
-		}
-		m.writeRollup(am, 2)
 	}
 
-	now := uint32(time.Now().Unix())
-	// chunks older than 60 days can be dropped
-	dropBefore := now - 60*60*24*60
-	// don't need raw older than 1 day
-	noRawBefore := now - 60*60*24
-
-	// if interval <1min, then create one min rollups
-	if def.Interval < 60 {
-		am := m.getAggMetric(def.Id, 60, m.ttls[1], outChunkSpan)
-
-		for _, itgen := range itgens {
-			if itgen.Ts < dropBefore {
-				continue
-			}
-			iter, err := itgen.Get()
-			if err != nil {
-				throwError(
-					fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
-				)
-			}
-			for iter.Next() {
-				ts, val := iter.Values()
-				am.Add(ts, val)
-			}
-		}
-		m.writeRollup(am, 1)
-	}
-
-	cd := &chunkDay{
-		itergens:  make([]chunk.IterGen, 0),
-		ttl:       m.ttls[0],
-		tableName: m.ttlTables[m.ttls[0]].Table,
-		id:        def.Id,
-	}
+	am := m.getAggMetric(def.Id, 60*60, m.ttls[1], outChunkSpan)
 	for _, itgen := range itgens {
-		if itgen.Ts+itgen.Span < noRawBefore {
-			continue
+		iter, err := itgen.Get()
+		if err != nil {
+			throwError(
+				fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
+			)
 		}
-		cd.itergens = append(cd.itergens, itgen)
+		for iter.Next() {
+			ts, val := iter.Values()
+			am.Add(ts, val)
+		}
 	}
-	if len(cd.itergens) > 0 {
-		fmt.Println(fmt.Sprintf(
-			"Writing %d chunks with ttl %d (%dd) to table %s",
-			len(cd.itergens), m.ttls[0], int64(m.ttls[0])/day_sec, m.ttlTables[m.ttls[0]].Table,
-		))
-		m.chunkChan <- cd
-	}
+	fmt.Println(fmt.Sprintf("Generating 1h-rollups for %d Chunks", len(itgens)))
+	m.writeRollup(am, 1)
 }
 
 func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
@@ -320,7 +271,7 @@ func (m *migrater) write() {
 }
 
 func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
-	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
+	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL ? AND TIMESTAMP ?", table)
 	for _, ig := range itergens {
 		idMonth := fmt.Sprintf(
 			"%s_%d",
@@ -328,7 +279,14 @@ func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.I
 			// itgens will always be of the same day for each chunkDay
 			ig.Ts/mdata.Month_sec,
 		)
-		err := m.session.Query(query, idMonth, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+		err := m.session.Query(
+			query,
+			idMonth,
+			ig.Ts,
+			mdata.PrepareChunkData(ig.Span, ig.Bytes()),
+			ttl,
+			ig.Ts,
+		).Exec()
 		if err != nil {
 			throwError(fmt.Sprintf("Error in query: %q", err))
 		}
