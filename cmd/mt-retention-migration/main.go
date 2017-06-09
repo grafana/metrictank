@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	bufferSize       = 1000
-	printLock        = sync.Mutex{}
-	day_sec    int64 = 60 * 60 * 24
+	bufferSize = 1000
+	printLock  = sync.Mutex{}
 	startDay   int
+	day_sec    uint32 = 60 * 60 * 24
+	sourceTTL  uint32 = day_sec * 68
 )
 
 type migrater struct {
@@ -51,7 +52,6 @@ func main() {
 		throwError(err.Error())
 	}
 
-	sourceTTL := uint32(60 * 60 * 24 * 68)
 	sourceTTLTable := mdata.GetTTLTables(
 		[]uint32{sourceTTL},
 		20,
@@ -62,8 +62,8 @@ func main() {
 
 	// output retentions
 	ttls := make([]uint32, 3)
-	ttls[0] = 60 * 60 * 24 * 68
-	ttls[1] = 60 * 60 * 24 * 365 * 3
+	ttls[0] = sourceTTL
+	ttls[1] = day_sec * 365 * 3
 
 	ttlTables := mdata.GetTTLTables(ttls, 20, mdata.Table_name_format)
 
@@ -110,40 +110,33 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	var b []byte
 	var ts int
 	var itgens []chunk.IterGen
-	now := time.Now().Unix()
-	start := (now - (int64(startDay) * day_sec))
-	start_month := start / mdata.Month_sec
-	end_month := (now - 1) / mdata.Month_sec
+	now := uint32(time.Now().Unix())
 
-	fmt.Println(fmt.Sprintf("-- Processing metric with id %s and interval %d (months %d-%d)", def.Id, def.Interval, start_month, end_month))
-
-	for month := start_month; month <= end_month; month++ {
-		row_key := fmt.Sprintf("%s_%d", def.Id, month)
-		itgenCount := 0
-		for from := month * mdata.Month_sec; from < (month+1)*mdata.Month_sec; from += day_sec {
-			fmt.Println(fmt.Sprintf("Day number %d", (from-(start_month*mdata.Month_sec))/day_sec))
-			to := from + day_sec
-			query := fmt.Sprintf(
-				"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
-				m.sourceTable,
-			)
-			it := m.session.Query(query, row_key, from, to).Iter()
-			for it.Scan(&ts, &b) {
-				itgen, err := chunk.NewGen(b, uint32(ts))
-				if err != nil {
-					throwError(fmt.Sprintf("Error generating Itgen: %q", err))
-				}
-				itgens = append(itgens, *itgen)
-			}
-			err := it.Close()
+	itgenCount := 0
+	fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Id))
+	for from := now - sourceTTL + (uint32(startDay) * day_sec) - (now % day_sec); from < now; from += day_sec {
+		row_key := fmt.Sprintf("%s_%d", def.Id, from/mdata.Month_sec)
+		fmt.Println(fmt.Sprintf("Day number %d", (from+sourceTTL-now)/day_sec))
+		query := fmt.Sprintf(
+			"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
+			m.sourceTable,
+		)
+		it := m.session.Query(query, row_key, from, from+day_sec).Iter()
+		for it.Scan(&ts, &b) {
+			itgen, err := chunk.NewGen(b, uint32(ts))
 			if err != nil {
-				throwError(fmt.Sprintf("cassandra query error. %s", err))
+				throwError(fmt.Sprintf("Error generating Itgen: %q", err))
 			}
-			itgenCount += len(itgens)
-			m.generateChunks(itgens, def)
+			itgens = append(itgens, *itgen)
 		}
-		fmt.Println(fmt.Sprintf("Processed %d chunks of table %s for row_key %s", itgenCount, m.sourceTable, row_key))
+		err := it.Close()
+		if err != nil {
+			throwError(fmt.Sprintf("cassandra query error. %s", err))
+		}
+		itgenCount += len(itgens)
+		m.generateChunks(itgens, def)
 	}
+	fmt.Println(fmt.Sprintf("Processed %d chunks of table %s", itgenCount, m.sourceTable))
 }
 
 // represents one day of chunks of one metric aggregate
@@ -231,7 +224,7 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 			m.chunkChan <- &rollupChunkDay
 			fmt.Println(fmt.Sprintf(
 				"Wrote rollup of %d chunks to table %s with ttl %d (%dd) for key %s",
-				chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], int64(m.ttls[ttlId])/day_sec, aggMetric.Key,
+				chunkCount, m.ttlTables[m.ttls[ttlId]].Table, m.ttls[ttlId], m.ttls[ttlId]/day_sec, aggMetric.Key,
 			))
 		}
 	}
