@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	bufferSize = 1000
-	printLock  = sync.Mutex{}
+	bufferSize       = 1000
+	printLock        = sync.Mutex{}
+	day_sec    int64 = 60 * 60 * 24
+	startDay   int
 )
-var day_sec int64 = 60 * 60 * 24
 
 type migrater struct {
 	casIdx          *cassandra.CasIdx
@@ -37,6 +38,7 @@ type migrater struct {
 
 func main() {
 	cassFlags := cassandra.ConfigSetup()
+	cassFlags.IntVar(&startDay, "start-day", 0, "Day to start processing from")
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
 
@@ -109,7 +111,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	var ts int
 	var itgens []chunk.IterGen
 	now := time.Now().Unix()
-	start := (now - (68 * day_sec))
+	start := (now - (int64(startDay) * day_sec))
 	start_month := start / mdata.Month_sec
 	end_month := (now - 1) / mdata.Month_sec
 
