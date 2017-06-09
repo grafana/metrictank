@@ -109,12 +109,12 @@ func (m *migrater) read() {
 func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	var b []byte
 	var ts int
-	var itgens []chunk.IterGen
 	now := uint32(time.Now().Unix())
 
 	itgenCount := 0
 	fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Id))
 	for from := now - sourceTTL + (uint32(startDay) * day_sec) - (now % day_sec); from < now; from += day_sec {
+		var itgens []chunk.IterGen
 		row_key := fmt.Sprintf("%s_%d", def.Id, from/mdata.Month_sec)
 		fmt.Println(fmt.Sprintf("Day number %d", (from+sourceTTL-now)/day_sec))
 		query := fmt.Sprintf(
@@ -191,14 +191,6 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 }
 
 func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
-	var aggs []string
-	for _, agg := range am.GetAggregators() {
-		for _, aggMetric := range agg.GetAggMetrics() {
-			aggs = append(aggs, aggMetric.Key)
-		}
-	}
-	fmt.Println(fmt.Sprintf("Processing rollups with keys %s", aggs))
-
 	for _, agg := range am.GetAggregators() {
 		for _, aggMetric := range agg.GetAggMetrics() {
 			chunkCount := int(0)
