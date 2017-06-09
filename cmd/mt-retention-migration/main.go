@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"sync"
 	"time"
 
@@ -18,11 +19,12 @@ import (
 )
 
 var (
-	bufferSize = 1000
-	printLock  = sync.Mutex{}
-	startDay   int
-	day_sec    uint32 = 60 * 60 * 24
-	sourceTTL  uint32 = day_sec * 68
+	bufferSize  = 1000
+	printLock   = sync.Mutex{}
+	startDay    int
+	startMetric string
+	day_sec     uint32 = 60 * 60 * 24
+	sourceTTL   uint32 = day_sec * 68
 )
 
 type migrater struct {
@@ -40,6 +42,7 @@ type migrater struct {
 func main() {
 	cassFlags := cassandra.ConfigSetup()
 	cassFlags.IntVar(&startDay, "start-day", 0, "Day to start processing from")
+	cassFlags.StringVar(&startMetric, "start-metric", "", "The metric to start from")
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
 
@@ -94,12 +97,33 @@ func (m *migrater) Start() {
 	printLock.Unlock()
 }
 
+type ByName []schema.MetricDefinition
+
+func (m ByName) Len() int           { return len(m) }
+func (m ByName) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
+func (m ByName) Less(i, j int) bool { return m[i].Name < m[j].Name }
+
 func (m *migrater) read() {
 	defs := m.casIdx.Load(nil)
 	fmt.Println(fmt.Sprintf("Received %d metrics", len(defs)))
 
-	for _, metric := range defs {
-		m.processMetric(&metric)
+	sort.Sort(ByName(defs))
+	if len(startMetric) > 0 {
+		found := false
+		for i, def := range defs {
+			if def.Name == startMetric {
+				found = true
+				defs = defs[i:]
+				break
+			}
+		}
+		if !found {
+			throwError(fmt.Sprintf("Metric name %s could not be found", startMetric))
+		}
+	}
+
+	for _, def := range defs {
+		m.processMetric(&def)
 		m.metricCount++
 	}
 
@@ -112,7 +136,7 @@ func (m *migrater) processMetric(def *schema.MetricDefinition) {
 	now := uint32(time.Now().Unix())
 
 	itgenCount := 0
-	fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Id))
+	fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Name))
 	for from := now - sourceTTL + (uint32(startDay) * day_sec) - (now % day_sec); from < now; from += day_sec {
 		var itgens []chunk.IterGen
 		row_key := fmt.Sprintf("%s_%d", def.Id, from/mdata.Month_sec)
@@ -178,7 +202,7 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		iter, err := itgen.Get()
 		if err != nil {
 			throwError(
-				fmt.Sprintf("Corrupt chunk %s at ts %d", def.Id, itgen.Ts),
+				fmt.Sprintf("Corrupt chunk in %s(%s) at ts %d", def.Name, def.Id, itgen.Ts),
 			)
 		}
 		for iter.Next() {
