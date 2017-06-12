@@ -220,14 +220,10 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	}
 }
 
+var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&*+-/:;<>?@[]^_|~."
+
 func isNameChar(r byte) bool {
-	return false ||
-		'a' <= r && r <= 'z' ||
-		'A' <= r && r <= 'Z' ||
-		'0' <= r && r <= '9' ||
-		r == '.' || r == '_' || r == '-' || r == '*' || r == '?' || r == ':' ||
-		r == '[' || r == ']' ||
-		r == '<' || r == '>'
+	return strings.IndexByte(nameChar, r) >= 0
 }
 
 func isFnChar(r byte) bool {
