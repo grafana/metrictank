@@ -19,30 +19,32 @@ import (
 )
 
 var (
-	bufferSize  = 1000
-	printLock   = sync.Mutex{}
-	startDay    int
-	startMetric string
-	day_sec     uint32 = 60 * 60 * 24
-	sourceTTL   uint32 = day_sec * 68
+	bufferSize       = 1000
+	printLock        = sync.Mutex{}
+	startDay         int
+	readConcurrency  int
+	writeConcurrency int
+	startMetric      string
+	day_sec          uint32 = 60 * 60 * 24
+	sourceTTL        uint32 = day_sec * 68
 )
 
 type migrater struct {
-	casIdx          *cassandra.CasIdx
-	session         *gocql.Session
-	chunkChan       chan *chunkDay
-	metricCount     int
-	readChunkCount  int
-	writeChunkCount int
-	ttlTables       mdata.TTLTables
-	ttls            []uint32
-	sourceTable     string
+	casIdx      *cassandra.CasIdx
+	session     *gocql.Session
+	chunkChan   chan *chunkDay
+	processChan chan *schema.MetricDefinition
+	ttlTables   mdata.TTLTables
+	ttls        []uint32
+	sourceTable string
 }
 
 func main() {
 	cassFlags := cassandra.ConfigSetup()
 	cassFlags.IntVar(&startDay, "start-day", 0, "Day to start processing from")
 	cassFlags.StringVar(&startMetric, "start-metric", "", "The metric to start from")
+	cassFlags.IntVar(&readConcurrency, "read-concurrency", 20, "How many read threads")
+	cassFlags.IntVar(&writeConcurrency, "write-concurrency", 20, "How many write threads")
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
 
@@ -74,6 +76,7 @@ func main() {
 		casIdx:      casIdx,
 		session:     casIdx.Session,
 		chunkChan:   make(chan *chunkDay, bufferSize),
+		processChan: make(chan *schema.MetricDefinition, readConcurrency),
 		ttlTables:   ttlTables,
 		ttls:        ttls,
 		sourceTable: sourceTTLTable[sourceTTL].Table,
@@ -84,17 +87,12 @@ func main() {
 
 func (m *migrater) Start() {
 	go m.read()
-	m.write()
-	printLock.Lock()
-	fmt.Println(
-		fmt.Sprintf(
-			"Finished. Metrics: %d, Read chunks: %d, Wrote chunks: %d",
-			m.metricCount,
-			m.readChunkCount,
-			m.writeChunkCount,
-		),
-	)
-	printLock.Unlock()
+	var wg sync.WaitGroup
+	for i := 0; i < writeConcurrency; i++ {
+		wg.Add(1)
+		go m.write(&wg)
+	}
+	wg.Wait()
 }
 
 type ByName []schema.MetricDefinition
@@ -122,45 +120,60 @@ func (m *migrater) read() {
 		}
 	}
 
-	for _, def := range defs {
-		m.processMetric(&def)
-		m.metricCount++
+	var wg sync.WaitGroup
+	for i := 0; i < readConcurrency; i++ {
+		wg.Add(1)
+		go m.processMetric(&wg)
 	}
 
+	for _, def := range defs {
+		m.processChan <- &def
+	}
+
+	close(m.processChan)
+	wg.Wait()
 	close(m.chunkChan)
 }
 
-func (m *migrater) processMetric(def *schema.MetricDefinition) {
+func (m *migrater) processMetric(wg *sync.WaitGroup) {
 	var b []byte
 	var ts int
-	now := uint32(time.Now().Unix())
+	defer wg.Done()
 
-	itgenCount := 0
-	fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Name))
-	for from := now - sourceTTL + (uint32(startDay) * day_sec) - (now % day_sec); from < now; from += day_sec {
-		var itgens []chunk.IterGen
-		row_key := fmt.Sprintf("%s_%d", def.Id, from/mdata.Month_sec)
-		fmt.Println(fmt.Sprintf("Day number %d", (from+sourceTTL-now)/day_sec))
-		query := fmt.Sprintf(
-			"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
-			m.sourceTable,
-		)
-		it := m.session.Query(query, row_key, from, from+day_sec).Iter()
-		for it.Scan(&ts, &b) {
-			itgen, err := chunk.NewGen(b, uint32(ts))
-			if err != nil {
-				throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+	for {
+		def, more := <-m.processChan
+		if !more {
+			return
+		}
+		now := uint32(time.Now().Unix())
+
+		itgenCount := 0
+		fmt.Println(fmt.Sprintf("--- processing metric %s ---", def.Name))
+		for from := now - sourceTTL + (uint32(startDay) * day_sec) - (now % day_sec); from < now; from += day_sec {
+			var itgens []chunk.IterGen
+			row_key := fmt.Sprintf("%s_%d", def.Id, from/mdata.Month_sec)
+			fmt.Println(fmt.Sprintf("Day number %d", (from+sourceTTL-now)/day_sec))
+			query := fmt.Sprintf(
+				"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
+				m.sourceTable,
+			)
+			it := m.session.Query(query, row_key, from, from+day_sec).Iter()
+			for it.Scan(&ts, &b) {
+				itgen, err := chunk.NewGen(b, uint32(ts))
+				if err != nil {
+					throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+				}
+				itgens = append(itgens, *itgen)
 			}
-			itgens = append(itgens, *itgen)
+			err := it.Close()
+			if err != nil {
+				throwError(fmt.Sprintf("cassandra query error. %s", err))
+			}
+			itgenCount += len(itgens)
+			m.generateChunks(itgens, def)
 		}
-		err := it.Close()
-		if err != nil {
-			throwError(fmt.Sprintf("cassandra query error. %s", err))
-		}
-		itgenCount += len(itgens)
-		m.generateChunks(itgens, def)
+		fmt.Println(fmt.Sprintf("Processed %d chunks of table %s", itgenCount, m.sourceTable))
 	}
-	fmt.Println(fmt.Sprintf("Processed %d chunks of table %s", itgenCount, m.sourceTable))
 }
 
 // represents one day of chunks of one metric aggregate
@@ -177,7 +190,6 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 		return
 	}
 
-	m.readChunkCount += len(itgens)
 	outChunkSpan := uint32(6 * 60 * 60)
 
 	// if interval is larger than or equal to 1h we can directly write the chunk to
@@ -266,7 +278,8 @@ func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uin
 	)
 }
 
-func (m *migrater) write() {
+func (m *migrater) write(wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
 		cd, more := <-m.chunkChan
 		if !more {
@@ -277,7 +290,6 @@ func (m *migrater) write() {
 		}
 
 		m.insertChunks(cd.tableName, cd.id, cd.ttl, cd.itergens)
-		m.writeChunkCount++
 	}
 }
 
