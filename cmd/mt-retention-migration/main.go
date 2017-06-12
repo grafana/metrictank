@@ -46,8 +46,8 @@ func main() {
 	cassFlags := cassandra.ConfigSetup()
 	cassFlags.IntVar(&startDay, "start-day", 0, "Day to start processing from")
 	cassFlags.StringVar(&startMetric, "start-metric", "", "The metric to start from")
-	cassFlags.IntVar(&readConcurrency, "read-concurrency", 20, "How many read threads")
-	cassFlags.IntVar(&writeConcurrency, "write-concurrency", 20, "How many write threads")
+	cassFlags.IntVar(&readConcurrency, "read-concurrency", 10, "How many read threads")
+	cassFlags.IntVar(&writeConcurrency, "write-concurrency", 10, "How many write threads")
 	cassFlags.Parse(os.Args[1:])
 	cassFlags.Usage = cassFlags.PrintDefaults
 
@@ -189,17 +189,22 @@ func (m *migrater) processMetric(wg *sync.WaitGroup) {
 				"SELECT ts, data FROM %s WHERE key = ? AND ts >= ? AND ts < ? ORDER BY ts ASC",
 				m.sourceTable,
 			)
-			it := m.session.Query(query, row_key, from, from+day_sec).Iter()
-			for it.Scan(&ts, &b) {
-				itgen, err := chunk.NewGen(b, uint32(ts))
-				if err != nil {
-					throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+			for {
+				it := m.session.Query(query, row_key, from, from+day_sec).Iter()
+				for it.Scan(&ts, &b) {
+					itgen, err := chunk.NewGen(b, uint32(ts))
+					if err != nil {
+						throwError(fmt.Sprintf("Error generating Itgen: %q", err))
+					}
+					itgens = append(itgens, *itgen)
 				}
-				itgens = append(itgens, *itgen)
-			}
-			err := it.Close()
-			if err != nil {
-				throwError(fmt.Sprintf("cassandra query error. %s", err))
+				err := it.Close()
+				if err == nil {
+					break
+				} else {
+					fmt.Println(fmt.Sprintf("cassandra query error. %s", err))
+					time.Sleep(time.Second)
+				}
 			}
 			itgenCount += len(itgens)
 			m.generateChunks(itgens, &def)
@@ -351,7 +356,8 @@ func (m *migrater) insertChunks(table, id string, ttl uint32, itergens []chunk.I
 
 func throwError(msg string) {
 	msg = fmt.Sprintf("%s\n", msg)
-	printLock.Lock()
+	/*printLock.Lock()
 	fmt.Fprintln(os.Stderr, msg)
-	printLock.Unlock()
+	printLock.Unlock()*/
+	panic(msg)
 }
