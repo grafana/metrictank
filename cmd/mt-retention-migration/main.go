@@ -64,7 +64,7 @@ func main() {
 		fmt.Sprintf("Using %s as source table", sourceTTLTable[sourceTTL].Table))
 
 	// output retentions
-	ttls := make([]uint32, 3)
+	ttls := make([]uint32, 2)
 	ttls[0] = sourceTTL
 	ttls[1] = day_sec * 365 * 3
 
