@@ -32,14 +32,14 @@ var (
 )
 
 type migrater struct {
-	casIdx           *cassandra.CasIdx
-	session          *gocql.Session
-	chunkChan        chan *chunkDay
-	chunkDayComplete chan *chunkDay
-	processChan      chan *schema.MetricDefinition
-	ttlTables        mdata.TTLTables
-	ttls             []uint32
-	sourceTable      string
+	casIdx         *cassandra.CasIdx
+	session        *gocql.Session
+	chunkChan      chan chunkDay
+	metricComplete chan chunkDay
+	processChan    chan schema.MetricDefinition
+	ttlTables      mdata.TTLTables
+	ttls           []uint32
+	sourceTable    string
 }
 
 func main() {
@@ -76,14 +76,14 @@ func main() {
 	ttlTables := mdata.GetTTLTables(ttls, 20, mdata.Table_name_format)
 
 	m := &migrater{
-		casIdx:           casIdx,
-		session:          casIdx.Session,
-		chunkChan:        make(chan *chunkDay, bufferSize),
-		chunkDayComplete: make(chan *chunkDay, bufferSize),
-		processChan:      make(chan *schema.MetricDefinition, readConcurrency),
-		ttlTables:        ttlTables,
-		ttls:             ttls,
-		sourceTable:      sourceTTLTable[sourceTTL].Table,
+		casIdx:         casIdx,
+		session:        casIdx.Session,
+		chunkChan:      make(chan chunkDay, bufferSize),
+		metricComplete: make(chan chunkDay, bufferSize),
+		processChan:    make(chan schema.MetricDefinition, readConcurrency),
+		ttlTables:      ttlTables,
+		ttls:           ttls,
+		sourceTable:    sourceTTLTable[sourceTTL].Table,
 	}
 
 	m.Start()
@@ -91,49 +91,40 @@ func main() {
 
 func (m *migrater) Start() {
 	go m.read()
-	var wg sync.WaitGroup
+	var wg1, wg2 sync.WaitGroup
 
-	go m.printStatus(&wg)
-	wg.Add(1)
+	go m.printStatus(&wg2)
+	wg2.Add(1)
 
 	for i := 0; i < writeConcurrency; i++ {
-		wg.Add(1)
-		go m.write(&wg)
+		wg1.Add(1)
+		go m.write(&wg1)
 	}
 
-	close(m.chunkDayComplete)
-	wg.Wait()
+	wg1.Wait()
+	close(m.metricComplete)
+	wg2.Wait()
 }
 
 func (m *migrater) printStatus(wg *sync.WaitGroup) {
-	defer wg.Done()
 	metricStatus := make(map[string]int)
 	metricsCompleted := 0
-	chunksWritten := 0
 	for {
-		cd, more := <-m.chunkDayComplete
+		cd, more := <-m.metricComplete
 		if !more {
+			wg.Done()
 			return
 		}
 
-		chunksWritten += len(cd.itergens)
-		if _, ok := metricStatus[cd.id]; !ok {
-			metricStatus[cd.id] = 1
-		} else {
-			metricStatus[cd.id]++
-		}
-
-		if metricStatus[cd.id] >= processDays {
-			metricsCompleted++
-			printLock.Lock()
-			fmt.Println(fmt.Sprintf("Completed metric %s (%d%), total chunks %d",
-				cd.id,
-				100*metricsCompleted/metricsToWrite,
-				chunksWritten,
-			))
-			printLock.Unlock()
-			delete(metricStatus, cd.id)
-		}
+		metricsCompleted++
+		printLock.Lock()
+		fmt.Println(fmt.Sprintf("Completed metric %s (%d%% of %d)",
+			cd.id,
+			100*metricsCompleted/metricsToWrite,
+			metricsToWrite,
+		))
+		printLock.Unlock()
+		delete(metricStatus, cd.id)
 	}
 }
 
@@ -169,22 +160,23 @@ func (m *migrater) read() {
 	}
 
 	for _, def := range defs {
-		m.processChan <- &def
+		m.processChan <- def
 	}
 
 	close(m.processChan)
 	wg.Wait()
+	fmt.Println("closing chunk chan")
 	close(m.chunkChan)
 }
 
 func (m *migrater) processMetric(wg *sync.WaitGroup) {
 	var b []byte
 	var ts int
-	defer wg.Done()
 
 	for {
 		def, more := <-m.processChan
 		if !more {
+			wg.Done()
 			return
 		}
 		now := uint32(time.Now().Unix())
@@ -210,17 +202,22 @@ func (m *migrater) processMetric(wg *sync.WaitGroup) {
 				throwError(fmt.Sprintf("cassandra query error. %s", err))
 			}
 			itgenCount += len(itgens)
-			m.generateChunks(itgens, def)
+			m.generateChunks(itgens, &def)
+		}
+		m.chunkChan <- chunkDay{
+			id:         def.Id,
+			metricDone: true,
 		}
 	}
 }
 
 // represents one day of chunks of one metric aggregate
 type chunkDay struct {
-	tableName string
-	id        string
-	ttl       uint32
-	itergens  []chunk.IterGen
+	tableName  string
+	id         string
+	ttl        uint32
+	itergens   []chunk.IterGen
+	metricDone bool
 }
 
 func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefinition) {
@@ -233,11 +230,12 @@ func (m *migrater) generateChunks(itgens []chunk.IterGen, def *schema.MetricDefi
 	// if interval is larger than or equal to 1h we can directly write the chunk to
 	// the higher retention table
 	if def.Interval >= 60*60 {
-		m.chunkChan <- &chunkDay{
-			itergens:  itgens,
-			ttl:       m.ttls[1],
-			tableName: m.ttlTables[m.ttls[1]].Table,
-			id:        def.Id,
+		m.chunkChan <- chunkDay{
+			itergens:   itgens,
+			ttl:        m.ttls[1],
+			tableName:  m.ttlTables[m.ttls[1]].Table,
+			id:         def.Id,
+			metricDone: false,
 		}
 		return
 	}
@@ -276,12 +274,13 @@ func (m *migrater) writeRollup(am *mdata.AggMetric, ttlId int) {
 			chunkCount += len(itgensNew)
 
 			rollupChunkDay := chunkDay{
-				ttl:       m.ttls[ttlId],
-				tableName: m.ttlTables[m.ttls[ttlId]].Table,
-				id:        aggMetric.Key,
-				itergens:  itgensNew,
+				ttl:        m.ttls[ttlId],
+				tableName:  m.ttlTables[m.ttls[ttlId]].Table,
+				id:         aggMetric.Key,
+				itergens:   itgensNew,
+				metricDone: false,
 			}
-			m.chunkChan <- &rollupChunkDay
+			m.chunkChan <- rollupChunkDay
 		}
 	}
 }
@@ -307,18 +306,23 @@ func (m *migrater) getAggMetric(id string, rollupSpan int, ttl, outChunkSpan uin
 }
 
 func (m *migrater) write(wg *sync.WaitGroup) {
-	defer wg.Done()
 	for {
 		cd, more := <-m.chunkChan
 		if !more {
+			wg.Done()
 			return
 		}
+
+		if cd.metricDone {
+			m.metricComplete <- cd
+			continue
+		}
+
 		if len(cd.itergens) == 0 {
 			continue
 		}
 
 		m.insertChunks(cd.tableName, cd.id, cd.ttl, cd.itergens)
-		m.chunkDayComplete <- cd
 	}
 }
 
