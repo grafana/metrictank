@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"gopkg.in/raintank/schema.v1"
+	schema "gopkg.in/raintank/schema.v1"
 )
 
 var (
@@ -22,7 +22,6 @@ type Node struct {
 	HasChildren bool
 }
 
-//msgp:ignore Archive
 type Archive struct {
 	schema.MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
