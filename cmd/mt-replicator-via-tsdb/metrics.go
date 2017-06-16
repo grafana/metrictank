@@ -145,6 +145,9 @@ func (r *MetricsReplicator) Consume() {
 				return
 			}
 			for _, line := range bytes.Split(m.Value, []byte("\n")) {
+				if len(line) == 0 {
+					continue
+				}
 				key, val, ts, err := m20.ValidatePacket(
 					line,
 					m20.NoneLegacy,
