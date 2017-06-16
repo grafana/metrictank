@@ -427,7 +427,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		}
 	}
 
-	log.Debug("memory-idx: reached pattern length. %d nodes matched", pos, len(children))
+	log.Debug("memory-idx: reached pattern length. %d nodes matched", len(children))
 	for _, c := range children {
 		results = append(results, c)
 	}
