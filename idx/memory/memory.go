@@ -390,7 +390,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 					}
 				}
 			} else if (matchAll) {
-				log.Debug("Matching all children")
+				log.Debug("memory-idx: Matching all children")
 				for _, c := range c.Children {
 					matches = append(matches, c)
 				}
