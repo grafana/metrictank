@@ -13,6 +13,7 @@ import (
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/snappy"
 	"github.com/jpillora/backoff"
+	m20 "github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 	"gopkg.in/raintank/schema.v1/msg"
@@ -24,6 +25,7 @@ var (
 	destinationKey    = flag.String("destination-key", "admin-key", "admin-key of destination tsdb-gw server")
 
 	group                = flag.String("group", "mt-replicator", "Kafka consumer group")
+	orgId                = flag.Int("org-id", -1, "Organization ID of the metrics to be submitted")
 	clientId             = flag.String("client-id", "mt-replicator", "Kafka consumer group client id")
 	srcTopic             = flag.String("src-topic", "mdm", "metrics topic name on source cluster")
 	initialOffset        = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
@@ -48,6 +50,7 @@ type MetricsReplicator struct {
 	wg          sync.WaitGroup
 	shutdown    chan struct{}
 	flushBuffer chan []*schema.MetricData
+	badCount    int
 }
 
 func NewMetricsReplicator() (*MetricsReplicator, error) {
@@ -108,8 +111,7 @@ func (r *MetricsReplicator) Consume() {
 	msgChan := r.consumer.Messages()
 
 	flush := func(topic string, partition int32, offset int64) {
-		mda := schema.MetricDataArray(buf)
-		data, err := msg.CreateMsg(mda, 0, msg.FormatMetricDataArrayMsgp)
+		data, err := msg.CreateMsg(buf, 0, msg.FormatMetricDataArrayMsgp)
 		if err != nil {
 			panic(err)
 		}
@@ -142,14 +144,30 @@ func (r *MetricsReplicator) Consume() {
 				}
 				return
 			}
-			md := &schema.MetricData{}
-			_, err := md.UnmarshalMsg(m.Value)
-			if err != nil {
-				log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
-				continue
+			for _, line := range bytes.Split(m.Value, []byte("\n")) {
+				key, val, ts, err := m20.ValidatePacket(
+					line,
+					m20.NoneLegacy,
+					m20.NoneM20,
+				)
+				if err != nil {
+					log.Error("Failed to parse msg")
+					r.badCount++
+					continue
+				}
+				keyStr := string(key)
+				md := &schema.MetricData{
+					Name:     keyStr,
+					Metric:   keyStr,
+					Time:     int64(ts),
+					Mtype:    "gauge",
+					Interval: 1,
+					Value:    val,
+					OrgId:    *orgId,
+				}
+				buf = append(buf, md)
 			}
 
-			buf = append(buf, md)
 			if len(buf) > *producerBatchSize {
 				flush(m.Topic, m.Partition, m.Offset)
 				// reset our ticker
@@ -166,6 +184,9 @@ func (r *MetricsReplicator) Consume() {
 			counter = 0
 			counterTs = t
 		case <-r.shutdown:
+			if r.badCount > 0 {
+				log.Error("Failed to parse %d msgs.", r.badCount)
+			}
 			if len(buf) > 0 {
 				flush(m.Topic, m.Partition, m.Offset)
 			}
