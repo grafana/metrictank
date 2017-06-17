@@ -10,6 +10,7 @@ import (
 
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/consolidation"
+	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -314,26 +315,27 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 
 func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
 	ctx := newRequestContext(&req, consolidator)
-	iters := s.getSeries(ctx)
-	points := s.itersToPoints(ctx, iters)
-	return Fix(points, req.From, req.To, req.ArchInterval)
+	res := s.getSeries(ctx)
+	res.Raw = append(s.itersToPoints(ctx, res.Iters), res.Raw...)
+	return Fix(res.Raw, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx *requestContext) []chunk.Iter {
+func (s *Server) getSeries(ctx *requestContext) mdata.MetricResult {
 
-	oldest, memIters := s.getSeriesAggMetrics(ctx)
-	log.Debug("oldest from aggmetrics is %d", oldest)
+	res := s.getSeriesAggMetrics(ctx)
+	log.Debug("oldest from aggmetrics is %d", res.Oldest)
 
-	if oldest <= ctx.From {
+	if res.Oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
-		return memIters
+		return res
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
-	until := util.Min(oldest, ctx.To)
+	until := util.Min(res.Oldest, ctx.To)
 
-	return append(s.getSeriesCachedStore(ctx, until), memIters...)
+	res.Iters = append(s.getSeriesCachedStore(ctx, until), res.Iters...)
+	return res
 }
 
 // getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
@@ -363,24 +365,23 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx *requestContext) (uint32, []chunk.Iter) {
-	oldest := ctx.Req.To
-	var memIters []chunk.Iter
-
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.MetricResult {
 	metric, ok := s.MemoryStore.Get(ctx.Key)
 	if !ok {
-		return oldest, memIters
+		return mdata.MetricResult{
+			Oldest: ctx.Req.To,
+			Iters:  make([]chunk.Iter, 0),
+			Raw:    make([]schema.Point, 0),
+		}
 	}
 
 	if ctx.Cons != consolidation.None {
 		logLoad("memory", ctx.AggKey, ctx.From, ctx.To)
-		oldest, memIters = metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
+		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
 	} else {
 		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
-		oldest, memIters = metric.Get(ctx.From, ctx.To)
+		return metric.Get(ctx.From, ctx.To)
 	}
-
-	return oldest, memIters
 }
 
 // will only fetch until until, but uses ctx.To for debug logging

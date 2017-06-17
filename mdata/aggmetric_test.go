@@ -2,6 +2,8 @@ package mdata
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"testing"
 	"time"
 
@@ -16,6 +18,12 @@ type point struct {
 	ts  uint32
 	val float64
 }
+
+type points []point
+
+func (a points) Len() int           { return len(a) }
+func (a points) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a points) Less(i, j int) bool { return a[i].ts < a[j].ts }
 
 func (p point) String() string {
 	return fmt.Sprintf("point{%0.f at %d}", p.val, p.ts)
@@ -37,13 +45,28 @@ func (c *Checker) Add(ts uint32, val float64) {
 	c.points = append(c.points, point{ts, val})
 }
 
+func (c *Checker) DropPointByTs(ts uint32) {
+	i := 0
+	for {
+		if i == len(c.points) {
+			return
+		}
+		if c.points[i].ts == ts {
+			c.points = append(c.points[:i], c.points[i+1:]...)
+		} else {
+			i++
+		}
+	}
+}
+
 // from to is the range that gets requested from AggMetric
 // first/last is what we use as data range to compare to (both inclusive)
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	currentClusterStatus := cluster.Manager.IsPrimary()
+	sort.Sort(points(c.points))
 	cluster.Manager.SetPrimary(primary)
-	_, iters := c.agg.Get(from, to)
+	res := c.agg.Get(from, to)
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
 	var pi int // index of first point we want
 	var pj int // index of last point we want
@@ -53,16 +76,25 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	}
 	c.t.Logf("verifying AggMetric.Get(%d,%d) =?= %d <= ts <= %d", from, to, first, last)
 	index := pi - 1
-	for _, iter := range iters {
+	for _, iter := range res.Iters {
 		for iter.Next() {
 			index++
 			tt, vv := iter.Values()
 			if index > pj {
-				c.t.Fatalf("Values()=(%v,%v), want end of stream\n", tt, vv)
+				c.t.Fatalf("Iters: Values()=(%v,%v), want end of stream\n", tt, vv)
 			}
 			if c.points[index].ts != tt || c.points[index].val != vv {
-				c.t.Fatalf("Values()=(%v,%v), want (%v,%v)\n", tt, vv, c.points[index].ts, c.points[index].val)
+				c.t.Fatalf("Iters: Values()=(%v,%v), want (%v,%v)\n", tt, vv, c.points[index].ts, c.points[index].val)
 			}
+		}
+	}
+	for _, point := range res.Raw {
+		index++
+		if index > pj {
+			c.t.Fatalf("Raw: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
+		}
+		if c.points[index].ts != point.Ts || c.points[index].val != point.Val {
+			c.t.Fatalf("Raw: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
 		}
 	}
 	if index != pj {
@@ -197,6 +229,56 @@ func TestAggMetric(t *testing.T) {
 	c.Add(1299, 1299)
 	// TODO: implement skips and enable this
 	//	c.Verify(true, 800, 1299, 1299, 1299)
+}
+
+func TestAggMetricWithWriteBuffer(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	agg := conf.Aggregation{
+		Name:              "Default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []conf.Method{conf.Avg},
+		WriteBufferConf: &conf.WriteBufferConf{
+			ReorderWindow: 10,
+			FlushMin:      10,
+		},
+	}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, &agg, false))
+
+	// basic case, single range
+	c.Add(101, 101)
+	c.Verify(true, 100, 200, 101, 101)
+	c.Add(105, 105)
+	c.Verify(true, 100, 199, 101, 105)
+	c.Add(115, 115)
+	c.Add(125, 125)
+	c.Add(135, 135)
+	c.Verify(true, 100, 199, 101, 135)
+
+	// add new ranges, aligned and unaligned
+	c.Add(200, 200)
+	c.Add(315, 315)
+	c.Verify(true, 100, 399, 101, 315)
+
+	metricsTooOld.SetUint32(0)
+
+	// adds 14 entries that are out of order and the write buffer should order the first 13
+	// including the previous 7 it will then reach 20 which is = reorder window + flush min, so it causes a flush
+	// the last item (14th) will be added out of order, after the buffer is flushed, so it increases metricsTooOld
+	for i := uint32(314); i > 300; i-- {
+		c.Add(i, float64(i))
+	}
+	c.DropPointByTs(301)
+
+	// get subranges
+	c.Verify(true, 100, 320, 101, 315)
+
+	// one point has been added out of order and too old for the buffer to reorder
+	if metricsTooOld.Peek() != 1 {
+		t.Fatalf("Expected the out off order count to be 1")
+	}
 }
 
 func TestAggMetricDropFirstChunk(t *testing.T) {

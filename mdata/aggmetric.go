@@ -12,6 +12,8 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
+
+	"gopkg.in/raintank/schema.v1"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -26,6 +28,7 @@ type AggMetric struct {
 	cachePusher cache.CachePusher
 	sync.RWMutex
 	Key             string
+	wb              *WriteBuffer
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
@@ -61,6 +64,10 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
 	}
+	if agg != nil && agg.WriteBufferConf != nil {
+		m.wb = NewWriteBuffer(agg.WriteBufferConf, m.add)
+	}
+
 	for _, ret := range retentions[1:] {
 		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk))
 	}
@@ -132,7 +139,7 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []chunk.Iter) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) MetricResult {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -161,7 +168,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
+func (a *AggMetric) Get(from, to uint32) MetricResult {
 	pre := time.Now()
 	if LogLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
@@ -172,12 +179,28 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 	a.RLock()
 	defer a.RUnlock()
 
+	result := MetricResult{
+		Oldest: math.MaxInt32,
+		Iters:  make([]chunk.Iter, 0),
+		Raw:    make([]schema.Point, 0),
+	}
+
+	if a.wb != nil {
+		result.Raw = a.wb.Get()
+		if len(result.Raw) > 0 {
+			result.Oldest = result.Raw[0].Ts
+			if result.Oldest <= from {
+				return result
+			}
+		}
+	}
+
 	if len(a.Chunks) == 0 {
 		// we dont have any data yet.
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return math.MaxInt32, make([]chunk.Iter, 0)
+		return result
 	}
 
 	newestChunk := a.getChunk(a.CurrentChunkPos)
@@ -197,7 +220,8 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return from, make([]chunk.Iter, 0)
+		result.Oldest = from
+		return result
 	}
 
 	// get the oldest chunk we have.
@@ -219,7 +243,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
 		log.Error(3, "unexpected nil chunk.")
-		return math.MaxInt32, make([]chunk.Iter, 0)
+		return result
 	}
 
 	// The first chunk is likely only a partial chunk. If we are not the primary node
@@ -233,7 +257,7 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return math.MaxInt32, make([]chunk.Iter, 0)
+			return result
 		}
 	}
 
@@ -242,7 +266,8 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
-		return oldestChunk.T0, make([]chunk.Iter, 0)
+		result.Oldest = oldestChunk.T0
+		return result
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -255,7 +280,8 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]chunk.Iter, 0)
+			result.Oldest = to
+			return result
 		}
 	}
 
@@ -274,15 +300,15 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
 			log.Error(3, "unexpected nil chunk.")
-			return to, make([]chunk.Iter, 0)
+			result.Oldest = to
+			return result
 		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
-	iters := make([]chunk.Iter, 0, a.NumChunks)
 	for {
 		c := a.getChunk(oldestPos)
-		iters = append(iters, chunk.NewIter(c.Iter()))
+		result.Iters = append(result.Iters, chunk.NewIter(c.Iter()))
 
 		if oldestPos == newestPos {
 			break
@@ -295,7 +321,8 @@ func (a *AggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
 	}
 
 	memToIterDuration.Value(time.Now().Sub(pre))
-	return oldestChunk.T0, iters
+	result.Oldest = oldestChunk.T0
+	return result
 }
 
 // this function must only be called while holding the lock
@@ -402,11 +429,24 @@ func (a *AggMetric) persist(pos int) {
 	return
 }
 
-// don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
 
+	if a.wb == nil {
+		// write directly
+		a.add(ts, val)
+	} else {
+		// write through write buffer, returns false if ts is out of reorder window
+		if !a.wb.Add(ts, val) {
+			metricsTooOld.Inc()
+		}
+	}
+}
+
+// don't ever call with a ts of 0, cause we use 0 to mean not initialized!
+// assumes a write lock is held by the call-site
+func (a *AggMetric) add(ts uint32, val float64) {
 	t0 := ts - (ts % a.ChunkSpan)
 
 	if len(a.Chunks) == 0 {

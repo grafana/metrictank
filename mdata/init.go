@@ -22,9 +22,14 @@ var (
 	// metric tank.chunk_operations.clear is a counter of how many chunks are cleared (replaced by new chunks)
 	chunkClear = stats.NewCounter32("tank.chunk_operations.clear")
 
-	// metric tank.metrics_too_old is points that go back in time.
-	// E.g. for any given series, when a point has a timestamp
-	// that is not higher than the timestamp of the last written timestamp for that series.
+	// metric tank.metrics_reordered is the number of points received that are going back in time, but are still
+	// within the reorder window. in such a case they will be inserted in the correct order.
+	// E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
+	// ts is not older than the 60th datapoint counting from the newest.
+	metricsReordered = stats.NewCounter32("tank.metrics_reorderd")
+
+	// metric tank.metrics_too_old is points that go back in time beyond the scope of the reorder window.
+	// these points will end up being dropped and lost.
 	metricsTooOld = stats.NewCounter32("tank.metrics_too_old")
 
 	// metric tank.add_to_closed_chunk is points received for the most recent chunk

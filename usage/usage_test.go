@@ -53,11 +53,11 @@ func (f *FakeAggMetric) Add(ts uint32, val float64) {
 }
 
 // we won't use this
-func (f *FakeAggMetric) Get(from, to uint32) (uint32, []chunk.Iter) {
-	return 0, make([]chunk.Iter, 0)
+func (f *FakeAggMetric) Get(from, to uint32) mdata.MetricResult {
+	return mdata.MetricResult{Oldest: 0, Iters: make([]chunk.Iter, 0)}
 }
-func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (uint32, []chunk.Iter) {
-	return 0, make([]chunk.Iter, 0)
+func (f *FakeAggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) mdata.MetricResult {
+	return mdata.MetricResult{Oldest: 0, Iters: make([]chunk.Iter, 0)}
 }
 
 func idFor(org int, metric, unit, mtype string, tags []string, interval uint32) string {
