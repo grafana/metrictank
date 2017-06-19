@@ -154,7 +154,7 @@ func (r *MetricsReplicator) Consume() {
 					m20.NoneM20,
 				)
 				if err != nil {
-					log.Error("Failed to parse msg")
+					log.Error(3, "Failed to parse msg")
 					r.badCount++
 					continue
 				}
@@ -188,7 +188,7 @@ func (r *MetricsReplicator) Consume() {
 			counterTs = t
 		case <-r.shutdown:
 			if r.badCount > 0 {
-				log.Error("Failed to parse %d msgs.", r.badCount)
+				log.Error(3, "Failed to parse %d msgs.", r.badCount)
 			}
 			if len(buf) > 0 {
 				flush(m.Topic, m.Partition, m.Offset)
