@@ -208,6 +208,7 @@ func (c *CasIdx) Init() error {
 		for i := 0; i < numConns; i++ {
 			go c.processWriteQueue()
 		}
+		log.Info("cassandra-idx started %d writeQueue handlers", numConns)
 	}
 
 	//Rebuild the in-memory index.
@@ -349,7 +350,6 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema
 }
 
 func (c *CasIdx) processWriteQueue() {
-	log.Info("cassandra-idx writeQueue handler started.")
 	var success bool
 	var attempts int
 	var err error
