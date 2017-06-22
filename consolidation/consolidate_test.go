@@ -193,6 +193,7 @@ func TestConsolidationFunctions(t *testing.T) {
 	}
 	validate(cases, t)
 }
+
 func TestConsolidateStableNoAgg(t *testing.T) {
 	testConsolidateStable(
 		[]schema.Point{
