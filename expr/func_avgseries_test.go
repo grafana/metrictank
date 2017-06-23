@@ -97,6 +97,52 @@ func TestAvgSeriesMultipleDiffQuery(t *testing.T) {
 	)
 }
 
+//mimic target=avgSeries(foo.*,foo.*,a,a)
+func TestAvgSeriesMultipleTimesSameInput(t *testing.T) {
+	testAvgSeries(
+		"avg-multiple-times-same-input",
+		[][]models.Series{
+			{
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(a),
+				},
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(b),
+				},
+			},
+			{
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(a),
+				},
+				{
+					QueryPatt:  "foo.*",
+					Datapoints: getCopy(b),
+				},
+			},
+			{
+				{
+					QueryPatt:  "a",
+					Datapoints: getCopy(a),
+				},
+			},
+			{
+				{
+					QueryPatt:  "a",
+					Datapoints: getCopy(a),
+				},
+			},
+		},
+		models.Series{
+			Target:     "averageSeries(foo.*,foo.*,a,a)",
+			Datapoints: getCopy(avg4a2b),
+		},
+		t,
+	)
+}
+
 func testAvgSeries(name string, in [][]models.Series, out models.Series, t *testing.T) {
 	f := NewAvgSeries()
 	avg := f.(*FuncAvgSeries)
