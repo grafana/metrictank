@@ -129,17 +129,15 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
-	targets := request.Targets
 	now := time.Now()
+	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+	defaultTo := uint32(now.Unix())
 
 	from := request.From
 	to := request.To
 	if to == "" {
 		to = request.Until
 	}
-
-	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	defaultTo := uint32(now.Unix())
 
 	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
 	if err != nil {
@@ -164,13 +162,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	fromUnix += 1
 	toUnix += 1
 
-	exprs, err := expr.ParseMany(targets)
+	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	reqRenderTargetCount.Value(len(targets))
+	reqRenderTargetCount.Value(len(request.Targets))
 
 	if request.Process == "none" {
 		ctx.Req.Request.Body = ctx.Body
