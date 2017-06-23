@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -269,7 +268,6 @@ func TestConsolidateBy(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		fmt.Println("#####", c.in)
 		// for the purpose of this test, we assume ParseMany works fine.
 		exprs, _ := ParseMany([]string{c.in})
 		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
