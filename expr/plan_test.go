@@ -304,10 +304,11 @@ func TestConsolidateBy(t *testing.T) {
 		}
 		if len(out) != len(c.expOut) {
 			t.Errorf("case %d: %q, expected %d series output, not %d", i, c.in, len(c.expOut), len(out))
-		}
-		for j, exp := range c.expOut {
-			if exp.QueryPatt != out[j].QueryPatt || exp.Consolidator != out[j].Consolidator {
-				t.Errorf("case %d: %q, output series mismatch at pos %d: expected %v-%v - got %v-%v", i, c.in, j, exp.QueryPatt, exp.Consolidator, out[j].QueryPatt, out[j].Consolidator)
+		} else {
+			for j, exp := range c.expOut {
+				if exp.QueryPatt != out[j].QueryPatt || exp.Consolidator != out[j].Consolidator {
+					t.Errorf("case %d: %q, output series mismatch at pos %d: expected %v-%v - got %v-%v", i, c.in, j, exp.QueryPatt, exp.Consolidator, out[j].QueryPatt, out[j].Consolidator)
+				}
 			}
 		}
 	}
