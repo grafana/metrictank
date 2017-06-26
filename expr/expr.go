@@ -85,6 +85,18 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		} else {
 			*v.val = got.float
 		}
+	case ArgIn:
+		for _, a := range v.args {
+			p, err := e.consumeBasicArg(pos, a)
+			if err == nil {
+				return p, err
+			}
+		}
+		expStr := []string{}
+		for _, a := range v.args {
+			expStr = append(expStr, fmt.Sprintf("%T", a))
+		}
+		return 0, ErrBadArgumentStr{strings.Join(expStr, ","), string(got.etype)}
 	case ArgInt:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", string(got.etype)}
@@ -240,6 +252,20 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		default:
 			return ErrBadKwarg{key, exp, got.etype}
 		}
+	case ArgIn:
+		for _, a := range v.args {
+			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn, not for every individual sub-arg
+			// so to make sure we pass the key matching requirement, we just call consumeKwarg with whatever the key is set to (typically "")
+			err := e.consumeKwarg(a.Key(), []Arg{a})
+			if err == nil {
+				return err
+			}
+		}
+		expStr := []string{}
+		for _, a := range v.args {
+			expStr = append(expStr, fmt.Sprintf("%T", a))
+		}
+		return ErrBadArgumentStr{strings.Join(expStr, ","), string(got.etype)}
 	case ArgInt:
 		if got.etype != etInt {
 			return ErrBadKwarg{key, exp, got.etype}
