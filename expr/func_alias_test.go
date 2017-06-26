@@ -23,7 +23,8 @@ func TestAliasSingle(t *testing.T) {
 		},
 		[]models.Series{
 			{
-				Target: "bar",
+				QueryPatt: "bar",
+				Target:    "bar",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
@@ -54,14 +55,16 @@ func TestAliasMultiple(t *testing.T) {
 		},
 		[]models.Series{
 			{
-				Target: "bar",
+				QueryPatt: "bar",
+				Target:    "bar",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
 				},
 			},
 			{
-				Target: "bar",
+				QueryPatt: "bar",
+				Target:    "bar",
 				Datapoints: []schema.Point{
 					{Val: 20, Ts: 10},
 					{Val: 100, Ts: 20},
@@ -84,20 +87,9 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 	if len(got) != len(in) {
 		t.Fatalf("case %q: alias output should be same amount of series as input: %d, not %d", name, len(in), len(got))
 	}
-	for i, o := range out {
-		g := got[i]
-		if o.Target != g.Target {
-			t.Fatalf("case %q: expected target %q, got %q", name, o.Target, g.Target)
-		}
-		if len(o.Datapoints) != len(g.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(o.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range o.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(g.Datapoints[j].Val)
-			if (bothNaN || p.Val == g.Datapoints[j].Val) && p.Ts == g.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, p, g.Datapoints[j])
+	for i, _ := range got {
+		if err := equalSeries(out[i], got[i]); err != nil {
+			t.Fatalf("case %q: %s", name, err)
 		}
 	}
 }

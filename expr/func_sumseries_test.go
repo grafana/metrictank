@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -24,6 +23,7 @@ func TestSumSeriesIdentity(t *testing.T) {
 		},
 		models.Series{
 			QueryPatt:  "sumSeries(single)",
+			Target:     "sumSeries(single)",
 			Datapoints: getCopy(a),
 		},
 		t,
@@ -36,13 +36,14 @@ func TestSumSeriesQueryToSingle(t *testing.T) {
 			{
 				{
 					QueryPatt:  "foo.*",
-					Target:     "foo",
+					Target:     "foo.bar",
 					Datapoints: getCopy(a),
 				},
 			},
 		},
 		models.Series{
 			QueryPatt:  "sumSeries(foo.*)",
+			Target:     "sumSeries(foo.*)",
 			Datapoints: getCopy(a),
 		},
 		t,
@@ -67,6 +68,7 @@ func TestSumSeriesMultipleSameQuery(t *testing.T) {
 		},
 		models.Series{
 			QueryPatt:  "sumSeries(foo.*)",
+			Target:     "sumSeries(foo.*)",
 			Datapoints: getCopy(sumab),
 		},
 		t,
@@ -74,7 +76,7 @@ func TestSumSeriesMultipleSameQuery(t *testing.T) {
 }
 func TestSumSeriesMultipleDiffQuery(t *testing.T) {
 	testSumSeries(
-		"sum-multiple-serieslists",
+		"sum-multiple-serieslists-diff-query",
 		[][]models.Series{
 			{
 				{
@@ -98,6 +100,7 @@ func TestSumSeriesMultipleDiffQuery(t *testing.T) {
 		},
 		models.Series{
 			QueryPatt:  "sumSeries(foo.*,movingAverage(bar, '1min'))",
+			Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
 			Datapoints: getCopy(sumabc),
 		},
 		t,
@@ -117,19 +120,8 @@ func testSumSeries(name string, in [][]models.Series, out models.Series, t *test
 	if len(got) != 1 {
 		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
 	}
-	g := got[0]
-	if g.QueryPatt != out.QueryPatt {
-		t.Fatalf("case %q: expected target %q, got %q", name, out.QueryPatt, g.QueryPatt)
-	}
-	if len(g.Datapoints) != len(out.Datapoints) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
-	}
-	for j, p := range g.Datapoints {
-		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out.Datapoints[j].Val)
-		if (bothNaN || p.Val == out.Datapoints[j].Val) && p.Ts == out.Datapoints[j].Ts {
-			continue
-		}
-		t.Fatalf("case %q: output point %d - expected %v got %v", name, j, out.Datapoints[j], p)
+	if err := equalSeries(out, got[0]); err != nil {
+		t.Fatalf("case %q: %s", name, err)
 	}
 }
 
