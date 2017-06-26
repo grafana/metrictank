@@ -81,16 +81,8 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 	alias.alias = "bar"
 	alias.in = NewMock(in)
 	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(got) != len(in) {
-		t.Fatalf("case %q: alias output should be same amount of series as input: %d, not %d", name, len(in), len(got))
-	}
-	for i, _ := range got {
-		if err := equalSeries(out[i], got[i]); err != nil {
-			t.Fatalf("case %q: %s", name, err)
-		}
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("case %q: %s", name, err)
 	}
 }
 

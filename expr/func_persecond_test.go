@@ -192,16 +192,8 @@ func testPerSecond(name string, in [][]models.Series, out []models.Series, max i
 		ps.in = append(ps.in, NewMock(in[i]))
 		ps.maxValue = max
 	}
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: perSecond len output expected %d, got %d", name, len(out), len(gots))
-	}
-	for i, g := range gots {
-		if err := equalSeries(out[i], g); err != nil {
-			t.Fatalf("case %q: %s", name, err)
-		}
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("case %q: %s", name, err)
 	}
 }

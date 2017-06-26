@@ -114,13 +114,7 @@ func testSumSeries(name string, in [][]models.Series, out models.Series, t *test
 		sum.in = append(sum.in, NewMock(i))
 	}
 	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("case %q: sumSeries output should be only 1 thing (a series) not %d", name, len(got))
-	}
-	if err := equalSeries(out, got[0]); err != nil {
+	if err := equalOutput([]models.Series{out}, got, nil, err); err != nil {
 		t.Fatalf("case %q: %s", name, err)
 	}
 }

@@ -9,6 +9,24 @@ import (
 
 var results []models.Series
 
+func equalOutput(exp, got []models.Series, expErr, gotErr error) error {
+	if expErr == nil && gotErr != nil {
+		return fmt.Errorf("err should be nil. got %q", gotErr)
+	}
+	if expErr != nil && gotErr == nil {
+		return fmt.Errorf("err should be error %v. got %q", expErr, gotErr)
+	}
+	if len(got) != len(exp) {
+		return fmt.Errorf("perSecond len output expected %d, got %d", len(exp), len(got))
+	}
+	for i, _ := range got {
+		if err := equalSeries(exp[i], got[i]); err != nil {
+			return fmt.Errorf("series %d: %s", i, err)
+		}
+	}
+	return nil
+}
+
 // cannot just use reflect.DeepEqual because NaN != NaN, whereas we want NaN == NaN
 // https://github.com/golang/go/issues/12025
 func equalSeries(exp, got models.Series) error {
