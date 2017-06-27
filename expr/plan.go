@@ -140,7 +140,7 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 		if len(e.args) <= pos {
 			return nil, ErrMissingArg
 		}
-		pos, err = e.consumeBasicArg(pos, argExp)
+		pos, err = e.consumeBasicArg(pos, argExp, argsExp[cutoff+1:])
 		if err != nil {
 			return nil, err
 		}
@@ -155,11 +155,11 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	// so that those args should not be specified via their keys anymore.
 
 	seenKwargs := make(map[string]struct{})
-	for _, argOpt := range argsExp[cutoff:] {
+	for j, argOpt := range argsExp[cutoff:] {
 		if len(e.args) <= pos {
 			break // no more args specified. we're done.
 		}
-		pos, err = e.consumeBasicArg(pos, argOpt)
+		pos, err = e.consumeBasicArg(pos, argOpt, argsExp[cutoff+j+1:])
 		if err != nil {
 			return nil, err
 		}
@@ -190,10 +190,10 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	// this function, we can set up the input arguments for the function
 	// that are series
 	pos = 0
-	for _, argExp = range argsExp[:cutoff] {
+	for j, argExp := range argsExp {
 		switch argExp.(type) {
 		case ArgSeries, ArgSeriesList, ArgSeriesLists:
-			pos, reqs, err = e.consumeSeriesArg(pos, argExp, context, stable, reqs)
+			pos, reqs, err = e.consumeSeriesArg(pos, argExp, argsExp[j+1:], context, stable, reqs)
 			if err != nil {
 				return nil, err
 			}

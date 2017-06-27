@@ -121,3 +121,36 @@ type ArgBool struct {
 
 func (a ArgBool) Key() string    { return a.key }
 func (a ArgBool) Optional() bool { return a.opt }
+
+// allowsSeries looks if the argument is one that allows for a series.
+// if ArgIn is encountered, we recursively look into all the options
+// to find if a series is allowed.
+func allowsSeries(arg Arg) bool {
+	switch a := arg.(type) {
+	case ArgSeries, ArgSeriesList, ArgSeriesLists:
+		return true
+	case ArgIn:
+		for _, subArg := range a.args {
+			allows := allowsSeries(subArg)
+			if allows {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func allowsInt(arg Arg) bool {
+	switch a := arg.(type) {
+	case ArgInt, ArgInts:
+		return true
+	case ArgIn:
+		for _, subArg := range a.args {
+			allows := allowsInt(subArg)
+			if allows {
+				return true
+			}
+		}
+	}
+	return false
+}

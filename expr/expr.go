@@ -62,7 +62,7 @@ func (e expr) Print(indent int) string {
 // appropriate value(s) will be assigned to exp.val
 // for non-basic args, see consumeSeriesArg which should be called after deducing the required from/to.
 // the returned pos is always the index where the next argument should be.
-func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
+func (e expr) consumeBasicArg(pos int, exp Arg, next []Arg) (int, error) {
 	got := e.args[pos]
 	switch v := exp.(type) {
 	case ArgBool:
@@ -87,7 +87,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 	case ArgIn:
 		for _, a := range v.args {
-			p, err := e.consumeBasicArg(pos, a)
+			p, err := e.consumeBasicArg(pos, a, next)
 			if err == nil {
 				return p, err
 			}
@@ -113,14 +113,17 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		*v.val = append(*v.val, got.int)
 		// special case! consume all subsequent args (if any) in args that will also yield an integer
-		for len(e.args) > pos+1 && e.args[pos+1].etype == etInt {
-			pos += 1
-			for _, va := range v.validator {
-				if err := va(e.args[pos]); err != nil {
-					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+		// unless the input is ambiguous
+		if len(next) == 0 || !allowsInt(next[0]) {
+			for len(e.args) > pos+1 && e.args[pos+1].etype == etInt {
+				pos += 1
+				for _, va := range v.validator {
+					if err := va(e.args[pos]); err != nil {
+						return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+					}
 				}
+				*v.val = append(*v.val, e.args[pos].int)
 			}
-			*v.val = append(*v.val, e.args[pos].int)
 		}
 	case ArgRegex:
 		if got.etype != etString {
@@ -145,8 +148,17 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
 		}
 		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos += 1
+		// this is a convenience for users that they can provide multiple pattern arguments and not have to use group()
+		// except when the next argument is also a serieslist.
+		// for example:
+		// function signature          | given by user
+		// serieslist, int             | etName, 5
+		// serieslist, int             | etName, etName, 5 -> unambiguous input. can consume the next etName.
+		// serieslist, serieslist, int | etName, etName, 5 -> ambiguous input. cannot consume the next etName.
+		if len(next) == 0 || !allowsSeries(next[0]) {
+			for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+				pos += 1
+			}
 		}
 	case ArgString:
 		if got.etype != etString {
@@ -172,7 +184,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 // but for non-basic args (meaning a series, seriesList or seriesLists) the
 // appropriate value(s) will be assigned to exp.val
 // the returned pos is always the index where the next argument should be.
-func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, reqs []Req) (int, []Req, error) {
+func (e expr) consumeSeriesArg(pos int, exp Arg, next []Arg, context Context, stable bool, reqs []Req) (int, []Req, error) {
 	got := e.args[pos]
 	var err error
 	var fn GraphiteFunc
@@ -204,14 +216,16 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 			return 0, nil, err
 		}
 		*v.val = append(*v.val, fn)
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos += 1
-			fn, reqs, err = newplan(e.args[pos], context, stable, reqs)
-			if err != nil {
-				return 0, nil, err
+		if len(next) == 0 || !allowsSeries(next[0]) {
+			// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+			for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+				pos += 1
+				fn, reqs, err = newplan(e.args[pos], context, stable, reqs)
+				if err != nil {
+					return 0, nil, err
+				}
+				*v.val = append(*v.val, fn)
 			}
-			*v.val = append(*v.val, fn)
 		}
 	default:
 		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
