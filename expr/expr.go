@@ -65,17 +65,25 @@ func (e expr) Print(indent int) string {
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	got := e.args[pos]
 	switch v := exp.(type) {
-	case ArgSeries, ArgSeriesList:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+	case ArgBool:
+		if got.etype != etBool {
+			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
-	case ArgSeriesLists:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		*v.val = got.bool
+	case ArgFloat:
+		// integer is also a valid float, just happened to have no decimals
+		if got.etype != etFloat && got.etype != etInt {
+			return 0, ErrBadArgumentStr{"float", string(got.etype)}
 		}
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos += 1
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		if got.etype == etInt {
+			*v.val = float64(got.int)
+		} else {
+			*v.val = got.float
 		}
 	case ArgInt:
 		if got.etype != etInt {
@@ -102,31 +110,6 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			}
 			*v.val = append(*v.val, e.args[pos].int)
 		}
-	case ArgFloat:
-		// integer is also a valid float, just happened to have no decimals
-		if got.etype != etFloat && got.etype != etInt {
-			return 0, ErrBadArgumentStr{"float", string(got.etype)}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-			}
-		}
-		if got.etype == etInt {
-			*v.val = float64(got.int)
-		} else {
-			*v.val = got.float
-		}
-	case ArgString:
-		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string", string(got.etype)}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
-			}
-		}
-		*v.val = got.str
 	case ArgRegex:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
@@ -141,11 +124,28 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			return 0, err
 		}
 		*v.val = re
-	case ArgBool:
-		if got.etype != etBool {
+	case ArgSeries, ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+	case ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+			pos += 1
+		}
+	case ArgString:
+		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
-		*v.val = got.bool
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		*v.val = got.str
 	default:
 		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
 	}
@@ -225,11 +225,11 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	}
 	got := e.namedArgs[key]
 	switch v := exp.(type) {
-	case ArgInt:
-		if got.etype != etInt {
+	case ArgBool:
+		if got.etype != etBool {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
-		*v.val = got.int
+		*v.val = got.bool
 	case ArgFloat:
 		switch got.etype {
 		case etInt:
@@ -240,16 +240,16 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		default:
 			return ErrBadKwarg{key, exp, got.etype}
 		}
+	case ArgInt:
+		if got.etype != etInt {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.int
 	case ArgString:
 		if got.etype != etString {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
 		*v.val = got.str
-	case ArgBool:
-		if got.etype != etBool {
-			return ErrBadKwarg{key, exp, got.etype}
-		}
-		*v.val = got.bool
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}
