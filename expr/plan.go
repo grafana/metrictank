@@ -223,9 +223,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			aggNum := consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
-			out[i].Datapoints = consolidation.Consolidate(o.Datapoints, aggNum, o.Consolidator)
-			out[i].Interval *= aggNum
+			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateStable(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
 		}
 	}
 	return out, nil
