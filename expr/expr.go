@@ -257,6 +257,11 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		}
 		*v.val = got.bool
 	case ArgFloat:
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
 		switch got.etype {
 		case etInt:
 			// integer is also a valid float, just happened to have no decimals
@@ -284,7 +289,30 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		if got.etype != etInt {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
 		*v.val = got.int
+	case ArgRegex:
+		if got.etype != etString {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return fmt.Errorf("%s: %s", v.key, err.Error())
+			}
+		}
+		re, err := regexp.Compile(got.str)
+		if err != nil {
+			return err
+		}
+		*v.val = re
+	case ArgSeries, ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
 	case ArgString:
 		if got.etype != etString {
 			return ErrBadKwarg{key, exp, got.etype}
