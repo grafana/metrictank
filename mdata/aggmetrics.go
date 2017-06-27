@@ -63,7 +63,7 @@ func (ms *AggMetrics) GC() {
 			a := ms.Metrics[key]
 			ms.RUnlock()
 			if stale := a.GC(chunkMinTs, metricMinTs); stale {
-				log.Info("metric %s is stale. Purging data from memory.", key)
+				log.Debug("metric %s is stale. Purging data from memory.", key)
 				ms.Lock()
 				delete(ms.Metrics, key)
 				metricsActive.Set(len(ms.Metrics))
