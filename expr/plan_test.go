@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -189,6 +190,128 @@ func TestArgs(t *testing.T) {
 		if !reflect.DeepEqual(req, c.expReq) {
 			t.Errorf("case %d: %q, expected req %v - got %v", i, c.name, c.expReq, req)
 		}
+	}
+}
+
+// for the ArgIn tests, we use perSecond because it has a nice example of an ArgIn that can be specified via position or keyword.
+func TestArgInMissing(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+		},
+		namedArgs: nil,
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if !math.IsNaN(ap.totalFloat) {
+		t.Fatalf("totalFloat should be unset. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries != nil {
+		t.Fatalf("totalSeries should be nil. got %v", ap.totalSeries)
+	}
+}
+
+func TestArgInSeriesPositional(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+			{etype: etName, str: "total.*"},
+		},
+		namedArgs: nil,
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if !math.IsNaN(ap.totalFloat) {
+		t.Fatalf("totalFloat should be unset. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries == nil {
+		t.Fatalf("totalSeries must not be nil. got nil")
+	}
+}
+
+func TestArgInIntPositional(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+			{etype: etInt, str: "10", int: 10},
+		},
+		namedArgs: nil,
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if ap.totalFloat != 10 {
+		t.Fatalf("totalFloat should be 10. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries != nil {
+		t.Fatalf("totalSeries must be nil. got %v", ap.totalSeries)
+	}
+}
+
+func TestArgInSeriesKeyword(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+		},
+		namedArgs: map[string]*expr{
+			"total": {etype: etName, str: "total.*"},
+		},
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if !math.IsNaN(ap.totalFloat) {
+		t.Fatalf("totalFloat should be nil. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries == nil {
+		t.Fatalf("totalSeries must not be nil. got nil")
+	}
+}
+
+func TestArgInIntKeyword(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+		},
+		namedArgs: map[string]*expr{
+			"total": {etype: etInt, str: "10", int: 10},
+		},
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if ap.totalFloat != 10 {
+		t.Fatalf("totalFloat should be 10. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries != nil {
+		t.Fatalf("totalSeries must be nil. got %v", ap.totalSeries)
 	}
 }
 
