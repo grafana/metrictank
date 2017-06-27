@@ -24,6 +24,15 @@ var b = []schema.Point{
 	{Val: math.NaN(), Ts: 60},
 }
 
+var avg4a2b = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.Inf(0), Ts: 20},
+	{Val: math.Inf(0), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1234567890, Ts: 50}, // in accordance with graphite, avg(5,null) = 5
+	{Val: 1234567890, Ts: 60},
+}
+
 var c = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 0, Ts: 20},

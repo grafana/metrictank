@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
@@ -28,12 +29,14 @@ func (s *FuncSumSeries) Context(context Context) Context {
 
 func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	var series []models.Series
+	var queryPatts []string
 	for i := range s.in {
 		in, err := s.in[i].Exec(cache)
 		if err != nil {
 			return nil, err
 		}
 		series = append(series, in...)
+		queryPatts = append(queryPatts, in[0].QueryPatt)
 	}
 
 	if len(series) == 0 {
@@ -64,7 +67,7 @@ func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		out = append(out, point)
 	}
-	name := fmt.Sprintf("sumSeries(%s)", patternsAsArgs(series))
+	name := fmt.Sprintf("sumSeries(%s)", strings.Join(queryPatts, ","))
 	cons, queryCons := summarizeCons(series)
 	output := models.Series{
 		Target:       name,
