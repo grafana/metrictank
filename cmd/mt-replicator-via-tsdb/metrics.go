@@ -20,11 +20,11 @@ import (
 
 var (
 	producerBatchSize = flag.Int("batch-size", 10000, "number of metrics to send in each batch.")
-	destinationUrl    = flag.String("destination-url", "http://localhost/metrics", "tsdb-gw address to send metrics to")
+	destinationURL    = flag.String("destination-url", "http://localhost/metrics", "tsdb-gw address to send metrics to")
 	destinationKey    = flag.String("destination-key", "admin-key", "admin-key of destination tsdb-gw server")
 
 	group                = flag.String("group", "mt-replicator", "Kafka consumer group")
-	clientId             = flag.String("client-id", "mt-replicator", "Kafka consumer group client id")
+	clientID             = flag.String("client-id", "mt-replicator", "Kafka consumer group client id")
 	srcTopic             = flag.String("src-topic", "mdm", "metrics topic name on source cluster")
 	initialOffset        = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
 	srcBrokerStr         = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
@@ -66,7 +66,7 @@ func NewMetricsReplicator() (*MetricsReplicator, error) {
 
 	config := cluster.NewConfig()
 	config.Consumer.Offsets.Initial = int64(*initialOffset)
-	config.ClientID = *clientId
+	config.ClientID = *clientID
 	config.Group.Return.Notifications = true
 	config.ChannelBufferSize = 1000
 	config.Consumer.Fetch.Min = 1
@@ -92,14 +92,40 @@ func NewMetricsReplicator() (*MetricsReplicator, error) {
 		consumer:   consumer,
 		tsdbClient: tsdbClient,
 		tsdbKey:    *destinationKey,
-		tsdbUrl:    *destinationUrl,
+		tsdbUrl:    *destinationURL,
 
 		shutdown:   make(chan struct{}),
 		writeQueue: make(chan *writeRequest, 10),
 	}, nil
 }
 
-func (r *MetricsReplicator) Consume() {
+func (r *MetricsReplicator) Start() {
+	r.wg.Add(1)
+	go r.consume()
+	r.wg.Add(1)
+	go r.flush()
+}
+
+func (r *MetricsReplicator) Stop() {
+	r.consumer.Close()
+	close(r.shutdown)
+	log.Info("Consumer closed.")
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-time.After(time.Minute):
+		log.Info("shutdown not complete after 1 minute. Abandoning inflight data.")
+	case <-done:
+		log.Info("shutdown complete.")
+	}
+	return
+}
+
+func (r *MetricsReplicator) consume() {
 	buf := make([]*schema.MetricData, 0)
 	accountingTicker := time.NewTicker(time.Second * 10)
 	flushTicker := time.NewTicker(time.Second)
@@ -174,33 +200,7 @@ func (r *MetricsReplicator) Consume() {
 	}
 }
 
-func (r *MetricsReplicator) Stop() {
-	r.consumer.Close()
-	close(r.shutdown)
-	log.Info("Consumer closed.")
-	done := make(chan struct{})
-	go func() {
-		r.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-time.After(time.Minute):
-		log.Info("shutdown not complete after 1 minute. Abandoning inflight data.")
-	case <-done:
-		log.Info("shutdown complete.")
-	}
-	return
-}
-
-func (r *MetricsReplicator) Start() {
-	r.wg.Add(1)
-	go r.Consume()
-	r.wg.Add(1)
-	go r.Flush()
-}
-
-func (r *MetricsReplicator) Flush() {
+func (r *MetricsReplicator) flush() {
 	b := &backoff.Backoff{
 		Min:    100 * time.Millisecond,
 		Max:    time.Minute,
