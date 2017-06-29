@@ -10,11 +10,16 @@ See also:
 
 Here are the currently included functions:
 
-Function name and signature                          | Alias        | Metrictank
----------------------------------------------------- | ------------ | ----------
-alias(seriesList, alias) seriesList                  |              | Stable
-averageSeries(seriesLists) series                    | avg          | Stable
-consolidateBy(seriesList, func) seriesList           |              | Stable
-movingAverage(seriesLists, windowSize) seriesList    |              | Unstable
-sumSeries(seriesLists) series                        | sum          | Stable
-transformNull(seriesList, default=0) seriesList      |              | Stable
+Function name and signature                           | Alias        | Metrictank
+----------------------------------------------------- | ------------ | ----------
+alias(seriesList, alias) seriesList                   |              | Stable
+aliasByNode(seriesList, nodeList) seriesList          |              | Stable
+aliasSub(seriesList, pattern, replacement) seriesList |              | Stable
+averageSeries(seriesLists) series                     | avg          | Stable
+consolidateBy(seriesList, func) seriesList            |              | Stable
+divideSeries(seriesList, dividend, divisor) seriesList|              | Stable
+movingAverage(seriesLists, windowSize) seriesList     |              | Unstable
+perSecond(seriesLists) seriesList                     |              | Stable
+scale(seriesLists, num) series                        | sum          | Stable
+sumSeries(seriesLists) series                         | sum          | Stable
+transformNull(seriesList, default=0) seriesList       |              | Stable
