@@ -291,6 +291,40 @@ Flags:
 ```
 
 
+## mt-replicator-via-tsdb
+
+```
+mt-replicator-via-tsdb
+
+Replicates a kafka mdm topic on a given cluster to a remote tsdb-gw server
+
+Flags:
+
+  -batch-size int
+    	number of metrics to send in each batch. (default 10000)
+  -client-id string
+    	Kafka consumer group client id (default "mt-replicator")
+  -consumer-fetch-default int
+    	number of bytes to try and fetch from consumer (default 32768)
+  -destination-key string
+    	admin-key of destination tsdb-gw server (default "admin-key")
+  -destination-url string
+    	tsdb-gw address to send metrics to (default "http://localhost/metrics")
+  -group string
+    	Kafka consumer group (default "mt-replicator")
+  -initial-offset int
+    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
+  -log-level int
+    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+  -src-brokers string
+    	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
+  -src-topic string
+    	metrics topic name on source cluster (default "mdm")
+  -version
+    	print version string
+```
+
+
 ## mt-schemas-explain
 
 ```
