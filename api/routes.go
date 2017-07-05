@@ -27,6 +27,7 @@ func (s *Server) RegisterRoutes() {
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
 
 	r.Get("/cluster", s.getClusterStatus)
+	r.Post("/cluster", bind(models.ClusterMembers{}), s.postClusterMembers)
 
 	r.Combo("/getdata", bind(models.GetData{})).Get(s.getData).Post(s.getData)
 
