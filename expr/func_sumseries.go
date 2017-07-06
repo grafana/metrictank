@@ -28,15 +28,9 @@ func (s *FuncSumSeries) Context(context Context) Context {
 }
 
 func (s *FuncSumSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	var series []models.Series
-	var queryPatts []string
-	for i := range s.in {
-		in, err := s.in[i].Exec(cache)
-		if err != nil {
-			return nil, err
-		}
-		series = append(series, in...)
-		queryPatts = append(queryPatts, in[0].QueryPatt)
+	series, queryPatts, err := consumeFuncs(cache, s.in)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(series) == 0 {
