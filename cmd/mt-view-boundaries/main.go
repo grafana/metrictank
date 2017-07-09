@@ -57,7 +57,7 @@ func main() {
 	display(int64(mdata.Month_sec), "cassandra rowkey month")
 
 	if *spanStr != "" {
-		span := dur.MustParseUNsec("span", *spanStr)
+		span := dur.MustParseNDuration("span", *spanStr)
 		_, ok := chunk.RevChunkSpans[span]
 		if !ok {
 			log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *spanStr)

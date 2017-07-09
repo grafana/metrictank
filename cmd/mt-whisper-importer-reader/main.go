@@ -82,7 +82,7 @@ func main() {
 	flag.Parse()
 
 	for _, chunkSpanStrSplit := range strings.Split(*chunkSpanStr, ",") {
-		chunkSpan := dur.MustParseUNsec("chunkspan", chunkSpanStrSplit)
+		chunkSpan := dur.MustParseNDuration("chunkspan", chunkSpanStrSplit)
 
 		if (mdata.Month_sec % chunkSpan) != 0 {
 			panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")

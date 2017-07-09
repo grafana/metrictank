@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -24,8 +25,10 @@ var (
 	keyFile          string
 	multiTenant      bool
 	fallbackGraphite string
+	timeZoneStr      string
 
 	graphiteProxy *httputil.ReverseProxy
+	timeZone      *time.Location
 )
 
 func ConfigSetup() {
@@ -41,11 +44,12 @@ func ConfigSetup() {
 	apiCfg.StringVar(&keyFile, "key-file", "", "SSL key file")
 	apiCfg.BoolVar(&multiTenant, "multi-tenant", true, "require x-org-id authentication to auth as a specific org. otherwise orgId 1 is assumed")
 	apiCfg.StringVar(&fallbackGraphite, "fallback-graphite-addr", "http://localhost:8080", "in case our /render endpoint does not support the requested processing, proxy the request to this graphite")
+	apiCfg.StringVar(&timeZoneStr, "time-zone", "local", "timezone for interpreting from/until values when needed, specified using [zoneinfo name](https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones) e.g. 'America/New_York', 'UTC' or 'local' to use local server timezone")
 	globalconf.Register("http", apiCfg)
 }
 
 func ConfigProcess() {
-	logMinDur = dur.MustParseUsec("log-min-dur", logMinDurStr)
+	logMinDur = dur.MustParseDuration("log-min-dur", logMinDurStr)
 
 	//validate the addr
 	_, err := net.ResolveTCPAddr("tcp", Addr)
@@ -58,4 +62,13 @@ func ConfigProcess() {
 		log.Fatal(4, "API Cannot parse fallback-graphite-addr: %s", err)
 	}
 	graphiteProxy = NewGraphiteProxy(u)
+
+	if timeZoneStr == "local" {
+		timeZone = time.Local
+	} else {
+		timeZone, err = time.LoadLocation(timeZoneStr)
+		if err != nil {
+			log.Fatal(4, "API Cannot load timezone %q: %s", timeZoneStr, err)
+		}
+	}
 }

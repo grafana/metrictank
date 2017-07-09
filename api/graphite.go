@@ -133,19 +133,34 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Unix())
 
+	var loc *time.Location
+	switch request.Tz {
+	case "":
+		loc = timeZone
+	case "local":
+		loc = time.Local
+	default:
+		var err error
+		loc, err = time.LoadLocation(request.Tz)
+		if err != nil {
+			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+			return
+		}
+	}
+
 	from := request.From
 	to := request.To
 	if to == "" {
 		to = request.Until
 	}
 
-	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
+	fromUnix, err := dur.ParseDateTime(from, loc, now, defaultFrom)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 
-	toUnix, err := dur.ParseTSpec(to, now, defaultTo)
+	toUnix, err := dur.ParseDateTime(to, loc, now, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
