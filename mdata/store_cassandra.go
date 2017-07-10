@@ -49,6 +49,8 @@ var (
 	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
 	// reads that were already too old to be executed
 	cassOmitOldRead = stats.NewCounter32("store.cassandra.omitted_old_reads")
+	// reads that could not be pushed into the queue because it was full
+	cassReadQueueFull = stats.NewCounter32("store.cassandra.read_queue_full")
 
 	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
 	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
@@ -448,7 +450,12 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	results := make(chan outcome, numQueries)
 	for i := range crrs {
 		crrs[i].out = results
-		c.readQueue <- crrs[i]
+		select {
+		case c.readQueue <- crrs[i]:
+		default:
+			cassReadQueueFull.Inc()
+			numQueries--
+		}
 	}
 	outcomes := make([]outcome, 0, numQueries)
 
