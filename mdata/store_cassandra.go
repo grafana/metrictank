@@ -47,6 +47,8 @@ var (
 	cassPutExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.put.exec")
 	// metric store.cassandra.put.wait is the duration of a put in the wait queue
 	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
+	// reads that were already too old to be executed
+	cassOmitOldRead = stats.NewCounter32("store.cassandra.omitted_old_reads")
 
 	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
 	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
@@ -88,6 +90,7 @@ type CassandraStore struct {
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
 	ttlTables        TTLTables
+	omitReadTimeout  time.Duration
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -159,7 +162,7 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor int, ssl, auth, hostVerification bool, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, ttls []uint32) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -244,6 +247,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
 		writeQueueMeters: make([]*stats.Range32, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
+		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
 	}
 
@@ -366,7 +370,12 @@ func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
-		cassGetWaitDuration.Value(time.Since(crr.timestamp))
+		waitDuration := time.Since(crr.timestamp)
+		cassGetWaitDuration.Value(waitDuration)
+		if waitDuration > c.omitReadTimeout {
+			cassOmitOldRead.Inc()
+			continue
+		}
 		pre := time.Now()
 		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter()}
 		cassGetExecDuration.Value(time.Since(pre))
