@@ -46,13 +46,14 @@ var (
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
 	// our own flags
-	from         = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
-	to           = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
-	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
-	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
-	groupTTL     = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
-	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
-	timeZoneStr  = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+	from                     = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
+	to                       = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
+	fix                      = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
+	printTs                  = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
+	groupTTL                 = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
+	windowFactor             = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	timeZoneStr              = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 10, "if a read is older than this, it will directly be omitted without executing")
 )
 
 func main() {
@@ -155,7 +156,7 @@ func main() {
 		}
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}

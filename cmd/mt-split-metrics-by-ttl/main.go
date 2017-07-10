@@ -32,7 +32,8 @@ var (
 	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
-	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	windowFactor             = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 10, "if a read is older than this, it will directly be omitted without executing")
 )
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 		panic(fmt.Sprintf("Error creating directory: %s", err))
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}
