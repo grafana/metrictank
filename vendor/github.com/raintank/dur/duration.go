@@ -1,8 +1,12 @@
-package dur
-
+// Package dur is a package to convert string duration and time specifications
+// to numbers of seconds and to unix timestamps.
+// It aims to support the full specification as outlined in http://graphite.readthedocs.io/en/latest/render_api.html#from-until
+// which incorporates the formats defined by `at`.
+//
 // this package works with the following shorthands:
-// Usec : unsigned (positive) number of seconds
-// UNsec: like Usec, but non-zero.
+// Duration : unsigned (positive) number of seconds
+// NDuration: like Duration, but non-zero.
+package dur
 
 import (
 	"errors"
@@ -15,33 +19,40 @@ var errNegative = errors.New("number cannot be negative")
 var errNonZero = errors.New("number must be nonzero")
 var errUnknownTimeUnit = errors.New("unknown time unit")
 
-func MustParseUsec(desc, s string) uint32 {
-	sec, err := ParseUsec(s)
+// MustParseNDuration parses a format string to a non-zero number of seconds, or panics otherwise
+// unit defaults to s if not specified
+func MustParseNDuration(desc, s string) uint32 {
+	sec, err := ParseNDuration(s)
 	if err != nil {
 		panic(fmt.Sprintf("%q: %s", desc, s))
 	}
 	return sec
 }
 
-func MustParseUNsec(desc, s string) uint32 {
-	sec, err := ParseUNsec(s)
+// MustParseDuration parses a format string to a number of seconds, or panics otherwise
+// unit defaults to s if not specified
+func MustParseDuration(desc, s string) uint32 {
+	sec, err := ParseDuration(s)
 	if err != nil {
 		panic(fmt.Sprintf("%q: %s", desc, s))
 	}
 	return sec
 }
 
-func ParseUNsec(s string) (uint32, error) {
-	i, e := ParseUsec(s)
+// ParseNDuration parses a format string to a non-zero number of seconds, or error otherwise
+// unit defaults to s if not specified
+func ParseNDuration(s string) (uint32, error) {
+	i, e := ParseDuration(s)
 	if e == nil && i == 0 {
 		return 0, errNonZero
 	}
 	return i, e
 }
 
-// ParseUsec converts a string expr to an Usec.
+// ParseDuration parses a format string to a number of seconds, or error otherwise
+// valid units are s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours, d/day/days, w/week/weeks, mon/month/months, y/year/years
 // unit defaults to s if not specified
-func ParseUsec(s string) (uint32, error) {
+func ParseDuration(s string) (uint32, error) {
 	if s == "" {
 		return 0, errEmpty
 	}

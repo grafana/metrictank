@@ -1,6 +1,8 @@
 FROM alpine
 MAINTAINER Anthony Woods awoods@raintank.io
 
+RUN apk add -U tzdata
+
 RUN mkdir -p /etc/metrictank
 COPY config/metrictank-docker.ini /etc/metrictank/metrictank.ini
 COPY config/storage-schemas.conf /etc/metrictank/storage-schemas.conf

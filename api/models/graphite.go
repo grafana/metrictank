@@ -20,6 +20,7 @@ type GraphiteRender struct {
 	Format        string   `json:"format" form:"format" binding:"In(,json,msgp,pickle)"`
 	NoProxy       bool     `json:"local" form:"local"` //this is set to true by graphite-web when it passes request to cluster servers
 	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
+	Tz            string   `json:"tz" form:"tz"`
 }
 
 func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) binding.Errors {

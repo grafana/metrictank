@@ -52,6 +52,7 @@ var (
 	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
 	groupTTL     = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	timeZoneStr  = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 )
 
 func main() {
@@ -142,6 +143,18 @@ func main() {
 		return
 	}
 
+	var loc *time.Location
+	switch *timeZoneStr {
+	case "local":
+		loc = time.Local
+	default:
+		var err error
+		loc, err = time.LoadLocation(*timeZoneStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
@@ -169,12 +182,12 @@ func main() {
 		defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 		defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
 
-		fromUnix, err = dur.ParseTSpec(*from, now, defaultFrom)
+		fromUnix, err = dur.ParseDateTime(*from, loc, now, defaultFrom)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		toUnix, err = dur.ParseTSpec(*to, now, defaultTo)
+		toUnix, err = dur.ParseDateTime(*to, loc, now, defaultTo)
 		if err != nil {
 			log.Fatal(err)
 		}
