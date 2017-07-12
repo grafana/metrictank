@@ -64,8 +64,8 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
 	}
-	if agg != nil && agg.WriteBufferConf != nil {
-		m.wb = NewWriteBuffer(agg.WriteBufferConf, m.add)
+	if agg != nil && agg.ReorderWindow != 0 {
+		m.wb = NewWriteBuffer(agg.ReorderWindow, ret.SecondsPerPoint, m.add)
 	}
 
 	for _, ret := range retentions[1:] {

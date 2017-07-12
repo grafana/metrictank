@@ -9,11 +9,6 @@ import (
 	"github.com/alyu/configparser"
 )
 
-type WriteBufferConf struct {
-	ReorderWindow uint32
-	FlushMin      uint32
-}
-
 // Aggregations holds the aggregation definitions
 type Aggregations struct {
 	Data               []Aggregation
@@ -25,7 +20,7 @@ type Aggregation struct {
 	Pattern           *regexp.Regexp
 	XFilesFactor      float64
 	AggregationMethod []Method
-	WriteBufferConf   *WriteBufferConf
+	ReorderWindow     uint32
 }
 
 // NewAggregations create instance of Aggregations
@@ -116,10 +111,7 @@ func ReadAggregations(file string) (Aggregations, error) {
 			}
 			// if reorderWindow == 0 we just disable the buffer
 			if reorderWindow > 0 {
-				item.WriteBufferConf = &WriteBufferConf{
-					ReorderWindow: uint32(reorderWindow),
-					FlushMin:      uint32(flushMin),
-				}
+				item.ReorderWindow = uint32(reorderWindow)
 			}
 		}
 

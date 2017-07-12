@@ -94,6 +94,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 			c.t.Fatalf("Raw: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
 		}
 		if c.points[index].ts != point.Ts || c.points[index].val != point.Val {
+			fmt.Println(res.Raw)
 			c.t.Fatalf("Raw: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
 		}
 	}
@@ -239,10 +240,7 @@ func TestAggMetricWithWriteBuffer(t *testing.T) {
 		Pattern:           regexp.MustCompile(".*"),
 		XFilesFactor:      0.5,
 		AggregationMethod: []conf.Method{conf.Avg},
-		WriteBufferConf: &conf.WriteBufferConf{
-			ReorderWindow: 10,
-			FlushMin:      10,
-		},
+		ReorderWindow:     10,
 	}
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
 	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, &agg, false))
@@ -267,17 +265,17 @@ func TestAggMetricWithWriteBuffer(t *testing.T) {
 	// adds 14 entries that are out of order and the write buffer should order the first 13
 	// including the previous 7 it will then reach 20 which is = reorder window + flush min, so it causes a flush
 	// the last item (14th) will be added out of order, after the buffer is flushed, so it increases metricsTooOld
-	for i := uint32(314); i > 300; i-- {
+	for i := uint32(314); i > 304; i-- {
 		c.Add(i, float64(i))
 	}
-	c.DropPointByTs(301)
+	c.DropPointByTs(305)
 
 	// get subranges
 	c.Verify(true, 100, 320, 101, 315)
 
 	// one point has been added out of order and too old for the buffer to reorder
 	if metricsTooOld.Peek() != 1 {
-		t.Fatalf("Expected the out off order count to be 1")
+		t.Fatalf("Expected the out of order count to be 1, not %d", metricsTooOld.Peek())
 	}
 }
 
