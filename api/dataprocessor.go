@@ -370,8 +370,6 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.MetricResult {
 	if !ok {
 		return mdata.MetricResult{
 			Oldest: ctx.Req.To,
-			Iters:  make([]chunk.Iter, 0),
-			Raw:    make([]schema.Point, 0),
 		}
 	}
 

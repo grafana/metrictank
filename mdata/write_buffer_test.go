@@ -269,13 +269,13 @@ func TestWriteBufferFlushUnsortedData1(t *testing.T) {
 		{12, 12},
 		{13, 13},
 	}
-	for i, _ := range expecting {
+	for i := range expecting {
 		if expecting[i] != results[i] {
-			t.Fatalf("Unexpected results ", expecting, results)
+			t.Fatalf("Unexpected results %+v, %+v", expecting, results)
 		}
 	}
 	if failedCount != 1 {
-		t.Fatalf("expecting failed count to be 1, not ", failedCount)
+		t.Fatalf("expecting failed count to be 1, not %d", failedCount)
 	}
 }
 

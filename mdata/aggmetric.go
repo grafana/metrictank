@@ -429,6 +429,7 @@ func (a *AggMetric) persist(pos int) {
 	return
 }
 
+// don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
