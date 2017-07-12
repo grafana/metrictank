@@ -8,7 +8,7 @@ import (
 )
 
 func testAddAndGet(t *testing.T, reorderWindow uint32, flush func(uint32, float64), testData, expectedData []schema.Point, expectAddFail bool) {
-	b := NewWriteBuffer(reorderWindow, 1, flush)
+	b := NewReorderBuffer(reorderWindow, 1, flush)
 	gotFailure := false
 	for _, point := range testData {
 		success := b.Add(point.Ts, point.Val)
@@ -175,7 +175,7 @@ func TestWriteBufferOmitFlushIfNotEnoughData(t *testing.T) {
 	flush := func(ts uint32, val float64) {
 		t.Fatalf("Expected the flush function to not get called")
 	}
-	b := NewWriteBuffer(9, 1, flush)
+	b := NewReorderBuffer(9, 1, flush)
 	for i := uint32(1); i < 10; i++ {
 		b.Add(i, float64(i*100))
 	}
@@ -223,7 +223,7 @@ func TestWriteBufferFlushSortedData(t *testing.T) {
 		results[resultI] = schema.Point{Ts: ts, Val: val}
 		resultI++
 	}
-	buf := NewWriteBuffer(600, 1, receiver)
+	buf := NewReorderBuffer(600, 1, receiver)
 	for i := 1100; i < 2100; i++ {
 		if !buf.Add(uint32(i), float64(i)) {
 			t.Fatalf("Adding failed")
@@ -245,7 +245,7 @@ func TestWriteBufferFlushUnsortedData1(t *testing.T) {
 		resultI++
 	}
 	metricsTooOld.SetUint32(0)
-	buf := NewWriteBuffer(3, 1, receiver)
+	buf := NewReorderBuffer(3, 1, receiver)
 	data := []schema.Point{
 		{10, 10},
 		{11, 11},
@@ -286,7 +286,7 @@ func TestWriteBufferFlushUnsortedData2(t *testing.T) {
 		results[resultI] = schema.Point{Ts: ts, Val: val}
 		resultI++
 	}
-	buf := NewWriteBuffer(600, 1, receiver)
+	buf := NewReorderBuffer(600, 1, receiver)
 	data := make([]schema.Point, 1000)
 	for i := 0; i < 1000; i++ {
 		data[i] = schema.Point{Ts: uint32(i + 1000), Val: float64(i + 1000)}
@@ -304,7 +304,7 @@ func TestWriteBufferFlushUnsortedData2(t *testing.T) {
 
 func BenchmarkAddInOrder(b *testing.B) {
 	data := make([]schema.Point, b.N)
-	buf := NewWriteBuffer(uint32(b.N), 1, nil)
+	buf := NewReorderBuffer(uint32(b.N), 1, nil)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -315,7 +315,7 @@ func BenchmarkAddInOrder(b *testing.B) {
 func BenchmarkAddOutOfOrder(b *testing.B) {
 	data := make([]schema.Point, b.N)
 	unsortedData := unsort(data, 10)
-	buf := NewWriteBuffer(uint32(b.N), 1, nil)
+	buf := NewReorderBuffer(uint32(b.N), 1, nil)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -324,7 +324,7 @@ func BenchmarkAddOutOfOrder(b *testing.B) {
 }
 
 func benchmarkAddAndFlushX(b *testing.B, datapoints, flushMin, reorderWindow uint32) {
-	buf := NewWriteBuffer(
+	buf := NewReorderBuffer(
 		reorderWindow,
 		1,
 		func(ts uint32, val float64) {},

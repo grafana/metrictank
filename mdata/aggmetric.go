@@ -28,7 +28,7 @@ type AggMetric struct {
 	cachePusher cache.CachePusher
 	sync.RWMutex
 	Key             string
-	wb              *WriteBuffer
+	wb              *ReorderBuffer
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
@@ -65,7 +65,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	if agg != nil && agg.ReorderWindow != 0 {
-		m.wb = NewWriteBuffer(agg.ReorderWindow, ret.SecondsPerPoint, m.add)
+		m.wb = NewReorderBuffer(agg.ReorderWindow, ret.SecondsPerPoint, m.add)
 	}
 
 	for _, ret := range retentions[1:] {

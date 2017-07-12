@@ -19,11 +19,11 @@ type point struct {
 	val float64
 }
 
-type points []point
+type ByTs []point
 
-func (a points) Len() int           { return len(a) }
-func (a points) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a points) Less(i, j int) bool { return a[i].ts < a[j].ts }
+func (a ByTs) Len() int           { return len(a) }
+func (a ByTs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByTs) Less(i, j int) bool { return a[i].ts < a[j].ts }
 
 func (p point) String() string {
 	return fmt.Sprintf("point{%0.f at %d}", p.val, p.ts)
@@ -46,11 +46,7 @@ func (c *Checker) Add(ts uint32, val float64) {
 }
 
 func (c *Checker) DropPointByTs(ts uint32) {
-	i := 0
-	for {
-		if i == len(c.points) {
-			return
-		}
+	for i := 0; i != len(c.points); {
 		if c.points[i].ts == ts {
 			c.points = append(c.points[:i], c.points[i+1:]...)
 		} else {
@@ -64,7 +60,7 @@ func (c *Checker) DropPointByTs(ts uint32) {
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	currentClusterStatus := cluster.Manager.IsPrimary()
-	sort.Sort(points(c.points))
+	sort.Sort(ByTs(c.points))
 	cluster.Manager.SetPrimary(primary)
 	res := c.agg.Get(from, to)
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
