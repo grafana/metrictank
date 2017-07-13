@@ -362,15 +362,10 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	for i := pos; i < len(nodes); i++ {
 		p := nodes[i]
 
-		matchAll := "*" == p
-		var regex *regexp.Regexp
-		if !matchAll && strings.ContainsAny(nodes[i], "*{}[]?") {
-			r, err := regexp.Compile(toRegexp(p))
-			if err != nil {
-				log.Debug("memory-idx: regexp failed to compile. %s - %s", p, err)
-				return nil, err
-			}
-			regex = r
+		matcher, err := getMatcher(p)
+
+		if err != nil {
+			return nil, err
 		}
 
 		grandChildren := make([]*Node, 0)
@@ -381,28 +376,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				continue
 			}
 			log.Debug("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
-			matches := make([]string, 0)
-			if regex != nil {
-				for _, c := range c.Children {
-					if regex.MatchString(c) {
-						log.Debug("memory-idx: %s regex matches %s", c, regex.String())
-						matches = append(matches, c)
-					}
-				}
-			} else if (matchAll) {
-				log.Debug("memory-idx: Matching all children")
-				for _, c := range c.Children {
-					matches = append(matches, c)
-				}
-			} else {
-				for _, c := range c.Children {
-					if c == p {
-						log.Debug("memory-idx: %s matches %s", c, p)
-						matches = append(matches, c)
-						break
-					}
-				}
-			}
+			matches := matcher(c.Children)
 			for _, m := range matches {
 				newBranch := c.Path + "." + m
 				if c.Path == "" {
@@ -612,6 +586,46 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	}
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil
+}
+
+func getMatcher(path string) (func([]string) []string, error) {
+	// Matches everything
+	if path == "*" {
+		return func(children []string) []string {
+			log.Debug("memory-idx: Matching all children")
+			return children
+		}, nil
+	}
+
+	// Convert to regex and match
+	if strings.ContainsAny(path, "*{}[]?") {
+		r, err := regexp.Compile(toRegexp(path))
+		if err != nil {
+			log.Debug("memory-idx: regexp failed to compile. %s - %s", path, err)
+			return nil, err
+		}
+		return func(children []string) []string {
+			matches := make([]string, 0)
+			for _, c := range children {
+				if r.MatchString(c) {
+					log.Debug("memory-idx: %s regex matches %s", c, r.String())
+					matches = append(matches, c)
+				}
+			}
+			return matches
+		}, nil
+	}
+
+	// Match a particular value
+	return func(children []string) []string {
+		for _, c := range children {
+			if c == path {
+				log.Debug("memory-idx: %s matches %s", c, path)
+				return []string{c}
+			}
+		}
+		return []string{}
+	}, nil
 }
 
 func toRegexp(pattern string) string {
