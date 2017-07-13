@@ -137,7 +137,7 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) GetResult {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) Result {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -166,7 +166,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) GetResult {
+func (a *AggMetric) Get(from, to uint32) Result {
 	pre := time.Now()
 	if LogLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
@@ -177,7 +177,7 @@ func (a *AggMetric) Get(from, to uint32) GetResult {
 	a.RLock()
 	defer a.RUnlock()
 
-	result := GetResult{
+	result := Result{
 		Oldest: math.MaxInt32,
 	}
 
@@ -436,11 +436,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	} else {
 		// write through write buffer, returns false if ts is out of reorder window
 		res := a.rob.Add(ts, val)
-		if !res.Success {
-			metricsTooOld.Inc()
-			return
-		}
-		for _, p := range res.Flushed {
+		for _, p := range res {
 			a.add(p.Ts, p.Val)
 		}
 	}

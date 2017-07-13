@@ -11,16 +11,12 @@ import (
 func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAddFail bool) []schema.Point {
 	var flushed []schema.Point
 	b := NewReorderBuffer(reorderWindow, 1)
-	gotFailure := false
+	metricsTooOld.SetUint32(0)
 	for _, point := range testData {
-		res := b.Add(point.Ts, point.Val)
-		if !res.Success {
-			gotFailure = true
-		} else {
-			flushed = append(flushed, res.Flushed...)
-		}
+		addRes := b.Add(point.Ts, point.Val)
+		flushed = append(flushed, addRes...)
 	}
-	if expectAddFail && !gotFailure {
+	if expectAddFail && metricsTooOld.Peek() == 0 {
 		t.Fatal("Expected an add to fail, but they all succeeded")
 	}
 	returned := b.Get()
@@ -166,8 +162,8 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) 
 func TestReorderBufferOmitFlushIfNotEnoughData(t *testing.T) {
 	b := NewReorderBuffer(9, 1)
 	for i := uint32(1); i < 10; i++ {
-		res := b.Add(i, float64(i*100))
-		if len(res.Flushed) > 0 {
+		flushed := b.Add(i, float64(i*100))
+		if len(flushed) > 0 {
 			t.Fatalf("Expected no data to get flushed out")
 		}
 	}
@@ -205,14 +201,15 @@ func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 }
 
 func TestReorderBufferFlushSortedData(t *testing.T) {
-	buf := NewReorderBuffer(600, 1)
 	var results []schema.Point
+	buf := NewReorderBuffer(600, 1)
+	metricsTooOld.SetUint32(0)
 	for i := 1100; i < 2100; i++ {
-		res := buf.Add(uint32(i), float64(i))
-		if !res.Success {
+		flushed := buf.Add(uint32(i), float64(i))
+		if metricsTooOld.Peek() != 0 {
 			t.Fatalf("Adding failed")
 		}
-		results = append(results, res.Flushed...)
+		results = append(results, flushed...)
 	}
 
 	for i := 0; i < 400; i++ {
@@ -223,9 +220,8 @@ func TestReorderBufferFlushSortedData(t *testing.T) {
 }
 
 func TestReorderBufferFlushUnsortedData1(t *testing.T) {
-	buf := NewReorderBuffer(3, 1)
 	var results []schema.Point
-	metricsTooOld.SetUint32(0)
+	buf := NewReorderBuffer(3, 1)
 	data := []schema.Point{
 		{10, 10},
 		{11, 11},
@@ -237,12 +233,14 @@ func TestReorderBufferFlushUnsortedData1(t *testing.T) {
 		{19, 19},
 	}
 	failedCount := 0
+	metricsTooOld.SetUint32(0)
 	for _, p := range data {
-		res := buf.Add(p.Ts, p.Val)
-		if !res.Success {
+		flushed := buf.Add(p.Ts, p.Val)
+		if metricsTooOld.Peek() != 0 {
 			failedCount++
+			metricsTooOld.SetUint32(0)
 		} else {
-			results = append(results, res.Flushed...)
+			results = append(results, flushed...)
 		}
 	}
 	expecting := []schema.Point{
@@ -263,16 +261,16 @@ func TestReorderBufferFlushUnsortedData1(t *testing.T) {
 }
 
 func TestReorderBufferFlushUnsortedData2(t *testing.T) {
-	buf := NewReorderBuffer(600, 1)
 	var results []schema.Point
+	buf := NewReorderBuffer(600, 1)
 	data := make([]schema.Point, 1000)
 	for i := 0; i < 1000; i++ {
 		data[i] = schema.Point{Ts: uint32(i + 1000), Val: float64(i + 1000)}
 	}
 	unsortedData := unsort(data, 10)
 	for i := 0; i < len(data); i++ {
-		res := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
-		results = append(results, res.Flushed...)
+		flushed := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
+		results = append(results, flushed...)
 	}
 	for i := 0; i < 400; i++ {
 		if results[i].Ts != uint32(i+1000) || results[i].Val != float64(i+1000) {

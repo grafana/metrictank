@@ -320,7 +320,7 @@ func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Conso
 	return Fix(res.Points, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx *requestContext) mdata.GetResult {
+func (s *Server) getSeries(ctx *requestContext) mdata.Result {
 
 	res := s.getSeriesAggMetrics(ctx)
 	log.Debug("oldest from aggmetrics is %d", res.Oldest)
@@ -365,10 +365,10 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.GetResult {
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
 	metric, ok := s.MemoryStore.Get(ctx.Key)
 	if !ok {
-		return mdata.GetResult{
+		return mdata.Result{
 			Oldest: ctx.Req.To,
 		}
 	}

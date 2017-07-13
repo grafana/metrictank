@@ -27,15 +27,16 @@ func NewReorderBuffer(reorderWindow uint32, interval int) *ReorderBuffer {
 	return buf
 }
 
-func (rob *ReorderBuffer) Add(ts uint32, val float64) AddResult {
+func (rob *ReorderBuffer) Add(ts uint32, val float64) []schema.Point {
 	ts = aggBoundary(ts, rob.interval)
-	res := AddResult{}
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(rob.len*rob.interval) {
-		return res
+		metricsTooOld.Inc()
+		return nil
 	}
 
+	var res []schema.Point
 	oldest := (rob.newest + 1) % rob.len
 	index := (ts / rob.interval) % rob.len
 	if ts > rob.buf[rob.newest].Ts {
@@ -46,7 +47,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) AddResult {
 
 		for i := uint32(0); i < flushCount; i++ {
 			if rob.buf[oldest].Ts != 0 {
-				res.Flushed = append(res.Flushed, rob.buf[oldest])
+				res = append(res, rob.buf[oldest])
 			}
 			rob.buf[oldest].Ts = 0
 			rob.buf[oldest].Val = 0
@@ -60,7 +61,6 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) AddResult {
 		rob.buf[index].Val = val
 	}
 
-	res.Success = true
 	return res
 }
 
