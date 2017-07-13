@@ -177,6 +177,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	fromUnix += 1
 	toUnix += 1
 
+	// note: the model is already validated to assure at least one of them has len >0
+	if len(request.Targets) == 0 {
+		request.Targets = request.TargetsRails
+	}
+
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
 		ctx.Error(http.StatusBadRequest, err.Error())
