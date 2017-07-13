@@ -54,7 +54,7 @@ These settings are good for development and geared towards Cassandra 3.0
 For clustered scenarios, you may want to initialize Cassandra yourself with a schema like:
 
 ```
-CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': '3'}  AND durable_writes = true;
+CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'NetworkTopologyStrategy', 'DC1': '3'}  AND durable_writes = true;
 
 CREATE TABLE IF NOT EXISTS metrictank.metric (
     key ascii,
