@@ -5,79 +5,78 @@ import (
 )
 
 /*
- * The write buffer keeps a window of data during which it is ok to send data out of order.
- * Once the reorder window has passed it will try to flush the data out.
- * The write buffer itself is not thread safe because it is only used by AggMetric,
+ * The reorder buffer keeps a window of data during which it is ok to send data out of order.
+ * Once the reorder window has passed Add() will return the old data and delete it from the buffer.
+ * The reorder buffer itself is not thread safe because it is only used by AggMetric,
  * which is thread safe, so there is no locking in the buffer.
  */
 
 type ReorderBuffer struct {
-	len      uint32                // length of buffer in number of datapoints
-	newest   uint32                // index of newest buffer entry
-	interval uint32                // metric interval
-	buf      []schema.Point        // the actual buffer holding the data
-	flush    func(uint32, float64) // flushCount callback
+	len      uint32         // length of buffer in number of datapoints
+	newest   uint32         // index of newest buffer entry
+	interval uint32         // metric interval
+	buf      []schema.Point // the actual buffer holding the data
 }
 
-func NewReorderBuffer(reorderWindow uint32, interval int, flush func(uint32, float64)) *ReorderBuffer {
+func NewReorderBuffer(reorderWindow uint32, interval int) *ReorderBuffer {
 	buf := &ReorderBuffer{
 		len:      reorderWindow,
-		flush:    flush,
 		interval: uint32(interval),
-		newest:   0,
 		buf:      make([]schema.Point, reorderWindow),
 	}
 	return buf
 }
 
-func (wb *ReorderBuffer) Add(ts uint32, val float64) bool {
-	ts = aggBoundary(ts, wb.interval)
+func (rob *ReorderBuffer) Add(ts uint32, val float64) AddResult {
+	ts = aggBoundary(ts, rob.interval)
+	res := AddResult{}
 
 	// out of order and too old
-	if wb.buf[wb.newest].Ts != 0 && ts <= wb.buf[wb.newest].Ts-(wb.len*wb.interval) {
-		return false
+	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(rob.len*rob.interval) {
+		return res
 	}
 
-	oldest := (wb.newest + 1) % wb.len
-	index := (ts / wb.interval) % wb.len
-	if ts > wb.buf[wb.newest].Ts {
-		flushCount := (ts - wb.buf[wb.newest].Ts) / wb.interval
-		if flushCount > wb.len {
-			flushCount = wb.len
+	oldest := (rob.newest + 1) % rob.len
+	index := (ts / rob.interval) % rob.len
+	if ts > rob.buf[rob.newest].Ts {
+		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
+		if flushCount > rob.len {
+			flushCount = rob.len
 		}
 
 		for i := uint32(0); i < flushCount; i++ {
-			if wb.buf[oldest].Ts != 0 {
-				wb.flush(wb.buf[oldest].Ts, wb.buf[oldest].Val)
+			if rob.buf[oldest].Ts != 0 {
+				res.Flushed = append(res.Flushed, rob.buf[oldest])
 			}
-			wb.buf[oldest].Ts = 0
-			wb.buf[oldest].Val = 0
-			oldest = (oldest + 1) % wb.len
+			rob.buf[oldest].Ts = 0
+			rob.buf[oldest].Val = 0
+			oldest = (oldest + 1) % rob.len
 		}
-		wb.buf[index].Ts = ts
-		wb.buf[index].Val = val
-		wb.newest = index
+		rob.buf[index].Ts = ts
+		rob.buf[index].Val = val
+		rob.newest = index
 	} else {
-		wb.buf[index].Ts = ts
-		wb.buf[index].Val = val
+		rob.buf[index].Ts = ts
+		rob.buf[index].Val = val
 	}
 
-	return true
+	res.Success = true
+	return res
 }
 
 // returns all the data in the buffer as a raw list of points
-func (wb *ReorderBuffer) Get() []schema.Point {
-	res := make([]schema.Point, 0, wb.len)
-	oldest := (wb.newest + 1) % wb.len
+func (rob *ReorderBuffer) Get() []schema.Point {
+	res := make([]schema.Point, 0, rob.len)
+	oldest := (rob.newest + 1) % rob.len
 
 	for {
-		if wb.buf[oldest].Ts != 0 {
-			res = append(res, wb.buf[oldest])
+		if rob.buf[oldest].Ts != 0 {
+			res = append(res, rob.buf[oldest])
 		}
-		if oldest == wb.newest {
+		if oldest == rob.newest {
 			break
 		}
-		oldest = (oldest + 1) % wb.len
+		oldest = (oldest + 1) % rob.len
 	}
 
 	return res

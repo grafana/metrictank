@@ -39,7 +39,6 @@ func NewChecker(t *testing.T, agg *AggMetric) *Checker {
 	return &Checker{t, agg, make([]point, 0)}
 }
 
-// always add points in ascending order, never same ts!
 func (c *Checker) Add(ts uint32, val float64) {
 	c.agg.Add(ts, val)
 	c.points = append(c.points, point{ts, val})
@@ -84,14 +83,14 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 			}
 		}
 	}
-	for _, point := range res.Raw {
+	for _, point := range res.Points {
 		index++
 		if index > pj {
-			c.t.Fatalf("Raw: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
+			c.t.Fatalf("Points: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
 		}
 		if c.points[index].ts != point.Ts || c.points[index].val != point.Val {
-			fmt.Println(res.Raw)
-			c.t.Fatalf("Raw: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
+			fmt.Println(res.Points)
+			c.t.Fatalf("Points: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
 		}
 	}
 	if index != pj {
@@ -228,7 +227,7 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(true, 800, 1299, 1299, 1299)
 }
 
-func TestAggMetricWithWriteBuffer(t *testing.T) {
+func TestAggMetricWithReorderBuffer(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	agg := conf.Aggregation{
@@ -241,7 +240,7 @@ func TestAggMetricWithWriteBuffer(t *testing.T) {
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
 	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, &agg, false))
 
-	// basic case, single range
+	// basic adds and verifies with test data
 	c.Add(101, 101)
 	c.Verify(true, 100, 200, 101, 101)
 	c.Add(105, 105)
@@ -250,17 +249,14 @@ func TestAggMetricWithWriteBuffer(t *testing.T) {
 	c.Add(125, 125)
 	c.Add(135, 135)
 	c.Verify(true, 100, 199, 101, 135)
-
-	// add new ranges, aligned and unaligned
 	c.Add(200, 200)
 	c.Add(315, 315)
 	c.Verify(true, 100, 399, 101, 315)
 
 	metricsTooOld.SetUint32(0)
 
-	// adds 14 entries that are out of order and the write buffer should order the first 13
-	// including the previous 7 it will then reach 20 which is = reorder window + flush min, so it causes a flush
-	// the last item (14th) will be added out of order, after the buffer is flushed, so it increases metricsTooOld
+	// adds 10 entries that are out of order and the write buffer should order the first 9
+	// the last item (305) will be too old, so it increases metricsTooOld counter
 	for i := uint32(314); i > 304; i-- {
 		c.Add(i, float64(i))
 	}

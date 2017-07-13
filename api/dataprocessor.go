@@ -316,11 +316,11 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
 	ctx := newRequestContext(&req, consolidator)
 	res := s.getSeries(ctx)
-	res.Raw = append(s.itersToPoints(ctx, res.Iters), res.Raw...)
-	return Fix(res.Raw, req.From, req.To, req.ArchInterval)
+	res.Points = append(s.itersToPoints(ctx, res.Iters), res.Points...)
+	return Fix(res.Points, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx *requestContext) mdata.MetricResult {
+func (s *Server) getSeries(ctx *requestContext) mdata.GetResult {
 
 	res := s.getSeriesAggMetrics(ctx)
 	log.Debug("oldest from aggmetrics is %d", res.Oldest)
@@ -365,10 +365,10 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.MetricResult {
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.GetResult {
 	metric, ok := s.MemoryStore.Get(ctx.Key)
 	if !ok {
-		return mdata.MetricResult{
+		return mdata.GetResult{
 			Oldest: ctx.Req.To,
 		}
 	}

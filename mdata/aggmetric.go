@@ -12,8 +12,6 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
-
-	"gopkg.in/raintank/schema.v1"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -28,7 +26,7 @@ type AggMetric struct {
 	cachePusher cache.CachePusher
 	sync.RWMutex
 	Key             string
-	wb              *ReorderBuffer
+	rob             *ReorderBuffer
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
@@ -65,7 +63,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	if agg != nil && agg.ReorderWindow != 0 {
-		m.wb = NewReorderBuffer(agg.ReorderWindow, ret.SecondsPerPoint, m.add)
+		m.rob = NewReorderBuffer(agg.ReorderWindow, ret.SecondsPerPoint)
 	}
 
 	for _, ret := range retentions[1:] {
@@ -139,7 +137,7 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) MetricResult {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) GetResult {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -168,7 +166,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) MetricResult {
+func (a *AggMetric) Get(from, to uint32) GetResult {
 	pre := time.Now()
 	if LogLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
@@ -179,16 +177,14 @@ func (a *AggMetric) Get(from, to uint32) MetricResult {
 	a.RLock()
 	defer a.RUnlock()
 
-	result := MetricResult{
+	result := GetResult{
 		Oldest: math.MaxInt32,
-		Iters:  make([]chunk.Iter, 0),
-		Raw:    make([]schema.Point, 0),
 	}
 
-	if a.wb != nil {
-		result.Raw = a.wb.Get()
-		if len(result.Raw) > 0 {
-			result.Oldest = result.Raw[0].Ts
+	if a.rob != nil {
+		result.Points = a.rob.Get()
+		if len(result.Points) > 0 {
+			result.Oldest = result.Points[0].Ts
 			if result.Oldest <= from {
 				return result
 			}
@@ -434,13 +430,18 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
 
-	if a.wb == nil {
+	if a.rob == nil {
 		// write directly
 		a.add(ts, val)
 	} else {
 		// write through write buffer, returns false if ts is out of reorder window
-		if !a.wb.Add(ts, val) {
+		res := a.rob.Add(ts, val)
+		if !res.Success {
 			metricsTooOld.Inc()
+			return
+		}
+		for _, p := range res.Flushed {
+			a.add(p.Ts, p.Val)
 		}
 	}
 }
