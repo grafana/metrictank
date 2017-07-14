@@ -176,6 +176,8 @@ a counter of the number of GC cycles since process start
 a count of times a metric did not validate
 * `metrics_decode_err`:  
 a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+* `plan.run`:
+the time spent running the plan for a request (function processing of all targets and runtime consolidation)
 * `store.cassandra.chunk_operations.save_fail`:  
 counter of failed saves
 * `store.cassandra.chunk_operations.save_ok`:  
