@@ -20,7 +20,6 @@ type Aggregation struct {
 	Pattern           *regexp.Regexp
 	XFilesFactor      float64
 	AggregationMethod []Method
-	ReorderWindow     uint32
 }
 
 // NewAggregations create instance of Aggregations
@@ -83,20 +82,6 @@ func ReadAggregations(file string) (Aggregations, error) {
 				item.AggregationMethod = append(item.AggregationMethod, Min)
 			default:
 				return result, fmt.Errorf("[%s]: unknown aggregation method %q", item.Name, methodStr)
-			}
-		}
-
-		reorderBufferStr := s.ValueOf("reorderBuffer")
-		if len(reorderBufferStr) > 0 {
-			reorderWindow, err := strconv.ParseUint(reorderBufferStr, 10, 32)
-			if err != nil {
-				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected a number: %s", item.Name, reorderBufferStr)
-				return Aggregations{}, err
-			}
-
-			// if reorderWindow == 0 we just disable the buffer
-			if reorderWindow > 0 {
-				item.ReorderWindow = uint32(reorderWindow)
 			}
 		}
 

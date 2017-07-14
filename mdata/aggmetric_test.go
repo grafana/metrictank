@@ -89,7 +89,6 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 			c.t.Fatalf("Points: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
 		}
 		if c.points[index].ts != point.Ts || c.points[index].val != point.Val {
-			fmt.Println(res.Points)
 			c.t.Fatalf("Points: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
 		}
 	}
@@ -123,7 +122,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil, false)
+	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, 0, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -159,7 +158,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil, false))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, 0, nil, false))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -235,10 +234,9 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		Pattern:           regexp.MustCompile(".*"),
 		XFilesFactor:      0.5,
 		AggregationMethod: []conf.Method{conf.Avg},
-		ReorderWindow:     10,
 	}
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, &agg, false))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, 10, &agg, false))
 
 	// basic adds and verifies with test data
 	c.Add(101, 101)
@@ -278,7 +276,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, nil, true)
+	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, 0, nil, true)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)

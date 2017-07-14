@@ -10,7 +10,6 @@ import (
  * The reorder buffer itself is not thread safe because it is only used by AggMetric,
  * which is thread safe, so there is no locking in the buffer.
  */
-
 type ReorderBuffer struct {
 	len      uint32         // length of buffer in number of datapoints
 	newest   uint32         // index of newest buffer entry
