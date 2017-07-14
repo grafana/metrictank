@@ -255,7 +255,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 
 	metricsTooOld.SetUint32(0)
 
-	// adds 10 entries that are out of order and the write buffer should order the first 9
+	// adds 10 entries that are out of order and the reorder buffer should order the first 9
 	// the last item (305) will be too old, so it increases metricsTooOld counter
 	for i := uint32(314); i > 304; i-- {
 		c.Add(i, float64(i))

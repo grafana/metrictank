@@ -86,26 +86,26 @@ func ReadAggregations(file string) (Aggregations, error) {
 			}
 		}
 
-		writeBufferStr := s.ValueOf("writeBuffer")
-		if len(writeBufferStr) > 0 {
-			writeBufferStrs := strings.Split(writeBufferStr, ",")
-			if len(writeBufferStrs) != 2 {
-				err = fmt.Errorf("[%s]: Failed to parse write buffer conf, expected 2 parts: %s", item.Name, writeBufferStr)
+		reorderBufferStr := s.ValueOf("reorderBuffer")
+		if len(reorderBufferStr) > 0 {
+			reorderBufferStrs := strings.Split(reorderBufferStr, ",")
+			if len(reorderBufferStrs) != 2 {
+				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 parts: %s", item.Name, reorderBufferStr)
 				return Aggregations{}, err
 			}
 
-			reorderWindow, err := strconv.ParseUint(writeBufferStrs[0], 10, 32)
+			reorderWindow, err := strconv.ParseUint(reorderBufferStrs[0], 10, 32)
 			if err != nil {
-				err = fmt.Errorf("[%s]: Failed to parse write buffer conf, expected 2 numbers: %s", item.Name, writeBufferStr)
+				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 numbers: %s", item.Name, reorderBufferStr)
 				return Aggregations{}, err
 			}
-			flushMin, err := strconv.ParseUint(writeBufferStrs[1], 10, 32)
+			flushMin, err := strconv.ParseUint(reorderBufferStrs[1], 10, 32)
 			if err != nil {
-				err = fmt.Errorf("[%s]: Failed to parse write buffer conf, expected 2 numbers: %s", item.Name, writeBufferStr)
+				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 numbers: %s", item.Name, reorderBufferStr)
 				return Aggregations{}, err
 			}
 			if flushMin < 1 && reorderWindow > 0 {
-				err = fmt.Errorf("[%s]: Failed to parse write buffer conf, flush minimum needs to be > 0: %s", item.Name, writeBufferStr)
+				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, flush minimum needs to be > 0: %s", item.Name, reorderBufferStr)
 				return Aggregations{}, err
 
 			}
