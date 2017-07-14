@@ -27,7 +27,7 @@ func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []
 	return flushed
 }
 
-// mixes up a sorted slice
+// mixes up a sorted slice, but only within a certain range
 // it simply reverses the order of bunches of a fixed size that's defined by the unsortBy parameter
 // for example if unsortBy is 3, then this:
 // [0,1,2,3,4,5,6,7,8,9]

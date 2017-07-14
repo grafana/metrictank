@@ -434,7 +434,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// write directly
 		a.add(ts, val)
 	} else {
-		// write through reorder buffer, returns false if ts is out of reorder window
+		// write through reorder buffer
 		res := a.rob.Add(ts, val)
 		for _, p := range res {
 			a.add(p.Ts, p.Val)
