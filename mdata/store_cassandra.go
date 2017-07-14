@@ -29,7 +29,7 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
     data blob,
     PRIMARY KEY (key, ts)
 ) WITH CLUSTERING ORDER BY (ts DESC)
-    AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d' }
+    AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d', 'tombstone_threshold': '0.2', 'tombstone_compaction_interval': '86400'}
     AND compression = { 'class': 'LZ4Compressor' }`
 const Table_name_format = `metric_%d`
 
