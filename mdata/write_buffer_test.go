@@ -300,7 +300,7 @@ func BenchmarkAddOutOfOrder(b *testing.B) {
 	}
 }
 
-func benchmarkAddAndFlushX(b *testing.B, datapoints, flushMin, reorderWindow uint32) {
+func benchmarkAddAndFlushX(b *testing.B, datapoints, reorderWindow uint32) {
 	buf := NewReorderBuffer(
 		reorderWindow,
 		1,
@@ -321,13 +321,13 @@ func benchmarkAddAndFlushX(b *testing.B, datapoints, flushMin, reorderWindow uin
 }
 
 func BenchmarkAddAndFlush10000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 10000, 100, 1000)
+	benchmarkAddAndFlushX(b, 10000, 1000)
 }
 
 func BenchmarkAddAndFlush1000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 1000, 10, 100)
+	benchmarkAddAndFlushX(b, 1000, 100)
 }
 
 func BenchmarkAddAndFlush100(b *testing.B) {
-	benchmarkAddAndFlushX(b, 100, 1, 10)
+	benchmarkAddAndFlushX(b, 100, 10)
 }

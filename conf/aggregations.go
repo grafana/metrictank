@@ -88,27 +88,12 @@ func ReadAggregations(file string) (Aggregations, error) {
 
 		reorderBufferStr := s.ValueOf("reorderBuffer")
 		if len(reorderBufferStr) > 0 {
-			reorderBufferStrs := strings.Split(reorderBufferStr, ",")
-			if len(reorderBufferStrs) != 2 {
-				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 parts: %s", item.Name, reorderBufferStr)
+			reorderWindow, err := strconv.ParseUint(reorderBufferStr, 10, 32)
+			if err != nil {
+				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected a number: %s", item.Name, reorderBufferStr)
 				return Aggregations{}, err
 			}
 
-			reorderWindow, err := strconv.ParseUint(reorderBufferStrs[0], 10, 32)
-			if err != nil {
-				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 numbers: %s", item.Name, reorderBufferStr)
-				return Aggregations{}, err
-			}
-			flushMin, err := strconv.ParseUint(reorderBufferStrs[1], 10, 32)
-			if err != nil {
-				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected 2 numbers: %s", item.Name, reorderBufferStr)
-				return Aggregations{}, err
-			}
-			if flushMin < 1 && reorderWindow > 0 {
-				err = fmt.Errorf("[%s]: Failed to parse reorder buffer conf, flush minimum needs to be > 0: %s", item.Name, reorderBufferStr)
-				return Aggregations{}, err
-
-			}
 			// if reorderWindow == 0 we just disable the buffer
 			if reorderWindow > 0 {
 				item.ReorderWindow = uint32(reorderWindow)
