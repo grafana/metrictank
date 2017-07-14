@@ -35,6 +35,9 @@ var (
 
 	// metric api.request.render.series is the number of targets a /render request is handling.
 	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", false)
+
+	// metric plan.run is the time spent running the plan for a request (function processing of all targets and runtime consolidation)
+	planRunDuration = stats.NewLatencyHistogram15s32("plan.run")
 )
 
 type Series struct {
@@ -583,5 +586,8 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 		data[q] = append(data[q], serie)
 	}
 
-	return plan.Run(data)
+	preRun := time.Now()
+	out, err = plan.Run(data)
+	planRunDuration.Value(time.Since(preRun))
+	return out, err
 }

@@ -1150,6 +1150,11 @@
               "refId": "F",
               "target": "alias(metrictank.stats.$environment.$instance.mem.to_iter.latency.mean.gauge32, 'mem to iter')",
               "textEditor": false
+            },
+	    {
+              "refId": "G",
+              "target": "alias(metrictank.stats.$environment.$instance.plan.run.latency.mean.gauge32, 'plan run')",
+              "textEditor": false
             }
           ],
           "thresholds": [],
