@@ -639,7 +639,7 @@ func getMatcher(path string) (func([]string) []string, error) {
 		}, nil
 	}
 
-	// Match a particular value
+	// Exact match one or more values
 	return func(children []string) []string {
 		var results []string
 		for _, p := range patterns {
