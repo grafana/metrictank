@@ -196,7 +196,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	// this path extends.
 	pos := strings.LastIndex(path, ".")
 	prevPos := len(path)
-	for true {
+	for {
 		branch := path[:pos]
 		prevNode := path[pos+1 : prevPos]
 		if n, ok := tree.Items[branch]; ok {
