@@ -191,45 +191,36 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 			return *archive
 		}
 	}
+
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
-	nodes := strings.Split(path, ".")
-
-	// if we're trying to insert foo.bar.baz.quux then we see if we can insert it under (in this order):
-	// - foo.bar.baz (if found, startPos is 3)
-	// - foo.bar (if found, startPos is 2)
-	// - foo (if found, startPos is 1)
-	nodePos := 0 // the index of the first word that is not part of the prefix
-	var startNode *Node
-
-	for i := len(nodes) - 1; i > 0; i-- {
-		branch := strings.Join(nodes[0:i], ".")
+	pos := strings.LastIndex(path, ".")
+	prevPos := len(path)
+	for {
+		branch := path[:pos]
+		prevNode := path[pos+1 : prevPos]
 		if n, ok := tree.Items[branch]; ok {
-			log.Debug("memory-idx: Found branch %s which metricDef %s is a descendant of", branch, path)
-			startNode = n
-			nodePos = i
+			log.Debug("memory-idx: adding %s as child of %s", prevNode, n.Path)
+			n.Children = append(n.Children, prevNode)
 			break
 		}
-	}
 
-	if nodePos == 0 && startNode == nil {
-		// need to add to the root node.
-		log.Debug("memory-idx: no existing branches found for %s.  Adding to the root node.", path)
-		startNode = tree.Items[""]
-	}
-
-	log.Debug("memory-idx: adding %s as child of %s", nodes[nodePos], startNode.Path)
-	startNode.Children = append(startNode.Children, nodes[nodePos])
-	nodePos++
-
-	// Add missing branch nodes
-	for ; nodePos < len(nodes); nodePos++ {
-		branch := strings.Join(nodes[0:nodePos], ".")
-		log.Debug("memory-idx: creating branch %s with child %s", branch, nodes[nodePos])
+		log.Debug("memory-idx: creating branch %s with child %s", branch, prevNode)
 		tree.Items[branch] = &Node{
 			Path:     branch,
-			Children: []string{nodes[nodePos]},
+			Children: []string{prevNode},
 			Defs:     make([]string, 0),
+		}
+
+		prevPos = pos
+		pos = strings.LastIndex(branch, ".")
+
+		if pos == -1 {
+			// need to add to the root node.
+			log.Debug("memory-idx: no existing branches found for %s.  Adding to the root node.", branch)
+			n := tree.Items[""]
+			n.Children = append(n.Children, branch)
+			break
 		}
 	}
 
