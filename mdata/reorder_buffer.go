@@ -4,12 +4,10 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-/*
- * The reorder buffer keeps a window of data during which it is ok to send data out of order.
- * Once the reorder window has passed Add() will return the old data and delete it from the buffer.
- * The reorder buffer itself is not thread safe because it is only used by AggMetric,
- * which is thread safe, so there is no locking in the buffer.
- */
+// ReorderBuffer keeps a window of data during which it is ok to send data out of order.
+// Once the reorder window has passed Add() will return the old data and delete it from the buffer.
+// The reorder buffer itself is not thread safe because it is only used by AggMetric,
+// which is thread safe, so there is no locking in the buffer.
 type ReorderBuffer struct {
 	len      uint32         // length of buffer in number of datapoints
 	newest   uint32         // index of newest buffer entry
