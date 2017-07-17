@@ -2,6 +2,8 @@ package mdata
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"testing"
 	"time"
 
@@ -17,6 +19,12 @@ type point struct {
 	val float64
 }
 
+type ByTs []point
+
+func (a ByTs) Len() int           { return len(a) }
+func (a ByTs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByTs) Less(i, j int) bool { return a[i].ts < a[j].ts }
+
 func (p point) String() string {
 	return fmt.Sprintf("point{%0.f at %d}", p.val, p.ts)
 }
@@ -31,10 +39,19 @@ func NewChecker(t *testing.T, agg *AggMetric) *Checker {
 	return &Checker{t, agg, make([]point, 0)}
 }
 
-// always add points in ascending order, never same ts!
 func (c *Checker) Add(ts uint32, val float64) {
 	c.agg.Add(ts, val)
 	c.points = append(c.points, point{ts, val})
+}
+
+func (c *Checker) DropPointByTs(ts uint32) {
+	for i := 0; i != len(c.points); {
+		if c.points[i].ts == ts {
+			c.points = append(c.points[:i], c.points[i+1:]...)
+		} else {
+			i++
+		}
+	}
 }
 
 // from to is the range that gets requested from AggMetric
@@ -42,8 +59,9 @@ func (c *Checker) Add(ts uint32, val float64) {
 // these may be different because AggMetric returns broader rangers (due to packed format),
 func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	currentClusterStatus := cluster.Manager.IsPrimary()
+	sort.Sort(ByTs(c.points))
 	cluster.Manager.SetPrimary(primary)
-	_, iters := c.agg.Get(from, to)
+	res := c.agg.Get(from, to)
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
 	var pi int // index of first point we want
 	var pj int // index of last point we want
@@ -53,16 +71,25 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	}
 	c.t.Logf("verifying AggMetric.Get(%d,%d) =?= %d <= ts <= %d", from, to, first, last)
 	index := pi - 1
-	for _, iter := range iters {
+	for _, iter := range res.Iters {
 		for iter.Next() {
 			index++
 			tt, vv := iter.Values()
 			if index > pj {
-				c.t.Fatalf("Values()=(%v,%v), want end of stream\n", tt, vv)
+				c.t.Fatalf("Iters: Values()=(%v,%v), want end of stream\n", tt, vv)
 			}
 			if c.points[index].ts != tt || c.points[index].val != vv {
-				c.t.Fatalf("Values()=(%v,%v), want (%v,%v)\n", tt, vv, c.points[index].ts, c.points[index].val)
+				c.t.Fatalf("Iters: Values()=(%v,%v), want (%v,%v)\n", tt, vv, c.points[index].ts, c.points[index].val)
 			}
+		}
+	}
+	for _, point := range res.Points {
+		index++
+		if index > pj {
+			c.t.Fatalf("Points: Values()=(%v,%v), want end of stream\n", point.Ts, point.Val)
+		}
+		if c.points[index].ts != point.Ts || c.points[index].val != point.Val {
+			c.t.Fatalf("Points: Values()=(%v,%v), want (%v,%v)\n", point.Ts, point.Val, c.points[index].ts, c.points[index].val)
 		}
 	}
 	if index != pj {
@@ -95,7 +122,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, nil, false)
+	agg := NewAggMetric(dnstore, &mockCache, "foo", ret, 0, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -131,7 +158,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, nil, false))
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, 0, nil, false))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -199,6 +226,49 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(true, 800, 1299, 1299, 1299)
 }
 
+func TestAggMetricWithReorderBuffer(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	agg := conf.Aggregation{
+		Name:              "Default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []conf.Method{conf.Avg},
+	}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
+	c := NewChecker(t, NewAggMetric(dnstore, &cache.MockCache{}, "foo", ret, 10, &agg, false))
+
+	// basic adds and verifies with test data
+	c.Add(101, 101)
+	c.Verify(true, 100, 200, 101, 101)
+	c.Add(105, 105)
+	c.Verify(true, 100, 199, 101, 105)
+	c.Add(115, 115)
+	c.Add(125, 125)
+	c.Add(135, 135)
+	c.Verify(true, 100, 199, 101, 135)
+	c.Add(200, 200)
+	c.Add(315, 315)
+	c.Verify(true, 100, 399, 101, 315)
+
+	metricsTooOld.SetUint32(0)
+
+	// adds 10 entries that are out of order and the reorder buffer should order the first 9
+	// the last item (305) will be too old, so it increases metricsTooOld counter
+	for i := uint32(314); i > 304; i-- {
+		c.Add(i, float64(i))
+	}
+	c.DropPointByTs(305)
+
+	// get subranges
+	c.Verify(true, 100, 320, 101, 315)
+
+	// one point has been added out of order and too old for the buffer to reorder
+	if metricsTooOld.Peek() != 1 {
+		t.Fatalf("Expected the out of order count to be 1, not %d", metricsTooOld.Peek())
+	}
+}
+
 func TestAggMetricDropFirstChunk(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	cluster.Manager.SetPrimary(true)
@@ -206,7 +276,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, nil, true)
+	m := NewAggMetric(store, &cache.MockCache{}, "foo", ret, 0, nil, true)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)

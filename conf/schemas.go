@@ -26,10 +26,11 @@ func (s SchemaSlice) Less(i, j int) bool { return s[i].Priority >= s[j].Priority
 
 // Schema represents one schema setting
 type Schema struct {
-	Name       string
-	Pattern    *regexp.Regexp
-	Retentions Retentions
-	Priority   int64
+	Name          string
+	Pattern       *regexp.Regexp
+	Retentions    Retentions
+	Priority      int64
+	ReorderWindow uint32
 }
 
 func NewSchemas(schemas []Schema) Schemas {
@@ -115,6 +116,19 @@ func ReadSchemas(file string) (Schemas, error) {
 			}
 		}
 		schema.Priority = int64(p)<<32 - int64(i) // to sort records with same priority by position in file
+
+		reorderBufferStr := sec.ValueOf("reorderBuffer")
+		if len(reorderBufferStr) > 0 {
+			reorderWindow, err := strconv.ParseUint(reorderBufferStr, 10, 32)
+			if err != nil {
+				return Schemas{}, fmt.Errorf("[%s]: Failed to parse reorder buffer conf, expected a number: %s", schema.Name, reorderBufferStr)
+			}
+
+			// if reorderWindow == 0 we just disable the buffer
+			if reorderWindow > 0 {
+				schema.ReorderWindow = uint32(reorderWindow)
+			}
+		}
 
 		schemas = append(schemas, schema)
 	}
