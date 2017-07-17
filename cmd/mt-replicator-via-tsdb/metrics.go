@@ -137,6 +137,7 @@ func (r *MetricsReplicator) consume() {
 	counter := 0
 	counterTs := time.Now()
 	msgChan := r.consumer.Messages()
+	notificationsChan := r.consumer.Notifications()
 
 	flush := func(topic string, partition int32, offset int64) {
 		mda := schema.MetricDataArray(buf)
@@ -201,6 +202,26 @@ func (r *MetricsReplicator) consume() {
 				flush(m.Topic, m.Partition, m.Offset)
 			}
 			return
+		case msg := <-notificationsChan:
+			if len(msg.Claimed) > 0 {
+				for topic, partitions := range msg.Claimed {
+					log.Info("kafka consumer claimed %d partitions on topic: %s", len(partitions), topic)
+				}
+			}
+			if len(msg.Released) > 0 {
+				for topic, partitions := range msg.Released {
+					log.Info("kafka consumer released %d partitions on topic: %s", len(partitions), topic)
+				}
+			}
+
+			if len(msg.Current) == 0 {
+				log.Info("kafka consumer is no longer consuming from any partitions.")
+			} else {
+				log.Info("kafka Current partitions:")
+				for topic, partitions := range msg.Current {
+					log.Info("kafka Current partitions: %s: %v", topic, partitions)
+				}
+			}
 		}
 	}
 }
