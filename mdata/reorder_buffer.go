@@ -54,6 +54,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) []schema.Point {
 		rob.buf[index].Val = val
 		rob.newest = index
 	} else {
+		metricsReordered.Inc()
 		rob.buf[index].Ts = ts
 		rob.buf[index].Val = val
 	}

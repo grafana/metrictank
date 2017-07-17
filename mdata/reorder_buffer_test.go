@@ -7,16 +7,20 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAddFail uint32) []schema.Point {
+func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAddFail, expectReordered uint32) []schema.Point {
 	var flushed []schema.Point
 	b := NewReorderBuffer(reorderWindow, 1)
 	metricsTooOld.SetUint32(0)
+	metricsReordered.SetUint32(0)
 	for _, point := range testData {
 		addRes := b.Add(point.Ts, point.Val)
 		flushed = append(flushed, addRes...)
 	}
 	if expectAddFail != metricsTooOld.Peek() {
 		t.Fatalf("Expected %d failures, but had %d", expectAddFail, metricsTooOld.Peek())
+	}
+	if metricsReordered.Peek() != expectReordered {
+		t.Fatalf("Expected %d metrics to get reordered, but had %d", expectReordered, metricsReordered.Peek())
 	}
 	returned := b.Get()
 
@@ -91,7 +95,7 @@ func TestReorderBufferAddAndGetInOrder(t *testing.T) {
 		{Ts: 1002, Val: 200},
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0)
+	testAddAndGet(t, 600, testData, expectedData, 0, 0)
 }
 
 func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
@@ -103,7 +107,7 @@ func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	expectedData := []schema.Point{
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 1, testData, expectedData, 2)
+	testAddAndGet(t, 1, testData, expectedData, 2, 0)
 }
 
 func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
@@ -129,7 +133,7 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0)
+	testAddAndGet(t, 600, testData, expectedData, 0, 2)
 }
 
 func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
@@ -155,7 +159,7 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) 
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0)
+	testAddAndGet(t, 600, testData, expectedData, 0, 3)
 }
 
 func TestReorderBufferOmitFlushIfNotEnoughData(t *testing.T) {
@@ -193,7 +197,7 @@ func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 		{Ts: 1003, Val: 300},
 		{Ts: 1004, Val: 400},
 	}
-	flushedData := testAddAndGet(t, 5, testData, expectedData, 1)
+	flushedData := testAddAndGet(t, 5, testData, expectedData, 1, 2)
 	if !reflect.DeepEqual(flushedData, expectedFlushedData) {
 		t.Fatalf("Flushed data does not match expected flushed data:\n%+v\n%+v", flushedData, expectedFlushedData)
 	}
