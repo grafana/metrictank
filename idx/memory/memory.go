@@ -340,10 +340,10 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 
 	nodes := strings.Split(pattern, ".")
 
-	// pos is the index of the last node we know for sure
-	// for a query like foo.bar.baz, pos is 2
-	// for a query like foo.bar.* or foo.bar, pos is 1
-	// for a query like foo.b*.baz, pos is 0
+	// pos is the index of the first node with special chars, or one past the last node if exact
+	// for a query like foo.bar.baz, pos is 3
+	// for a query like foo.bar.* or foo.bar, pos is 2
+	// for a query like foo.b*.baz, pos is 1
 	pos := len(nodes)
 	for i := 0; i < len(nodes); i++ {
 		if strings.ContainsAny(nodes[i], "*{}[]?") {
