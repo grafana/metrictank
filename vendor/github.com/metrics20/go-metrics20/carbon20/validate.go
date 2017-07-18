@@ -213,6 +213,14 @@ func ValidatePacket(buf []byte, levelLegacy ValidationLevelLegacy, levelM20 Vali
 
 	version := GetVersionB(fields[0])
 	var err error
+
+	// graphite graciously allows a leading dot by pretending it's not there.
+	// (e.g. send ".foo" -> metric will become "foo") so we do the same.
+	// see #668
+	if len(fields[0]) != 0 && fields[0][0] == '.' {
+		fields[0] = fields[0][1:]
+	}
+
 	if version == Legacy {
 		err = ValidateKeyLegacyB(fields[0], levelLegacy)
 	} else if version == M20 {
