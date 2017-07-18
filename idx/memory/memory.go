@@ -196,15 +196,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	// this path extends.
 	pos := strings.LastIndex(path, ".")
 	prevPos := len(path)
-	branch := path
-	var n *Node
 	for pos != -1 {
-		branch = path[:pos]
+		branch := path[:pos]
 		prevNode := path[pos+1 : prevPos]
 		if n, ok := tree.Items[branch]; ok {
 			log.Debug("memory-idx: adding %s as child of %s", prevNode, n.Path)
 			n.Children = append(n.Children, prevNode)
-			goto DoneWithBranches
+			break
 		}
 
 		log.Debug("memory-idx: creating branch %s with child %s", branch, prevNode)
@@ -218,12 +216,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		pos = strings.LastIndex(branch, ".")
 	}
 
-	// need to add to the root node.
-	log.Debug("memory-idx: no existing branches found for %s.  Adding to the root node.", branch)
-	n = tree.Items[""]
-	n.Children = append(n.Children, branch)
-
-DoneWithBranches:
+	if pos == -1 {
+		// need to add to the root node.
+		branch := path[:prevPos]
+		log.Debug("memory-idx: no existing branches found for %s.  Adding to the root node.", branch)
+		n := tree.Items[""]
+		n.Children = append(n.Children, branch)
+	}
 
 	// Add leaf node
 	log.Debug("memory-idx: creating leaf %s", path)
