@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +25,7 @@ var (
 	destinationKey    = flag.String("destination-key", "admin-key", "admin-key of destination tsdb-gw server")
 
 	group                = flag.String("group", "mt-replicator", "Kafka consumer group")
-	clientID             = flag.String("client-id", "mt-replicator", "Kafka consumer group client id")
+	clientID             = flag.String("client-id", "$HOSTNAME", "Kafka consumer group client id")
 	srcTopic             = flag.String("src-topic", "mdm", "metrics topic name on source cluster")
 	initialOffset        = flag.Int("initial-offset", -2, "initial offset to consume from. (-2=oldest, -1=newest)")
 	srcBrokerStr         = flag.String("src-brokers", "localhost:9092", "tcp address of source kafka cluster (may be be given multiple times as a comma-separated list)")
@@ -60,6 +61,10 @@ func NewMetricsReplicator() (*MetricsReplicator, error) {
 	}
 	if *srcTopic == "" {
 		log.Fatal(4, "--src-topic is required")
+	}
+
+	if *clientID == "$HOSTNAME" {
+		*clientID, _ = os.Hostname()
 	}
 
 	srcBrokers := strings.Split(*srcBrokerStr, ",")
@@ -132,6 +137,7 @@ func (r *MetricsReplicator) consume() {
 	counter := 0
 	counterTs := time.Now()
 	msgChan := r.consumer.Messages()
+	notificationsChan := r.consumer.Notifications()
 
 	flush := func(topic string, partition int32, offset int64) {
 		mda := schema.MetricDataArray(buf)
@@ -196,6 +202,26 @@ func (r *MetricsReplicator) consume() {
 				flush(m.Topic, m.Partition, m.Offset)
 			}
 			return
+		case msg := <-notificationsChan:
+			if len(msg.Claimed) > 0 {
+				for topic, partitions := range msg.Claimed {
+					log.Info("kafka consumer claimed %d partitions on topic: %s", len(partitions), topic)
+				}
+			}
+			if len(msg.Released) > 0 {
+				for topic, partitions := range msg.Released {
+					log.Info("kafka consumer released %d partitions on topic: %s", len(partitions), topic)
+				}
+			}
+
+			if len(msg.Current) == 0 {
+				log.Info("kafka consumer is no longer consuming from any partitions.")
+			} else {
+				log.Info("kafka Current partitions:")
+				for topic, partitions := range msg.Current {
+					log.Info("kafka Current partitions: %s: %v", topic, partitions)
+				}
+			}
 		}
 	}
 }
