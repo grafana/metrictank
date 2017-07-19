@@ -31,8 +31,6 @@ the defaults here match the default behavior.
 ```
 # instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics.
 instance = default
-# accounting period to track per-org usage metrics
-accounting-period = 5min
 ```
 
 ## data ##

@@ -100,9 +100,6 @@ In the metrics tab you should see a bunch of metrics already in the root hierarc
 
 * `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
 * `metrictank.stats`: internal stats reported by metrictank
-* `metrictank.usage`: usage metrics reported by metrictank.  See
-[Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
-It may take a few minutes for the usage metrics to show up.
 * `stats`: metrics aggregated by statsdaemon and sent into metrictank every second. Will only show up if something actually sends
   metrics into statsdaemon (e.g. if graphite receives requests directly, you send stats to statsdaemon, etc)
 
