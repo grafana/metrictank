@@ -303,7 +303,7 @@ Flags:
   -batch-size int
     	number of metrics to send in each batch. (default 10000)
   -client-id string
-    	Kafka consumer group client id (default "mt-replicator")
+    	Kafka consumer group client id (default "$HOSTNAME")
   -consumer-fetch-default int
     	number of bytes to try and fetch from consumer (default 32768)
   -destination-key string
@@ -455,6 +455,8 @@ Flags:
     	group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
   -print-ts
     	print time stamps instead of formatted dates. only for points and poins-summary format
+  -time-zone string
+    	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
   -to string
     	get data until (exclusive). only for points and points-summary format (default "now")
   -version
