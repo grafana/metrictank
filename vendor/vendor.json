@@ -57,12 +57,6 @@
 			"revisionTime": "2015-12-07T02:54:52Z"
 		},
 		{
-			"checksumSHA1": "ek48rtBCnHMbp7CK+63djVf+9bY=",
-			"path": "github.com/benbjohnson/clock",
-			"revision": "a620c1cc9866f84a2550ad53f4f353ec030fa26b",
-			"revisionTime": "2016-01-25T16:29:48Z"
-		},
-		{
 			"checksumSHA1": "Wqg57i6dQo9ZvTAifQscSij80dE=",
 			"path": "github.com/bitly/go-hostpool",
 			"revision": "d0e59c22a56e8dadfed24f74f452cea5a52722d2",

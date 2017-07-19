@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx/memory"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
-	"github.com/raintank/metrictank/usage"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -26,8 +24,7 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
-	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := NewDefaultHandler(aggmetrics, metricIndex, usage, "BenchmarkProcess")
+	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
 	datas := make([]*schema.MetricData, b.N)
@@ -65,8 +62,7 @@ func BenchmarkProcessSameMetric(b *testing.B) {
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
-	usage := usage.New(300, aggmetrics, metricIndex, clock.New())
-	in := NewDefaultHandler(aggmetrics, metricIndex, usage, "BenchmarkProcess")
+	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
 	datas := make([]*schema.MetricData, b.N)

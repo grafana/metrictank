@@ -9,7 +9,6 @@ import (
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -30,10 +29,9 @@ type DefaultHandler struct {
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
-	usage       *usage.Usage
 }
 
-func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage *usage.Usage, input string) DefaultHandler {
+func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input string) DefaultHandler {
 	return DefaultHandler{
 		metricsReceived: stats.NewCounter32(fmt.Sprintf("input.%s.metrics_received", input)),
 		MetricInvalid:   stats.NewCounter32(fmt.Sprintf("input.%s.metric_invalid", input)),
@@ -43,12 +41,10 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, usage
 
 		metrics:     metrics,
 		metricIndex: metricIndex,
-		usage:       usage,
 	}
 }
 
-// process makes sure the data is stored and the metadata is in the index,
-// and the usage is tracked, if enabled.
+// process makes sure the data is stored and the metadata is in the index
 // concurrency-safe.
 func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	if metric == nil {
@@ -74,8 +70,5 @@ func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
 	pre = time.Now()
 	m := in.metrics.GetOrCreate(metric.Id, metric.Name, archive.SchemaId, archive.AggId)
 	m.Add(uint32(metric.Time), metric.Value)
-	if in.usage != nil {
-		in.usage.Add(metric.OrgId, metric.Id)
-	}
 	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 }

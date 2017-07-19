@@ -17,7 +17,6 @@ import (
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
-	"github.com/benbjohnson/clock"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/cluster"
@@ -33,7 +32,6 @@ import (
 	"github.com/raintank/metrictank/mdata/notifierNsq"
 	"github.com/raintank/metrictank/stats"
 	statsConfig "github.com/raintank/metrictank/stats/config"
-	"github.com/raintank/metrictank/usage"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -51,8 +49,6 @@ var (
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
 	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-
-	accountingPeriodStr = flag.String("accounting-period", "5min", "accounting period to track per-org usage metrics")
 
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
@@ -233,8 +229,6 @@ func main() {
 		go trigger.Run()
 	}
 
-	accountingPeriod := dur.MustParseNDuration("accounting-period", *accountingPeriodStr)
-
 	/***********************************
 		configure Profiling
 	***********************************/
@@ -355,18 +349,13 @@ func main() {
 	mdata.InitPersistNotifier(handlers...)
 
 	/***********************************
-		Initialize usage Reporting
-	***********************************/
-	usg := usage.New(accountingPeriod, metrics, metricIndex, clock.New())
-
-	/***********************************
 		Start our inputs
 	***********************************/
 	for _, plugin := range inputs {
 		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
 			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
 		}
-		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, usg, plugin.Name()))
+		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()))
 		plugin.MaintainPriority()
 	}
 

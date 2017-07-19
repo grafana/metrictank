@@ -73,7 +73,6 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * [Graphite](https://github.com/raintank/metrictank/blob/master/docs/graphite.md)
 * [Metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md)
 * [Tags](https://github.com/raintank/metrictank/blob/master/docs/tags.md)
-* [Usage reporting](https://github.com/raintank/metrictank/blob/master/docs/usage-reporting.md)
 
 ### Other
 
