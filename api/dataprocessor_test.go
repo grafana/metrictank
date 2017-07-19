@@ -767,11 +767,11 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 		metric.Add(i, float64(i^2))
 	}
 
-	oldest, iters := srv.getSeriesAggMetrics(ctx)
+	res := srv.getSeriesAggMetrics(ctx)
 	timestamps := make([]uint32, 0)
 	values := make([]float64, 0)
 
-	for _, it := range iters {
+	for _, it := range res.Iters {
 		for it.Next() {
 			ts, val := it.Values()
 			timestamps = append(timestamps, ts)
@@ -782,8 +782,8 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	// should be the T0 of the chunk from (1744) is in
 	// 1744 - (1744 % 600) = 1200
 	expected := uint32(1200)
-	if oldest != expected {
-		t.Errorf("Expected oldest to be %d but got %d", expected, oldest)
+	if res.Oldest != expected {
+		t.Errorf("Expected oldest to be %d but got %d", expected, res.Oldest)
 	}
 
 	// number of returned ts should be the number of chunks the searched range spans across * chunkspan

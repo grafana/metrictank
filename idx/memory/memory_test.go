@@ -520,6 +520,19 @@ func TestPrune(t *testing.T) {
 	})
 
 }
+func TestSingleNodeMetric(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	data := &schema.MetricData{
+		Name:     "node1",
+		Metric:   "node1",
+		Interval: 10,
+		OrgId:    1,
+	}
+	data.SetId()
+	ix.AddOrUpdate(data, 1)
+}
 
 func BenchmarkIndexing(b *testing.B) {
 	ix := New()
