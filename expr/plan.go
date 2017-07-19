@@ -10,6 +10,7 @@ import (
 	"github.com/raintank/metrictank/consolidation"
 )
 
+// Req represents a request for one/more series
 type Req struct {
 	Query string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
 	From  uint32
@@ -60,9 +61,8 @@ func (p Plan) Dump(w io.Writer) {
 // which is just a list of requests and the expressions.
 // traverse tree and as we go down:
 // * make sure function exists
-// * tentative validation pre function call (number of args and type of args, to the extent it can be done in advance),
-// * let function validate input arguments further (to the extend it can be done in advance)
-// * allow functions to extend the notion of which data is required
+// * validation of arguments
+// * allow functions to modify the Context (change data range or consolidation)
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
 func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan, error) {
 	var err error
@@ -223,9 +223,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			aggNum := consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
-			out[i].Datapoints = consolidation.Consolidate(o.Datapoints, aggNum, o.Consolidator)
-			out[i].Interval *= aggNum
+			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateStable(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
 		}
 	}
 	return out, nil

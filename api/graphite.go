@@ -35,6 +35,9 @@ var (
 
 	// metric api.request.render.series is the number of targets a /render request is handling.
 	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", false)
+
+	// metric plan.run is the time spent running the plan for a request (function processing of all targets and runtime consolidation)
+	planRunDuration = stats.NewLatencyHistogram15s32("plan.run")
 )
 
 type Series struct {
@@ -129,8 +132,24 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
-	targets := request.Targets
 	now := time.Now()
+	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+	defaultTo := uint32(now.Unix())
+
+	var loc *time.Location
+	switch request.Tz {
+	case "":
+		loc = timeZone
+	case "local":
+		loc = time.Local
+	default:
+		var err error
+		loc, err = time.LoadLocation(request.Tz)
+		if err != nil {
+			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+			return
+		}
+	}
 
 	from := request.From
 	to := request.To
@@ -138,16 +157,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		to = request.Until
 	}
 
-	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-	defaultTo := uint32(now.Unix())
-
-	fromUnix, err := dur.ParseTSpec(from, now, defaultFrom)
+	fromUnix, err := dur.ParseDateTime(from, loc, now, defaultFrom)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 
-	toUnix, err := dur.ParseTSpec(to, now, defaultTo)
+	toUnix, err := dur.ParseDateTime(to, loc, now, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -164,13 +180,18 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	fromUnix += 1
 	toUnix += 1
 
-	exprs, err := expr.ParseMany(targets)
+	// note: the model is already validated to assure at least one of them has len >0
+	if len(request.Targets) == 0 {
+		request.Targets = request.TargetsRails
+	}
+
+	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	reqRenderTargetCount.Value(len(targets))
+	reqRenderTargetCount.Value(len(request.Targets))
 
 	if request.Process == "none" {
 		ctx.Req.Request.Body = ctx.Body
@@ -565,5 +586,8 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 		data[q] = append(data[q], serie)
 	}
 
-	return plan.Run(data)
+	preRun := time.Now()
+	out, err = plan.Run(data)
+	planRunDuration.Value(time.Since(preRun))
+	return out, err
 }

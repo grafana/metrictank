@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
@@ -27,13 +28,9 @@ func (s *FuncAvgSeries) Context(context Context) Context {
 }
 
 func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	var series []models.Series
-	for i := range s.in {
-		in, err := s.in[i].Exec(cache)
-		if err != nil {
-			return nil, err
-		}
-		series = append(series, in...)
+	series, queryPatts, err := consumeFuncs(cache, s.in)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(series) == 0 {
@@ -69,7 +66,7 @@ func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := fmt.Sprintf("averageSeries(%s)", patternsAsArgs(series))
+	name := fmt.Sprintf("averageSeries(%s)", strings.Join(queryPatts, ","))
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,

@@ -13,31 +13,36 @@ import (
 
 type GraphiteRender struct {
 	MaxDataPoints uint32   `json:"maxDataPoints" form:"maxDataPoints" binding:"Default(800)"`
-	Targets       []string `json:"target" form:"target" binding:"Required"`
+	Targets       []string `json:"target" form:"target"`
+	TargetsRails  []string `form:"target[]"` // # Rails/PHP/jQuery common practice format: ?target[]=path.1&target[]=path.2 -> like graphite, we allow this.
 	From          string   `json:"from" form:"from"`
 	Until         string   `json:"until" form:"until"`
 	To            string   `json:"to" form:"to"`
 	Format        string   `json:"format" form:"format" binding:"In(,json,msgp,pickle)"`
 	NoProxy       bool     `json:"local" form:"local"` //this is set to true by graphite-web when it passes request to cluster servers
 	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
+	Tz            string   `json:"tz" form:"tz"`
 }
 
 func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) binding.Errors {
-	if len(gr.Targets) < 1 {
-		errs = append(errs, binding.Error{
-			FieldNames:     []string{"target"},
-			Classification: "RequiredError",
-			Message:        "Required",
-		})
-	} else {
-		for _, val := range gr.Targets {
-			if val == "" {
-				errs = append(errs, binding.Error{
-					FieldNames:     []string{"target"},
-					Classification: "RequiredError",
-					Message:        "Required",
-				})
-			}
+	if len(gr.Targets) == 0 {
+		if len(gr.TargetsRails) == 0 {
+			errs = append(errs, binding.Error{
+				FieldNames:     []string{"target"},
+				Classification: "RequiredError",
+				Message:        "Required",
+			})
+			return errs
+		}
+		gr.Targets = gr.TargetsRails
+	}
+	for _, val := range gr.Targets {
+		if val == "" {
+			errs = append(errs, binding.Error{
+				FieldNames:     []string{"target"},
+				Classification: "RequiredError",
+				Message:        "Required",
+			})
 		}
 	}
 	return errs

@@ -176,6 +176,8 @@ a counter of the number of GC cycles since process start
 a count of times a metric did not validate
 * `metrics_decode_err`:  
 a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+* `plan.run`:
+the time spent running the plan for a request (function processing of all targets and runtime consolidation)
 * `store.cassandra.chunk_operations.save_fail`:  
 counter of failed saves
 * `store.cassandra.chunk_operations.save_ok`:  
@@ -227,6 +229,11 @@ a counter of how many chunks are created
 the number of times the metrics GC is about to inspect a metric (series)
 * `tank.metrics_active`:  
 the number of currently known metrics (excl rollup series), measured every second
+* `tank.metrics_reordered`:
+the number of points received that are going back in time, but are still
+within the reorder window. in such a case they will be inserted in the correct order.
+E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
+ts is not older than the 60th datapoint counting from the newest.
 * `tank.metrics_too_old`:  
 points that go back in time.
 E.g. for any given series, when a point has a timestamp

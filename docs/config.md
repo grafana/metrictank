@@ -181,6 +181,8 @@ multi-tenant = true
 fallback-graphite-addr = http://localhost:8080
 # only log incoming requests if their timerange is at least this duration. Use 0 to disable
 log-min-dur = 5min
+# timezone for interpreting from/until values when needed, specified using [zoneinfo name](https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones) e.g. 'America/New_York', 'UTC' or 'local' to use local server timezone.
+time-zone = local
 ```
 
 ## metric data inputs ##
@@ -356,8 +358,9 @@ enabled = false
 # will be applied. The configured rollups will be saved by primary nodes and served in responses if they are ready.
 # (note in particular that if you remove archives here, we will no longer read from them)
 # * Retentions must be specified in order of increasing interval and retention
+# * The reorderBuffer an optional buffer that temporarily keeps data points in memory as raw data and allows insertion at random order. The specified value is how many datapoints, based on the raw interval specified in the first defined retention, should be kept before they are flushed out. This is useful if the metric producers cannot guarantee that the data will arrive in order, but it is relatively memory intensive. If you are unsure whether you need this, better leave it disabled to not waste memory.
 # 
-# A given rule is made up of 3 lines: the name, regex pattern and retentions.
+# A given rule is made up of at least 3 lines: the name, regex pattern, retentions and optionally the reorder buffer size.
 # The retentions line can specify multiple retention definitions. You need one or more, space separated.
 #
 # There are 2 formats for a single retention definition:
@@ -399,6 +402,7 @@ enabled = false
 [default]
 pattern = .*
 retentions = 1s:35d:10min:7
+# reorderBuffer = 20
 ```
 
 # storage-aggregation.conf

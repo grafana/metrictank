@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS metrictank.metric (
 
 CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
     id text,
+    orgid int,
     partition int,
     name text,
     metric text,

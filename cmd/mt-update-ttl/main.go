@@ -51,7 +51,7 @@ func main() {
 		flag.Usage()
 	}
 
-	ttl := int(dur.MustParseUNsec("ttl", flag.Arg(0)))
+	ttl := int(dur.MustParseNDuration("ttl", flag.Arg(0)))
 	tableIn, tableOut := flag.Arg(1), flag.Arg(1)
 	if flag.NArg() == 3 {
 		tableOut = flag.Arg(2)

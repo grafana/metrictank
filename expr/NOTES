@@ -93,22 +93,22 @@ see also https://github.com/raintank/metrictank/issues/463#issuecomment-27519988
 
 ## naming
 
-note that when requesting series directly, we want to show the target (to uniquely identify them), not the queryPattern
-it follows that the output returned by plan.Run must always use Target attribute to show the proper name, and that any processing functions thus must set that attribute properly.
+when requesting series directly, we want to show the target (to uniquely identify each series), not the queryPattern
+thus the output returned by plan.Run must always use Target attribute to show the proper name
+it follows that any processing functions must set that attribute properly.
 but some functions (e.g. sumSeries) take queryPattern of their inputs, to show summary query pattern instead of each individual value.
-thus, to accomodate wrapping functions as well as lack of wrapping functions (e.g. generating json output), processing functions must set both Target and QueryPatt, and they
-should set it to the same value.
+thus, to accomodate wrapping functions (which may use QueryPattern) as well as lack of wrapping functions (e.g. generating json output which will look at Target), processing functions must set both Target and QueryPatt, and they should set it to the same value.
 
 in a future version we can probably refactor things to make this simpler: fetched data could result in a series with key attribute the graphite key (currently stored in target), and store the query pattern used in the target attribute.  functions only set target and only look at target, and at output phase, we just use target. there's only 1 special case of metrics returned without function processing. we could detect this case, or if we have multiple things with same target, print the metric name instead, or something
 
 examples: (series are in `series{target,querypatt}` form)
 
-input              => results in fetched series                                     output targets
+input              => results in fetched series                                   output targets
 ==================================================================================================================
-target=a&target=ab => series{a, a }, series{ab,ab}                                  a and ab
-target=a*          => series{a, a*}, series{ab,a*}                                  a and ab
-target=sum(a,ab)   => series{a, a }, series{ab,ab}                                  sum(a,ab)
-target=sum(a*)     => series{a, a*}, series{ab,a*}                                  sum(a*)
-target=sum(a,a,ab) => series{a, a }, series{a,a  }, series{ab, ab}                  sum(a,a,ab) (bug in graphite! it has sum(a,ab) )
-target=sum(a,a*)   => series{a, a }, series{a,a* }, series{ab, a*}                  sum(a,a*)
-target=sum(a,a,a*) => series{a, a }, series{a,a  }, series{a, ab*}, series{ab, ab*} sum(a,a,a*) (bug in graphite! it has sum(a,a*), doesn't even add the extra a)
+target=a&target=ab => series{a, a }, series{ab,ab}                                a and ab
+target=a*          => series{a, a*}, series{ab,a*}                                a and ab
+target=sum(a,ab)   => series{a, a }, series{ab,ab}                                sum(a,ab)
+target=sum(a*)     => series{a, a*}, series{ab,a*}                                sum(a*)
+target=sum(a,a,ab) => series{a, a }, series{a,a  }, series{ab, ab}                sum(a,a,ab) (bug in graphite! it has sum(a,ab) )
+target=sum(a,a*)   => series{a, a }, series{a,a* }, series{ab, a*}                sum(a,a*)
+target=sum(a,a,a*) => series{a, a }, series{a,a  }, series{a, a*}, series{ab, a*} sum(a,a,a*) (bug in graphite! it has sum(a,a*), doesn't even add the extra a)

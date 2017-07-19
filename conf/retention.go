@@ -109,7 +109,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 			}
 		}
 		if len(parts) >= 3 {
-			retention.ChunkSpan, err = dur.ParseUNsec(parts[2])
+			retention.ChunkSpan, err = dur.ParseNDuration(parts[2])
 			if err != nil {
 				return nil, err
 			}
@@ -157,12 +157,12 @@ func ParseRetentionNew(def string) (Retention, error) {
 	if len(parts) < 2 {
 		return Retention{}, fmt.Errorf("Not enough parts in retentionDef %q", def)
 	}
-	interval, err := dur.ParseUsec(parts[0])
+	interval, err := dur.ParseDuration(parts[0])
 	if err != nil {
 		return Retention{}, fmt.Errorf("Failed to parse interval in %q: %s", def, err)
 	}
 
-	ttl, err := dur.ParseUsec(parts[1])
+	ttl, err := dur.ParseDuration(parts[1])
 	if err != nil {
 		return Retention{}, fmt.Errorf("Failed to parse TTL in %q: %s", def, err)
 	}

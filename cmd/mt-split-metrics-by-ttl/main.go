@@ -53,7 +53,7 @@ func main() {
 	}
 
 	for i := 0; i < flag.NArg(); i++ {
-		ttls = append(ttls, uint32(dur.MustParseUNsec("ttl", flag.Arg(i))))
+		ttls = append(ttls, uint32(dur.MustParseNDuration("ttl", flag.Arg(i))))
 	}
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), *cassandraKeyspace)

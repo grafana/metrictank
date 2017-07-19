@@ -32,13 +32,9 @@ func (s *FuncPerSecond) Context(context Context) Context {
 }
 
 func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	var series []models.Series
-	for i := range s.in {
-		serie, err := s.in[i].Exec(cache)
-		if err != nil {
-			return nil, err
-		}
-		series = append(series, serie...)
+	series, _, err := consumeFuncs(cache, s.in)
+	if err != nil {
+		return nil, err
 	}
 	maxValue := math.NaN()
 	if s.maxValue > 0 {

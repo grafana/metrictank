@@ -209,15 +209,15 @@ func main() {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
-	sec := dur.MustParseUNsec("warm-up-period", *warmUpPeriodStr)
+	sec := dur.MustParseNDuration("warm-up-period", *warmUpPeriodStr)
 	warmupPeriod = time.Duration(sec) * time.Second
 
-	chunkMaxStale := dur.MustParseUNsec("chunk-max-stale", *chunkMaxStaleStr)
-	metricMaxStale := dur.MustParseUNsec("metric-max-stale", *metricMaxStaleStr)
-	gcInterval := time.Duration(dur.MustParseUNsec("gc-interval", *gcIntervalStr)) * time.Second
+	chunkMaxStale := dur.MustParseNDuration("chunk-max-stale", *chunkMaxStaleStr)
+	metricMaxStale := dur.MustParseNDuration("metric-max-stale", *metricMaxStaleStr)
+	gcInterval := time.Duration(dur.MustParseNDuration("gc-interval", *gcIntervalStr)) * time.Second
 
-	proftrigFreq := dur.MustParseUsec("proftrigger-freq", *proftrigFreqStr)
-	proftrigMinDiff := int(dur.MustParseUNsec("proftrigger-min-diff", *proftrigMinDiffStr))
+	proftrigFreq := dur.MustParseDuration("proftrigger-freq", *proftrigFreqStr)
+	proftrigMinDiff := int(dur.MustParseNDuration("proftrigger-min-diff", *proftrigMinDiffStr))
 	if proftrigFreq > 0 {
 		errors := make(chan error)
 		trigger, _ := heap.New(*proftrigPath, *proftrigHeapThresh, proftrigMinDiff, time.Duration(proftrigFreq)*time.Second, errors)

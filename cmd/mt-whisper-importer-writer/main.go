@@ -111,7 +111,7 @@ func main() {
 	splits := strings.Split(*ttlsStr, ",")
 	ttls := make([]uint32, 0)
 	for _, split := range splits {
-		ttls = append(ttls, dur.MustParseUNsec("ttl", split))
+		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
 	}
 	ttlTables := mdata.GetTTLTables(ttls, *windowFactor, mdata.Table_name_format)
 

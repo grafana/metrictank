@@ -69,6 +69,12 @@
 			"revisionTime": "2016-12-06T10:26:25Z"
 		},
 		{
+			"checksumSHA1": "n6WHmaVaxufQthaT1tYnqTmtSsY=",
+			"path": "github.com/codeskyblue/go-uuid",
+			"revision": "952abbca900b023c1a80bc522ff4795db50d9d6c",
+			"revisionTime": "2014-02-08T11:57:53Z"
+		},
+		{
 			"checksumSHA1": "dvabztWVQX8f6oMLRyv4dLH+TGY=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
@@ -195,6 +201,12 @@
 			"revisionTime": "2016-12-13T23:44:46Z"
 		},
 		{
+			"checksumSHA1": "oIkoHb8+rM5Etur5HhZVY/sDQKQ=",
+			"path": "github.com/jpillora/backoff",
+			"revision": "06c7a16c845dc8e0bf575fafeeca0f5462f5eb4d",
+			"revisionTime": "2017-02-22T00:19:28Z"
+		},
+		{
 			"checksumSHA1": "tewA7jXVGCw1zb5mA0BDecWi4iQ=",
 			"path": "github.com/jtolds/gls",
 			"revision": "8ddce2a84170772b95dd5d576c48d517b22cac63",
@@ -279,10 +291,10 @@
 			"revisionTime": "2015-11-20T02:40:02Z"
 		},
 		{
-			"checksumSHA1": "6B/7widWpxa60dqiH3Eh9qZGQhY=",
+			"checksumSHA1": "z0EFMfc2jG9gWobdTvDtqblBHuk=",
 			"path": "github.com/raintank/dur",
-			"revision": "7b06fb4cf9324a785c2dedea9aa4e47769d54b92",
-			"revisionTime": "2016-07-13T16:23:06Z"
+			"revision": "6ce9ec78e3a2ee918588104869369e5527aefe88",
+			"revisionTime": "2017-07-08T19:17:46Z"
 		},
 		{
 			"checksumSHA1": "BmaVwqQ2CN9byGuy9RUl482cIMM=",
@@ -479,6 +491,12 @@
 		{
 			"checksumSHA1": "coHpC7KbWRXTjC0JM/bwnBn8zmY=",
 			"path": "gopkg.in/raintank/schema.v1",
+			"revision": "a323316458b5df84827551e9b6b5f61cb2de423b",
+			"revisionTime": "2017-01-12T12:37:55Z"
+		},
+		{
+			"checksumSHA1": "MjwLYwIckCtBwXhQMt5ji/L5lJA=",
+			"path": "gopkg.in/raintank/schema.v1/msg",
 			"revision": "a323316458b5df84827551e9b6b5f61cb2de423b",
 			"revisionTime": "2017-01-12T12:37:55Z"
 		}

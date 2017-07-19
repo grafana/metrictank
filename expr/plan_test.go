@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -269,7 +268,6 @@ func TestConsolidateBy(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		fmt.Println("#####", c.in)
 		// for the purpose of this test, we assume ParseMany works fine.
 		exprs, _ := ParseMany([]string{c.in})
 		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
@@ -306,10 +304,156 @@ func TestConsolidateBy(t *testing.T) {
 		}
 		if len(out) != len(c.expOut) {
 			t.Errorf("case %d: %q, expected %d series output, not %d", i, c.in, len(c.expOut), len(out))
+		} else {
+			for j, exp := range c.expOut {
+				if exp.QueryPatt != out[j].QueryPatt || exp.Consolidator != out[j].Consolidator {
+					t.Errorf("case %d: %q, output series mismatch at pos %d: expected %v-%v - got %v-%v", i, c.in, j, exp.QueryPatt, exp.Consolidator, out[j].QueryPatt, out[j].Consolidator)
+				}
+			}
 		}
-		for j, exp := range c.expOut {
-			if exp.QueryPatt != out[j].QueryPatt || exp.Consolidator != out[j].Consolidator {
-				t.Errorf("case %d: %q, output series mismatch at pos %d: expected %v-%v - got %v-%v", i, c.in, j, exp.QueryPatt, exp.Consolidator, out[j].QueryPatt, out[j].Consolidator)
+	}
+}
+
+// TestNamingChains tests whether series names (targets) are correct, after a processing chain of multiple functions
+func TestNamingChains(t *testing.T) {
+	from := uint32(1000)
+	to := uint32(2000)
+	stable := true
+	cases := []struct {
+		target string // target request "from user"
+		keys   []string
+		expOut []string
+	}{
+		// the first two are cases that we've seen in the wild
+		// see https://github.com/raintank/metrictank/issues/648
+		{
+			`aliasSub(perSecond(metrictank.stats.*.*.input.*.metric_invalid.counter32),'.*\.([^\.]+)\.metric_invalid.*', '\1 metric invalid')`,
+			[]string{
+				"metrictank.stats.env.instance1.input.carbon.metric_invalid.counter32",
+				"metrictank.stats.env.instance2.input.carbon.metric_invalid.counter32",
+				"metrictank.stats.env.instance1.input.kafka.metric_invalid.counter32",
+			},
+			[]string{
+				"carbon metric invalid",
+				"carbon metric invalid",
+				"kafka metric invalid",
+			},
+		},
+		{
+			`aliasSub(sumSeries(perSecond(metrictank.stats.*.*.input.*.metric_invalid.counter32)),'.*\.([^\.]+)\.metric_invalid.*', '\1 metric invalid')`,
+			[]string{
+				"metrictank.stats.env.instance1.input.carbon.metric_invalid.counter32",
+				"metrictank.stats.env.instance2.input.carbon.metric_invalid.counter32",
+				"metrictank.stats.env.instance1.input.kafka.metric_invalid.counter32",
+			},
+			[]string{
+				"* metric invalid",
+			},
+		},
+		{
+			`aliasSub(sumSeries(perSecond(metrictank.stats.*.*.input.*.metric_invalid.counter32)),'.*\.([^\.]+)\.metric_invalid.*', '\1 metric invalid')`,
+			[]string{
+				"metrictank.stats.env.instance1.input.carbon.metric_invalid.counter32",
+			},
+			[]string{
+				"* metric invalid", // could be argued that "carbon metric invalid" is more useful, but is less consistent. see #648
+			},
+		},
+		// what follows here is a simplified, but comparable test case, for other alias functions
+		{
+			`aliasByNode(perSecond(*.bar), 0)`,
+			[]string{
+				"a.bar",
+				"b.bar",
+			},
+			[]string{
+				"a",
+				"b",
+			},
+		},
+		{
+			`aliasByNode(avg(perSecond(*.bar)), 0)`,
+			[]string{
+				"a.bar",
+				"b.bar",
+			},
+			[]string{
+				"*",
+			},
+		},
+		{
+			`aliasByNode(avg(perSecond(*.bar)), 0)`,
+			[]string{
+				"a.bar",
+			},
+			[]string{
+				"*", // "a" could be more useful but see #648
+			},
+		},
+		{
+			`alias(perSecond(*.bar), 'a')`,
+			[]string{
+				"a.bar",
+				"b.bar",
+			},
+			[]string{
+				"a",
+				"a",
+			},
+		},
+		{
+			`alias(avg(perSecond(*.bar)), 'a')`,
+			[]string{
+				"a",
+				"b",
+			},
+			[]string{
+				"a",
+			},
+		},
+		{
+			`alias(avg(perSecond(*.bar)), 'a')`,
+			[]string{
+				"a",
+			},
+			[]string{
+				"a",
+			},
+		},
+	}
+
+	for i, c := range cases {
+		exprs, err := ParseMany([]string{c.target})
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// create input data
+		series := make([]models.Series, len(c.keys))
+		for j, key := range c.keys {
+			series[j] = models.Series{
+				QueryPatt: plan.Reqs[0].Query,
+				Target:    key,
+			}
+		}
+		input := map[Req][]models.Series{
+			plan.Reqs[0]: series,
+		}
+		out, err := plan.Run(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(out) != len(c.expOut) {
+			t.Errorf("case %d:\n%q with %d inputs:\nexpected %d series output, not %d", i, c.target, len(c.keys), len(c.expOut), len(out))
+		} else {
+			for j, exp := range c.expOut {
+				if out[j].Target != exp {
+					t.Errorf("case %d:\n%q with %d inputs:\noutput series mismatch at pos %d:\nexp: %v\ngot: %v", i, c.target, len(c.keys), j, exp, out[j].Target)
+				}
 			}
 		}
 	}

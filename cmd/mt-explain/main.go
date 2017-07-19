@@ -16,6 +16,7 @@ func main() {
 	from := flag.String("from", "-24h", "get data from (inclusive)")
 	to := flag.String("to", "now", "get data until (exclusive)")
 	mdp := flag.Int("mdp", 800, "max data points to return")
+	timeZoneStr := flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 
 	flag.Usage = func() {
 		fmt.Println("mt-explain")
@@ -35,16 +36,28 @@ func main() {
 	}
 	targets := flag.Args()
 
+	var loc *time.Location
+	switch *timeZoneStr {
+	case "local":
+		loc = time.Local
+	default:
+		var err error
+		loc, err = time.LoadLocation(*timeZoneStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
 
-	fromUnix, err := dur.ParseTSpec(*from, now, defaultFrom)
+	fromUnix, err := dur.ParseDateTime(*from, loc, now, defaultFrom)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	toUnix, err := dur.ParseTSpec(*to, now, defaultTo)
+	toUnix, err := dur.ParseDateTime(*to, loc, now, defaultTo)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -73,3 +73,19 @@ func summarizeCons(series []models.Series) (consolidation.Consolidator, consolid
 	}
 	return series[0].Consolidator, series[0].QueryCons
 }
+
+func consumeFuncs(cache map[Req][]models.Series, fns []GraphiteFunc) ([]models.Series, []string, error) {
+	var series []models.Series
+	var queryPatts []string
+	for i := range fns {
+		in, err := fns[i].Exec(cache)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(in) != 0 {
+			series = append(series, in...)
+			queryPatts = append(queryPatts, in[0].QueryPatt)
+		}
+	}
+	return series, queryPatts, nil
+}
