@@ -73,6 +73,9 @@ Please include the following information:
 * cpu profile obtained with `curl 'http://<ip>:<port>/debug/pprof/profile'`
 * output of `metrictank --version`.
 
+You can also send `SIGQUIT` via Control-Backslash to the process, in which case it will print the stack dump and then exit.
+See [behavior of signals in Go programs](https://golang.org/pkg/os/signal/#hdr-Default_behavior_of_signals_in_Go_programs) for more information.
+
 
 ## Primary failover
 
