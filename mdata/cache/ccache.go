@@ -7,12 +7,14 @@ import (
 
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
 
 var (
-	maxSize uint64
+	maxSize        uint64
+	cacheMetricBug = stats.NewCounter32("cache.ops.metric.searchForward-bug-surpressed")
 )
 
 func init() {
@@ -150,7 +152,7 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 		return res
 	}
 
-	cm.Search(res, from, until)
+	cm.Search(metric, res, from, until)
 	if len(res.Start) == 0 && len(res.End) == 0 {
 		accnt.CacheMetricMiss.Inc()
 	} else {
