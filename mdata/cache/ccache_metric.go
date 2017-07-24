@@ -185,7 +185,7 @@ func (mc *CCacheMetric) seekDesc(ts uint32) (uint32, bool) {
 	return 0, false
 }
 
-func (mc *CCacheMetric) searchForward(from, until uint32, res *CCSearchResult) {
+func (mc *CCacheMetric) searchForward(metric string, from, until uint32, res *CCSearchResult) {
 	ts, ok := mc.seekAsc(from)
 	if !ok {
 		return
@@ -200,6 +200,11 @@ func (mc *CCacheMetric) searchForward(from, until uint32, res *CCSearchResult) {
 
 		if nextTs >= until {
 			res.Complete = true
+			break
+		}
+		if ts >= mc.chunks[ts].Next {
+			log.Warn("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
+			cacheMetricBug.Inc()
 			break
 		}
 	}
@@ -236,7 +241,7 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
 //
-func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
+func (mc *CCacheMetric) Search(metric string, res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
@@ -244,7 +249,7 @@ func (mc *CCacheMetric) Search(res *CCSearchResult, from, until uint32) {
 		return
 	}
 
-	mc.searchForward(from, until, res)
+	mc.searchForward(metric, from, until, res)
 	if !res.Complete {
 		mc.searchBackward(from, until, res)
 	}
