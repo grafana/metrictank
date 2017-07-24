@@ -12,15 +12,16 @@ import (
 )
 
 var (
-	ClusterName     string
-	primary         bool
-	peersStr        string
-	mode            string
-	maxPrio         int
-	clusterPort     int
-	clusterHost     net.IP
-	clusterBindAddr string
-	httpTimeout     time.Duration
+	ClusterName        string
+	primary            bool
+	peersStr           string
+	mode               string
+	maxPrio            int
+	clusterPort        int
+	clusterHost        net.IP
+	clusterBindAddr    string
+	httpTimeout        time.Duration
+	minAvailableShards int
 
 	client http.Client
 )
@@ -34,6 +35,7 @@ func ConfigSetup() {
 	clusterCfg.StringVar(&mode, "mode", "single", "Operating mode of cluster. (single|multi)")
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
+	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
 	globalconf.Register("cluster", clusterCfg)
 }
 

@@ -12,7 +12,8 @@ func TestPeersForQuery(t *testing.T) {
 	Manager.SetPartitions([]int32{1, 2})
 	Manager.SetReady()
 	Convey("when cluster in single mode", t, func() {
-		selected := MembersForQuery()
+		selected, err := MembersForQuery()
+		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 1)
 		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
@@ -42,7 +43,8 @@ func TestPeersForQuery(t *testing.T) {
 	}
 	Manager.Unlock()
 	Convey("when cluster in multi mode", t, func() {
-		selected := MembersForQuery()
+		selected, err := MembersForQuery()
+		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 2)
 		nodeNames := []string{}
 		for _, n := range selected {
@@ -56,7 +58,8 @@ func TestPeersForQuery(t *testing.T) {
 		Convey("members should be selected randomly with even distribution", func() {
 			peerCount := make(map[string]int)
 			for i := 0; i < 1000; i++ {
-				selected = MembersForQuery()
+				selected, err = MembersForQuery()
+				So(err, ShouldBeNil)
 				for _, p := range selected {
 					peerCount[p.Name]++
 				}
@@ -70,5 +73,10 @@ func TestPeersForQuery(t *testing.T) {
 			}
 		})
 	})
-
+	Convey("when shards missing", t, func() {
+		minAvailableShards = 5
+		selected, err := MembersForQuery()
+		So(err, ShouldEqual, InsufficientShardsAvailable)
+		So(selected, ShouldHaveLength, 0)
+	})
 }
