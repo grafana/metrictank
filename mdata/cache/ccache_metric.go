@@ -81,9 +81,9 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	// this is common in a scenario where a metric continuously gets queried
 	// for a range that starts less than one chunkspan before now().
 	if prev == 0 {
-		ts, ok := mc.seekDesc(ts - 1)
+		res, ok := mc.seekDesc(ts - 1)
 		if ok {
-			prev = ts
+			prev = res
 		}
 	}
 
