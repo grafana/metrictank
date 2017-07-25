@@ -37,6 +37,7 @@ const Table_name_format = `metric_%d`
 var (
 	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
 	errStartBeforeEnd = errors.New("start must be before end.")
+	errReadQueueFull  = errors.New("the cassandra read queue is full")
 	errTableNotFound  = errors.New("table for given TTL not found")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
@@ -363,6 +364,7 @@ type outcome struct {
 	month   uint32
 	sortKey uint32
 	i       *gocql.Iter
+	omitted bool
 }
 type asc []outcome
 
@@ -376,10 +378,11 @@ func (c *CassandraStore) processReadQueue() {
 		cassGetWaitDuration.Value(waitDuration)
 		if waitDuration > c.omitReadTimeout {
 			cassOmitOldRead.Inc()
+			crr.out <- outcome{omitted: true}
 			continue
 		}
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter()}
+		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter(), false}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -454,13 +457,16 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 		case c.readQueue <- crrs[i]:
 		default:
 			cassReadQueueFull.Inc()
-			numQueries--
+			return nil, errReadQueueFull
 		}
 	}
 	outcomes := make([]outcome, 0, numQueries)
 
 	seen := 0
 	for o := range results {
+		if o.omitted {
+			return nil, errReadQueueFull
+		}
 		seen += 1
 		outcomes = append(outcomes, o)
 		if seen == numQueries {
