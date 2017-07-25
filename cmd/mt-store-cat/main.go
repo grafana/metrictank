@@ -53,7 +53,7 @@ var (
 	groupTTL                 = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	windowFactor             = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
 	timeZoneStr              = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
-	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 10, "if a read is older than this, it will directly be omitted without executing")
+	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
 )
 
 func main() {

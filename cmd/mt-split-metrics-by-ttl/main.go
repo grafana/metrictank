@@ -33,7 +33,7 @@ var (
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
 	windowFactor             = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
-	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 10, "if a read is older than this, it will directly be omitted without executing")
+	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
 )
 
 func main() {
