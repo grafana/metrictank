@@ -2,7 +2,9 @@ package cluster
 
 import (
 	"crypto/sha256"
+	"errors"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -28,6 +30,8 @@ var (
 	Mode    ModeType
 	Manager *ClusterManager
 	cfg     *memberlist.Config
+
+	InsufficientShardsAvailable = NewError(http.StatusServiceUnavailable, errors.New("Insufficient shards available."))
 )
 
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
@@ -95,11 +99,11 @@ type partitionCandidates struct {
 // The nodes are selected based on priority, preferring thisNode if it
 // has the lowest prio, otherwise using a random selection from all
 // nodes with the lowest prio.
-func MembersForQuery() []Node {
+func MembersForQuery() ([]Node, error) {
 	thisNode := Manager.ThisNode()
 	// If we are running in single mode, just return thisNode
 	if Mode == ModeSingle {
-		return []Node{thisNode}
+		return []Node{thisNode}, nil
 	}
 
 	// store the available nodes for each partition, grouped by
@@ -138,6 +142,9 @@ func MembersForQuery() []Node {
 		}
 	}
 
+	if len(membersMap) < minAvailableShards {
+		return nil, InsufficientShardsAvailable
+	}
 	selectedMembers := make(map[string]struct{})
 	answer := make([]Node, 0)
 	// we want to get the minimum number of nodes
@@ -165,5 +172,5 @@ LOOP:
 		answer = append(answer, selected)
 	}
 
-	return answer
+	return answer, nil
 }

@@ -47,10 +47,15 @@ type Series struct {
 }
 
 func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
-	peers := cluster.MembersForQuery()
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		log.Error(3, "HTTP findSeries unable to get peers, %s", err)
+		return nil, err
+	}
 	log.Debug("HTTP findSeries for %v across %d instances", patterns, len(peers))
 	errors := make([]error, 0)
 	series := make([]Series, 0)
+
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, peer := range peers {
@@ -81,7 +86,6 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 		}
 	}
 	wg.Wait()
-	var err error
 	if len(errors) > 0 {
 		err = errors[0]
 	}
@@ -298,7 +302,11 @@ func (s *Server) listRemote(orgId int, peer cluster.Node) ([]idx.Archive, error)
 }
 
 func (s *Server) metricsIndex(ctx *middleware.Context) {
-	peers := cluster.MembersForQuery()
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
 	errors := make([]error, 0)
 	series := make([]idx.Archive, 0)
 	seenDefs := make(map[string]struct{})
@@ -338,7 +346,6 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		}
 	}
 	wg.Wait()
-	var err error
 	if len(errors) > 0 {
 		err = errors[0]
 	}
