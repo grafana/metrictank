@@ -30,7 +30,8 @@ const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
     PRIMARY KEY (key, ts)
 ) WITH CLUSTERING ORDER BY (ts DESC)
     AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d', 'tombstone_threshold': '0.2', 'tombstone_compaction_interval': '86400'}
-    AND compression = { 'class': 'LZ4Compressor' }`
+    AND compression = { 'class': 'LZ4Compressor' }
+    AND gc_grace_seconds = %d`
 const Table_name_format = `metric_%d`
 
 var (
@@ -192,7 +193,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 
 	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
 	for _, result := range ttlTables {
-		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.WindowSize)).Exec()
+		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
 		if err != nil {
 			return nil, err
 		}
