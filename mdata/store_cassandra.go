@@ -83,10 +83,11 @@ type ttlTable struct {
 }
 
 type CassandraStore struct {
-	Session     *gocql.Session
-	writeQueues []chan *ChunkWriteRequest
-	readQueue   chan *ChunkReadRequest
-	ttlTables   TTLTables
+	Session          *gocql.Session
+	writeQueues      []chan *ChunkWriteRequest
+	writeQueueMeters []*stats.Range32
+	readQueue        chan *ChunkReadRequest
+	ttlTables        TTLTables
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -239,16 +240,17 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	}
 	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
 	c := &CassandraStore{
-		Session:     session,
-		writeQueues: make([]chan *ChunkWriteRequest, writers),
-		readQueue:   make(chan *ChunkReadRequest, readqsize),
-		ttlTables:   ttlTables,
+		Session:          session,
+		writeQueues:      make([]chan *ChunkWriteRequest, writers),
+		writeQueueMeters: make([]*stats.Range32, writers),
+		readQueue:        make(chan *ChunkReadRequest, readqsize),
+		ttlTables:        ttlTables,
 	}
 
 	for i := 0; i < writers; i++ {
 		c.writeQueues[i] = make(chan *ChunkWriteRequest, writeqsize)
-		queueMeter := stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
-		go c.processWriteQueue(c.writeQueues[i], queueMeter)
+		c.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
+		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
 	}
 
 	for i := 0; i < readers; i++ {
@@ -263,6 +265,7 @@ func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
 		sum += int(char)
 	}
 	which := sum % len(c.writeQueues)
+	c.writeQueueMeters[which].Value(len(c.writeQueues[which]))
 	c.writeQueues[which] <- cwr
 }
 
