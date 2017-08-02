@@ -148,6 +148,7 @@ func main() {
 	server.Index.Init()
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
+	http.HandleFunc("/status", server.statusHandler)
 
 	log(fmt.Sprintf("Listening on %q", *httpEndpoint))
 	err = http.ListenAndServe(*httpEndpoint, nil)
@@ -173,6 +174,10 @@ func log(msg string) {
 		fmt.Println(msg)
 		printLock.Unlock()
 	}
+}
+
+func (s *Server) statusHandler(w http.ResponseWriter, req *http.Request) {
+	w.Write([]byte("ok"))
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
