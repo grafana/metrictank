@@ -45,16 +45,6 @@ var (
 		"127.0.0.1:8080",
 		"The http endpoint to listen on",
 	)
-	cassandraAddrs = flag.String(
-		"cassandra-addrs",
-		"localhost",
-		"cassandra host (may be given multiple times as comma-separated list)",
-	)
-	cassandraKeyspace = flag.String(
-		"cassandra-keyspace",
-		"metrictank",
-		"cassandra keyspace to use for storing the metric data table",
-	)
 	ttlsStr = flag.String(
 		"ttls",
 		"35d",
@@ -80,12 +70,30 @@ var (
 		1,
 		"Number of Partitions",
 	)
+
+	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
+	cassandraKeyspace            = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
+	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
+	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
+	cassandraReadConcurrency     = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
+	cassandraReadQueueSize       = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
+	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
+	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
+
+	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
+	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
+	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
+
+	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
+	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
+	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
+
 	GitHash   = "(none)"
 	printLock sync.Mutex
 )
 
 type Server struct {
-	Cluster     *gocql.ClusterConfig
 	Session     *gocql.Session
 	TTLTables   mdata.TTLTables
 	Partitioner partitioner.Partitioner
@@ -96,16 +104,9 @@ func main() {
 	cassandra.ConfigSetup()
 	flag.Parse()
 
-	cassCluster := gocql.NewCluster(strings.Split(*cassandraAddrs, ",")...)
-	cassCluster.Consistency = gocql.ParseConsistency("one")
-	cassCluster.Timeout = time.Second
-	cassCluster.NumConns = 2
-	cassCluster.ProtoVersion = 4
-	cassCluster.Keyspace = *cassandraKeyspace
-
-	session, err := cassCluster.CreateSession()
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create cassandra session: %q", err))
+		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
 	}
 
 	splits := strings.Split(*ttlsStr, ",")
@@ -121,8 +122,7 @@ func main() {
 	}
 
 	server := &Server{
-		Cluster:     cassCluster,
-		Session:     session,
+		Session:     store.Session,
 		TTLTables:   ttlTables,
 		Partitioner: p,
 		Index:       cassandra.New(),
