@@ -25,69 +25,71 @@ import (
 )
 
 var (
-	exitOnError = flag.Bool(
+	globalFlags = flag.NewFlagSet("global config flags", flag.ExitOnError)
+
+	exitOnError = globalFlags.Bool(
 		"exit-on-error",
 		true,
 		"Exit with a message when there's an error",
 	)
-	verbose = flag.Bool(
+	verbose = globalFlags.Bool(
 		"verbose",
 		false,
 		"Write logs to terminal",
 	)
-	fakeAvgAggregates = flag.Bool(
+	fakeAvgAggregates = globalFlags.Bool(
 		"fake-avg-aggregates",
 		true,
 		"Generate sum/cnt series out of avg series to accommodate metrictank",
 	)
-	httpEndpoint = flag.String(
+	httpEndpoint = globalFlags.String(
 		"http-endpoint",
 		"127.0.0.1:8080",
 		"The http endpoint to listen on",
 	)
-	ttlsStr = flag.String(
+	ttlsStr = globalFlags.String(
 		"ttls",
 		"35d",
 		"list of ttl strings used by MT separated by ','",
 	)
-	windowFactor = flag.Int(
+	windowFactor = globalFlags.Int(
 		"window-factor",
 		20,
 		"the window factor be used when creating the metric table schema",
 	)
-	partitionScheme = flag.String(
+	partitionScheme = globalFlags.String(
 		"partition-scheme",
 		"bySeries",
 		"method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)",
 	)
-	uriPath = flag.String(
+	uriPath = globalFlags.String(
 		"uri-path",
 		"/chunks",
 		"the URI on which we expect chunks to get posted",
 	)
-	numPartitions = flag.Int(
+	numPartitions = globalFlags.Int(
 		"num-partitions",
 		1,
 		"Number of Partitions",
 	)
 
-	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	cassandraKeyspace            = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
-	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	cassandraReadConcurrency     = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
-	cassandraReadQueueSize       = flag.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
-	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
+	cassandraAddrs               = globalFlags.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
+	cassandraKeyspace            = globalFlags.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
+	cassandraConsistency         = globalFlags.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	cassandraHostSelectionPolicy = globalFlags.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
+	cassandraTimeout             = globalFlags.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
+	cassandraReadConcurrency     = globalFlags.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
+	cassandraReadQueueSize       = globalFlags.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
+	cassandraRetries             = globalFlags.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
+	cqlProtocolVersion           = globalFlags.Int("cql-protocol-version", 4, "cql protocol version to use")
 
-	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
+	cassandraSSL              = globalFlags.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
+	cassandraCaPath           = globalFlags.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
+	cassandraHostVerification = globalFlags.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
 
-	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
+	cassandraAuth     = globalFlags.Bool("cassandra-auth", false, "enable cassandra authentication")
+	cassandraUsername = globalFlags.String("cassandra-username", "cassandra", "username for authentication")
+	cassandraPassword = globalFlags.String("cassandra-password", "cassandra", "password for authentication")
 
 	GitHash   = "(none)"
 	printLock sync.Mutex
@@ -101,8 +103,23 @@ type Server struct {
 }
 
 func main() {
-	cassandra.ConfigSetup()
-	flag.Parse()
+	cassFlags := cassandra.ConfigSetup()
+
+	var cassI int
+	for i, v := range os.Args {
+		if v == "cass" {
+			cassI = i
+		}
+	}
+	if cassI == 0 {
+		fmt.Println("only indextype 'cass' supported")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	globalFlags.Parse(os.Args[1:cassI])
+	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
+	cassandra.Enabled = true
 
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
