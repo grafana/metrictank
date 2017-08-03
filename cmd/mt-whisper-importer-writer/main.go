@@ -171,7 +171,7 @@ func main() {
 	server.Index.Init()
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
-	http.HandleFunc("/status", server.statusHandler)
+	http.HandleFunc("/healthz", server.healthzHandler)
 
 	log(fmt.Sprintf("Listening on %q", *httpEndpoint))
 	err = http.ListenAndServe(*httpEndpoint, nil)
@@ -199,7 +199,7 @@ func log(msg string) {
 	}
 }
 
-func (s *Server) statusHandler(w http.ResponseWriter, req *http.Request) {
+func (s *Server) healthzHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("ok"))
 }
 

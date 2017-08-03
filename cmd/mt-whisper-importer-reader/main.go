@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -200,6 +201,8 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		if resp.StatusCode != 200 {
 			throwError(fmt.Sprintf("Error when submitting data: %s", resp.Status))
 		}
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
 	}
 	wg.Done()
 }
