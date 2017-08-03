@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -63,6 +65,11 @@ var (
 		1,
 		"Organization ID the data belongs to ",
 	)
+	insecureSSL = flag.Bool(
+		"insecure-ssl",
+		false,
+		"Disables ssl certificate verification",
+	)
 	whisperDirectory = flag.String(
 		"whisper-directory",
 		"/opt/graphite/storage/whisper",
@@ -72,6 +79,11 @@ var (
 		"read-archives",
 		"*",
 		"Comma separated list of positive integers or '*' for all archives",
+	)
+	httpAuth = flag.String(
+		"http-auth",
+		"",
+		"The credentials used to authenticate in the format \"user:password\"",
 	)
 	chunkSpans   []uint32
 	readArchives map[int]struct{}
@@ -139,7 +151,10 @@ func log(msg string) {
 }
 
 func processFromChan(files chan string, wg *sync.WaitGroup) {
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
+	}
+	client := &http.Client{Transport: tr}
 
 	for file := range files {
 		fd, err := os.Open(file)
@@ -173,10 +188,17 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 
-		_, err = client.Do(req)
+		if len(*httpAuth) > 0 {
+			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
 			continue
+		}
+		if resp.StatusCode != 200 {
+			throwError(fmt.Sprintf("Error when submitting data: %s", resp.Status))
 		}
 	}
 	wg.Done()
@@ -363,7 +385,7 @@ func getFileListIntoChan(fileChan chan string) {
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
-			if path[len(path)-4:] == ".wsp" {
+			if len(path) >= 4 && path[len(path)-4:] == ".wsp" {
 				fileChan <- path
 			}
 			return nil
