@@ -105,6 +105,29 @@ type Server struct {
 func main() {
 	cassFlags := cassandra.ConfigSetup()
 
+	flag.Usage = func() {
+		fmt.Println("mt-whisper-importer-writer")
+		fmt.Println()
+		fmt.Println("Opens an endpoint to send data to, which then gets stored in the MT internal DB(s)")
+		fmt.Println()
+		fmt.Printf("Usage:\n\n")
+		fmt.Printf("  mt-whisper-importer-writer [global config flags] <idxtype> [idx config flags] \n\n")
+		fmt.Printf("global config flags:\n\n")
+		globalFlags.PrintDefaults()
+		fmt.Println()
+		fmt.Printf("idxtype: only 'cass' supported for now\n\n")
+		fmt.Printf("cass config flags:\n\n")
+		cassFlags.PrintDefaults()
+		fmt.Println()
+		fmt.Println("EXAMPLES:")
+		fmt.Println("mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata")
+	}
+
+	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
+		flag.Usage()
+		os.Exit(0)
+	}
+
 	var cassI int
 	for i, v := range os.Args {
 		if v == "cass" {
