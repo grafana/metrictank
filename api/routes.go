@@ -14,6 +14,7 @@ func (s *Server) RegisterRoutes() {
 		r.Use(gziper.Gziper())
 	}
 	r.Use(middleware.RequestStats())
+	r.Use(middleware.Tracer(s.Tracer))
 	r.Use(macaron.Renderer())
 	r.Use(middleware.OrgMiddleware(multiTenant))
 	r.Use(middleware.CorsHandler())

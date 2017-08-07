@@ -17,9 +17,11 @@ import (
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/cluster"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/idx/cassandra"
 	"github.com/raintank/metrictank/idx/memory"
@@ -41,6 +43,7 @@ var (
 	warmupPeriod time.Duration
 	startupTime  time.Time
 	GitHash      = "(none)"
+	tracer       opentracing.Tracer
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
@@ -112,7 +115,7 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		path = *confFile
 	}
-	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+	config, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename:  path,
 		EnvPrefix: "MT_",
 	})
@@ -143,7 +146,7 @@ func main() {
 	// storage-schemas, storage-aggregation files
 	mdata.ConfigSetup()
 
-	conf.ParseAll()
+	config.ParseAll()
 
 	/***********************************
 		Initialize Logging
@@ -310,6 +313,15 @@ func main() {
 	}
 
 	/***********************************
+		Initialize tracer
+	***********************************/
+	tracer, traceCloser, err := conf.GetTracer()
+	if err != nil {
+		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+	}
+	defer traceCloser.Close()
+
+	/***********************************
 		Initialize our API server
 	***********************************/
 	apiServer, err := api.NewServer()
@@ -321,6 +333,8 @@ func main() {
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
 	apiServer.BindCache(ccache)
+	apiServer.BindTracer(tracer)
+	cluster.Tracer = tracer
 	go apiServer.Run()
 
 	/***********************************

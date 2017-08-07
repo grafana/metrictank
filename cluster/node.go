@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
+	opentracing "github.com/opentracing/opentracing-go"
+	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -85,9 +88,21 @@ func (n Node) IsLocal() bool {
 	return n.local
 }
 
-func (n Node) Post(path string, body interface{}) ([]byte, error) {
+func (n Node) Post(ctx context.Context, name, path string, body Traceable) ([]byte, error) {
+
+	span := opentracing.SpanFromContext(ctx)
+	span = Tracer.StartSpan(name, opentracing.ChildOf(span.Context()))
+	tags.SpanKindRPCClient.Set(span)
+	tags.PeerService.Set(span, "metrictank")
+	tags.PeerAddress.Set(span, n.RemoteAddr)
+	tags.PeerHostname.Set(span, n.Name)
+	body.Trace(span)
+	ctx = opentracing.ContextWithSpan(ctx, span)
+	defer span.Finish()
+
 	b, err := json.Marshal(body)
 	if err != nil {
+		tags.Error.Set(span, true)
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	var reader *bytes.Reader
@@ -95,15 +110,26 @@ func (n Node) Post(path string, body interface{}) ([]byte, error) {
 	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
+		tags.Error.Set(span, true)
 		return nil, NewError(http.StatusInternalServerError, err)
+	}
+	carrier := opentracing.HTTPHeadersCarrier(req.Header)
+	err = Tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		log.Error(3, "CLU failed to inject span into headers: %s", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	rsp, err := client.Do(req)
 	if err != nil {
+		tags.Error.Set(span, true)
 		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
-	return handleResp(rsp)
+	out, err := handleResp(rsp)
+	if err != nil {
+		tags.Error.Set(span, true)
+	}
+	return out, err
 }
 
 func handleResp(rsp *http.Response) ([]byte, error) {

@@ -9,6 +9,7 @@ import (
 
 	_ "net/http/pprof"
 
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/cache"
@@ -44,6 +45,7 @@ type Server struct {
 	BackendStore mdata.Store
 	Cache        cache.Cache
 	shutdown     chan struct{}
+	Tracer       opentracing.Tracer
 }
 
 func (s *Server) BindMetricIndex(i idx.MetricIndex) {
@@ -58,6 +60,10 @@ func (s *Server) BindBackendStore(store mdata.Store) {
 
 func (s *Server) BindCache(cache cache.Cache) {
 	s.Cache = cache
+}
+
+func (s *Server) BindTracer(tracer opentracing.Tracer) {
+	s.Tracer = tracer
 }
 
 func NewServer() (*Server, error) {
@@ -79,6 +85,7 @@ func NewServer() (*Server, error) {
 		keyFile:  keyFile,
 		shutdown: make(chan struct{}),
 		Macaron:  m,
+		Tracer:   opentracing.NoopTracer{},
 	}, nil
 }
 

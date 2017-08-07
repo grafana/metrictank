@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"math"
 	"net/http"
@@ -8,6 +9,10 @@ import (
 	"sync"
 	"time"
 
+	macaron "gopkg.in/macaron.v1"
+
+	opentracing "github.com/opentracing/opentracing-go"
+	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api/middleware"
 	"github.com/raintank/metrictank/api/models"
@@ -46,7 +51,7 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
+func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
 		log.Error(3, "HTTP findSeries unable to get peers, %s", err)
@@ -63,7 +68,7 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
-				result, err := s.findSeriesLocal(orgId, patterns, seenAfter)
+				result, err := s.findSeriesLocal(ctx, orgId, patterns, seenAfter)
 				mu.Lock()
 				if err != nil {
 					errors = append(errors, err)
@@ -74,7 +79,7 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.findSeriesRemote(orgId, patterns, seenAfter, peer)
+				result, err := s.findSeriesRemote(ctx, orgId, patterns, seenAfter, peer)
 				mu.Lock()
 				if err != nil {
 					errors = append(errors, err)
@@ -93,11 +98,18 @@ func (s *Server) findSeries(orgId int, patterns []string, seenAfter int64) ([]Se
 	return series, err
 }
 
-func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) ([]Series, error) {
+func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
+		span := opentracing.SpanFromContext(ctx)
+		span = s.Tracer.StartSpan("findSeriesLocal", opentracing.ChildOf(span.Context()))
+		span.SetTag("org", orgId)
+		span.SetTag("pattern", pattern)
+		ctx = opentracing.ContextWithSpan(ctx, span)
+		defer span.Finish()
 		nodes, err := s.MetricIndex.Find(orgId, pattern, seenAfter)
 		if err != nil {
+			tags.Error.Set(span, true)
 			return nil, response.NewError(http.StatusBadRequest, err.Error())
 		}
 		result = append(result, Series{
@@ -110,9 +122,14 @@ func (s *Server) findSeriesLocal(orgId int, patterns []string, seenAfter int64) 
 	return result, nil
 }
 
-func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
+func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
 	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.Name, orgId, patterns)
-	buf, err := peer.Post("/index/find", models.IndexFind{Patterns: patterns, OrgId: orgId, From: seenAfter})
+	data := models.IndexFind{
+		Patterns: patterns,
+		OrgId:    orgId,
+		From:     seenAfter,
+	}
+	buf, err := peer.Post(ctx, "findSeriesRemote", "/index/find", data)
 	if err != nil {
 		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.Name, err)
 		return nil, err
@@ -136,6 +153,22 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
+	span := opentracing.SpanFromContext(ctx.Req.Context())
+
+	// note: the model is already validated to assure at least one of them has len >0
+	if len(request.Targets) == 0 {
+		request.Targets = request.TargetsRails
+	}
+
+	span.SetTag("from", request.FromTo.From)
+	span.SetTag("until", request.FromTo.Until)
+	span.SetTag("to", request.FromTo.To)
+	span.SetTag("tz", request.FromTo.Tz)
+	span.SetTag("mdp", request.MaxDataPoints)
+	span.SetTag("targets", request.Targets)
+	span.SetTag("format", request.Format)
+	span.SetTag("noproxy", request.NoProxy)
+	span.SetTag("process", request.Process)
 
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
@@ -150,16 +183,15 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
+	span.SetTag("fromUnix", fromUnix)
+	span.SetTag("toUnix", toUnix)
+	span.SetTag("span", toUnix-fromUnix)
+
 	// render API is modeled after graphite, so from exclusive, to inclusive.
 	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
 	// so we must adjust
 	fromUnix += 1
 	toUnix += 1
-
-	// note: the model is already validated to assure at least one of them has len >0
-	if len(request.Targets) == 0 {
-		request.Targets = request.TargetsRails
-	}
 
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
@@ -190,8 +222,18 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
 				return
 			}
+			span := opentracing.SpanFromContext(ctx.Req.Context())
+			if span != nil {
+				span = s.Tracer.StartSpan("graphiteproxy", opentracing.ChildOf(span.Context()))
+				tags.SpanKindRPCClient.Set(span)
+				tags.PeerService.Set(span, "graphite")
+				ctx.Req = macaron.Request{ctx.Req.WithContext(opentracing.ContextWithSpan(ctx.Req.Context(), span))}
+			}
 			ctx.Req.Request.Body = ctx.Body
 			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+			if span != nil {
+				span.Finish()
+			}
 			proxyStats.Miss(string(fun))
 			renderReqProxied.Inc()
 			return
@@ -200,11 +242,17 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	out, err := s.executePlan(ctx.OrgId, plan)
+	span = opentracing.SpanFromContext(ctx.Req.Context())
+	span = s.Tracer.StartSpan("executePlan", opentracing.ChildOf(span.Context()))
+	ctx.Req = macaron.Request{ctx.Req.WithContext(opentracing.ContextWithSpan(ctx.Req.Context(), span))}
+	out, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
 	if err != nil {
+		tags.Error.Set(span, true)
+		span.Finish()
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
+	span.Finish()
 
 	switch request.Format {
 	case "msgp":
@@ -226,7 +274,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		return
 	}
 	nodes := make([]idx.Node, 0)
-	series, err := s.findSeries(ctx.OrgId, []string{request.Query}, int64(fromUnix))
+	series, err := s.findSeries(ctx.Req.Context(), ctx.OrgId, []string{request.Query}, int64(fromUnix))
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -260,9 +308,9 @@ func (s *Server) listLocal(orgId int) []idx.Archive {
 	return s.MetricIndex.List(orgId)
 }
 
-func (s *Server) listRemote(orgId int, peer cluster.Node) ([]idx.Archive, error) {
+func (s *Server) listRemote(ctx context.Context, orgId int, peer cluster.Node) ([]idx.Archive, error) {
 	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.Name, orgId)
-	buf, err := peer.Post("/index/list", models.IndexList{OrgId: orgId})
+	buf, err := peer.Post(ctx, "listRemote", "/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
 		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.Name, err)
 		return nil, err
@@ -308,7 +356,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.listRemote(ctx.OrgId, peer)
+				result, err := s.listRemote(ctx.Req.Context(), ctx.OrgId, peer)
 				mu.Lock()
 				if err != nil {
 					errors = append(errors, err)
@@ -448,7 +496,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.metricsDeleteRemote(ctx.OrgId, req.Query, peer)
+				result, err := s.metricsDeleteRemote(ctx.Req.Context(), ctx.OrgId, req.Query, peer)
 				mu.Lock()
 				if err != nil {
 					errors = append(errors, err)
@@ -477,9 +525,14 @@ func (s *Server) metricsDeleteLocal(orgId int, query string) (int, error) {
 	return len(defs), err
 }
 
-func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node) (int, error) {
+func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query string, peer cluster.Node) (int, error) {
 	log.Debug("HTTP metricDelete calling %s/index/delete for %d:%q", peer.Name, orgId, query)
-	buf, err := peer.Post("/index/delete", models.IndexDelete{Query: query, OrgId: orgId})
+
+	body := models.IndexDelete{
+		Query: query,
+		OrgId: orgId,
+	}
+	buf, err := peer.Post(ctx, "metricsDeleteRemote", "/index/delete", body)
 	if err != nil {
 		log.Error(4, "HTTP metricDelete error querying %s/index/delete: %q", peer.Name, err)
 		return 0, err
@@ -497,7 +550,7 @@ func (s *Server) metricsDeleteRemote(orgId int, query string, peer cluster.Node)
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
-func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error) {
+func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]models.Series, error) {
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
@@ -507,7 +560,7 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	for _, r := range plan.Reqs {
-		series, err := s.findSeries(orgId, []string{r.Query}, int64(r.From))
+		series, err := s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		if err != nil {
 			return nil, err
 		}
@@ -556,7 +609,7 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 		}
 	}
 
-	out, err := s.getTargets(reqs)
+	out, err := s.getTargets(ctx, reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render %s", err.Error())
 		return nil, err
