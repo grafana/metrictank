@@ -67,6 +67,16 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
+		case "QueryCons":
+			err = z.QueryCons.DecodeMsg(dc)
+			if err != nil {
+				return
+			}
+		case "Consolidator":
+			err = z.Consolidator.DecodeMsg(dc)
+			if err != nil {
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -79,9 +89,9 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 6
+	// map header, size 8
 	// write "Target"
-	err = en.Append(0x86, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	err = en.Append(0x88, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	if err != nil {
 		return err
 	}
@@ -140,15 +150,33 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
+	// write "QueryCons"
+	err = en.Append(0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x43, 0x6f, 0x6e, 0x73)
+	if err != nil {
+		return err
+	}
+	err = z.QueryCons.EncodeMsg(en)
+	if err != nil {
+		return
+	}
+	// write "Consolidator"
+	err = en.Append(0xac, 0x43, 0x6f, 0x6e, 0x73, 0x6f, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72)
+	if err != nil {
+		return err
+	}
+	err = z.Consolidator.EncodeMsg(en)
+	if err != nil {
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 6
+	// map header, size 8
 	// string "Target"
-	o = append(o, 0x86, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	o = append(o, 0x88, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	o = msgp.AppendString(o, z.Target)
 	// string "Datapoints"
 	o = append(o, 0xaa, 0x44, 0x61, 0x74, 0x61, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x73)
@@ -171,6 +199,18 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "QueryTo"
 	o = append(o, 0xa7, 0x51, 0x75, 0x65, 0x72, 0x79, 0x54, 0x6f)
 	o = msgp.AppendUint32(o, z.QueryTo)
+	// string "QueryCons"
+	o = append(o, 0xa9, 0x51, 0x75, 0x65, 0x72, 0x79, 0x43, 0x6f, 0x6e, 0x73)
+	o, err = z.QueryCons.MarshalMsg(o)
+	if err != nil {
+		return
+	}
+	// string "Consolidator"
+	o = append(o, 0xac, 0x43, 0x6f, 0x6e, 0x73, 0x6f, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72)
+	o, err = z.Consolidator.MarshalMsg(o)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -232,6 +272,16 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
+		case "QueryCons":
+			bts, err = z.QueryCons.UnmarshalMsg(bts)
+			if err != nil {
+				return
+			}
+		case "Consolidator":
+			bts, err = z.Consolidator.UnmarshalMsg(bts)
+			if err != nil {
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -249,7 +299,7 @@ func (z *Series) Msgsize() (s int) {
 	for zxvk := range z.Datapoints {
 		s += z.Datapoints[zxvk].Msgsize()
 	}
-	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size
+	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size + 10 + z.QueryCons.Msgsize() + 13 + z.Consolidator.Msgsize()
 	return
 }
 

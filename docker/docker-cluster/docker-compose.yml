@@ -108,7 +108,7 @@ services:
     environment:
       GRAPHITE_CLUSTER_SERVERS: metrictank0:6060
       GRAPHITE_STATSD_HOST: statsdaemon
-      SINGLE_TENANT: yes
+      SINGLE_TENANT: "true"
       WSGI_PROCESSES: 4
       WSGI_THREADS: 25
 
