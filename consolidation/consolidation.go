@@ -10,6 +10,7 @@ import (
 
 // consolidator is a highlevel description of a point consolidation method
 // mostly for use by the http api, but can also be used internally for data processing
+//go:generate msgp
 type Consolidator int
 
 var errUnknownConsolidationFunction = errors.New("unknown consolidation function")
