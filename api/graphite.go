@@ -136,43 +136,15 @@ func (s *Server) findSeriesRemote(orgId int, patterns []string, seenAfter int64,
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
+
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Unix())
-
-	var loc *time.Location
-	switch request.Tz {
-	case "":
-		loc = timeZone
-	case "local":
-		loc = time.Local
-	default:
-		var err error
-		loc, err = time.LoadLocation(request.Tz)
-		if err != nil {
-			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-			return
-		}
-	}
-
-	from := request.From
-	to := request.To
-	if to == "" {
-		to = request.Until
-	}
-
-	fromUnix, err := dur.ParseDateTime(from, loc, now, defaultFrom)
+	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-
-	toUnix, err := dur.ParseDateTime(to, loc, now, defaultTo)
-	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-		return
-	}
-
 	if fromUnix >= toUnix {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
 		return
@@ -246,8 +218,15 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
+	now := time.Now()
+	var defaultFrom, defaultTo uint32
+	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
 	nodes := make([]idx.Node, 0)
-	series, err := s.findSeries(ctx.OrgId, []string{request.Query}, request.From)
+	series, err := s.findSeries(ctx.OrgId, []string{request.Query}, int64(fromUnix))
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -273,7 +252,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	case "completer":
 		response.Write(ctx, response.NewJson(200, findCompleter(nodes), request.Jsonp))
 	case "pickle":
-		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request)))
+		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
 	}
 }
 
@@ -383,11 +362,11 @@ func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 	return result
 }
 
-func findPickle(nodes []idx.Node, request models.GraphiteFind) models.SeriesPickle {
+func findPickle(nodes []idx.Node, request models.GraphiteFind, fromUnix, toUnix uint32) models.SeriesPickle {
 	result := make([]models.SeriesPickleItem, len(nodes))
 	var intervals [][]int64
-	if request.From != 0 && request.Until != 0 {
-		intervals = [][]int64{{request.From, request.Until}}
+	if fromUnix != 0 && toUnix != 0 {
+		intervals = [][]int64{{int64(fromUnix), int64(toUnix)}}
 	}
 	for i, g := range nodes {
 		result[i] = models.NewSeriesPickleItem(g.Path, g.Leaf, intervals)
@@ -597,4 +576,39 @@ func (s *Server) executePlan(orgId int, plan expr.Plan) ([]models.Series, error)
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))
 	return out, err
+}
+
+func getFromTo(ft models.FromTo, now time.Time, defaultFrom, defaultTo uint32) (uint32, uint32, error) {
+	loc, err := getLocation(ft.Tz)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	from := ft.From
+	to := ft.To
+	if to == "" {
+		to = ft.Until
+	}
+
+	fromUnix, err := dur.ParseDateTime(from, loc, now, defaultFrom)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	toUnix, err := dur.ParseDateTime(to, loc, now, defaultTo)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return fromUnix, toUnix, nil
+}
+
+func getLocation(desc string) (*time.Location, error) {
+	switch desc {
+	case "":
+		return timeZone, nil
+	case "local":
+		return time.Local, nil
+	}
+	return time.LoadLocation(desc)
 }
