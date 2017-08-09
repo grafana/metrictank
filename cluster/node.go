@@ -85,28 +85,6 @@ func (n Node) IsLocal() bool {
 	return n.local
 }
 
-func (n Node) Get(path string, query interface{}) ([]byte, error) {
-	if query != nil {
-		qstr, err := toQueryString(query)
-		if err != nil {
-			return nil, NewError(http.StatusInternalServerError, err)
-		}
-		path = path + "?" + qstr
-	}
-
-	addr := n.RemoteURL() + path
-	req, err := http.NewRequest("GET", addr, nil)
-	if err != nil {
-		return nil, NewError(http.StatusInternalServerError, err)
-	}
-	rsp, err := client.Do(req)
-	if err != nil {
-		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
-		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
-	}
-	return handleResp(rsp)
-}
-
 func (n Node) Post(path string, body interface{}) ([]byte, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
