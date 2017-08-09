@@ -175,11 +175,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	defaultTo := uint32(now.Unix())
 	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 	if fromUnix >= toUnix {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
+		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
 		return
 	}
 
@@ -270,13 +270,13 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	var defaultFrom, defaultTo uint32
 	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 	nodes := make([]idx.Node, 0)
 	series, err := s.findSeries(ctx.Req.Context(), ctx.OrgId, []string{request.Query}, int64(fromUnix))
 	if err != nil {
-		response.Write(ctx, response.WrapError(err))
+		response.WriteErr(ctx.Req.Context(), ctx, response.WrapError(err))
 		return
 	}
 	seenPaths := make(map[string]struct{})
@@ -331,7 +331,7 @@ func (s *Server) listRemote(ctx context.Context, orgId int, peer cluster.Node) (
 func (s *Server) metricsIndex(ctx *middleware.Context) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
-		response.Write(ctx, response.WrapError(err))
+		response.WriteErr(ctx.Req.Context(), ctx, response.WrapError(err))
 		return
 	}
 	errors := make([]error, 0)
@@ -379,7 +379,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 
 	if err != nil {
 		log.Error(3, "HTTP IndexJson() %s", err.Error())
-		response.Write(ctx, response.WrapError(err))
+		response.WriteErr(ctx.Req.Context(), ctx, response.WrapError(err))
 		return
 	}
 
@@ -510,7 +510,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	wg.Wait()
 	var err error
 	if len(errors) > 0 {
-		response.Write(ctx, response.WrapError(err))
+		response.WriteErr(ctx.Req.Context(), ctx, response.WrapError(err))
 	}
 
 	resp := models.MetricsDeleteResp{
