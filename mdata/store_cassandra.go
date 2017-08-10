@@ -37,7 +37,8 @@ const Table_name_format = `metric_%d`
 var (
 	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
 	errStartBeforeEnd = errors.New("start must be before end.")
-	errReadQueueFull  = errors.New("the cassandra read queue is full")
+	errReadQueueFull  = errors.New("the read queue is full")
+	errReadTooOld     = errors.New("the read is too old")
 	errTableNotFound  = errors.New("table for given TTL not found")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
@@ -49,9 +50,9 @@ var (
 	// metric store.cassandra.put.wait is the duration of a put in the wait queue
 	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
 	// reads that were already too old to be executed
-	cassOmitOldRead = stats.NewCounter32("store.cassandra.omitted_old_reads")
+	cassOmitOldRead = stats.NewCounter32("store.cassandra.omit_read.too_old")
 	// reads that could not be pushed into the queue because it was full
-	cassReadQueueFull = stats.NewCounter32("store.cassandra.read_queue_full")
+	cassReadQueueFull = stats.NewCounter32("store.cassandra.omit_read.queue_full")
 
 	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
 	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
@@ -411,7 +412,7 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	crrs := make([]*ChunkReadRequest, 0)
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, time.Now(), nil})
+		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -465,7 +466,7 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	seen := 0
 	for o := range results {
 		if o.omitted {
-			return nil, errReadQueueFull
+			return nil, errReadTooOld
 		}
 		seen += 1
 		outcomes = append(outcomes, o)

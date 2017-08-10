@@ -41,19 +41,19 @@ var (
 	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
 	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
 
-	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
+	cassandraAuth            = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
+	cassandraUsername        = flag.String("cassandra-username", "cassandra", "username for authentication")
+	cassandraPassword        = flag.String("cassandra-password", "cassandra", "password for authentication")
+	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
 
 	// our own flags
-	from                     = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
-	to                       = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
-	fix                      = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
-	printTs                  = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
-	groupTTL                 = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
-	windowFactor             = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
-	timeZoneStr              = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
-	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
+	from         = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
+	to           = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
+	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
+	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
+	groupTTL     = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
+	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
+	timeZoneStr  = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 )
 
 func main() {
