@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -8,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	opentracing "github.com/opentracing/opentracing-go"
+	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/metrictank/api/models"
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
@@ -108,7 +111,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
-func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
+func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
 	remoteReqs := make(map[string][]models.Req)
@@ -131,7 +134,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 		go func() {
 			// the only errors returned are from us catching panics, so we should treat them
 			// all as internalServerErrors
-			series, err := s.getTargetsLocal(localReqs)
+			series, err := s.getTargetsLocal(ctx, localReqs)
 			mu.Lock()
 			if err != nil {
 				errs = append(errs, err)
@@ -147,7 +150,7 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 		wg.Add(1)
 		go func() {
 			// all errors returned returned are *response.Error.
-			series, err := s.getTargetsRemote(remoteReqs)
+			series, err := s.getTargetsRemote(ctx, remoteReqs)
 			mu.Lock()
 			if err != nil {
 				errs = append(errs, err)
@@ -168,17 +171,17 @@ func (s *Server) getTargets(reqs []models.Req) ([]models.Series, error) {
 	return out, err
 }
 
-func (s *Server) getTargetsRemote(remoteReqs map[string][]models.Req) ([]models.Series, error) {
+func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 	seriesChan := make(chan []models.Series, len(remoteReqs))
 	errorsChan := make(chan error, len(remoteReqs))
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for _, nodeReqs := range remoteReqs {
 		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.Name)
-		go func(reqs []models.Req) {
+		go func(ctx context.Context, reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
-			buf, err := node.Post("/getdata", models.GetData{Requests: reqs})
+			buf, err := node.Post(ctx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 			if err != nil {
 				errorsChan <- err
 				return
@@ -192,7 +195,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[string][]models.Req) ([]models.
 			}
 			log.Debug("DP getTargetsRemote: %s returned %d series", node.Name, len(resp.Series))
 			seriesChan <- resp.Series
-		}(nodeReqs)
+		}(ctx, nodeReqs)
 	}
 	go func() {
 		wg.Wait()
@@ -213,7 +216,7 @@ func (s *Server) getTargetsRemote(remoteReqs map[string][]models.Req) ([]models.
 }
 
 // error is the error of the first failing target request
-func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
+func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]models.Series, error) {
 	log.Debug("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	seriesChan := make(chan models.Series, len(reqs))
 	errorsChan := make(chan error, len(reqs))
@@ -221,10 +224,16 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(reqs))
 	for _, req := range reqs {
-		go func(wg *sync.WaitGroup, req models.Req) {
+		go func(ctx context.Context, wg *sync.WaitGroup, req models.Req) {
+			span := opentracing.SpanFromContext(ctx)
+			span = s.Tracer.StartSpan("getTargetsLocal", opentracing.ChildOf(span.Context()))
+			req.Trace(span)
+			ctx = opentracing.ContextWithSpan(ctx, span)
+			defer span.Finish()
 			pre := time.Now()
 			points, interval, err := s.getTarget(req)
 			if err != nil {
+				tags.Error.Set(span, true)
 				errorsChan <- err
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
@@ -240,7 +249,7 @@ func (s *Server) getTargetsLocal(reqs []models.Req) ([]models.Series, error) {
 				}
 			}
 			wg.Done()
-		}(&wg, req)
+		}(ctx, &wg, req)
 	}
 	go func() {
 		wg.Wait()

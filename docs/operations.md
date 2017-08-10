@@ -151,3 +151,9 @@ For more information on profiling see the excellent [Profiling Go Programs](http
 * can use debug logging to trace data throughout the pipeline. mt-store-cat to see what's in cassandra, mt-kafka-mdm-sniff, etc.
 * if it's old data, make sure you have a primary that can save data to cassandra, that the write queue can drain
 * check `metric-max-stale` and `chunk-max-stale` settings, make sure chunks are not being prematurely sealed (happens in some rare cases if you send data very infrequently. see `tank.add_to_closed_chunk` metric)
+
+## Opentracing
+
+Metrictank supports opentracing via [Jaeger](http://jaeger.readthedocs.io/en/latest/)
+It can give good insights into why certain requests are slow, and is easy to run.
+To use, enable in the config and point it at a Jaeger collector.

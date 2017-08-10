@@ -1,9 +1,13 @@
 package response
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
+	opentracing "github.com/opentracing/opentracing-go"
+	tags "github.com/opentracing/opentracing-go/ext"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/raintank/metrictank/util"
 )
 
@@ -25,6 +29,14 @@ func Write(w http.ResponseWriter, resp Response) {
 	w.WriteHeader(resp.Code())
 	w.Write(body)
 	return
+}
+
+func WriteErr(ctx context.Context, w http.ResponseWriter, resp Response) {
+	Write(w, resp)
+	span := opentracing.SpanFromContext(ctx)
+	body, _ := resp.Body()
+	span.LogFields(log.String("error.kind", string(body)))
+	tags.Error.Set(span, true)
 }
 
 type Response interface {

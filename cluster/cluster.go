@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/memberlist"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -30,6 +31,7 @@ var (
 	Mode    ModeType
 	Manager *ClusterManager
 	cfg     *memberlist.Config
+	Tracer  opentracing.Tracer
 
 	InsufficientShardsAvailable = NewError(http.StatusServiceUnavailable, errors.New("Insufficient shards available."))
 )

@@ -115,6 +115,10 @@ proftrigger-min-diff = 1h
 proftrigger-heap-thresh = 25000000000
 # only log log-level and higher. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL
 log-level = 2
+# enable/disable distributed opentracing via jaeger
+tracing-enabled = false
+# address of the jaeger agent to send data to
+tracing-addr = localhost:6831
 ```
 
 ## Retention settings ##
