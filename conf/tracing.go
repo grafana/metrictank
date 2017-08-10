@@ -9,17 +9,18 @@ import (
 	jaegerlog "github.com/uber/jaeger-client-go/log"
 )
 
-func GetTracer() (opentracing.Tracer, io.Closer, error) {
+func GetTracer(enabled bool, addr string) (opentracing.Tracer, io.Closer, error) {
 	// Sample configuration for testing. Use constant sampling to sample every trace
 	// and enable LogSpan to log every span via configured Logger.
 	cfg := jaegercfg.Configuration{
+		Disabled: !enabled,
 		Sampler: &jaegercfg.SamplerConfig{
 			Type:  jaeger.SamplerTypeConst,
 			Param: 1,
 		},
 		Reporter: &jaegercfg.ReporterConfig{
 			LogSpans:           true,
-			LocalAgentHostPort: "jaeger:6831",
+			LocalAgentHostPort: addr,
 		},
 	}
 
