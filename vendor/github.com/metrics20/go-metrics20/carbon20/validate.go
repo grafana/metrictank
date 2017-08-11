@@ -213,6 +213,15 @@ func ValidatePacket(buf []byte, levelLegacy ValidationLevelLegacy, levelM20 Vali
 
 	version := GetVersionB(fields[0])
 	var err error
+
+	// graphite graciously allows a leading dot by pretending it's not there.
+	// (e.g. send ".foo" -> metric will become "foo") so we do the same.
+	// see https://github.com/raintank/metrictank/issues/668 and
+	// https://github.com/raintank/metrictank/issues/694
+	if len(fields[0]) != 0 && fields[0][0] == '.' {
+		fields[0] = fields[0][1:]
+	}
+
 	if version == Legacy {
 		err = ValidateKeyLegacyB(fields[0], levelLegacy)
 	} else if version == M20 {
@@ -221,17 +230,17 @@ func ValidatePacket(buf []byte, levelLegacy ValidationLevelLegacy, levelM20 Vali
 		err = ValidateKeyM20NoEqualsB(fields[0], levelM20)
 	}
 	if err != nil {
-		return empty, 0, 0, err
+		return fields[0], 0, 0, err
 	}
 
-	val, err := strconv.ParseFloat(string(fields[1]), 32)
+	val, err := strconv.ParseFloat(string(fields[1]), 64)
 	if err != nil {
-		return empty, 0, 0, errValNotNumber
+		return fields[0], 0, 0, errValNotNumber
 	}
 
-	ts, err := strconv.ParseUint(string(fields[2]), 10, 0)
+	ts, err := strconv.ParseFloat(string(fields[2]), 64)
 	if err != nil {
-		return empty, 0, 0, errTsNotTs
+		return fields[0], 0, 0, errTsNotTs
 	}
 
 	return fields[0], val, uint32(ts), nil
