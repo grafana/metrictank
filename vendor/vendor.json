@@ -255,10 +255,10 @@
 			"revisionTime": "2016-05-02T23:32:43Z"
 		},
 		{
-			"checksumSHA1": "r2lgpkGtAwuk+v61NaVeEiz4olw=",
+			"checksumSHA1": "j4CCNdvlzHLOMA7gyS7wzIfwBTw=",
 			"path": "github.com/metrics20/go-metrics20/carbon20",
-			"revision": "6e880ed6742d76b6f3fd1719d50073e3c81c9086",
-			"revisionTime": "2017-01-18T21:04:38Z"
+			"revision": "55e770486f161cc83baf4e7178f7bb928dbc5716",
+			"revisionTime": "2017-08-11T09:14:05Z"
 		},
 		{
 			"checksumSHA1": "WKGTGMb40ppaVUJa6AXc+/6ghUk=",
