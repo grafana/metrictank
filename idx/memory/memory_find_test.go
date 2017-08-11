@@ -131,6 +131,8 @@ func Init() {
 		{Pattern: "*.dc3.host960.cpu.1.*", ExpectedResults: 8},
 		{Pattern: "*.dc3.host96{1,3}.cpu.1.*", ExpectedResults: 16},
 		{Pattern: "*.dc3.{host,server}96{1,3}.cpu.1.*", ExpectedResults: 16},
+
+		{Pattern: "*.dc3.{host,server}9[6-9]{1,3}.cpu.1.*", ExpectedResults: 64},
 	}
 }
 

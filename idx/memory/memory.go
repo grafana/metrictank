@@ -331,25 +331,25 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 
 	nodes := strings.Split(pattern, ".")
 
-	// pos is the index of the last node we know for sure
-	// for a query like foo.bar.baz, pos is 2
-	// for a query like foo.bar.* or foo.bar, pos is 1
-	// for a query like foo.b*.baz, pos is 0
-	pos := len(nodes) - 1
+	// pos is the index of the first node with special chars, or one past the last node if exact
+	// for a query like foo.bar.baz, pos is 3
+	// for a query like foo.bar.* or foo.bar, pos is 2
+	// for a query like foo.b*.baz, pos is 1
+	pos := len(nodes)
 	for i := 0; i < len(nodes); i++ {
 		if strings.ContainsAny(nodes[i], "*{}[]?") {
 			log.Debug("memory-idx: found first pattern sequence at node %s pos %d", nodes[i], i)
-			pos = i - 1
+			pos = i
 			break
 		}
 	}
 	var startNode *Node
-	if pos == -1 {
+	if pos == 0 {
 		//we need to start at the root.
 		log.Debug("memory-idx: starting search at the root node")
 		startNode = tree.Items[""]
 	} else {
-		branch := strings.Join(nodes[0:pos+1], ".")
+		branch := strings.Join(nodes[0:pos], ".")
 		log.Debug("memory-idx: starting search at branch %s", branch)
 		startNode, ok = tree.Items[branch]
 		if !ok {
@@ -358,23 +358,16 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		}
 	}
 
-	if pos == len(nodes)-1 {
-		// startNode is the leaf we want.
-		log.Debug("memory-idx: pattern %s was a specific branch/leaf name.", pattern)
-		results = append(results, startNode)
-		return results, nil
-	}
-
 	children := []*Node{startNode}
-	for pos < len(nodes) {
-		pos++
-		if pos == len(nodes) {
-			log.Debug("memory-idx: reached pattern length at node pos %d. %d nodes matched", pos, len(children))
-			for _, c := range children {
-				results = append(results, c)
-			}
-			continue
+	for i := pos; i < len(nodes); i++ {
+		p := nodes[i]
+
+		matcher, err := getMatcher(p)
+
+		if err != nil {
+			return nil, err
 		}
+
 		grandChildren := make([]*Node, 0)
 		for _, c := range children {
 			if !c.HasChildren() {
@@ -382,11 +375,8 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				// expecting a branch
 				continue
 			}
-			log.Debug("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[pos])
-			matches, err := match(nodes[pos], c.Children)
-			if err != nil {
-				return results, err
-			}
+			log.Debug("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
+			matches := matcher(c.Children)
 			for _, m := range matches {
 				newBranch := c.Path + "." + m
 				if c.Path == "" {
@@ -402,43 +392,11 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		}
 	}
 
-	return results, nil
-}
-
-func match(pattern string, candidates []string) ([]string, error) {
-	var patterns []string
-	if strings.ContainsAny(pattern, "{}") {
-		patterns = expandQueries(pattern)
-	} else {
-		patterns = []string{pattern}
+	log.Debug("memory-idx: reached pattern length. %d nodes matched", len(children))
+	for _, c := range children {
+		results = append(results, c)
 	}
 
-	results := make([]string, 0)
-	for _, p := range patterns {
-		if strings.ContainsAny(p, "*[]?") {
-			p = strings.Replace(p, "*", ".*", -1)
-			p = strings.Replace(p, "?", ".?", -1)
-			p = "^" + p + "$"
-			r, err := regexp.Compile(p)
-			if err != nil {
-				log.Debug("memory-idx: regexp failed to compile. %s - %s", p, err)
-				return nil, err
-			}
-			for _, c := range candidates {
-				if r.MatchString(c) {
-					log.Debug("memory-idx: %s matches %s", c, p)
-					results = append(results, c)
-				}
-			}
-		} else {
-			for _, c := range candidates {
-				if c == p {
-					log.Debug("memory-idx: %s is exact match", c)
-					results = append(results, c)
-				}
-			}
-		}
-	}
 	return results, nil
 }
 
@@ -448,7 +406,7 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	defer m.RUnlock()
 	orgs := []int{-1, orgId}
 	if orgId == -1 {
-		log.Info("memory-idx: returing all metricDefs for all orgs")
+		log.Info("memory-idx: returning all metricDefs for all orgs")
 		orgs = make([]int, len(m.Tree))
 		i := 0
 		for org := range m.Tree {
@@ -630,10 +588,68 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	return pruned, nil
 }
 
-// filepath.Match doesn't support {} because that's not posix, it's a bashism
+func getMatcher(path string) (func([]string) []string, error) {
+	// Matches everything
+	if path == "*" {
+		return func(children []string) []string {
+			log.Debug("memory-idx: Matching all children")
+			return children
+		}, nil
+	}
+
+	var patterns []string
+	if strings.ContainsAny(path, "{}") {
+		patterns = expandQueries(path)
+	} else {
+		patterns = []string{path}
+	}
+
+	// Convert to regex and match
+	if strings.ContainsAny(path, "*[]?") {
+		regexes := make([]*regexp.Regexp, 0, len(patterns))
+		for _, p := range patterns {
+			r, err := regexp.Compile(toRegexp(p))
+			if err != nil {
+				log.Debug("memory-idx: regexp failed to compile. %s - %s", p, err)
+				return nil, err
+			}
+			regexes = append(regexes, r)
+		}
+
+		return func(children []string) []string {
+			var matches []string
+			for _, r := range regexes {
+				for _, c := range children {
+					if r.MatchString(c) {
+						log.Debug("memory-idx: %s =~ %s", c, r.String())
+						matches = append(matches, c)
+					}
+				}
+			}
+			return matches
+		}, nil
+	}
+
+	// Exact match one or more values
+	return func(children []string) []string {
+		var results []string
+		for _, p := range patterns {
+			for _, c := range children {
+				if c == p {
+					log.Debug("memory-idx: %s matches %s", c, p)
+					results = append(results, c)
+					break
+				}
+			}
+		}
+		return results
+	}, nil
+}
+
+// We don't use filepath.Match as it doesn't support {} because that's not posix, it's a bashism
 // the easiest way of implementing this extra feature is just expanding single queries
-// that contain these queries into multiple queries, who will be checked separately
-// and whose results will be ORed.
+// that contain these queries into multiple queries, which will be checked separately
+// and the results of which will be ORed.
 func expandQueries(query string) []string {
 	queries := []string{query}
 
@@ -668,4 +684,12 @@ func expandQueries(query string) []string {
 		queries = expanded
 	}
 	return queries
+}
+
+func toRegexp(pattern string) string {
+	p := pattern
+	p = strings.Replace(p, "*", ".*", -1)
+	p = strings.Replace(p, "?", ".?", -1)
+	p = "^" + p + "$"
+	return p
 }
