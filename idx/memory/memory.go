@@ -382,7 +382,12 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				if c.Path == "" {
 					newBranch = m
 				}
-				grandChildren = append(grandChildren, tree.Items[newBranch])
+				nextNode, ok := tree.Items[newBranch]
+				if !ok {
+					log.Warn("memory-idx: tried to traverse non-existent branch '%s'", newBranch)
+					continue
+				}
+				grandChildren = append(grandChildren, nextNode)
 			}
 		}
 		children = grandChildren

@@ -118,7 +118,10 @@ func TestFind(t *testing.T) {
 		s.Time = 1 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
-
+	for _, s := range getMetricData(2, 2, 5, 10, ".blank.metric.foo") {
+		s.Time = 1 * 86400
+		ix.AddOrUpdate(s, 1)
+	}
 	Convey("When listing root nodes", t, func() {
 		Convey("root nodes for orgId 1", func() {
 			nodes, err := ix.Find(1, "*", 0)
