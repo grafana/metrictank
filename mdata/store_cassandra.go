@@ -37,6 +37,8 @@ const Table_name_format = `metric_%d`
 var (
 	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
 	errStartBeforeEnd = errors.New("start must be before end.")
+	errReadQueueFull  = errors.New("the read queue is full")
+	errReadTooOld     = errors.New("the read is too old")
 	errTableNotFound  = errors.New("table for given TTL not found")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
@@ -47,6 +49,10 @@ var (
 	cassPutExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.put.exec")
 	// metric store.cassandra.put.wait is the duration of a put in the wait queue
 	cassPutWaitDuration = stats.NewLatencyHistogram12h32("store.cassandra.put.wait")
+	// reads that were already too old to be executed
+	cassOmitOldRead = stats.NewCounter32("store.cassandra.omit_read.too_old")
+	// reads that could not be pushed into the queue because it was full
+	cassReadQueueFull = stats.NewCounter32("store.cassandra.omit_read.queue_full")
 
 	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
 	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
@@ -88,6 +94,7 @@ type CassandraStore struct {
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
 	ttlTables        TTLTables
+	omitReadTimeout  time.Duration
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -159,7 +166,7 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor int, ssl, auth, hostVerification bool, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, ttls []uint32) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -244,6 +251,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		writeQueues:      make([]chan *ChunkWriteRequest, writers),
 		writeQueueMeters: make([]*stats.Range32, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
+		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
 	}
 
@@ -357,6 +365,7 @@ type outcome struct {
 	month   uint32
 	sortKey uint32
 	i       *gocql.Iter
+	omitted bool
 }
 type asc []outcome
 
@@ -366,9 +375,15 @@ func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
-		cassGetWaitDuration.Value(time.Since(crr.timestamp))
+		waitDuration := time.Since(crr.timestamp)
+		cassGetWaitDuration.Value(waitDuration)
+		if waitDuration > c.omitReadTimeout {
+			cassOmitOldRead.Inc()
+			crr.out <- outcome{omitted: true}
+			continue
+		}
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter()}
+		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter(), false}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -397,7 +412,7 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	crrs := make([]*ChunkReadRequest, 0)
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, time.Now(), nil})
+		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -439,12 +454,20 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	results := make(chan outcome, numQueries)
 	for i := range crrs {
 		crrs[i].out = results
-		c.readQueue <- crrs[i]
+		select {
+		case c.readQueue <- crrs[i]:
+		default:
+			cassReadQueueFull.Inc()
+			return nil, errReadQueueFull
+		}
 	}
 	outcomes := make([]outcome, 0, numQueries)
 
 	seen := 0
 	for o := range results {
+		if o.omitted {
+			return nil, errReadTooOld
+		}
 		seen += 1
 		outcomes = append(outcomes, o)
 		if seen == numQueries {
