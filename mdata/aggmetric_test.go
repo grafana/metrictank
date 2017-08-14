@@ -10,6 +10,7 @@ import (
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata/cache"
+	"github.com/raintank/metrictank/test"
 )
 
 var dnstore = NewDevnullStore()
@@ -287,7 +288,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	m.Add(31, 31)
 	m.Add(32, 32)
 	m.Add(40, 40)
-	itgens, err := store.Search("foo", 0, 0, 1000)
+	itgens, err := store.Search(test.NewContext(), "foo", 0, 0, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

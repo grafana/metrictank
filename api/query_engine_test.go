@@ -28,7 +28,7 @@ func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []model
 	}
 
 	mdata.Schemas = conf.NewSchemas(schemas)
-	out, err := alignRequests(now, reqs[0].From, reqs[0].To, reqs)
+	out, _, _, err := alignRequests(now, reqs[0].From, reqs[0].To, reqs)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
@@ -430,7 +430,7 @@ func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t 
 		}),
 	}})
 
-	out, err := alignRequests(30*day, reqs[0].From, reqs[0].To, reqs)
+	out, _, _, err := alignRequests(30*day, reqs[0].From, reqs[0].To, reqs)
 	maxPointsPerReqSoft = origMaxPointsPerReqSoft
 	maxPointsPerReqHard = origMaxPointsPerReqHard
 	return out, err
@@ -523,7 +523,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 	})
 
 	for n := 0; n < b.N; n++ {
-		res, _ = alignRequests(14*24*3600, 0, 3600*24*7, reqs)
+		res, _, _, _ = alignRequests(14*24*3600, 0, 3600*24*7, reqs)
 	}
 	result = res
 }

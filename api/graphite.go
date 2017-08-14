@@ -23,6 +23,7 @@ import (
 	"github.com/raintank/metrictank/idx"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -101,11 +102,9 @@ func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, s
 func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
-		span := opentracing.SpanFromContext(ctx)
-		span = s.Tracer.StartSpan("findSeriesLocal", opentracing.ChildOf(span.Context()))
+		_, span := tracing.NewSpan(ctx, s.Tracer, "findSeriesLocal")
 		span.SetTag("org", orgId)
 		span.SetTag("pattern", pattern)
-		ctx = opentracing.ContextWithSpan(ctx, span)
 		defer span.Finish()
 		nodes, err := s.MetricIndex.Find(orgId, pattern, seenAfter)
 		if err != nil {
@@ -222,13 +221,10 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
 				return
 			}
-			span := opentracing.SpanFromContext(ctx.Req.Context())
-			if span != nil {
-				span = s.Tracer.StartSpan("graphiteproxy", opentracing.ChildOf(span.Context()))
-				tags.SpanKindRPCClient.Set(span)
-				tags.PeerService.Set(span, "graphite")
-				ctx.Req = macaron.Request{ctx.Req.WithContext(opentracing.ContextWithSpan(ctx.Req.Context(), span))}
-			}
+			newctx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "graphiteproxy")
+			tags.SpanKindRPCClient.Set(span)
+			tags.PeerService.Set(span, "graphite")
+			ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
 			ctx.Req.Request.Body = ctx.Body
 			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
 			if span != nil {
@@ -242,17 +238,16 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	span = opentracing.SpanFromContext(ctx.Req.Context())
-	span = s.Tracer.StartSpan("executePlan", opentracing.ChildOf(span.Context()))
-	ctx.Req = macaron.Request{ctx.Req.WithContext(opentracing.ContextWithSpan(ctx.Req.Context(), span))}
+	newctx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
+	defer span.Finish()
+	ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
 	out, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
 	if err != nil {
 		tags.Error.Set(span, true)
-		span.Finish()
+		tracing.Error(span, err)
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
-	span.Finish()
 
 	switch request.Format {
 	case "msgp":
@@ -597,11 +592,14 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 	}
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
-	reqs, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	reqs, pointsFetch, pointsReturn, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
 	if err != nil {
 		log.Error(3, "HTTP Render alignReq error: %s", err)
 		return nil, err
 	}
+	span := opentracing.SpanFromContext(ctx)
+	span.SetTag("points_fetch", pointsFetch)
+	span.SetTag("points_return", pointsReturn)
 
 	if LogLevel < 2 {
 		for _, req := range reqs {

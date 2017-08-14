@@ -2,6 +2,7 @@ package mdata
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -12,9 +13,12 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/hailocab/go-hostpool"
+	opentracing "github.com/opentracing/opentracing-go"
+	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/metrictank/cassandra"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -95,6 +99,7 @@ type CassandraStore struct {
 	readQueue        chan *ChunkReadRequest
 	ttlTables        TTLTables
 	omitReadTimeout  time.Duration
+	tracer           opentracing.Tracer
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -253,6 +258,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
+		tracer:           opentracing.NoopTracer{},
 	}
 
 	for i := 0; i < writers; i++ {
@@ -267,6 +273,11 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 
 	return c, err
 }
+
+func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
+	c.tracer = t
+}
+
 func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
 	sum := 0
 	for _, char := range cwr.key {
@@ -391,19 +402,25 @@ func (c *CassandraStore) processReadQueue() {
 
 // Basic search of cassandra in the table for given ttl
 // start inclusive, end exclusive
-func (c *CassandraStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	table, err := c.getTable(ttl)
 	if err != nil {
 		return nil, err
 	}
-	return c.SearchTable(key, table, start, end)
+	return c.SearchTable(ctx, key, table, start, end)
 }
 
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
-func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, start, end uint32) ([]chunk.IterGen, error) {
+	ctx, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
+	defer span.Finish()
+	tags.SpanKindRPCClient.Set(span)
+	tags.PeerService.Set(span, "cassandra")
+
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
+		tracing.Error(span, errStartBeforeEnd)
 		return itgens, errStartBeforeEnd
 	}
 
@@ -458,6 +475,7 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 		case c.readQueue <- crrs[i]:
 		default:
 			cassReadQueueFull.Inc()
+			tracing.Error(span, errReadQueueFull)
 			return nil, errReadQueueFull
 		}
 	}
@@ -466,6 +484,7 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	seen := 0
 	for o := range results {
 		if o.omitted {
+			tracing.Error(span, errReadTooOld)
 			return nil, errReadTooOld
 		}
 		seen += 1
@@ -488,19 +507,19 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 			chunks += 1
 			chunkSizeAtLoad.Value(len(b))
 			if len(b) < 2 {
-				log.Error(3, errChunkTooSmall.Error())
+				tracing.Error(span, errChunkTooSmall)
 				return itgens, errChunkTooSmall
 			}
 			itgen, err := chunk.NewGen(b, uint32(ts))
 			if err != nil {
-				log.Error(3, err.Error())
+				tracing.Error(span, err)
 				return itgens, err
 			}
 			itgens = append(itgens, *itgen)
 		}
 		err := outcome.i.Close()
 		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
+			tracing.Error(span, err)
 			errmetrics.Inc(err)
 		} else {
 			cassChunksPerRow.Value(int(chunks))
@@ -508,7 +527,8 @@ func (c *CassandraStore) SearchTable(key, table string, start, end uint32) ([]ch
 	}
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(len(outcomes))
-	log.Debug("CS: searchCassandra(): %d outcomes (queries), %d total itgens", len(outcomes), len(itgens))
+	span.SetTag("outcomes", len(outcomes))
+	span.SetTag("itgens", len(itgens))
 	return itgens, nil
 }
 

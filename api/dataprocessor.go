@@ -15,6 +15,7 @@ import (
 	"github.com/raintank/metrictank/consolidation"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
@@ -225,13 +226,11 @@ func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]mode
 	wg.Add(len(reqs))
 	for _, req := range reqs {
 		go func(ctx context.Context, wg *sync.WaitGroup, req models.Req) {
-			span := opentracing.SpanFromContext(ctx)
-			span = s.Tracer.StartSpan("getTargetsLocal", opentracing.ChildOf(span.Context()))
+			ctx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 			req.Trace(span)
-			ctx = opentracing.ContextWithSpan(ctx, span)
 			defer span.Finish()
 			pre := time.Now()
-			points, interval, err := s.getTarget(req)
+			points, interval, err := s.getTarget(ctx, req)
 			if err != nil {
 				tags.Error.Set(span, true)
 				errorsChan <- err
@@ -270,7 +269,7 @@ func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]mode
 
 }
 
-func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint32, err error) {
+func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
 	normalize := req.AggNum > 1    // do we need to normalize points at runtime?
@@ -286,28 +285,28 @@ func (s *Server) getTarget(req models.Req) (points []schema.Point, interval uint
 	}
 
 	if !readRollup && !normalize {
-		return s.getSeriesFixed(req, consolidation.None), req.OutInterval, nil
+		return s.getSeriesFixed(ctx, req, consolidation.None), req.OutInterval, nil
 	} else if !readRollup && normalize {
-		return consolidation.Consolidate(s.getSeriesFixed(req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
+		return consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readRollup && !normalize {
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				s.getSeriesFixed(req, consolidation.Sum),
-				s.getSeriesFixed(req, consolidation.Cnt),
+				s.getSeriesFixed(ctx, req, consolidation.Sum),
+				s.getSeriesFixed(ctx, req, consolidation.Cnt),
 			), req.OutInterval, nil
 		} else {
-			return s.getSeriesFixed(req, req.Consolidator), req.OutInterval, nil
+			return s.getSeriesFixed(ctx, req, req.Consolidator), req.OutInterval, nil
 		}
 	} else {
 		// readRollup && normalize
 		if req.Consolidator == consolidation.Avg {
 			return divide(
-				consolidation.Consolidate(s.getSeriesFixed(req, consolidation.Sum), req.AggNum, consolidation.Sum),
-				consolidation.Consolidate(s.getSeriesFixed(req, consolidation.Cnt), req.AggNum, consolidation.Sum),
+				consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.Sum), req.AggNum, consolidation.Sum),
+				consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.Cnt), req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
 		} else {
 			return consolidation.Consolidate(
-				s.getSeriesFixed(req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
+				s.getSeriesFixed(ctx, req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -322,28 +321,30 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
-func (s *Server) getSeriesFixed(req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	ctx := newRequestContext(&req, consolidator)
-	res := s.getSeries(ctx)
-	res.Points = append(s.itersToPoints(ctx, res.Iters), res.Points...)
+func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) []schema.Point {
+	rctx := newRequestContext(&req, consolidator)
+	res := s.getSeries(ctx, rctx)
+	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...)
 	return Fix(res.Points, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx *requestContext) mdata.Result {
+func (s *Server) getSeries(ctx context.Context, rctx *requestContext) mdata.Result {
 
-	res := s.getSeriesAggMetrics(ctx)
+	res := s.getSeriesAggMetrics(ctx, rctx)
 	log.Debug("oldest from aggmetrics is %d", res.Oldest)
+	span := opentracing.SpanFromContext(ctx)
+	span.SetTag("oldest_in_ring", res.Oldest)
 
-	if res.Oldest <= ctx.From {
-		reqSpanMem.ValueUint32(ctx.To - ctx.From)
+	if res.Oldest <= rctx.From {
+		reqSpanMem.ValueUint32(rctx.To - rctx.From)
 		return res
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
-	until := util.Min(res.Oldest, ctx.To)
+	until := util.Min(res.Oldest, rctx.To)
 
-	res.Iters = append(s.getSeriesCachedStore(ctx, until), res.Iters...)
+	res.Iters = append(s.getSeriesCachedStore(ctx, rctx, until), res.Iters...)
 	return res
 }
 
@@ -351,7 +352,7 @@ func (s *Server) getSeries(ctx *requestContext) mdata.Result {
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
-func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
+func (s *Server) itersToPoints(rctx *requestContext, iters []chunk.Iter) []schema.Point {
 	pre := time.Now()
 
 	points := pointSlicePool.Get().([]schema.Point)
@@ -361,7 +362,7 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 		for iter.Next() {
 			total += 1
 			ts, val := iter.Values()
-			if ts >= ctx.From && ts < ctx.To {
+			if ts >= rctx.From && ts < rctx.To {
 				good += 1
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
@@ -374,38 +375,46 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
-	metric, ok := s.MemoryStore.Get(ctx.Key)
+func (s *Server) getSeriesAggMetrics(ctx context.Context, rctx *requestContext) mdata.Result {
+	ctx, span := tracing.NewSpan(ctx, s.Tracer, "getSeriesAggMetrics")
+	defer span.Finish()
+	metric, ok := s.MemoryStore.Get(rctx.Key)
 	if !ok {
 		return mdata.Result{
-			Oldest: ctx.Req.To,
+			Oldest: rctx.Req.To,
 		}
 	}
 
-	if ctx.Cons != consolidation.None {
-		logLoad("memory", ctx.AggKey, ctx.From, ctx.To)
-		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
+	if rctx.Cons != consolidation.None {
+		logLoad("memory", rctx.AggKey, rctx.From, rctx.To)
+		return metric.GetAggregated(rctx.Cons, rctx.Req.ArchInterval, rctx.From, rctx.To)
 	} else {
-		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
-		return metric.Get(ctx.From, ctx.To)
+		logLoad("memory", rctx.Req.Key, rctx.From, rctx.To)
+		return metric.Get(rctx.From, rctx.To)
 	}
 }
 
-// will only fetch until until, but uses ctx.To for debug logging
-func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
+// will only fetch until until, but uses rctx.To for debug logging
+func (s *Server) getSeriesCachedStore(ctx context.Context, rctx *requestContext, until uint32) []chunk.Iter {
 	var iters []chunk.Iter
 	var prevts uint32
 
-	key := ctx.Key
-	if ctx.Cons != consolidation.None {
-		key = ctx.AggKey
+	key := rctx.Key
+	if rctx.Cons != consolidation.None {
+		key = rctx.AggKey
 	}
 
-	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
-	logLoad("cassan", ctx.Key, ctx.From, ctx.To)
+	ctx, span := tracing.NewSpan(ctx, s.Tracer, "getSeriesCachedStore")
+	defer span.Finish()
+	span.SetTag("key", key)
+	span.SetTag("from", rctx.From)
+	span.SetTag("until", until)
 
-	log.Debug("cache: searching query key %s, from %d, until %d", key, ctx.From, until)
-	cacheRes := s.Cache.Search(key, ctx.From, until)
+	reqSpanBoth.ValueUint32(rctx.To - rctx.From)
+	logLoad("cassan", rctx.Key, rctx.From, rctx.To)
+
+	log.Debug("cache: searching query key %s, from %d, until %d", key, rctx.From, until)
+	cacheRes := s.Cache.Search(ctx, key, rctx.From, until)
 	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
 	for _, itgen := range cacheRes.Start {
@@ -413,7 +422,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 		prevts = itgen.Ts
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
-			log.Error(3, "itergen: error getting iter from Start list %+v", err)
+			tracing.Errorf(span, "itergen: error getting iter from Start list %+v", err)
 			continue
 		}
 		iters = append(iters, *iter)
@@ -422,7 +431,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	// the request cannot completely be served from cache, it will require cassandra involvement
 	if !cacheRes.Complete {
 		if cacheRes.From != cacheRes.Until {
-			storeIterGens, err := s.BackendStore.Search(key, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
+			storeIterGens, err := s.BackendStore.Search(ctx, key, rctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
 				panic(err)
 			}
@@ -431,7 +440,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 				it, err := itgen.Get()
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
-					log.Error(3, "itergen: error getting iter from cassandra slice %+v", err)
+					tracing.Errorf(span, "itergen: error getting iter from cassandra slice %+v", err)
 					continue
 				}
 				// it's important that the itgens get added in chronological order,

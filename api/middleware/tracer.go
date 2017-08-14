@@ -19,24 +19,24 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		}
 
 		spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(macCtx.Req.Header))
-		sp := tracer.StartSpan("HTTP "+macCtx.Req.Method+" "+path, ext.RPCServerOption(spanCtx))
+		span := tracer.StartSpan("HTTP "+macCtx.Req.Method+" "+path, ext.RPCServerOption(spanCtx))
 
-		ext.HTTPMethod.Set(sp, macCtx.Req.Method)
-		ext.HTTPUrl.Set(sp, macCtx.Req.URL.String())
-		ext.Component.Set(sp, "metrictank/api")
+		ext.HTTPMethod.Set(span, macCtx.Req.Method)
+		ext.HTTPUrl.Set(span, macCtx.Req.URL.String())
+		ext.Component.Set(span, "metrictank/api")
 
-		macCtx.Req = macaron.Request{macCtx.Req.WithContext(opentracing.ContextWithSpan(macCtx.Req.Context(), sp))}
+		macCtx.Req = macaron.Request{macCtx.Req.WithContext(opentracing.ContextWithSpan(macCtx.Req.Context(), span))}
 
 		rw := macCtx.Resp.(macaron.ResponseWriter)
 		// call next handler. This will return after all handlers
 		// have completed and the request has been sent.
 		macCtx.Next()
 		status := rw.Status()
-		ext.HTTPStatusCode.Set(sp, uint16(status))
+		ext.HTTPStatusCode.Set(span, uint16(status))
 		if status >= 200 && status < 300 {
-			sp.SetTag("http.size", rw.Size())
+			span.SetTag("http.size", rw.Size())
 		}
 		// TODO: else write error msg?
-		sp.Finish()
+		span.Finish()
 	}
 }
