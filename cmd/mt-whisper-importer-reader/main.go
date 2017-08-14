@@ -12,13 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/api"
+	"github.com/raintank/metrictank/conf"
 	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/chunk/archive"
@@ -41,11 +40,6 @@ var (
 		"http://127.0.0.1:8080/chunks",
 		"The http endpoint to send the data to",
 	)
-	chunkSpanStr = flag.String(
-		"chunkspans",
-		"10min",
-		"List of chunk spans separated by ':'. The 1st whisper archive gets the 1st span, 2nd the 2nd, etc",
-	)
 	namePrefix = flag.String(
 		"name-prefix",
 		"",
@@ -54,7 +48,7 @@ var (
 	threads = flag.Int(
 		"threads",
 		10,
-		"Number of workers threads to process .wsp files",
+		"Number of workers threads to process and convert .wsp files",
 	)
 	writeUnfinishedChunks = flag.Bool(
 		"write-unfinished-chunks",
@@ -76,48 +70,29 @@ var (
 		"/opt/graphite/storage/whisper",
 		"The directory that contains the whisper file structure",
 	)
-	readArchivesStr = flag.String(
-		"read-archives",
-		"*",
-		"Comma separated list of positive integers or '*' for all archives",
-	)
 	httpAuth = flag.String(
 		"http-auth",
 		"",
 		"The credentials used to authenticate in the format \"user:password\"",
 	)
+	dstSchemas = flag.String(
+		"dst-schemas",
+		"",
+		"The filename of the output schemas definition file",
+	)
 	chunkSpans   []uint32
 	readArchives map[int]struct{}
 	printLock    sync.Mutex
+	schemas      conf.Schemas
 )
 
 func main() {
+	var err error
 	flag.Parse()
 
-	for _, chunkSpanStrSplit := range strings.Split(*chunkSpanStr, ",") {
-		chunkSpan := dur.MustParseNDuration("chunkspan", chunkSpanStrSplit)
-
-		if (mdata.Month_sec % chunkSpan) != 0 {
-			panic("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
-		}
-
-		_, ok := chunk.RevChunkSpans[chunkSpan]
-		if !ok {
-			panic(fmt.Sprintf("chunkSpan %d is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", chunkSpan))
-		}
-
-		chunkSpans = append(chunkSpans, chunkSpan)
-	}
-
-	if *readArchivesStr != "*" {
-		readArchives = make(map[int]struct{})
-		for _, archiveIdStr := range strings.Split(*readArchivesStr, ",") {
-			archiveId, err := strconv.Atoi(archiveIdStr)
-			if err != nil {
-				panic(fmt.Sprintf("Invalid archive id %q: %q", archiveIdStr, err))
-			}
-			readArchives[archiveId] = struct{}{}
-		}
+	schemas, err = conf.ReadSchemas(*dstSchemas)
+	if err != nil {
+		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
 	}
 
 	fileChan := make(chan string)
@@ -256,60 +231,58 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 	archives := make([]archive.Archive, 0, len(w.Header.Archives))
 	var chunkSpan uint32
 	var rowKey string
-	var aggMethodStr string
+	var archiveInfo whisper.ArchiveInfo
+	var archiveIdx int
 	name := getMetricName(file)
+
+	aggMethodStr := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	if aggMethodStr == "" {
+		return nil, errors.New(fmt.Sprintf(
+			"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
+			file,
+			w.Header.Metadata.AggregationMethod,
+			aggMethodStr,
+		))
+	}
 
 	// md gets generated from the first archive in the whisper file
 	md := getMetricData(name, int(w.Header.Archives[0].SecondsPerPoint))
 
-	for archiveIdx, archiveInfo := range w.Header.Archives {
-		if archiveIdx > 0 {
+	_, schema := schemas.Match(md.Name, 0)
+	for i, retention := range schema.Retentions {
+		// retention TTL is the amount of historic data we're aiming to generate
+		ttl := retention.SecondsPerPoint * retention.NumberOfPoints
 
-			// on the first aggregation we determin the aggregation method as string
-			if aggMethodStr == "" {
-				aggMethodStr = shortAggMethodString(w.Header.Metadata.AggregationMethod)
-
-				if aggMethodStr == "" {
-					return nil, errors.New(fmt.Sprintf(
-						"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
-						file,
-						w.Header.Metadata.AggregationMethod,
-						aggMethodStr,
-					))
-				}
+		// on the first aggregation we determin the aggregation method as string
+		// find the highest resolution archive that has enough data to fill the TTL
+		// if none have enough, just take the last one
+		for archiveIdx, archiveInfo = range w.Header.Archives {
+			if archiveInfo.SecondsPerPoint*archiveInfo.Points >= uint32(ttl) {
+				break
 			}
-
-			rowKey = api.AggMetricKey(
-				md.Id,
-				aggMethodStr,
-				archiveInfo.SecondsPerPoint,
-			)
-		} else {
-			rowKey = md.Id
-		}
-
-		// only read archive if archiveIdx is in readArchives
-		if _, ok := readArchives[archiveIdx]; !ok && len(readArchives) > 0 {
-			continue
-		}
-
-		encodedChunks := make([]chunk.IterGen, 0)
-
-		if len(chunkSpans)-1 < archiveIdx {
-			// if we have more archives than chunk spans are specified, we simply use the last one
-			chunkSpan = chunkSpans[len(chunkSpans)-1]
-		} else {
-			chunkSpan = chunkSpans[archiveIdx]
 		}
 
 		points, err := w.DumpArchive(archiveIdx)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
+		points = sortPoints(points)
+		/*for _, point := range pointsRaw {
+			if point.Ts > 0 {
+				points = append(points, point)
+			}
+		}*/
+
+		if uint32(retention.SecondsPerPoint) > archiveInfo.SecondsPerPoint {
+			points = incResolution(points, archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
+		} else if uint32(retention.SecondsPerPoint) < archiveInfo.SecondsPerPoint {
+			points = decResolution(points, aggMethodStr, archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
+		}
 
 		var point whisper.Point
 		var t0, prevT0 uint32
 		var c *chunk.Chunk
+		encodedChunks := make([]chunk.IterGen, 0)
 
 		for _, point = range sortPoints(points) {
 			// this shouldn't happen, but if it would we better catch it here because Metrictank wouldn't handle it well:
@@ -339,12 +312,22 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 			}
 		}
 
-		if int64(point.Timestamp) > md.Time {
-			md.Time = int64(point.Timestamp)
+		if i == 0 {
+			if archiveIdx != 0 {
+				//log.Warning("Using aggregated archive as input for raw archive")
+				fmt.Println("Using aggregated archive as input for raw archive")
+			}
+			rowKey = md.Id
+		} else {
+			rowKey = api.AggMetricKey(
+				md.Id,
+				aggMethodStr,
+				uint32(retention.SecondsPerPoint),
+			)
 		}
 
 		// if the last written point was also the last one of the current chunk,
-		// or if writeUnfinishedChunks is on, we close the chunk and
+		// or if writeUnfinishedChunks is on, we close the chunk and push add it
 		if point.Timestamp == t0+chunkSpan-archiveInfo.SecondsPerPoint || *writeUnfinishedChunks {
 			log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
 			c.Finish()
@@ -365,6 +348,31 @@ func getMetric(w *whisper.Whisper, file string) (*archive.Metric, error) {
 		MetricData:        *md,
 		Archives:          archives,
 	}, nil
+}
+
+func incResolution(points []whisper.Point, inRes, outRes uint32) []whisper.Point {
+	pointCount := (points[len(points)-1].Timestamp - points[0].Timestamp) * outRes / inRes
+	out := make([]whisper.Point, 0, pointCount)
+	for _, inPoint := range points {
+		if inPoint.Timestamp == 0 {
+			continue
+		}
+
+		if inPoint.Timestamp%outRes == 0 {
+			out = append(out, inPoint)
+		}
+
+		for ts := inPoint.Timestamp + outRes - (inPoint.Timestamp % outRes); ts < inPoint.Timestamp+inRes; ts = ts + outRes {
+			outPoint := inPoint
+			outPoint.Timestamp = ts
+			out = append(out, outPoint)
+		}
+	}
+	return sortPoints(out)
+}
+
+func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint32) []whisper.Point {
+	return make([]whisper.Point, 0, 0)
 }
 
 func getMetricData(name string, interval int) *schema.MetricData {
