@@ -268,84 +268,17 @@ func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
 			return nil, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
 
-		adjustedPoints := make(map[string][]whisper.Point)
-		if uint32(retention.SecondsPerPoint) < archiveInfo.SecondsPerPoint {
-			if retentionIdx == 0 || aggMethodStr != "avg" {
-				// need to use aggregation as input for raw retention
-				// if agg method is "avg" we want to actually calculate averages instead of sum & cnt
-				adjustedPoints[aggMethodStr] = decResolution(points, aggMethodStr, archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
-			} else {
-				adjustedPoints["sum"] = decResolution(points, "sum", archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
-				adjustedPoints["cnt"] = decResolution(points, "cnt", archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
-			}
-		} else if uint32(retention.SecondsPerPoint) > archiveInfo.SecondsPerPoint {
-			adjustedPoints[aggMethodStr] = incResolution(points, archiveInfo.SecondsPerPoint, uint32(retention.SecondsPerPoint))
-		} else {
-			adjustedPoints[aggMethodStr] = sortPoints(points)
-		}
+		adjustedPoints := adjustAggregation(retention, retentionIdx, archiveInfo, aggMethodStr, points)
 
 		var archives []archive.Archive
-		var rowKey string
 		for method, points := range adjustedPoints {
-			var point whisper.Point
-			var t0, prevT0 uint32
-			var c *chunk.Chunk
-			var encodedChunks []chunk.IterGen
-
-			for _, point = range points {
-				// this shouldn't happen, but if it would we better catch it here because Metrictank wouldn't handle it well:
-				// https://github.com/raintank/metrictank/blob/f1868cccfb92fc82cd853914af958f6d187c5f74/mdata/aggmetric.go#L378
-				if point.Timestamp == 0 {
-					continue
-				}
-
-				t0 = point.Timestamp - (point.Timestamp % chunkSpan)
-				if prevT0 == 0 {
-					c = chunk.New(t0)
-					prevT0 = t0
-				} else if prevT0 != t0 {
-					log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
-					c.Finish()
-
-					encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
-
-					log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
-					c = chunk.New(t0)
-					prevT0 = t0
-				}
-
-				err := c.Push(point.Timestamp, point.Value)
-				if err != nil {
-					return nil, errors.New(fmt.Sprintf("ERROR: Failed to push value into chunk at t0 %d: %q", t0, err))
-				}
-			}
-
-			if retentionIdx == 0 {
-				if archiveIdx != 0 {
-					//log.Warning("Using aggregated archive as input for raw archive")
-					fmt.Println("Using aggregated archive as input for raw archive")
-				}
-				rowKey = md.Id
-			} else {
-				rowKey = api.AggMetricKey(
-					md.Id,
-					method,
-					uint32(retention.SecondsPerPoint),
-				)
-			}
-
-			// if the last written point was also the last one of the current chunk,
-			// or if writeUnfinishedChunks is on, we close the chunk and push add it
-			if point.Timestamp == t0+chunkSpan-archiveInfo.SecondsPerPoint || *writeUnfinishedChunks {
-				log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
-				c.Finish()
-				encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
-			}
-
+			encodedChunks := encodedChunksFromPoints(points, archiveInfo.SecondsPerPoint, chunkSpan)
 			log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
+			rowKey := getRowKey(retentionIdx, md.Id, method, retention.SecondsPerPoint)
+
 			archives = append(archives, archive.Archive{
-				SecondsPerPoint: archiveInfo.SecondsPerPoint,
-				Points:          archiveInfo.Points,
+				SecondsPerPoint: uint32(retention.SecondsPerPoint),
+				Points:          uint32(len(points)),
 				Chunks:          encodedChunks,
 				RowKey:          rowKey,
 			})
@@ -358,6 +291,82 @@ func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
 	}
 
 	return metrics, nil
+}
+
+func getRowKey(retIdx int, id, meth string, resolution int) string {
+	if retIdx == 0 {
+		return id
+	} else {
+		return api.AggMetricKey(
+			id,
+			meth,
+			uint32(resolution),
+		)
+	}
+}
+
+func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
+	result := make(map[string][]whisper.Point)
+	if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
+		if retIdx == 0 || method != "avg" {
+			// need to use aggregation as input for raw ret
+			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
+			result[method] = decResolution(points, method, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		} else {
+			result["sum"] = decResolution(points, "sum", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		}
+	} else if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
+		result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+	} else {
+		result[method] = sortPoints(points)
+	}
+	return result
+}
+
+func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint32) []chunk.IterGen {
+	var point whisper.Point
+	var t0, prevT0 uint32
+	var c *chunk.Chunk
+	var encodedChunks []chunk.IterGen
+
+	for _, point = range points {
+		// this shouldn't happen, but if it would we better catch it here because Metrictank wouldn't handle it well:
+		// https://github.com/raintank/metrictank/blob/f1868cccfb92fc82cd853914af958f6d187c5f74/mdata/aggmetric.go#L378
+		if point.Timestamp == 0 {
+			continue
+		}
+
+		t0 = point.Timestamp - (point.Timestamp % chunkSpan)
+		if prevT0 == 0 {
+			c = chunk.New(t0)
+			prevT0 = t0
+		} else if prevT0 != t0 {
+			log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
+			c.Finish()
+
+			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
+
+			log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
+			c = chunk.New(t0)
+			prevT0 = t0
+		}
+
+		err := c.Push(point.Timestamp, point.Value)
+		if err != nil {
+			panic(fmt.Sprintf("ERROR: Failed to push value into chunk at t0 %d: %q", t0, err))
+		}
+	}
+
+	// if the last written point was also the last one of the current chunk,
+	// or if writeUnfinishedChunks is on, we close the chunk and push it
+	if point.Timestamp == t0+chunkSpan-intervalIn || *writeUnfinishedChunks {
+		log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
+		c.Finish()
+		encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
+	}
+
+	return encodedChunks
 }
 
 // inreasing the resolution by just duplicating points to fill in empty data points
