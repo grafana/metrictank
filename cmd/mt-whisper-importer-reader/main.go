@@ -267,7 +267,6 @@ func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
-
 		adjustedPoints := adjustAggregation(retention, retentionIdx, archiveInfo, aggMethodStr, points)
 
 		var archives []archive.Archive
@@ -307,7 +306,7 @@ func getRowKey(retIdx int, id, meth string, resolution int) string {
 
 func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
 	result := make(map[string][]whisper.Point)
-	if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
+	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
 		if retIdx == 0 || method != "avg" {
 			// need to use aggregation as input for raw ret
 			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
@@ -316,7 +315,7 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 			result["sum"] = decResolution(points, "sum", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
 			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
 		}
-	} else if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
+	} else if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
 		result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
 	} else {
 		result[method] = sortPoints(points)

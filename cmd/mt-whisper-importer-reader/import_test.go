@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/kisielk/whisper-go/whisper"
+	"github.com/raintank/metrictank/conf"
 )
 
 func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, inRes, outRes uint32) {
@@ -211,4 +212,114 @@ func TestDecResolutionOutOfOrder(t *testing.T) {
 		{60, 15},
 	}
 	testDecResolution(t, inData, expectedResult, "avg", 10, 30)
+}
+
+func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch whisper.ArchiveInfo, meth string, points []whisper.Point, expectedRes map[string][]whisper.Point) {
+	res := adjustAggregation(ret, retIdx, arch, meth, points)
+	for meth, expectedPoints := range expectedRes {
+		if _, ok := res[meth]; !ok {
+			t.Fatalf("missing expected agg method %s in %+v", meth, res)
+		}
+
+		if len(res[meth]) != len(expectedPoints) {
+			t.Fatalf("length of %s does not match expected:\n%+v\n%+v", meth, res, expectedRes)
+		}
+
+		for i, _ := range expectedPoints {
+			if expectedPoints[i] != res[meth][i] {
+				t.Fatalf("point %d of %s does not match expected:\n%+v\n%+v", i, meth, res, expectedRes)
+			}
+		}
+	}
+}
+
+func TestAdjustAggregationAvg0(t *testing.T) {
+	ret := conf.Retention{
+		SecondsPerPoint: 30,
+		NumberOfPoints:  30,
+	}
+
+	arch := whisper.ArchiveInfo{
+		Offset:          3,
+		SecondsPerPoint: 10,
+		Points:          14,
+	}
+
+	points := []whisper.Point{
+		{Timestamp: 3690, Value: 19},
+		{Timestamp: 3700, Value: 20},
+		{Timestamp: 3710, Value: 21},
+		{Timestamp: 3720, Value: 22},
+		{Timestamp: 3730, Value: 23},
+		{Timestamp: 3600, Value: 10},
+		{Timestamp: 3610, Value: 11},
+		{Timestamp: 3620, Value: 12},
+		{Timestamp: 3630, Value: 13},
+		{Timestamp: 3640, Value: 14},
+		{Timestamp: 3650, Value: 15},
+		{Timestamp: 3660, Value: 16},
+		{Timestamp: 3670, Value: 17},
+		{Timestamp: 3680, Value: 18},
+	}
+
+	expected := map[string][]whisper.Point{
+		"avg": {
+			{Timestamp: 3600, Value: 10},
+			{Timestamp: 3630, Value: 12},
+			{Timestamp: 3660, Value: 15},
+			{Timestamp: 3690, Value: 18},
+			{Timestamp: 3720, Value: 21},
+		},
+	}
+
+	testAdjustAggregation(t, ret, 0, arch, "avg", points, expected)
+}
+
+func TestAdjustAggregationAvg1(t *testing.T) {
+	ret := conf.Retention{
+		SecondsPerPoint: 30,
+		NumberOfPoints:  30,
+	}
+
+	arch := whisper.ArchiveInfo{
+		Offset:          3,
+		SecondsPerPoint: 10,
+		Points:          12,
+	}
+
+	points := []whisper.Point{
+		{Timestamp: 3690, Value: 19},
+		{Timestamp: 3700, Value: 20},
+		{Timestamp: 3710, Value: 21},
+		{Timestamp: 3720, Value: 22},
+		{Timestamp: 3730, Value: 23},
+		{Timestamp: 3600, Value: 10},
+		{Timestamp: 3610, Value: 11},
+		{Timestamp: 3620, Value: 12},
+		{Timestamp: 3630, Value: 13},
+		{Timestamp: 3640, Value: 14},
+		{Timestamp: 3650, Value: 15},
+		{Timestamp: 3660, Value: 16},
+		{Timestamp: 3670, Value: 17},
+		{Timestamp: 3680, Value: 18},
+	}
+
+	expected := map[string][]whisper.Point{
+		"sum": {
+			{Timestamp: 3600, Value: 10},
+			{Timestamp: 3630, Value: 36},
+			{Timestamp: 3660, Value: 45},
+			{Timestamp: 3690, Value: 54},
+			{Timestamp: 3720, Value: 63},
+		},
+		"cnt": {
+			{Timestamp: 3600, Value: 1},
+			{Timestamp: 3630, Value: 3},
+			{Timestamp: 3660, Value: 3},
+			{Timestamp: 3690, Value: 3},
+			{Timestamp: 3720, Value: 3},
+		},
+	}
+
+	testAdjustAggregation(t, ret, 1, arch, "avg", points, expected)
 }
