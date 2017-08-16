@@ -34,3 +34,16 @@ func (a *Aggregation) Reset() {
 	a.cnt = 0
 	// no need to set a.lst, for a to be valid (cnt > 1), a.lst will always be set properly
 }
+
+func (a *Aggregation) FlushAndReset() map[string]float64 {
+	result := map[string]float64{
+		"min": a.min,
+		"max": a.max,
+		"sum": a.sum,
+		"cnt": a.cnt,
+		"lst": a.lst,
+		"avg": a.sum / a.cnt,
+	}
+	a.Reset()
+	return result
+}

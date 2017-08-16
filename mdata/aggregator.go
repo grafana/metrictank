@@ -7,9 +7,9 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 )
 
-// aggBoundary returns ts if it is a boundary, or the next boundary otherwise.
+// AggBoundary returns ts if it is a boundary, or the next boundary otherwise.
 // see description for Aggregator and unit tests, for more details
-func aggBoundary(ts uint32, span uint32) uint32 {
+func AggBoundary(ts uint32, span uint32) uint32 {
 	return ts + span - ((ts-1)%span + 1)
 }
 
@@ -93,7 +93,7 @@ func (agg *Aggregator) flush() {
 }
 
 func (agg *Aggregator) Add(ts uint32, val float64) {
-	boundary := aggBoundary(ts, agg.span)
+	boundary := AggBoundary(ts, agg.span)
 
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(val)
