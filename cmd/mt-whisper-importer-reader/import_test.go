@@ -345,5 +345,16 @@ func TestAdjustAggregationAvg1(t *testing.T) {
 	testAdjustAggregation(t, ret, 1, arch, "avg", points, expected)
 }
 
-func TestRowKey(t *testing.T) {
+func TestRowKeyAgg0(t *testing.T) {
+	res := getRowKey(0, "aaa", "", 0)
+	if res != "aaa" {
+		t.Fatalf("row key for aggregation 0 should equal the id")
+	}
+}
+
+func TestRowKeyAgg1(t *testing.T) {
+	res := getRowKey(1, "aaa", "sum", 60)
+	if res != "aaa_sum_60" {
+		t.Fatalf("row key for aggregation 0 should equal the id")
+	}
 }
