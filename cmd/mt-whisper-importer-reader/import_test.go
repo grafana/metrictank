@@ -233,6 +233,57 @@ func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch wh
 	}
 }
 
+func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {
+	res := make([]whisper.Point, count)
+	for i := 0; i < count; i++ {
+		res[(i+offset)%count] = whisper.Point{
+			Timestamp: ts,
+			Value:     value,
+		}
+		ts += interval
+		value = inc(value)
+	}
+	return res
+}
+
+func TestAdjustAggregationDecResolution(t *testing.T) {
+	ret := conf.Retention{
+		SecondsPerPoint: 10,
+		NumberOfPoints:  15,
+	}
+
+	arch := whisper.ArchiveInfo{
+		Offset:          5,
+		SecondsPerPoint: 30,
+		Points:          5,
+	}
+
+	points := generatePoints(3600, 30, 10, 3, 5, func(i float64) float64 { return i + 100 })
+
+	expected := map[string][]whisper.Point{
+		"lst": {
+			{Timestamp: 3600, Value: 10},
+			{Timestamp: 3610, Value: 10},
+			{Timestamp: 3620, Value: 10},
+			{Timestamp: 3630, Value: 110},
+			{Timestamp: 3640, Value: 110},
+			{Timestamp: 3650, Value: 110},
+			{Timestamp: 3660, Value: 210},
+			{Timestamp: 3670, Value: 210},
+			{Timestamp: 3680, Value: 210},
+			{Timestamp: 3690, Value: 310},
+			{Timestamp: 3700, Value: 310},
+			{Timestamp: 3710, Value: 310},
+			{Timestamp: 3720, Value: 410},
+			{Timestamp: 3730, Value: 410},
+			{Timestamp: 3740, Value: 410},
+		},
+	}
+
+	testAdjustAggregation(t, ret, 0, arch, "lst", points, expected)
+	testAdjustAggregation(t, ret, 3, arch, "lst", points, expected)
+}
+
 func TestAdjustAggregationAvg0(t *testing.T) {
 	ret := conf.Retention{
 		SecondsPerPoint: 30,
@@ -245,22 +296,7 @@ func TestAdjustAggregationAvg0(t *testing.T) {
 		Points:          14,
 	}
 
-	points := []whisper.Point{
-		{Timestamp: 3690, Value: 19},
-		{Timestamp: 3700, Value: 20},
-		{Timestamp: 3710, Value: 21},
-		{Timestamp: 3720, Value: 22},
-		{Timestamp: 3730, Value: 23},
-		{Timestamp: 3600, Value: 10},
-		{Timestamp: 3610, Value: 11},
-		{Timestamp: 3620, Value: 12},
-		{Timestamp: 3630, Value: 13},
-		{Timestamp: 3640, Value: 14},
-		{Timestamp: 3650, Value: 15},
-		{Timestamp: 3660, Value: 16},
-		{Timestamp: 3670, Value: 17},
-		{Timestamp: 3680, Value: 18},
-	}
+	points := generatePoints(3600, 10, 10, 3, 14, func(i float64) float64 { return i + 1 })
 
 	expected := map[string][]whisper.Point{
 		"avg": {
@@ -287,22 +323,7 @@ func TestAdjustAggregationAvg1(t *testing.T) {
 		Points:          12,
 	}
 
-	points := []whisper.Point{
-		{Timestamp: 3690, Value: 19},
-		{Timestamp: 3700, Value: 20},
-		{Timestamp: 3710, Value: 21},
-		{Timestamp: 3720, Value: 22},
-		{Timestamp: 3730, Value: 23},
-		{Timestamp: 3600, Value: 10},
-		{Timestamp: 3610, Value: 11},
-		{Timestamp: 3620, Value: 12},
-		{Timestamp: 3630, Value: 13},
-		{Timestamp: 3640, Value: 14},
-		{Timestamp: 3650, Value: 15},
-		{Timestamp: 3660, Value: 16},
-		{Timestamp: 3670, Value: 17},
-		{Timestamp: 3680, Value: 18},
-	}
+	points := generatePoints(3600, 10, 10, 3, 14, func(i float64) float64 { return i + 1 })
 
 	expected := map[string][]whisper.Point{
 		"sum": {
@@ -322,4 +343,7 @@ func TestAdjustAggregationAvg1(t *testing.T) {
 	}
 
 	testAdjustAggregation(t, ret, 1, arch, "avg", points, expected)
+}
+
+func TestRowKey(t *testing.T) {
 }
