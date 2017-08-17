@@ -358,3 +358,55 @@ func TestRowKeyAgg1(t *testing.T) {
 		t.Fatalf("row key for aggregation 0 should equal the id")
 	}
 }
+
+func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
+	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
+
+	*writeUnfinishedChunks = false
+	chunks := encodedChunksFromPoints(points, 10, 21600)
+
+	if len(chunks) != 4 {
+		t.Fatalf("Expected to get 4 chunks, but got %d", len(chunks))
+	}
+
+	i := 0
+	for _, c := range chunks {
+		iter, err := c.Get()
+		if err != nil {
+			t.Fatalf("Error getting iterator: %s", err)
+		}
+		for iter.Next() {
+			ts, val := iter.Values()
+			if points[i].Timestamp != ts || points[i].Value != val {
+				t.Fatalf("Unexpected value at index %d: %d:%f instead of %d:%f", i, ts, val, points[i].Timestamp, points[i].Value)
+			}
+			i++
+		}
+	}
+}
+
+func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
+	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
+
+	*writeUnfinishedChunks = true
+	chunks := encodedChunksFromPoints(points, 10, 21600)
+
+	if len(chunks) != 5 {
+		t.Fatalf("Expected to get 5 chunks, but got %d", len(chunks))
+	}
+
+	i := 0
+	for _, c := range chunks {
+		iter, err := c.Get()
+		if err != nil {
+			t.Fatalf("Error getting iterator: %s", err)
+		}
+		for iter.Next() {
+			ts, val := iter.Values()
+			if points[i].Timestamp != ts || points[i].Value != val {
+				t.Fatalf("Unexpected value at index %d: %d:%f instead of %d:%f", i, ts, val, points[i].Timestamp, points[i].Value)
+			}
+			i++
+		}
+	}
+}
