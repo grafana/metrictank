@@ -145,41 +145,39 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 
 		log(fmt.Sprintf("Processing file %q", file))
-		mets, err := getMetrics(w, file)
+		met, err := getMetrics(w, file)
 		if err != nil {
 			throwError(fmt.Sprintf("Failed to get metric: %q", err))
 			continue
 		}
 
-		for _, met := range mets {
-			b, err := met.MarshalCompressed()
-			if err != nil {
-				throwError(fmt.Sprintf("Failed to encode metric: %q", err))
-				continue
-			}
-
-			req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
-			if err != nil {
-				panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
-			}
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Content-Encoding", "gzip")
-
-			if len(*httpAuth) > 0 {
-				req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
-			}
-
-			resp, err := client.Do(req)
-			if err != nil {
-				throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
-				continue
-			}
-			if resp.StatusCode != 200 {
-				throwError(fmt.Sprintf("Error when submitting data: %s", resp.Status))
-			}
-			io.Copy(ioutil.Discard, resp.Body)
-			resp.Body.Close()
+		b, err := met.MarshalCompressed()
+		if err != nil {
+			throwError(fmt.Sprintf("Failed to encode metric: %q", err))
+			continue
 		}
+
+		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
+		if err != nil {
+			panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+
+		if len(*httpAuth) > 0 {
+			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
+			continue
+		}
+		if resp.StatusCode != 200 {
+			throwError(fmt.Sprintf("Error when submitting data: %s", resp.Status))
+		}
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
 	}
 	wg.Done()
 }
@@ -225,20 +223,20 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
-func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
+func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
+	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
-		return nil, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
+		return res, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
 	}
 
-	var metrics []archive.Metric
-	var chunkSpan uint32
 	var archiveInfo whisper.ArchiveInfo
 	var archiveIdx int
+	var archives []archive.Archive
 	name := getMetricName(file)
 
 	aggMethodStr := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	if aggMethodStr == "" {
-		return nil, errors.New(fmt.Sprintf(
+		return res, errors.New(fmt.Sprintf(
 			"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
 			file,
 			w.Header.Metadata.AggregationMethod,
@@ -263,17 +261,27 @@ func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
 			}
 		}
 
+		fmt.Println(fmt.Sprintf(
+			"Using arch %d (ttl %d, interval %d) for ret %d (ttl %d, interval %d)",
+			archiveIdx,
+			archiveInfo.SecondsPerPoint*archiveInfo.Points,
+			archiveInfo.SecondsPerPoint,
+			retentionIdx,
+			retention.SecondsPerPoint*retention.NumberOfPoints,
+			retention.SecondsPerPoint,
+		))
+
 		points, err := w.DumpArchive(archiveIdx)
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
+			return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
 		adjustedPoints := adjustAggregation(retention, retentionIdx, archiveInfo, aggMethodStr, points)
 
-		var archives []archive.Archive
 		for method, points := range adjustedPoints {
-			encodedChunks := encodedChunksFromPoints(points, archiveInfo.SecondsPerPoint, chunkSpan)
-			log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
+			fmt.Println(fmt.Sprintf("retention %d method %s", retentionIdx, method))
 			rowKey := getRowKey(retentionIdx, md.Id, method, retention.SecondsPerPoint)
+			encodedChunks := encodedChunksFromPoints(points, archiveInfo.SecondsPerPoint, retention.ChunkSpan)
+			//log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
 
 			archives = append(archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
@@ -281,15 +289,17 @@ func getMetrics(w *whisper.Whisper, file string) ([]archive.Metric, error) {
 				Chunks:          encodedChunks,
 				RowKey:          rowKey,
 			})
+			fmt.Println(fmt.Sprintf(
+				"Row key %s gets %d chunks", rowKey, len(encodedChunks),
+			))
+			//fmt.Println("Completed chunks for rowkey ", rowKey)
 		}
-		metrics = append(metrics, archive.Metric{
-			AggregationMethod: uint32(w.Header.Metadata.AggregationMethod),
-			MetricData:        *md,
-			Archives:          archives,
-		})
 	}
 
-	return metrics, nil
+	res.AggregationMethod = uint32(w.Header.Metadata.AggregationMethod)
+	res.MetricData = *md
+	res.Archives = archives
+	return res, nil
 }
 
 func getRowKey(retIdx int, id, meth string, resolution int) string {
@@ -316,7 +326,16 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
 		}
 	} else if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
-		result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		if retIdx == 0 || method != "avg" {
+			// need to use aggregation as input for raw ret
+			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
+			result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		} else {
+			result["sum"] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+			for _, point := range result["sum"] {
+				result["cnt"] = append(result["cnt"], whisper.Point{Timestamp: point.Timestamp, Value: 1})
+			}
+		}
 	} else {
 		result[method] = sortPoints(points)
 	}
@@ -341,12 +360,12 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 			c = chunk.New(t0)
 			prevT0 = t0
 		} else if prevT0 != t0 {
-			log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
+			//log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
 			c.Finish()
 
 			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 
-			log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
+			//log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
 			c = chunk.New(t0)
 			prevT0 = t0
 		}
@@ -360,7 +379,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 	// if the last written point was also the last one of the current chunk,
 	// or if writeUnfinishedChunks is on, we close the chunk and push it
 	if point.Timestamp == t0+chunkSpan-intervalIn || *writeUnfinishedChunks {
-		log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
+		//log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
 		c.Finish()
 		encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 	}
