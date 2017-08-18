@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -223,6 +224,85 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
+// keyed by archive id and pointing to the TTL up to which we use that archive
+type plan struct {
+	archive    int
+	timeRange  uint32
+	conversion conversion // -1 decrease, 0 no action, 1 increase
+}
+type conversion int
+type plans []plan
+
+func (c conversion) String() string {
+	if c == 0 {
+		return "same"
+	}
+	if c == -1 {
+		return "dec"
+	}
+	return "inc"
+}
+
+// pretty print
+func (ps *plans) String() string {
+	var buffer bytes.Buffer
+	for _, p := range *ps {
+		buffer.WriteString(fmt.Sprintf(
+			"arch:%d, seconds:%d, resolution:%s\n", p.archive, p.timeRange, p.conversion.String(),
+		))
+	}
+	return buffer.String()
+}
+
+func conversionPlan(spp, nop uint32, archs []whisper.ArchiveInfo) plans {
+	ttl := spp * nop
+
+	// find the largest archive that has at least the resolution we need
+	startArchiveIdx := 0
+	for idx, archive := range archs {
+		if archive.SecondsPerPoint > spp {
+			break
+		}
+		startArchiveIdx = idx
+	}
+
+	// for how many seconds of range we've planned out
+	plannedUpTo := uint32(0)
+	var res plans
+
+	for idx, archive := range archs {
+		if idx < startArchiveIdx {
+			continue
+		}
+
+		if plannedUpTo >= ttl {
+			// we've planned enough to cover the whole ttl we're looking for
+			return res
+		}
+
+		var conv conversion
+		if archive.SecondsPerPoint == spp {
+			conv = 0
+		} else if archive.SecondsPerPoint < spp {
+			conv = -1
+		} else {
+			conv = 1
+		}
+
+		plannedUpTo = archive.SecondsPerPoint * archive.Points
+		if ttl < plannedUpTo {
+			plannedUpTo = ttl
+		}
+		res = append(res, plan{
+			archive:    idx,
+			timeRange:  plannedUpTo,
+			conversion: conv,
+		})
+	}
+
+	return res
+}
+
 func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
@@ -248,7 +328,11 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	md := getMetricData(name, int(w.Header.Archives[0].SecondsPerPoint))
 
 	_, schema := schemas.Match(md.Name, 0)
+
 	for retentionIdx, retention := range schema.Retentions {
+		plan := conversionPlan(uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints), w.Header.Archives)
+		fmt.Println(fmt.Sprintf("retention:%d\n%s", retentionIdx, plan.String()))
+
 		// retention TTL is the amount of historic data we're aiming to generate
 		ttl := retention.SecondsPerPoint * retention.NumberOfPoints
 
@@ -261,7 +345,7 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 			}
 		}
 
-		fmt.Println(fmt.Sprintf(
+		log(fmt.Sprintf(
 			"Using arch %d (ttl %d, interval %d) for ret %d (ttl %d, interval %d)",
 			archiveIdx,
 			archiveInfo.SecondsPerPoint*archiveInfo.Points,
@@ -282,10 +366,8 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 		}
 
 		for method, points := range adjustedPoints {
-			fmt.Println(fmt.Sprintf("retention %d method %s", retentionIdx, method))
 			rowKey := getRowKey(retentionIdx, md.Id, method, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(points, archiveInfo.SecondsPerPoint, retention.ChunkSpan)
-			//log(fmt.Sprintf("Whisper file %q archive %d (%q) gets %d chunks", file, archiveIdx, name, len(encodedChunks)))
 
 			archives = append(archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
@@ -293,10 +375,6 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 				Chunks:          encodedChunks,
 				RowKey:          rowKey,
 			})
-			fmt.Println(fmt.Sprintf(
-				"Row key %s gets %d chunks", rowKey, len(encodedChunks),
-			))
-			//fmt.Println("Completed chunks for rowkey ", rowKey)
 		}
 	}
 
@@ -364,12 +442,10 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 			c = chunk.New(t0)
 			prevT0 = t0
 		} else if prevT0 != t0 {
-			//log(fmt.Sprintf("Mark chunk at t0 %d as finished", prevT0))
 			c.Finish()
 
 			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 
-			//log(fmt.Sprintf("Create new chunk at t0 %d with chunk span %d", t0, chunkSpan))
 			c = chunk.New(t0)
 			prevT0 = t0
 		}
@@ -383,7 +459,6 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 	// if the last written point was also the last one of the current chunk,
 	// or if writeUnfinishedChunks is on, we close the chunk and push it
 	if point.Timestamp == t0+chunkSpan-intervalIn || *writeUnfinishedChunks {
-		//log(fmt.Sprintf("Mark current (last) chunk at t0 %d as finished", t0))
 		c.Finish()
 		encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
 	}

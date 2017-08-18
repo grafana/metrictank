@@ -7,6 +7,62 @@ import (
 	"github.com/raintank/metrictank/conf"
 )
 
+func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
+	archs := []whisper.ArchiveInfo{
+		// 1 hour of 1 sec
+		{
+			Offset:          0,
+			SecondsPerPoint: 1,
+			Points:          3600,
+		},
+		// 2 days of 1 min
+		{
+			Offset:          0,
+			SecondsPerPoint: 60,
+			Points:          2880,
+		},
+		// 1 year of 1 hour
+		{
+			Offset:          0,
+			SecondsPerPoint: 3600,
+			Points:          8760,
+		},
+	}
+
+	plan := conversionPlan(spp, nop, archs)
+	if len(plan) != len(expected) {
+		t.Fatalf("Length of plan does not match expected:\n%+v\n%+v", plan, expected)
+	}
+
+	for i, _ := range expected {
+		if expected[i] != plan[i] {
+			t.Fatalf("Plan does not match expected:\n%+v\n%+v", plan, expected)
+		}
+	}
+}
+
+func TestPlanSingleInputArch(t *testing.T) {
+	expected := plans{
+		{archive: 1, timeRange: 24 * 60 * 60, conversion: 0},
+	}
+	testPlanner(t, 60, 24*60, expected)
+}
+
+func TestPlanTwoInputArchs(t *testing.T) {
+	expected := plans{
+		{archive: 0, timeRange: 60 * 60, conversion: -1},
+		{archive: 1, timeRange: 12 * 60 * 60, conversion: 1},
+	}
+	testPlanner(t, 30, 24*60, expected)
+}
+
+func TestPlanExceedAvailableArchs(t *testing.T) {
+	expected := plans{
+		{archive: 2, timeRange: 365 * 24 * 60 * 60, conversion: 0},
+	}
+	testPlanner(t, 60*60, 2*365*24, expected)
+}
+
 func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, inRes, outRes uint32) {
 	outData := incResolution(inData, inRes, outRes)
 
