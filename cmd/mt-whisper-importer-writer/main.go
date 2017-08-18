@@ -12,9 +12,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/cluster"
 	"github.com/raintank/metrictank/cluster/partitioner"
 	"github.com/raintank/metrictank/idx"
@@ -217,8 +215,6 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	avg := (whisper.AggregationMethod(metric.AggregationMethod) == whisper.AggregationAverage)
-
 	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
 	if err != nil {
 		throwError(fmt.Sprintf("Error partitioning: %q", err))
@@ -240,59 +236,11 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		tableName := entry.Table
 
-		if !avg || archiveIdx == 0 || !*fakeAvgAggregates {
-			log(fmt.Sprintf(
-				"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
-				len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
-			))
-			s.insertChunks(tableName, a.RowKey, tableTTL, a.Chunks)
-		} else {
-			// averaged archives are a special case because mt doesn't store them as such.
-			// mt reconstructs the averages on the fly from the sum and cnt series, so we need
-			// to generate these two series out of raw averaged data by multiplying each point
-			// with the aggregation span and storing the result as sum, cnt is the aggregation span.
-
-			// aggCount is the aggregation span of this archive divided by the raw interval
-			aggCount := a.SecondsPerPoint / metric.Archives[0].SecondsPerPoint
-			aggSpan := a.SecondsPerPoint
-
-			sumArchive := make([]chunk.IterGen, 0, len(a.Chunks))
-			cntArchive := make([]chunk.IterGen, 0, len(a.Chunks))
-			for _, ig := range a.Chunks {
-				T0 := ig.Ts
-				sum := chunk.New(T0)
-				cnt := chunk.New(T0)
-
-				it, err := ig.Get()
-				if err != nil {
-					throwError(fmt.Sprintf("failed to get iterator from itergen: %q", err))
-					continue
-				}
-
-				for it.Next() {
-					ts, val := it.Values()
-					cnt.Push(ts, float64(aggCount))
-					sum.Push(ts, val*float64(aggCount))
-				}
-
-				cnt.Finish()
-				sum.Finish()
-
-				cntArchive = append(cntArchive, *chunk.NewBareIterGen(cnt.Bytes(), T0, aggSpan))
-				sumArchive = append(sumArchive, *chunk.NewBareIterGen(sum.Bytes(), T0, aggSpan))
-			}
-
-			cntId := api.AggMetricKey(metric.MetricData.Id, "cnt", aggSpan)
-			sumId := api.AggMetricKey(metric.MetricData.Id, "sum", aggSpan)
-
-			log(fmt.Sprintf(
-				"inserting 2 archives of %d chunks per archive with ttl %d into table %s with ttl %d and keys %s/%s",
-				len(a.Chunks), archiveTTL, tableName, tableTTL, cntId, sumId,
-			))
-
-			s.insertChunks(tableName, cntId, tableTTL, cntArchive)
-			s.insertChunks(tableName, sumId, tableTTL, sumArchive)
-		}
+		log(fmt.Sprintf(
+			"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
+			len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
+		))
+		s.insertChunks(tableName, a.RowKey, tableTTL, a.Chunks)
 	}
 }
 
