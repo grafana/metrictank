@@ -275,7 +275,11 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 		if err != nil {
 			return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 		}
+
 		adjustedPoints := adjustAggregation(retention, retentionIdx, archiveInfo, aggMethodStr, points)
+		if int64(points[len(points)-1].Timestamp) > md.Time {
+			md.Time = int64(points[len(points)-1].Timestamp)
+		}
 
 		for method, points := range adjustedPoints {
 			fmt.Println(fmt.Sprintf("retention %d method %s", retentionIdx, method))
