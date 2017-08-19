@@ -35,7 +35,7 @@ func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
 	}
 
 	for i, _ := range expected {
-		if expected[i] != plan[i] {
+		if expected[i].archive != plan[i].archive || expected[i].timeRange != plan[i].timeRange || expected[i].conversion != plan[i].conversion {
 			t.Fatalf("Plan does not match expected:\n%+v\n%+v", plan, expected)
 		}
 	}

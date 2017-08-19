@@ -224,15 +224,6 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
-// keyed by archive id and pointing to the TTL up to which we use that archive
-type plan struct {
-	archive    int
-	timeRange  uint32
-	conversion conversion // -1 decrease, 0 no action, 1 increase
-}
-type conversion int
-type plans []plan
-
 func (c conversion) String() string {
 	if c == 0 {
 		return "same"
@@ -248,59 +239,56 @@ func (ps *plans) String() string {
 	var buffer bytes.Buffer
 	for _, p := range *ps {
 		buffer.WriteString(fmt.Sprintf(
-			"arch:%d, seconds:%d, resolution:%s\n", p.archive, p.timeRange, p.conversion.String(),
+			"arch:%d, seconds:%d-%d, resolution:%s\n", p.archive, p.timeFrom, p.TimeUntil, p.conversion.String(),
 		))
 	}
 	return buffer.String()
 }
 
-func conversionPlan(spp, nop uint32, archs []whisper.ArchiveInfo) plans {
-	ttl := spp * nop
-
-	// find the largest archive that has at least the resolution we need
-	startArchiveIdx := 0
-	for idx, archive := range archs {
-		if archive.SecondsPerPoint > spp {
-			break
-		}
-		startArchiveIdx = idx
-	}
-
-	// for how many seconds of range we've planned out
-	plannedUpTo := uint32(0)
-	var res plans
-
-	for idx, archive := range archs {
-		if idx < startArchiveIdx {
-			continue
-		}
-
-		if plannedUpTo >= ttl {
-			// we've planned enough to cover the whole ttl we're looking for
-			return res
-		}
-
-		var conv conversion
-		if archive.SecondsPerPoint == spp {
-			conv = 0
-		} else if archive.SecondsPerPoint < spp {
-			conv = -1
+func (ps *plans) convert(raw bool, method string) map[string][]whisper.Point {
+	var res map[string][]whisper.Point
+	for _, plan := range *ps {
+		// no conversion necessary
+		if plan.conversion == 0 {
+			res[method] = plan.points
+		} else if plan.conversion < 0 {
+			if !raw && method == "avg" {
+			} else {
+			}
 		} else {
-			conv = 1
+			if !raw && method == "avg" {
+			} else {
+			}
 		}
-
-		plannedUpTo = archive.SecondsPerPoint * archive.Points
-		if ttl < plannedUpTo {
-			plannedUpTo = ttl
-		}
-		res = append(res, plan{
-			archive:    idx,
-			timeRange:  plannedUpTo,
-			conversion: conv,
-		})
 	}
-
 	return res
+}
+func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
+	result := make(map[string][]whisper.Point)
+	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
+		if retIdx == 0 || method != "avg" {
+			// need to use aggregation as input for raw ret
+			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
+			result[method] = decResolution(points, method, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		} else {
+			result["sum"] = decResolution(points, "sum", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		}
+	} else if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
+		if retIdx == 0 || method != "avg" {
+			// need to use aggregation as input for raw ret
+			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
+			result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+		} else {
+			result["sum"] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
+			for _, point := range result["sum"] {
+				result["cnt"] = append(result["cnt"], whisper.Point{Timestamp: point.Timestamp, Value: 1})
+			}
+		}
+	} else {
+		result[method] = sortPoints(points)
+	}
+	return result
 }
 
 func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
@@ -330,51 +318,32 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	_, schema := schemas.Match(md.Name, 0)
 
 	for retentionIdx, retention := range schema.Retentions {
-		plan := conversionPlan(uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints), w.Header.Archives)
-		fmt.Println(fmt.Sprintf("retention:%d\n%s", retentionIdx, plan.String()))
+		plans := NewPlan(uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints), w)
+		log(fmt.Sprintf("retention:%d\n%s", retentionIdx, plans.String()))
 
-		// retention TTL is the amount of historic data we're aiming to generate
-		ttl := retention.SecondsPerPoint * retention.NumberOfPoints
-
-		// on the first aggregation we determine the aggregation method as string
-		// find the highest resolution archive that has enough data to fill the TTL
-		// if none have enough, just take the last one
-		for archiveIdx, archiveInfo = range w.Header.Archives {
-			if archiveInfo.SecondsPerPoint*archiveInfo.Points >= uint32(ttl) {
-				break
+		for _, plan := range plans {
+			points, err := w.DumpArchive(plan.archive)
+			if err != nil {
+				return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
 			}
+			plan.setPoints(points)
 		}
 
-		log(fmt.Sprintf(
-			"Using arch %d (ttl %d, interval %d) for ret %d (ttl %d, interval %d)",
-			archiveIdx,
-			archiveInfo.SecondsPerPoint*archiveInfo.Points,
-			archiveInfo.SecondsPerPoint,
-			retentionIdx,
-			retention.SecondsPerPoint*retention.NumberOfPoints,
-			retention.SecondsPerPoint,
-		))
+		points := plans.convert(aggMethodStr)
 
-		points, err := w.DumpArchive(archiveIdx)
-		if err != nil {
-			return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
-		}
-
-		adjustedPoints := adjustAggregation(retention, retentionIdx, archiveInfo, aggMethodStr, points)
-		if int64(points[len(points)-1].Timestamp) > md.Time {
-			md.Time = int64(points[len(points)-1].Timestamp)
-		}
-
-		for method, points := range adjustedPoints {
+		for method, p := range points {
 			rowKey := getRowKey(retentionIdx, md.Id, method, retention.SecondsPerPoint)
-			encodedChunks := encodedChunksFromPoints(points, archiveInfo.SecondsPerPoint, retention.ChunkSpan)
+			encodedChunks := encodedChunksFromPoints(p, archiveInfo.SecondsPerPoint, retention.ChunkSpan)
 
 			archives = append(archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
-				Points:          uint32(len(points)),
+				Points:          uint32(len(p)),
 				Chunks:          encodedChunks,
 				RowKey:          rowKey,
 			})
+			if int64(p[len(p)-1].Timestamp) > md.Time {
+				md.Time = int64(p[len(p)-1].Timestamp)
+			}
 		}
 	}
 
@@ -394,34 +363,6 @@ func getRowKey(retIdx int, id, meth string, resolution int) string {
 			uint32(resolution),
 		)
 	}
-}
-
-func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
-	result := make(map[string][]whisper.Point)
-	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
-		if retIdx == 0 || method != "avg" {
-			// need to use aggregation as input for raw ret
-			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
-			result[method] = decResolution(points, method, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		} else {
-			result["sum"] = decResolution(points, "sum", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		}
-	} else if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
-		if retIdx == 0 || method != "avg" {
-			// need to use aggregation as input for raw ret
-			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
-			result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		} else {
-			result["sum"] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-			for _, point := range result["sum"] {
-				result["cnt"] = append(result["cnt"], whisper.Point{Timestamp: point.Timestamp, Value: 1})
-			}
-		}
-	} else {
-		result[method] = sortPoints(points)
-	}
-	return result
 }
 
 func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint32) []chunk.IterGen {
