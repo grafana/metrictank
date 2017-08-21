@@ -7,7 +7,7 @@ import (
 	"github.com/raintank/metrictank/conf"
 )
 
-func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
+/*func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
 	archs := []whisper.ArchiveInfo{
 		// 1 hour of 1 sec
 		{
@@ -61,6 +61,166 @@ func TestPlanExceedAvailableArchs(t *testing.T) {
 		{archive: 2, timeRange: 365 * 24 * 60 * 60, conversion: 0},
 	}
 	testPlanner(t, 60*60, 2*365*24, expected)
+}*/
+
+func testIncResolutionFakeAvg(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, inRes, outRes uint32) {
+	outData := incResolutionFakeAvg(inData, inRes, outRes)
+
+	if len(expectedResult) != len(outData) {
+		t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
+	}
+
+	for m, ep := range expectedResult {
+		var p []whisper.Point
+		var ok bool
+		if p, ok = outData[m]; !ok {
+			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
+		}
+		if len(p) != len(outData[m]) {
+			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
+		}
+		for i, _ := range p {
+			if p[i] != ep[i] {
+				t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
+			}
+		}
+	}
+}
+
+func TestIncResolutionFakeAvgSimple(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{10, 5},
+			{15, 5},
+			{20, 5.5},
+			{25, 5.5},
+		},
+		"cnt": {
+			{10, 0.5},
+			{15, 0.5},
+			{20, 0.5},
+			{25, 0.5},
+		},
+	}
+	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
+}
+
+func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+		{30, 12},
+		{40, 13},
+		{50, 14},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{12, float64(10) / 3},
+			{15, float64(10) / 3},
+			{18, float64(10) / 3},
+			{21, float64(11) / 3},
+			{24, float64(11) / 3},
+			{27, float64(11) / 3},
+			{30, float64(12) / 4},
+			{33, float64(12) / 4},
+			{36, float64(12) / 4},
+			{39, float64(12) / 4},
+			{42, float64(13) / 3},
+			{45, float64(13) / 3},
+			{48, float64(13) / 3},
+			{51, float64(14) / 3},
+			{54, float64(14) / 3},
+			{57, float64(14) / 3},
+		},
+		"cnt": {
+			{12, float64(1) / 3},
+			{15, float64(1) / 3},
+			{18, float64(1) / 3},
+			{21, float64(1) / 3},
+			{24, float64(1) / 3},
+			{27, float64(1) / 3},
+			{30, float64(1) / 4},
+			{33, float64(1) / 4},
+			{36, float64(1) / 4},
+			{39, float64(1) / 4},
+			{42, float64(1) / 3},
+			{45, float64(1) / 3},
+			{48, float64(1) / 3},
+			{51, float64(1) / 3},
+			{54, float64(1) / 3},
+			{57, float64(1) / 3},
+		},
+	}
+
+	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 3)
+}
+
+func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
+	inData := []whisper.Point{
+		{0, 0},
+		{10, 10},
+		{0, 0},
+		{0, 0},
+		{40, 13},
+		{50, 14},
+		{0, 0},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{10, 5},
+			{15, 5},
+			{40, 6.5},
+			{45, 6.5},
+			{50, 7},
+			{55, 7},
+		},
+		"cnt": {
+			{10, 0.5},
+			{15, 0.5},
+			{40, 0.5},
+			{45, 0.5},
+			{50, 0.5},
+			{55, 0.5},
+		},
+	}
+
+	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
+}
+
+func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
+	inData := []whisper.Point{
+		{40, 13},
+		{10, 10},
+		{50, 14},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{40, 6.5},
+			{45, 6.5},
+			{10, 5},
+			{15, 5},
+			{50, 7},
+			{55, 7},
+		},
+		"cnt": {
+			{40, 0.5},
+			{45, 0.5},
+			{10, 0.5},
+			{15, 0.5},
+			{50, 0.5},
+			{55, 0.5},
+		},
+	}
+
+	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
 }
 
 func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, inRes, outRes uint32) {
@@ -72,7 +232,7 @@ func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, inR
 
 	for i := 0; i < len(expectedResult); i++ {
 		if outData[i] != expectedResult[i] {
-			t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData[i], expectedResult[i])
+			t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
 		}
 	}
 }
@@ -268,6 +428,53 @@ func TestDecResolutionOutOfOrder(t *testing.T) {
 		{60, 15},
 	}
 	testDecResolution(t, inData, expectedResult, "avg", 10, 30)
+}
+
+func testDecResolutionFakeAvg(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, inRes, outRes uint32) {
+	outData := decResolutionFakeAvg(inData, inRes, outRes)
+
+	if len(expectedResult) != len(outData) {
+		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(expectedResult), len(outData), outData, expectedResult)
+	}
+
+	for m, ep := range expectedResult {
+		var p []whisper.Point
+		var ok bool
+		if p, ok = outData[m]; !ok {
+			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
+		}
+		if len(p) != len(outData[m]) {
+			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
+		}
+		for i, _ := range p {
+			if p[i] != ep[i] {
+				t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
+			}
+		}
+	}
+}
+
+func TestDecResolutionFakeAvgSimple(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+		{30, 12},
+		{40, 14},
+		{50, 15},
+		{60, 16},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{30, 33},
+			{60, 45},
+		},
+		"cnt": {
+			{30, 3},
+			{60, 3},
+		},
+	}
+	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
 }
 
 func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch whisper.ArchiveInfo, meth string, points []whisper.Point, expectedRes map[string][]whisper.Point) {

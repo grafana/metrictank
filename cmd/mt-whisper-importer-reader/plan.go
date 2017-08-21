@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/kisielk/whisper-go/whisper"
+//"github.com/kisielk/whisper-go/whisper"
 )
 
+/*
 type conversion int8
 
 type inputArchive struct {
@@ -91,7 +92,6 @@ func (p *plan) getPoints(retIdx int, method string, spp, nop uint32) map[string]
 	return res
 }
 
-/*
 	// find the largest archive that has at least the resolution we need
 	startArchiveIdx := 0
 	for idx, archive := range p.whisper.Header.Archives {
@@ -133,9 +133,9 @@ func (p *plan) getPoints(retIdx int, method string, spp, nop uint32) map[string]
 		}
 
 		res.inputs = append(res.inputs, a)
-	}*/
+	}
 
-/*func (p *plan) addRetention(spp, nop uint32) {
+func (p *plan) addRetention(spp, nop uint32) {
 	retention := retention{
 		secondsPerPoint: spp,
 		numberOfPoints:  nop,
@@ -185,17 +185,17 @@ func (p *plan) getPoints(retIdx int, method string, spp, nop uint32) map[string]
 
 		res.inputs = append(res.inputs, a)
 	}
-}*/
+}
 
-/*func (c *plan) getAdjustedPoints() []whisper.Point {
+func (c *plan) getAdjustedPoints() []whisper.Point {
 	for _, archive := range c.archives {
 		in := c.whisper.DumpArchive(archive.idx)
 		c.whisper.Header.Archives[archive.idx].Offset
 	}
-}*/
+}
 
 // pretty print
-/*func (ps *plans) String() string {
+func (ps *plans) String() string {
 	var buffer bytes.Buffer
 	for _, p := range *ps {
 		buffer.WriteString(fmt.Sprintf(
@@ -203,4 +203,5 @@ func (p *plan) getPoints(retIdx int, method string, spp, nop uint32) map[string]
 		))
 	}
 	return buffer.String()
-}*/
+}
+*/

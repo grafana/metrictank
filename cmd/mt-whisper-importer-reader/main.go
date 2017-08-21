@@ -19,7 +19,6 @@ import (
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/mdata"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/mdata/chunk/archive"
 	"gopkg.in/raintank/schema.v1"
@@ -224,7 +223,7 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
-func (c conversion) String() string {
+/*func (c conversion) String() string {
 	if c == 0 {
 		return "same"
 	}
@@ -232,7 +231,7 @@ func (c conversion) String() string {
 		return "dec"
 	}
 	return "inc"
-}
+}*/
 
 // pretty print
 /*func (ps *plans) String() string {
@@ -291,14 +290,12 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 	return result
 }
 
-/*func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
+func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
 		return res, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
 	}
 
-	var archiveInfo whisper.ArchiveInfo
-	var archiveIdx int
 	var archives []archive.Archive
 	name := getMetricName(file)
 
@@ -317,50 +314,33 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 
 	_, schema := schemas.Match(md.Name, 0)
 
-	addArchive := func(rowKey string, ret conf.Retention, secondsPerPoint, chunkSpan uint32, p []whisper.Point) {
-		encodedChunks := encodedChunksFromPoints(p, secondsPerPoint, chunkSpan)
-
-		archives = append(archives, archive.Archive{
-			SecondsPerPoint: uint32(ret.SecondsPerPoint),
-			Points:          uint32(len(p)),
-			Chunks:          encodedChunks,
-			RowKey:          rowKey,
-		})
-		if int64(p[len(p)-1].Timestamp) > md.Time {
-			md.Time = int64(p[len(p)-1].Timestamp)
-		}
-	}
-
-	plan := newPlan(w)
+	conversion := newConversion(w)
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	for retIdx, retention := range schema.Retentions {
-		points := plan.getPoints(retIdx, method, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		points, err := conversion.getPoints(retIdx, method, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		if err != nil {
+			throwError(err.Error())
+		}
 		for m, p := range points {
 			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
-			addArchive(rowKey, retention, uint32(retention.SecondsPerPoint), retention.ChunkSpan, points)
+			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
+			archives = append(archives, archive.Archive{
+				SecondsPerPoint: uint32(retention.SecondsPerPoint),
+				Points:          uint32(len(p)),
+				Chunks:          encodedChunks,
+				RowKey:          rowKey,
+			})
+			if int64(p[len(p)-1].Timestamp) > md.Time {
+				md.Time = int64(p[len(p)-1].Timestamp)
+			}
 		}
-	}
-
-	log(fmt.Sprintf("retention:%d\n%s", retentionIdx, plans.String()))
-
-	for _, plan := range plans {
-		points, err := w.DumpArchive(plan.archive)
-		if err != nil {
-			return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
-		}
-		plan.setPoints(points)
-	}
-
-	points := plans.convert(aggMethodStr)
-
-	for method, p := range points {
 	}
 
 	res.AggregationMethod = uint32(w.Header.Metadata.AggregationMethod)
 	res.MetricData = *md
 	res.Archives = archives
 	return res, nil
-}*/
+}
 
 func getRowKey(retIdx int, id, meth string, resolution int) string {
 	if retIdx == 0 {
@@ -417,25 +397,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 }
 
 // inreasing the resolution by just duplicating points to fill in empty data points
-func incResolution(points []whisper.Point, inRes, outRes uint32) []whisper.Point {
-	pointCount := (points[len(points)-1].Timestamp - points[0].Timestamp) * outRes / inRes
-	out := make([]whisper.Point, 0, pointCount)
-	for _, inPoint := range points {
-		if inPoint.Timestamp == 0 {
-			continue
-		}
-
-		rangeStart := inPoint.Timestamp % outRes
-		for ts := rangeStart; ts < rangeStart+inRes; ts = ts + outRes {
-			outPoint := inPoint
-			outPoint.Timestamp = ts
-			out = append(out, outPoint)
-		}
-	}
-	return sortPoints(out)
-}
-
-func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[string][]whisper.Point {
+/*func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
 	ratio := float64(outRes) / float64(inRes)
 	for _, inPoint := range points {
@@ -455,10 +417,10 @@ func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[stri
 		}
 	}
 	return out
-}
+}*/
 
 // decreasing the resolution by using the aggregation method in aggMethod
-func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint32) []whisper.Point {
+/*func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint32) []whisper.Point {
 	agg := mdata.NewAggregation()
 	out := make([]whisper.Point, 0)
 	currentBoundary := uint32(0)
@@ -494,7 +456,7 @@ func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint3
 	}
 
 	return out
-}
+}*/
 
 func getMetricData(name string, interval int) *schema.MetricData {
 	md := &schema.MetricData{
