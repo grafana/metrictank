@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -235,7 +235,7 @@ func (c conversion) String() string {
 }
 
 // pretty print
-func (ps *plans) String() string {
+/*func (ps *plans) String() string {
 	var buffer bytes.Buffer
 	for _, p := range *ps {
 		buffer.WriteString(fmt.Sprintf(
@@ -262,7 +262,7 @@ func (ps *plans) convert(raw bool, method string) map[string][]whisper.Point {
 		}
 	}
 	return res
-}
+}*/
 func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
 	result := make(map[string][]whisper.Point)
 	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
@@ -291,7 +291,7 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 	return result
 }
 
-func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
+/*func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
 		return res, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
@@ -317,41 +317,50 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 
 	_, schema := schemas.Match(md.Name, 0)
 
-	for retentionIdx, retention := range schema.Retentions {
-		plans := NewPlan(uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints), w)
-		log(fmt.Sprintf("retention:%d\n%s", retentionIdx, plans.String()))
+	addArchive := func(rowKey string, ret conf.Retention, secondsPerPoint, chunkSpan uint32, p []whisper.Point) {
+		encodedChunks := encodedChunksFromPoints(p, secondsPerPoint, chunkSpan)
 
-		for _, plan := range plans {
-			points, err := w.DumpArchive(plan.archive)
-			if err != nil {
-				return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
-			}
-			plan.setPoints(points)
+		archives = append(archives, archive.Archive{
+			SecondsPerPoint: uint32(ret.SecondsPerPoint),
+			Points:          uint32(len(p)),
+			Chunks:          encodedChunks,
+			RowKey:          rowKey,
+		})
+		if int64(p[len(p)-1].Timestamp) > md.Time {
+			md.Time = int64(p[len(p)-1].Timestamp)
 		}
+	}
 
-		points := plans.convert(aggMethodStr)
-
-		for method, p := range points {
-			rowKey := getRowKey(retentionIdx, md.Id, method, retention.SecondsPerPoint)
-			encodedChunks := encodedChunksFromPoints(p, archiveInfo.SecondsPerPoint, retention.ChunkSpan)
-
-			archives = append(archives, archive.Archive{
-				SecondsPerPoint: uint32(retention.SecondsPerPoint),
-				Points:          uint32(len(p)),
-				Chunks:          encodedChunks,
-				RowKey:          rowKey,
-			})
-			if int64(p[len(p)-1].Timestamp) > md.Time {
-				md.Time = int64(p[len(p)-1].Timestamp)
-			}
+	plan := newPlan(w)
+	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	for retIdx, retention := range schema.Retentions {
+		points := plan.getPoints(retIdx, method, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		for m, p := range points {
+			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
+			addArchive(rowKey, retention, uint32(retention.SecondsPerPoint), retention.ChunkSpan, points)
 		}
+	}
+
+	log(fmt.Sprintf("retention:%d\n%s", retentionIdx, plans.String()))
+
+	for _, plan := range plans {
+		points, err := w.DumpArchive(plan.archive)
+		if err != nil {
+			return res, errors.New(fmt.Sprintf("ERROR: Failed to read archive %d in %q, skipping: %q", archiveIdx, file, err))
+		}
+		plan.setPoints(points)
+	}
+
+	points := plans.convert(aggMethodStr)
+
+	for method, p := range points {
 	}
 
 	res.AggregationMethod = uint32(w.Header.Metadata.AggregationMethod)
 	res.MetricData = *md
 	res.Archives = archives
 	return res, nil
-}
+}*/
 
 func getRowKey(retIdx int, id, meth string, resolution int) string {
 	if retIdx == 0 {
@@ -416,17 +425,36 @@ func incResolution(points []whisper.Point, inRes, outRes uint32) []whisper.Point
 			continue
 		}
 
-		if inPoint.Timestamp%outRes == 0 {
-			out = append(out, inPoint)
-		}
-
-		for ts := inPoint.Timestamp + outRes - (inPoint.Timestamp % outRes); ts < inPoint.Timestamp+inRes; ts = ts + outRes {
+		rangeStart := inPoint.Timestamp % outRes
+		for ts := rangeStart; ts < rangeStart+inRes; ts = ts + outRes {
 			outPoint := inPoint
 			outPoint.Timestamp = ts
 			out = append(out, outPoint)
 		}
 	}
 	return sortPoints(out)
+}
+
+func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[string][]whisper.Point {
+	out := make(map[string][]whisper.Point)
+	ratio := float64(outRes) / float64(inRes)
+	for _, inPoint := range points {
+		if inPoint.Timestamp == 0 {
+			continue
+		}
+
+		inPoint.Value = inPoint.Value * ratio
+		for ts := inPoint.Timestamp + outRes - (inPoint.Timestamp % outRes); ts < inPoint.Timestamp+inRes; ts = ts + outRes {
+			outPoint := inPoint
+			outPoint.Timestamp = ts
+			out["sum"] = append(out["sum"], outPoint)
+			out["cnt"] = append(out["cnt"], whisper.Point{
+				Timestamp: ts,
+				Value:     ratio,
+			})
+		}
+	}
+	return out
 }
 
 // decreasing the resolution by using the aggregation method in aggMethod
