@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/metrictank/conf"
+	//"github.com/raintank/metrictank/conf"
 )
 
 /*func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
@@ -223,8 +223,8 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
 }
 
-func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, inRes, outRes uint32) {
-	outData := incResolution(inData, inRes, outRes)
+func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, method string, inRes, outRes uint32) {
+	outData := incResolution(inData, method, inRes, outRes)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(outData), len(expectedResult), outData, expectedResult)
@@ -249,7 +249,7 @@ func TestIncResolutionSimple(t *testing.T) {
 		{20, 11},
 		{25, 11},
 	}
-	testIncResolution(t, inData, expectedResult, 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
 
 func TestIncResolutionNonFactorResolutions(t *testing.T) {
@@ -280,7 +280,7 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		{57, 14},
 	}
 
-	testIncResolution(t, inData, expectedResult, 10, 3)
+	testIncResolution(t, inData, expectedResult, "max", 10, 3)
 }
 
 func TestIncResolutionWithGaps(t *testing.T) {
@@ -303,7 +303,7 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		{55, 14},
 	}
 
-	testIncResolution(t, inData, expectedResult, 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
 
 func TestIncResolutionOutOfOrder(t *testing.T) {
@@ -322,7 +322,7 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		{55, 14},
 	}
 
-	testIncResolution(t, inData, expectedResult, 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
 
 func testDecResolution(t *testing.T, inData, expectedResult []whisper.Point, aggMethod string, inRes, outRes uint32) {
@@ -477,7 +477,85 @@ func TestDecResolutionFakeAvgSimple(t *testing.T) {
 	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
 }
 
-func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch whisper.ArchiveInfo, meth string, points []whisper.Point, expectedRes map[string][]whisper.Point) {
+func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+		{30, 12},
+		{40, 13},
+		{50, 14},
+		{60, 15},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{15, 10},
+			{30, 23},
+			{45, 13},
+			{60, 29},
+		},
+		"cnt": {
+			{15, 1},
+			{30, 2},
+			{45, 1},
+			{60, 2},
+		},
+	}
+	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 15)
+}
+
+func TestDecFakeAvgResolutionWithGaps(t *testing.T) {
+	inData := []whisper.Point{
+		{0, 0},
+		{10, 10},
+		{0, 0},
+		{0, 0},
+		{40, 13},
+		{50, 14},
+		{0, 0},
+		{70, 16},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{20, 10},
+			{40, 13},
+			{60, 14},
+		},
+		"cnt": {
+			{20, 1},
+			{40, 1},
+			{60, 1},
+		},
+	}
+
+	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 20)
+}
+
+func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
+	inData := []whisper.Point{
+		{20, 11},
+		{50, 15},
+		{30, 12},
+		{10, 10},
+		{60, 16},
+		{40, 14},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{30, 33},
+			{60, 45},
+		},
+		"cnt": {
+			{30, 3},
+			{60, 3},
+		},
+	}
+	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
+}
+
+/*func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch whisper.ArchiveInfo, meth string, points []whisper.Point, expectedRes map[string][]whisper.Point) {
 	res := adjustAggregation(ret, retIdx, arch, meth, points)
 	for meth, expectedPoints := range expectedRes {
 		if _, ok := res[meth]; !ok {
@@ -494,7 +572,7 @@ func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch wh
 			}
 		}
 	}
-}
+}*/
 
 func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {
 	res := make([]whisper.Point, count)
@@ -509,7 +587,7 @@ func generatePoints(ts, interval uint32, value float64, offset, count int, inc f
 	return res
 }
 
-func TestAdjustAggregationDecResolution(t *testing.T) {
+/*func TestAdjustAggregationDecResolution(t *testing.T) {
 	ret := conf.Retention{
 		SecondsPerPoint: 10,
 		NumberOfPoints:  15,
@@ -606,7 +684,7 @@ func TestAdjustAggregationAvg1(t *testing.T) {
 	}
 
 	testAdjustAggregation(t, ret, 1, arch, "avg", points, expected)
-}
+}*/
 
 func TestRowKeyAgg0(t *testing.T) {
 	res := getRowKey(0, "aaa", "", 0)
@@ -670,6 +748,123 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 				t.Fatalf("Unexpected value at index %d: %d:%f instead of %d:%f", i, ts, val, points[i].Timestamp, points[i].Value)
 			}
 			i++
+		}
+	}
+}
+
+func TestPointsConversion(t *testing.T) {
+	c := conversion{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 5},
+			{SecondsPerPoint: 3, Points: 15},
+			{SecondsPerPoint: 10, Points: 60},
+		},
+		points: map[int][]whisper.Point{
+			0: {
+				{1503384108, 100},
+				{1503384109, 100},
+			},
+			1: {
+				{1503384106, 200},
+				{1503384108, 200},
+			},
+			2: {
+				{1503384108, 200},
+				{1503384104, 400},
+			},
+		},
+
+		/*points: map[int][]whisper.Point{
+			0: {
+				{1503331540, 100},
+				{1503331533, 100},
+				{1503331534, 100},
+				{1503331535, 100},
+				{1503331536, 100},
+				{1503331537, 100},
+				{1503331538, 100},
+				{1503331539, 100},
+			},
+			1: {
+				{1503331540, 100},
+				{1503331526, 200},
+				{1503331528, 200},
+				{1503331530, 200},
+				{1503331532, 200},
+				{1503331534, 200},
+				{1503331536, 200},
+				{1503331538, 200},
+			},
+			2: {
+				{1503331540, 100},
+				{1503331512, 400},
+				{1503331516, 400},
+				{1503331520, 400},
+				{1503331524, 400},
+				{1503331528, 400},
+				{1503331532, 400},
+				{1503331536, 400},
+			},
+		},*/
+		method: "sum",
+	}
+
+	expectedPoints := map[string][]whisper.Point{
+		"sum": {
+			{1503384102, 100},
+			{1503384103, 100},
+			{1503384104, 100},
+			{1503384105, 100},
+			{1503384106, 100},
+			{1503384107, 100},
+			{1503384108, 100},
+			{1503384109, 100},
+		},
+	}
+	/*expectedPoints := map[string][]whisper.Point{
+		"sum": {
+			{1503331509, 100},
+			{1503331510, 100},
+			{1503331511, 100},
+			{1503331512, 100},
+			{1503331513, 100},
+			{1503331514, 100},
+			{1503331515, 100},
+			{1503331516, 100},
+			{1503331517, 100},
+			{1503331518, 100},
+			{1503331519, 100},
+			{1503331520, 100},
+			{1503331521, 100},
+			{1503331522, 100},
+			{1503331523, 100},
+			{1503331524, 100},
+			{1503331525, 100},
+			{1503331526, 100},
+			{1503331527, 100},
+			{1503331528, 100},
+			{1503331529, 100},
+			{1503331530, 100},
+			{1503331531, 100},
+			{1503331532, 100},
+			{1503331533, 100},
+			{1503331534, 100},
+			{1503331535, 100},
+			{1503331536, 100},
+			{1503331537, 100},
+			{1503331538, 100},
+			{1503331539, 100},
+			{1503331540, 100},
+		},
+	}*/
+
+	points, _ := c.getPoints(1, "sum", 1, 8)
+
+	for meth, ep := range expectedPoints {
+		for i, p := range ep {
+			if points[meth][i] != p {
+				t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
+			}
 		}
 	}
 }

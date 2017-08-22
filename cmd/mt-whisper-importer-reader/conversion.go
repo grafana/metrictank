@@ -1,28 +1,33 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/metrictank/mdata"
 )
 
+var (
+	errUnknownArchive = errors.New("Archive not found")
+	errNoData         = errors.New("Whisper file appears to have no data")
+)
+
 type conversion struct {
-	whisper *whisper.Whisper
-	method  string
+	archives []whisper.ArchiveInfo
+	points   map[int][]whisper.Point
+	method   string
 }
 
-func newConversion(w *whisper.Whisper) *conversion {
-	conversion := conversion{whisper: w, method: shortAggMethodString(w.Header.Metadata.AggregationMethod)}
+func newConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method string) *conversion {
+	conversion := conversion{archives: arch, points: points, method: method}
 	return &conversion
 }
 
-func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[string][]whisper.Point, error) {
-	ttl := spp * nop
-	res := make(map[string][]whisper.Point)
-
+func (c *conversion) findSmallestLargestArchive(ttl, spp uint32) (int, int) {
 	// find smallest archive that still contains enough data to satisfy requested range
-	largestArchiveIdx := len(c.whisper.Header.Archives) - 1
+	largestArchiveIdx := len(c.archives) - 1
 	for i := largestArchiveIdx; i >= 0; i-- {
-		arch := c.whisper.Header.Archives[i]
+		arch := c.archives[i]
 		if arch.SecondsPerPoint*arch.Points < ttl {
 			break
 		}
@@ -31,52 +36,90 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 
 	// find largest archive that still has higher resolution than requested
 	smallestArchiveIdx := 0
-	for i := 0; i < len(c.whisper.Header.Archives); i++ {
-		arch := c.whisper.Header.Archives[i]
+	for i := 0; i < len(c.archives); i++ {
+		arch := c.archives[i]
 		if arch.SecondsPerPoint > spp {
 			break
 		}
 		smallestArchiveIdx = i
 	}
 
-	for i := largestArchiveIdx; i > smallestArchiveIdx; i++ {
-		in, err := c.whisper.DumpArchive(i)
-		if err != nil {
-			return res, err
+	return smallestArchiveIdx, largestArchiveIdx
+}
+
+func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[string][]whisper.Point, error) {
+	ttl := spp * nop
+	res := make(map[string][]whisper.Point)
+
+	if len(c.points) == 0 {
+		return res, errNoData
+	}
+
+	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(ttl, spp)
+
+	adjustedPoints := make(map[string]map[uint32]float64)
+	if retIdx == 0 && method == "avg" {
+		adjustedPoints["cnt"] = make(map[uint32]float64)
+		adjustedPoints["sum"] = make(map[uint32]float64)
+	} else {
+		adjustedPoints[method] = make(map[uint32]float64)
+	}
+
+	for i := largestArchiveIdx; i > smallestArchiveIdx; i-- {
+		in, ok := c.points[i]
+		if !ok {
+			return res, errUnknownArchive
 		}
-		adjustedPoints := make(map[string][]whisper.Point)
-		arch := c.whisper.Header.Archives[i]
+		arch := c.archives[i]
 		if arch.SecondsPerPoint == spp {
 			if retIdx == 0 || method != "avg" {
-				adjustedPoints[method] = in
+				for _, p := range in {
+					adjustedPoints[method][p.Timestamp] = p.Value
+				}
 			} else {
-				adjustedPoints["sum"] = in
-				for _, c := range adjustedPoints["sum"] {
-					adjustedPoints["cnt"] = append(adjustedPoints["cnt"], whisper.Point{
-						Timestamp: c.Timestamp,
-						Value:     1,
-					})
+				for _, p := range in {
+					adjustedPoints["sum"][p.Timestamp] = p.Value
+					adjustedPoints["cnt"][p.Timestamp] = 1
 				}
 			}
 		} else if arch.SecondsPerPoint > spp {
 			if method != "avg" || retIdx == 0 {
-				adjustedPoints[method] = incResolution(in, arch.SecondsPerPoint, spp)
+				for _, p := range incResolution(in, method, arch.SecondsPerPoint, spp) {
+					adjustedPoints[method][p.Timestamp] = p.Value
+				}
 			} else {
-				adjustedPoints = incResolutionFakeAvg(in, arch.SecondsPerPoint, spp)
+				for m, points := range incResolutionFakeAvg(in, arch.SecondsPerPoint, spp) {
+					for _, p := range points {
+						adjustedPoints[m][p.Timestamp] = p.Value
+					}
+				}
 			}
 		} else {
 			if method != "avg" || retIdx == 0 {
-				adjustedPoints[method] = decResolution(in, method, arch.SecondsPerPoint, spp)
+				for _, p := range decResolution(in, method, arch.SecondsPerPoint, spp) {
+					adjustedPoints[method][p.Timestamp] = p.Value
+				}
 			} else {
-				//adjustedPoints = decResolutionFakeAvg(in, method, arch.SecondsPerPoint, spp)
+				for m, points := range decResolutionFakeAvg(in, arch.SecondsPerPoint, spp) {
+					for _, p := range points {
+						adjustedPoints[m][p.Timestamp] = p.Value
+					}
+				}
 			}
+		}
+
+		for m, p := range adjustedPoints {
+			for t, v := range p {
+				res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
+			}
+			sortPoints(res[m])
 		}
 	}
 
 	return res, nil
 }
 
-func incResolution(points []whisper.Point, inRes, outRes uint32) []whisper.Point {
+func incResolution(points []whisper.Point, method string, inRes, outRes uint32) []whisper.Point {
 	pointCount := (points[len(points)-1].Timestamp - points[0].Timestamp) * outRes / inRes
 	out := make([]whisper.Point, 0, pointCount)
 	for _, inPoint := range points {
@@ -90,9 +133,18 @@ func incResolution(points []whisper.Point, inRes, outRes uint32) []whisper.Point
 		} else {
 			rangeStart = inPoint.Timestamp - (inPoint.Timestamp % outRes) + outRes
 		}
+
+		var outPoints []whisper.Point
 		for ts := rangeStart; ts < inPoint.Timestamp+inRes; ts = ts + outRes {
-			outPoint := inPoint
-			outPoint.Timestamp = ts
+			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
+		}
+
+		for _, outPoint := range outPoints {
+			if method == "sum" || method == "cnt" {
+				outPoint.Value = inPoint.Value / float64(len(outPoints))
+			} else {
+				outPoint.Value = inPoint.Value
+			}
 			out = append(out, outPoint)
 		}
 	}

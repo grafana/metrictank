@@ -262,7 +262,7 @@ func (ps *plans) convert(raw bool, method string) map[string][]whisper.Point {
 	}
 	return res
 }*/
-func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
+/*func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
 	result := make(map[string][]whisper.Point)
 	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
 		if retIdx == 0 || method != "avg" {
@@ -288,7 +288,7 @@ func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveIn
 		result[method] = sortPoints(points)
 	}
 	return result
-}
+}*/
 
 func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
@@ -314,8 +314,8 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 
 	_, schema := schemas.Match(md.Name, 0)
 
-	conversion := newConversion(w)
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	conversion := newConversion(w.Header.Archives, nil, method)
 	for retIdx, retention := range schema.Retentions {
 		points, err := conversion.getPoints(retIdx, method, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		if err != nil {
