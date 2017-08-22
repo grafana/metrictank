@@ -4,64 +4,7 @@ import (
 	"testing"
 
 	"github.com/kisielk/whisper-go/whisper"
-	//"github.com/raintank/metrictank/conf"
 )
-
-/*func testPlanner(t *testing.T, spp, nop uint32, expected plans) {
-	archs := []whisper.ArchiveInfo{
-		// 1 hour of 1 sec
-		{
-			Offset:          0,
-			SecondsPerPoint: 1,
-			Points:          3600,
-		},
-		// 2 days of 1 min
-		{
-			Offset:          0,
-			SecondsPerPoint: 60,
-			Points:          2880,
-		},
-		// 1 year of 1 hour
-		{
-			Offset:          0,
-			SecondsPerPoint: 3600,
-			Points:          8760,
-		},
-	}
-
-	plan := conversionPlan(spp, nop, archs)
-	if len(plan) != len(expected) {
-		t.Fatalf("Length of plan does not match expected:\n%+v\n%+v", plan, expected)
-	}
-
-	for i, _ := range expected {
-		if expected[i].archive != plan[i].archive || expected[i].timeRange != plan[i].timeRange || expected[i].conversion != plan[i].conversion {
-			t.Fatalf("Plan does not match expected:\n%+v\n%+v", plan, expected)
-		}
-	}
-}
-
-func TestPlanSingleInputArch(t *testing.T) {
-	expected := plans{
-		{archive: 1, timeRange: 24 * 60 * 60, conversion: 0},
-	}
-	testPlanner(t, 60, 24*60, expected)
-}
-
-func TestPlanTwoInputArchs(t *testing.T) {
-	expected := plans{
-		{archive: 0, timeRange: 60 * 60, conversion: -1},
-		{archive: 1, timeRange: 12 * 60 * 60, conversion: 1},
-	}
-	testPlanner(t, 30, 24*60, expected)
-}
-
-func TestPlanExceedAvailableArchs(t *testing.T) {
-	expected := plans{
-		{archive: 2, timeRange: 365 * 24 * 60 * 60, conversion: 0},
-	}
-	testPlanner(t, 60*60, 2*365*24, expected)
-}*/
 
 func testIncResolutionFakeAvg(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, inRes, outRes uint32) {
 	outData := incResolutionFakeAvg(inData, inRes, outRes)
@@ -95,16 +38,16 @@ func TestIncResolutionFakeAvgSimple(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
+			{5, 5},
 			{10, 5},
-			{15, 5},
+			{15, 5.5},
 			{20, 5.5},
-			{25, 5.5},
 		},
 		"cnt": {
+			{5, 0.5},
 			{10, 0.5},
 			{15, 0.5},
 			{20, 0.5},
-			{25, 0.5},
 		},
 	}
 	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
@@ -121,40 +64,40 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{12, float64(10) / 3},
-			{15, float64(10) / 3},
-			{18, float64(10) / 3},
-			{21, float64(11) / 3},
-			{24, float64(11) / 3},
-			{27, float64(11) / 3},
+			{3, float64(10) / 3},
+			{6, float64(10) / 3},
+			{9, float64(10) / 3},
+			{12, float64(11) / 3},
+			{15, float64(11) / 3},
+			{18, float64(11) / 3},
+			{21, float64(12) / 4},
+			{24, float64(12) / 4},
+			{27, float64(12) / 4},
 			{30, float64(12) / 4},
-			{33, float64(12) / 4},
-			{36, float64(12) / 4},
-			{39, float64(12) / 4},
-			{42, float64(13) / 3},
-			{45, float64(13) / 3},
-			{48, float64(13) / 3},
-			{51, float64(14) / 3},
-			{54, float64(14) / 3},
-			{57, float64(14) / 3},
+			{33, float64(13) / 3},
+			{36, float64(13) / 3},
+			{39, float64(13) / 3},
+			{42, float64(14) / 3},
+			{45, float64(14) / 3},
+			{48, float64(14) / 3},
 		},
 		"cnt": {
+			{3, float64(1) / 3},
+			{6, float64(1) / 3},
+			{9, float64(1) / 3},
 			{12, float64(1) / 3},
 			{15, float64(1) / 3},
 			{18, float64(1) / 3},
-			{21, float64(1) / 3},
-			{24, float64(1) / 3},
-			{27, float64(1) / 3},
+			{21, float64(1) / 4},
+			{24, float64(1) / 4},
+			{27, float64(1) / 4},
 			{30, float64(1) / 4},
-			{33, float64(1) / 4},
-			{36, float64(1) / 4},
-			{39, float64(1) / 4},
+			{33, float64(1) / 3},
+			{36, float64(1) / 3},
+			{39, float64(1) / 3},
 			{42, float64(1) / 3},
 			{45, float64(1) / 3},
 			{48, float64(1) / 3},
-			{51, float64(1) / 3},
-			{54, float64(1) / 3},
-			{57, float64(1) / 3},
 		},
 	}
 
@@ -174,20 +117,20 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
+			{5, 5},
 			{10, 5},
-			{15, 5},
+			{35, 6.5},
 			{40, 6.5},
-			{45, 6.5},
+			{45, 7},
 			{50, 7},
-			{55, 7},
 		},
 		"cnt": {
+			{5, 0.5},
 			{10, 0.5},
-			{15, 0.5},
+			{35, 0.5},
 			{40, 0.5},
 			{45, 0.5},
 			{50, 0.5},
-			{55, 0.5},
 		},
 	}
 
@@ -203,20 +146,20 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{40, 6.5},
-			{45, 6.5},
+			{5, 5},
 			{10, 5},
-			{15, 5},
+			{35, 6.5},
+			{40, 6.5},
+			{45, 7},
 			{50, 7},
-			{55, 7},
 		},
 		"cnt": {
+			{5, 0.5},
+			{10, 0.5},
+			{35, 0.5},
 			{40, 0.5},
 			{45, 0.5},
-			{10, 0.5},
-			{15, 0.5},
 			{50, 0.5},
-			{55, 0.5},
 		},
 	}
 
@@ -244,10 +187,10 @@ func TestIncResolutionSimple(t *testing.T) {
 	}
 
 	expectedResult := []whisper.Point{
+		{5, 10},
 		{10, 10},
-		{15, 10},
+		{15, 11},
 		{20, 11},
-		{25, 11},
 	}
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
@@ -262,22 +205,22 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 	}
 
 	expectedResult := []whisper.Point{
-		{12, 10},
-		{15, 10},
-		{18, 10},
-		{21, 11},
-		{24, 11},
-		{27, 11},
+		{3, 10},
+		{6, 10},
+		{9, 10},
+		{12, 11},
+		{15, 11},
+		{18, 11},
+		{21, 12},
+		{24, 12},
+		{27, 12},
 		{30, 12},
-		{33, 12},
-		{36, 12},
-		{39, 12},
-		{42, 13},
-		{45, 13},
-		{48, 13},
-		{51, 14},
-		{54, 14},
-		{57, 14},
+		{33, 13},
+		{36, 13},
+		{39, 13},
+		{42, 14},
+		{45, 14},
+		{48, 14},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 3)
@@ -295,12 +238,12 @@ func TestIncResolutionWithGaps(t *testing.T) {
 	}
 
 	expectedResult := []whisper.Point{
+		{5, 10},
 		{10, 10},
-		{15, 10},
+		{35, 13},
 		{40, 13},
-		{45, 13},
+		{45, 14},
 		{50, 14},
-		{55, 14},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
@@ -314,12 +257,12 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 	}
 
 	expectedResult := []whisper.Point{
+		{5, 10},
 		{10, 10},
-		{15, 10},
+		{35, 13},
 		{40, 13},
-		{45, 13},
+		{45, 14},
 		{50, 14},
-		{55, 14},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
@@ -555,25 +498,6 @@ func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
 	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
 }
 
-/*func testAdjustAggregation(t *testing.T, ret conf.Retention, retIdx int, arch whisper.ArchiveInfo, meth string, points []whisper.Point, expectedRes map[string][]whisper.Point) {
-	res := adjustAggregation(ret, retIdx, arch, meth, points)
-	for meth, expectedPoints := range expectedRes {
-		if _, ok := res[meth]; !ok {
-			t.Fatalf("missing expected agg method %s in %+v", meth, res)
-		}
-
-		if len(res[meth]) != len(expectedPoints) {
-			t.Fatalf("length of %s does not match expected:\n%+v\n%+v", meth, res, expectedRes)
-		}
-
-		for i, _ := range expectedPoints {
-			if expectedPoints[i] != res[meth][i] {
-				t.Fatalf("point %d of %s does not match expected:\n%+v\n%+v", i, meth, res, expectedRes)
-			}
-		}
-	}
-}*/
-
 func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {
 	res := make([]whisper.Point, count)
 	for i := 0; i < count; i++ {
@@ -752,12 +676,12 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 	}
 }
 
-func TestPointsConversion(t *testing.T) {
+func TestPointsConversionSimple1(t *testing.T) {
 	c := conversion{
 		archives: []whisper.ArchiveInfo{
-			{SecondsPerPoint: 1, Points: 5},
-			{SecondsPerPoint: 3, Points: 15},
-			{SecondsPerPoint: 10, Points: 60},
+			{SecondsPerPoint: 1, Points: 2},
+			{SecondsPerPoint: 2, Points: 2},
+			{SecondsPerPoint: 4, Points: 2},
 		},
 		points: map[int][]whisper.Point{
 			0: {
@@ -773,8 +697,45 @@ func TestPointsConversion(t *testing.T) {
 				{1503384104, 400},
 			},
 		},
+		method: "sum",
+	}
 
-		/*points: map[int][]whisper.Point{
+	expectedPoints := map[string][]whisper.Point{
+		"sum": {
+			{1503384101, 100},
+			{1503384102, 100},
+			{1503384103, 100},
+			{1503384104, 100},
+			{1503384105, 100},
+			{1503384106, 100},
+			{1503384107, 100},
+			{1503384108, 100},
+			{1503384109, 100},
+		},
+	}
+
+	points, _ := c.getPoints(0, "sum", 1, 8)
+
+	for meth, ep := range expectedPoints {
+		if len(ep) != len(points[meth]) {
+			t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
+		}
+		for i, p := range ep {
+			if points[meth][i] != p {
+				t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
+			}
+		}
+	}
+}
+
+func TestPointsConversionSimple2(t *testing.T) {
+	c := conversion{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 8},
+			{SecondsPerPoint: 2, Points: 8},
+			{SecondsPerPoint: 4, Points: 8},
+		},
+		points: map[int][]whisper.Point{
 			0: {
 				{1503331540, 100},
 				{1503331533, 100},
@@ -805,23 +766,11 @@ func TestPointsConversion(t *testing.T) {
 				{1503331532, 400},
 				{1503331536, 400},
 			},
-		},*/
+		},
 		method: "sum",
 	}
 
 	expectedPoints := map[string][]whisper.Point{
-		"sum": {
-			{1503384102, 100},
-			{1503384103, 100},
-			{1503384104, 100},
-			{1503384105, 100},
-			{1503384106, 100},
-			{1503384107, 100},
-			{1503384108, 100},
-			{1503384109, 100},
-		},
-	}
-	/*expectedPoints := map[string][]whisper.Point{
 		"sum": {
 			{1503331509, 100},
 			{1503331510, 100},
@@ -856,11 +805,14 @@ func TestPointsConversion(t *testing.T) {
 			{1503331539, 100},
 			{1503331540, 100},
 		},
-	}*/
+	}
 
-	points, _ := c.getPoints(1, "sum", 1, 8)
+	points, _ := c.getPoints(0, "sum", 1, 32)
 
 	for meth, ep := range expectedPoints {
+		if len(ep) != len(points[meth]) {
+			t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
+		}
 		for i, p := range ep {
 			if points[meth][i] != p {
 				t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)

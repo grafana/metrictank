@@ -65,7 +65,7 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 		adjustedPoints[method] = make(map[uint32]float64)
 	}
 
-	for i := largestArchiveIdx; i > smallestArchiveIdx; i-- {
+	for i := largestArchiveIdx; i >= smallestArchiveIdx; i-- {
 		in, ok := c.points[i]
 		if !ok {
 			return res, errUnknownArchive
@@ -108,34 +108,28 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 			}
 		}
 
-		for m, p := range adjustedPoints {
-			for t, v := range p {
-				res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
-			}
-			sortPoints(res[m])
+	}
+	for m, p := range adjustedPoints {
+		for t, v := range p {
+			res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
 		}
+		res[m] = sortPoints(res[m])
 	}
 
 	return res, nil
 }
 
 func incResolution(points []whisper.Point, method string, inRes, outRes uint32) []whisper.Point {
-	pointCount := (points[len(points)-1].Timestamp - points[0].Timestamp) * outRes / inRes
-	out := make([]whisper.Point, 0, pointCount)
+	var out []whisper.Point
 	for _, inPoint := range points {
 		if inPoint.Timestamp == 0 {
 			continue
 		}
 
-		var rangeStart uint32
-		if inPoint.Timestamp%outRes == 0 {
-			rangeStart = inPoint.Timestamp
-		} else {
-			rangeStart = inPoint.Timestamp - (inPoint.Timestamp % outRes) + outRes
-		}
+		rangeEnd := inPoint.Timestamp - (inPoint.Timestamp % outRes)
 
 		var outPoints []whisper.Point
-		for ts := rangeStart; ts < inPoint.Timestamp+inRes; ts = ts + outRes {
+		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
 			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
 		}
 
@@ -159,15 +153,10 @@ func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[stri
 			continue
 		}
 
-		var rangeStart uint32
-		if inPoint.Timestamp%outRes == 0 {
-			rangeStart = inPoint.Timestamp
-		} else {
-			rangeStart = inPoint.Timestamp - (inPoint.Timestamp % outRes) + outRes
-		}
+		rangeEnd := inPoint.Timestamp - (inPoint.Timestamp % outRes)
 
 		var outPoints []whisper.Point
-		for ts := rangeStart; ts < inPoint.Timestamp+inRes; ts = ts + outRes {
+		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
 			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
 		}
 
@@ -177,6 +166,8 @@ func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[stri
 			out["cnt"] = append(out["cnt"], whisper.Point{Timestamp: outPoint.Timestamp, Value: float64(1) / float64(len(outPoints))})
 		}
 	}
+	out["sum"] = sortPoints(out["sum"])
+	out["cnt"] = sortPoints(out["cnt"])
 	return out
 }
 
