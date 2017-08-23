@@ -262,20 +262,6 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
 
-func testDecResolution(t *testing.T, inData, expectedResult []whisper.Point, aggMethod string, inRes, outRes uint32) {
-	outData := decResolution(inData, aggMethod, inRes, outRes)
-
-	if len(expectedResult) != len(outData) {
-		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(expectedResult), len(outData), outData, expectedResult)
-	}
-
-	for i := 0; i < len(expectedResult); i++ {
-		if outData[i] != expectedResult[i] {
-			t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
-		}
-	}
-}
-
 func TestDecResolutionSimple(t *testing.T) {
 	inData := []whisper.Point{
 		{10, 10},
@@ -286,11 +272,13 @@ func TestDecResolutionSimple(t *testing.T) {
 		{60, 16},
 	}
 
-	expectedResult := []whisper.Point{
-		{30, 33},
-		{60, 45},
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{30, 33},
+			{60, 45},
+		},
 	}
-	testDecResolution(t, inData, expectedResult, "sum", 10, 30)
+	testDecResolution(t, inData, expectedResult, []string{"sum"}, 10, 30)
 }
 
 func TestDecResolutionAvg(t *testing.T) {
@@ -303,11 +291,13 @@ func TestDecResolutionAvg(t *testing.T) {
 		{60, 16},
 	}
 
-	expectedResult := []whisper.Point{
-		{30, 11},
-		{60, 15},
+	expectedResult := map[string][]whisper.Point{
+		"avg": {
+			{30, 11},
+			{60, 15},
+		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 30)
+	testDecResolution(t, inData, expectedResult, []string{"avg"}, 10, 30)
 }
 
 func TestDecNonFactorResolutions(t *testing.T) {
@@ -320,13 +310,15 @@ func TestDecNonFactorResolutions(t *testing.T) {
 		{60, 15},
 	}
 
-	expectedResult := []whisper.Point{
-		{15, 10},
-		{30, 11.5},
-		{45, 13},
-		{60, 14.5},
+	expectedResult := map[string][]whisper.Point{
+		"avg": {
+			{15, 10},
+			{30, 11.5},
+			{45, 13},
+			{60, 14.5},
+		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 15)
+	testDecResolution(t, inData, expectedResult, []string{"avg"}, 10, 15)
 }
 
 func TestDecResolutionWithGaps(t *testing.T) {
@@ -341,13 +333,15 @@ func TestDecResolutionWithGaps(t *testing.T) {
 		{70, 16},
 	}
 
-	expectedResult := []whisper.Point{
-		{20, 10},
-		{40, 13},
-		{60, 14},
+	expectedResult := map[string][]whisper.Point{
+		"avg": {
+			{20, 10},
+			{40, 13},
+			{60, 14},
+		},
 	}
 
-	testDecResolution(t, inData, expectedResult, "avg", 10, 20)
+	testDecResolution(t, inData, expectedResult, []string{"avg"}, 10, 20)
 }
 
 func TestDecResolutionOutOfOrder(t *testing.T) {
@@ -360,15 +354,17 @@ func TestDecResolutionOutOfOrder(t *testing.T) {
 		{40, 14},
 	}
 
-	expectedResult := []whisper.Point{
-		{30, 11},
-		{60, 15},
+	expectedResult := map[string][]whisper.Point{
+		"avg": {
+			{30, 11},
+			{60, 15},
+		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 30)
+	testDecResolution(t, inData, expectedResult, []string{"avg"}, 10, 30)
 }
 
-func testDecResolutionFakeAvg(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, inRes, outRes uint32) {
-	outData := decResolutionFakeAvg(inData, inRes, outRes)
+func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, methods []string, inRes, outRes uint32) {
+	outData := decResolution(inData, methods, inRes, outRes)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(expectedResult), len(outData), outData, expectedResult)
@@ -411,7 +407,7 @@ func TestDecResolutionFakeAvgSimple(t *testing.T) {
 			{60, 3},
 		},
 	}
-	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
+	testDecResolution(t, inData, expectedResult, []string{"sum", "cnt"}, 10, 30)
 }
 
 func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
@@ -438,7 +434,7 @@ func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
 			{60, 2},
 		},
 	}
-	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 15)
+	testDecResolution(t, inData, expectedResult, []string{"sum", "cnt"}, 10, 15)
 }
 
 func TestDecFakeAvgResolutionWithGaps(t *testing.T) {
@@ -466,7 +462,7 @@ func TestDecFakeAvgResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 20)
+	testDecResolution(t, inData, expectedResult, []string{"sum", "cnt"}, 10, 20)
 }
 
 func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
@@ -489,7 +485,7 @@ func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
 			{60, 3},
 		},
 	}
-	testDecResolutionFakeAvg(t, inData, expectedResult, 10, 30)
+	testDecResolution(t, inData, expectedResult, []string{"sum", "cnt"}, 10, 30)
 }
 
 func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {

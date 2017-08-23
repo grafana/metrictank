@@ -87,15 +87,13 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 				}
 			}
 		} else {
-			if c.method != "avg" || retIdx == 0 {
-				for _, p := range decResolution(in, c.method, arch.SecondsPerPoint, spp) {
-					adjustedPoints[c.method][p.Timestamp] = p.Value
-				}
-			} else {
-				for m, points := range decResolutionFakeAvg(in, arch.SecondsPerPoint, spp) {
-					for _, p := range points {
-						adjustedPoints[m][p.Timestamp] = p.Value
-					}
+			methods := []string{c.method}
+			if c.method == "avg" && retIdx > 0 {
+				methods = []string{"sum", "cnt"}
+			}
+			for m, points := range decResolution(in, methods, arch.SecondsPerPoint, spp) {
+				for _, p := range points {
+					adjustedPoints[m][p.Timestamp] = p.Value
 				}
 			}
 		}
@@ -149,45 +147,7 @@ func incResolution(points []whisper.Point, method string, inRes, outRes uint32) 
 	return out
 }
 
-func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint32) []whisper.Point {
-	agg := mdata.NewAggregation()
-	out := make([]whisper.Point, 0)
-	currentBoundary := uint32(0)
-
-	flush := func() {
-		values := agg.FlushAndReset()
-		if values["cnt"] == 0 {
-			return
-		}
-
-		out = append(out, whisper.Point{
-			Timestamp: currentBoundary,
-			Value:     values[aggMethod],
-		})
-	}
-
-	for _, inPoint := range sortPoints(points) {
-		if inPoint.Timestamp == 0 {
-			continue
-		}
-		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
-
-		if boundary == currentBoundary {
-			agg.Add(inPoint.Value)
-			if inPoint.Timestamp == boundary {
-				flush()
-			}
-		} else {
-			flush()
-			currentBoundary = boundary
-			agg.Add(inPoint.Value)
-		}
-	}
-
-	return out
-}
-
-func decResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[string][]whisper.Point {
+func decResolution(points []whisper.Point, methods []string, inRes, outRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
 	agg := mdata.NewAggregation()
 	currentBoundary := uint32(0)
@@ -198,14 +158,12 @@ func decResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[stri
 			return
 		}
 
-		out["sum"] = append(out["sum"], whisper.Point{
-			Timestamp: currentBoundary,
-			Value:     values["sum"],
-		})
-		out["cnt"] = append(out["cnt"], whisper.Point{
-			Timestamp: currentBoundary,
-			Value:     values["cnt"],
-		})
+		for _, method := range methods {
+			out[method] = append(out[method], whisper.Point{
+				Timestamp: currentBoundary,
+				Value:     values[method],
+			})
+		}
 	}
 
 	for _, inPoint := range sortPoints(points) {
