@@ -1,15 +1,8 @@
 package main
 
 import (
-	"errors"
-
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/metrictank/mdata"
-)
-
-var (
-	errUnknownArchive = errors.New("Archive not found")
-	errNoData         = errors.New("Whisper file appears to have no data")
 )
 
 type conversion struct {
@@ -47,12 +40,12 @@ func (c *conversion) findSmallestLargestArchive(ttl, spp uint32) (int, int) {
 	return smallestArchiveIdx, largestArchiveIdx
 }
 
-func (c *conversion) getPoints(retIdx int, spp, nop uint32) (map[string][]whisper.Point, error) {
+func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper.Point {
 	ttl := spp * nop
 	res := make(map[string][]whisper.Point)
 
 	if len(c.points) == 0 {
-		return res, errNoData
+		return res
 	}
 
 	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(ttl, spp)
@@ -66,10 +59,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) (map[string][]whispe
 	}
 
 	for i := largestArchiveIdx; i >= smallestArchiveIdx; i-- {
-		in, ok := c.points[i]
-		if !ok {
-			return res, errUnknownArchive
-		}
+		in := c.points[i]
 		arch := c.archives[i]
 		if arch.SecondsPerPoint == spp {
 			if retIdx == 0 || c.method != "avg" {
@@ -116,7 +106,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) (map[string][]whispe
 		res[m] = sortPoints(res[m])
 	}
 
-	return res, nil
+	return res
 }
 
 func incResolution(points []whisper.Point, method string, inRes, outRes uint32) []whisper.Point {

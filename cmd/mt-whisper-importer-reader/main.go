@@ -243,17 +243,22 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 
 	// md gets generated from the first archive in the whisper file
 	md := getMetricData(name, int(w.Header.Archives[0].SecondsPerPoint))
-
 	_, schema := schemas.Match(md.Name, 0)
 
-	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
-	conversion := newConversion(w.Header.Archives, nil, method)
-	for retIdx, retention := range schema.Retentions {
-		points, err := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+	points := make(map[int][]whisper.Point)
+	for i, _ := range w.Header.Archives {
+		p, err := w.DumpArchive(i)
 		if err != nil {
-			throwError(err.Error())
+			throwError(fmt.Sprintf("Failed to read whisper file %s", file))
 		}
-		for m, p := range points {
+		points[i] = p
+	}
+	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	conversion := newConversion(w.Header.Archives, points, method)
+
+	for retIdx, retention := range schema.Retentions {
+		convertedPoints := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		for m, p := range convertedPoints {
 			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			archives = append(archives, archive.Archive{

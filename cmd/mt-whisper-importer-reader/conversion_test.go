@@ -645,9 +645,9 @@ func TestPointsConversionSum1(t *testing.T) {
 		},
 	}
 
-	points1, _ := c.getPoints(0, 1, 8)
-	points2, _ := c.getPoints(0, 2, 8)
-	points3, _ := c.getPoints(0, 4, 8)
+	points1 := c.getPoints(0, 1, 8)
+	points2 := c.getPoints(0, 2, 8)
+	points3 := c.getPoints(0, 4, 8)
 
 	verifyPointMaps(t, points1, expectedPoints1)
 	verifyPointMaps(t, points2, expectedPoints2)
@@ -708,9 +708,9 @@ func TestPointsConversionLast1(t *testing.T) {
 		},
 	}
 
-	points1, _ := c.getPoints(0, 1, 8)
-	points2, _ := c.getPoints(0, 2, 8)
-	points3, _ := c.getPoints(0, 4, 8)
+	points1 := c.getPoints(0, 1, 8)
+	points2 := c.getPoints(0, 2, 8)
+	points3 := c.getPoints(0, 4, 8)
 
 	verifyPointMaps(t, points1, expectedPoints1)
 	verifyPointMaps(t, points2, expectedPoints2)
@@ -830,9 +830,9 @@ func TestPointsConversionSum2(t *testing.T) {
 		},
 	}
 
-	points1, _ := c.getPoints(0, 1, 32)
-	points2, _ := c.getPoints(1, 2, 16)
-	points3, _ := c.getPoints(2, 4, 8)
+	points1 := c.getPoints(0, 1, 32)
+	points2 := c.getPoints(1, 2, 16)
+	points3 := c.getPoints(2, 4, 8)
 
 	verifyPointMaps(t, points1, expectedPoints1)
 	verifyPointMaps(t, points2, expectedPoints2)
@@ -946,13 +946,13 @@ func TestPointsConversionAvg1(t *testing.T) {
 		},
 	}
 
-	points1_0, _ := c.getPoints(0, 1, 8)
-	points2_0, _ := c.getPoints(0, 2, 8)
-	points3_0, _ := c.getPoints(0, 4, 8)
+	points1_0 := c.getPoints(0, 1, 8)
+	points2_0 := c.getPoints(0, 2, 8)
+	points3_0 := c.getPoints(0, 4, 8)
 
-	points1_1, _ := c.getPoints(1, 1, 8)
-	points2_1, _ := c.getPoints(1, 2, 8)
-	points3_1, _ := c.getPoints(1, 4, 8)
+	points1_1 := c.getPoints(1, 1, 8)
+	points2_1 := c.getPoints(1, 2, 8)
+	points3_1 := c.getPoints(1, 4, 8)
 
 	verifyPointMaps(t, points1_0, expectedPoints1_0)
 	verifyPointMaps(t, points2_0, expectedPoints2_0)
@@ -1158,13 +1158,13 @@ func TestPointsConversionAvg2(t *testing.T) {
 		},
 	}
 
-	points1_0, _ := c.getPoints(0, 1, 27)
-	points2_0, _ := c.getPoints(0, 3, 27)
-	points3_0, _ := c.getPoints(0, 9, 27)
+	points1_0 := c.getPoints(0, 1, 27)
+	points2_0 := c.getPoints(0, 3, 27)
+	points3_0 := c.getPoints(0, 9, 27)
 
-	points1_1, _ := c.getPoints(1, 1, 27)
-	points2_1, _ := c.getPoints(1, 3, 27)
-	points3_1, _ := c.getPoints(1, 9, 27)
+	points1_1 := c.getPoints(1, 1, 27)
+	points2_1 := c.getPoints(1, 3, 27)
+	points3_1 := c.getPoints(1, 9, 27)
 
 	verifyPointMaps(t, points1_0, expectedPoints1_0)
 	verifyPointMaps(t, points2_0, expectedPoints2_0)
