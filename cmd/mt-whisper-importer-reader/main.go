@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
@@ -223,73 +222,6 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
-/*func (c conversion) String() string {
-	if c == 0 {
-		return "same"
-	}
-	if c == -1 {
-		return "dec"
-	}
-	return "inc"
-}*/
-
-// pretty print
-/*func (ps *plans) String() string {
-	var buffer bytes.Buffer
-	for _, p := range *ps {
-		buffer.WriteString(fmt.Sprintf(
-			"arch:%d, seconds:%d-%d, resolution:%s\n", p.archive, p.timeFrom, p.TimeUntil, p.conversion.String(),
-		))
-	}
-	return buffer.String()
-}
-
-func (ps *plans) convert(raw bool, method string) map[string][]whisper.Point {
-	var res map[string][]whisper.Point
-	for _, plan := range *ps {
-		// no conversion necessary
-		if plan.conversion == 0 {
-			res[method] = plan.points
-		} else if plan.conversion < 0 {
-			if !raw && method == "avg" {
-			} else {
-			}
-		} else {
-			if !raw && method == "avg" {
-			} else {
-			}
-		}
-	}
-	return res
-}*/
-/*func adjustAggregation(ret conf.Retention, retIdx int, archive whisper.ArchiveInfo, method string, points []whisper.Point) map[string][]whisper.Point {
-	result := make(map[string][]whisper.Point)
-	if uint32(ret.SecondsPerPoint) > archive.SecondsPerPoint {
-		if retIdx == 0 || method != "avg" {
-			// need to use aggregation as input for raw ret
-			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
-			result[method] = decResolution(points, method, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		} else {
-			result["sum"] = decResolution(points, "sum", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-			result["cnt"] = decResolution(points, "cnt", archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		}
-	} else if uint32(ret.SecondsPerPoint) < archive.SecondsPerPoint {
-		if retIdx == 0 || method != "avg" {
-			// need to use aggregation as input for raw ret
-			// if agg method is "avg" we want to actually calculate averages and not sum & cnt
-			result[method] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-		} else {
-			result["sum"] = incResolution(points, archive.SecondsPerPoint, uint32(ret.SecondsPerPoint))
-			for _, point := range result["sum"] {
-				result["cnt"] = append(result["cnt"], whisper.Point{Timestamp: point.Timestamp, Value: 1})
-			}
-		}
-	} else {
-		result[method] = sortPoints(points)
-	}
-	return result
-}*/
-
 func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
@@ -395,68 +327,6 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 
 	return encodedChunks
 }
-
-// inreasing the resolution by just duplicating points to fill in empty data points
-/*func incResolutionFakeAvg(points []whisper.Point, inRes, outRes uint32) map[string][]whisper.Point {
-	out := make(map[string][]whisper.Point)
-	ratio := float64(outRes) / float64(inRes)
-	for _, inPoint := range points {
-		if inPoint.Timestamp == 0 {
-			continue
-		}
-
-		inPoint.Value = inPoint.Value * ratio
-		for ts := inPoint.Timestamp + outRes - (inPoint.Timestamp % outRes); ts < inPoint.Timestamp+inRes; ts = ts + outRes {
-			outPoint := inPoint
-			outPoint.Timestamp = ts
-			out["sum"] = append(out["sum"], outPoint)
-			out["cnt"] = append(out["cnt"], whisper.Point{
-				Timestamp: ts,
-				Value:     ratio,
-			})
-		}
-	}
-	return out
-}*/
-
-// decreasing the resolution by using the aggregation method in aggMethod
-/*func decResolution(points []whisper.Point, aggMethod string, inRes, outRes uint32) []whisper.Point {
-	agg := mdata.NewAggregation()
-	out := make([]whisper.Point, 0)
-	currentBoundary := uint32(0)
-
-	flush := func() {
-		values := agg.FlushAndReset()
-		if values["cnt"] == 0 {
-			return
-		}
-
-		out = append(out, whisper.Point{
-			Timestamp: currentBoundary,
-			Value:     values[aggMethod],
-		})
-	}
-
-	for _, inPoint := range sortPoints(points) {
-		if inPoint.Timestamp == 0 {
-			continue
-		}
-		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
-
-		if boundary == currentBoundary {
-			agg.Add(inPoint.Value)
-			if inPoint.Timestamp == boundary {
-				flush()
-			}
-		} else {
-			flush()
-			currentBoundary = boundary
-			agg.Add(inPoint.Value)
-		}
-	}
-
-	return out
-}*/
 
 func getMetricData(name string, interval int) *schema.MetricData {
 	md := &schema.MetricData{
