@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"flag"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -28,11 +28,6 @@ var (
 		"exit-on-error",
 		true,
 		"Exit with a message when there's an error",
-	)
-	verbose = flag.Bool(
-		"verbose",
-		false,
-		"Write logs to terminal",
 	)
 	httpEndpoint = flag.String(
 		"http-endpoint",
@@ -79,10 +74,8 @@ var (
 		"",
 		"The filename of the output schemas definition file",
 	)
-	chunkSpans   []uint32
-	readArchives map[int]struct{}
-	printLock    sync.Mutex
-	schemas      conf.Schemas
+	printLock sync.Mutex
+	schemas   conf.Schemas
 )
 
 func main() {
@@ -106,25 +99,6 @@ func main() {
 	wg.Wait()
 }
 
-func throwError(msg string) {
-	msg = fmt.Sprintf("%s\n", msg)
-	if *exitOnError {
-		panic(msg)
-	} else {
-		printLock.Lock()
-		fmt.Fprintln(os.Stderr, msg)
-		printLock.Unlock()
-	}
-}
-
-func log(msg string) {
-	if *verbose {
-		printLock.Lock()
-		fmt.Println(msg)
-		printLock.Unlock()
-	}
-}
-
 func processFromChan(files chan string, wg *sync.WaitGroup) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
@@ -134,31 +108,31 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file %q: %q\n", file, err))
+			log.Error(fmt.Sprintf("Failed to open whisper file %q: %q\n", file, err))
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			throwError(fmt.Sprintf("ERROR: Failed to open whisper file %q: %q\n", file, err))
+			log.Error(fmt.Sprintf("Failed to open whisper file %q: %q\n", file, err))
 			continue
 		}
 
-		log(fmt.Sprintf("Processing file %q", file))
+		log.Info(fmt.Sprintf("Processing file %q", file))
 		met, err := getMetrics(w, file)
 		if err != nil {
-			throwError(fmt.Sprintf("Failed to get metric: %q", err))
+			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
 			continue
 		}
 
 		b, err := met.MarshalCompressed()
 		if err != nil {
-			throwError(fmt.Sprintf("Failed to encode metric: %q", err))
+			log.Error(fmt.Sprintf("Failed to encode metric: %q", err))
 			continue
 		}
 
 		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 		if err != nil {
-			panic(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+			log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
@@ -168,12 +142,8 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 
 		resp, err := client.Do(req)
-		if err != nil {
-			throwError(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
-			continue
-		}
-		if resp.StatusCode != 200 {
-			throwError(fmt.Sprintf("Error when submitting data: %s", resp.Status))
+		if err != nil || resp.StatusCode != 200 {
+			log.Error(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
 		}
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
@@ -225,20 +195,20 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
-		return res, errors.New(fmt.Sprintf("ERROR: Whisper file contains no archives: %q", file))
+		return res, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
 
 	var archives []archive.Archive
 	name := getMetricName(file)
 
-	aggMethodStr := shortAggMethodString(w.Header.Metadata.AggregationMethod)
-	if aggMethodStr == "" {
-		return res, errors.New(fmt.Sprintf(
-			"ERROR: Aggregation method in file %s not allowed: %d(%s)\n",
+	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	if method == "" {
+		return res, fmt.Errorf(
+			"Aggregation method in file %s not allowed: %d(%s)\n",
 			file,
 			w.Header.Metadata.AggregationMethod,
-			aggMethodStr,
-		))
+			method,
+		)
 	}
 
 	// md gets generated from the first archive in the whisper file
@@ -249,14 +219,12 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	for i, _ := range w.Header.Archives {
 		p, err := w.DumpArchive(i)
 		if err != nil {
-			throwError(fmt.Sprintf("Failed to read whisper file %s", file))
+			return res, fmt.Errorf("Failed to dump archive %d from whisper file %s", i, file)
 		}
 		points[i] = p
 	}
 
-	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	conversion := newConversion(w.Header.Archives, points, method)
-
 	for retIdx, retention := range schema.Retentions {
 		convertedPoints := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
