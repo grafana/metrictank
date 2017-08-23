@@ -47,7 +47,7 @@ func (c *conversion) findSmallestLargestArchive(ttl, spp uint32) (int, int) {
 	return smallestArchiveIdx, largestArchiveIdx
 }
 
-func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[string][]whisper.Point, error) {
+func (c *conversion) getPoints(retIdx int, spp, nop uint32) (map[string][]whisper.Point, error) {
 	ttl := spp * nop
 	res := make(map[string][]whisper.Point)
 
@@ -58,11 +58,11 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(ttl, spp)
 
 	adjustedPoints := make(map[string]map[uint32]float64)
-	if retIdx > 0 && method == "avg" {
+	if retIdx > 0 && c.method == "avg" {
 		adjustedPoints["cnt"] = make(map[uint32]float64)
 		adjustedPoints["sum"] = make(map[uint32]float64)
 	} else {
-		adjustedPoints[method] = make(map[uint32]float64)
+		adjustedPoints[c.method] = make(map[uint32]float64)
 	}
 
 	for i := largestArchiveIdx; i >= smallestArchiveIdx; i-- {
@@ -72,9 +72,9 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 		}
 		arch := c.archives[i]
 		if arch.SecondsPerPoint == spp {
-			if retIdx == 0 || method != "avg" {
+			if retIdx == 0 || c.method != "avg" {
 				for _, p := range in {
-					adjustedPoints[method][p.Timestamp] = p.Value
+					adjustedPoints[c.method][p.Timestamp] = p.Value
 				}
 			} else {
 				for _, p := range in {
@@ -83,9 +83,9 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 				}
 			}
 		} else if arch.SecondsPerPoint > spp {
-			if method != "avg" || retIdx == 0 {
-				for _, p := range incResolution(in, method, arch.SecondsPerPoint, spp) {
-					adjustedPoints[method][p.Timestamp] = p.Value
+			if c.method != "avg" || retIdx == 0 {
+				for _, p := range incResolution(in, c.method, arch.SecondsPerPoint, spp) {
+					adjustedPoints[c.method][p.Timestamp] = p.Value
 				}
 			} else {
 				for m, points := range incResolutionFakeAvg(in, arch.SecondsPerPoint, spp) {
@@ -95,9 +95,9 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 				}
 			}
 		} else {
-			if method != "avg" || retIdx == 0 {
-				for _, p := range decResolution(in, method, arch.SecondsPerPoint, spp) {
-					adjustedPoints[method][p.Timestamp] = p.Value
+			if c.method != "avg" || retIdx == 0 {
+				for _, p := range decResolution(in, c.method, arch.SecondsPerPoint, spp) {
+					adjustedPoints[c.method][p.Timestamp] = p.Value
 				}
 			} else {
 				for m, points := range decResolutionFakeAvg(in, arch.SecondsPerPoint, spp) {

@@ -249,7 +249,7 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	conversion := newConversion(w.Header.Archives, nil, method)
 	for retIdx, retention := range schema.Retentions {
-		points, err := conversion.getPoints(retIdx, method, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		points, err := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		if err != nil {
 			throwError(err.Error())
 		}
