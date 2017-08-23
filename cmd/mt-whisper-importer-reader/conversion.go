@@ -58,7 +58,7 @@ func (c *conversion) getPoints(retIdx int, method string, spp, nop uint32) (map[
 	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(ttl, spp)
 
 	adjustedPoints := make(map[string]map[uint32]float64)
-	if retIdx == 0 && method == "avg" {
+	if retIdx > 0 && method == "avg" {
 		adjustedPoints["cnt"] = make(map[uint32]float64)
 		adjustedPoints["sum"] = make(map[uint32]float64)
 	} else {

@@ -676,6 +676,22 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 	}
 }
 
+func verifyPointMaps(t *testing.T, points map[string][]whisper.Point, expected map[string][]whisper.Point) {
+	for meth, ep := range expected {
+		if _, ok := points[meth]; !ok {
+			t.Fatalf("Missing method %s in result", meth)
+		}
+		if len(ep) != len(points[meth]) {
+			t.Fatalf("Unexpected data returned in %s:\n%+v\n%+v", meth, expected[meth], points[meth])
+		}
+		for i, p := range ep {
+			if points[meth][i] != p {
+				t.Fatalf("Unexpected data returned in %s:\n%+v\n%+v", meth, expected[meth], points[meth])
+			}
+		}
+	}
+}
+
 func TestPointsConversionSimple1(t *testing.T) {
 	c := conversion{
 		archives: []whisper.ArchiveInfo{
@@ -716,16 +732,7 @@ func TestPointsConversionSimple1(t *testing.T) {
 
 	points, _ := c.getPoints(0, "sum", 1, 8)
 
-	for meth, ep := range expectedPoints {
-		if len(ep) != len(points[meth]) {
-			t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
-		}
-		for i, p := range ep {
-			if points[meth][i] != p {
-				t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
-			}
-		}
-	}
+	verifyPointMaps(t, points, expectedPoints)
 }
 
 func TestPointsConversionSimple2(t *testing.T) {
@@ -770,7 +777,7 @@ func TestPointsConversionSimple2(t *testing.T) {
 		method: "sum",
 	}
 
-	expectedPoints := map[string][]whisper.Point{
+	expectedPointsRet0 := map[string][]whisper.Point{
 		"sum": {
 			{1503331509, 100},
 			{1503331510, 100},
@@ -807,16 +814,202 @@ func TestPointsConversionSimple2(t *testing.T) {
 		},
 	}
 
-	points, _ := c.getPoints(0, "sum", 1, 32)
-
-	for meth, ep := range expectedPoints {
-		if len(ep) != len(points[meth]) {
-			t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
-		}
-		for i, p := range ep {
-			if points[meth][i] != p {
-				t.Fatalf("Unexpected data returned:\n%+v\n%+v", expectedPoints, points)
-			}
-		}
+	expectedPointsRet1 := map[string][]whisper.Point{
+		"sum": {
+			{1503331510, 200},
+			{1503331512, 200},
+			{1503331514, 200},
+			{1503331516, 200},
+			{1503331518, 200},
+			{1503331520, 200},
+			{1503331522, 200},
+			{1503331524, 200},
+			{1503331526, 200},
+			{1503331528, 200},
+			{1503331530, 200},
+			{1503331532, 200},
+			{1503331534, 200},
+			{1503331536, 200},
+			{1503331538, 200},
+			{1503331540, 100},
+		},
 	}
+
+	expectedPointsRet2 := map[string][]whisper.Point{
+		"sum": {
+			{1503331512, 400},
+			{1503331516, 400},
+			{1503331520, 400},
+			{1503331524, 400},
+			{1503331528, 400},
+			{1503331532, 400},
+			{1503331536, 400},
+			{1503331540, 100},
+		},
+	}
+
+	pointsRet0, _ := c.getPoints(0, "sum", 1, 32)
+	pointsRet1, _ := c.getPoints(1, "sum", 2, 16)
+	pointsRet2, _ := c.getPoints(2, "sum", 4, 8)
+
+	verifyPointMaps(t, pointsRet0, expectedPointsRet0)
+	verifyPointMaps(t, pointsRet1, expectedPointsRet1)
+	verifyPointMaps(t, pointsRet2, expectedPointsRet2)
+}
+
+func TestPointsConversionAvg1(t *testing.T) {
+	c := conversion{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 2},
+			{SecondsPerPoint: 2, Points: 2},
+			{SecondsPerPoint: 4, Points: 2},
+		},
+		points: map[int][]whisper.Point{
+			0: {
+				{1503407725, 7},
+				{1503407726, 8},
+			},
+			1: {
+				{1503407726, 8},
+				{1503407724, 6.5},
+			},
+			2: {
+				{1503407724, 7.25},
+				{1503407720, 3.5},
+			},
+		},
+		method: "avg",
+	}
+
+	expectedPoints := map[string][]whisper.Point{
+		"sum": {
+			{1503407717, 3.5 / 4},
+			{1503407718, 3.5 / 4},
+			{1503407719, 3.5 / 4},
+			{1503407720, 3.5 / 4},
+			{1503407721, 7.25 / 4},
+			{1503407722, 7.25 / 4},
+			{1503407723, 6.5 / 2},
+			{1503407724, 6.5 / 2},
+			{1503407725, 7},
+			{1503407726, 8},
+		},
+		"cnt": {
+			{1503407717, float64(1) / 4},
+			{1503407718, float64(1) / 4},
+			{1503407719, float64(1) / 4},
+			{1503407720, float64(1) / 4},
+			{1503407721, float64(1) / 4},
+			{1503407722, float64(1) / 4},
+			{1503407723, float64(1) / 2},
+			{1503407724, float64(1) / 2},
+			{1503407725, 1},
+			{1503407726, 1},
+		},
+	}
+
+	points, _ := c.getPoints(1, "avg", 1, 8)
+
+	verifyPointMaps(t, points, expectedPoints)
+}
+
+func TestPointsConversionAvg2(t *testing.T) {
+	c := conversion{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 3},
+			{SecondsPerPoint: 3, Points: 3},
+			{SecondsPerPoint: 9, Points: 3},
+		},
+		points: map[int][]whisper.Point{
+			0: {
+				{1503406145, 25},
+				{1503406146, 26},
+				{1503406147, 27},
+			},
+			1: {
+				{1503406140, 21},
+				{1503406143, 24},
+				{1503406146, 26.5},
+			},
+			2: {
+				{1503406125, 9},
+				{1503406134, 18},
+				{1503406143, 25.25},
+			},
+		},
+		method: "avg",
+	}
+
+	expectedPoints := map[string][]whisper.Point{
+		"sum": {
+			{1503406117, float64(9) / 9},
+			{1503406118, float64(9) / 9},
+			{1503406119, float64(9) / 9},
+			{1503406120, float64(9) / 9},
+			{1503406121, float64(9) / 9},
+			{1503406122, float64(9) / 9},
+			{1503406123, float64(9) / 9},
+			{1503406124, float64(9) / 9},
+			{1503406125, float64(9) / 9},
+			{1503406126, float64(18) / 9},
+			{1503406127, float64(18) / 9},
+			{1503406128, float64(18) / 9},
+			{1503406129, float64(18) / 9},
+			{1503406130, float64(18) / 9},
+			{1503406131, float64(18) / 9},
+			{1503406132, float64(18) / 9},
+			{1503406133, float64(18) / 9},
+			{1503406134, float64(18) / 9},
+			{1503406135, float64(25.25) / 9},
+			{1503406136, float64(25.25) / 9},
+			{1503406137, float64(25.25) / 9},
+			{1503406138, float64(21) / 3},
+			{1503406139, float64(21) / 3},
+			{1503406140, float64(21) / 3},
+			{1503406141, float64(24) / 3},
+			{1503406142, float64(24) / 3},
+			{1503406143, float64(24) / 3},
+			{1503406144, float64(26.5) / 3},
+			{1503406145, 25},
+			{1503406146, 26},
+			{1503406147, 27},
+		},
+		"cnt": {
+			{1503406117, float64(1) / 9},
+			{1503406118, float64(1) / 9},
+			{1503406119, float64(1) / 9},
+			{1503406120, float64(1) / 9},
+			{1503406121, float64(1) / 9},
+			{1503406122, float64(1) / 9},
+			{1503406123, float64(1) / 9},
+			{1503406124, float64(1) / 9},
+			{1503406125, float64(1) / 9},
+			{1503406126, float64(1) / 9},
+			{1503406127, float64(1) / 9},
+			{1503406128, float64(1) / 9},
+			{1503406129, float64(1) / 9},
+			{1503406130, float64(1) / 9},
+			{1503406131, float64(1) / 9},
+			{1503406132, float64(1) / 9},
+			{1503406133, float64(1) / 9},
+			{1503406134, float64(1) / 9},
+			{1503406135, float64(1) / 9},
+			{1503406136, float64(1) / 9},
+			{1503406137, float64(1) / 9},
+			{1503406138, float64(1) / 3},
+			{1503406139, float64(1) / 3},
+			{1503406140, float64(1) / 3},
+			{1503406141, float64(1) / 3},
+			{1503406142, float64(1) / 3},
+			{1503406143, float64(1) / 3},
+			{1503406144, float64(1) / 3},
+			{1503406145, float64(1)},
+			{1503406146, float64(1)},
+			{1503406147, float64(1)},
+		},
+	}
+
+	points, _ := c.getPoints(1, "avg", 1, 27)
+
+	verifyPointMaps(t, points, expectedPoints)
 }
