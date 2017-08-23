@@ -12,16 +12,15 @@ type conversion struct {
 }
 
 func newConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method string) *conversion {
-	conversion := conversion{archives: arch, points: points, method: method}
-	return &conversion
+	return &conversion{archives: arch, points: points, method: method}
 }
 
-func (c *conversion) findSmallestLargestArchive(ttl, spp uint32) (int, int) {
+func (c *conversion) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 	// find smallest archive that still contains enough data to satisfy requested range
 	largestArchiveIdx := len(c.archives) - 1
 	for i := largestArchiveIdx; i >= 0; i-- {
 		arch := c.archives[i]
-		if arch.SecondsPerPoint*arch.Points < ttl {
+		if arch.Points*arch.SecondsPerPoint < nop*spp {
 			break
 		}
 		largestArchiveIdx = i
@@ -40,15 +39,16 @@ func (c *conversion) findSmallestLargestArchive(ttl, spp uint32) (int, int) {
 	return smallestArchiveIdx, largestArchiveIdx
 }
 
+// generates points according to specified parameters by finding and using the best archives as input
 func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper.Point {
-	ttl := spp * nop
 	res := make(map[string][]whisper.Point)
 
 	if len(c.points) == 0 {
 		return res
 	}
 
-	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(ttl, spp)
+	// figure out the range of archives that make sense to use for the requested specs
+	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(spp, nop)
 
 	adjustedPoints := make(map[string]map[uint32]float64)
 	if retIdx > 0 && c.method == "avg" {
@@ -58,6 +58,10 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 		adjustedPoints[c.method] = make(map[uint32]float64)
 	}
 
+	// Out of the input archives that we'll use, start with the lowest resolution one by converting
+	// it to the requested resolution and filling the resulting points into adjustedPoints.
+	// Then continue with archives of increasing resolutions while overwriting the generated points
+	// of previous ones.
 	for i := largestArchiveIdx; i >= smallestArchiveIdx; i-- {
 		in := c.points[i]
 		arch := c.archives[i]
@@ -99,6 +103,8 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 		}
 
 	}
+
+	// merge the results that are keyed by timestamp into a slice of points
 	for m, p := range adjustedPoints {
 		for t, v := range p {
 			res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
