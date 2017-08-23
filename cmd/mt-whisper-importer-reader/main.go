@@ -216,7 +216,7 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 	_, schema := schemas.Match(md.Name, 0)
 
 	points := make(map[int][]whisper.Point)
-	for i, _ := range w.Header.Archives {
+	for i := range w.Header.Archives {
 		p, err := w.DumpArchive(i)
 		if err != nil {
 			return res, fmt.Errorf("Failed to dump archive %d from whisper file %s", i, file)

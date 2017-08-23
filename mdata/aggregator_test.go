@@ -33,7 +33,7 @@ func TestAggBoundary(t *testing.T) {
 		{241, 120, 360},
 	}
 	for _, c := range cases {
-		if ret := aggBoundary(c.ts, c.span); ret != c.boundary {
+		if ret := AggBoundary(c.ts, c.span); ret != c.boundary {
 			t.Fatalf("aggBoundary for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
 		}
 	}

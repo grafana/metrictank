@@ -22,7 +22,7 @@ func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[
 		if len(p) != len(outData[m]) {
 			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
 		}
-		for i, _ := range p {
+		for i := range p {
 			if p[i] != ep[i] {
 				t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
 			}
@@ -379,7 +379,7 @@ func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[
 		if len(p) != len(outData[m]) {
 			t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
 		}
-		for i, _ := range p {
+		for i := range p {
 			if p[i] != ep[i] {
 				t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
 			}

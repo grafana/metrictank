@@ -141,7 +141,7 @@ func incResolution(points []whisper.Point, method string, inRes, outRes uint32) 
 			}
 		}
 	}
-	for m, _ := range out {
+	for m := range out {
 		out[m] = sortPoints(out[m])
 	}
 	return out
