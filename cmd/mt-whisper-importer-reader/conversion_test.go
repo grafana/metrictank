@@ -6,8 +6,8 @@ import (
 	"github.com/kisielk/whisper-go/whisper"
 )
 
-func testIncResolutionFakeAvg(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, inRes, outRes uint32) {
-	outData := incResolutionFakeAvg(inData, inRes, outRes)
+func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, method string, inRes, outRes uint32) {
+	outData := incResolution(inData, method, inRes, outRes)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
@@ -50,7 +50,7 @@ func TestIncResolutionFakeAvgSimple(t *testing.T) {
 			{20, 0.5},
 		},
 	}
-	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
 }
 
 func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
@@ -101,7 +101,7 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 3)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 3)
 }
 
 func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
@@ -134,7 +134,7 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
 }
 
 func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
@@ -163,21 +163,7 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolutionFakeAvg(t, inData, expectedResult, 10, 5)
-}
-
-func testIncResolution(t *testing.T, inData, expectedResult []whisper.Point, method string, inRes, outRes uint32) {
-	outData := incResolution(inData, method, inRes, outRes)
-
-	if len(expectedResult) != len(outData) {
-		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(outData), len(expectedResult), outData, expectedResult)
-	}
-
-	for i := 0; i < len(expectedResult); i++ {
-		if outData[i] != expectedResult[i] {
-			t.Fatalf("Datapoint does not match expected data:\n%+v\n%+v", outData, expectedResult)
-		}
-	}
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
 }
 
 func TestIncResolutionSimple(t *testing.T) {
@@ -186,11 +172,13 @@ func TestIncResolutionSimple(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := []whisper.Point{
-		{5, 10},
-		{10, 10},
-		{15, 11},
-		{20, 11},
+	expectedResult := map[string][]whisper.Point{
+		"max": {
+			{5, 10},
+			{10, 10},
+			{15, 11},
+			{20, 11},
+		},
 	}
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
 }
@@ -204,23 +192,25 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := []whisper.Point{
-		{3, 10},
-		{6, 10},
-		{9, 10},
-		{12, 11},
-		{15, 11},
-		{18, 11},
-		{21, 12},
-		{24, 12},
-		{27, 12},
-		{30, 12},
-		{33, 13},
-		{36, 13},
-		{39, 13},
-		{42, 14},
-		{45, 14},
-		{48, 14},
+	expectedResult := map[string][]whisper.Point{
+		"max": {
+			{3, 10},
+			{6, 10},
+			{9, 10},
+			{12, 11},
+			{15, 11},
+			{18, 11},
+			{21, 12},
+			{24, 12},
+			{27, 12},
+			{30, 12},
+			{33, 13},
+			{36, 13},
+			{39, 13},
+			{42, 14},
+			{45, 14},
+			{48, 14},
+		},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 3)
@@ -237,13 +227,15 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		{0, 0},
 	}
 
-	expectedResult := []whisper.Point{
-		{5, 10},
-		{10, 10},
-		{35, 13},
-		{40, 13},
-		{45, 14},
-		{50, 14},
+	expectedResult := map[string][]whisper.Point{
+		"max": {
+			{5, 10},
+			{10, 10},
+			{35, 13},
+			{40, 13},
+			{45, 14},
+			{50, 14},
+		},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
@@ -256,13 +248,15 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := []whisper.Point{
-		{5, 10},
-		{10, 10},
-		{35, 13},
-		{40, 13},
-		{45, 14},
-		{50, 14},
+	expectedResult := map[string][]whisper.Point{
+		"max": {
+			{5, 10},
+			{10, 10},
+			{35, 13},
+			{40, 13},
+			{45, 14},
+			{50, 14},
+		},
 	}
 
 	testIncResolution(t, inData, expectedResult, "max", 10, 5)
