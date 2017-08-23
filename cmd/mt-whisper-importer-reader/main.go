@@ -253,6 +253,7 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 		}
 		points[i] = p
 	}
+
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	conversion := newConversion(w.Header.Archives, points, method)
 
@@ -263,7 +264,7 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			archives = append(archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
-				Points:          uint32(len(p)),
+				Points:          uint32(retention.NumberOfPoints),
 				Chunks:          encodedChunks,
 				RowKey:          rowKey,
 			})
