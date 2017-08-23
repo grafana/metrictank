@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -74,14 +75,21 @@ var (
 		"",
 		"The filename of the output schemas definition file",
 	)
-	printLock sync.Mutex
-	schemas   conf.Schemas
+	nameFilterPattern = flag.String(
+		"name-filter",
+		"",
+		"A regex pattern to be applied to all metric names, only matching ones will be imported",
+	)
+	printLock  sync.Mutex
+	schemas    conf.Schemas
+	nameFilter *regexp.Regexp
 )
 
 func main() {
 	var err error
 	flag.Parse()
 
+	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
 	if err != nil {
 		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
@@ -121,6 +129,10 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		met, err := getMetrics(w, file)
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
+			continue
+		}
+		if len(met.Archives) == 0 {
+			log.Info(fmt.Sprintf("Skipping file %s", file))
 			continue
 		}
 
@@ -200,6 +212,10 @@ func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
 
 	var archives []archive.Archive
 	name := getMetricName(file)
+
+	if !nameFilter.Match([]byte(name)) {
+		return res, nil
+	}
 
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	if method == "" {
