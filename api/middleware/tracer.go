@@ -1,10 +1,27 @@
 package middleware
 
 import (
+	"errors"
+	"net/http"
+
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/raintank/metrictank/tracing"
 	"gopkg.in/macaron.v1"
 )
+
+type TracingResponseWriter struct {
+	macaron.ResponseWriter
+	errBody []byte // the body in case it is an error
+}
+
+func (rw *TracingResponseWriter) Write(b []byte) (int, error) {
+	if rw.ResponseWriter.Status() >= 400 {
+		rw.errBody = make([]byte, len(b))
+		copy(rw.errBody, b)
+	}
+	return rw.ResponseWriter.Write(b)
+}
 
 // Tracer returns a middleware that traces requests
 func Tracer(tracer opentracing.Tracer) macaron.Handler {
@@ -26,8 +43,12 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		ext.Component.Set(span, "metrictank/api")
 
 		macCtx.Req = macaron.Request{macCtx.Req.WithContext(opentracing.ContextWithSpan(macCtx.Req.Context(), span))}
+		macCtx.Resp = &TracingResponseWriter{
+			ResponseWriter: macCtx.Resp,
+		}
+		macCtx.MapTo(macCtx.Resp, (*http.ResponseWriter)(nil))
 
-		rw := macCtx.Resp.(macaron.ResponseWriter)
+		rw := macCtx.Resp.(*TracingResponseWriter)
 		// call next handler. This will return after all handlers
 		// have completed and the request has been sent.
 		macCtx.Next()
@@ -36,7 +57,12 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		if status >= 200 && status < 300 {
 			span.SetTag("http.size", rw.Size())
 		}
-		// TODO: else write error msg?
+		if status >= 400 {
+			tracing.Error(span, errors.New(string(rw.errBody)))
+			if status >= 500 {
+				tracing.Failure(span)
+			}
+		}
 		span.Finish()
 	}
 }

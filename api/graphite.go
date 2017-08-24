@@ -243,7 +243,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
 	out, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
 	if err != nil {
-		tags.Error.Set(span, true)
+		tracing.Failure(span)
 		tracing.Error(span, err)
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return

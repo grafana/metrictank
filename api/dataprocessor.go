@@ -422,6 +422,7 @@ func (s *Server) getSeriesCachedStore(ctx context.Context, rctx *requestContext,
 		prevts = itgen.Ts
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
+			tracing.Failure(span)
 			tracing.Errorf(span, "itergen: error getting iter from Start list %+v", err)
 			continue
 		}
@@ -440,6 +441,7 @@ func (s *Server) getSeriesCachedStore(ctx context.Context, rctx *requestContext,
 				it, err := itgen.Get()
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
+					tracing.Failure(span)
 					tracing.Errorf(span, "itergen: error getting iter from cassandra slice %+v", err)
 					continue
 				}

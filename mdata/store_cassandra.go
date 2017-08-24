@@ -420,6 +420,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
+		tracing.Failure(span)
 		tracing.Error(span, errStartBeforeEnd)
 		return itgens, errStartBeforeEnd
 	}
@@ -475,6 +476,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 		case c.readQueue <- crrs[i]:
 		default:
 			cassReadQueueFull.Inc()
+			tracing.Failure(span)
 			tracing.Error(span, errReadQueueFull)
 			return nil, errReadQueueFull
 		}
@@ -484,6 +486,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 	seen := 0
 	for o := range results {
 		if o.omitted {
+			tracing.Failure(span)
 			tracing.Error(span, errReadTooOld)
 			return nil, errReadTooOld
 		}
@@ -507,11 +510,13 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 			chunks += 1
 			chunkSizeAtLoad.Value(len(b))
 			if len(b) < 2 {
+				tracing.Failure(span)
 				tracing.Error(span, errChunkTooSmall)
 				return itgens, errChunkTooSmall
 			}
 			itgen, err := chunk.NewGen(b, uint32(ts))
 			if err != nil {
+				tracing.Failure(span)
 				tracing.Error(span, err)
 				return itgens, err
 			}
@@ -519,6 +524,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 		}
 		err := outcome.i.Close()
 		if err != nil {
+			tracing.Failure(span)
 			tracing.Error(span, err)
 			errmetrics.Inc(err)
 		} else {

@@ -1,3 +1,5 @@
+// package tracing contains some helpers to make working with opentracing
+// a tad simpler
 package tracing
 
 import (
@@ -20,14 +22,17 @@ func NewSpan(ctx context.Context, tracer opentracing.Tracer, name string) (conte
 	return ctx, span
 }
 
-// Error marks the span (and parents) as failed, and logs error
+// Error logs error
 func Error(span opentracing.Span, err error) {
-	tags.Error.Set(span, true)
 	span.LogFields(log.Error(err))
 }
 
-// Errorf marks the span (and parents) as failed, and logs error
+// Errorf logs error
 func Errorf(span opentracing.Span, format string, a ...interface{}) {
-	tags.Error.Set(span, true)
 	span.LogFields(log.Error(fmt.Errorf(format, a...)))
+}
+
+// Failure marks the current request as a failure
+func Failure(span opentracing.Span) {
+	tags.Error.Set(span, true)
 }
