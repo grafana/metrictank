@@ -153,17 +153,34 @@ func decResolution(points []whisper.Point, methods []string, inRes, outRes uint3
 	currentBoundary := uint32(0)
 
 	flush := func() {
-		values := agg.FlushAndReset()
-		if values["cnt"] == 0 {
+		if agg.Cnt == 0 {
 			return
 		}
 
 		for _, method := range methods {
+			var value float64
+			switch method {
+			case "min":
+				value = agg.Min
+			case "max":
+				value = agg.Max
+			case "sum":
+				value = agg.Sum
+			case "cnt":
+				value = agg.Cnt
+			case "lst":
+				value = agg.Lst
+			case "avg":
+				value = agg.Sum / agg.Cnt
+			default:
+				return
+			}
 			out[method] = append(out[method], whisper.Point{
 				Timestamp: currentBoundary,
-				Value:     values[method],
+				Value:     value,
 			})
 		}
+		agg.Reset()
 	}
 
 	for _, inPoint := range sortPoints(points) {

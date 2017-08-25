@@ -3,47 +3,34 @@ package mdata
 import "math"
 
 // Aggregation is a container for all summary statistics / aggregated data for 1 metric, in 1 time frame
-// if the cnt is 0, the numbers don't necessarily make sense.
+// if the Cnt is 0, the numbers don't necessarily make sense.
 type Aggregation struct {
-	min float64
-	max float64
-	sum float64
-	cnt float64
-	lst float64
+	Min float64
+	Max float64
+	Sum float64
+	Cnt float64
+	Lst float64
 }
 
 func NewAggregation() *Aggregation {
 	return &Aggregation{
-		min: math.MaxFloat64,
-		max: -math.MaxFloat64,
+		Min: math.MaxFloat64,
+		Max: -math.MaxFloat64,
 	}
 }
 
 func (a *Aggregation) Add(val float64) {
-	a.min = math.Min(val, a.min)
-	a.max = math.Max(val, a.max)
-	a.sum += val
-	a.cnt += 1
-	a.lst = val
+	a.Min = math.Min(val, a.Min)
+	a.Max = math.Max(val, a.Max)
+	a.Sum += val
+	a.Cnt += 1
+	a.Lst = val
 }
 
 func (a *Aggregation) Reset() {
-	a.min = math.MaxFloat64
-	a.max = -math.MaxFloat64
-	a.sum = 0
-	a.cnt = 0
-	// no need to set a.lst, for a to be valid (cnt > 1), a.lst will always be set properly
-}
-
-func (a *Aggregation) FlushAndReset() map[string]float64 {
-	result := map[string]float64{
-		"min": a.min,
-		"max": a.max,
-		"sum": a.sum,
-		"cnt": a.cnt,
-		"lst": a.lst,
-		"avg": a.sum / a.cnt,
-	}
-	a.Reset()
-	return result
+	a.Min = math.MaxFloat64
+	a.Max = -math.MaxFloat64
+	a.Sum = 0
+	a.Cnt = 0
+	// no need to set a.Lst, for a to be valid (Cnt > 1), a.Lst will always be set properly
 }

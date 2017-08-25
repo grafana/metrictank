@@ -125,14 +125,15 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			continue
 		}
 
-		log.Info(fmt.Sprintf("Processing file %q", file))
-		met, err := getMetrics(w, file)
-		if err != nil {
-			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
+		name := getMetricName(file)
+		if !nameFilter.Match([]byte(name)) {
+			log.Info(fmt.Sprintf("Skipping file %s with name %s", file, name))
 			continue
 		}
-		if len(met.Archives) == 0 {
-			log.Info(fmt.Sprintf("Skipping file %s", file))
+		log.Info(fmt.Sprintf("Processing file %q", file))
+		met, err := getMetrics(w, file, name)
+		if err != nil {
+			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
 			continue
 		}
 
@@ -204,18 +205,13 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
 	}
 }
 
-func getMetrics(w *whisper.Whisper, file string) (archive.Metric, error) {
+func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 	var res archive.Metric
 	if len(w.Header.Archives) == 0 {
 		return res, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
 
 	var archives []archive.Archive
-	name := getMetricName(file)
-
-	if !nameFilter.Match([]byte(name)) {
-		return res, nil
-	}
 
 	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	if method == "" {
