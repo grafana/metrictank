@@ -26,7 +26,7 @@ func (c *conversion) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 		largestArchiveIdx = i
 	}
 
-	// find largest archive that still has higher resolution than requested
+	// find largest archive that still has a higher or equal resolution than requested
 	smallestArchiveIdx := 0
 	for i := 0; i < len(c.archives); i++ {
 		arch := c.archives[i]
@@ -118,7 +118,10 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 	return res
 }
 
-// increase resolution of given points according to defined specs
+// increase resolution of given points according to defined specs by generating
+// additional datapoints to bridge the gaps between the given points. depending
+// on what aggregation method is specified, those datapoints may be generated in
+// slightly different ways.
 func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
 	aggFactor := float64(outRes) / float64(rawRes)
@@ -160,6 +163,9 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 	return out
 }
 
+// decreases the resolution of given points by using the aggregation method specified
+// in the second argument. emulates the way metrictank aggregates data when it generates
+// rollups of the raw data.
 func decResolution(points []whisper.Point, methods []string, inRes, outRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
 	agg := mdata.NewAggregation()
