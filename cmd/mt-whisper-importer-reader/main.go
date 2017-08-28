@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/metrictank/api"
 	"github.com/raintank/metrictank/conf"
@@ -25,11 +26,6 @@ import (
 )
 
 var (
-	exitOnError = flag.Bool(
-		"exit-on-error",
-		true,
-		"Exit with a message when there's an error",
-	)
 	httpEndpoint = flag.String(
 		"http-endpoint",
 		"http://127.0.0.1:8080/chunks",
@@ -80,7 +76,11 @@ var (
 		"",
 		"A regex pattern to be applied to all metric names, only matching ones will be imported",
 	)
-	printLock  sync.Mutex
+	importUpTo = flag.Uint(
+		"import-up-to",
+		math.MaxUint32,
+		"Only import up to the specified timestamp",
+	)
 	schemas    conf.Schemas
 	nameFilter *regexp.Regexp
 )
@@ -188,20 +188,20 @@ func sortPoints(points pointSorter) pointSorter {
 	return points
 }
 
-func shortAggMethodString(aggMethod whisper.AggregationMethod) string {
+func shortAggMethodString(aggMethod whisper.AggregationMethod) (string, error) {
 	switch aggMethod {
 	case whisper.AggregationAverage:
-		return "avg"
+		return "avg", nil
 	case whisper.AggregationSum:
-		return "sum"
+		return "sum", nil
 	case whisper.AggregationMin:
-		return "min"
+		return "min", nil
 	case whisper.AggregationMax:
-		return "max"
+		return "max", nil
 	case whisper.AggregationLast:
-		return "lst"
+		return "lst", nil
 	default:
-		return ""
+		return "", fmt.Errorf("Unknown aggregation method %d", aggMethod)
 	}
 }
 
@@ -213,18 +213,23 @@ func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 
 	var archives []archive.Archive
 
-	method := shortAggMethodString(w.Header.Metadata.AggregationMethod)
-	if method == "" {
-		return res, fmt.Errorf(
-			"Aggregation method in file %s not allowed: %d(%s)\n",
-			file,
-			w.Header.Metadata.AggregationMethod,
-			method,
-		)
+	method, err := shortAggMethodString(w.Header.Metadata.AggregationMethod)
+	if err != nil {
+		return res, err
 	}
 
-	// md gets generated from the first archive in the whisper file
-	md := getMetricData(name, int(w.Header.Archives[0].SecondsPerPoint))
+	md := &schema.MetricData{
+		Name:     name,
+		Metric:   name,
+		Interval: int(w.Header.Archives[0].SecondsPerPoint),
+		Value:    0,
+		Unit:     "unknown",
+		Time:     0,
+		Mtype:    "gauge",
+		Tags:     []string{},
+		OrgId:    *orgId,
+	}
+	md.SetId()
 	_, schema := schemas.Match(md.Name, 0)
 
 	points := make(map[int][]whisper.Point)
@@ -260,14 +265,14 @@ func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 	return res, nil
 }
 
-func getRowKey(retIdx int, id, meth string, resolution int) string {
+func getRowKey(retIdx int, id, meth string, secondsPerPoint int) string {
 	if retIdx == 0 {
 		return id
 	} else {
 		return api.AggMetricKey(
 			id,
 			meth,
-			uint32(resolution),
+			uint32(secondsPerPoint),
 		)
 	}
 }
@@ -312,22 +317,6 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 	}
 
 	return encodedChunks
-}
-
-func getMetricData(name string, interval int) *schema.MetricData {
-	md := &schema.MetricData{
-		Name:     name,
-		Metric:   name,
-		Interval: interval,
-		Value:    0,
-		Unit:     "unknown",
-		Time:     0,
-		Mtype:    "gauge",
-		Tags:     []string{},
-		OrgId:    *orgId,
-	}
-	md.SetId()
-	return md
 }
 
 // scan a directory and feed the list of whisper files relative to base into the given channel

@@ -69,10 +69,16 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 		if arch.SecondsPerPoint == spp {
 			if retIdx == 0 || c.method != "avg" {
 				for _, p := range in {
+					if p.Timestamp > uint32(*importUpTo) {
+						continue
+					}
 					adjustedPoints[c.method][p.Timestamp] = p.Value
 				}
 			} else {
 				for _, p := range in {
+					if p.Timestamp > uint32(*importUpTo) {
+						continue
+					}
 					adjustedPoints["sum"][p.Timestamp] = p.Value
 					adjustedPoints["cnt"][p.Timestamp] = 1
 				}
@@ -125,6 +131,9 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 
 		var outPoints []whisper.Point
 		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
+			if ts > uint32(*importUpTo) {
+				continue
+			}
 			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
 		}
 
@@ -192,6 +201,9 @@ func decResolution(points []whisper.Point, methods []string, inRes, outRes uint3
 			continue
 		}
 		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
+		if boundary > uint32(*importUpTo) {
+			break
+		}
 
 		if boundary == currentBoundary {
 			agg.Add(inPoint.Value)

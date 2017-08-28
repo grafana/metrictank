@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"testing"
 
 	"github.com/kisielk/whisper-go/whisper"
@@ -51,6 +52,25 @@ func TestIncResolutionFakeAvgSimple(t *testing.T) {
 		},
 	}
 	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+}
+
+func TestIncResolutionUpToTime(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{5, 50},
+		},
+		"cnt": {
+			{5, 5},
+		},
+	}
+	*importUpTo = uint(5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+	*importUpTo = math.MaxUint32
 }
 
 func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
@@ -316,6 +336,26 @@ func TestDecResolutionSimple(t *testing.T) {
 		},
 	}
 	testDecResolution(t, inData, expectedResult, []string{"sum"}, 10, 30)
+}
+
+func TestDecResolutionUpToTime(t *testing.T) {
+	inData := []whisper.Point{
+		{10, 10},
+		{20, 11},
+		{30, 12},
+		{40, 14},
+		{50, 15},
+		{60, 16},
+	}
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{30, 33},
+		},
+	}
+	*importUpTo = uint(40)
+	testDecResolution(t, inData, expectedResult, []string{"sum"}, 10, 30)
+	*importUpTo = math.MaxUint32
 }
 
 func TestDecResolutionAvg(t *testing.T) {
@@ -974,6 +1014,47 @@ func TestPointsConversionAvg1(t *testing.T) {
 		},
 	}
 
+	expectedPoints1_2 := map[string][]whisper.Point{
+		"sum": {
+			{1503407717, 3.5},
+			{1503407718, 3.5},
+			{1503407719, 3.5},
+			{1503407720, 3.5},
+			{1503407721, 7.25},
+			{1503407722, 7.25},
+			{1503407723, 6.5},
+		},
+		"cnt": {
+			{1503407717, 1},
+			{1503407718, 1},
+			{1503407719, 1},
+			{1503407720, 1},
+			{1503407721, 1},
+			{1503407722, 1},
+			{1503407723, 1},
+		},
+	}
+	expectedPoints2_2 := map[string][]whisper.Point{
+		"sum": {
+			{1503407718, 3.5 * 2},
+			{1503407720, 3.5 * 2},
+			{1503407722, 7.25 * 2},
+		},
+		"cnt": {
+			{1503407718, 2},
+			{1503407720, 2},
+			{1503407722, 2},
+		},
+	}
+	expectedPoints3_2 := map[string][]whisper.Point{
+		"sum": {
+			{1503407720, 3.5},
+		},
+		"cnt": {
+			{1503407720, 1},
+		},
+	}
+
 	points1_0 := c.getPoints(0, 1, 8)
 	points2_0 := c.getPoints(0, 2, 8)
 	points3_0 := c.getPoints(0, 4, 8)
@@ -982,6 +1063,12 @@ func TestPointsConversionAvg1(t *testing.T) {
 	points2_1 := c.getPoints(1, 2, 8)
 	points3_1 := c.getPoints(1, 4, 8)
 
+	*importUpTo = uint(1503407723)
+	points1_2 := c.getPoints(1, 1, 8)
+	points2_2 := c.getPoints(1, 2, 8)
+	points3_2 := c.getPoints(1, 4, 8)
+	*importUpTo = math.MaxUint32
+
 	verifyPointMaps(t, points1_0, expectedPoints1_0)
 	verifyPointMaps(t, points2_0, expectedPoints2_0)
 	verifyPointMaps(t, points3_0, expectedPoints3_0)
@@ -989,6 +1076,10 @@ func TestPointsConversionAvg1(t *testing.T) {
 	verifyPointMaps(t, points1_1, expectedPoints1_1)
 	verifyPointMaps(t, points2_1, expectedPoints2_1)
 	verifyPointMaps(t, points3_1, expectedPoints3_1)
+
+	verifyPointMaps(t, points1_2, expectedPoints1_2)
+	verifyPointMaps(t, points2_2, expectedPoints2_2)
+	verifyPointMaps(t, points3_2, expectedPoints3_2)
 }
 
 func TestPointsConversionAvg2(t *testing.T) {
