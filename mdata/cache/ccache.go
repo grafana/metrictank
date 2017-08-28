@@ -142,7 +142,7 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 }
 
 func (c *CCache) Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult {
-	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
+	_, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
 	defer span.Finish()
 	var hit chunk.IterGen
 	var cm *CCacheMetric

@@ -413,7 +413,7 @@ func (c *CassandraStore) Search(ctx context.Context, key string, ttl, start, end
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
 func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, start, end uint32) ([]chunk.IterGen, error) {
-	ctx, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
+	_, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
 	defer span.Finish()
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "cassandra")
