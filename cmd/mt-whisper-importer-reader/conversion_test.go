@@ -6,8 +6,8 @@ import (
 	"github.com/kisielk/whisper-go/whisper"
 )
 
-func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, method string, inRes, outRes uint32) {
-	outData := incResolution(inData, method, inRes, outRes)
+func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, method string, inRes, outRes, rawRes uint32) {
+	outData := incResolution(inData, method, inRes, outRes, rawRes)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data is not as expected:\n%+v\n%+v", outData, expectedResult)
@@ -38,19 +38,19 @@ func TestIncResolutionFakeAvgSimple(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{5, 5},
-			{10, 5},
-			{15, 5.5},
-			{20, 5.5},
+			{5, 50},
+			{10, 50},
+			{15, 55},
+			{20, 55},
 		},
 		"cnt": {
-			{5, 0.5},
-			{10, 0.5},
-			{15, 0.5},
-			{20, 0.5},
+			{5, 5},
+			{10, 5},
+			{15, 5},
+			{20, 5},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
 }
 
 func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
@@ -64,44 +64,44 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{3, float64(10) / 3},
-			{6, float64(10) / 3},
-			{9, float64(10) / 3},
-			{12, float64(11) / 3},
-			{15, float64(11) / 3},
-			{18, float64(11) / 3},
-			{21, float64(12) / 4},
-			{24, float64(12) / 4},
-			{27, float64(12) / 4},
-			{30, float64(12) / 4},
-			{33, float64(13) / 3},
-			{36, float64(13) / 3},
-			{39, float64(13) / 3},
-			{42, float64(14) / 3},
-			{45, float64(14) / 3},
-			{48, float64(14) / 3},
+			{3, 30},
+			{6, 30},
+			{9, 30},
+			{12, 33},
+			{15, 33},
+			{18, 33},
+			{21, 36},
+			{24, 36},
+			{27, 36},
+			{30, 36},
+			{33, 39},
+			{36, 39},
+			{39, 39},
+			{42, 42},
+			{45, 42},
+			{48, 42},
 		},
 		"cnt": {
-			{3, float64(1) / 3},
-			{6, float64(1) / 3},
-			{9, float64(1) / 3},
-			{12, float64(1) / 3},
-			{15, float64(1) / 3},
-			{18, float64(1) / 3},
-			{21, float64(1) / 4},
-			{24, float64(1) / 4},
-			{27, float64(1) / 4},
-			{30, float64(1) / 4},
-			{33, float64(1) / 3},
-			{36, float64(1) / 3},
-			{39, float64(1) / 3},
-			{42, float64(1) / 3},
-			{45, float64(1) / 3},
-			{48, float64(1) / 3},
+			{3, 3},
+			{6, 3},
+			{9, 3},
+			{12, 3},
+			{15, 3},
+			{18, 3},
+			{21, 3},
+			{24, 3},
+			{27, 3},
+			{30, 3},
+			{33, 3},
+			{36, 3},
+			{39, 3},
+			{42, 3},
+			{45, 3},
+			{48, 3},
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 3)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 3, 1)
 }
 
 func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
@@ -117,24 +117,24 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{5, 5},
-			{10, 5},
-			{35, 6.5},
-			{40, 6.5},
-			{45, 7},
-			{50, 7},
+			{5, 50},
+			{10, 50},
+			{35, 65},
+			{40, 65},
+			{45, 70},
+			{50, 70},
 		},
 		"cnt": {
-			{5, 0.5},
-			{10, 0.5},
-			{35, 0.5},
-			{40, 0.5},
-			{45, 0.5},
-			{50, 0.5},
+			{5, 5},
+			{10, 5},
+			{35, 5},
+			{40, 5},
+			{45, 5},
+			{50, 5},
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
 }
 
 func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
@@ -146,24 +146,61 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 
 	expectedResult := map[string][]whisper.Point{
 		"sum": {
-			{5, 5},
-			{10, 5},
-			{35, 6.5},
-			{40, 6.5},
-			{45, 7},
-			{50, 7},
+			{5, 50},
+			{10, 50},
+			{35, 65},
+			{40, 65},
+			{45, 70},
+			{50, 70},
 		},
 		"cnt": {
-			{5, 0.5},
-			{10, 0.5},
-			{35, 0.5},
-			{40, 0.5},
-			{45, 0.5},
-			{50, 0.5},
+			{5, 5},
+			{10, 5},
+			{35, 5},
+			{40, 5},
+			{45, 5},
+			{50, 5},
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5)
+	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+}
+
+func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
+	inData := []whisper.Point{
+		{30, 10},
+		{60, 11},
+		{90, 12},
+	}
+
+	aggFactor := float64(10) / float64(3)
+
+	expectedResult := map[string][]whisper.Point{
+		"sum": {
+			{10, 10 * aggFactor},
+			{20, 10 * aggFactor},
+			{30, 10 * aggFactor},
+			{40, 11 * aggFactor},
+			{50, 11 * aggFactor},
+			{60, 11 * aggFactor},
+			{70, 12 * aggFactor},
+			{80, 12 * aggFactor},
+			{90, 12 * aggFactor},
+		},
+		"cnt": {
+			{10, aggFactor},
+			{20, aggFactor},
+			{30, aggFactor},
+			{40, aggFactor},
+			{50, aggFactor},
+			{60, aggFactor},
+			{70, aggFactor},
+			{80, aggFactor},
+			{90, aggFactor},
+		},
+	}
+
+	testIncResolution(t, inData, expectedResult, "fakeavg", 30, 10, 3)
 }
 
 func TestIncResolutionSimple(t *testing.T) {
@@ -180,7 +217,7 @@ func TestIncResolutionSimple(t *testing.T) {
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "max", 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
 }
 
 func TestIncResolutionNonFactorResolutions(t *testing.T) {
@@ -213,7 +250,7 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 3)
+	testIncResolution(t, inData, expectedResult, "max", 10, 3, 1)
 }
 
 func TestIncResolutionWithGaps(t *testing.T) {
@@ -238,7 +275,7 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
 }
 
 func TestIncResolutionOutOfOrder(t *testing.T) {
@@ -259,7 +296,7 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 5)
+	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
 }
 
 func TestDecResolutionSimple(t *testing.T) {
@@ -568,6 +605,7 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 }
 
 func verifyPointMaps(t *testing.T, points map[string][]whisper.Point, expected map[string][]whisper.Point) {
+	t.Helper()
 	for meth, ep := range expected {
 		if _, ok := points[meth]; !ok {
 			t.Fatalf("Missing method %s in result", meth)
@@ -885,42 +923,42 @@ func TestPointsConversionAvg1(t *testing.T) {
 
 	expectedPoints1_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503407717, 3.5 / 4},
-			{1503407718, 3.5 / 4},
-			{1503407719, 3.5 / 4},
-			{1503407720, 3.5 / 4},
-			{1503407721, 7.25 / 4},
-			{1503407722, 7.25 / 4},
-			{1503407723, 6.5 / 2},
-			{1503407724, 6.5 / 2},
+			{1503407717, 3.5},
+			{1503407718, 3.5},
+			{1503407719, 3.5},
+			{1503407720, 3.5},
+			{1503407721, 7.25},
+			{1503407722, 7.25},
+			{1503407723, 6.5},
+			{1503407724, 6.5},
 			{1503407725, 7},
 			{1503407726, 8},
 		},
 		"cnt": {
-			{1503407717, float64(1) / 4},
-			{1503407718, float64(1) / 4},
-			{1503407719, float64(1) / 4},
-			{1503407720, float64(1) / 4},
-			{1503407721, float64(1) / 4},
-			{1503407722, float64(1) / 4},
-			{1503407723, float64(1) / 2},
-			{1503407724, float64(1) / 2},
+			{1503407717, 1},
+			{1503407718, 1},
+			{1503407719, 1},
+			{1503407720, 1},
+			{1503407721, 1},
+			{1503407722, 1},
+			{1503407723, 1},
+			{1503407724, 1},
 			{1503407725, 1},
 			{1503407726, 1},
 		},
 	}
 	expectedPoints2_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503407718, 3.5 / 2},
-			{1503407720, 3.5 / 2},
-			{1503407722, 7.25 / 2},
+			{1503407718, 3.5 * 2},
+			{1503407720, 3.5 * 2},
+			{1503407722, 7.25 * 2},
 			{1503407724, 6.5},
 			{1503407726, 8},
 		},
 		"cnt": {
-			{1503407718, float64(1) / 2},
-			{1503407720, float64(1) / 2},
-			{1503407722, float64(1) / 2},
+			{1503407718, 2},
+			{1503407720, 2},
+			{1503407722, 2},
 			{1503407724, 1},
 			{1503407726, 1},
 		},
@@ -1018,67 +1056,67 @@ func TestPointsConversionAvg2(t *testing.T) {
 
 	expectedPoints1_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503406117, float64(9) / 9},
-			{1503406118, float64(9) / 9},
-			{1503406119, float64(9) / 9},
-			{1503406120, float64(9) / 9},
-			{1503406121, float64(9) / 9},
-			{1503406122, float64(9) / 9},
-			{1503406123, float64(9) / 9},
-			{1503406124, float64(9) / 9},
-			{1503406125, float64(9) / 9},
-			{1503406126, float64(18) / 9},
-			{1503406127, float64(18) / 9},
-			{1503406128, float64(18) / 9},
-			{1503406129, float64(18) / 9},
-			{1503406130, float64(18) / 9},
-			{1503406131, float64(18) / 9},
-			{1503406132, float64(18) / 9},
-			{1503406133, float64(18) / 9},
-			{1503406134, float64(18) / 9},
-			{1503406135, float64(25.25) / 9},
-			{1503406136, float64(25.25) / 9},
-			{1503406137, float64(25.25) / 9},
-			{1503406138, float64(21) / 3},
-			{1503406139, float64(21) / 3},
-			{1503406140, float64(21) / 3},
-			{1503406141, float64(24) / 3},
-			{1503406142, float64(24) / 3},
-			{1503406143, float64(24) / 3},
-			{1503406144, float64(26.5) / 3},
+			{1503406117, 9},
+			{1503406118, 9},
+			{1503406119, 9},
+			{1503406120, 9},
+			{1503406121, 9},
+			{1503406122, 9},
+			{1503406123, 9},
+			{1503406124, 9},
+			{1503406125, 9},
+			{1503406126, 18},
+			{1503406127, 18},
+			{1503406128, 18},
+			{1503406129, 18},
+			{1503406130, 18},
+			{1503406131, 18},
+			{1503406132, 18},
+			{1503406133, 18},
+			{1503406134, 18},
+			{1503406135, 25.25},
+			{1503406136, 25.25},
+			{1503406137, 25.25},
+			{1503406138, 21},
+			{1503406139, 21},
+			{1503406140, 21},
+			{1503406141, 24},
+			{1503406142, 24},
+			{1503406143, 24},
+			{1503406144, 26.5},
 			{1503406145, 25},
 			{1503406146, 26},
 			{1503406147, 27},
 		},
 		"cnt": {
-			{1503406117, float64(1) / 9},
-			{1503406118, float64(1) / 9},
-			{1503406119, float64(1) / 9},
-			{1503406120, float64(1) / 9},
-			{1503406121, float64(1) / 9},
-			{1503406122, float64(1) / 9},
-			{1503406123, float64(1) / 9},
-			{1503406124, float64(1) / 9},
-			{1503406125, float64(1) / 9},
-			{1503406126, float64(1) / 9},
-			{1503406127, float64(1) / 9},
-			{1503406128, float64(1) / 9},
-			{1503406129, float64(1) / 9},
-			{1503406130, float64(1) / 9},
-			{1503406131, float64(1) / 9},
-			{1503406132, float64(1) / 9},
-			{1503406133, float64(1) / 9},
-			{1503406134, float64(1) / 9},
-			{1503406135, float64(1) / 9},
-			{1503406136, float64(1) / 9},
-			{1503406137, float64(1) / 9},
-			{1503406138, float64(1) / 3},
-			{1503406139, float64(1) / 3},
-			{1503406140, float64(1) / 3},
-			{1503406141, float64(1) / 3},
-			{1503406142, float64(1) / 3},
-			{1503406143, float64(1) / 3},
-			{1503406144, float64(1) / 3},
+			{1503406117, 1},
+			{1503406118, 1},
+			{1503406119, 1},
+			{1503406120, 1},
+			{1503406121, 1},
+			{1503406122, 1},
+			{1503406123, 1},
+			{1503406124, 1},
+			{1503406125, 1},
+			{1503406126, 1},
+			{1503406127, 1},
+			{1503406128, 1},
+			{1503406129, 1},
+			{1503406130, 1},
+			{1503406131, 1},
+			{1503406132, 1},
+			{1503406133, 1},
+			{1503406134, 1},
+			{1503406135, 1},
+			{1503406136, 1},
+			{1503406137, 1},
+			{1503406138, 1},
+			{1503406139, 1},
+			{1503406140, 1},
+			{1503406141, 1},
+			{1503406142, 1},
+			{1503406143, 1},
+			{1503406144, 1},
 			{1503406145, 1},
 			{1503406146, 1},
 			{1503406147, 1},
@@ -1102,25 +1140,25 @@ func TestPointsConversionAvg2(t *testing.T) {
 
 	expectedPoints2_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503406119, float64(9) / 3},
-			{1503406122, float64(9) / 3},
-			{1503406125, float64(9) / 3},
-			{1503406128, float64(18) / 3},
-			{1503406131, float64(18) / 3},
-			{1503406134, float64(18) / 3},
-			{1503406137, float64(25.25) / 3},
+			{1503406119, 9 * 3},
+			{1503406122, 9 * 3},
+			{1503406125, 9 * 3},
+			{1503406128, 18 * 3},
+			{1503406131, 18 * 3},
+			{1503406134, 18 * 3},
+			{1503406137, 25.25 * 3},
 			{1503406140, 21},
 			{1503406143, 24},
 			{1503406146, 26.5},
 		},
 		"cnt": {
-			{1503406119, float64(1) / 3},
-			{1503406122, float64(1) / 3},
-			{1503406125, float64(1) / 3},
-			{1503406128, float64(1) / 3},
-			{1503406131, float64(1) / 3},
-			{1503406134, float64(1) / 3},
-			{1503406137, float64(1) / 3},
+			{1503406119, 3},
+			{1503406122, 3},
+			{1503406125, 3},
+			{1503406128, 3},
+			{1503406131, 3},
+			{1503406134, 3},
+			{1503406137, 3},
 			{1503406140, 1},
 			{1503406143, 1},
 			{1503406146, 1},

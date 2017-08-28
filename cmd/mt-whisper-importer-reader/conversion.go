@@ -49,6 +49,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 
 	// figure out the range of archives that make sense to use for the requested specs
 	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(spp, nop)
+	rawRes := c.archives[0].SecondsPerPoint
 
 	adjustedPoints := make(map[string]map[uint32]float64)
 	if retIdx > 0 && c.method == "avg" {
@@ -81,7 +82,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 			if method == "avg" && retIdx > 0 {
 				method = "fakeavg"
 			}
-			for m, points := range incResolution(in, method, arch.SecondsPerPoint, spp) {
+			for m, points := range incResolution(in, method, arch.SecondsPerPoint, spp, rawRes) {
 				for _, p := range points {
 					adjustedPoints[m][p.Timestamp] = p.Value
 				}
@@ -112,8 +113,9 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 }
 
 // increase resolution of given points according to defined specs
-func incResolution(points []whisper.Point, method string, inRes, outRes uint32) map[string][]whisper.Point {
+func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
+	aggFactor := float64(outRes) / float64(rawRes)
 	for _, inPoint := range points {
 		if inPoint.Timestamp == 0 {
 			continue
@@ -127,15 +129,17 @@ func incResolution(points []whisper.Point, method string, inRes, outRes uint32) 
 		}
 
 		for _, outPoint := range outPoints {
-			if method == "cnt" || method == "sum" || method == "fakeavg" {
+			if method == "cnt" || method == "sum" {
 				outPoint.Value = inPoint.Value / float64(len(outPoints))
+			} else if method == "fakeavg" {
+				outPoint.Value = inPoint.Value * aggFactor
 			} else {
 				outPoint.Value = inPoint.Value
 			}
 
 			if method == "fakeavg" {
 				out["sum"] = append(out["sum"], outPoint)
-				out["cnt"] = append(out["cnt"], whisper.Point{Timestamp: outPoint.Timestamp, Value: float64(1) / float64(len(outPoints))})
+				out["cnt"] = append(out["cnt"], whisper.Point{Timestamp: outPoint.Timestamp, Value: aggFactor})
 			} else {
 				out[method] = append(out[method], outPoint)
 			}
