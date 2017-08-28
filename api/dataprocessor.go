@@ -322,29 +322,28 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 }
 
 func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) []schema.Point {
-	rctx := newRequestContext(&req, consolidator)
-	res := s.getSeries(ctx, rctx)
+	rctx := newRequestContext(ctx, &req, consolidator)
+	res := s.getSeries(rctx)
 	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...)
 	return Fix(res.Points, req.From, req.To, req.ArchInterval)
 }
 
-func (s *Server) getSeries(ctx context.Context, rctx *requestContext) mdata.Result {
-
-	res := s.getSeriesAggMetrics(ctx, rctx)
+func (s *Server) getSeries(ctx *requestContext) mdata.Result {
+	res := s.getSeriesAggMetrics(ctx)
 	log.Debug("oldest from aggmetrics is %d", res.Oldest)
-	span := opentracing.SpanFromContext(ctx)
+	span := opentracing.SpanFromContext(ctx.ctx)
 	span.SetTag("oldest_in_ring", res.Oldest)
 
-	if res.Oldest <= rctx.From {
-		reqSpanMem.ValueUint32(rctx.To - rctx.From)
+	if res.Oldest <= ctx.From {
+		reqSpanMem.ValueUint32(ctx.To - ctx.From)
 		return res
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
-	until := util.Min(res.Oldest, rctx.To)
+	until := util.Min(res.Oldest, ctx.To)
 
-	res.Iters = append(s.getSeriesCachedStore(ctx, rctx, until), res.Iters...)
+	res.Iters = append(s.getSeriesCachedStore(ctx, until), res.Iters...)
 	return res
 }
 
@@ -352,7 +351,7 @@ func (s *Server) getSeries(ctx context.Context, rctx *requestContext) mdata.Resu
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 // all data will also be quantized.
-func (s *Server) itersToPoints(rctx *requestContext, iters []chunk.Iter) []schema.Point {
+func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
 	pre := time.Now()
 
 	points := pointSlicePool.Get().([]schema.Point)
@@ -362,7 +361,7 @@ func (s *Server) itersToPoints(rctx *requestContext, iters []chunk.Iter) []schem
 		for iter.Next() {
 			total += 1
 			ts, val := iter.Values()
-			if ts >= rctx.From && ts < rctx.To {
+			if ts >= ctx.From && ts < ctx.To {
 				good += 1
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
@@ -375,46 +374,46 @@ func (s *Server) itersToPoints(rctx *requestContext, iters []chunk.Iter) []schem
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx context.Context, rctx *requestContext) mdata.Result {
-	ctx, span := tracing.NewSpan(ctx, s.Tracer, "getSeriesAggMetrics")
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
+	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesAggMetrics")
 	defer span.Finish()
-	metric, ok := s.MemoryStore.Get(rctx.Key)
+	metric, ok := s.MemoryStore.Get(ctx.Key)
 	if !ok {
 		return mdata.Result{
-			Oldest: rctx.Req.To,
+			Oldest: ctx.Req.To,
 		}
 	}
 
-	if rctx.Cons != consolidation.None {
-		logLoad("memory", rctx.AggKey, rctx.From, rctx.To)
-		return metric.GetAggregated(rctx.Cons, rctx.Req.ArchInterval, rctx.From, rctx.To)
+	if ctx.Cons != consolidation.None {
+		logLoad("memory", ctx.AggKey, ctx.From, ctx.To)
+		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
 	} else {
-		logLoad("memory", rctx.Req.Key, rctx.From, rctx.To)
-		return metric.Get(rctx.From, rctx.To)
+		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
+		return metric.Get(ctx.From, ctx.To)
 	}
 }
 
-// will only fetch until until, but uses rctx.To for debug logging
-func (s *Server) getSeriesCachedStore(ctx context.Context, rctx *requestContext, until uint32) []chunk.Iter {
+// will only fetch until until, but uses ctx.To for debug logging
+func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
 	var iters []chunk.Iter
 	var prevts uint32
 
-	key := rctx.Key
-	if rctx.Cons != consolidation.None {
-		key = rctx.AggKey
+	key := ctx.Key
+	if ctx.Cons != consolidation.None {
+		key = ctx.AggKey
 	}
 
-	ctx, span := tracing.NewSpan(ctx, s.Tracer, "getSeriesCachedStore")
+	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesCachedStore")
 	defer span.Finish()
 	span.SetTag("key", key)
-	span.SetTag("from", rctx.From)
+	span.SetTag("from", ctx.From)
 	span.SetTag("until", until)
 
-	reqSpanBoth.ValueUint32(rctx.To - rctx.From)
-	logLoad("cassan", rctx.Key, rctx.From, rctx.To)
+	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
+	logLoad("cassan", ctx.Key, ctx.From, ctx.To)
 
-	log.Debug("cache: searching query key %s, from %d, until %d", key, rctx.From, until)
-	cacheRes := s.Cache.Search(ctx, key, rctx.From, until)
+	log.Debug("cache: searching query key %s, from %d, until %d", key, ctx.From, until)
+	cacheRes := s.Cache.Search(ctx.ctx, key, ctx.From, until)
 	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
 	for _, itgen := range cacheRes.Start {
@@ -432,7 +431,7 @@ func (s *Server) getSeriesCachedStore(ctx context.Context, rctx *requestContext,
 	// the request cannot completely be served from cache, it will require cassandra involvement
 	if !cacheRes.Complete {
 		if cacheRes.From != cacheRes.Until {
-			storeIterGens, err := s.BackendStore.Search(ctx, key, rctx.Req.TTL, cacheRes.From, cacheRes.Until)
+			storeIterGens, err := s.BackendStore.Search(ctx.ctx, key, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
 				panic(err)
 			}
@@ -514,6 +513,8 @@ func mergeSeries(in []models.Series) []models.Series {
 }
 
 type requestContext struct {
+	ctx context.Context
+
 	// request by external user.
 	Req *models.Req
 
@@ -529,9 +530,10 @@ func prevBoundary(ts uint32, span uint32) uint32 {
 	return ts - ((ts-1)%span + 1)
 }
 
-func newRequestContext(req *models.Req, consolidator consolidation.Consolidator) *requestContext {
+func newRequestContext(ctx context.Context, req *models.Req, consolidator consolidation.Consolidator) *requestContext {
 
 	rc := requestContext{
+		ctx:  ctx,
 		Req:  req,
 		Cons: consolidator,
 		Key:  req.Key,

@@ -483,7 +483,7 @@ func TestRequestContextWithoutConsolidator(t *testing.T) {
 	archInterval := uint32(10)
 	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.None)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
 	expectFrom := uint32(41)
 	if ctx.From != expectFrom {
@@ -508,7 +508,7 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	to := uint32(88)
 	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.Sum)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.Sum)
 
 	expectFrom := from
 	if ctx.From != expectFrom {
@@ -636,8 +636,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// create a request for the current range
 				req := reqRaw(metric, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
-				ctx := newRequestContext(&req, consolidation.None)
-				iters := srv.getSeriesCachedStore(test.NewContext(), ctx, to)
+				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
+				iters := srv.getSeriesCachedStore(ctx, to)
 
 				// expecting the first returned timestamp to be the T0 of the chunk containing "from"
 				expectResFrom := from - (from % span)
@@ -760,14 +760,14 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	archInterval := uint32(10)
 	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.None)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
 	metric := metrics.GetOrCreate(metricKey, metricKey, 0, 0)
 	for i := uint32(50); i < 3000; i++ {
 		metric.Add(i, float64(i^2))
 	}
 
-	res := srv.getSeriesAggMetrics(test.NewContext(), ctx)
+	res := srv.getSeriesAggMetrics(ctx)
 	timestamps := make([]uint32, 0)
 	values := make([]float64, 0)
 
