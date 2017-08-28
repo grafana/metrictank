@@ -126,11 +126,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 
 		name := getMetricName(file)
-		if !nameFilter.Match([]byte(name)) {
-			log.Info(fmt.Sprintf("Skipping file %s with name %s", file, name))
-			continue
-		}
-		log.Info(fmt.Sprintf("Processing file %q", file))
+		log.Info(fmt.Sprintf("Processing file %s (%s)", file, name))
 		met, err := getMetrics(w, file, name)
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
@@ -324,6 +320,11 @@ func getFileListIntoChan(fileChan chan string) {
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
+			name := getMetricName(path)
+			if !nameFilter.Match([]byte(getMetricName(name))) {
+				log.Info(fmt.Sprintf("Skipping file %s with name %s", file, name))
+				continue
+			}
 			if len(path) >= 4 && path[len(path)-4:] == ".wsp" {
 				fileChan <- path
 			}
