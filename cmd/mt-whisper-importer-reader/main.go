@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/whisper-go/whisper"
@@ -81,8 +82,10 @@ var (
 		math.MaxUint32,
 		"Only import up to the specified timestamp",
 	)
-	schemas    conf.Schemas
-	nameFilter *regexp.Regexp
+	schemas        conf.Schemas
+	nameFilter     *regexp.Regexp
+	processedCount uint32
+	skippedCount   uint32
 )
 
 func main() {
@@ -156,6 +159,12 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
+
+		processed := atomic.AddUint32(&processedCount, 1)
+		if processed%100 == 0 {
+			skipped := atomic.LoadUint32(&skippedCount)
+			log.Info(fmt.Sprintf("Processed %d files, %d skipped", processed, skipped))
+		}
 	}
 	wg.Done()
 }
@@ -323,6 +332,7 @@ func getFileListIntoChan(fileChan chan string) {
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
 				log.Info(fmt.Sprintf("Skipping file %s with name %s", path, name))
+				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}
 			if len(path) >= 4 && path[len(path)-4:] == ".wsp" {
