@@ -130,8 +130,12 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 			continue
 		}
 
+		// inPoints are guaranteed to be quantized by whisper
+		// outRes is > inRes, otherwise this function should never be called
+		// rangeEnd is the the TS of the last datapoint that will be generated based on inPoint
 		rangeEnd := inPoint.Timestamp - (inPoint.Timestamp % outRes)
 
+		// generate datapoints based on inPoint in reverse order
 		var outPoints []whisper.Point
 		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
 			if ts > uint32(*importUpTo) {
