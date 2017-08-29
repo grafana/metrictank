@@ -322,8 +322,8 @@ func getFileListIntoChan(fileChan chan string) {
 		func(path string, info os.FileInfo, err error) error {
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
-				log.Info(fmt.Sprintf("Skipping file %s with name %s", file, name))
-				continue
+				log.Info(fmt.Sprintf("Skipping file %s with name %s", path, name))
+				return nil
 			}
 			if len(path) >= 4 && path[len(path)-4:] == ".wsp" {
 				fileChan <- path
