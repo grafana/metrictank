@@ -725,7 +725,10 @@ func TestRowKey(t *testing.T) {
 }
 
 func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
+	// the actual data in these points doesn't matter, we just want to be sure
+	// that the chunks resulting from these points include the same data
 	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
+	expectedCount := 8640 - (2520 % 2160) // count minus what would end up in an unfinished chunk
 
 	*writeUnfinishedChunks = false
 	chunks := encodedChunksFromPoints(points, 10, 21600)
@@ -743,15 +746,19 @@ func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
 		for iter.Next() {
 			ts, val := iter.Values()
 			if points[i].Timestamp != ts || points[i].Value != val {
-				t.Fatalf("Unexpected value at index %d: %d:%f instead of %d:%f", i, ts, val, points[i].Timestamp, points[i].Value)
+				t.Fatalf("Unexpected value at index %d:\nExpected: %d:%f\nGot: %d:%f\n", i, ts, val, points[i].Timestamp, points[i].Value)
 			}
 			i++
 		}
+	}
+	if i != expectedCount {
+		t.Fatalf("Unexpected number of datapoints in chunks:\nExpected: %d\nGot: %d\n", expectedCount, i)
 	}
 }
 
 func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
+	expectedCount := 8640 // count including unfinished chunks
 
 	*writeUnfinishedChunks = true
 	chunks := encodedChunksFromPoints(points, 10, 21600)
@@ -769,10 +776,13 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 		for iter.Next() {
 			ts, val := iter.Values()
 			if points[i].Timestamp != ts || points[i].Value != val {
-				t.Fatalf("Unexpected value at index %d: %d:%f instead of %d:%f", i, ts, val, points[i].Timestamp, points[i].Value)
+				t.Fatalf("Unexpected value at index %d:\nExpected: %d:%f\nGot: %d:%f\n", i, ts, val, points[i].Timestamp, points[i].Value)
 			}
 			i++
 		}
+	}
+	if i != expectedCount {
+		t.Fatalf("Unexpected number of datapoints in chunks:\nExpected: %d\nGot: %d\n", expectedCount, i)
 	}
 }
 
