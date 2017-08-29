@@ -702,17 +702,25 @@ func generatePoints(ts, interval uint32, value float64, offset, count int, inc f
 	return res
 }
 
-func TestRowKeyAgg0(t *testing.T) {
-	res := getRowKey(0, "aaa", "", 0)
-	if res != "aaa" {
-		t.Fatalf("row key for aggregation 0 should equal the id")
+func TestRowKey(t *testing.T) {
+	type rowKeyTest struct {
+		rollup   int
+		id       string
+		method   string
+		spp      int
+		expected string
 	}
-}
+	tests := []rowKeyTest{
+		{0, "aaa", "sum", 600, "aaa"},
+		{1, "aaa", "sum", 600, "aaa_sum_600"},
+		{2, "bbb", "avg", 10, "bbb_avg_10"},
+	}
 
-func TestRowKeyAgg1(t *testing.T) {
-	res := getRowKey(1, "aaa", "sum", 60)
-	if res != "aaa_sum_60" {
-		t.Fatalf("row key for aggregation 0 should equal the id")
+	for _, test := range tests {
+		rowKey := getRowKey(test.rollup, test.id, test.method, test.spp)
+		if test.expected != rowKey {
+			t.Fatalf("Unexpected row key:\nExpected: %s\nGot: %s\n", test.expected, rowKey)
+		}
 	}
 }
 
