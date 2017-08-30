@@ -1,7 +1,9 @@
 package mdata
 
 import (
+	"context"
 	"errors"
+
 	"github.com/raintank/metrictank/mdata/chunk"
 )
 
@@ -26,7 +28,7 @@ func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 }
 
 // searches through the mock results and returns the right ones according to start / end
-func (c *MockStore) Search(metric string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *MockStore) Search(ctx context.Context, metric string, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	var itgens []chunk.IterGen
 	var ok bool
 	res := make([]chunk.IterGen, 0)

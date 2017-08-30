@@ -254,17 +254,28 @@ func main() {
 	statsConfig.Start()
 
 	/***********************************
+		Initialize tracer
+	***********************************/
+	tracer, traceCloser, err := conf.GetTracer(*tracingEnabled, *tracingAddr)
+	if err != nil {
+		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+	}
+	defer traceCloser.Close()
+
+	/***********************************
 		Initialize our backendStore
 	***********************************/
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, mdata.TTLs())
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
+	store.SetTracer(tracer)
 
 	/***********************************
 		Initialize the Chunk Cache
 	***********************************/
 	ccache := cache.NewCCache()
+	ccache.SetTracer(tracer)
 
 	/***********************************
 		Initialize our MemoryStore
@@ -315,15 +326,6 @@ func main() {
 	if metricIndex == nil {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
-
-	/***********************************
-		Initialize tracer
-	***********************************/
-	tracer, traceCloser, err := conf.GetTracer(*tracingEnabled, *tracingAddr)
-	if err != nil {
-		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
-	}
-	defer traceCloser.Close()
 
 	/***********************************
 		Initialize our API server

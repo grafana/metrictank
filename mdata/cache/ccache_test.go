@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/raintank/metrictank/test"
 )
 
 func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
@@ -219,7 +220,7 @@ func TestDisconnectedAdding(t *testing.T) {
 	cc.Add(metric, 0, itgen2)
 	cc.Add(metric, 0, itgen3)
 
-	res := cc.Search(metric, 900, 1015)
+	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
@@ -253,7 +254,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	cc.Add(metric, 1000, itgen2)
 	cc.Add(metric, 0, itgen3)
 
-	res := cc.Search(metric, 900, 1015)
+	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
@@ -289,7 +290,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 func TestSearchFromBeginningComplete(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(metric, 1006, 1025)
+	res := cc.Search(test.NewContext(), metric, 1006, 1025)
 
 	if !res.Complete {
 		t.Fatalf("complete is expected to be true")
@@ -307,7 +308,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(metric, 1006, 1030)
+	res := cc.Search(test.NewContext(), metric, 1006, 1030)
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
 	}
@@ -324,7 +325,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 func TestSearchFromEnd(t *testing.T) {
 	metric := "metric1"
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(metric, 500, 1025)
+	res := cc.Search(test.NewContext(), metric, 500, 1025)
 
 	if res.Complete {
 		t.Fatalf("complete is expected to not be true")
@@ -394,7 +395,7 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 				cc.Add(metric, 0, itgen1)
 			}
 
-			res = cc.Search(metric, from, until)
+			res = cc.Search(test.NewContext(), metric, from, until)
 			if !res.Complete {
 				t.Fatalf("from %d, until %d: complete is expected to be true", from, until)
 			}
@@ -470,7 +471,7 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 				cc.Add(metric, 0, itgen1)
 			}
 
-			res = cc.Search(metric, from, until)
+			res = cc.Search(test.NewContext(), metric, from, until)
 			if res.Complete {
 				t.Fatalf("from %d, until %d: complete is expected to be false", from, until)
 			}

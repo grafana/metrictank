@@ -123,7 +123,7 @@ func main() {
 	if _, err := os.Stat(*confFile); err == nil {
 		path = *confFile
 	}
-	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+	config, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename:  path,
 		EnvPrefix: "MT_",
 	})
@@ -132,7 +132,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	conf.ParseAll()
+	config.ParseAll()
 
 	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
 		log.Fatal(4, "groupTTL must be one of s/m/h/d")

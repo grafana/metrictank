@@ -1,6 +1,10 @@
 package mdata
 
-import "github.com/raintank/metrictank/mdata/chunk"
+import (
+	"context"
+
+	"github.com/raintank/metrictank/mdata/chunk"
+)
 
 type devnullStore struct {
 	AddCount uint32
@@ -19,7 +23,7 @@ func (c *devnullStore) Reset() {
 	c.AddCount = 0
 }
 
-func (c *devnullStore) Search(key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *devnullStore) Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	return nil, nil
 }
 

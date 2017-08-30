@@ -23,8 +23,9 @@ func (s *Server) getNodeStatus(ctx *middleware.Context) {
 func (s *Server) setNodeStatus(ctx *middleware.Context, status models.NodeStatus) {
 	primary, err := strconv.ParseBool(status.Primary)
 	if err != nil {
-		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest,
-			fmt.Sprintf("could not parse status to bool. %s", err.Error())),
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf(
+			"could not parse status to bool. %s",
+			err.Error())),
 		)
 		return
 	}
@@ -37,7 +38,8 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 		ctx.PlainText(200, []byte("OK"))
 		return
 	}
-	response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusServiceUnavailable, "node not ready"))
+
+	response.Write(ctx, response.NewError(http.StatusServiceUnavailable, "node not ready"))
 }
 
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
@@ -75,8 +77,9 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 
 	n, err := cluster.Manager.Join(toJoin)
 	if err != nil {
-		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest,
-			fmt.Sprintf("error when joining cluster members: %s", err.Error())))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf(
+			"error when joining cluster members: %s", err.Error())),
+		)
 		return
 	}
 	resp.MembersAdded = n
@@ -95,7 +98,7 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	for _, pattern := range req.Patterns {
 		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From)
 		if err != nil {
-			response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest, err.Error()))
+			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
 		resp.Nodes[pattern] = nodes
@@ -107,7 +110,7 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 	def, ok := s.MetricIndex.Get(req.Id)
 	if !ok {
-		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusNotFound, "Not Found"))
+		response.Write(ctx, response.NewError(http.StatusNotFound, "Not Found"))
 		return
 	}
 
@@ -131,7 +134,7 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 		// the only errors returned are from us catching panics, so we should treat them
 		// all as internalServerErrors
 		log.Error(3, "HTTP getData() %s", err.Error())
-		response.WriteErr(ctx.Req.Context(), ctx, response.WrapError(err))
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataResp{Series: series}))
@@ -141,7 +144,7 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 	defs, err := s.MetricIndex.Delete(req.OrgId, req.Query)
 	if err != nil {
 		// errors can only be caused by bad request.
-		response.WriteErr(ctx.Req.Context(), ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 

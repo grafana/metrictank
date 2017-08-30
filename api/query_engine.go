@@ -26,7 +26,7 @@ var (
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
-func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, error) {
+func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint32, uint32, error) {
 	tsRange := to - from
 
 	var listIntervals []uint32
@@ -79,7 +79,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, error
 			}
 		}
 		if req.Archive == -1 {
-			return nil, errUnSatisfiable
+			return nil, 0, 0, errUnSatisfiable
 		}
 
 		if _, ok := seenIntervals[req.ArchInterval]; !ok {
@@ -93,7 +93,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, error
 	interval := util.Lcm(listIntervals)
 
 	if interval < minIntervalHard {
-		return nil, errMaxPointsPerReq
+		return nil, 0, 0, errMaxPointsPerReq
 	}
 
 	// now, for all our requests, set all their properties.  we may have to apply runtime consolidation to get the
@@ -143,8 +143,9 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, error
 		reqRenderChosenArchive.Value(req.Archive)
 	}
 
+	pointsReturn := uint32(len(reqs)) * tsRange / interval
 	reqRenderPointsFetched.ValueUint32(pointsFetch)
-	reqRenderPointsReturned.ValueUint32(uint32(len(reqs)) * tsRange / interval)
+	reqRenderPointsReturned.ValueUint32(pointsReturn)
 
-	return reqs, nil
+	return reqs, pointsFetch, pointsReturn, nil
 }
