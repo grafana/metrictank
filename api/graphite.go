@@ -249,6 +249,16 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
+	noDataPoints := true
+	for _, o := range out {
+		if len(o.Datapoints) != 0 {
+			noDataPoints = false
+		}
+	}
+	if noDataPoints {
+		span.SetTag("nodatapoints", true)
+	}
+
 	switch request.Format {
 	case "msgp":
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
