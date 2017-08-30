@@ -119,26 +119,26 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to open whisper file %q: %q\n", file, err))
+			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to open whisper file %q: %q\n", file, err))
+			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
 			continue
 		}
 
 		name := getMetricName(file)
-		log.Info(fmt.Sprintf("Processing file %s (%s)", file, name))
+		log.Infof("Processing file %s (%s)", file, name)
 		met, err := getMetrics(w, file, name)
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to get metric: %q", err))
+			log.Errorf("Failed to get metric: %q", err)
 			continue
 		}
 
 		b, err := met.MarshalCompressed()
 		if err != nil {
-			log.Error(fmt.Sprintf("Failed to encode metric: %q", err))
+			log.Errorf("Failed to encode metric: %q", err)
 			continue
 		}
 
@@ -155,7 +155,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 
 		resp, err := client.Do(req)
 		if err != nil || resp.StatusCode != 200 {
-			log.Error(fmt.Sprintf("Error sending request to http endpoint %q: %q", *httpEndpoint, err))
+			log.Errorf("Error sending request to http endpoint %q: %q", *httpEndpoint, err)
 		}
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
@@ -163,7 +163,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		processed := atomic.AddUint32(&processedCount, 1)
 		if processed%100 == 0 {
 			skipped := atomic.LoadUint32(&skippedCount)
-			log.Info(fmt.Sprintf("Processed %d files, %d skipped", processed, skipped))
+			log.Infof("Processed %d files, %d skipped", processed, skipped)
 		}
 	}
 	wg.Done()
@@ -331,7 +331,7 @@ func getFileListIntoChan(fileChan chan string) {
 		func(path string, info os.FileInfo, err error) error {
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
-				log.Info(fmt.Sprintf("Skipping file %s with name %s", path, name))
+				log.Infof("Skipping file %s with name %s", path, name)
 				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}
