@@ -21,6 +21,7 @@ var (
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
+	cassandraCreateKeyspace      = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
 	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
@@ -68,7 +69,7 @@ func main() {
 		panic(fmt.Sprintf("Error creating directory: %s", err))
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, cassandraReadConcurrency, cassandraReadConcurrency, cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, windowFactor, cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, ttls)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, cassandraReadConcurrency, cassandraReadConcurrency, cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, windowFactor, cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, ttls)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}

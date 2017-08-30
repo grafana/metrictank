@@ -80,6 +80,7 @@ var (
 	cassandraReadQueueSize       = globalFlags.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
 	cassandraRetries             = globalFlags.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
 	cqlProtocolVersion           = globalFlags.Int("cql-protocol-version", 4, "cql protocol version to use")
+	cassandraCreateKeyspace      = globalFlags.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
 
 	cassandraSSL              = globalFlags.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
 	cassandraCaPath           = globalFlags.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
@@ -148,7 +149,7 @@ func main() {
 		log.SetLevel(log.InfoLevel)
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
+	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
 	}
