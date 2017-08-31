@@ -176,9 +176,15 @@ func (c *CasIdx) InitBare() error {
 			log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
 			return err
 		}
+		err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
+		if err != nil {
+			log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
+			return err
+		}
 	} else {
+		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
-			_, err = tmpSession.KeyspaceMetadata(keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
 				log.Warn("cassandra-idx cassandra keyspace not found. retry attempt: %v", attempt)
 				if attempt > 5 {
@@ -186,16 +192,20 @@ func (c *CasIdx) InitBare() error {
 				}
 				time.Sleep(5 * time.Second)
 			} else {
-				break
+				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
+					break
+				} else {
+					log.Warn("cassandra-idx cassandra table not found. retry attempt: %v", attempt)
+					if attempt > 5 {
+						return err
+					}
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
+
 	}
-	
-	err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
-		return err
-	}
+
 	tmpSession.Close()
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()

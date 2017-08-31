@@ -34,9 +34,9 @@ var (
 	//cassandraWriteConcurrency    = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
 	cassandraReadQueueSize = flag.Int("cassandra-read-queue-size", 200000, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
 	//cassandraWriteQueueSize      = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	cassandraRetries   = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cqlProtocolVersion = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace      = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
+	cassandraRetries        = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
+	cqlProtocolVersion      = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
+	cassandraCreateKeyspace = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
 	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
