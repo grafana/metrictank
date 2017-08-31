@@ -194,16 +194,30 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		return nil, err
 	}
 
+	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
+
 	// create or verify the metrictank keyspace
 	if createKeyspace {
 		err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
+		for _, result := range ttlTables {
+			err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if err != nil {
+			return nil, err
+		}
 	} else {
+		var keyspaceMetadata *gocql.KeyspaceMetadata
 		// five attempts to verify the keyspace exists before returning an error
+	AttemptLoop:
 		for attempt := 1; attempt > 0; attempt++ {
-			_, err = tmpSession.KeyspaceMetadata(keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
 				log.Warn("cassandra keyspace not found; attempt: %v", attempt)
 				if attempt > 5 {
@@ -211,22 +225,21 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 				}
 				time.Sleep(5 * time.Second)
 			} else {
+				for _, result := range ttlTables {
+					if _, ok := keyspaceMetadata.Tables[result.Table]; !ok {
+						log.Warn("cassandra table %s not found; attempt: %v", result.Table, attempt)
+						if attempt > 5 {
+							return nil, err
+						}
+						time.Sleep(5 * time.Second)
+						continue AttemptLoop
+					}
+				}
 				break
 			}
 		}
-	} 
-
-	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
-	for _, result := range ttlTables {
-		err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
-		if err != nil {
-			return nil, err
-		}
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	tmpSession.Close()
 	cluster.Keyspace = keyspace
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
