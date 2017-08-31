@@ -6,7 +6,7 @@ machine:
   environment:
     GOPATH: "/home/ubuntu/.go_workspace"
     IMPORTPATH: "/home/ubuntu/.go_workspace/src/github.com/raintank/metrictank"
-    GODIST: "go1.8.1.linux-amd64.tar.gz"
+    GODIST: "go1.9.linux-amd64.tar.gz"
   post:
     - mkdir -p download
     - test -e download/$GODIST || curl -o download/$GODIST https://storage.googleapis.com/golang/$GODIST
