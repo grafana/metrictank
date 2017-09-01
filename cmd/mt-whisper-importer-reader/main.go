@@ -165,7 +165,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 
 		resp, err := client.Do(req)
 		if err != nil || resp.StatusCode != 200 {
-			log.Errorf("Error sending request to http endpoint %q: %q", *httpEndpoint, err)
+			log.Errorf("Error sending request to http endpoint %q (status %d): %s", *httpEndpoint, resp.StatusCode, err)
 		}
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
