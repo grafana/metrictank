@@ -74,7 +74,7 @@ var (
 	cassandraWindowFactor        = flag.Int("cassandra-window-factor", 20, "size of compaction window relative to TTL")
 	cassandraOmitReadTimeout     = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace      = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
+	cassandraCreateKeyspace      = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the mdata keyspace and tables, only one node needs this")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
 	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")

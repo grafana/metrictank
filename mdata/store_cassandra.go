@@ -225,7 +225,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
 				log.Warn("cassandra keyspace not found; attempt: %v", attempt)
-				if attempt > 5 {
+				if attempt >= 5 {
 					return nil, err
 				}
 				time.Sleep(5 * time.Second)
@@ -233,7 +233,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 				for _, result := range ttlTables {
 					if _, ok := keyspaceMetadata.Tables[result.Table]; !ok {
 						log.Warn("cassandra table %s not found; attempt: %v", result.Table, attempt)
-						if attempt > 5 {
+						if attempt >= 5 {
 							return nil, err
 						}
 						time.Sleep(5 * time.Second)

@@ -100,7 +100,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
-	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "set to create keyspaces otherwise check to ensure they exist")
+	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
 	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
@@ -187,7 +187,7 @@ func (c *CasIdx) InitBare() error {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
 				log.Warn("cassandra-idx cassandra keyspace not found. retry attempt: %v", attempt)
-				if attempt > 5 {
+				if attempt >= 5 {
 					return err
 				}
 				time.Sleep(5 * time.Second)
@@ -196,7 +196,7 @@ func (c *CasIdx) InitBare() error {
 					break
 				} else {
 					log.Warn("cassandra-idx cassandra table not found. retry attempt: %v", attempt)
-					if attempt > 5 {
+					if attempt >= 5 {
 						return err
 					}
 					time.Sleep(5 * time.Second)
