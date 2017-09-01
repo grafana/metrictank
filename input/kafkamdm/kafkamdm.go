@@ -269,6 +269,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 				partitionLogSizeMetric.Set(int(offset))
 			}
 			if currentOffset < 0 {
+				// we're set to consume oldest/newest and
 				// we have not yet consumed any messages.
 				continue
 			}
