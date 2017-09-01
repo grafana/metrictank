@@ -10,7 +10,7 @@ import (
 func TestLagLogger(t *testing.T) {
 	logger := newLagLogger(5)
 	Convey("with 0 measurements", t, func() {
-		So(logger.Min(), ShouldEqual, 0)
+		So(logger.Min(), ShouldEqual, -1)
 	})
 	Convey("with 1 measurements", t, func() {
 		logger.Store(10)
@@ -18,6 +18,10 @@ func TestLagLogger(t *testing.T) {
 	})
 	Convey("with 2 measurements", t, func() {
 		logger.Store(5)
+		So(logger.Min(), ShouldEqual, 5)
+	})
+	Convey("with a negative measurement", t, func() {
+		logger.Store(-5)
 		So(logger.Min(), ShouldEqual, 5)
 	})
 	Convey("with lots of measurements", t, func() {
@@ -104,7 +108,7 @@ func TestRateLoggerSmallIncrements(t *testing.T) {
 func TestLagMonitor(t *testing.T) {
 	mon := NewLagMonitor(10, []int32{0, 1, 2, 3})
 	Convey("with 0 measurements", t, func() {
-		So(mon.Metric(), ShouldEqual, 0)
+		So(mon.Metric(), ShouldEqual, 10000)
 	})
 	Convey("with lots of measurements", t, func() {
 		now := time.Now()

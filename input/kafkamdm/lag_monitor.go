@@ -22,7 +22,14 @@ func newLagLogger(size int) *lagLogger {
 
 // Store saves the current value, potentially overwriting an old value
 // if needed.
+// Note: negative values are ignored.  We rely on previous data - if any - in such case.
+// negative values can happen when:
+//  - kafka had to recover, and a previous offset loaded from offsetMgr was bigger than current offset
+//  - a rollover of the offset counter
 func (l *lagLogger) Store(lag int) {
+	if lag < 0 {
+		return
+	}
 	l.Lock()
 	defer l.Unlock()
 	l.pos++
@@ -37,22 +44,20 @@ func (l *lagLogger) Store(lag int) {
 	l.measurements[l.pos] = lag
 }
 
-// Min returns the lowest lag seen or 0 if:
-// * no lags reported yet
-// * reported lag was negative, which can happen when:
-//   - kafka had to recover, and a previous offset loaded from offsetMgr was bigger than current offset
-//   - a rollover of the offset counter
+// Min returns the lowest lag seen (0 or positive) or -1 if no lags reported yet
+// note: values may be slightly out of date if negative values were reported
+// (see Store())
 func (l *lagLogger) Min() int {
 	l.Lock()
 	defer l.Unlock()
+	if len(l.measurements) == 0 {
+		return -1
+	}
 	min := -1
 	for _, m := range l.measurements {
 		if min < 0 || m < min {
 			min = m
 		}
-	}
-	if min < 0 {
-		min = 0
 	}
 	return min
 }
@@ -160,7 +165,7 @@ func NewLagMonitor(size int, partitions []int32) *LagMonitor {
 // lag (in messages/metrics)     ingest rate       --->    score (seconds behind)
 //                       10k       1k/second                 10
 //                       200       1k/second                  0 (less than 1s behind)
-//     0 (see lag.Min() docs)              *                  0 !!! PROBLEM
+//                         0               *                  0 (perfectly in sync)
 //                   anything     0 (after startup)          same as lag
 //
 // The returned total score for the node is the max of the scores of individual partitions.
@@ -173,12 +178,19 @@ func (l *LagMonitor) Metric() int {
 	max := 0
 	for p, lag := range l.lag {
 		rate := l.rate[p]
-		l := lag.Min()   // accurate lag, or 0 if no reports yet or in some other conditions
+		l := lag.Min()   // accurate lag, -1 if unknown
 		r := rate.Rate() // accurate rate, or 0 if we're not sure.
 		if r == 0 {
 			r = 1
 		}
-		val := l / int(r)
+		var val int
+		if l == -1 {
+			// if we have no lag measurements yet,
+			// just assign a priority of 10k for this partition
+			val = 10000
+		} else {
+			val = l / int(r)
+		}
 		if val > max {
 			max = val
 		}
