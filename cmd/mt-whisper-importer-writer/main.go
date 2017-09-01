@@ -35,11 +35,6 @@ var (
 		false,
 		"More detailed logging",
 	)
-	fakeAvgAggregates = globalFlags.Bool(
-		"fake-avg-aggregates",
-		true,
-		"Generate sum/cnt series out of avg series to accommodate metrictank",
-	)
 	httpEndpoint = globalFlags.String(
 		"http-endpoint",
 		"127.0.0.1:8080",
