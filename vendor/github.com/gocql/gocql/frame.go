@@ -9,13 +9,16 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
+
+type unsetColumn struct{}
+
+var UnsetValue = unsetColumn{}
 
 const (
 	protoDirectionMask = 0x80
@@ -276,6 +279,7 @@ type frameHeader struct {
 	op            frameOp
 	length        int
 	customPayload map[string][]byte
+	warnings      []string
 }
 
 func (f frameHeader) String() string {
@@ -469,11 +473,7 @@ func (f *framer) parseFrame() (frame frame, err error) {
 	}
 
 	if f.header.flags&flagWarning == flagWarning {
-		warnings := f.readStringList()
-		// what to do with warnings?
-		for _, v := range warnings {
-			log.Println(v)
-		}
+		f.header.warnings = f.readStringList()
 	}
 
 	if f.header.flags&flagCustomPayload == flagCustomPayload {
@@ -562,7 +562,7 @@ func (f *framer) parseErrorFrame() frame {
 		stmtId := f.readShortBytes()
 		return &RequestErrUnprepared{
 			errorFrame:  errD,
-			StatementId: copyBytes(stmtId), // defensivly copy
+			StatementId: copyBytes(stmtId), // defensively copy
 		}
 	case errReadFailure:
 		res := &RequestErrReadFailure{
@@ -1259,8 +1259,10 @@ func (f *framer) writeAuthResponseFrame(streamID int, data []byte) error {
 
 type queryValues struct {
 	value []byte
+
 	// optional name, will set With names for values flag
-	name string
+	name    string
+	isUnset bool
 }
 
 type queryParams struct {
@@ -1323,11 +1325,16 @@ func (f *framer) writeQueryParams(opts *queryParams) {
 
 	if n := len(opts.values); n > 0 {
 		f.writeShort(uint16(n))
+
 		for i := 0; i < n; i++ {
 			if names {
 				f.writeString(opts.values[i].name)
 			}
-			f.writeBytes(opts.values[i].value)
+			if opts.values[i].isUnset {
+				f.writeUnset()
+			} else {
+				f.writeBytes(opts.values[i].value)
+			}
 		}
 	}
 
@@ -1408,7 +1415,11 @@ func (f *framer) writeExecuteFrame(streamID int, preparedID []byte, params *quer
 		n := len(params.values)
 		f.writeShort(uint16(n))
 		for i := 0; i < n; i++ {
-			f.writeBytes(params.values[i].value)
+			if params.values[i].isUnset {
+				f.writeUnset()
+			} else {
+				f.writeBytes(params.values[i].value)
+			}
 		}
 		f.writeConsistency(params.consistency)
 	}
@@ -1467,7 +1478,11 @@ func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame) error {
 				flags |= flagWithNameValues
 				f.writeString(col.name)
 			}
-			f.writeBytes(col.value)
+			if col.isUnset {
+				f.writeUnset()
+			} else {
+				f.writeBytes(col.value)
+			}
 		}
 	}
 
@@ -1788,6 +1803,14 @@ func (f *framer) writeStringList(l []string) {
 	for _, s := range l {
 		f.writeString(s)
 	}
+}
+
+func (f *framer) writeUnset() {
+	// Protocol version 4 specifies that bind variables do not require having a
+	// value when executing a statement.   Bind variables without a value are
+	// called 'unset'. The 'unset' bind variable is serialized as the int
+	// value '-2' without following bytes.
+	f.writeInt(-2)
 }
 
 func (f *framer) writeBytes(p []byte) {

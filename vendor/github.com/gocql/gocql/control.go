@@ -1,22 +1,22 @@
 package gocql
 
 import (
+	"context"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"regexp"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 var (
-	randr *rand.Rand
+	randr    *rand.Rand
+	mutRandr sync.Mutex
 )
 
 func init() {
@@ -132,11 +132,13 @@ func hostInfo(addr string, defaultPort int) (*HostInfo, error) {
 
 	}
 
-	return &HostInfo{peer: ip, port: port}, nil
+	return &HostInfo{connectAddress: ip, port: port}, nil
 }
 
 func shuffleHosts(hosts []*HostInfo) []*HostInfo {
+	mutRandr.Lock()
 	perm := randr.Perm(len(hosts))
+	mutRandr.Unlock()
 	shuffled := make([]*HostInfo, len(hosts))
 
 	for i, host := range hosts {
@@ -159,7 +161,7 @@ func (c *controlConn) shuffleDial(endpoints []*HostInfo) (*Conn, error) {
 			return conn, nil
 		}
 
-		log.Printf("gocql: unable to dial control conn %v: %v\n", host.Peer(), err)
+		Logger.Printf("gocql: unable to dial control conn %v: %v\n", host.ConnectAddress(), err)
 	}
 
 	return nil, err
@@ -245,16 +247,27 @@ func (c *controlConn) setupConn(conn *Conn) error {
 
 	c.conn.Store(conn)
 
+	if v, ok := conn.conn.RemoteAddr().(*net.TCPAddr); ok {
+		c.session.handleNodeUp(copyBytes(v.IP), v.Port, false)
+		return nil
+	}
+
 	host, portstr, err := net.SplitHostPort(conn.conn.RemoteAddr().String())
 	if err != nil {
 		return err
 	}
+
 	port, err := strconv.Atoi(portstr)
 	if err != nil {
 		return err
 	}
 
-	c.session.handleNodeUp(net.ParseIP(host), port, false)
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("invalid remote addr: addr=%v host=%q", conn.conn.RemoteAddr(), host)
+	}
+
+	c.session.handleNodeUp(ip, port, false)
 
 	return nil
 }
@@ -312,7 +325,7 @@ func (c *controlConn) reconnect(refreshring bool) {
 		if err != nil {
 			// host is dead
 			// TODO: this is replicated in a few places
-			c.session.handleNodeDown(host.Peer(), host.Port())
+			c.session.handleNodeDown(host.ConnectAddress(), host.Port())
 		} else {
 			newConn = conn
 		}
@@ -337,7 +350,7 @@ func (c *controlConn) reconnect(refreshring bool) {
 
 	if err := c.setupConn(newConn); err != nil {
 		newConn.Close()
-		log.Printf("gocql: control unable to register events: %v\n", err)
+		Logger.Printf("gocql: control unable to register events: %v\n", err)
 		return
 	}
 
@@ -398,7 +411,7 @@ func (c *controlConn) withConn(fn func(*Conn) *Iter) *Iter {
 
 // query will return nil if the connection is closed or nil
 func (c *controlConn) query(statement string, values ...interface{}) (iter *Iter) {
-	q := c.session.Query(statement, values...).Consistency(One).RoutingKey([]byte{})
+	q := c.session.Query(statement, values...).Consistency(One).RoutingKey([]byte{}).Trace(nil)
 
 	for {
 		iter = c.withConn(func(conn *Conn) *Iter {
@@ -406,7 +419,7 @@ func (c *controlConn) query(statement string, values ...interface{}) (iter *Iter
 		})
 
 		if gocqlDebug && iter.err != nil {
-			log.Printf("control: error executing %q: %v\n", statement, iter.err)
+			Logger.Printf("control: error executing %q: %v\n", statement, iter.err)
 		}
 
 		q.attempts++
@@ -418,52 +431,13 @@ func (c *controlConn) query(statement string, values ...interface{}) (iter *Iter
 	return
 }
 
-func (c *controlConn) fetchHostInfo(ip net.IP, port int) (*HostInfo, error) {
-	// TODO(zariel): we should probably move this into host_source or atleast
-	// share code with it.
-	localHost := c.host()
-	if localHost == nil {
-		return nil, errors.New("unable to fetch host info, invalid conn host")
-	}
-
-	isLocal := localHost.Peer().Equal(ip)
-
-	var fn func(*HostInfo) error
-
-	// TODO(zariel): fetch preferred_ip address (is it >3.x only?)
-	if isLocal {
-		fn = func(host *HostInfo) error {
-			iter := c.query("SELECT data_center, rack, host_id, tokens, release_version FROM system.local WHERE key='local'")
-			iter.Scan(&host.dataCenter, &host.rack, &host.hostId, &host.tokens, &host.version)
-			return iter.Close()
-		}
-	} else {
-		fn = func(host *HostInfo) error {
-			iter := c.query("SELECT data_center, rack, host_id, tokens, release_version FROM system.peers WHERE peer=?", ip)
-			iter.Scan(&host.dataCenter, &host.rack, &host.hostId, &host.tokens, &host.version)
-			return iter.Close()
-		}
-	}
-
-	host := &HostInfo{
-		port: port,
-		peer: ip,
-	}
-
-	if err := fn(host); err != nil {
-		return nil, err
-	}
-
-	return host, nil
-}
-
 func (c *controlConn) awaitSchemaAgreement() error {
 	return c.withConn(func(conn *Conn) *Iter {
 		return &Iter{err: conn.awaitSchemaAgreement()}
 	}).err
 }
 
-func (c *controlConn) host() *HostInfo {
+func (c *controlConn) GetHostInfo() *HostInfo {
 	conn := c.conn.Load().(*Conn)
 	if conn == nil {
 		return nil

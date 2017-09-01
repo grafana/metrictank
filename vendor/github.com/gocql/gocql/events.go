@@ -1,7 +1,6 @@
 package gocql
 
 import (
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -74,7 +73,7 @@ func (e *eventDebouncer) debounce(frame frame) {
 	if len(e.events) < eventBufferSize {
 		e.events = append(e.events, frame)
 	} else {
-		log.Printf("%s: buffer full, dropping event frame: %s", e.name, frame)
+		Logger.Printf("%s: buffer full, dropping event frame: %s", e.name, frame)
 	}
 
 	e.mu.Unlock()
@@ -87,12 +86,12 @@ func (s *Session) handleEvent(framer *framer) {
 	frame, err := framer.parseFrame()
 	if err != nil {
 		// TODO: logger
-		log.Printf("gocql: unable to parse event frame: %v\n", err)
+		Logger.Printf("gocql: unable to parse event frame: %v\n", err)
 		return
 	}
 
 	if gocqlDebug {
-		log.Printf("gocql: handling frame: %v\n", frame)
+		Logger.Printf("gocql: handling frame: %v\n", frame)
 	}
 
 	// TODO: handle medatadata events
@@ -102,11 +101,14 @@ func (s *Session) handleEvent(framer *framer) {
 	case *topologyChangeEventFrame, *statusChangeEventFrame:
 		s.nodeEvents.debounce(frame)
 	default:
-		log.Printf("gocql: invalid event frame (%T): %v\n", f, f)
+		Logger.Printf("gocql: invalid event frame (%T): %v\n", f, f)
 	}
 }
 
 func (s *Session) handleSchemaEvent(frames []frame) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	if s.schemaDescriber == nil {
 		return
 	}
@@ -152,7 +154,7 @@ func (s *Session) handleNodeEvent(frames []frame) {
 
 	for _, f := range events {
 		if gocqlDebug {
-			log.Printf("gocql: dispatching event: %+v\n", f)
+			Logger.Printf("gocql: dispatching event: %+v\n", f)
 		}
 
 		switch f.change {
@@ -172,23 +174,15 @@ func (s *Session) handleNodeEvent(frames []frame) {
 }
 
 func (s *Session) handleNewNode(ip net.IP, port int, waitForBinary bool) {
-	var hostInfo *HostInfo
-	if s.control != nil && !s.cfg.IgnorePeerAddr {
-		var err error
-		hostInfo, err = s.control.fetchHostInfo(ip, port)
-		if err != nil {
-			log.Printf("gocql: events: unable to fetch host info for (%s:%d): %v\n", ip, port, err)
-			return
-		}
-	} else {
-		hostInfo = &HostInfo{peer: ip, port: port}
+	// Get host info and apply any filters to the host
+	hostInfo, err := s.hostSource.GetHostInfo(ip, port)
+	if err != nil {
+		Logger.Printf("gocql: events: unable to fetch host info for (%s:%d): %v\n", ip, port, err)
+		return
 	}
 
-	if s.cfg.IgnorePeerAddr && hostInfo.Peer().Equal(ip) {
-		hostInfo.setPeer(ip)
-	}
-
-	if s.cfg.HostFilter != nil && !s.cfg.HostFilter.Accept(hostInfo) {
+	// If hostInfo is nil, this host was filtered out by cfg.HostFilter
+	if hostInfo == nil {
 		return
 	}
 
@@ -214,7 +208,7 @@ func (s *Session) handleRemovedNode(ip net.IP, port int) {
 	// we remove all nodes but only add ones which pass the filter
 	host := s.ring.getHost(ip)
 	if host == nil {
-		host = &HostInfo{peer: ip, port: port}
+		host = &HostInfo{connectAddress: ip, port: port}
 	}
 
 	if s.cfg.HostFilter != nil && !s.cfg.HostFilter.Accept(host) {
@@ -233,14 +227,15 @@ func (s *Session) handleRemovedNode(ip net.IP, port int) {
 
 func (s *Session) handleNodeUp(ip net.IP, port int, waitForBinary bool) {
 	if gocqlDebug {
-		log.Printf("gocql: Session.handleNodeUp: %s:%d\n", ip.String(), port)
+		Logger.Printf("gocql: Session.handleNodeUp: %s:%d\n", ip.String(), port)
 	}
 
 	host := s.ring.getHost(ip)
 	if host != nil {
-		if s.cfg.IgnorePeerAddr && host.Peer().Equal(ip) {
-			// TODO: how can this ever be true?
-			host.setPeer(ip)
+		// If we receive a node up event and user has asked us to ignore the peer address use
+		// the address provide by the event instead the address provide by peer the table.
+		if s.cfg.IgnorePeerAddr && !host.ConnectAddress().Equal(ip) {
+			host.SetConnectAddress(ip)
 		}
 
 		if s.cfg.HostFilter != nil && !s.cfg.HostFilter.Accept(host) {
@@ -262,12 +257,12 @@ func (s *Session) handleNodeUp(ip net.IP, port int, waitForBinary bool) {
 
 func (s *Session) handleNodeDown(ip net.IP, port int) {
 	if gocqlDebug {
-		log.Printf("gocql: Session.handleNodeDown: %s:%d\n", ip.String(), port)
+		Logger.Printf("gocql: Session.handleNodeDown: %s:%d\n", ip.String(), port)
 	}
 
 	host := s.ring.getHost(ip)
 	if host == nil {
-		host = &HostInfo{peer: ip, port: port}
+		host = &HostInfo{connectAddress: ip, port: port}
 	}
 
 	if s.cfg.HostFilter != nil && !s.cfg.HostFilter.Accept(host) {

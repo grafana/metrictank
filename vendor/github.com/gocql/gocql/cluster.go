@@ -6,7 +6,6 @@ package gocql
 
 import (
 	"errors"
-	"log"
 	"net"
 	"time"
 )
@@ -29,7 +28,7 @@ func (p PoolConfig) buildPool(session *Session) *policyConnPool {
 // behavior to fit the most common use cases. Applications that require a
 // different setup must implement their own cluster.
 type ClusterConfig struct {
-	// addresses for the initial connections. It is recomended to use the value set in
+	// addresses for the initial connections. It is recommended to use the value set in
 	// the Cassandra config for broadcast_address or listen_address, an IP address not
 	// a domain name. This is because events from Cassandra will use the configured IP
 	// address, which is used to index connected hosts. If the domain name specified
@@ -47,6 +46,7 @@ type ClusterConfig struct {
 	// versions the protocol selected is not defined (ie, it can be any of the supported in the cluster)
 	ProtoVersion      int
 	Timeout           time.Duration     // connection timeout (default: 600ms)
+	ConnectTimeout    time.Duration     // initial connection timeout, used during initial dial to server (default: 600ms)
 	Port              int               // port (default: 9042)
 	Keyspace          string            // initial keyspace (optional)
 	NumConns          int               // number of connections per host (default: 2)
@@ -65,7 +65,7 @@ type ClusterConfig struct {
 	// configuration of host selection and connection selection policies.
 	PoolConfig PoolConfig
 
-	// If not zero, gocql attempt to reconnect known DOWN nodes in every ReconnectSleep.
+	// If not zero, gocql attempt to reconnect known DOWN nodes in every ReconnectInterval.
 	ReconnectInterval time.Duration
 
 	// The maximum amount of time to wait for schema agreement in a cluster after
@@ -122,7 +122,7 @@ type ClusterConfig struct {
 // NewCluster generates a new config for the default cluster implementation.
 //
 // The supplied hosts are used to initially connect to the cluster then the rest of
-// the ring will be automatically discovered. It is recomended to use the value set in
+// the ring will be automatically discovered. It is recommended to use the value set in
 // the Cassandra config for broadcast_address or listen_address, an IP address not
 // a domain name. This is because events from Cassandra will use the configured IP
 // address, which is used to index connected hosts. If the domain name specified
@@ -133,6 +133,7 @@ func NewCluster(hosts ...string) *ClusterConfig {
 		Hosts:                  hosts,
 		CQLVersion:             "3.0.0",
 		Timeout:                600 * time.Millisecond,
+		ConnectTimeout:         600 * time.Millisecond,
 		Port:                   9042,
 		NumConns:               2,
 		Consistency:            Quorum,
@@ -162,7 +163,7 @@ func (cfg *ClusterConfig) translateAddressPort(addr net.IP, port int) (net.IP, i
 	}
 	newAddr, newPort := cfg.AddressTranslator.Translate(addr, port)
 	if gocqlDebug {
-		log.Printf("gocql: translating address '%v:%d' to '%v:%d'", addr, port, newAddr, newPort)
+		Logger.Printf("gocql: translating address '%v:%d' to '%v:%d'", addr, port, newAddr, newPort)
 	}
 	return newAddr, newPort
 }
