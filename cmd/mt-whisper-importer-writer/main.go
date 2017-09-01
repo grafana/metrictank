@@ -102,6 +102,7 @@ type Server struct {
 	TTLTables   mdata.TTLTables
 	Partitioner partitioner.Partitioner
 	Index       idx.MetricIndex
+	HTTPServer  *http.Server
 }
 
 func main() {
@@ -169,13 +170,18 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
+	cluster.Init("mt-whisper-importer-writer", GitHash, time.Now(), "http", int(80))
+
 	server := &Server{
 		Session:     store.Session,
 		TTLTables:   ttlTables,
 		Partitioner: p,
 		Index:       cassandra.New(),
+		HTTPServer: &http.Server{
+			Addr:        *httpEndpoint,
+			ReadTimeout: 10 * time.Minute,
+		},
 	}
-	cluster.Init("mt-whisper-importer-writer", GitHash, time.Now(), "http", int(80))
 	server.Index.Init()
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
@@ -257,9 +263,23 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 	log.Debug(query)
 	for _, ig := range itergens {
 		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
-		err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
-		if err != nil {
-			throwError(fmt.Sprintf("Error in query: %q", err))
+		success := false
+		attempts := 0
+		for !success {
+			err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+			if err != nil {
+				if (attempts % 20) == 0 {
+					log.Warn("CS: failed to save chunk to cassandra after %d attempts+1. %s", attempts+1, err)
+				}
+				sleepTime := 100 * attempts
+				if sleepTime > 2000 {
+					sleepTime = 2000
+				}
+				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				attempts++
+			} else {
+				success = true
+			}
 		}
 	}
 }
