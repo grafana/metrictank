@@ -82,6 +82,11 @@ var (
 		math.MaxUint32,
 		"Only import up to the specified timestamp",
 	)
+	verbose = flag.Bool(
+		"verbose",
+		false,
+		"More detailled logging",
+	)
 	schemas        conf.Schemas
 	nameFilter     *regexp.Regexp
 	processedCount uint32
@@ -91,6 +96,11 @@ var (
 func main() {
 	var err error
 	flag.Parse()
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
 
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
@@ -129,7 +139,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 
 		name := getMetricName(file)
-		log.Infof("Processing file %s (%s)", file, name)
+		log.Debugf("Processing file %s (%s)", file, name)
 		met, err := getMetrics(w, file, name)
 		if err != nil {
 			log.Errorf("Failed to get metric: %q", err)
@@ -331,7 +341,7 @@ func getFileListIntoChan(fileChan chan string) {
 		func(path string, info os.FileInfo, err error) error {
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
-				log.Infof("Skipping file %s with name %s", path, name)
+				log.Debugf("Skipping file %s with name %s", path, name)
 				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}
