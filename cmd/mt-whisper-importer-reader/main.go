@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/whisper-go/whisper"
@@ -151,6 +152,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			log.Errorf("Failed to encode metric: %q", err)
 			continue
 		}
+		size := b.Len()
 
 		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 		if err != nil {
@@ -163,12 +165,26 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
 		}
 
-		resp, err := client.Do(req)
-		if err != nil || resp.StatusCode != 200 {
-			log.Errorf("Error sending request to http endpoint %q (status %d): %s", *httpEndpoint, resp.StatusCode, err)
+		success := false
+		attempts := 0
+		for !success {
+			pre := time.Now()
+			resp, err := client.Do(req)
+			passed := time.Now().Sub(pre).Seconds()
+			if err != nil || resp.StatusCode-(resp.StatusCode%100) != 200 {
+				if err != nil {
+					log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
+				} else {
+					log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
+				}
+				attempts++
+			} else {
+				log.Debugf("Posted %s (%d bytes) to endpoint %q in %f seconds", name, size, *httpEndpoint, passed)
+				success = true
+			}
+			io.Copy(ioutil.Discard, resp.Body)
+			resp.Body.Close()
 		}
-		io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
 
 		processed := atomic.AddUint32(&processedCount, 1)
 		if processed%100 == 0 {
