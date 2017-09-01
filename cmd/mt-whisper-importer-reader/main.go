@@ -85,7 +85,7 @@ var (
 	verbose = flag.Bool(
 		"verbose",
 		false,
-		"More detailled logging",
+		"More detailed logging",
 	)
 	schemas        conf.Schemas
 	nameFilter     *regexp.Regexp
