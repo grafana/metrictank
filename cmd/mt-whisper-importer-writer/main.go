@@ -70,6 +70,11 @@ var (
 		1,
 		"Number of Partitions",
 	)
+	overwriteChunks = globalFlags.Bool(
+		"overwrite-chunks",
+		false,
+		"If true existing chunks may be overwritten",
+	)
 
 	cassandraAddrs               = globalFlags.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace            = globalFlags.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
@@ -245,7 +250,12 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
-	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
+	var query string
+	if *overwriteChunks {
+		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
+	} else {
+		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) IF NOT EXISTS USING TTL %d", table, ttl)
+	}
 	for _, ig := range itergens {
 		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
 		err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
