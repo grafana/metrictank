@@ -95,6 +95,14 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 		o.lastOffset = offset
 		return
 	}
+	if o.lastOffset < 0 {
+		// last offset is symbolical value representing "newest" or "latest"
+		// it can't be used to compute a rate (it would lead to a value way too high)
+		// so set the new baseline and hopefully we can compute the rate next time
+		o.lastTs = ts
+		o.lastOffset = offset
+		return
+	}
 	metrics := offset - o.lastOffset
 	o.lastTs = ts
 	o.lastOffset = offset
