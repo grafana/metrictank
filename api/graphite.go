@@ -245,7 +245,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	if err != nil {
 		tracing.Failure(span)
 		tracing.Error(span, err)
-		ctx.Error(http.StatusBadRequest, err.Error())
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
