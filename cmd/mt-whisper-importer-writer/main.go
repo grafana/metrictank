@@ -67,7 +67,7 @@ var (
 	)
 	overwriteChunks = globalFlags.Bool(
 		"overwrite-chunks",
-		false,
+		true,
 		"If true existing chunks may be overwritten",
 	)
 
