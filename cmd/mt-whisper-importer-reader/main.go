@@ -141,57 +141,55 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 
 		name := getMetricName(file)
 		log.Debugf("Processing file %s (%s)", file, name)
-		mets, err := getMetrics(w, file, name)
+		met, err := getMetric(w, file, name)
 		if err != nil {
 			log.Errorf("Failed to get metric: %q", err)
 			continue
 		}
 
-		for _, met := range mets {
-			b, err := met.MarshalCompressed()
-			if err != nil {
-				log.Errorf("Failed to encode metric: %q", err)
-				continue
-			}
-			size := b.Len()
+		b, err := met.MarshalCompressed()
+		if err != nil {
+			log.Errorf("Failed to encode metric: %q", err)
+			continue
+		}
+		size := b.Len()
 
-			req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
-			if err != nil {
-				log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
-			}
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Content-Encoding", "gzip")
+		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
+		if err != nil {
+			log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
 
-			if len(*httpAuth) > 0 {
-				req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
-			}
+		if len(*httpAuth) > 0 {
+			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
+		}
 
-			success := false
-			attempts := 0
-			for !success {
-				pre := time.Now()
-				resp, err := client.Do(req)
-				passed := time.Now().Sub(pre).Seconds()
-				if err != nil || resp.StatusCode-(resp.StatusCode%100) != 200 {
-					if err != nil {
-						log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
-					} else {
-						log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
-					}
-					attempts++
+		success := false
+		attempts := 0
+		for !success {
+			pre := time.Now()
+			resp, err := client.Do(req)
+			passed := time.Now().Sub(pre).Seconds()
+			if err != nil || resp.StatusCode-(resp.StatusCode%100) != 200 {
+				if err != nil {
+					log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
 				} else {
-					log.Debugf("Posted %s (%d bytes) to endpoint %q in %f seconds", name, size, *httpEndpoint, passed)
-					success = true
+					log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
 				}
-				io.Copy(ioutil.Discard, resp.Body)
-				resp.Body.Close()
+				attempts++
+			} else {
+				log.Debugf("Posted %s (%d bytes) to endpoint %q in %f seconds", name, size, *httpEndpoint, passed)
+				success = true
 			}
+			io.Copy(ioutil.Discard, resp.Body)
+			resp.Body.Close()
+		}
 
-			processed := atomic.AddUint32(&processedCount, 1)
-			if processed%100 == 0 {
-				skipped := atomic.LoadUint32(&skippedCount)
-				log.Infof("Processed %d files, %d skipped", processed, skipped)
-			}
+		processed := atomic.AddUint32(&processedCount, 1)
+		if processed%100 == 0 {
+			skipped := atomic.LoadUint32(&skippedCount)
+			log.Infof("Processed %d files, %d skipped", processed, skipped)
 		}
 	}
 	wg.Done()
@@ -238,8 +236,10 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) (string, error) {
 	}
 }
 
-func getMetrics(w *whisper.Whisper, file, name string) ([]archive.Metric, error) {
-	var res []archive.Metric
+func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
+	res := archive.Metric{
+		AggregationMethod: uint32(w.Header.Metadata.AggregationMethod),
+	}
 	if len(w.Header.Archives) == 0 {
 		return res, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
@@ -274,17 +274,12 @@ func getMetrics(w *whisper.Whisper, file, name string) ([]archive.Metric, error)
 
 	conversion := newConversion(w.Header.Archives, points, method)
 	for retIdx, retention := range schema.Retentions {
-		metric := archive.Metric{
-			AggregationMethod: uint32(w.Header.Metadata.AggregationMethod),
-			MetricData:        md,
-		}
 		convertedPoints := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
-			log.Debugf("First point %d last point %d", p[0].Timestamp, p[len(p)-1].Timestamp)
 			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			log.Debugf("Archive %d Method %s got %d points = %d chunks at a span of %d", retIdx, m, len(p), len(encodedChunks), retention.ChunkSpan)
-			metric.Archives = append(metric.Archives, archive.Archive{
+			res.Archives = append(res.Archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
 				Points:          uint32(retention.NumberOfPoints),
 				Chunks:          encodedChunks,
@@ -294,8 +289,8 @@ func getMetrics(w *whisper.Whisper, file, name string) ([]archive.Metric, error)
 				md.Time = int64(p[len(p)-1].Timestamp)
 			}
 		}
-		res = append(res, metric)
 	}
+	res.MetricData = md
 
 	return res, nil
 }
