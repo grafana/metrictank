@@ -6,10 +6,12 @@ package gocql
 
 import (
 	"fmt"
-	"log"
+	"math"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hailocab/go-hostpool"
 )
@@ -103,7 +105,7 @@ func (c *cowHostList) remove(ip net.IP) bool {
 	found := false
 	newL := make([]*HostInfo, 0, size)
 	for i := 0; i < len(l); i++ {
-		if !l[i].Peer().Equal(ip) {
+		if !l[i].ConnectAddress().Equal(ip) {
 			newL = append(newL, l[i])
 		} else {
 			found = true
@@ -158,6 +160,34 @@ type SimpleRetryPolicy struct {
 // than the NumRetries defined in the policy.
 func (s *SimpleRetryPolicy) Attempt(q RetryableQuery) bool {
 	return q.Attempts() <= s.NumRetries
+}
+
+// ExponentialBackoffRetryPolicy sleeps between attempts
+type ExponentialBackoffRetryPolicy struct {
+	NumRetries int
+	Min, Max   time.Duration
+}
+
+func (e *ExponentialBackoffRetryPolicy) Attempt(q RetryableQuery) bool {
+	if q.Attempts() > e.NumRetries {
+		return false
+	}
+	time.Sleep(e.napTime(q.Attempts()))
+	return true
+}
+
+func (e *ExponentialBackoffRetryPolicy) napTime(attempts int) time.Duration {
+	if e.Min <= 0 {
+		e.Min = 100 * time.Millisecond
+	}
+	if e.Max <= 0 {
+		e.Max = 10 * time.Second
+	}
+	minFloat := float64(e.Min)
+	napDuration := minFloat * math.Pow(2, float64(attempts-1))
+	// add some jitter
+	napDuration += rand.Float64()*minFloat - (minFloat / 2)
+	return time.Duration(napDuration)
 }
 
 type HostStateNotifier interface {
@@ -237,7 +267,7 @@ func (r *roundRobinHostPolicy) AddHost(host *HostInfo) {
 }
 
 func (r *roundRobinHostPolicy) RemoveHost(host *HostInfo) {
-	r.hosts.remove(host.Peer())
+	r.hosts.remove(host.ConnectAddress())
 }
 
 func (r *roundRobinHostPolicy) HostUp(host *HostInfo) {
@@ -280,7 +310,7 @@ func (t *tokenAwareHostPolicy) AddHost(host *HostInfo) {
 }
 
 func (t *tokenAwareHostPolicy) RemoveHost(host *HostInfo) {
-	t.hosts.remove(host.Peer())
+	t.hosts.remove(host.ConnectAddress())
 	t.fallback.RemoveHost(host)
 
 	t.resetTokenRing()
@@ -307,7 +337,7 @@ func (t *tokenAwareHostPolicy) resetTokenRing() {
 	hosts := t.hosts.get()
 	tokenRing, err := newTokenRing(t.partitioner, hosts)
 	if err != nil {
-		log.Printf("Unable to update the token ring due to error: %s", err)
+		Logger.Printf("Unable to update the token ring due to error: %s", err)
 		return
 	}
 
@@ -394,7 +424,7 @@ func (r *hostPoolHostPolicy) SetHosts(hosts []*HostInfo) {
 	hostMap := make(map[string]*HostInfo, len(hosts))
 
 	for i, host := range hosts {
-		ip := host.Peer().String()
+		ip := host.ConnectAddress().String()
 		peers[i] = ip
 		hostMap[ip] = host
 	}
@@ -406,7 +436,7 @@ func (r *hostPoolHostPolicy) SetHosts(hosts []*HostInfo) {
 }
 
 func (r *hostPoolHostPolicy) AddHost(host *HostInfo) {
-	ip := host.Peer().String()
+	ip := host.ConnectAddress().String()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -427,7 +457,7 @@ func (r *hostPoolHostPolicy) AddHost(host *HostInfo) {
 }
 
 func (r *hostPoolHostPolicy) RemoveHost(host *HostInfo) {
-	ip := host.Peer().String()
+	ip := host.ConnectAddress().String()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -439,7 +469,7 @@ func (r *hostPoolHostPolicy) RemoveHost(host *HostInfo) {
 	delete(r.hostMap, ip)
 	hosts := make([]string, 0, len(r.hostMap))
 	for _, host := range r.hostMap {
-		hosts = append(hosts, host.Peer().String())
+		hosts = append(hosts, host.ConnectAddress().String())
 	}
 
 	r.hp.SetHosts(hosts)
@@ -493,7 +523,7 @@ func (host selectedHostPoolHost) Info() *HostInfo {
 }
 
 func (host selectedHostPoolHost) Mark(err error) {
-	ip := host.info.Peer().String()
+	ip := host.info.ConnectAddress().String()
 
 	host.policy.mu.RLock()
 	defer host.policy.mu.RUnlock()
@@ -504,4 +534,82 @@ func (host selectedHostPoolHost) Mark(err error) {
 	}
 
 	host.hostR.Mark(err)
+}
+
+type dcAwareRR struct {
+	local string
+
+	mu          sync.RWMutex
+	localHosts  map[string]*HostInfo
+	remoteHosts map[string]*HostInfo
+}
+
+// DCAwareRoundRobinPolicy is a host selection policies which will priorities and
+// return hosts which are in the local datacentre before returning hosts in all
+// other datercentres
+func DCAwareRoundRobinPolicy(localDC string) HostSelectionPolicy {
+	return &dcAwareRR{
+		local:       localDC,
+		localHosts:  make(map[string]*HostInfo),
+		remoteHosts: make(map[string]*HostInfo),
+	}
+}
+
+func (d *dcAwareRR) AddHost(host *HostInfo) {
+	d.mu.Lock()
+
+	if host.DataCenter() == d.local {
+		d.localHosts[host.HostID()] = host
+	} else {
+		d.remoteHosts[host.HostID()] = host
+	}
+
+	d.mu.Unlock()
+}
+
+func (d *dcAwareRR) RemoveHost(host *HostInfo) {
+	d.mu.Lock()
+
+	delete(d.localHosts, host.HostID())
+	delete(d.remoteHosts, host.HostID())
+
+	d.mu.Unlock()
+}
+
+func (d *dcAwareRR) HostUp(host *HostInfo) {
+	d.AddHost(host)
+}
+
+func (d *dcAwareRR) HostDown(host *HostInfo) {
+	d.RemoveHost(host)
+}
+
+func (d *dcAwareRR) SetPartitioner(p string) {}
+
+func (d *dcAwareRR) Pick(q ExecutableQuery) NextHost {
+	d.mu.RLock()
+
+	// TODO: this is O(len(hosts)) and requires calculating a full query plan for
+	// every query. On the other hand it is stupidly simply and provides random host
+	// order prefering local dcs over remote ones.
+	hosts := make([]*HostInfo, 0, len(d.localHosts)+len(d.remoteHosts))
+	for _, host := range d.localHosts {
+		hosts = append(hosts, host)
+	}
+	for _, host := range d.remoteHosts {
+		hosts = append(hosts, host)
+	}
+
+	d.mu.RUnlock()
+
+	return func() SelectedHost {
+		if len(hosts) == 0 {
+			return nil
+		}
+
+		host := hosts[0]
+		hosts = hosts[1:]
+
+		return (*selectedHost)(host)
+	}
 }

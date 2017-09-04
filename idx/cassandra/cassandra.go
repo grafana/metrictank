@@ -67,6 +67,7 @@ var (
 	ssl              bool
 	auth             bool
 	hostverification bool
+	createKeyspace   bool
 	keyspace         string
 	hosts            string
 	capath           string
@@ -99,6 +100,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
+	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
 	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
@@ -167,17 +169,43 @@ func (c *CasIdx) InitBare() error {
 		return err
 	}
 
-	// ensure the keyspace and table exist.
-	err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
-		return err
+	// create the keyspace or ensure it exists
+	if createKeyspace {
+		err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
+		if err != nil {
+			log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
+			return err
+		}
+		err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
+		if err != nil {
+			log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
+			return err
+		}
+	} else {
+		var keyspaceMetadata *gocql.KeyspaceMetadata
+		for attempt := 1; attempt > 0; attempt++ {
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
+			if err != nil {
+				log.Warn("cassandra-idx cassandra keyspace not found. retry attempt: %v", attempt)
+				if attempt >= 5 {
+					return err
+				}
+				time.Sleep(5 * time.Second)
+			} else {
+				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
+					break
+				} else {
+					log.Warn("cassandra-idx cassandra table not found. retry attempt: %v", attempt)
+					if attempt >= 5 {
+						return err
+					}
+					time.Sleep(5 * time.Second)
+				}
+			}
+		}
+
 	}
-	err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
-	if err != nil {
-		log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
-		return err
-	}
+
 	tmpSession.Close()
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()

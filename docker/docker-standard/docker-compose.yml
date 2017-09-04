@@ -8,9 +8,9 @@ services:
      - "6060:6060"
      - "2003:2003"
     environment:
-     WAIT_HOSTS: cassandra:9042
-     WAIT_TIMEOUT: 60
-     MT_HTTP_MULTI_TENANT: "false"
+      WAIT_HOSTS: cassandra:9042
+      WAIT_TIMEOUT: 60
+      MT_HTTP_MULTI_TENANT: "false"
     links:
      - cassandra
 
