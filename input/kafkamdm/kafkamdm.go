@@ -231,19 +231,26 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	partitionOffsetMetric := partitionOffset[partition]
 	partitionLogSizeMetric := partitionLogSize[partition]
 	partitionLagMetric := partitionLag[partition]
+	var initialOffset int64
 	offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
 	if err != nil {
 		log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
 	} else {
 		partitionLogSizeMetric.Set(int(offset))
 	}
-	if currentOffset >= 0 {
-		// we cant set the offsetMetrics until we know what offset we are at.
-		partitionOffsetMetric.Set(int(currentOffset))
-		// we need the currentLogSize to be able to record our initial Lag.
-		if err == nil {
-			partitionLagMetric.Set(int(offset - currentOffset))
+	var err2 error
+	if currentOffset == sarama.OffsetNewest {
+		initialOffset = offset
+	} else if currentOffset == sarama.OffsetOldest {
+		initialOffset, err2 = k.client.GetOffset(topic, partition, currentOffset)
+		if err != nil {
+			log.Error(3, "kafka-mdm failed to get oldest offset of partition %s:%d. %s", topic, partition, err)
 		}
+	}
+
+	if err == nil && err2 == nil {
+		partitionOffsetMetric.Set(int(initialOffset))
+		partitionLagMetric.Set(int(offset - initialOffset))
 	}
 
 	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
@@ -268,14 +275,16 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			} else {
 				partitionLogSizeMetric.Set(int(offset))
 			}
+
+			effectiveOffset := currentOffset
 			if currentOffset < 0 {
-				// we're set to consume oldest/newest and
-				// we have not yet consumed any messages.
-				continue
+				// we're set to consume oldest/newest and we have not yet consumed any messages.
+				// so we're still stuck at the offset we got initially.
+				effectiveOffset = initialOffset
 			}
-			partitionOffsetMetric.Set(int(currentOffset))
+			partitionOffsetMetric.Set(int(effectiveOffset))
 			if err == nil {
-				lag := int(offset - currentOffset)
+				lag := int(offset - effectiveOffset)
 				partitionLagMetric.Set(lag)
 				k.lagMonitor.StoreLag(partition, lag)
 			}
