@@ -1,9 +1,11 @@
 package cache
 
 import (
+	"context"
 	"sort"
 	"sync"
 
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -185,7 +187,7 @@ func (mc *CCacheMetric) seekDesc(ts uint32) (uint32, bool) {
 	return 0, false
 }
 
-func (mc *CCacheMetric) searchForward(metric string, from, until uint32, res *CCSearchResult) {
+func (mc *CCacheMetric) searchForward(ctx context.Context, metric string, from, until uint32, res *CCSearchResult) {
 	ts, ok := mc.seekAsc(from)
 	if !ok {
 		return
@@ -204,6 +206,8 @@ func (mc *CCacheMetric) searchForward(metric string, from, until uint32, res *CC
 		}
 		if ts >= mc.chunks[ts].Next {
 			log.Warn("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
+			span := opentracing.SpanFromContext(ctx)
+			span.SetTag("searchForwardBug", true)
 			cacheMetricBug.Inc()
 			break
 		}
@@ -241,7 +245,7 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
 //
-func (mc *CCacheMetric) Search(metric string, res *CCSearchResult, from, until uint32) {
+func (mc *CCacheMetric) Search(ctx context.Context, metric string, res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 
@@ -249,7 +253,7 @@ func (mc *CCacheMetric) Search(metric string, res *CCSearchResult, from, until u
 		return
 	}
 
-	mc.searchForward(metric, from, until, res)
+	mc.searchForward(ctx, metric, from, until, res)
 	if !res.Complete {
 		mc.searchBackward(from, until, res)
 	}

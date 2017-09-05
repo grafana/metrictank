@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-querystring/query"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
+	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -89,15 +90,12 @@ func (n Node) IsLocal() bool {
 }
 
 func (n Node) Post(ctx context.Context, name, path string, body Traceable) ([]byte, error) {
-
-	span := opentracing.SpanFromContext(ctx)
-	span = Tracer.StartSpan(name, opentracing.ChildOf(span.Context()))
+	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "metrictank")
 	tags.PeerAddress.Set(span, n.RemoteAddr)
 	tags.PeerHostname.Set(span, n.Name)
 	body.Trace(span)
-	ctx = opentracing.ContextWithSpan(ctx, span)
 	defer span.Finish()
 
 	b, err := json.Marshal(body)

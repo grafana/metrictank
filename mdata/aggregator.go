@@ -7,9 +7,9 @@ import (
 	"github.com/raintank/metrictank/mdata/cache"
 )
 
-// aggBoundary returns ts if it is a boundary, or the next boundary otherwise.
+// AggBoundary returns ts if it is a boundary, or the next boundary otherwise.
 // see description for Aggregator and unit tests, for more details
-func aggBoundary(ts uint32, span uint32) uint32 {
+func AggBoundary(ts uint32, span uint32) uint32 {
 	return ts + span - ((ts-1)%span + 1)
 }
 
@@ -74,26 +74,26 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret c
 // flush adds points to the aggregation-series and resets aggregation state
 func (agg *Aggregator) flush() {
 	if agg.minMetric != nil {
-		agg.minMetric.Add(agg.currentBoundary, agg.agg.min)
+		agg.minMetric.Add(agg.currentBoundary, agg.agg.Min)
 	}
 	if agg.maxMetric != nil {
-		agg.maxMetric.Add(agg.currentBoundary, agg.agg.max)
+		agg.maxMetric.Add(agg.currentBoundary, agg.agg.Max)
 	}
 	if agg.sumMetric != nil {
-		agg.sumMetric.Add(agg.currentBoundary, agg.agg.sum)
+		agg.sumMetric.Add(agg.currentBoundary, agg.agg.Sum)
 	}
 	if agg.cntMetric != nil {
-		agg.cntMetric.Add(agg.currentBoundary, agg.agg.cnt)
+		agg.cntMetric.Add(agg.currentBoundary, agg.agg.Cnt)
 	}
 	if agg.lstMetric != nil {
-		agg.lstMetric.Add(agg.currentBoundary, agg.agg.lst)
+		agg.lstMetric.Add(agg.currentBoundary, agg.agg.Lst)
 	}
 	//msg := fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 	agg.agg.Reset()
 }
 
 func (agg *Aggregator) Add(ts uint32, val float64) {
-	boundary := aggBoundary(ts, agg.span)
+	boundary := AggBoundary(ts, agg.span)
 
 	if boundary == agg.currentBoundary {
 		agg.agg.Add(val)
@@ -103,7 +103,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	} else if boundary > agg.currentBoundary {
 		// store current totals as a new point in their series
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
-		if agg.agg.cnt != 0 {
+		if agg.agg.Cnt != 0 {
 			agg.flush()
 		}
 		agg.currentBoundary = boundary

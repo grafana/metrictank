@@ -368,7 +368,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
 				req := models.NewReq(name, name, name, from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
-				points := srv.getSeriesFixed(req, consolidation.None)
+				points := srv.getSeriesFixed(test.NewContext(), req, consolidation.None)
 				if !reflect.DeepEqual(expected, points) {
 					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
 				}
@@ -483,7 +483,7 @@ func TestRequestContextWithoutConsolidator(t *testing.T) {
 	archInterval := uint32(10)
 	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.None)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
 	expectFrom := uint32(41)
 	if ctx.From != expectFrom {
@@ -508,7 +508,7 @@ func TestRequestContextWithConsolidator(t *testing.T) {
 	to := uint32(88)
 	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.Sum)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.Sum)
 
 	expectFrom := from
 	if ctx.From != expectFrom {
@@ -636,7 +636,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// create a request for the current range
 				req := reqRaw(metric, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
-				ctx := newRequestContext(&req, consolidation.None)
+				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 				iters := srv.getSeriesCachedStore(ctx, to)
 
 				// expecting the first returned timestamp to be the T0 of the chunk containing "from"
@@ -760,7 +760,7 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	archInterval := uint32(10)
 	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
-	ctx := newRequestContext(&req, consolidation.None)
+	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
 	metric := metrics.GetOrCreate(metricKey, metricKey, 0, 0)
 	for i := uint32(50); i < 3000; i++ {

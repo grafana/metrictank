@@ -1,13 +1,16 @@
 package cache
 
 import (
+	"context"
 	"flag"
 	"runtime"
 	"sync"
 
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/stats"
+	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -36,6 +39,8 @@ type CCache struct {
 
 	// channel that's only used to signal go routines to stop
 	stop chan interface{}
+
+	tracer opentracing.Tracer
 }
 
 func NewCCache() *CCache {
@@ -43,9 +48,14 @@ func NewCCache() *CCache {
 		metricCache: make(map[string]*CCacheMetric),
 		accnt:       accnt.NewFlatAccnt(maxSize),
 		stop:        make(chan interface{}),
+		tracer:      opentracing.NoopTracer{},
 	}
 	go cc.evictLoop()
 	return cc
+}
+
+func (c *CCache) SetTracer(t opentracing.Tracer) {
+	c.tracer = t
 }
 
 func (c *CCache) evictLoop() {
@@ -131,7 +141,9 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	}
 }
 
-func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
+func (c *CCache) Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult {
+	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
+	defer span.Finish()
 	var hit chunk.IterGen
 	var cm *CCacheMetric
 	var ok bool
@@ -148,12 +160,14 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 	defer c.RUnlock()
 
 	if cm, ok = c.metricCache[metric]; !ok {
+		span.SetTag("cache", "miss")
 		accnt.CacheMetricMiss.Inc()
 		return res
 	}
 
-	cm.Search(metric, res, from, until)
+	cm.Search(ctx, metric, res, from, until)
 	if len(res.Start) == 0 && len(res.End) == 0 {
+		span.SetTag("cache", "miss")
 		accnt.CacheMetricMiss.Inc()
 	} else {
 
@@ -168,8 +182,10 @@ func (c *CCache) Search(metric string, from, until uint32) *CCSearchResult {
 		}()
 
 		if res.Complete {
+			span.SetTag("cache", "hit-full")
 			accnt.CacheMetricHitFull.Inc()
 		} else {
+			span.SetTag("cache", "hit-partial")
 			accnt.CacheMetricHitPartial.Inc()
 		}
 	}
