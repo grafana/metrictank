@@ -73,8 +73,8 @@ func newRateLogger() *rateLogger {
 	return &rateLogger{}
 }
 
-// Store saves the current offset updates the rate if it is confident
-// note that offset may be -2 or -1
+// Store saves the current offset and updates the rate if it is confident
+// offset must be concrete values, not logical values like -2 (oldest) or -1 (newest)
 func (o *rateLogger) Store(offset int64, ts time.Time) {
 	o.Lock()
 	defer o.Unlock()
@@ -96,14 +96,6 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 		// in which case we can't reliably work out how
 		// long it has really been since we last took a measurement.
 		// but set a new baseline for next time
-		o.lastTs = ts
-		o.lastOffset = offset
-		return
-	}
-	if o.lastOffset < 0 {
-		// last offset is symbolical value representing "newest" or "latest"
-		// it can't be used to compute a rate (it would lead to a value way too high)
-		// so set the new baseline and hopefully we can compute the rate next time
 		o.lastTs = ts
 		o.lastOffset = offset
 		return
