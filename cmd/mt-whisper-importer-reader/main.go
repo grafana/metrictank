@@ -171,7 +171,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			pre := time.Now()
 			resp, err := client.Do(req)
 			passed := time.Now().Sub(pre).Seconds()
-			if err != nil || resp.StatusCode-(resp.StatusCode%100) != 200 {
+			if err != nil || resp.StatusCode >= 300 {
 				if err != nil {
 					log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
 				} else {
