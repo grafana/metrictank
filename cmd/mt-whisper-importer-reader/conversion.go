@@ -111,7 +111,9 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 	// merge the results that are keyed by timestamp into a slice of points
 	for m, p := range adjustedPoints {
 		for t, v := range p {
-			res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
+			if t <= uint32(*importUpTo) {
+				res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
+			}
 		}
 		res[m] = sortPoints(res[m])
 
