@@ -133,6 +133,10 @@
             {
               "refId": "F",
               "target": "aliasByNode(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.*.counter32), 0.000000001), 6, 7)"
+            },
+            {
+              "refId": "G",
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32), 'reordered')"
             }
           ],
           "thresholds": [],
@@ -479,7 +483,7 @@
             "hideEmpty": true,
             "max": false,
             "min": false,
-            "show": true,
+            "show": false,
             "total": false,
             "values": false
           },
@@ -880,6 +884,268 @@
       "repeatRowId": null,
       "showTitle": false,
       "title": "New row",
+      "titleSize": "h6"
+    },
+    {
+      "collapse": false,
+      "height": 250,
+      "panels": [
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "id": 32,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.series.median.gauge32), 'median')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.series.max.gauge32), 'max')",
+              "textEditor": false
+            },
+            {
+              "refId": "C",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.series.p90.gauge32), 'p90')",
+              "textEditor": false
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Series Per Request",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "id": 33,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": false,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 1,
+          "points": true,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.points_fetched.median.gauge32), 'fetched-median')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.points_fetched.p90.gauge32), 'fetched-p90')"
+            },
+            {
+              "refId": "C",
+              "target": "alias(maxSeries(metrictank.stats.$environment.$instance.api.request.render.points_fetched.max.gauge32), 'fetched-max')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.points_returned.median.gauge32), 'returned-median')"
+            },
+            {
+              "refId": "E",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.points_returned.p90.gauge32), 'returned-p90')"
+            },
+            {
+              "refId": "F",
+              "target": "alias(maxSeries(metrictank.stats.$environment.$instance.api.request.render.points_returned.max.gauge32), 'returned-max')"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Points Per Request",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "id": 34,
+          "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": false,
+            "hideEmpty": true,
+            "hideZero": true,
+            "max": false,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "span": 4,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "aliasByNode(sortByName(sumSeriesWithWildcards(perSecond(metrictank.stats.$environment.$instance.api.request.*.status.*.counter32), 3), 'true'), 5, 7)"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeShift": null,
+          "title": "Response Status per path",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "repeat": null,
+      "repeatIteration": null,
+      "repeatRowId": null,
+      "showTitle": false,
+      "title": "Dashboard Row",
       "titleSize": "h6"
     },
     {
@@ -1924,6 +2190,10 @@
             {
               "refId": "A",
               "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.store.cassandra.error.*.counter32), 6)"
+            },
+            {
+              "refId": "B",
+              "target": "aliasByNode(metrictank.stats.$environment.$instance.store.cassandra.omit_read.*.counter32, 7)"
             }
           ],
           "thresholds": [],
@@ -2840,6 +3110,10 @@
             {
               "refId": "C",
               "target": "alias(perSecond(metrictank.stats.$environment.$instance.cache.ops.chunk.evict.counter32), 'chunk evict')"
+            },
+            {
+              "refId": "D",
+              "target": "alias(perSecond(metrictank.stats.$environment.$instance.cache.ops.metric.searchForward-bug-surpressed.counter32), 'cache-bug-surpress')"
             }
           ],
           "thresholds": [],
