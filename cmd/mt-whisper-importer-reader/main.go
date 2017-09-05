@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/kisielk/whisper-go/whisper"
@@ -82,6 +83,11 @@ var (
 		math.MaxUint32,
 		"Only import up to the specified timestamp",
 	)
+	verbose = flag.Bool(
+		"verbose",
+		false,
+		"More detailed logging",
+	)
 	schemas        conf.Schemas
 	nameFilter     *regexp.Regexp
 	processedCount uint32
@@ -91,6 +97,11 @@ var (
 func main() {
 	var err error
 	flag.Parse()
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
 
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
@@ -129,8 +140,8 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 		}
 
 		name := getMetricName(file)
-		log.Infof("Processing file %s (%s)", file, name)
-		met, err := getMetrics(w, file, name)
+		log.Debugf("Processing file %s (%s)", file, name)
+		met, err := getMetric(w, file, name)
 		if err != nil {
 			log.Errorf("Failed to get metric: %q", err)
 			continue
@@ -141,6 +152,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			log.Errorf("Failed to encode metric: %q", err)
 			continue
 		}
+		size := b.Len()
 
 		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 		if err != nil {
@@ -153,12 +165,26 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
 		}
 
-		resp, err := client.Do(req)
-		if err != nil || resp.StatusCode != 200 {
-			log.Errorf("Error sending request to http endpoint %q: %q", *httpEndpoint, err)
+		success := false
+		attempts := 0
+		for !success {
+			pre := time.Now()
+			resp, err := client.Do(req)
+			passed := time.Now().Sub(pre).Seconds()
+			if err != nil || resp.StatusCode >= 300 {
+				if err != nil {
+					log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
+				} else {
+					log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
+				}
+				attempts++
+			} else {
+				log.Debugf("Posted %s (%d bytes) to endpoint %q in %f seconds", name, size, *httpEndpoint, passed)
+				success = true
+			}
+			io.Copy(ioutil.Discard, resp.Body)
+			resp.Body.Close()
 		}
-		io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
 
 		processed := atomic.AddUint32(&processedCount, 1)
 		if processed%100 == 0 {
@@ -210,20 +236,20 @@ func shortAggMethodString(aggMethod whisper.AggregationMethod) (string, error) {
 	}
 }
 
-func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
-	var res archive.Metric
+func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
+	res := archive.Metric{
+		AggregationMethod: uint32(w.Header.Metadata.AggregationMethod),
+	}
 	if len(w.Header.Archives) == 0 {
 		return res, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
-
-	var archives []archive.Archive
 
 	method, err := shortAggMethodString(w.Header.Metadata.AggregationMethod)
 	if err != nil {
 		return res, err
 	}
 
-	md := &schema.MetricData{
+	md := schema.MetricData{
 		Name:     name,
 		Metric:   name,
 		Interval: int(w.Header.Archives[0].SecondsPerPoint),
@@ -252,7 +278,8 @@ func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 		for m, p := range convertedPoints {
 			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
-			archives = append(archives, archive.Archive{
+			log.Debugf("Archive %d Method %s got %d points = %d chunks at a span of %d", retIdx, m, len(p), len(encodedChunks), retention.ChunkSpan)
+			res.Archives = append(res.Archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
 				Points:          uint32(retention.NumberOfPoints),
 				Chunks:          encodedChunks,
@@ -263,10 +290,8 @@ func getMetrics(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 			}
 		}
 	}
+	res.MetricData = md
 
-	res.AggregationMethod = uint32(w.Header.Metadata.AggregationMethod)
-	res.MetricData = *md
-	res.Archives = archives
 	return res, nil
 }
 
@@ -331,7 +356,7 @@ func getFileListIntoChan(fileChan chan string) {
 		func(path string, info os.FileInfo, err error) error {
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
-				log.Infof("Skipping file %s with name %s", path, name)
+				log.Debugf("Skipping file %s with name %s", path, name)
 				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}

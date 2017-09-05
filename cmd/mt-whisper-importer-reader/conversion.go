@@ -114,6 +114,13 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 			res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
 		}
 		res[m] = sortPoints(res[m])
+
+		// if the resolution of data had to be increased it's possible that we
+		// get a little more historic data than necessary, so we chop off the
+		// older data that's not needed
+		if uint32(len(res[m])) > nop {
+			res[m] = res[m][uint32(len(res[m]))-nop:]
+		}
 	}
 
 	return res

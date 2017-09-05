@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
 	"github.com/raintank/dur"
 	"github.com/raintank/metrictank/cluster"
@@ -33,12 +33,7 @@ var (
 	verbose = globalFlags.Bool(
 		"verbose",
 		false,
-		"Write logs to terminal",
-	)
-	fakeAvgAggregates = globalFlags.Bool(
-		"fake-avg-aggregates",
-		true,
-		"Generate sum/cnt series out of avg series to accommodate metrictank",
+		"More detailed logging",
 	)
 	httpEndpoint = globalFlags.String(
 		"http-endpoint",
@@ -70,6 +65,11 @@ var (
 		1,
 		"Number of Partitions",
 	)
+	overwriteChunks = globalFlags.Bool(
+		"overwrite-chunks",
+		true,
+		"If true existing chunks may be overwritten",
+	)
 
 	cassandraAddrs               = globalFlags.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace            = globalFlags.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
@@ -89,8 +89,7 @@ var (
 	cassandraUsername = globalFlags.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = globalFlags.String("cassandra-password", "cassandra", "password for authentication")
 
-	GitHash   = "(none)"
-	printLock sync.Mutex
+	GitHash = "(none)"
 )
 
 type Server struct {
@@ -98,6 +97,7 @@ type Server struct {
 	TTLTables   mdata.TTLTables
 	Partitioner partitioner.Partitioner
 	Index       idx.MetricIndex
+	HTTPServer  *http.Server
 }
 
 func main() {
@@ -142,6 +142,12 @@ func main() {
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
 	cassandra.Enabled = true
 
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
 	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
@@ -159,19 +165,24 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
+	cluster.Init("mt-whisper-importer-writer", GitHash, time.Now(), "http", int(80))
+
 	server := &Server{
 		Session:     store.Session,
 		TTLTables:   ttlTables,
 		Partitioner: p,
 		Index:       cassandra.New(),
+		HTTPServer: &http.Server{
+			Addr:        *httpEndpoint,
+			ReadTimeout: 10 * time.Minute,
+		},
 	}
-	cluster.Init("mt-whisper-importer-writer", GitHash, time.Now(), "http", int(80))
 	server.Index.Init()
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
 	http.HandleFunc("/healthz", server.healthzHandler)
 
-	log(fmt.Sprintf("Listening on %q", *httpEndpoint))
+	log.Infof("Listening on %q", *httpEndpoint)
 	err = http.ListenAndServe(*httpEndpoint, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating listener: %q", err))
@@ -181,19 +192,9 @@ func main() {
 func throwError(msg string) {
 	msg = fmt.Sprintf("%s\n", msg)
 	if *exitOnError {
-		panic(msg)
+		log.Panic(msg)
 	} else {
-		printLock.Lock()
-		fmt.Fprintln(os.Stderr, msg)
-		printLock.Unlock()
-	}
-}
-
-func log(msg string) {
-	if *verbose {
-		printLock.Lock()
-		fmt.Println(msg)
-		printLock.Unlock()
+		log.Error(msg)
 	}
 }
 
@@ -208,7 +209,10 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		throwError(fmt.Sprintf("Error decoding metric stream: %q", err))
 		return
 	}
-	log("Handling new metric")
+
+	log.Debugf(
+		"Receiving Id:%s OrgId:%d Metric:%s AggMeth:%d ArchCnt:%d",
+		metric.MetricData.Id, metric.MetricData.OrgId, metric.MetricData.Metric, metric.AggregationMethod, len(metric.Archives))
 
 	if len(metric.Archives) == 0 {
 		throwError("Metric has no archives")
@@ -236,21 +240,41 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		tableName := entry.Table
 
-		log(fmt.Sprintf(
+		log.Debugf(
 			"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
 			len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
-		))
+		)
 		s.insertChunks(tableName, a.RowKey, tableTTL, a.Chunks)
 	}
 }
 
 func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
-	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
+	var query string
+	if *overwriteChunks {
+		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
+	} else {
+		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) IF NOT EXISTS USING TTL %d", table, ttl)
+	}
+	log.Debug(query)
 	for _, ig := range itergens {
 		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
-		err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
-		if err != nil {
-			throwError(fmt.Sprintf("Error in query: %q", err))
+		success := false
+		attempts := 0
+		for !success {
+			err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+			if err != nil {
+				if (attempts % 20) == 0 {
+					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)
+				}
+				sleepTime := 100 * attempts
+				if sleepTime > 2000 {
+					sleepTime = 2000
+				}
+				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				attempts++
+			} else {
+				success = true
+			}
 		}
 	}
 }

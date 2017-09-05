@@ -829,7 +829,6 @@ func TestPointsConversionSum1(t *testing.T) {
 
 	expectedPoints1 := map[string][]whisper.Point{
 		"sum": {
-			{1503384101, 100},
 			{1503384102, 100},
 			{1503384103, 100},
 			{1503384104, 100},
@@ -856,8 +855,8 @@ func TestPointsConversionSum1(t *testing.T) {
 	}
 
 	points1 := c.getPoints(0, 1, 8)
-	points2 := c.getPoints(0, 2, 8)
-	points3 := c.getPoints(0, 4, 8)
+	points2 := c.getPoints(0, 2, 4)
+	points3 := c.getPoints(0, 4, 2)
 
 	verifyPointMaps(t, points1, expectedPoints1)
 	verifyPointMaps(t, points2, expectedPoints2)
@@ -890,8 +889,6 @@ func TestPointsConversionLast1(t *testing.T) {
 
 	expectedPoints1 := map[string][]whisper.Point{
 		"lst": {
-			{1503475273, 5},
-			{1503475274, 5},
 			{1503475275, 5},
 			{1503475276, 5},
 			{1503475277, 8},
@@ -904,7 +901,6 @@ func TestPointsConversionLast1(t *testing.T) {
 	}
 	expectedPoints2 := map[string][]whisper.Point{
 		"lst": {
-			{1503475274, 5},
 			{1503475276, 5},
 			{1503475278, 8},
 			{1503475280, 7},
@@ -919,8 +915,8 @@ func TestPointsConversionLast1(t *testing.T) {
 	}
 
 	points1 := c.getPoints(0, 1, 8)
-	points2 := c.getPoints(0, 2, 8)
-	points3 := c.getPoints(0, 4, 8)
+	points2 := c.getPoints(0, 2, 4)
+	points3 := c.getPoints(0, 4, 2)
 
 	verifyPointMaps(t, points1, expectedPoints1)
 	verifyPointMaps(t, points2, expectedPoints2)
@@ -1075,8 +1071,6 @@ func TestPointsConversionAvg1(t *testing.T) {
 
 	expectedPoints1_0 := map[string][]whisper.Point{
 		"avg": {
-			{1503407717, 3.5},
-			{1503407718, 3.5},
 			{1503407719, 3.5},
 			{1503407720, 3.5},
 			{1503407721, 7.25},
@@ -1089,7 +1083,6 @@ func TestPointsConversionAvg1(t *testing.T) {
 	}
 	expectedPoints2_0 := map[string][]whisper.Point{
 		"avg": {
-			{1503407718, 3.5},
 			{1503407720, 3.5},
 			{1503407722, 7.25},
 			{1503407724, 6.5},
@@ -1105,8 +1098,6 @@ func TestPointsConversionAvg1(t *testing.T) {
 
 	expectedPoints1_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503407717, 3.5},
-			{1503407718, 3.5},
 			{1503407719, 3.5},
 			{1503407720, 3.5},
 			{1503407721, 7.25},
@@ -1117,8 +1108,6 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407726, 8},
 		},
 		"cnt": {
-			{1503407717, 1},
-			{1503407718, 1},
 			{1503407719, 1},
 			{1503407720, 1},
 			{1503407721, 1},
@@ -1131,14 +1120,12 @@ func TestPointsConversionAvg1(t *testing.T) {
 	}
 	expectedPoints2_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503407718, 3.5 * 2},
 			{1503407720, 3.5 * 2},
 			{1503407722, 7.25 * 2},
 			{1503407724, 6.5 * 2},
 			{1503407726, 8 * 2},
 		},
 		"cnt": {
-			{1503407718, 2},
 			{1503407720, 2},
 			{1503407722, 2},
 			{1503407724, 2},
@@ -1198,11 +1185,11 @@ func TestPointsConversionAvg1(t *testing.T) {
 	}
 
 	points1_0 := c.getPoints(0, 1, 8)
-	points2_0 := c.getPoints(0, 2, 8)
-	points3_0 := c.getPoints(0, 4, 8)
+	points2_0 := c.getPoints(0, 2, 4)
+	points3_0 := c.getPoints(0, 4, 2)
 
 	points1_1 := c.getPoints(1, 1, 8)
-	points2_1 := c.getPoints(1, 2, 8)
+	points2_1 := c.getPoints(1, 2, 4)
 	points3_1 := c.getPoints(1, 4, 100)
 
 	*importUpTo = uint(1503407723)
@@ -1253,10 +1240,6 @@ func TestPointsConversionAvg2(t *testing.T) {
 
 	expectedPoints1_0 := map[string][]whisper.Point{
 		"avg": {
-			{1503406117, 9},
-			{1503406118, 9},
-			{1503406119, 9},
-			{1503406120, 9},
 			{1503406121, 9},
 			{1503406122, 9},
 			{1503406123, 9},
@@ -1289,10 +1272,6 @@ func TestPointsConversionAvg2(t *testing.T) {
 
 	expectedPoints1_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503406117, 9},
-			{1503406118, 9},
-			{1503406119, 9},
-			{1503406120, 9},
 			{1503406121, 9},
 			{1503406122, 9},
 			{1503406123, 9},
@@ -1322,10 +1301,6 @@ func TestPointsConversionAvg2(t *testing.T) {
 			{1503406147, 27},
 		},
 		"cnt": {
-			{1503406117, 1},
-			{1503406118, 1},
-			{1503406119, 1},
-			{1503406120, 1},
 			{1503406121, 1},
 			{1503406122, 1},
 			{1503406123, 1},
@@ -1373,7 +1348,6 @@ func TestPointsConversionAvg2(t *testing.T) {
 
 	expectedPoints2_1 := map[string][]whisper.Point{
 		"sum": {
-			{1503406119, 9 * 3},
 			{1503406122, 9 * 3},
 			{1503406125, 9 * 3},
 			{1503406128, 18 * 3},
@@ -1385,7 +1359,6 @@ func TestPointsConversionAvg2(t *testing.T) {
 			{1503406146, 26.5 * 3},
 		},
 		"cnt": {
-			{1503406119, 3},
 			{1503406122, 3},
 			{1503406125, 3},
 			{1503406128, 3},
