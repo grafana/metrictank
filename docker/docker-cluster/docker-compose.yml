@@ -19,6 +19,8 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PRIMARY_NODE: "true"
       MT_CLUSTER_BIND_ADDR: "metrictank0:7946"
+      MT_CASSANDRA_CREATE_KEYSPACE: "true"
+      MT_CASSANDRA_IDX_CREATE_KEYSPACE: "true"
     links:
      - cassandra
 
