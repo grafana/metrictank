@@ -10,6 +10,8 @@ func TestPeersForQuery(t *testing.T) {
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
+	maxPrio = 10
+	Manager.SetPriority(10)
 	Manager.SetReady()
 	Convey("when cluster in single mode", t, func() {
 		selected, err := MembersForQuery()
@@ -27,18 +29,21 @@ func TestPeersForQuery(t *testing.T) {
 			Primary:    true,
 			Partitions: []int32{1, 2},
 			State:      NodeReady,
+			Priority:   10,
 		},
 		"node3": {
 			Name:       "node3",
 			Primary:    true,
 			Partitions: []int32{3, 4},
 			State:      NodeReady,
+			Priority:   10,
 		},
 		"node4": {
 			Name:       "node4",
 			Primary:    true,
 			Partitions: []int32{3, 4},
 			State:      NodeReady,
+			Priority:   10,
 		},
 	}
 	Manager.Unlock()

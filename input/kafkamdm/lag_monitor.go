@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// lagLogger maintains a set of most recent lag measurements
+// and is able to provide the lowest value seen.
 type lagLogger struct {
 	sync.Mutex
 	pos          int
@@ -18,7 +20,16 @@ func newLagLogger(size int) *lagLogger {
 	}
 }
 
+// Store saves the current value, potentially overwriting an old value
+// if needed.
+// Note: negative values are ignored.  We rely on previous data - if any - in such case.
+// negative values can happen when:
+//  - kafka had to recover, and a previous offset loaded from offsetMgr was bigger than current offset
+//  - a rollover of the offset counter
 func (l *lagLogger) Store(lag int) {
+	if lag < 0 {
+		return
+	}
 	l.Lock()
 	defer l.Unlock()
 	l.pos++
@@ -33,17 +44,20 @@ func (l *lagLogger) Store(lag int) {
 	l.measurements[l.pos] = lag
 }
 
+// Min returns the lowest lag seen (0 or positive) or -1 if no lags reported yet
+// note: values may be slightly out of date if negative values were reported
+// (see Store())
 func (l *lagLogger) Min() int {
 	l.Lock()
 	defer l.Unlock()
+	if len(l.measurements) == 0 {
+		return -1
+	}
 	min := -1
 	for _, m := range l.measurements {
 		if min < 0 || m < min {
 			min = m
 		}
-	}
-	if min < 0 {
-		min = 0
 	}
 	return min
 }
@@ -55,6 +69,12 @@ type rateLogger struct {
 	rate       int64
 }
 
+func newRateLogger() *rateLogger {
+	return &rateLogger{}
+}
+
+// Store saves the current offset and updates the rate if it is confident
+// offset must be concrete values, not logical values like -2 (oldest) or -1 (newest)
 func (o *rateLogger) Store(offset int64, ts time.Time) {
 	o.Lock()
 	defer o.Unlock()
@@ -96,29 +116,22 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 	return
 }
 
+// Rate returns the last reliable rate calculation
+// * generally, it's the last reported measurement
+// * occasionally, it's one report interval in the past (due to rollover)
+// * exceptionally, it's an old measurement (if you keep adjusting the system clock)
+// after startup, reported rate may be 0 if we haven't been up long enough to determine it yet.
 func (o *rateLogger) Rate() int64 {
 	o.Lock()
 	defer o.Unlock()
 	return o.rate
 }
 
-func newRateLogger() *rateLogger {
-	return &rateLogger{}
-}
-
-/*
-   LagMonitor is used to determine how upToDate this node is.
-   We periodically collect the lag for each partition, keeping the last N
-   measurements in a moving window. We also collect the ingest rate of each
-   partition. Using these measurements we can then compute a overall score
-   for this each partition. The score is just the minimum lag seen in the last
-   N measurements divided by the ingest rate. So if the ingest rate is 1k/second
-   and the lag is 10000 messages. Then our reported lag is 10, meaning 10seconds.
-   If the rate is 1k/second and the lag is 200 then our lag is reported as 0, meaning
-   the node is less then 1second behind.
-
-   The node's overall lag is then the highest lag of all partitions.
-*/
+// LagMonitor determines how upToDate this node is.
+// For each partition, we periodically collect:
+// * the consumption lag (we keep the last N measurements)
+// * ingest rate
+// We then combine this data into a score, see the Metric() method.
 type LagMonitor struct {
 	lag  map[int32]*lagLogger
 	rate map[int32]*rateLogger
@@ -136,16 +149,40 @@ func NewLagMonitor(size int, partitions []int32) *LagMonitor {
 	return m
 }
 
+// Metric computes the overall score of up-to-date-ness of this node,
+// as an estimated number of seconds behind kafka.
+// We first compute the score for each partition like so:
+// (minimum lag seen in last N measurements) / ingest rate.
+// example:
+// lag (in messages/metrics)     ingest rate       --->    score (seconds behind)
+//                       10k       1k/second                 10
+//                       200       1k/second                  0 (less than 1s behind)
+//                         0               *                  0 (perfectly in sync)
+//                   anything     0 (after startup)          same as lag
+//
+// The returned total score for the node is the max of the scores of individual partitions.
+// Note that one or more StoreOffset() (rate) calls may have been made but no StoreLag().
+// This can happen in 3 cases:
+// - we're not consuming yet
+// - trouble querying the partition for latest offset
+// - consumePartition() has called StoreOffset() but the code hasn't advanced yet to StoreLag()
 func (l *LagMonitor) Metric() int {
 	max := 0
 	for p, lag := range l.lag {
 		rate := l.rate[p]
-		l := lag.Min()
-		r := rate.Rate()
+		l := lag.Min()   // accurate lag, -1 if unknown
+		r := rate.Rate() // accurate rate, or 0 if we're not sure.
 		if r == 0 {
 			r = 1
 		}
-		val := l / int(r)
+		var val int
+		if l == -1 {
+			// if we have no lag measurements yet,
+			// just assign a priority of 10k for this partition
+			val = 10000
+		} else {
+			val = l / int(r)
+		}
 		if val > max {
 			max = val
 		}

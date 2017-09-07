@@ -218,35 +218,73 @@ func (k *KafkaMdm) Start(handler input.Handler) {
 	}
 }
 
+// tryGetOffset will to query kafka repeatedly for the requested offset and give up after attempts unsuccesfull attempts
+// an error is returned when it had to give up
+func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, attempts int, sleep time.Duration) (int64, error) {
+
+	var val int64
+	var err error
+	var offsetStr string
+
+	switch offset {
+	case sarama.OffsetNewest:
+		offsetStr = "newest"
+	case sarama.OffsetOldest:
+		offsetStr = "oldest"
+	default:
+		offsetStr = strconv.FormatInt(offset, 10)
+	}
+
+	attempt := 1
+	for {
+		val, err = k.client.GetOffset(topic, partition, offset)
+		if err == nil {
+			break
+		}
+
+		err = fmt.Errorf("failed to get offset %s of partition %s:%d. %s (attempt %d/%d)", offsetStr, topic, partition, err, attempt, attempts)
+		if attempt == attempts {
+			break
+		}
+		log.Warn("kafka-mdm %s", err)
+		attempt += 1
+		time.Sleep(sleep)
+	}
+	return val, err
+}
+
 // this will continually consume from the topic until k.stopConsuming is triggered.
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	k.wg.Add(1)
 	defer k.wg.Done()
 
+	partitionOffsetMetric := partitionOffset[partition]
+	partitionLogSizeMetric := partitionLogSize[partition]
+	partitionLagMetric := partitionLag[partition]
+
+	// determine the pos of the topic and the initial offset of our consumer
+	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
+	if err != nil {
+		log.Fatal(3, "kafka-mdm %s", err)
+	}
+	if currentOffset == sarama.OffsetNewest {
+		currentOffset = newest
+	} else if currentOffset == sarama.OffsetOldest {
+		currentOffset, err = k.tryGetOffset(topic, partition, sarama.OffsetOldest, 7, time.Second*10)
+		if err != nil {
+			log.Fatal(3, "kafka-mdm %s", err)
+		}
+	}
+
+	partitionOffsetMetric.Set(int(currentOffset))
+	partitionLogSizeMetric.Set(int(newest))
+	partitionLagMetric.Set(int(newest - currentOffset))
+
+	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
 		log.Fatal(4, "kafka-mdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
 	}
-
-	partitionOffsetMetric := partitionOffset[partition]
-	partitionLogSizeMetric := partitionLogSize[partition]
-	partitionLagMetric := partitionLag[partition]
-	offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
-	if err != nil {
-		log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
-	} else {
-		partitionLogSizeMetric.Set(int(offset))
-	}
-	if currentOffset >= 0 {
-		// we cant set the offsetMetrics until we know what offset we are at.
-		partitionOffsetMetric.Set(int(currentOffset))
-		// we need the currentLogSize to be able to record our initial Lag.
-		if err == nil {
-			partitionLagMetric.Set(int(offset - currentOffset))
-		}
-	}
-
-	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
 	for {
@@ -262,19 +300,16 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
 			}
 			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
-			offset, err := k.client.GetOffset(topic, partition, sarama.OffsetNewest)
+			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
 			if err != nil {
-				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
+				log.Error(3, "kafka-mdm %s", err)
 			} else {
-				partitionLogSizeMetric.Set(int(offset))
+				partitionLogSizeMetric.Set(int(newest))
 			}
-			if currentOffset < 0 {
-				// we have not yet consumed any messages.
-				continue
-			}
+
 			partitionOffsetMetric.Set(int(currentOffset))
 			if err == nil {
-				lag := int(offset - currentOffset)
+				lag := int(newest - currentOffset)
 				partitionLagMetric.Set(lag)
 				k.lagMonitor.StoreLag(partition, lag)
 			}

@@ -38,6 +38,35 @@ func NodeStateFromString(s string) NodeState {
 	return NodeNotReady
 }
 
+// UnmarshalJSON supports unmarshalling according to the older
+// integer based, as well as the new string based, representation
+func (n *NodeState) UnmarshalJSON(data []byte) error {
+	s := string(data)
+	switch s {
+	case "0", `"NodeNotReady"`:
+		*n = NodeNotReady
+	case "1", `"NodeReady"`:
+		*n = NodeReady
+	case "2", `"NodeUnreachable"`:
+		*n = NodeUnreachable
+	default:
+		return fmt.Errorf("unrecognized NodeState %q", s)
+	}
+	return nil
+}
+
+func (n NodeState) MarshalJSON() ([]byte, error) {
+	switch n {
+	case NodeNotReady:
+		return []byte(`"NodeNotReady"`), nil
+	case NodeReady:
+		return []byte(`"NodeReady"`), nil
+	case NodeUnreachable:
+		return []byte(`"NodeUnreachable"`), nil
+	}
+	return nil, fmt.Errorf("impossible nodestate %v", n)
+}
+
 type Error struct {
 	code int
 	err  error

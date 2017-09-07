@@ -117,8 +117,10 @@ func (c *Carbon) Start(handler input.Handler) {
 	go c.accept()
 }
 
-// MaintainPriority is a no-op. priority for carbon not implemented
+// MaintainPriority is very simplistic for carbon. there is no backfill,
+// so mark as ready immediately.
 func (c *Carbon) MaintainPriority() {
+	cluster.Manager.SetPriority(0)
 }
 
 func (c *Carbon) accept() {
