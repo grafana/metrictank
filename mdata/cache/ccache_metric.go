@@ -204,7 +204,7 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric string, from, 
 			res.Complete = true
 			break
 		}
-		if ts >= mc.chunks[ts].Next {
+		if mc.chunks[ts].Next != 0 && ts >= mc.chunks[ts].Next {
 			log.Warn("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
 			span := opentracing.SpanFromContext(ctx)
 			span.SetTag("searchForwardBug", true)
