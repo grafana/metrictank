@@ -1,7 +1,9 @@
 package cluster
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -70,6 +72,26 @@ type MemberlistManager struct {
 	nodeName string
 	list     *memberlist.Memberlist
 	cfg      *memberlist.Config
+}
+
+func NewMemberlistManager(thisNode Node, clusterName string, clusterHost net.IP, clusterPort int) *MemberlistManager {
+	mgr := &MemberlistManager{
+		members: map[string]Node{
+			thisNode.Name: thisNode,
+		},
+		nodeName: thisNode.Name,
+	}
+	mgr.cfg = memberlist.DefaultLANConfig()
+	mgr.cfg.BindPort = clusterPort
+	mgr.cfg.BindAddr = clusterHost.String()
+	mgr.cfg.AdvertisePort = clusterPort
+	mgr.cfg.Events = mgr
+	mgr.cfg.Delegate = mgr
+	h := sha256.New()
+	h.Write([]byte(ClusterName))
+	mgr.cfg.SecretKey = h.Sum(nil)
+
+	return mgr
 }
 
 func (c *MemberlistManager) Start() {
@@ -377,6 +399,12 @@ func (c *MemberlistManager) Stop() {
 type SingleNodeManager struct {
 	sync.RWMutex
 	node Node
+}
+
+func NewSingleNodeManager(thisNode Node) *SingleNodeManager {
+	return &SingleNodeManager{
+		node: thisNode,
+	}
 }
 
 func (m *SingleNodeManager) Start() {

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func TestPeersForQuery(t *testing.T) {
-	Mode = ModeMulti
+func TestPeersForQuerySingle(t *testing.T) {
+	Mode = ModeSingle
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
@@ -20,6 +20,16 @@ func TestPeersForQuery(t *testing.T) {
 		So(selected, ShouldHaveLength, 1)
 		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
+}
+
+func TestPeersForQueryMulti(t *testing.T) {
+	Mode = ModeMulti
+	Init("node1", "test", time.Now(), "http", 6060)
+	Manager.SetPrimary(true)
+	Manager.SetPartitions([]int32{1, 2})
+	maxPrio = 10
+	Manager.SetPriority(10)
+	Manager.SetReady()
 	thisNode := Manager.ThisNode()
 	Manager.(*MemberlistManager).Lock()
 

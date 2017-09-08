@@ -1,13 +1,11 @@
 package cluster
 
 import (
-	"crypto/sha256"
 	"errors"
 	"math/rand"
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/memberlist"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -48,27 +46,9 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		local:         true,
 	}
 	if Mode == ModeMulti {
-		mgr := &MemberlistManager{
-			members: map[string]Node{
-				name: thisNode,
-			},
-			nodeName: name,
-		}
-		mgr.cfg = memberlist.DefaultLANConfig()
-		mgr.cfg.BindPort = clusterPort
-		mgr.cfg.BindAddr = clusterHost.String()
-		mgr.cfg.AdvertisePort = clusterPort
-		mgr.cfg.Events = mgr
-		mgr.cfg.Delegate = mgr
-		h := sha256.New()
-		h.Write([]byte(ClusterName))
-		mgr.cfg.SecretKey = h.Sum(nil)
-
-		Manager = mgr
+		Manager = NewMemberlistManager(thisNode, ClusterName, clusterHost, clusterPort)
 	} else {
-		Manager = &SingleNodeManager{
-			node: thisNode,
-		}
+		Manager = NewSingleNodeManager(thisNode)
 	}
 	// initialize our "primary" state metric.
 	nodePrimary.Set(primary)
