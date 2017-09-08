@@ -7,6 +7,7 @@ import (
 )
 
 func TestPeersForQuery(t *testing.T) {
+	Mode = ModeMulti
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
@@ -20,9 +21,9 @@ func TestPeersForQuery(t *testing.T) {
 		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
 	thisNode := Manager.ThisNode()
-	Manager.Lock()
-	Mode = ModeMulti
-	Manager.members = map[string]Node{
+	Manager.(*MemberlistClusterManager).Lock()
+
+	Manager.(*MemberlistClusterManager).members = map[string]Node{
 		thisNode.Name: thisNode,
 		"node2": {
 			Name:       "node2",
@@ -46,7 +47,7 @@ func TestPeersForQuery(t *testing.T) {
 			Priority:   10,
 		},
 	}
-	Manager.Unlock()
+	Manager.(*MemberlistClusterManager).Unlock()
 	Convey("when cluster in multi mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
