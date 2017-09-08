@@ -54,7 +54,6 @@ type ClusterManager interface {
 	SetPrimary(bool)
 	IsReady() bool
 	SetReady()
-	SetReadyIn(time.Duration)
 	SetState(NodeState)
 	ThisNode() Node
 	MemberList() []Node
@@ -322,16 +321,6 @@ func (c *MemberlistManager) SetState(state NodeState) {
 	c.BroadcastUpdate()
 }
 
-// mark this node as ready after the specified duration.
-func (c *MemberlistManager) SetReadyIn(t time.Duration) {
-	go func() {
-		// wait for warmupPeriod before marking ourselves
-		// as ready.
-		time.Sleep(t)
-		c.SetReady()
-	}()
-}
-
 // Returns true if the this node is a set as a primary node that should write data to cassandra.
 func (c *MemberlistManager) IsPrimary() bool {
 	c.RLock()
@@ -437,15 +426,6 @@ func (m *SingleNodeManager) IsReady() bool {
 
 func (m *SingleNodeManager) SetReady() {
 	m.SetState(NodeReady)
-}
-
-func (m *SingleNodeManager) SetReadyIn(t time.Duration) {
-	go func() {
-		// wait for warmupPeriod before marking ourselves
-		// as ready.
-		time.Sleep(t)
-		m.SetReady()
-	}()
 }
 
 func (m *SingleNodeManager) SetState(state NodeState) {

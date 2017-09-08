@@ -394,7 +394,7 @@ func main() {
 	if cluster.Manager.IsPrimary() {
 		cluster.Manager.SetReady()
 	} else {
-		cluster.Manager.SetReadyIn(warmupPeriod)
+		time.AfterFunc(warmupPeriod, cluster.Manager.SetReady)
 	}
 
 	/***********************************
