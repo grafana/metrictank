@@ -395,12 +395,9 @@ func (m *SingleNodeManager) SetPrimary(primary bool) {
 	if m.node.Primary == primary {
 		return
 	}
-	node := m.node
-	node.Primary = primary
-	node.PrimaryChange = time.Now()
-	node.Updated = time.Now()
-	m.node = node
-
+	m.node.Primary = primary
+	m.node.PrimaryChange = time.Now()
+	m.node.Updated = time.Now()
 	nodePrimary.Set(primary)
 }
 
@@ -429,12 +426,9 @@ func (m *SingleNodeManager) SetState(state NodeState) {
 	if m.node.State == state {
 		return
 	}
-	node := m.node
-	node.State = state
-	node.Updated = time.Now()
-	m.node = node
+	m.node.State = state
+	m.node.Updated = time.Now()
 	nodeReady.Set(state == NodeReady)
-	return
 }
 
 func (m *SingleNodeManager) ThisNode() Node {
@@ -458,12 +452,9 @@ func (m *SingleNodeManager) Join(peers []string) (int, error) {
 func (m *SingleNodeManager) SetPartitions(part []int32) {
 	m.Lock()
 	defer m.Unlock()
-	node := m.node
-	node.Partitions = part
-	node.Updated = time.Now()
-	m.node = node
+	m.node.Partitions = part
+	m.node.Updated = time.Now()
 	nodePartitions.Set(len(part))
-	return
 }
 
 // get the partitions that this node is handling.
@@ -477,16 +468,13 @@ func (m *SingleNodeManager) GetPartitions() []int32 {
 // lower values == higher priority
 func (m *SingleNodeManager) SetPriority(prio int) {
 	m.Lock()
-	defer m.RUnlock()
+	defer m.Unlock()
 	if m.node.Priority == prio {
 		return
 	}
-	node := m.node
-	node.Priority = prio
-	node.Updated = time.Now()
-	m.node = node
+	m.node.Priority = prio
+	m.node.Updated = time.Now()
 	nodePriority.Set(prio)
-	return
 }
 
 func (m *SingleNodeManager) Stop() {
