@@ -1,7 +1,10 @@
 package cluster
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,26 +49,82 @@ var (
 	unmarshalErrMergeRemoteState = stats.NewCounter32("cluster.decode_err.merge_remote_state")
 )
 
-type ClusterManager struct {
+type ClusterManager interface {
+	IsPrimary() bool
+	SetPrimary(bool)
+	IsReady() bool
+	SetReady()
+	SetReadyIn(time.Duration)
+	SetState(NodeState)
+	ThisNode() Node
+	MemberList() []Node
+	Join([]string) (int, error)
+	GetPartitions() []int32
+	SetPartitions([]int32)
+	SetPriority(int)
+	Stop()
+	Start()
+}
+
+type MemberlistManager struct {
 	sync.RWMutex
 	members  map[string]Node // all members in the cluster, including this node.
 	nodeName string
 	list     *memberlist.Memberlist
+	cfg      *memberlist.Config
 }
 
-func (c *ClusterManager) setList(list *memberlist.Memberlist) {
+func NewMemberlistManager(thisNode Node, clusterName string, clusterHost net.IP, clusterPort int) *MemberlistManager {
+	mgr := &MemberlistManager{
+		members: map[string]Node{
+			thisNode.Name: thisNode,
+		},
+		nodeName: thisNode.Name,
+	}
+	mgr.cfg = memberlist.DefaultLANConfig()
+	mgr.cfg.BindPort = clusterPort
+	mgr.cfg.BindAddr = clusterHost.String()
+	mgr.cfg.AdvertisePort = clusterPort
+	mgr.cfg.Events = mgr
+	mgr.cfg.Delegate = mgr
+	h := sha256.New()
+	h.Write([]byte(ClusterName))
+	mgr.cfg.SecretKey = h.Sum(nil)
+
+	return mgr
+}
+
+func (c *MemberlistManager) Start() {
+	log.Info("CLU Start: Starting cluster on %s:%d", c.cfg.BindAddr, c.cfg.BindPort)
+	list, err := memberlist.Create(c.cfg)
+	if err != nil {
+		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
+	}
+	c.setList(list)
+
+	if peersStr == "" {
+		return
+	}
+	n, err := list.Join(strings.Split(peersStr, ","))
+	if err != nil {
+		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
+	}
+	log.Info("CLU Start: joined to %d nodes in cluster", n)
+}
+
+func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
 	c.Lock()
 	c.list = list
 	c.Unlock()
 }
 
-func (c *ClusterManager) ThisNode() Node {
+func (c *MemberlistManager) ThisNode() Node {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName]
 }
 
-func (c *ClusterManager) MemberList() []Node {
+func (c *MemberlistManager) MemberList() []Node {
 	c.RLock()
 	list := make([]Node, len(c.members), len(c.members))
 	i := 0
@@ -77,13 +136,13 @@ func (c *ClusterManager) MemberList() []Node {
 	return list
 }
 
-func (c *ClusterManager) Join(peers []string) (int, error) {
+func (c *MemberlistManager) Join(peers []string) (int, error) {
 	return c.list.Join(peers)
 }
 
 // report the cluster stats every time there is a change to the cluster state.
 // it is assumed that the lock is acquired before calling this method.
-func (c *ClusterManager) clusterStats() {
+func (c *MemberlistManager) clusterStats() {
 	primReady := 0
 	primNotReady := 0
 	secReady := 0
@@ -116,7 +175,7 @@ func (c *ClusterManager) clusterStats() {
 	totalPartitions.Set(len(partitions))
 }
 
-func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 	eventsJoin.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -139,7 +198,7 @@ func (c *ClusterManager) NotifyJoin(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
 	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -148,7 +207,7 @@ func (c *ClusterManager) NotifyLeave(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	eventsUpdate.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -179,7 +238,7 @@ func (c *ClusterManager) NotifyUpdate(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *ClusterManager) BroadcastUpdate() {
+func (c *MemberlistManager) BroadcastUpdate() {
 	if c.list != nil {
 		//notify our peers immediately of the change. If this fails, which will only happen if all peers
 		// are unreachable then the change will be picked up on the next complete state sync (run every 30seconds.)
@@ -190,7 +249,7 @@ func (c *ClusterManager) BroadcastUpdate() {
 // NodeMeta is used to retrieve meta-data about the current node
 // when broadcasting an alive message. It's length is limited to
 // the given byte size. This metadata is available in the Node structure.
-func (c *ClusterManager) NodeMeta(limit int) []byte {
+func (c *MemberlistManager) NodeMeta(limit int) []byte {
 	c.RLock()
 	meta, err := json.Marshal(c.members[c.nodeName])
 	c.RUnlock()
@@ -204,7 +263,7 @@ func (c *ClusterManager) NodeMeta(limit int) []byte {
 // Care should be taken that this method does not block, since doing
 // so would block the entire UDP packet receive loop. Additionally, the byte
 // slice may be modified after the call returns, so it should be copied if needed.
-func (c *ClusterManager) NotifyMsg(buf []byte) {
+func (c *MemberlistManager) NotifyMsg(buf []byte) {
 	// we dont have any need for passing messages between nodes, other then
 	// the NodeMeta sent with alive messages.
 	return
@@ -216,7 +275,7 @@ func (c *ClusterManager) NotifyMsg(buf []byte) {
 // The total byte size of the resulting data to send must not exceed
 // the limit. Care should be taken that this method does not block,
 // since doing so would block the entire UDP packet receive loop.
-func (c *ClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
+func (c *MemberlistManager) GetBroadcasts(overhead, limit int) [][]byte {
 	// we dont have any need for passing messages between nodes, other then
 	// the NodeMeta sent with alive messages.
 	return nil
@@ -226,29 +285,29 @@ func (c *ClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
 // the remote side in addition to the membership information. Any
 // data can be sent here. See MergeRemoteState as well. The `join`
 // boolean indicates this is for a join instead of a push/pull.
-func (c *ClusterManager) LocalState(join bool) []byte {
+func (c *MemberlistManager) LocalState(join bool) []byte {
 	return nil
 }
 
-func (c *ClusterManager) MergeRemoteState(buf []byte, join bool) {
+func (c *MemberlistManager) MergeRemoteState(buf []byte, join bool) {
 	return
 }
 
 // Returns true if this node is a ready to accept requests
 // from users.
-func (c *ClusterManager) IsReady() bool {
+func (c *MemberlistManager) IsReady() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].IsReady()
 }
 
 // mark this node as ready to accept requests from users.
-func (c *ClusterManager) SetReady() {
+func (c *MemberlistManager) SetReady() {
 	c.SetState(NodeReady)
 }
 
 // Set the state of this node.
-func (c *ClusterManager) SetState(state NodeState) {
+func (c *MemberlistManager) SetState(state NodeState) {
 	c.Lock()
 	if c.members[c.nodeName].State == state {
 		c.Unlock()
@@ -264,7 +323,7 @@ func (c *ClusterManager) SetState(state NodeState) {
 }
 
 // mark this node as ready after the specified duration.
-func (c *ClusterManager) SetReadyIn(t time.Duration) {
+func (c *MemberlistManager) SetReadyIn(t time.Duration) {
 	go func() {
 		// wait for warmupPeriod before marking ourselves
 		// as ready.
@@ -274,14 +333,14 @@ func (c *ClusterManager) SetReadyIn(t time.Duration) {
 }
 
 // Returns true if the this node is a set as a primary node that should write data to cassandra.
-func (c *ClusterManager) IsPrimary() bool {
+func (c *MemberlistManager) IsPrimary() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].Primary
 }
 
 // SetPrimary sets the primary status of this node
-func (c *ClusterManager) SetPrimary(p bool) {
+func (c *MemberlistManager) SetPrimary(p bool) {
 	c.Lock()
 	if c.members[c.nodeName].Primary == p {
 		c.Unlock()
@@ -298,7 +357,7 @@ func (c *ClusterManager) SetPrimary(p bool) {
 }
 
 // set the partitions that this node is handling.
-func (c *ClusterManager) SetPartitions(part []int32) {
+func (c *MemberlistManager) SetPartitions(part []int32) {
 	c.Lock()
 	node := c.members[c.nodeName]
 	node.Partitions = part
@@ -310,7 +369,7 @@ func (c *ClusterManager) SetPartitions(part []int32) {
 }
 
 // get the partitions that this node is handling.
-func (c *ClusterManager) GetPartitions() []int32 {
+func (c *MemberlistManager) GetPartitions() []int32 {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].Partitions
@@ -318,7 +377,7 @@ func (c *ClusterManager) GetPartitions() []int32 {
 
 // set the priority of this node.
 // lower values == higher priority
-func (c *ClusterManager) SetPriority(prio int) {
+func (c *MemberlistManager) SetPriority(prio int) {
 	c.Lock()
 	if c.members[c.nodeName].Priority == prio {
 		c.Unlock()
@@ -331,4 +390,121 @@ func (c *ClusterManager) SetPriority(prio int) {
 	c.Unlock()
 	nodePriority.Set(prio)
 	c.BroadcastUpdate()
+}
+
+func (c *MemberlistManager) Stop() {
+	c.list.Leave(time.Second)
+}
+
+type SingleNodeManager struct {
+	sync.RWMutex
+	node Node
+}
+
+func NewSingleNodeManager(thisNode Node) *SingleNodeManager {
+	return &SingleNodeManager{
+		node: thisNode,
+	}
+}
+
+func (m *SingleNodeManager) Start() {
+	return
+}
+
+func (m *SingleNodeManager) IsPrimary() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return m.node.Primary
+}
+
+func (m *SingleNodeManager) SetPrimary(primary bool) {
+	m.Lock()
+	defer m.Unlock()
+	if m.node.Primary == primary {
+		return
+	}
+	m.node.Primary = primary
+	m.node.PrimaryChange = time.Now()
+	m.node.Updated = time.Now()
+	nodePrimary.Set(primary)
+}
+
+func (m *SingleNodeManager) IsReady() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return m.node.IsReady()
+}
+
+func (m *SingleNodeManager) SetReady() {
+	m.SetState(NodeReady)
+}
+
+func (m *SingleNodeManager) SetReadyIn(t time.Duration) {
+	go func() {
+		// wait for warmupPeriod before marking ourselves
+		// as ready.
+		time.Sleep(t)
+		m.SetReady()
+	}()
+}
+
+func (m *SingleNodeManager) SetState(state NodeState) {
+	m.Lock()
+	defer m.Unlock()
+	if m.node.State == state {
+		return
+	}
+	m.node.State = state
+	m.node.Updated = time.Now()
+	nodeReady.Set(state == NodeReady)
+}
+
+func (m *SingleNodeManager) ThisNode() Node {
+	m.RLock()
+	defer m.RUnlock()
+	return m.node
+}
+
+func (m *SingleNodeManager) MemberList() []Node {
+	m.RLock()
+	defer m.RUnlock()
+	return []Node{m.node}
+}
+
+func (m *SingleNodeManager) Join(peers []string) (int, error) {
+	//noop
+	return 0, nil
+}
+
+// set the partitions that this node is handling.
+func (m *SingleNodeManager) SetPartitions(part []int32) {
+	m.Lock()
+	defer m.Unlock()
+	m.node.Partitions = part
+	m.node.Updated = time.Now()
+	nodePartitions.Set(len(part))
+}
+
+// get the partitions that this node is handling.
+func (m *SingleNodeManager) GetPartitions() []int32 {
+	m.RLock()
+	defer m.RUnlock()
+	return m.node.Partitions
+}
+
+// set the priority of this node.
+// lower values == higher priority
+func (m *SingleNodeManager) SetPriority(prio int) {
+	m.Lock()
+	defer m.Unlock()
+	if m.node.Priority == prio {
+		return
+	}
+	m.node.Priority = prio
+	m.node.Updated = time.Now()
+	nodePriority.Set(prio)
+}
+
+func (m *SingleNodeManager) Stop() {
+	return
 }

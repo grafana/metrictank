@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-func TestPeersForQuery(t *testing.T) {
+func TestPeersForQuerySingle(t *testing.T) {
+	Mode = ModeSingle
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
@@ -19,10 +20,20 @@ func TestPeersForQuery(t *testing.T) {
 		So(selected, ShouldHaveLength, 1)
 		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
-	thisNode := Manager.ThisNode()
-	Manager.Lock()
+}
+
+func TestPeersForQueryMulti(t *testing.T) {
 	Mode = ModeMulti
-	Manager.members = map[string]Node{
+	Init("node1", "test", time.Now(), "http", 6060)
+	Manager.SetPrimary(true)
+	Manager.SetPartitions([]int32{1, 2})
+	maxPrio = 10
+	Manager.SetPriority(10)
+	Manager.SetReady()
+	thisNode := Manager.ThisNode()
+	Manager.(*MemberlistManager).Lock()
+
+	Manager.(*MemberlistManager).members = map[string]Node{
 		thisNode.Name: thisNode,
 		"node2": {
 			Name:       "node2",
@@ -46,7 +57,7 @@ func TestPeersForQuery(t *testing.T) {
 			Priority:   10,
 		},
 	}
-	Manager.Unlock()
+	Manager.(*MemberlistManager).Unlock()
 	Convey("when cluster in multi mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)

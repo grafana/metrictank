@@ -1,16 +1,12 @@
 package cluster
 
 import (
-	"crypto/sha256"
 	"errors"
 	"math/rand"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/hashicorp/memberlist"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type ModeType string
@@ -29,65 +25,41 @@ func validMode(m string) bool {
 
 var (
 	Mode    ModeType
-	Manager *ClusterManager
-	cfg     *memberlist.Config
+	Manager ClusterManager
 	Tracer  opentracing.Tracer
 
 	InsufficientShardsAvailable = NewError(http.StatusServiceUnavailable, errors.New("Insufficient shards available."))
 )
 
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
-	Manager = &ClusterManager{
-		members: map[string]Node{
-			name: {
-				Name:          name,
-				ApiPort:       apiPort,
-				ApiScheme:     apiScheme,
-				Started:       started,
-				Version:       version,
-				Priority:      10000,
-				Primary:       primary,
-				PrimaryChange: time.Now(),
-				StateChange:   time.Now(),
-				Updated:       time.Now(),
-				local:         true,
-			},
-		},
-		nodeName: name,
+	thisNode := Node{
+		Name:          name,
+		ApiPort:       apiPort,
+		ApiScheme:     apiScheme,
+		Started:       started,
+		Version:       version,
+		Primary:       primary,
+		Priority:      10000,
+		PrimaryChange: time.Now(),
+		StateChange:   time.Now(),
+		Updated:       time.Now(),
+		local:         true,
+	}
+	if Mode == ModeMulti {
+		Manager = NewMemberlistManager(thisNode, ClusterName, clusterHost, clusterPort)
+	} else {
+		Manager = NewSingleNodeManager(thisNode)
 	}
 	// initialize our "primary" state metric.
 	nodePrimary.Set(primary)
-	cfg = memberlist.DefaultLANConfig()
-	cfg.BindPort = clusterPort
-	cfg.BindAddr = clusterHost.String()
-	cfg.AdvertisePort = clusterPort
-	cfg.Events = Manager
-	cfg.Delegate = Manager
-	h := sha256.New()
-	h.Write([]byte(ClusterName))
-	cfg.SecretKey = h.Sum(nil)
 }
 
 func Stop() {
-	Manager.list.Leave(time.Second)
+	Manager.Stop()
 }
 
 func Start() {
-	log.Info("CLU Start: Starting cluster on %s:%d", cfg.BindAddr, cfg.BindPort)
-	list, err := memberlist.Create(cfg)
-	if err != nil {
-		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
-	}
-	Manager.setList(list)
-
-	if peersStr == "" {
-		return
-	}
-	n, err := list.Join(strings.Split(peersStr, ","))
-	if err != nil {
-		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
-	}
-	log.Info("CLU Start: joined to %d nodes in cluster", n)
+	Manager.Start()
 }
 
 type partitionCandidates struct {
