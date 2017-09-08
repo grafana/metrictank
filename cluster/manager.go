@@ -64,7 +64,7 @@ type ClusterManager interface {
 	Start()
 }
 
-type MemberlistClusterManager struct {
+type MemberlistManager struct {
 	sync.RWMutex
 	members  map[string]Node // all members in the cluster, including this node.
 	nodeName string
@@ -72,7 +72,7 @@ type MemberlistClusterManager struct {
 	cfg      *memberlist.Config
 }
 
-func (c *MemberlistClusterManager) Start() {
+func (c *MemberlistManager) Start() {
 	log.Info("CLU Start: Starting cluster on %s:%d", c.cfg.BindAddr, c.cfg.BindPort)
 	list, err := memberlist.Create(c.cfg)
 	if err != nil {
@@ -90,19 +90,19 @@ func (c *MemberlistClusterManager) Start() {
 	log.Info("CLU Start: joined to %d nodes in cluster", n)
 }
 
-func (c *MemberlistClusterManager) setList(list *memberlist.Memberlist) {
+func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
 	c.Lock()
 	c.list = list
 	c.Unlock()
 }
 
-func (c *MemberlistClusterManager) ThisNode() Node {
+func (c *MemberlistManager) ThisNode() Node {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName]
 }
 
-func (c *MemberlistClusterManager) MemberList() []Node {
+func (c *MemberlistManager) MemberList() []Node {
 	c.RLock()
 	list := make([]Node, len(c.members), len(c.members))
 	i := 0
@@ -114,13 +114,13 @@ func (c *MemberlistClusterManager) MemberList() []Node {
 	return list
 }
 
-func (c *MemberlistClusterManager) Join(peers []string) (int, error) {
+func (c *MemberlistManager) Join(peers []string) (int, error) {
 	return c.list.Join(peers)
 }
 
 // report the cluster stats every time there is a change to the cluster state.
 // it is assumed that the lock is acquired before calling this method.
-func (c *MemberlistClusterManager) clusterStats() {
+func (c *MemberlistManager) clusterStats() {
 	primReady := 0
 	primNotReady := 0
 	secReady := 0
@@ -153,7 +153,7 @@ func (c *MemberlistClusterManager) clusterStats() {
 	totalPartitions.Set(len(partitions))
 }
 
-func (c *MemberlistClusterManager) NotifyJoin(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 	eventsJoin.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -176,7 +176,7 @@ func (c *MemberlistClusterManager) NotifyJoin(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *MemberlistClusterManager) NotifyLeave(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
 	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -185,7 +185,7 @@ func (c *MemberlistClusterManager) NotifyLeave(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *MemberlistClusterManager) NotifyUpdate(node *memberlist.Node) {
+func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	eventsUpdate.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -216,7 +216,7 @@ func (c *MemberlistClusterManager) NotifyUpdate(node *memberlist.Node) {
 	c.clusterStats()
 }
 
-func (c *MemberlistClusterManager) BroadcastUpdate() {
+func (c *MemberlistManager) BroadcastUpdate() {
 	if c.list != nil {
 		//notify our peers immediately of the change. If this fails, which will only happen if all peers
 		// are unreachable then the change will be picked up on the next complete state sync (run every 30seconds.)
@@ -227,7 +227,7 @@ func (c *MemberlistClusterManager) BroadcastUpdate() {
 // NodeMeta is used to retrieve meta-data about the current node
 // when broadcasting an alive message. It's length is limited to
 // the given byte size. This metadata is available in the Node structure.
-func (c *MemberlistClusterManager) NodeMeta(limit int) []byte {
+func (c *MemberlistManager) NodeMeta(limit int) []byte {
 	c.RLock()
 	meta, err := json.Marshal(c.members[c.nodeName])
 	c.RUnlock()
@@ -241,7 +241,7 @@ func (c *MemberlistClusterManager) NodeMeta(limit int) []byte {
 // Care should be taken that this method does not block, since doing
 // so would block the entire UDP packet receive loop. Additionally, the byte
 // slice may be modified after the call returns, so it should be copied if needed.
-func (c *MemberlistClusterManager) NotifyMsg(buf []byte) {
+func (c *MemberlistManager) NotifyMsg(buf []byte) {
 	// we dont have any need for passing messages between nodes, other then
 	// the NodeMeta sent with alive messages.
 	return
@@ -253,7 +253,7 @@ func (c *MemberlistClusterManager) NotifyMsg(buf []byte) {
 // The total byte size of the resulting data to send must not exceed
 // the limit. Care should be taken that this method does not block,
 // since doing so would block the entire UDP packet receive loop.
-func (c *MemberlistClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
+func (c *MemberlistManager) GetBroadcasts(overhead, limit int) [][]byte {
 	// we dont have any need for passing messages between nodes, other then
 	// the NodeMeta sent with alive messages.
 	return nil
@@ -263,29 +263,29 @@ func (c *MemberlistClusterManager) GetBroadcasts(overhead, limit int) [][]byte {
 // the remote side in addition to the membership information. Any
 // data can be sent here. See MergeRemoteState as well. The `join`
 // boolean indicates this is for a join instead of a push/pull.
-func (c *MemberlistClusterManager) LocalState(join bool) []byte {
+func (c *MemberlistManager) LocalState(join bool) []byte {
 	return nil
 }
 
-func (c *MemberlistClusterManager) MergeRemoteState(buf []byte, join bool) {
+func (c *MemberlistManager) MergeRemoteState(buf []byte, join bool) {
 	return
 }
 
 // Returns true if this node is a ready to accept requests
 // from users.
-func (c *MemberlistClusterManager) IsReady() bool {
+func (c *MemberlistManager) IsReady() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].IsReady()
 }
 
 // mark this node as ready to accept requests from users.
-func (c *MemberlistClusterManager) SetReady() {
+func (c *MemberlistManager) SetReady() {
 	c.SetState(NodeReady)
 }
 
 // Set the state of this node.
-func (c *MemberlistClusterManager) SetState(state NodeState) {
+func (c *MemberlistManager) SetState(state NodeState) {
 	c.Lock()
 	if c.members[c.nodeName].State == state {
 		c.Unlock()
@@ -301,7 +301,7 @@ func (c *MemberlistClusterManager) SetState(state NodeState) {
 }
 
 // mark this node as ready after the specified duration.
-func (c *MemberlistClusterManager) SetReadyIn(t time.Duration) {
+func (c *MemberlistManager) SetReadyIn(t time.Duration) {
 	go func() {
 		// wait for warmupPeriod before marking ourselves
 		// as ready.
@@ -311,14 +311,14 @@ func (c *MemberlistClusterManager) SetReadyIn(t time.Duration) {
 }
 
 // Returns true if the this node is a set as a primary node that should write data to cassandra.
-func (c *MemberlistClusterManager) IsPrimary() bool {
+func (c *MemberlistManager) IsPrimary() bool {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].Primary
 }
 
 // SetPrimary sets the primary status of this node
-func (c *MemberlistClusterManager) SetPrimary(p bool) {
+func (c *MemberlistManager) SetPrimary(p bool) {
 	c.Lock()
 	if c.members[c.nodeName].Primary == p {
 		c.Unlock()
@@ -335,7 +335,7 @@ func (c *MemberlistClusterManager) SetPrimary(p bool) {
 }
 
 // set the partitions that this node is handling.
-func (c *MemberlistClusterManager) SetPartitions(part []int32) {
+func (c *MemberlistManager) SetPartitions(part []int32) {
 	c.Lock()
 	node := c.members[c.nodeName]
 	node.Partitions = part
@@ -347,7 +347,7 @@ func (c *MemberlistClusterManager) SetPartitions(part []int32) {
 }
 
 // get the partitions that this node is handling.
-func (c *MemberlistClusterManager) GetPartitions() []int32 {
+func (c *MemberlistManager) GetPartitions() []int32 {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName].Partitions
@@ -355,7 +355,7 @@ func (c *MemberlistClusterManager) GetPartitions() []int32 {
 
 // set the priority of this node.
 // lower values == higher priority
-func (c *MemberlistClusterManager) SetPriority(prio int) {
+func (c *MemberlistManager) SetPriority(prio int) {
 	c.Lock()
 	if c.members[c.nodeName].Priority == prio {
 		c.Unlock()
@@ -370,7 +370,7 @@ func (c *MemberlistClusterManager) SetPriority(prio int) {
 	c.BroadcastUpdate()
 }
 
-func (c *MemberlistClusterManager) Stop() {
+func (c *MemberlistManager) Stop() {
 	c.list.Leave(time.Second)
 }
 

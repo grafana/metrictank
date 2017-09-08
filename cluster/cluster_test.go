@@ -21,9 +21,9 @@ func TestPeersForQuery(t *testing.T) {
 		So(selected[0], ShouldResemble, Manager.ThisNode())
 	})
 	thisNode := Manager.ThisNode()
-	Manager.(*MemberlistClusterManager).Lock()
+	Manager.(*MemberlistManager).Lock()
 
-	Manager.(*MemberlistClusterManager).members = map[string]Node{
+	Manager.(*MemberlistManager).members = map[string]Node{
 		thisNode.Name: thisNode,
 		"node2": {
 			Name:       "node2",
@@ -47,7 +47,7 @@ func TestPeersForQuery(t *testing.T) {
 			Priority:   10,
 		},
 	}
-	Manager.(*MemberlistClusterManager).Unlock()
+	Manager.(*MemberlistManager).Unlock()
 	Convey("when cluster in multi mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)

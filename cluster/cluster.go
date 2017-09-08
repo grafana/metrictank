@@ -48,7 +48,7 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		local:         true,
 	}
 	if Mode == ModeMulti {
-		mgr := &MemberlistClusterManager{
+		mgr := &MemberlistManager{
 			members: map[string]Node{
 				name: thisNode,
 			},
