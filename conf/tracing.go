@@ -19,7 +19,7 @@ func GetTracer(enabled bool, addr string) (opentracing.Tracer, io.Closer, error)
 			Param: 1,
 		},
 		Reporter: &jaegercfg.ReporterConfig{
-			LogSpans:           true,
+			LogSpans:           false,
 			LocalAgentHostPort: addr,
 		},
 	}
