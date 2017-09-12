@@ -24,3 +24,18 @@ type GetDataResp struct {
 type MetricsDeleteResp struct {
 	DeletedDefs int `json:"deletedDefs"`
 }
+
+//go:generate msgp
+type IndexTagListResp struct {
+	Tags []string `json:"tags"`
+}
+
+//go:generate msgp
+type IndexTagResp struct {
+	Values map[string]uint32 `json:"values"`
+}
+
+//go:generate msgp
+type IndexTagFindSeriesResp struct {
+	Series []string `json:"series"`
+}

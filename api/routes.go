@@ -39,6 +39,9 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/list", ready, bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
 	r.Combo("/index/delete", ready, bind(models.IndexDelete{})).Get(s.indexDelete).Post(s.indexDelete)
 	r.Combo("/index/get", ready, bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
+	r.Combo("/index/tags", ready, bind(models.IndexTagList{})).Get(s.indexTagList).Post(s.indexTagList)
+	r.Combo("/index/tags/findSeries", ready, bind(models.IndexTagFindSeries{})).Get(s.indexTagFindSeries).Post(s.indexTagFindSeries)
+	r.Combo("/index/tags/:tag([0-9a-zA-Z]+)", ready, bind(models.IndexTag{})).Get(s.indexTag).Post(s.indexTag)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
@@ -49,5 +52,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/find", withOrg, ready, bind(models.GraphiteFind{})).Get(s.metricsFind).Post(s.metricsFind)
 	r.Get("/metrics/index.json", withOrg, ready, s.metricsIndex)
 	r.Post("/metrics/delete", withOrg, ready, bind(models.MetricsDelete{}), s.metricsDelete)
-
+	r.Combo("/tags", withOrg, ready, bind(models.GraphiteTagList{})).Get(s.graphiteTagList).Post(s.graphiteTagList)
+	r.Combo("/tags/:tag([0-9a-zA-Z]+)", withOrg, ready, bind(models.GraphiteTag{})).Get(s.graphiteTag).Post(s.graphiteTag)
+	r.Combo("/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
 }
