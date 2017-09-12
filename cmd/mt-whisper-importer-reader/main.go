@@ -276,6 +276,9 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 	for retIdx, retention := range schema.Retentions {
 		convertedPoints := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
+			if len(p) == 0 {
+				continue
+			}
 			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			log.Debugf("Archive %d Method %s got %d points = %d chunks at a span of %d", retIdx, m, len(p), len(encodedChunks), retention.ChunkSpan)
