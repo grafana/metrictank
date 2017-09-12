@@ -173,7 +173,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			passed := time.Now().Sub(pre).Seconds()
 			if err != nil || resp.StatusCode >= 300 {
 				if err != nil {
-					log.Warningf("Error posting %s (%d bytes), to endpoint %q status %d (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, resp.StatusCode, attempts, passed, err)
+					log.Warningf("Error posting %s (%d bytes), to endpoint %q (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, attempts, passed, err)
 				} else {
 					log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
 				}
