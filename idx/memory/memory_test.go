@@ -44,7 +44,6 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 	data := make([]*schema.MetricData, count)
 	series := getSeriesNames(depth, count, prefix)
 	for i, s := range series {
-
 		data[i] = &schema.MetricData{
 			Name:     s,
 			Metric:   s,
@@ -520,6 +519,7 @@ func TestPrune(t *testing.T) {
 	})
 
 }
+
 func TestSingleNodeMetric(t *testing.T) {
 	ix := New()
 	ix.Init()
@@ -532,6 +532,98 @@ func TestSingleNodeMetric(t *testing.T) {
 	}
 	data.SetId()
 	ix.AddOrUpdate(data, 1)
+}
+
+func TestGetByTag(t *testing.T) {
+	tagSupport := TagSupport
+	defer func() { TagSupport = tagSupport }()
+	TagSupport = true
+
+	ix := New()
+	ix.Init()
+
+	mds := getMetricData(1, 2, 50, 10, "metric.public")
+	mds[10].Tags = []string{"key1=value1", "key2=value2"}
+	mds[21].Tags = []string{"key1=value1"}
+	mds[28].Tags = []string{"key1=value2", "key2=value2"}
+	mds[30].Tags = []string{"key1=value1", "key3=value3"}
+
+	for _, md := range mds {
+		ix.AddOrUpdate(md, 1)
+	}
+
+	expressions := [][]string{
+		{"key1=value1"},
+		{"key1=value2"},
+		{"key1=~value[0-9]"},
+		{"key1=~value[23]"},
+		{"key1=value1", "key2=value1"},
+		{"key1=value1", "key2=value2"},
+		{"key1=~value[12]", "key2=value2"},
+		{"key1=~value1", "key1=value2"},
+		{"key1=~value[0-9]", "key2=~", "key3!=value3"},
+		{"key2=", "key1=value1"},
+	}
+	expecting := []int{3, 1, 4, 1, 0, 1, 2, 0, 1, 2}
+
+	for i := 0; i < len(expecting); i++ {
+		tagQuery, err := NewTagQuery(expressions[i])
+		if err != nil {
+			t.Fatalf("Got an unexpected error with query %s: %s", expressions[i], err)
+		}
+		res := ix.IdsByTagQuery(1, tagQuery)
+		if len(res) != expecting[i] {
+			t.Fatalf("Expected %d in test %d results, but got %d: %q", expecting[i], i, len(res), res)
+		}
+	}
+}
+
+func TestDeleteTaggedSeries(t *testing.T) {
+	tagSupport := TagSupport
+	defer func() { TagSupport = tagSupport }()
+	TagSupport = true
+
+	ix := New()
+	ix.Init()
+
+	orgId := 1
+
+	mds := getMetricData(orgId, 2, 50, 10, "metric.public")
+	mds[10].Tags = []string{"key1=value1", "key2=value2"}
+
+	for _, md := range mds {
+		ix.AddOrUpdate(md, 1)
+	}
+
+	tagQuery, _ := NewTagQuery([]string{"key1=value1", "key2=value2"})
+	res := ix.IdsByTagQuery(orgId, tagQuery)
+
+	if len(res) != 1 {
+		t.Fatalf(fmt.Sprintf("Expected to get 1 result, but got %d", len(res)))
+	}
+
+	if len(ix.Tags[orgId]) != 2 {
+		t.Fatalf(fmt.Sprintf("Expected tag index to contain 2 keys, but it does not: %+v", ix.Tags))
+	}
+
+	deleted, err := ix.Delete(orgId, mds[10].Metric)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Error deleting metric: %s", err))
+	}
+
+	if len(deleted) != 1 {
+		t.Fatalf(fmt.Sprintf("Expected 1 metric to get deleted, but got %d", len(deleted)))
+	}
+
+	res = ix.IdsByTagQuery(orgId, tagQuery)
+
+	if len(res) != 0 {
+		t.Fatalf(fmt.Sprintf("Expected to get 0 results, but got %d", len(res)))
+	}
+
+	if len(ix.Tags[orgId]) > 0 {
+		t.Fatalf(fmt.Sprintf("Expected tag index to be empty, but it is not: %+v", ix.Tags))
+	}
 }
 
 func BenchmarkIndexing(b *testing.B) {
