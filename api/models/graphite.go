@@ -52,6 +52,36 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 	return errs
 }
 
+type GraphiteTagList struct {
+	From uint32 `json:"from" form:"from"`
+}
+
+type GraphiteTagListResp struct {
+	Tags []string `json:"tags"`
+}
+
+type GraphiteTag struct {
+	Tag string `json:"tag" form:"tag"`
+}
+
+type GraphiteTagValueResp struct {
+	Count uint32 `json:"count"`
+	Value string `json:"value"`
+}
+
+type GraphiteTagResp struct {
+	Tag    string                 `json:"tag" form:"tag"`
+	Values []GraphiteTagValueResp `json:"values"`
+}
+
+type GraphiteTagFindSeries struct {
+	Expr []string `json:"expr" form:"expr"`
+}
+
+type GraphiteTagFindSeriesResp struct {
+	Series []string `json:"series"`
+}
+
 type GraphiteFind struct {
 	FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`
