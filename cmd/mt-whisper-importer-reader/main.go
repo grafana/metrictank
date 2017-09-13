@@ -147,27 +147,28 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			continue
 		}
 
-		b, err := met.MarshalCompressed()
-		if err != nil {
-			log.Errorf("Failed to encode metric: %q", err)
-			continue
-		}
-		size := b.Len()
-
-		req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
-		if err != nil {
-			log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-
-		if len(*httpAuth) > 0 {
-			req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
-		}
-
 		success := false
 		attempts := 0
 		for !success {
+			b, err := met.MarshalCompressed()
+			if err != nil {
+				log.Errorf("Failed to encode metric: %q", err)
+				continue
+			}
+			size := b.Len()
+
+			req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
+			if err != nil {
+				log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+			}
+
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Content-Encoding", "gzip")
+
+			if len(*httpAuth) > 0 {
+				req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
+			}
+
 			pre := time.Now()
 			resp, err := client.Do(req)
 			passed := time.Now().Sub(pre).Seconds()
