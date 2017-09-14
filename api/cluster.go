@@ -158,7 +158,8 @@ func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 }
 
 func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
-	series, err := s.getTargetsLocal(ctx.Req.Context(), request.Requests)
+	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
+	series, err := s.getTargetsLocal(reqCtx, cancel, request.Requests)
 	if err != nil {
 		// the only errors returned are from us catching panics, so we should treat them
 		// all as internalServerErrors

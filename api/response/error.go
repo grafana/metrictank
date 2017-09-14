@@ -51,3 +51,5 @@ func (r *ErrorResp) Headers() (headers map[string]string) {
 	headers = map[string]string{"content-type": "text/plain"}
 	return headers
 }
+
+var RequestCanceledErr = NewError(499, "request canceled")

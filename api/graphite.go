@@ -59,44 +59,61 @@ func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, s
 		return nil, err
 	}
 	log.Debug("HTTP findSeries for %v across %d instances", patterns, len(peers))
-	errors := make([]error, 0)
-	series := make([]Series, 0)
-
-	var mu sync.Mutex
 	var wg sync.WaitGroup
+
+	responses := make(chan struct {
+		series []Series
+		err    error
+	}, 1)
+	findCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	for _, peer := range peers {
 		log.Debug("HTTP findSeries getting results from %s", peer.Name)
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
-				result, err := s.findSeriesLocal(ctx, orgId, patterns, seenAfter)
-				mu.Lock()
+				result, err := s.findSeriesLocal(findCtx, orgId, patterns, seenAfter)
 				if err != nil {
-					errors = append(errors, err)
+					// cancel requests on all other peers.
+					cancel()
 				}
-				series = append(series, result...)
-				mu.Unlock()
+				responses <- struct {
+					series []Series
+					err    error
+				}{result, err}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.findSeriesRemote(ctx, orgId, patterns, seenAfter, peer)
-				mu.Lock()
+				result, err := s.findSeriesRemote(findCtx, orgId, patterns, seenAfter, peer)
 				if err != nil {
-					errors = append(errors, err)
+					// cancel requests on all other peers.
+					cancel()
 				}
-				series = append(series, result...)
-				mu.Unlock()
+				responses <- struct {
+					series []Series
+					err    error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	if len(errors) > 0 {
-		err = errors[0]
+
+	// wait for all findSeries goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	series := make([]Series, 0)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, err
+		}
+		series = append(series, resp.series...)
 	}
 
-	return series, err
+	return series, nil
 }
 
 func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
@@ -132,6 +149,12 @@ func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []str
 	if err != nil {
 		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.Name, err)
 		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 	resp := models.NewIndexFindResp()
 	_, err = resp.UnmarshalMsg(buf)
@@ -249,6 +272,15 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-newctx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
 	noDataPoints := true
 	for _, o := range out {
 		if len(o.Datapoints) != 0 {
@@ -279,11 +311,22 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		return
 	}
 	nodes := make([]idx.Node, 0)
-	series, err := s.findSeries(ctx.Req.Context(), ctx.OrgId, []string{request.Query}, int64(fromUnix))
+	reqCtx := ctx.Req.Context()
+	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix))
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
 	seenPaths := make(map[string]struct{})
 	// different nodes may have overlapping data in their index.
 	// maybe because they used to receive a certain shard but now dont. or because they host metrics under branches
@@ -320,6 +363,12 @@ func (s *Server) listRemote(ctx context.Context, orgId int, peer cluster.Node) (
 		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.Name, err)
 		return nil, err
 	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
 	result := make([]idx.Archive, 0)
 	for len(buf) != 0 {
 		var def idx.Archive
@@ -339,53 +388,63 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
-	errors := make([]error, 0)
-	series := make([]idx.Archive, 0)
-	seenDefs := make(map[string]struct{})
-	var mu sync.Mutex
+	reqCtx := ctx.Req.Context()
+	responses := make(chan struct {
+		series []idx.Archive
+		err    error
+	}, 1)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
 				result := s.listLocal(ctx.OrgId)
-				mu.Lock()
-				for _, def := range result {
-					if _, ok := seenDefs[def.Id]; !ok {
-						series = append(series, def)
-						seenDefs[def.Id] = struct{}{}
-					}
-				}
-				mu.Unlock()
+				responses <- struct {
+					series []idx.Archive
+					err    error
+				}{result, nil}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.listRemote(ctx.Req.Context(), ctx.OrgId, peer)
-				mu.Lock()
-				if err != nil {
-					errors = append(errors, err)
-				}
-				for _, def := range result {
-					if _, ok := seenDefs[def.Id]; !ok {
-						series = append(series, def)
-						seenDefs[def.Id] = struct{}{}
-					}
-				}
-				mu.Unlock()
+				result, err := s.listRemote(reqCtx, ctx.OrgId, peer)
+				responses <- struct {
+					series []idx.Archive
+					err    error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	if len(errors) > 0 {
-		err = errors[0]
+
+	// wait for all list goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	series := make([]idx.Archive, 0)
+	seenDefs := make(map[string]struct{})
+	for resp := range responses {
+		if resp.err != nil {
+			response.Write(ctx, response.WrapError(err))
+			return
+		}
+		for _, def := range resp.series {
+			if _, ok := seenDefs[def.Id]; !ok {
+				series = append(series, def)
+				seenDefs[def.Id] = struct{}{}
+			}
+		}
 	}
 
-	if err != nil {
-		log.Error(3, "HTTP IndexJson() %s", err.Error())
-		response.Write(ctx, response.WrapError(err))
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
 		return
+	default:
 	}
 
 	response.Write(ctx, response.NewFastJson(200, models.MetricNames(series)))
@@ -479,9 +538,13 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	peers := cluster.Manager.MemberList()
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debug("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
-	errors := make([]error, 0)
+
+	reqCtx := ctx.Req.Context()
 	deleted := 0
-	var mu sync.Mutex
+	responses := make(chan struct {
+		deleted int
+		err     error
+	}, 1)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		log.Debug("HTTP metricsDelete getting results from %s", peer.Name)
@@ -489,36 +552,53 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 		if peer.IsLocal() {
 			go func() {
 				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
-				mu.Lock()
+				var e error
 				if err != nil {
-					// errors can be due to bad user input or corrupt index.
 					if strings.Contains(err.Error(), "Index is corrupt") {
-						errors = append(errors, response.NewError(http.StatusInternalServerError, err.Error()))
+						e = response.NewError(http.StatusInternalServerError, err.Error())
 					} else {
-						errors = append(errors, response.NewError(http.StatusBadRequest, err.Error()))
+						e = response.NewError(http.StatusBadRequest, err.Error())
 					}
 				}
-				deleted += result
-				mu.Unlock()
+				responses <- struct {
+					deleted int
+					err     error
+				}{result, e}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.metricsDeleteRemote(ctx.Req.Context(), ctx.OrgId, req.Query, peer)
-				mu.Lock()
-				if err != nil {
-					errors = append(errors, err)
-				}
-				deleted += result
-				mu.Unlock()
+				result, err := s.metricsDeleteRemote(reqCtx, ctx.OrgId, req.Query, peer)
+				responses <- struct {
+					deleted int
+					err     error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	var err error
-	if len(errors) > 0 {
-		response.Write(ctx, response.WrapError(err))
+
+	// wait for all metricsDelete goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	for resp := range responses {
+		if resp.err != nil {
+			response.Write(ctx, response.WrapError(resp.err))
+			return
+		}
+		deleted += resp.deleted
+	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
 	}
 
 	resp := models.MetricsDeleteResp{
@@ -545,6 +625,14 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query strin
 		log.Error(4, "HTTP metricDelete error querying %s/index/delete: %q", peer.Name, err)
 		return 0, err
 	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return 0, nil
+	default:
+	}
+
 	resp := models.MetricsDeleteResp{}
 	_, err = resp.UnmarshalMsg(buf)
 	if err != nil {
@@ -568,6 +656,12 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	for _, r := range plan.Reqs {
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, nil
+		default:
+		}
 		series, err := s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		if err != nil {
 			return nil, err
@@ -600,6 +694,13 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 		}
 	}
 
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
 	reqRenderSeriesCount.Value(len(reqs))
 	if len(reqs) == 0 {
 		return nil, nil
@@ -626,6 +727,7 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 		log.Error(3, "HTTP Render %s", err.Error())
 		return nil, err
 	}
+
 	out = mergeSeries(out)
 
 	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work

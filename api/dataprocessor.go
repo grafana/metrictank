@@ -21,6 +21,11 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+type getTargetsResp struct {
+	series []models.Series
+	err    error
+}
+
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
 func doRecover(errp *error) {
 	e := recover()
@@ -124,26 +129,18 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		}
 	}
 
-	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	out := make([]models.Series, 0)
-	errs := make([]error, 0)
-
+	responses := make(chan getTargetsResp, 1)
+	getCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	if len(localReqs) > 0 {
 		wg.Add(1)
 		go func() {
 			// the only errors returned are from us catching panics, so we should treat them
 			// all as internalServerErrors
-			series, err := s.getTargetsLocal(ctx, localReqs)
-			mu.Lock()
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if len(series) > 0 {
-				out = append(out, series...)
-			}
-			mu.Unlock()
+			series, err := s.getTargetsLocal(getCtx, cancel, localReqs)
+			responses <- getTargetsResp{series, err}
 			wg.Done()
 		}()
 	}
@@ -151,81 +148,84 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		wg.Add(1)
 		go func() {
 			// all errors returned returned are *response.Error.
-			series, err := s.getTargetsRemote(ctx, remoteReqs)
-			mu.Lock()
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if len(series) > 0 {
-				out = append(out, series...)
-			}
-			mu.Unlock()
+			series, err := s.getTargetsRemote(getCtx, cancel, remoteReqs)
+			responses <- getTargetsResp{series, err}
 			wg.Done()
 		}()
 	}
-	wg.Wait()
-	var err error
-	if len(errs) > 0 {
-		err = errs[0]
+
+	// wait for all getTargets goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	out := make([]models.Series, 0)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, resp.err
+		}
+		out = append(out, resp.series...)
 	}
 	log.Debug("DP getTargets: %d series found on cluster", len(out))
-	return out, err
+	return out, nil
 }
 
-func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]models.Req) ([]models.Series, error) {
-	seriesChan := make(chan []models.Series, len(remoteReqs))
-	errorsChan := make(chan error, len(remoteReqs))
+func (s *Server) getTargetsRemote(ctx context.Context, cancel context.CancelFunc, remoteReqs map[string][]models.Req) ([]models.Series, error) {
+	responses := make(chan getTargetsResp, 1)
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for _, nodeReqs := range remoteReqs {
 		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.Name)
-		go func(ctx context.Context, reqs []models.Req) {
+		go func(reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
 			buf, err := node.Post(ctx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 			if err != nil {
-				errorsChan <- err
+				cancel() // cancel all other requests.
+				responses <- getTargetsResp{nil, err}
 				return
 			}
 			var resp models.GetDataResp
 			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.Name, err)
-				errorsChan <- err
+				cancel() // cancel all other requests.
+				responses <- getTargetsResp{nil, err}
 				return
 			}
 			log.Debug("DP getTargetsRemote: %s returned %d series", node.Name, len(resp.Series))
-			seriesChan <- resp.Series
-		}(ctx, nodeReqs)
+			responses <- getTargetsResp{resp.Series, nil}
+		}(nodeReqs)
 	}
+
+	// wait for all getTargetsRemote goroutines to end, then close our responses channel
 	go func() {
 		wg.Wait()
-		close(seriesChan)
-		close(errorsChan)
+		close(responses)
 	}()
+
 	out := make([]models.Series, 0)
-	var err error
-	for series := range seriesChan {
-		out = append(out, series...)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, resp.err
+		}
+		out = append(out, resp.series...)
 	}
 	log.Debug("DP getTargetsRemote: total of %d series found on peers", len(out))
-	for e := range errorsChan {
-		err = e
-		break
-	}
-	return out, err
+	return out, nil
 }
 
 // error is the error of the first failing target request
-func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]models.Series, error) {
+func (s *Server) getTargetsLocal(ctx context.Context, cancel context.CancelFunc, reqs []models.Req) ([]models.Series, error) {
 	log.Debug("DP getTargetsLocal: handling %d reqs locally", len(reqs))
-	seriesChan := make(chan models.Series, len(reqs))
-	errorsChan := make(chan error, len(reqs))
-	// TODO: abort pending requests on error, maybe use context, maybe timeouts too
-	wg := sync.WaitGroup{}
+	responses := make(chan getTargetsResp, 1)
+
+	var wg sync.WaitGroup
 	wg.Add(len(reqs))
 	for _, req := range reqs {
-		go func(ctx context.Context, wg *sync.WaitGroup, req models.Req) {
+		go func(req models.Req) {
 			ctx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 			req.Trace(span)
 			defer span.Finish()
@@ -233,10 +233,11 @@ func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]mode
 			points, interval, err := s.getTarget(ctx, req)
 			if err != nil {
 				tags.Error.Set(span, true)
-				errorsChan <- err
+				cancel() // cancel all other requests.
+				responses <- getTargetsResp{nil, err}
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
-				seriesChan <- models.Series{
+				responses <- getTargetsResp{[]models.Series{{
 					Target:       req.Target, // always simply the metric name from index
 					Datapoints:   points,
 					Interval:     interval,
@@ -245,27 +246,24 @@ func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]mode
 					QueryTo:      req.To,
 					QueryCons:    req.ConsReq,
 					Consolidator: req.Consolidator,
-				}
+				}}, nil}
 			}
 			wg.Done()
-		}(ctx, &wg, req)
+		}(req)
 	}
 	go func() {
 		wg.Wait()
-		close(seriesChan)
-		close(errorsChan)
+		close(responses)
 	}()
 	out := make([]models.Series, 0, len(reqs))
-	var err error
-	for series := range seriesChan {
-		out = append(out, series)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, resp.err
+		}
+		out = append(out, resp.series...)
 	}
 	log.Debug("DP getTargetsLocal: %d series found locally", len(out))
-	for e := range errorsChan {
-		err = e
-		break
-	}
-	return out, err
+	return out, nil
 
 }
 
@@ -337,6 +335,14 @@ func (s *Server) getSeries(ctx *requestContext) mdata.Result {
 	if res.Oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
 		return res
+	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-ctx.ctx.Done():
+		//request canceled
+		return res
+	default:
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
@@ -415,6 +421,14 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	log.Debug("cache: searching query key %s, from %d, until %d", key, ctx.From, until)
 	cacheRes := s.Cache.Search(ctx.ctx, key, ctx.From, until)
 	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-ctx.ctx.Done():
+		//request canceled
+		return nil
+	default:
+	}
 
 	for _, itgen := range cacheRes.Start {
 		iter, err := itgen.Get()
