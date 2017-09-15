@@ -27,6 +27,8 @@ var (
 	fallbackGraphite string
 	timeZoneStr      string
 
+	getTargetsConcurrency int
+
 	graphiteProxy *httputil.ReverseProxy
 	timeZone      *time.Location
 )
@@ -45,6 +47,7 @@ func ConfigSetup() {
 	apiCfg.BoolVar(&multiTenant, "multi-tenant", true, "require x-org-id authentication to auth as a specific org. otherwise orgId 1 is assumed")
 	apiCfg.StringVar(&fallbackGraphite, "fallback-graphite-addr", "http://localhost:8080", "in case our /render endpoint does not support the requested processing, proxy the request to this graphite")
 	apiCfg.StringVar(&timeZoneStr, "time-zone", "local", "timezone for interpreting from/until values when needed, specified using [zoneinfo name](https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones) e.g. 'America/New_York', 'UTC' or 'local' to use local server timezone")
+	apiCfg.IntVar(&getTargetsConcurrency, "get-targets-concurrency", 20, "maximum number of concurrent threads for fetching data on the local node. Each thread handles a single series.")
 	globalconf.Register("http", apiCfg)
 }
 

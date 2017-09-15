@@ -21,6 +21,15 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+type limiter chan struct{}
+
+func (l limiter) enter() { l <- struct{}{} }
+func (l limiter) leave() { <-l }
+
+func newLimiter(l int) limiter {
+	return make(chan struct{}, l)
+}
+
 type getTargetsResp struct {
 	series []models.Series
 	err    error
@@ -224,11 +233,14 @@ func (s *Server) getTargetsLocal(ctx context.Context, cancel context.CancelFunc,
 
 	var wg sync.WaitGroup
 	wg.Add(len(reqs))
+	reqLimiter := newLimiter(getTargetsConcurrency)
 	for _, req := range reqs {
+		// if there are already getDataConcurrency goroutines running, then block
+		// until a slot becomes free.
+		reqLimiter.enter()
 		go func(req models.Req) {
 			ctx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 			req.Trace(span)
-			defer span.Finish()
 			pre := time.Now()
 			points, interval, err := s.getTarget(ctx, req)
 			if err != nil {
@@ -249,6 +261,9 @@ func (s *Server) getTargetsLocal(ctx context.Context, cancel context.CancelFunc,
 				}}, nil}
 			}
 			wg.Done()
+			// pop an item of our limiter so that other requests can be processed.
+			reqLimiter.leave()
+			span.Finish()
 		}(req)
 	}
 	go func() {
