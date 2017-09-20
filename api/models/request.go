@@ -91,6 +91,8 @@ func (r Req) Trace(span opentracing.Span) {
 
 // TraceLog puts all request properties in a span log entry
 // good for when a span deals with multiple requests
+// note that the amount of data generated here can be up to
+// 1000~1500 bytes
 func (r Req) TraceLog(span opentracing.Span) {
 	span.LogFields(
 		log.String("key", r.Key),

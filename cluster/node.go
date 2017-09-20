@@ -118,18 +118,25 @@ func (n Node) IsLocal() bool {
 	return n.local
 }
 
-func (n Node) Post(ctx context.Context, name, path string, body Traceable) ([]byte, error) {
+func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "metrictank")
 	tags.PeerAddress.Set(span, n.RemoteAddr)
 	tags.PeerHostname.Set(span, n.Name)
 	body.Trace(span)
-	defer span.Finish()
+	defer func(pre time.Time) {
+		if err != nil {
+			tags.Error.Set(span, true)
+		}
+		if err != nil || time.Since(pre) > 10*time.Second {
+			body.TraceDebug(span)
+		}
+		span.Finish()
+	}(time.Now())
 
 	b, err := json.Marshal(body)
 	if err != nil {
-		tags.Error.Set(span, true)
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	var reader *bytes.Reader
@@ -137,7 +144,6 @@ func (n Node) Post(ctx context.Context, name, path string, body Traceable) ([]by
 	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
-		tags.Error.Set(span, true)
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
 	carrier := opentracing.HTTPHeadersCarrier(req.Header)
@@ -148,15 +154,10 @@ func (n Node) Post(ctx context.Context, name, path string, body Traceable) ([]by
 	req.Header.Add("Content-Type", "application/json")
 	rsp, err := client.Do(req)
 	if err != nil {
-		tags.Error.Set(span, true)
 		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 	}
-	out, err := handleResp(rsp)
-	if err != nil {
-		tags.Error.Set(span, true)
-	}
-	return out, err
+	return handleResp(rsp)
 }
 
 func handleResp(rsp *http.Response) ([]byte, error) {

@@ -32,6 +32,9 @@ func (i IndexList) Trace(span opentracing.Span) {
 	span.SetTag("org", i.OrgId)
 }
 
+func (i IndexList) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	Id string `json:"id" form:"id" binding:"Required"`
 }
@@ -48,12 +51,25 @@ func (i IndexFind) Trace(span opentracing.Span) {
 	span.SetTag("from", i.From)
 }
 
+func (i IndexFind) TraceDebug(span opentracing.Span) {
+}
+
 type GetData struct {
 	Requests []Req `json:"requests" binding:"Required"`
 }
 
 func (g GetData) Trace(span opentracing.Span) {
-	for _, r := range g.Requests {
+	span.SetTag("num_reqs", len(g.Requests))
+}
+
+func (g GetData) TraceDebug(span opentracing.Span) {
+	// max span size is 64kB. anything higher will be discarded
+	tolog := g.Requests
+	if len(g.Requests) > 45 {
+		span.SetTag("udp_cutoff", true)
+		tolog = g.Requests[:45]
+	}
+	for _, r := range tolog {
 		r.TraceLog(span)
 	}
 }
@@ -66,4 +82,7 @@ type IndexDelete struct {
 func (i IndexDelete) Trace(span opentracing.Span) {
 	span.SetTag("q", i.Query)
 	span.SetTag("org", i.OrgId)
+}
+
+func (i IndexDelete) TraceDebug(span opentracing.Span) {
 }
