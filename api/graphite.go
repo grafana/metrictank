@@ -119,6 +119,12 @@ func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, s
 func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, nil
+		default:
+		}
 		_, span := tracing.NewSpan(ctx, s.Tracer, "findSeriesLocal")
 		span.SetTag("org", orgId)
 		span.SetTag("pattern", pattern)
