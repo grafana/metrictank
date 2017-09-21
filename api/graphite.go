@@ -388,7 +388,8 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
-	reqCtx := ctx.Req.Context()
+	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
+	defer cancel()
 	responses := make(chan struct {
 		series []idx.Archive
 		err    error
@@ -408,6 +409,9 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		} else {
 			go func(peer cluster.Node) {
 				result, err := s.listRemote(reqCtx, ctx.OrgId, peer)
+				if err != nil {
+					cancel()
+				}
 				responses <- struct {
 					series []idx.Archive
 					err    error
@@ -539,12 +543,13 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debug("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
 
-	reqCtx := ctx.Req.Context()
+	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
+	defer cancel()
 	deleted := 0
 	responses := make(chan struct {
 		deleted int
 		err     error
-	}, 1)
+	}, len(peers))
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		log.Debug("HTTP metricsDelete getting results from %s", peer.Name)
@@ -554,6 +559,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
 				var e error
 				if err != nil {
+					cancel()
 					if strings.Contains(err.Error(), "Index is corrupt") {
 						e = response.NewError(http.StatusInternalServerError, err.Error())
 					} else {
@@ -569,6 +575,9 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 		} else {
 			go func(peer cluster.Node) {
 				result, err := s.metricsDeleteRemote(reqCtx, ctx.OrgId, req.Query, peer)
+				if err != nil {
+					cancel()
+				}
 				responses <- struct {
 					deleted int
 					err     error
