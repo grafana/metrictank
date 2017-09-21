@@ -188,7 +188,8 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 
 func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 	responses := make(chan getTargetsResp, len(remoteReqs))
-
+	rCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for _, nodeReqs := range remoteReqs {
@@ -196,14 +197,16 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 		go func(reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
-			buf, err := node.Post(ctx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
+			buf, err := node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 			if err != nil {
+				cancel()
 				responses <- getTargetsResp{nil, err}
 				return
 			}
 			var resp models.GetDataResp
 			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
+				cancel()
 				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.Name, err)
 				responses <- getTargetsResp{nil, err}
 				return
