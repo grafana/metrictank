@@ -84,6 +84,8 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	if mc.chunks[chunk.Prev].Next != chunk.Ts {
 		t.Fatalf("previous cache chunk didn't point at this one as it's next, got %d", mc.chunks[chunk.Prev].Next)
 	}
+
+	cc.Stop()
 }
 
 // test AddIfHot method without passing a previous timestamp on a cold metric

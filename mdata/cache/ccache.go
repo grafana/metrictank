@@ -41,6 +41,15 @@ type CCache struct {
 	stop chan interface{}
 
 	tracer opentracing.Tracer
+
+	addQ chan AddChunk
+}
+
+type AddChunk struct {
+	Metric string
+	PrevTs uint32
+	Itgen  chunk.IterGen
+	IfHot  bool
 }
 
 func NewCCache() *CCache {
@@ -49,8 +58,10 @@ func NewCCache() *CCache {
 		accnt:       accnt.NewFlatAccnt(maxSize),
 		stop:        make(chan interface{}),
 		tracer:      opentracing.NoopTracer{},
+		addQ:        make(chan AddChunk, 100),
 	}
 	go cc.evictLoop()
+	go cc.addLoop()
 	return cc
 }
 
@@ -70,8 +81,21 @@ func (c *CCache) evictLoop() {
 	}
 }
 
-// adds the given chunk to the cache, but only if the metric is sufficiently hot
-func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) addLoop() {
+	for {
+		select {
+		case target := <-c.addQ:
+			if target.IfHot && !c.isHot(target.Metric, target.Itgen.Ts) {
+				continue
+			}
+			c.add(target)
+		case _ = <-c.stop:
+			return
+		}
+	}
+}
+
+func (c *CCache) isHot(metric string, ts uint32) bool {
 	c.RLock()
 
 	var met *CCacheMetric
@@ -80,36 +104,55 @@ func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	// if this metric is not cached at all it is not hot
 	if met, ok = c.metricCache[metric]; !ok {
 		c.RUnlock()
-		return
+		return false
 	}
 
 	// if the previous chunk is not cached we consider the metric not hot enough to cache this chunk
 	// only works reliably if the last chunk of that metric is span aware, otherwise lastTs() will be guessed
 	// conservatively which means that the returned value will probably be lower than the real last ts
-	if met.lastTs() < itergen.Ts {
+	if met.lastTs() < ts {
 		c.RUnlock()
-		return
+		return false
 	}
 
 	accnt.CacheChunkPushHot.Inc()
 
 	c.RUnlock()
-	c.Add(metric, prev, itergen)
+	return true
+}
+
+// adds the given chunk to the cache, but only if the metric is sufficiently hot
+func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+	c.addQ <- AddChunk{
+		Metric: metric,
+		PrevTs: prev,
+		Itgen:  itergen,
+		IfHot:  true,
+	}
 }
 
 func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
+	c.addQ <- AddChunk{
+		Metric: metric,
+		PrevTs: prev,
+		Itgen:  itergen,
+		IfHot:  false,
+	}
+}
+
+func (c *CCache) add(chunk AddChunk) {
 	c.Lock()
 	defer c.Unlock()
 
-	if ccm, ok := c.metricCache[metric]; !ok {
+	if ccm, ok := c.metricCache[chunk.Metric]; !ok {
 		ccm = NewCCacheMetric()
-		ccm.Init(prev, itergen)
-		c.metricCache[metric] = ccm
+		ccm.Init(chunk.PrevTs, chunk.Itgen)
+		c.metricCache[chunk.Metric] = ccm
 	} else {
-		ccm.Add(prev, itergen)
+		ccm.Add(chunk.PrevTs, chunk.Itgen)
 	}
 
-	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+	c.accnt.AddChunk(chunk.Metric, chunk.Itgen.Ts, chunk.Itgen.Size())
 }
 
 func (cc *CCache) Reset() {
@@ -121,6 +164,7 @@ func (cc *CCache) Reset() {
 
 func (c *CCache) Stop() {
 	c.accnt.Stop()
+	c.stop <- nil
 	c.stop <- nil
 }
 
