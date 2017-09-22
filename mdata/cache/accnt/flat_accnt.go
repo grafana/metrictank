@@ -1,8 +1,9 @@
 package accnt
 
 import (
-	"github.com/raintank/worldping-api/pkg/log"
 	"sort"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 const evictQSize = 1000
@@ -130,7 +131,7 @@ func (a *FlatAccnt) eventLoop() {
 						Ts:     payload.ts,
 					},
 				)
-				cacheChunkAdd.Inc()
+				CacheChunkAdd.Inc()
 			case evnt_hit_chnk:
 				payload := event.pl.(*HitPayload)
 				a.lru.touch(

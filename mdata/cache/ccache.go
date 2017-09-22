@@ -84,8 +84,8 @@ func (c *CCache) evictLoop() {
 
 func (c *CCache) addLoop() {
 	bufferSize := 100
-	buffer := make([]AddTarget, bufferSize)
-	tick := time.Tick(time.Duration(1) * time.Second)
+	buffer := make([]AddTarget, 0, bufferSize)
+	tick := time.Tick(time.Duration(100) * time.Millisecond)
 	for {
 		select {
 		case <-tick:
@@ -160,6 +160,7 @@ func (c *CCache) add(targets []AddTarget) {
 			}
 
 			if !c.isHot(target.Metric, target.Itgen.Ts) {
+				accnt.CacheChunkOmitCold.Inc()
 				continue
 			}
 		}
