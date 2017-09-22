@@ -5,6 +5,7 @@ import (
 	"flag"
 	"runtime"
 	"sync"
+	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/metrictank/mdata/cache/accnt"
@@ -41,6 +42,15 @@ type CCache struct {
 	stop chan interface{}
 
 	tracer opentracing.Tracer
+
+	addQ chan AddTarget
+}
+
+type AddTarget struct {
+	Metric string
+	PrevTs uint32
+	Itgen  chunk.IterGen
+	IfHot  bool
 }
 
 func NewCCache() *CCache {
@@ -49,8 +59,10 @@ func NewCCache() *CCache {
 		accnt:       accnt.NewFlatAccnt(maxSize),
 		stop:        make(chan interface{}),
 		tracer:      opentracing.NoopTracer{},
+		addQ:        make(chan AddTarget, 100),
 	}
 	go cc.evictLoop()
+	go cc.addLoop()
 	return cc
 }
 
@@ -70,46 +82,113 @@ func (c *CCache) evictLoop() {
 	}
 }
 
-// adds the given chunk to the cache, but only if the metric is sufficiently hot
-func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
-	c.RLock()
+func (c *CCache) addLoop() {
+	bufferSize := 100
+	buffer := make([]AddTarget, 0, bufferSize)
+	tick := time.Tick(time.Duration(100) * time.Millisecond)
+	for {
+		select {
+		case <-tick:
+			if len(buffer) > 0 {
+				c.add(buffer)
+				buffer = buffer[:0]
+			}
+		case target := <-c.addQ:
+			buffer = append(buffer, target)
+			if len(buffer) > bufferSize {
+				c.add(buffer)
+				buffer = buffer[:0]
+			}
+		case _ = <-c.stop:
+			return
+		}
+	}
+}
 
+func (c *CCache) isHot(metric string, ts uint32) bool {
 	var met *CCacheMetric
 	var ok bool
 
 	// if this metric is not cached at all it is not hot
 	if met, ok = c.metricCache[metric]; !ok {
 		c.RUnlock()
-		return
+		return false
 	}
 
 	// if the previous chunk is not cached we consider the metric not hot enough to cache this chunk
 	// only works reliably if the last chunk of that metric is span aware, otherwise lastTs() will be guessed
 	// conservatively which means that the returned value will probably be lower than the real last ts
-	if met.lastTs() < itergen.Ts {
-		c.RUnlock()
-		return
+	if met.lastTs() < ts {
+		return false
 	}
 
 	accnt.CacheChunkPushHot.Inc()
 
-	c.RUnlock()
-	c.Add(metric, prev, itergen)
+	return true
+}
+
+// adds the given chunk to the cache, but only if the metric is sufficiently hot
+func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+	c.addQ <- AddTarget{
+		Metric: metric,
+		PrevTs: prev,
+		Itgen:  itergen,
+		IfHot:  true,
+	}
 }
 
 func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
-	c.Lock()
-	defer c.Unlock()
+	c.addQ <- AddTarget{
+		Metric: metric,
+		PrevTs: prev,
+		Itgen:  itergen,
+		IfHot:  false,
+	}
+}
 
-	if ccm, ok := c.metricCache[metric]; !ok {
-		ccm = NewCCacheMetric()
-		ccm.Init(prev, itergen)
-		c.metricCache[metric] = ccm
-	} else {
-		ccm.Add(prev, itergen)
+func (c *CCache) add(targets []AddTarget) {
+	currentLock := 0 // 1 = read, 2 = write
+
+	for _, target := range targets {
+		if target.IfHot {
+			if currentLock != 1 {
+				if currentLock == 2 {
+					c.Unlock()
+				}
+				c.RLock()
+				currentLock = 1
+			}
+
+			if !c.isHot(target.Metric, target.Itgen.Ts) {
+				accnt.CacheChunkOmitCold.Inc()
+				continue
+			}
+		}
+
+		if currentLock != 2 {
+			if currentLock == 1 {
+				c.RUnlock()
+			}
+			c.Lock()
+			currentLock = 2
+		}
+
+		if ccm, ok := c.metricCache[target.Metric]; !ok {
+			ccm = NewCCacheMetric()
+			ccm.Init(target.PrevTs, target.Itgen)
+			c.metricCache[target.Metric] = ccm
+		} else {
+			ccm.Add(target.PrevTs, target.Itgen)
+		}
+
+		c.accnt.AddChunk(target.Metric, target.Itgen.Ts, target.Itgen.Size())
 	}
 
-	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+	if currentLock == 1 {
+		c.RUnlock()
+	} else if currentLock == 2 {
+		c.Unlock()
+	}
 }
 
 func (cc *CCache) Reset() {
@@ -121,6 +200,7 @@ func (cc *CCache) Reset() {
 
 func (c *CCache) Stop() {
 	c.accnt.Stop()
+	c.stop <- nil
 	c.stop <- nil
 }
 

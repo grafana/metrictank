@@ -615,9 +615,13 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		// and various ranges between
 		for from := start; from <= lastTs; from += steps {
 			for to := from; to <= lastTs; to += steps {
+
 				// reinstantiate the cache at the beginning of each run
 				c = cache.NewCCache()
 				srv.BindCache(c)
+
+				accnt.CacheChunkAdd.SetUint32(0)
+				cacheAdds := uint32(0)
 
 				// populate cache and store according to pattern definition
 				prevts = 0
@@ -625,12 +629,24 @@ func TestGetSeriesCachedStore(t *testing.T) {
 					itgen = chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
 					if pattern[i] == 'c' || pattern[i] == 'b' {
 						c.Add(metric, prevts, *itgen)
+						cacheAdds++
 					}
 					if pattern[i] == 's' || pattern[i] == 'b' {
 						cwr := mdata.NewChunkWriteRequest(nil, metric, &chunks[i], 0, span, time.Now())
 						store.Add(&cwr)
 					}
 					prevts = chunks[i].T0
+				}
+
+				pre := time.Now()
+				for {
+					if accnt.CacheChunkAdd.Peek() == cacheAdds {
+						break
+					}
+
+					if time.Since(pre) > time.Second*3 {
+						t.Fatalf("Failed to add chunks in time")
+					}
 				}
 
 				// create a request for the current range

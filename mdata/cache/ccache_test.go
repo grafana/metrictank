@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+	"time"
 
+	"github.com/raintank/metrictank/mdata/cache/accnt"
 	"github.com/raintank/metrictank/mdata/chunk"
 	"github.com/raintank/metrictank/test"
 )
@@ -35,6 +37,8 @@ func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.It
 func getConnectedChunks(t *testing.T, metric string) *CCache {
 	cc := NewCCache()
 
+	accnt.CacheChunkAdd.SetUint32(0)
+
 	values := []uint32{1, 2, 3, 4, 5}
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen2 := getItgen(t, values, 1005, false)
@@ -48,7 +52,16 @@ func getConnectedChunks(t *testing.T, metric string) *CCache {
 	cc.Add(metric, 1010, itgen4)
 	cc.Add(metric, 1015, itgen5)
 
-	return cc
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == uint32(5) {
+			return cc
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 }
 
 // test AddIfHot method without passing a previous timestamp on a hot metric
@@ -61,10 +74,24 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+	accnt.CacheChunkPushHot.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
 	cc.CacheIfHot(metric, 0, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 3 && accnt.CacheChunkPushHot.Peek() == 1 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	mc := cc.metricCache[metric]
 
@@ -84,6 +111,8 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	if mc.chunks[chunk.Prev].Next != chunk.Ts {
 		t.Fatalf("previous cache chunk didn't point at this one as it's next, got %d", mc.chunks[chunk.Prev].Next)
 	}
+
+	cc.Stop()
 }
 
 // test AddIfHot method without passing a previous timestamp on a cold metric
@@ -95,9 +124,23 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+	accnt.CacheChunkOmitCold.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 
 	cc.CacheIfHot(metric, 0, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 1 && accnt.CacheChunkOmitCold.Peek() == 1 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	mc := cc.metricCache[metric]
 
@@ -121,10 +164,24 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+	accnt.CacheChunkPushHot.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
 	cc.CacheIfHot(metric, 1005, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 3 && accnt.CacheChunkPushHot.Peek() == 1 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	mc := cc.metricCache[metric]
 
@@ -155,9 +212,23 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+	accnt.CacheChunkOmitCold.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 
 	cc.CacheIfHot(metric, 1005, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 1 && accnt.CacheChunkOmitCold.Peek() == 1 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	mc := cc.metricCache[metric]
 
@@ -179,8 +250,21 @@ func TestConsecutiveAdding(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen2 := getItgen(t, values, 1005, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 2 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	mc := cc.metricCache[metric]
 	chunk1, ok := mc.chunks[1000]
@@ -216,9 +300,22 @@ func TestDisconnectedAdding(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, true)
 	itgen3 := getItgen(t, values, 1010, true)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 0, itgen2)
 	cc.Add(metric, 0, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 3 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
@@ -250,9 +347,22 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
+	accnt.CacheChunkAdd.SetUint32(0)
+
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 	cc.Add(metric, 0, itgen3)
+
+	pre := time.Now()
+	for {
+		if accnt.CacheChunkAdd.Peek() == 3 {
+			break
+		}
+
+		if time.Since(pre) > time.Second*3 {
+			t.Fatalf("Failed to add chunks in time")
+		}
+	}
 
 	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
@@ -379,6 +489,7 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 		for until := uint32(1051); until < 1061; until++ {
 			cc.Reset()
 
+			accnt.CacheChunkAdd.SetUint32(0)
 			if ascending {
 				cc.Add(metric, 0, itgen1)
 				cc.Add(metric, 1000, itgen2)
@@ -393,6 +504,17 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 				cc.Add(metric, 0, itgen3)
 				cc.Add(metric, 0, itgen2)
 				cc.Add(metric, 0, itgen1)
+			}
+
+			pre := time.Now()
+			for {
+				if accnt.CacheChunkAdd.Peek() == 6 {
+					break
+				}
+
+				if time.Since(pre) > time.Second*3 {
+					t.Fatalf("Failed to add chunks in time")
+				}
 			}
 
 			res = cc.Search(test.NewContext(), metric, from, until)
@@ -455,6 +577,7 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 		for until := uint32(1061); until < 1071; until++ {
 			cc.Reset()
 
+			accnt.CacheChunkAdd.SetUint32(0)
 			if ascending {
 				cc.Add(metric, 0, itgen1)
 				cc.Add(metric, 1000, itgen2)
@@ -469,6 +592,17 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 				cc.Add(metric, 0, itgen3)
 				cc.Add(metric, 0, itgen2)
 				cc.Add(metric, 0, itgen1)
+			}
+
+			pre := time.Now()
+			for {
+				if accnt.CacheChunkAdd.Peek() == 6 {
+					break
+				}
+
+				if time.Since(pre) > time.Second*3 {
+					t.Fatalf("Failed to add chunks in time")
+				}
 			}
 
 			res = cc.Search(test.NewContext(), metric, from, until)

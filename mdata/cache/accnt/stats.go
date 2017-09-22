@@ -25,8 +25,11 @@ var (
 	// metric cache.ops.chunk.push-hot is how many chunks have been pushed into the cache because their metric is hot
 	CacheChunkPushHot = stats.NewCounter32("cache.ops.chunk.push-hot")
 
+	// metric cache.ops.chunk.omit-cold is how many chunks have not been pushed into the cache because their metric is cold
+	CacheChunkOmitCold = stats.NewCounter32("cache.ops.chunk.omit-cold")
+
 	// metric cache.ops.chunk.add is how many chunks were added to the cache
-	cacheChunkAdd = stats.NewCounter32("cache.ops.chunk.add")
+	CacheChunkAdd = stats.NewCounter32("cache.ops.chunk.add")
 
 	// metric cache.ops.chunk.evict is how many chunks were evicted from the cache
 	cacheChunkEvict = stats.NewCounter32("cache.ops.chunk.evict")
