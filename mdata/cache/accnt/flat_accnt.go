@@ -124,13 +124,13 @@ func (a *FlatAccnt) eventLoop() {
 			case evnt_add_chnk:
 				payload := event.pl.(*AddPayload)
 				a.add(payload.metric, payload.ts, payload.size)
-				cacheChunkAdd.Inc()
 				a.lru.touch(
 					EvictTarget{
 						Metric: payload.metric,
 						Ts:     payload.ts,
 					},
 				)
+				cacheChunkAdd.Inc()
 			case evnt_hit_chnk:
 				payload := event.pl.(*HitPayload)
 				a.lru.touch(
