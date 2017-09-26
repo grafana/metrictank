@@ -71,9 +71,11 @@ func NewServer() (*Server, error) {
 	m := macaron.New()
 	m.Use(macaron.Logger())
 	m.Use(macaron.Recovery())
-	// route pprof to where it belongs
+	// route pprof to where it belongs, except for our own extensions
 	m.Use(func(ctx *macaron.Context) {
-		if strings.HasPrefix(ctx.Req.URL.Path, "/debug/") {
+		if strings.HasPrefix(ctx.Req.URL.Path, "/debug/") &&
+			!strings.HasPrefix(ctx.Req.URL.Path, "/debug/pprof/block") &&
+			!strings.HasPrefix(ctx.Req.URL.Path, "/debug/pprof/mutex") {
 			http.DefaultServeMux.ServeHTTP(ctx.Resp, ctx.Req.Request)
 		}
 	})

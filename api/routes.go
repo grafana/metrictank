@@ -27,6 +27,8 @@ func (s *Server) RegisterRoutes() {
 	r.Get("/", s.appStatus)
 	r.Get("/node", s.getNodeStatus)
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
+	r.Get("/debug/pprof/block", blockHandler)
+	r.Get("/debug/pprof/mutex", mutexHandler)
 
 	r.Get("/cluster", s.getClusterStatus)
 	r.Post("/cluster", bind(models.ClusterMembers{}), s.postClusterMembers)
