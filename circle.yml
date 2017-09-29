@@ -5,7 +5,7 @@ machine:
     - docker
   environment:
     GOPATH: "/home/ubuntu/.go_workspace"
-    IMPORTPATH: "/home/ubuntu/.go_workspace/src/github.com/raintank/metrictank"
+    IMPORTPATH: "/home/ubuntu/.go_workspace/src/github.com/grafana/metrictank"
     GODIST: "go1.9.linux-amd64.tar.gz"
   post:
     - mkdir -p download

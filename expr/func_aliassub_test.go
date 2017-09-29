@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/raintank/metrictank/api/models"
+	"github.com/grafana/metrictank/api/models"
 )
 
 func TestAliasSub(t *testing.T) {

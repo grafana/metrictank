@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"text/template"
 
-	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
-	"github.com/raintank/metrictank/stats"
+	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"

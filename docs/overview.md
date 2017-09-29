@@ -1,6 +1,6 @@
 # Overview
 
-![Overview](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/metrictank-highlevel.png)
+![Overview](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/metrictank-highlevel.png)
 
 Note:
 * You can use any, or multiple of the input mechanisms

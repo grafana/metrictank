@@ -3,7 +3,7 @@ package expr
 import (
 	"strings"
 
-	"github.com/raintank/metrictank/api/models"
+	"github.com/grafana/metrictank/api/models"
 )
 
 type FuncAliasByNode struct {

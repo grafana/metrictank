@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )

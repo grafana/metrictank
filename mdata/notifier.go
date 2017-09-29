@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

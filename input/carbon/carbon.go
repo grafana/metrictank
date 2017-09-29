@@ -9,10 +9,10 @@ import (
 	"net"
 	"sync"
 
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/input"
+	"github.com/grafana/metrictank/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/input"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"

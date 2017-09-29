@@ -3,7 +3,7 @@ package mdata
 import (
 	"time"
 
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk"
 )
 
 type ChunkReadRequest struct {

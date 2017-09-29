@@ -1,7 +1,7 @@
 package mdata
 
 import (
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 )
 

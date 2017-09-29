@@ -1,8 +1,8 @@
 package carbon
 
 import (
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/mdata"
 )
 
 //IntervalGetter is anything that can return the interval for the given path

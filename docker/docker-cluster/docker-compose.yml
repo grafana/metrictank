@@ -3,7 +3,7 @@ version: '2'
 services:
   metrictank0:
     hostname: metrictank0
-    image: raintank/metrictank
+    image: grafana/metrictank
     ports:
      - "6060:6060"
     volumes:
@@ -26,7 +26,7 @@ services:
 
   metrictank1:
     hostname: metrictank1
-    image: raintank/metrictank
+    image: grafana/metrictank
     ports:
       - "6061:6060"
     volumes:
@@ -49,7 +49,7 @@ services:
 
   metrictank2:
     hostname: metrictank2
-    image: raintank/metrictank
+    image: grafana/metrictank
     ports:
       - "6062:6060"
     volumes:
@@ -72,7 +72,7 @@ services:
 
   metrictank3:
     hostname: metrictank3
-    image: raintank/metrictank
+    image: grafana/metrictank
     ports:
       - "6063:6060"
     volumes:

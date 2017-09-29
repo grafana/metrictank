@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/stats"
 )
 
 var proxyStats graphiteProxyStats

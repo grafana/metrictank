@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/raintank/metrictank/tracing"
 	"gopkg.in/macaron.v1"
 )
 

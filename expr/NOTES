@@ -83,11 +83,11 @@ So:
    Note: some functions combine multiple series into a new one (e.g. sumSeries, avgSeries, ...). Your input series may use different consolidateBy settings, some may be explicitly specified while others are not.  In this scenario, the output series will be given the first explicitly defined consolidateBy found by iterating the inputs, or the first default otherwise.
 
 By combining the pass-down and pass-up we can give the user max power and correctness. In particular it also solves the problem with Graphite where data can be read from a different consolidation archive than what it used for runtime consolidation. While this is sometimes desirable (e.g. using special* functions), often - for most/simple requests - it is not. See
-(see https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation) 
+(see https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 
 [*] Special functions: e.g. summarize, perSecond, derivative, intergral. passing consolidate settings across these function calls would lead to bad results.
 
-see also https://github.com/raintank/metrictank/issues/463#issuecomment-275199880
+see also https://github.com/grafana/metrictank/issues/463#issuecomment-275199880
 
 
 

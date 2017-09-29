@@ -1,7 +1,7 @@
 package response
 
 import (
-	"github.com/raintank/metrictank/api/models"
+	"github.com/grafana/metrictank/api/models"
 	"gopkg.in/raintank/schema.v1"
 )
 

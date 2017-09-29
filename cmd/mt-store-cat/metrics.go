@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata"
 )
 
 type Metric struct {

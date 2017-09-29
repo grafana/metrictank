@@ -3,7 +3,7 @@
 When you request a larger number of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
 There's two pieces to this puzzle - rollups and runtime consolidation - explained below.
 
-In metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://blog.raintank.io/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))
+In metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))
 
 By default, metrictank will consolidate (at query time) like so:
 
@@ -11,7 +11,7 @@ By default, metrictank will consolidate (at query time) like so:
 * avg for everything else.
 
 But you can override this
-(see [HTTP api](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)) to use avg, min, max, sum.
+(see [HTTP api](https://github.com/grafana/metrictank/blob/master/docs/http-api.md)) to use avg, min, max, sum.
 Which ever function is used, metrictank will select the appropriate rollup band, and if necessary also perform runtime consolidation to further reduce the dataset.
 
 
@@ -26,7 +26,7 @@ We don't just store the raw data, but also statistical summaries, computed over 
 
 (sum and count are used to compute the average on the fly)
 
-Configure them using the [agg-settings in the data section of the config](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)
+Configure them using the [agg-settings in the data section of the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#data)
 
 
 ## Runtime consolidation
@@ -94,7 +94,7 @@ However, if a rollup band is available with higher resolution than this outcome,
 ## Configuration considerations
 
 
-Some considerations as you configure [the data options in the config, such as ttl and agg-settings](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)
+Some considerations as you configure [the data options in the config, such as ttl and agg-settings](https://github.com/grafana/metrictank/blob/master/docs/config.md#data)
 
 * avoid doing too many bands of data and having their TTL's be too similar, because they will all contain the most recent data and overlap.  
   Aim to achieve about 10x or more reduction from one level to the next
@@ -108,7 +108,7 @@ must cleanly multiply between one another (why again?)
 try to minimize storage overhead of each band
 
 SPAN CHOICE
-As described in the page [Memory server](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans), only a finite set of values are valid chunk spans. This applies to rolled up chunks as well.
+As described in the page [Memory server](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans), only a finite set of values are valid chunk spans. This applies to rolled up chunks as well.
 
 RETENTION:
 should at the minimum be maxT otherwise what's the point

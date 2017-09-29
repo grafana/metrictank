@@ -11,8 +11,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/grafana/metrictank/stats"
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/misc/app"
 	"github.com/rakyll/globalconf"
 )

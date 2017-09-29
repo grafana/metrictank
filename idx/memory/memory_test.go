@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/metrictank/idx"
+	"github.com/grafana/metrictank/idx"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )

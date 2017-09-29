@@ -9,11 +9,11 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/stats"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/cache"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/macaron.v1"
 )

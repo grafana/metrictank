@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/consolidation"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 )
 
 // Req represents a request for one/more series

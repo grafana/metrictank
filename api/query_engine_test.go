@@ -4,10 +4,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/mdata"
 )
 
 // testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)

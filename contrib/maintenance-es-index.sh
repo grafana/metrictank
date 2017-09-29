@@ -1,5 +1,5 @@
 # this file contains some bash functions which come in handy when maintaining an ES metadata index
-# (which is deprecated, but anyway. see https://github.com/raintank/metrictank/blob/master/docs/metadata.md )
+# (which is deprecated, but anyway. see https://github.com/grafana/metrictank/blob/master/docs/metadata.md )
 #
 # first source this file:
 # source maintenance-es-index.sh

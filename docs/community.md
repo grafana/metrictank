@@ -1,6 +1,6 @@
 # Community
 
-* We have a [community slack: raintank.slack.com](https://raintank.slack.com).
+* We have a [community slack: grafana.slack.com](https://grafana.slack.com).
   It has a `#metrictank` room (as well a room for all of our products, like grafana)
   [Get your invite](http://slack.raintank.io/).
 

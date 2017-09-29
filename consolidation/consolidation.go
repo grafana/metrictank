@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/raintank/metrictank/batch"
+	"github.com/grafana/metrictank/batch"
 )
 
 // consolidator is a highlevel description of a point consolidation method

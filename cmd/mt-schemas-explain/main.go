@@ -8,8 +8,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/mdata"
 )
 
 var (

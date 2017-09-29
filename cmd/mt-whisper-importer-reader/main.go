@@ -19,11 +19,11 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/grafana/metrictank/api"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk/archive"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/metrictank/api"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/mdata/chunk"
-	"github.com/raintank/metrictank/mdata/chunk/archive"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -321,7 +321,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 
 	for _, point = range points {
 		// this shouldn't happen, but if it would we better catch it here because Metrictank wouldn't handle it well:
-		// https://github.com/raintank/metrictank/blob/f1868cccfb92fc82cd853914af958f6d187c5f74/mdata/aggmetric.go#L378
+		// https://github.com/grafana/metrictank/blob/f1868cccfb92fc82cd853914af958f6d187c5f74/mdata/aggmetric.go#L378
 		if point.Timestamp == 0 {
 			continue
 		}

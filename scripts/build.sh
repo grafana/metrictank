@@ -17,7 +17,7 @@ rm -rf $BUILDDIR/*
 export CGO_ENABLED=0
 
 # Build binary
-cd $GOPATH/src/github.com/raintank/metrictank
+cd $GOPATH/src/github.com/grafana/metrictank
 
 OUTPUT=$BUILDDIR/metrictank
 

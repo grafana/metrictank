@@ -5,7 +5,7 @@ package archive
 // DO NOT EDIT
 
 import (
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/tinylib/msgp/msgp"
 )
 

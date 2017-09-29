@@ -1,7 +1,7 @@
 package mdata
 
 import (
-	"github.com/raintank/metrictank/consolidation"
+	"github.com/grafana/metrictank/consolidation"
 )
 
 type Metrics interface {

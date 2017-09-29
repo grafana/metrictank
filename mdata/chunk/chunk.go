@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgryski/go-tsz"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/stats"
 )
 
 // metric tank.total_points is the number of points currently held in the in-memory ringbuffer

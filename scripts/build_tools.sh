@@ -19,7 +19,7 @@ function fail () {
 }
 
 # Build binary
-cd $GOPATH/src/github.com/raintank/metrictank/cmd
+cd $GOPATH/src/github.com/grafana/metrictank/cmd
 for tool in *; do
   cd $tool
   if [ "$1" == "-race" ]

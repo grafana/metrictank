@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

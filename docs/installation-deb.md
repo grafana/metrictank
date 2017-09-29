@@ -5,18 +5,18 @@
 We'll go over these in more detail below.
 
 * Cassandra. We run and recommend 3.8 or newer
-  See [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+  See [Cassandra](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md)
 * The latest (1.0.1 or newer) version of [Graphite](http://graphite.readthedocs.io/en/latest/install.html)
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite.
 * Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
-  [more info](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
+  [more info](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
 
 Note: Cassandra and Kafka require Java, which will be automatically installed by apt as a dependency when we install Cassandra.
 
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
-[Inputs](https://github.com/raintank/metrictank/blob/master/docs/inputs.md)).  
+[Inputs](https://github.com/grafana/metrictank/blob/master/docs/inputs.md)).  
 Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
@@ -41,7 +41,7 @@ You need to install these packages:
 
 * metrictank
 
-Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/raintank/metrictank/releases)),
+Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/grafana/metrictank/releases)),
 whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
 the 20th commit after `0.5.1`
 
@@ -102,7 +102,7 @@ EOF
 * Run `apt-get update && apt-get install cassandra cassandra-tools`
 
 For basic setups, you can just start it with default settings.
-To tweak schema and settings, see [Cassandra](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+To tweak schema and settings, see [Cassandra](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md)
 
 * Start cassandra:
 
@@ -217,7 +217,7 @@ EOF
 
 ### Kafka
 
-Kafka 0.10.0.1 is highly recommended.  0.10.0.0 and 0.9 should work too, with some caveats [explained here](https://github.com/raintank/metrictank/blob/master/docs/kafka.md)
+Kafka 0.10.0.1 is highly recommended.  0.10.0.0 and 0.9 should work too, with some caveats [explained here](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
 
 * Download kafka. Find a mirror at https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz, and download kafka to your server.
 
@@ -242,19 +242,19 @@ Now edit the file at `/etc/metrictank/metrictank.ini`.  It should be commented e
 You may have to adjust `statsd-addr`, `cassandra-addrs`, `cassandra-idx`'s `hosts` option and `kafka-mdm-in`'s `brokers` option if you run
 any of these services on different locations then the localhost defaults.
 
-Out of the box, one input is enabled: the [Carbon line input](https://github.com/raintank/metrictank/blob/master/docs/inputs.md#carbon)
+Out of the box, one input is enabled: the [Carbon line input](https://github.com/grafana/metrictank/blob/master/docs/inputs.md#carbon)
 It uses a default storage-schemas to coalesce every incoming metric into 1 second resolution.  You may want to fine tune this for your needs
 at `/etc/metrictank/storage-schemas.conf`. (or simply what you already use in a pre-existing Graphite install).
 See the input plugin documentation referenced above for more details.
 
 If you want to use Kafka, you should enable the Kafka-mdm input plugin.
 See the `kafka-mdm-in` section, set `enabled` to true.
-See [the Inputs docs for more details](https://github.com/raintank/metrictank/blob/master/docs/inputs.md).
+See [the Inputs docs for more details](https://github.com/grafana/metrictank/blob/master/docs/inputs.md).
 
 Finally, by default `memory-idx` `enabled` is true, while `cassandra-idx` has `enabled` as false.
 This will use the non-persistent index, starting with a fresh index at every start of metrictank.
 You probably want to disable the memory index an enable `cassandra-idx` instead. (just switch the enabled values around).
-See [metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) for more details.
+See [metadata](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) for more details.
 
 
 ## Run it!

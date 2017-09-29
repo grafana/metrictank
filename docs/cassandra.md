@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS metrictank.metric (
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
 ```
 
-If you are using the [cassandra-idx](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
+If you are using the [cassandra-idx](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
 
 ```
 CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
@@ -89,7 +89,7 @@ You may also need to lower the cql-protocol-version value in the config to 3 or 
 ## Data persistence
 
 saving of chunks is initiated whenever the current time reaches a timestamp that divides without remainder by a chunkspan.
-Raw data has a certain chunkspan, and aggregated (rollup data) has chunkspans too (see [config](https://github.com/raintank/metrictank/blob/master/docs/config.md#data)) which is
+Raw data has a certain chunkspan, and aggregated (rollup data) has chunkspans too (see [config](https://github.com/grafana/metrictank/blob/master/docs/config.md#data)) which is
 why periodically e.g. on the hour and on every 6th our you'll see a burst in chunks being added to the write queue.
 The write queue is then gradually drained by the persistence workers.
 
@@ -100,7 +100,7 @@ Tuning the write queue is a bit tricky for now.
 Basically you have to make sure that `number of concurrent writers` times `write queue size` is enough to queue up all chunk writes that may occur at any given time.
 Chunk writes that may occur at any given time is usually `number of unique series you have` times (`number of rollups` * 4 + 1)
 There's also an upper bound for how large these queues can get.
-See [this ticket](https://github.com/raintank/metrictank/issues/125) for more information and discussion.
+See [this ticket](https://github.com/grafana/metrictank/issues/125) for more information and discussion.
 The advent of the new kafka input will probably resolve a lot of the constraints. Both for the lower and upper bound.
 
 

@@ -4,7 +4,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )

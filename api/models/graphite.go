@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
+	"github.com/grafana/metrictank/idx"
 	pickle "github.com/kisielk/og-rek"
-	"github.com/raintank/metrictank/idx"
 	"gopkg.in/macaron.v1"
 )
 

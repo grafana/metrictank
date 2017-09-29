@@ -1,8 +1,8 @@
 package expr
 
 import (
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/consolidation"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 )
 
 type Context struct {

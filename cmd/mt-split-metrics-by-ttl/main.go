@@ -8,8 +8,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/grafana/metrictank/mdata"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/mdata"
 )
 
 var (

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/mdata/chunk"
 )
 
 const Month_sec = 60 * 60 * 24 * 28
@@ -118,7 +118,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 			}
 			_, ok := chunk.RevChunkSpans[retention.ChunkSpan]
 			if !ok {
-				return nil, fmt.Errorf("chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", parts[2])
+				return nil, fmt.Errorf("chunkSpan %s is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", parts[2])
 			}
 		} else {
 			// default to a valid chunkspan that can hold at least 100 points, or select the largest one otherwise.

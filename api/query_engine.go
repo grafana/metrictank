@@ -3,11 +3,11 @@ package api
 import (
 	"math"
 
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/api/response"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/util"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 )
 
 var (

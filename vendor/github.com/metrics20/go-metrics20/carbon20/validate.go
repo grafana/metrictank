@@ -216,8 +216,8 @@ func ValidatePacket(buf []byte, levelLegacy ValidationLevelLegacy, levelM20 Vali
 
 	// graphite graciously allows a leading dot by pretending it's not there.
 	// (e.g. send ".foo" -> metric will become "foo") so we do the same.
-	// see https://github.com/raintank/metrictank/issues/668 and
-	// https://github.com/raintank/metrictank/issues/694
+	// see https://github.com/grafana/metrictank/issues/668 and
+	// https://github.com/grafana/metrictank/issues/694
 	if len(fields[0]) != 0 && fields[0][0] == '.' {
 		fields[0] = fields[0][1:]
 	}

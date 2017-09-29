@@ -1,5 +1,5 @@
 FROM alpine
-MAINTAINER Anthony Woods awoods@raintank.io
+MAINTAINER Dieter Plaetinck dieter@grafana.com
 
 RUN apk add -U tzdata
 

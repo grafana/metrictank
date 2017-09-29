@@ -12,10 +12,10 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/input"
-	"github.com/raintank/metrictank/kafka"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/input"
+	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/stats"
 	"gopkg.in/raintank/schema.v1"
 )
 

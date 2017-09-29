@@ -12,14 +12,14 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk/archive"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/cluster/partitioner"
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/idx/cassandra"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
-	"github.com/raintank/metrictank/mdata/chunk/archive"
 )
 
 var (

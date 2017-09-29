@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/grafana/metrictank/stats"
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/metrictank/stats"
 )
 
 type Consumer struct {

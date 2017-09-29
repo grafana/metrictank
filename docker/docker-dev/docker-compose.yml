@@ -3,7 +3,7 @@ version: '2'
 services:
   metrictank:
     hostname: metrictank
-    image: raintank/metrictank
+    image: grafana/metrictank
     ports:
      - "6060:6060"
      - "2003:2003"

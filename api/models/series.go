@@ -5,8 +5,8 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/grafana/metrictank/consolidation"
 	pickle "github.com/kisielk/og-rek"
-	"github.com/raintank/metrictank/consolidation"
 	"gopkg.in/raintank/schema.v1"
 )
 

@@ -1,6 +1,6 @@
 [Unit]
 Description=Starts and stops a single metrictank instance on this system
-Documentation=https://github.com/raintank/metrictank/tree/master/docs
+Documentation=https://github.com/grafana/metrictank/tree/master/docs
 Wants=network-online.target
 After=network-online.target
 
@@ -9,7 +9,7 @@ User=root
 Group=root
 Type=simple
 Restart=on-failure
-WorkingDirectory=/var/run/raintank
+WorkingDirectory=/var/run/metrictank
 ExecStart=/usr/sbin/metrictank -config=/etc/metrictank/metrictank.ini
 LimitNOFILE=102400
 TimeoutStopSec=60

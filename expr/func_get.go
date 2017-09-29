@@ -1,6 +1,6 @@
 package expr
 
-import "github.com/raintank/metrictank/api/models"
+import "github.com/grafana/metrictank/api/models"
 
 // internal function just for getting data
 type FuncGet struct {

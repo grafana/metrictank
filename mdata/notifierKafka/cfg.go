@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	part "github.com/raintank/metrictank/cluster/partitioner"
-	"github.com/raintank/metrictank/kafka"
-	"github.com/raintank/metrictank/stats"
+	part "github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )

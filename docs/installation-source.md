@@ -2,7 +2,7 @@
 
 This approach is not recommended, because it just gives you the metrictank binary, no dependencies, 
 and no configuration for an init system.
-To install dependencies or for more complete guides, see [installation guides](https://github.com/raintank/metrictank/blob/master/docs/installation.md).
+To install dependencies or for more complete guides, see [installation guides](https://github.com/grafana/metrictank/blob/master/docs/installation.md).
 
 ## The build environment
 
@@ -22,10 +22,10 @@ You may want to make the `GOPATH` setting persistent, by putting that export lin
 ## Build metrictank
 
 ```
-go get github.com/raintank/metrictank
+go get github.com/grafana/metrictank
 ```
 
-Take the file from `go/src/github.com/raintank/metrictank/metrictank-sample.ini`, put it in `/etc/metrictank/metrictank.ini` and make any changes.
+Take the file from `go/src/github.com/grafana/metrictank/metrictank-sample.ini`, put it in `/etc/metrictank/metrictank.ini` and make any changes.
 
 ## Run it!
 
