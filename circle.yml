@@ -41,5 +41,5 @@ deployment:
     branch: master
     commands:
       - scripts/deploy.sh
-      - docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - yes | docker login -u $DOCKER_USER -p $DOCKER_PASS
       - scripts/deploy_docker.sh
