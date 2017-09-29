@@ -5,7 +5,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
-	"github.com/raintank/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )

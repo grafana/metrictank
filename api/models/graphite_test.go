@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/raintank/metrictank/idx"
+	"github.com/grafana/metrictank/idx"
 )
 
 func TestGraphiteNames(t *testing.T) {

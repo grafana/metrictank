@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/mdata/cache"
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

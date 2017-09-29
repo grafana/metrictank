@@ -2,7 +2,7 @@
 
 This documents endpoints aimed to be used by users. For internal clustering http endpoints, which may change, refer to the source.
 
-- Note that some of the endpoints rely on being a fed a proper Org-Id.  See [Multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md).
+- Note that some of the endpoints rely on being a fed a proper Org-Id.  See [Multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md).
 
 - For GET requests, any parameters not specified as a header can be passed as an HTTP query string parameter.
 
@@ -35,7 +35,7 @@ POST /metrics/index.json
 
 * header `X-Org-Id` required
 
-Returns metrics stored under the given org, as well as public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
+Returns metrics stored under the given org, as well as public data under org -1 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 If orgId is -1, returns the metrics for all orgs. (but you can't neccessarily distinguish which org a metric is from)
 
 #### Example
@@ -57,7 +57,7 @@ POST /metrics/find
 * format: json, treejson, completer. (defaults to json)
 * jsonp
 
-Returns metrics which match the query and are stored under the given org or are public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
+Returns metrics which match the query and are stored under the given org or are public data under org -1 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 the completer format is for completion UI's such as graphite-web.
 json and treejson are the same.
 
@@ -101,7 +101,7 @@ POST /render
 * target: mandatory. one or more metric names or patterns, like graphite.  
   note: **no graphite functions are currently supported** except that
   you can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
-  [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
+  [Consolidation](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 * format: json or msgp (default: json)
@@ -113,7 +113,7 @@ POST /render
 
   If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
 
-Data queried for must be stored under the given org or be public data under org -1 (see [multi-tenancy](https://github.com/raintank/metrictank/blob/master/docs/multi-tenancy.md))
+Data queried for must be stored under the given org or be public data under org -1 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 
 #### Example
 

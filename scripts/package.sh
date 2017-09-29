@@ -57,7 +57,7 @@ BUILD=${BUILD_ROOT}/systemd
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
-mkdir -p ${BUILD}/var/run/raintank
+mkdir -p ${BUILD}/var/run/metrictank
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
@@ -69,7 +69,7 @@ PACKAGE_NAME="${BUILD}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --config-files /etc/metrictank/ \
-  -m "Raintank Inc. <hello@raintank.io>" --vendor "raintank.io" \
+  -m "Raintank Inc. <hello@grafana.com>" --vendor "grafana.com" \
   --license "Apache2.0" -C ${BUILD} -p ${PACKAGE_NAME} .
 
 BUILD=${BUILD_ROOT}/systemd-centos7
@@ -77,7 +77,7 @@ BUILD=${BUILD_ROOT}/systemd-centos7
 mkdir -p ${BUILD}/usr/sbin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
-mkdir -p ${BUILD}/var/run/raintank
+mkdir -p ${BUILD}/var/run/metrictank
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
@@ -89,7 +89,7 @@ PACKAGE_NAME="${BUILD}/metrictank-${VERSION}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --config-files /etc/metrictank/ \
-  -m "Raintank Inc. <hello@raintank.io>" --vendor "raintank.io" \
+  -m "Raintank Inc. <hello@grafana.com>" --vendor "grafana.com" \
   --license "Apache2.0" -C ${BUILD} -p ${PACKAGE_NAME} .
 
 ## CentOS 6

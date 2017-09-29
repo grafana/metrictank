@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gocql/gocql"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/stats"
 )
 
 type ErrMetrics struct {

@@ -3,11 +3,11 @@ package models
 import (
 	"fmt"
 
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/consolidation"
-	"github.com/raintank/metrictank/util"
 )
 
 type Req struct {

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/test"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/test"
 	"gopkg.in/raintank/schema.v1"
 )
 

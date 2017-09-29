@@ -7,8 +7,8 @@ import (
 	"runtime"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/consolidation"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/consolidation"
 )
 
 var (

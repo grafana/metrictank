@@ -2,9 +2,9 @@ package api
 
 import (
 	"github.com/go-macaron/binding"
+	"github.com/grafana/metrictank/api/middleware"
+	"github.com/grafana/metrictank/api/models"
 	"github.com/raintank/gziper"
-	"github.com/raintank/metrictank/api/middleware"
-	"github.com/raintank/metrictank/api/models"
 	"gopkg.in/macaron.v1"
 )
 

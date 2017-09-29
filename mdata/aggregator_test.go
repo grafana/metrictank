@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/mdata/cache"
 	"gopkg.in/raintank/schema.v1"
 )
 

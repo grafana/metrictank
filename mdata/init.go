@@ -7,8 +7,8 @@ import (
 	"flag"
 	"io/ioutil"
 
-	"github.com/raintank/metrictank/conf"
-	"github.com/raintank/metrictank/stats"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )

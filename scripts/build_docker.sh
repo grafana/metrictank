@@ -10,7 +10,7 @@ VERSION=`git describe --always`
 mkdir -p build
 cp ../build/* build/
 
-docker build -t raintank/metrictank .
-docker tag raintank/metrictank raintank/metrictank:latest
-docker tag raintank/metrictank raintank/metrictank:$VERSION
+docker build -t grafana/metrictank .
+docker tag grafana/metrictank grafana/metrictank:latest
+docker tag grafana/metrictank grafana/metrictank:$VERSION
 

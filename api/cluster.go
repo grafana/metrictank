@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/raintank/metrictank/api/middleware"
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/api/response"
-	"github.com/raintank/metrictank/cluster"
+	"github.com/grafana/metrictank/api/middleware"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/cluster"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/tinylib/msgp/msgp"
 )

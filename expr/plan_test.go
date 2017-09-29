@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/raintank/metrictank/api/models"
-	"github.com/raintank/metrictank/consolidation"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 )
 
 // here we use smartSummarize because it has multiple optional arguments which allows us to test some interesting things
@@ -325,7 +325,7 @@ func TestNamingChains(t *testing.T) {
 		expOut []string
 	}{
 		// the first two are cases that we've seen in the wild
-		// see https://github.com/raintank/metrictank/issues/648
+		// see https://github.com/grafana/metrictank/issues/648
 		{
 			`aliasSub(perSecond(metrictank.stats.*.*.input.*.metric_invalid.counter32),'.*\.([^\.]+)\.metric_invalid.*', '\1 metric invalid')`,
 			[]string{

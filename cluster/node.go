@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
+	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
-	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
+	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/cmd/mt-index-cat/out"
-	"github.com/raintank/metrictank/idx/cassandra"
 	"gopkg.in/raintank/schema.v1"
 )
 

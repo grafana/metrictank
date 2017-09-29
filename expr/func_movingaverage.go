@@ -1,7 +1,7 @@
 package expr
 
 import (
-	"github.com/raintank/metrictank/api/models"
+	"github.com/grafana/metrictank/api/models"
 )
 
 type FuncMovingAverage struct {

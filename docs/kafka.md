@@ -1,6 +1,6 @@
 # why
 
-Kafka can be used as an [ingestion option](https://github.com/raintank/metrictank/blob/master/docs/inputs.md) as well as a [clustering transport](https://github.com/raintank/metrictank/blob/master/docs/clustering.md) for metrictank.
+Kafka can be used as an [ingestion option](https://github.com/grafana/metrictank/blob/master/docs/inputs.md) as well as a [clustering transport](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for metrictank.
 
 # Kafka version
 

@@ -11,18 +11,18 @@ You will also need to install version >=1.6 of [docker-compose](https://docs.doc
 If you already have go installed, you can just: 
 
 ```
-go get github.com/raintank/metrictank
-cd $GOPATH/src/github.com/raintank/metrictank
+go get github.com/grafana/metrictank
+cd $GOPATH/src/github.com/grafana/metrictank
 ```
 
 If you don't, you can just use git:
 
 ```
-git clone https://github.com/raintank/metrictank.git
+git clone https://github.com/grafana/metrictank.git
 cd metrictank
 ```
 
-If you have neither, just [download the zip](https://github.com/raintank/metrictank/archive/master.zip), extract it somewhere and cd into the metrictank directory.
+If you have neither, just [download the zip](https://github.com/grafana/metrictank/archive/master.zip), extract it somewhere and cd into the metrictank directory.
 
 ## Bring up the stack
 
@@ -90,7 +90,7 @@ Add a new data source with with these settings:
 
 When you hit save, Grafana should succeed in talking to the data source.
 
-![Add data source screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/add-datasource-docker.png)
+![Add data source screenshot](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/add-datasource-docker.png)
 
 -Note: it also works with `direct` mode but then you have to enter `http://localhost:6060` as url.
 
@@ -123,7 +123,7 @@ echo "hits:1|c" | nc -w 1 -u localhost 8125
 Now for something neat!  
 There is an extensive [dashboard on grafana.net](https://grafana.net/dashboards/279) that displays all vital metrictank stats.
 
-![Dashboard screenshot](https://raw.githubusercontent.com/raintank/metrictank/master/docs/assets/dashboard-screenshot.png)
+![Dashboard screenshot](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/dashboard-screenshot.png)
 
 So go to the dashboard dropdown -> import -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
 It will show a dialog with a choice of which graphite datasource to use, for which you can enter `metrictank`.
@@ -138,7 +138,7 @@ of the plethora of [tools that can send data in carbon format](http://graphite.r
 , create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
 
 If anything doesn't work, please let us know via a ticket on github or reach out on slack. See
-[Community](https://github.com/raintank/metrictank/blob/master/docs/community.md)
+[Community](https://github.com/grafana/metrictank/blob/master/docs/community.md)
 
 
 ## Shut down the stack

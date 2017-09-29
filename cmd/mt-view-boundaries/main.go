@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
 )
 
 var (
@@ -60,7 +60,7 @@ func main() {
 		span := dur.MustParseNDuration("span", *spanStr)
 		_, ok := chunk.RevChunkSpans[span]
 		if !ok {
-			log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/raintank/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *spanStr)
+			log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *spanStr)
 		}
 		fmt.Println()
 		display(int64(span), "specified span")

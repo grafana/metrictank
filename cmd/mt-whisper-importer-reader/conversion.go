@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/grafana/metrictank/mdata"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/metrictank/mdata"
 )
 
 type conversion struct {

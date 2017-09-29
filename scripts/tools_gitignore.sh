@@ -6,7 +6,7 @@ cd ${DIR}
 SOURCEDIR=${DIR}/..
 file=$SOURCEDIR/.gitignore
 
-cd $GOPATH/src/github.com/raintank/metrictank/cmd
+cd $GOPATH/src/github.com/grafana/metrictank/cmd
 declare -a missing
 for tool in *; do
 	rule="/cmd/$tool/$tool"

@@ -1,8 +1,8 @@
 package models
 
 import (
+	"github.com/grafana/metrictank/cluster"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/metrictank/cluster"
 )
 
 type NodeStatus struct {

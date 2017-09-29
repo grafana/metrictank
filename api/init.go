@@ -3,7 +3,7 @@ package api
 import (
 	"sync"
 
-	"github.com/raintank/metrictank/expr"
+	"github.com/grafana/metrictank/expr"
 	"gopkg.in/raintank/schema.v1"
 )
 

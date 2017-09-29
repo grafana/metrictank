@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/stats"
 	"github.com/hashicorp/memberlist"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

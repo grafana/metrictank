@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/cassandra"
+	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/tracing"
 	"github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
-	"github.com/raintank/metrictank/cassandra"
-	"github.com/raintank/metrictank/mdata/chunk"
-	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

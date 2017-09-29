@@ -3,7 +3,7 @@ package cache
 import (
 	"context"
 
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk"
 )
 
 type Cache interface {

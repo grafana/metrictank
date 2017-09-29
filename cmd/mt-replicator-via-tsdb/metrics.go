@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
+	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/stats"
 	"github.com/jpillora/backoff"
-	"github.com/raintank/metrictank/cluster"
-	"github.com/raintank/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 	"gopkg.in/raintank/schema.v1/msg"

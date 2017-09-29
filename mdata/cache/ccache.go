@@ -6,11 +6,11 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/grafana/metrictank/mdata/cache/accnt"
+	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/metrictank/mdata/cache/accnt"
-	"github.com/raintank/metrictank/mdata/chunk"
-	"github.com/raintank/metrictank/stats"
-	"github.com/raintank/metrictank/tracing"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )

@@ -5,9 +5,9 @@
 You should monitor the dependencies according to their best practices.
 In particular, pay attention to delays in your kafka queue, if you use it.
 Especially for metric persistence messages which flow from primary to secondary nodes: if those have issues, chunks may be saved multiple times
-when you move around the primary role. (see [clustering transport](https://github.com/raintank/metrictank/blob/master/docs/clustering.md))
+when you move around the primary role. (see [clustering transport](https://github.com/grafana/metrictank/blob/master/docs/clustering.md))
 
-Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/raintank/metrictank/blob/master/docs/metrics.md)
+Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
 
 ### Dashboard
 
@@ -42,13 +42,13 @@ Metrictank crashed. What to do?
 1) Check `dmesg` to see if it was killed by the kernel, maybe it was consuming too much RAM
    If it was, check the grafana dashboard which may explain why. (sudden increase in ingested data? increase in requests or the amount of data requested? slow requests?)
    Tips:
-   * The [profiletrigger](https://github.com/raintank/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger
+   * The [profiletrigger](https://github.com/grafana/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger
    a memory profile and save it to disk.  This can be very helpful if suddently memory usage spikes up and then metrictank gets killed in seconds or minutes.  
    It helps diagnose problems in the codebase that may lead to memory savings.  The profiletrigger looks at the `bytes_sys` metric which is
    the amount of memory consumed by the process.
-   * Use [rollups](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
+   * Use [rollups](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
 2) Check the metrictank log.
-   If it exited due to a panic, you should probably open a [ticket](https://github.com/raintank/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceeding log data.
+   If it exited due to a panic, you should probably open a [ticket](https://github.com/grafana/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceeding log data.
    If it exited due to an error, it could be a problem in your infrastructure or a problem in the metrictank code (in the latter case, please open a ticket as described above)
 
 ### Recovery
@@ -56,12 +56,12 @@ Metrictank crashed. What to do?
 #### If you run multiple instances
 
 * If the crashed instance was a secondary, you can just restart it and after it warmed up, it will ready to serve requests.  Verify that you have other instances who can serve requests, otherwise you may want to start it with a much shorter warm up time.  It will be ready to serve requests sooner, but may have to reach out to Cassandra more to load data.
-* If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
+* If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
 
 
 #### If you only run once instance
 
-If you use the kafka-mdm input (at raintank we do), before restarting check your [offset option](https://github.com/raintank/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immidiately getting realtime insights back, at the cost of missing older data.
+If you use the kafka-mdm input (at grafana we do), before restarting check your [offset option](https://github.com/grafana/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immidiately getting realtime insights back, at the cost of missing older data.
 
 
 ## Metrictank hangs
@@ -84,30 +84,30 @@ See [behavior of signals in Go programs](https://golang.org/pkg/os/signal/#hdr-D
 * promote the candidate to primary: `curl -X POST -d primary=true http://<node>:6060/node`
 * you can verify the cluster status through `curl http://<node>:6060/node` or on the Grafana dashboard (see above)
 
-For more information see [Clustering: Promoting a secondary to primary](https://github.com/raintank/metrictank/blob/master/docs/clustering.md#promoting-a-secondary-to-primary)
+For more information see [Clustering: Promoting a secondary to primary](https://github.com/grafana/metrictank/blob/master/docs/clustering.md#promoting-a-secondary-to-primary)
 
-See [HTTP api docs](https://github.com/raintank/metrictank/blob/master/docs/http-api.md)
+See [HTTP api docs](https://github.com/grafana/metrictank/blob/master/docs/http-api.md)
 
 ## Ingestion stalls & backpressure
 
 If metrictank ingestion speed is lower than expected, or decreased for seemingly no reason, it may be due to:
 
-1) [Indexing of metadata](https://github.com/raintank/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
+1) [Indexing of metadata](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
    New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed into:
    * an in-memory index (which seems to always be snappy and not exert any backpressure)
    * Cassandra - if enabled - which may not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
    See the `pressure.idx` metric in the 'metrics in' graph of the metrictank dashboard.
    For more details, look at the various index stats further down the dashboard.
 
-2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/raintank/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
+2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
-   [based on the configuration of your write queues and how many series you have](https://github.com/raintank/metrictank/issues/125) the queues may run full and
+   [based on the configuration of your write queues and how many series you have](https://github.com/grafana/metrictank/issues/125) the queues may run full and
    provide ingestion backpressure, also lowering ingestion speed.  
    Store (cassandra) saving backpressure is also visualized on the 'metrics in' graph of the dashboard.
    Additionally, the 'write workers & queues' graph shows the queue limit and how many items are in the queues.   
    The queues are drained by saving chunks, but populated by new chunks that need to be saved.  Backpressure is active is when the queues are full (when number of items equals the limit).
    It's possible for the queues to stay at the limit for a while, despite chunks being saved (when there's new chunks that also need to be saved).
-   However you should probably tune your queue sizes in this case.  See [our Cassandra page](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md)
+   However you should probably tune your queue sizes in this case.  See [our Cassandra page](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md)
    Of course, if metrictank is running near peak capacity, The added workload of saving data may also lower ingest speed.
 
 3) golang GC runs may cause ingest drops.  Look at 'golang GC' in the Grafana dashboard and see if you can get the dashboard zoom right to look at individual GC runs, and see if they correspond to the ingest drops. (shared cursor is really handy here)

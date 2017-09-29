@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/raintank/metrictank/api"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/api"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"gopkg.in/raintank/schema.v1"
 )
 

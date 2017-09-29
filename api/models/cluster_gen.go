@@ -5,7 +5,7 @@ package models
 // DO NOT EDIT
 
 import (
-	"github.com/raintank/metrictank/idx"
+	"github.com/grafana/metrictank/idx"
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -167,7 +167,7 @@ func (z *IndexFindResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			if z.Nodes == nil && zlqf > 0 {
 				z.Nodes = make(map[string][]idx.Node, zlqf)
 			} else if len(z.Nodes) > 0 {
-				for key, _ := range z.Nodes {
+				for key := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}
@@ -283,7 +283,7 @@ func (z *IndexFindResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if z.Nodes == nil && zjfb > 0 {
 				z.Nodes = make(map[string][]idx.Node, zjfb)
 			} else if len(z.Nodes) > 0 {
-				for key, _ := range z.Nodes {
+				for key := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}

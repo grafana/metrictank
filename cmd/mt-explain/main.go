@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/grafana/metrictank/expr"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/expr"
 )
 
 func main() {

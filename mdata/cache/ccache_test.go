@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/raintank/metrictank/mdata/chunk"
-	"github.com/raintank/metrictank/test"
+	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/test"
 )
 
 func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {

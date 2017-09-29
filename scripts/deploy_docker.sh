@@ -7,5 +7,5 @@ cd ${DIR}
 
 VERSION=`git describe --always`
 
-docker push raintank/metrictank:$VERSION
-docker push raintank/metrictank:latest
+docker push grafana/metrictank:$VERSION
+docker push grafana/metrictank:latest

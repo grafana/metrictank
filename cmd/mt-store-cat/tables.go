@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata"
 )
 
 type TablesByTTL []string

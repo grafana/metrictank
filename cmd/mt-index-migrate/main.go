@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/raintank/metrictank/cluster/partitioner"
-	"github.com/raintank/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/raintank/metrictank/cluster"
+	"github.com/grafana/metrictank/cluster"
 	macaron "gopkg.in/macaron.v1"
 )
 

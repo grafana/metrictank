@@ -3,7 +3,7 @@ package expr
 import (
 	"regexp"
 
-	"github.com/raintank/metrictank/api/models"
+	"github.com/grafana/metrictank/api/models"
 )
 
 var groupPython = regexp.MustCompile(`\\(\d+)`)

@@ -29,7 +29,7 @@ This is the recommended option because it persists.
 * efficiency: On low end hardware the index rebuilds at about 70000 metricDefinitions per second. Saving new metrics works pretty fast.
 
 Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suit your deployment.
-Refer to the [cassandra guide](https://github.com/raintank/metrictank/blob/master/docs/cassandra.md) for more details.
+Refer to the [cassandra guide](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md) for more details.
 
 #### Configuration
 ```
@@ -75,9 +75,9 @@ type MetricDefinition struct {
 }
 ```
 
-See [the schema spec](https://github.com/raintank/schema/blob/master/metric.go#L78) for more details
+See [the schema spec](https://github.com/grafana/schema/blob/master/metric.go#L78) for more details
 
 ## Developers' guide to index plugin writing
 New indexes just need to implement the MetricIndex interface.
 
-See [the Interface spec](https://github.com/raintank/metrictank/blob/master/idx/idx.go#L22) for more details
+See [the Interface spec](https://github.com/grafana/metrictank/blob/master/idx/idx.go#L22) for more details

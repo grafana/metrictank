@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/raintank/metrictank/idx"
-	"github.com/raintank/metrictank/kafka"
-	"github.com/raintank/metrictank/mdata"
-	"github.com/raintank/metrictank/util"
+	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

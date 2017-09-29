@@ -1,7 +1,7 @@
 package mdata
 
 import (
-	"github.com/raintank/metrictank/conf"
+	"github.com/grafana/metrictank/conf"
 )
 
 func MaxChunkSpan() uint32 {

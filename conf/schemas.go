@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/alyu/configparser"
-	"github.com/raintank/metrictank/util"
+	"github.com/grafana/metrictank/util"
 )
 
 // Schemas contains schema settings

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/raintank/metrictank/util"
+	"github.com/grafana/metrictank/util"
 )
 
 var ErrMetricNotFound = errors.New("metric not found")

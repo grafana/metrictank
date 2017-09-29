@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/raintank/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk"
 )
 
 // MockStore is an in-memory Store implementation for unit tests

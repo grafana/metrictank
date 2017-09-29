@@ -30,7 +30,7 @@ The goal of the chunk cache is to offload as much read workload from cassandra a
 Any data chunks fetched from Cassandra are added to the chunk cache.
 But also, more interestingly, chunks expired out of the ring buffers will automatically be added to the chunk cache if the chunk before it is also in the cache.
 In other words, for series we know to be "hot" (queried frequently enough so that their data is kept in the chunk cache) we will try to avoid a roundtrip to Cassandra before adding the chunks to the cache.  This can be especially useful when it takes long for the primary to save data to cassandra, or when there is a cassandra outage.
-The chunk cache has a configurable [maximum size](https://github.com/raintank/metrictank/blob/master/docs/config.md#chunk-cache),
+The chunk cache has a configurable [maximum size](https://github.com/grafana/metrictank/blob/master/docs/config.md#chunk-cache),
 within that size it tries to always keep the most often queried data by using an LRU mechanism that evicts the Least Recently Used chunks.
 
 The effectiveness of the chunk cache largely depends on the common query patterns and the configured `max-size` value:
@@ -40,7 +40,7 @@ then Metrictank will need to fallback to Cassandra more often.
 
 ## Configuration guidelines
 
-See [the example config](https://github.com/raintank/metrictank/blob/master/metrictank-sample.ini) for an overview and basic explanation of what the config values are.
+See [the example config](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini) for an overview and basic explanation of what the config values are.
 Some of the values related to chunking and compression are a bit harder to tune, so this section will explain in more detail.
 
 
@@ -104,7 +104,7 @@ However:
 If you roll-up data for archival storage, those chunks will also be in memory as per your configuration.
 Querying for large timeframes will use the consolidated chunks in RAM, and keeping
 extra raw (or higher-resolution) data in RAM becomes pointless, putting an upper bound on how many chunks to keep.  
-See [Consolidation](https://github.com/raintank/metrictank/blob/master/docs/consolidation.md)
+See [Consolidation](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md)
 
 
 ### Configuration examples

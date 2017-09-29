@@ -10,8 +10,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/grafana/metrictank/mdata"
 	"github.com/raintank/dur"
-	"github.com/raintank/metrictank/mdata"
 	"github.com/rakyll/globalconf"
 )
 

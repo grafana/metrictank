@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata"
 )
 
 func chunkSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, keyspace, groupTTL string) error {

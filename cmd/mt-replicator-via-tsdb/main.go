@@ -12,9 +12,9 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	"github.com/raintank/metrictank/cluster"
-	inKafkaMdm "github.com/raintank/metrictank/input/kafkamdm"
-	statsConfig "github.com/raintank/metrictank/stats/config"
+	"github.com/grafana/metrictank/cluster"
+	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
+	statsConfig "github.com/grafana/metrictank/stats/config"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
