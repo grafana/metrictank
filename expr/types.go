@@ -15,6 +15,16 @@ type Arg interface {
 	Optional() bool
 }
 
+// ArgIn is a special type that allows one of multiple arguments
+type ArgIn struct {
+	key  string
+	opt  bool
+	args []Arg
+}
+
+func (a ArgIn) Key() string    { return a.key }
+func (a ArgIn) Optional() bool { return a.opt }
+
 // ArgSeries is a single series argument
 // not generally used as input since graphite functions typically take multiple series as input
 // but is useful to describe output
@@ -111,3 +121,36 @@ type ArgBool struct {
 
 func (a ArgBool) Key() string    { return a.key }
 func (a ArgBool) Optional() bool { return a.opt }
+
+// allowsSeries looks if the argument is one that allows for a series.
+// if ArgIn is encountered, we recursively look into all the options
+// to find if a series is allowed.
+func allowsSeries(arg Arg) bool {
+	switch a := arg.(type) {
+	case ArgSeries, ArgSeriesList, ArgSeriesLists:
+		return true
+	case ArgIn:
+		for _, subArg := range a.args {
+			allows := allowsSeries(subArg)
+			if allows {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func allowsInt(arg Arg) bool {
+	switch a := arg.(type) {
+	case ArgInt, ArgInts:
+		return true
+	case ArgIn:
+		for _, subArg := range a.args {
+			allows := allowsInt(subArg)
+			if allows {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -22,6 +21,7 @@ func TestAvgSeriesIdentity(t *testing.T) {
 			},
 		},
 		models.Series{
+			QueryPatt:  "averageSeries(single)",
 			Target:     "averageSeries(single)",
 			Datapoints: getCopy(a),
 		},
@@ -40,6 +40,7 @@ func TestAvgSeriesQueryToSingle(t *testing.T) {
 			},
 		},
 		models.Series{
+			QueryPatt:  "averageSeries(foo.*)",
 			Target:     "averageSeries(foo.*)",
 			Datapoints: getCopy(a),
 		},
@@ -62,6 +63,7 @@ func TestAvgSeriesMultiple(t *testing.T) {
 			},
 		},
 		models.Series{
+			QueryPatt:  "averageSeries(foo.*)",
 			Target:     "averageSeries(foo.*)",
 			Datapoints: getCopy(avgab),
 		},
@@ -90,6 +92,7 @@ func TestAvgSeriesMultipleDiffQuery(t *testing.T) {
 			},
 		},
 		models.Series{
+			QueryPatt:  "averageSeries(foo.*,movingAverage(bar, '1min'))",
 			Target:     "averageSeries(foo.*,movingAverage(bar, '1min'))",
 			Datapoints: getCopy(avgabc),
 		},
@@ -136,6 +139,7 @@ func TestAvgSeriesMultipleTimesSameInput(t *testing.T) {
 			},
 		},
 		models.Series{
+			QueryPatt:  "averageSeries(foo.*,foo.*,a,a)",
 			Target:     "averageSeries(foo.*,foo.*,a,a)",
 			Datapoints: getCopy(avg4a2b),
 		},
@@ -150,25 +154,8 @@ func testAvgSeries(name string, in [][]models.Series, out models.Series, t *test
 		avg.in = append(avg.in, NewMock(i))
 	}
 	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("case %q: avgSeries output should be only 1 thing (a series) not %d", name, len(got))
-	}
-	g := got[0]
-	if g.Target != out.Target {
-		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
-	}
-	if len(g.Datapoints) != len(out.Datapoints) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
-	}
-	for j, p := range g.Datapoints {
-		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out.Datapoints[j].Val)
-		if (bothNaN || p.Val == out.Datapoints[j].Val) && p.Ts == out.Datapoints[j].Ts {
-			continue
-		}
-		t.Fatalf("case %q: output point %d - expected %v got %v", name, j, out.Datapoints[j], p)
+	if err := equalOutput([]models.Series{out}, got, nil, err); err != nil {
+		t.Fatalf("case %q: %s", name, err)
 	}
 }
 

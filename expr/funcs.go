@@ -49,6 +49,7 @@ func init() {
 		"alias":          {NewAlias, true},
 		"aliasByNode":    {NewAliasByNode, true},
 		"aliasSub":       {NewAliasSub, true},
+		"asPercent":      {NewAsPercent, true},
 		"avg":            {NewAvgSeries, true},
 		"averageSeries":  {NewAvgSeries, true},
 		"consolidateBy":  {NewConsolidateBy, true},
