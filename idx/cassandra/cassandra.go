@@ -497,15 +497,3 @@ func (c *CasIdx) prune() {
 		}
 	}
 }
-
-func (c *CasIdx) TagList(orgId int, from uint32) []string {
-	return c.MemoryIdx.TagList(orgId, from)
-}
-
-func (c *CasIdx) Tag(orgId int, tag string) map[string]uint32 {
-	return c.MemoryIdx.Tag(orgId, tag)
-}
-
-func (c *CasIdx) IdsByTagExpressions(orgId int, expressions []string) ([]string, error) {
-	return c.MemoryIdx.IdsByTagExpressions(orgId, expressions)
-}

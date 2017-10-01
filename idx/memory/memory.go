@@ -43,13 +43,13 @@ var (
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
 	Enabled    bool
-	TagSupport bool
+	tagSupport bool
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
-	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "")
+	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "")
 	globalconf.Register("memory-idx", memoryIdx)
 }
 
@@ -127,8 +127,8 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 
-	if TagSupport {
-		m.addTags(def)
+	if tagSupport {
+		m.indexTags(def)
 	}
 
 	return archive
@@ -144,10 +144,12 @@ func (m *MemoryIdx) Update(entry idx.Archive) {
 	m.Unlock()
 }
 
-func (m *MemoryIdx) addTags(def *schema.MetricDefinition) {
+// reads the tags of a given metric definition and creates the
+// corresponding tag index entries to refer to it.
+func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
-		tags = make(map[string]map[string]map[string]struct{})
+		tags = make(TagIndex)
 		m.Tags[def.OrgId] = tags
 	}
 	for _, tag := range def.Tags {
@@ -172,7 +174,9 @@ func (m *MemoryIdx) addTags(def *schema.MetricDefinition) {
 	}
 }
 
-func (m *MemoryIdx) delTags(def *schema.MetricDefinition) {
+// takes a given metric definition and removes all references
+// to it from the tag index.
+func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
 		return
@@ -220,8 +224,8 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		}
 		m.add(def)
 
-		if TagSupport {
-			m.addTags(def)
+		if tagSupport {
+			m.indexTags(def)
 		}
 
 		// as we are loading the metricDefs from a persistent store, set the lastSave
@@ -353,7 +357,7 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 }
 
 func (m *MemoryIdx) Tag(orgId int, tag string) map[string]uint32 {
-	if !TagSupport {
+	if !tagSupport {
 		log.Debug("memory-idx: received tag query, but tag support is disabled")
 		return nil
 	}
@@ -377,7 +381,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string) map[string]uint32 {
 }
 
 func (m *MemoryIdx) TagList(orgId int, from uint32) []string {
-	if !TagSupport {
+	if !tagSupport {
 		log.Debug("memory-idx: received tag query, but tag support is disabled")
 		return nil
 	}
@@ -696,9 +700,9 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		delete(tree.Items, branch)
 	}
 
-	if TagSupport {
+	if tagSupport {
 		for _, def := range deletedDefs {
-			m.delTags(&(def.MetricDefinition))
+			m.deindexTags(&(def.MetricDefinition))
 		}
 	}
 

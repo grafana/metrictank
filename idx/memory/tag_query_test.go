@@ -115,9 +115,9 @@ func TestQueryByTagInvalidQuery(t *testing.T) {
 }
 
 func TestGetByTag(t *testing.T) {
-	tagSupport := TagSupport
-	defer func() { TagSupport = tagSupport }()
-	TagSupport = true
+	tagSupport := tagSupport
+	defer func() { tagSupport = tagSupport }()
+	tagSupport = true
 
 	ix := New()
 	ix.Init()
@@ -198,9 +198,9 @@ func TestGetByTag(t *testing.T) {
 }
 
 func TestDeleteTaggedSeries(t *testing.T) {
-	tagSupport := TagSupport
-	defer func() { TagSupport = tagSupport }()
-	TagSupport = true
+	tagSupport := tagSupport
+	defer func() { tagSupport = tagSupport }()
+	tagSupport = true
 
 	ix := New()
 	ix.Init()
