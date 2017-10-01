@@ -2,7 +2,6 @@ package memory
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -21,6 +20,83 @@ type TagQuery struct {
 	filters []func(def *idx.Archive) (bool, error)
 }
 
+const (
+	PARSING_ERROR = iota
+	EQUAL
+	NOT_EQUAL
+	MATCH
+	NOT_MATCH
+)
+
+// returns key, value, operator
+// in case of error the operator will be PARSING_ERROR
+func parseExpression(expr string) (string, string, int) {
+	var key []byte
+	regex, not := false, false
+	var pos int
+
+	// get key
+	for ; pos < len(expr); pos++ {
+		// ! || =
+		if expr[pos] == 33 || expr[pos] == 61 {
+			// key must not be empty
+			if len(key) == 0 {
+				return "", "", PARSING_ERROR
+			}
+			break
+		}
+
+		// a-z A-Z 0-9
+		if !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) {
+			return "", "", PARSING_ERROR
+		}
+
+		key = append(key, expr[pos])
+	}
+
+	// if !
+	if expr[pos] == 33 {
+		not = true
+		pos++
+	}
+
+	// expecting a =
+	if expr[pos] != 61 {
+		return "", "", PARSING_ERROR
+	}
+	pos++
+
+	// if ~
+	if len(expr) > pos && expr[pos] == 126 {
+		regex = true
+		pos++
+	}
+
+	var value []byte
+	for ; pos < len(expr); pos++ {
+		// enforce a-z A-Z 0-9 if query is not regex
+		if !regex && !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) {
+			return "", "", PARSING_ERROR
+		}
+
+		value = append(value, expr[pos])
+	}
+
+	if not {
+		if regex {
+			return string(key), string(value), NOT_MATCH
+		} else {
+			return string(key), string(value), NOT_EQUAL
+		}
+	} else {
+		if regex {
+			return string(key), string(value), MATCH
+		} else {
+			return string(key), string(value), EQUAL
+		}
+	}
+}
+
 func NewTagQuery(expressions []string) (*TagQuery, error) {
 	if len(expressions) == 0 {
 		return nil, errInvalidQuery
@@ -29,41 +105,33 @@ func NewTagQuery(expressions []string) (*TagQuery, error) {
 	query := &TagQuery{}
 
 	for _, expr := range expressions {
-		if !expressionRe.MatchString(expr) {
+		key, value, operator := parseExpression(expr)
+		if operator == PARSING_ERROR {
 			return nil, errInvalidQuery
 		}
-
-		exprSplits := expressionRe.FindAllStringSubmatch(expr, -1)
-		if len(exprSplits[0]) != 4 {
-			return nil, errInvalidQuery
-		}
-
-		key := exprSplits[0][1]
-		operator := exprSplits[0][2]
-		value := exprSplits[0][3]
 
 		// special case of empty value
 		if len(value) == 0 {
-			if operator[0] == byte('=') {
-				operator = "!=~"
+			if operator == EQUAL || operator == MATCH {
+				operator = NOT_MATCH
 				value = ".+"
 			} else {
-				operator = "=~"
+				operator = MATCH
 				value = ".+"
 			}
 		}
 
 		// always anchor all regular expressions at the beginning
-		if operator[len(operator)-1] == byte('~') && len(value) > 0 && value[0] != byte('^') {
-			value = fmt.Sprintf("^%s", value)
+		if (operator == MATCH || operator == NOT_MATCH) && len(value) > 0 && value[0] != byte('^') {
+			value = "^" + value
 		}
 
 		switch operator {
-		case "=":
+		case EQUAL:
 			query.selects = append(query.selects, func(idx TagIndex) (map[string]struct{}, error) {
 				return idx[key][value], nil
 			})
-		case "=~":
+		case MATCH:
 			query.selects = append(query.selects, func(idx TagIndex) (map[string]struct{}, error) {
 				re, err := regexp.Compile(value)
 				if err != nil {
@@ -82,7 +150,7 @@ func NewTagQuery(expressions []string) (*TagQuery, error) {
 
 				return res, nil
 			})
-		case "!=":
+		case NOT_EQUAL:
 			query.filters = append(query.filters,
 				func(def *idx.Archive) (bool, error) {
 					for _, tag := range def.Tags {
@@ -97,7 +165,7 @@ func NewTagQuery(expressions []string) (*TagQuery, error) {
 					return true, nil
 				},
 			)
-		case "!=~":
+		case NOT_MATCH:
 			query.filters = append(query.filters,
 				func(def *idx.Archive) (bool, error) {
 					re, err := regexp.Compile(value)

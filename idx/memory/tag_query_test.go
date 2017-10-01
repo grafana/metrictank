@@ -115,8 +115,8 @@ func TestQueryByTagInvalidQuery(t *testing.T) {
 }
 
 func TestGetByTag(t *testing.T) {
-	tagSupport := tagSupport
-	defer func() { tagSupport = tagSupport }()
+	_tagSupport := tagSupport
+	defer func() { tagSupport = _tagSupport }()
 	tagSupport = true
 
 	ix := New()
@@ -129,6 +129,7 @@ func TestGetByTag(t *testing.T) {
 		mds[i].Id = mds[i].Metric
 		mds[i].OrgId = 1
 		mds[i].Interval = 1
+		mds[i].Time = 12345
 	}
 	mds[1].Tags = []string{"key1=value1", "key2=value2"}
 	mds[11].Tags = []string{"key1=value1"}
@@ -198,8 +199,8 @@ func TestGetByTag(t *testing.T) {
 }
 
 func TestDeleteTaggedSeries(t *testing.T) {
-	tagSupport := tagSupport
-	defer func() { tagSupport = tagSupport }()
+	_tagSupport := tagSupport
+	defer func() { tagSupport = _tagSupport }()
 	tagSupport = true
 
 	ix := New()
@@ -242,5 +243,70 @@ func TestDeleteTaggedSeries(t *testing.T) {
 
 	if len(ix.Tags[orgId]) > 0 {
 		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.Tags)
+	}
+}
+
+func TestExpressionParsing1(t *testing.T) {
+	type testCase struct {
+		expression string
+		key        string
+		value      string
+		operator   int
+	}
+
+	testCases := []testCase{
+		{
+			expression: "key=value",
+			key:        "key",
+			value:      "value",
+			operator:   EQUAL,
+		}, {
+			expression: "key!=",
+			key:        "key",
+			value:      "",
+			operator:   NOT_EQUAL,
+		}, {
+			expression: "key=",
+			key:        "key",
+			value:      "",
+			operator:   EQUAL,
+		}, {
+			expression: "key=~",
+			key:        "key",
+			value:      "",
+			operator:   MATCH,
+		}, {
+			expression: "key=~value",
+			key:        "key",
+			value:      "value",
+			operator:   MATCH,
+		}, {
+			expression: "k!=~v",
+			key:        "k",
+			value:      "v",
+			operator:   NOT_MATCH,
+		}, {
+			expression: "key!!=value",
+			key:        "",
+			value:      "",
+			operator:   PARSING_ERROR,
+		}, {
+			expression: "key==value",
+			key:        "",
+			value:      "",
+			operator:   PARSING_ERROR,
+		}, {
+			expression: "key=~=value",
+			key:        "key",
+			value:      "=value",
+			operator:   MATCH,
+		},
+	}
+
+	for _, tc := range testCases {
+		k, v, o := parseExpression(tc.expression)
+		if k != tc.key || v != tc.value || o != tc.operator {
+			t.Fatalf("Expected the values %s, %s, %d, but got %s, %s, %d", tc.key, tc.value, tc.operator, k, v, o)
+		}
 	}
 }
