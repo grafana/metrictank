@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/raintank/metrictank/idx"
+	"github.com/grafana/metrictank/idx"
 )
 
 var (
