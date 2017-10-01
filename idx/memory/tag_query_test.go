@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/raintank/metrictank/idx"
+	"github.com/grafana/metrictank/idx"
 	"gopkg.in/raintank/schema.v1"
 )
 
