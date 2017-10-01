@@ -1,0 +1,17 @@
+Thanks for your interest in contributing to metrictank!
+
+When contributing PR's:
+
+1. functions, methods, types should be clearly understandable, either through an obvious name, or documentation when needed.
+2. all documentation must conform to [golang best practices](https://blog.golang.org/godoc-documenting-go-code)
+3. add unit tests for tricky or non-trivial code. Not needed for obvious, simple or glue code.  Use your best judgment or just ask us.
+4. add benchmarks for performance sensitive functionality (e.g. code in the read and write path) or commonly executed code. (e.g. index inserts and searches)
+5. It's OK for your PR to not be based on the absolute latest master, but don't let the base of your branch get too out of date. (rule of thumb: no more than 40 commits or 2 weeks behind)
+6. never merge master into your PR. As it mangles up git history and makes things harder to review. Instead, rebase your PR on top of master.
+7. code must be well formatted. You can use `gofmt -w -s $(find . -name '*.go' | grep -v vendor | grep -v _gen.go)` to help with this.
+8. regarding configuration:
+   * config options and metrictank-sample.ini must be in sync. the latter must match the former.
+   * all other config files should also be in sync with metrictank-sample.ini except where the file should differ on purpose.
+   (example: `docker/docker-cluster/metrictank.ini` is the same as metrictank-sample.ini except for the options that support the use case of running metrictank in a cluster)
+   Use `scripts/sync-configs.sh` which helps with the process of updating all configs based on metrictank-sample.ini.
+9. PR's will only be merged if all tests pass
