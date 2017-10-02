@@ -97,17 +97,17 @@ func parseExpression(expr string) (string, string, int) {
 	}
 }
 
-func NewTagQuery(expressions []string) (*TagQuery, error) {
-	if len(expressions) == 0 {
-		return nil, errInvalidQuery
-	}
+func NewTagQuery(expressions []string) (TagQuery, error) {
+	query := TagQuery{}
 
-	query := &TagQuery{}
+	if len(expressions) == 0 {
+		return query, errInvalidQuery
+	}
 
 	for _, expr := range expressions {
 		key, value, operator := parseExpression(expr)
 		if operator == PARSING_ERROR {
-			return nil, errInvalidQuery
+			return query, errInvalidQuery
 		}
 
 		// special case of empty value
@@ -188,7 +188,7 @@ func NewTagQuery(expressions []string) (*TagQuery, error) {
 	}
 
 	if len(query.selects) == 0 {
-		return nil, errInvalidQuery
+		return query, errInvalidQuery
 	}
 
 	return query, nil

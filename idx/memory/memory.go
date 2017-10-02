@@ -418,7 +418,7 @@ func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string) ([]stri
 	return res, nil
 }
 
-func (m *MemoryIdx) IdsByTagQuery(orgId int, query *TagQuery) map[string]struct{} {
+func (m *MemoryIdx) IdsByTagQuery(orgId int, query TagQuery) map[string]struct{} {
 	m.RLock()
 	defer m.RUnlock()
 

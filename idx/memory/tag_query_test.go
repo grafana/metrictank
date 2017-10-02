@@ -44,7 +44,7 @@ func getTestIndex() (TagIndex, map[string]*idx.Archive) {
 	return tagIdx, byId
 }
 
-func queryAndCompareResults(t *testing.T, q *TagQuery, expectedData map[string]struct{}) {
+func queryAndCompareResults(t *testing.T, q TagQuery, expectedData map[string]struct{}) {
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
