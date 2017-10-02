@@ -2,7 +2,9 @@ package memory
 
 import (
 	"fmt"
+	"os"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/grafana/metrictank/idx"
@@ -10,8 +12,9 @@ import (
 )
 
 var (
-	ix      idx.MetricIndex
-	queries []query
+	ix         idx.MetricIndex
+	queries    []query
+	tagQueries []tagQuery
 )
 
 type query struct {
@@ -19,14 +22,33 @@ type query struct {
 	ExpectedResults int
 }
 
-func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []string {
-	series := make([]string, 0)
+type tagQuery struct {
+	Expressions     []string
+	ExpectedResults int
+}
+
+type metric struct {
+	Name string
+	Tags []string
+}
+
+func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []metric {
+	var series []metric
 	for dc := 0; dc < dcCount; dc++ {
 		for host := hostOffset; host < hostCount+hostOffset; host++ {
 			for cpu := 0; cpu < cpuCount; cpu++ {
 				p := prefix + ".dc" + strconv.Itoa(dc) + ".host" + strconv.Itoa(host) + ".cpu." + strconv.Itoa(cpu)
-				for _, metric := range []string{"idle", "interrupt", "nice", "softirq", "steal", "system", "user", "wait"} {
-					series = append(series, p+"."+metric)
+				for _, m := range []string{"idle", "interrupt", "nice", "softirq", "steal", "system", "user", "wait"} {
+					series = append(series, metric{
+						Name: p + "." + m,
+						Tags: []string{
+							"dc=dc" + strconv.Itoa(dc),
+							"host=host" + strconv.Itoa(host),
+							"device=cpu",
+							"cpu=cpu" + strconv.Itoa(cpu),
+							"metric=" + m,
+						},
+					})
 				}
 			}
 		}
@@ -34,19 +56,49 @@ func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []s
 	return series
 }
 
-func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) []string {
-	series := make([]string, 0)
+func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) []metric {
+	var series []metric
 	for dc := 0; dc < dcCount; dc++ {
 		for host := hostOffset; host < hostCount+hostOffset; host++ {
 			for disk := 0; disk < diskCount; disk++ {
 				p := prefix + ".dc" + strconv.Itoa(dc) + ".host" + strconv.Itoa(host) + ".disk.disk" + strconv.Itoa(disk)
-				for _, metric := range []string{"disk_merged", "disk_octets", "disk_ops", "disk_time"} {
-					series = append(series, p+"."+metric+".read", p+"."+metric+".write")
+				for _, m := range []string{"disk_merged", "disk_octets", "disk_ops", "disk_time"} {
+					series = append(series, metric{
+						Name: p + "." + m + ".read",
+						Tags: []string{
+							"dc=dc" + strconv.Itoa(dc),
+							"host=host" + strconv.Itoa(host),
+							"device=disk",
+							"disk=disk" + strconv.Itoa(disk),
+							"metric=" + m,
+							"direction=read",
+						},
+					})
+					series = append(series, metric{
+						Name: p + "." + m + ".write",
+						Tags: []string{
+							"dc=dc" + strconv.Itoa(dc),
+							"host=host" + strconv.Itoa(host),
+							"device=disk",
+							"disk=disk" + strconv.Itoa(disk),
+							"metric=" + m,
+							"direction=write",
+						},
+					})
 				}
 			}
 		}
 	}
 	return series
+}
+
+func TestMain(m *testing.M) {
+	_tagSupport := tagSupport
+	defer func() { tagSupport = _tagSupport }()
+	tagSupport = true
+
+	Init()
+	os.Exit(m.Run())
 }
 
 func Init() {
@@ -57,8 +109,9 @@ func Init() {
 
 	for _, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
-			Name:     series,
-			Metric:   series,
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
 		}
@@ -67,8 +120,9 @@ func Init() {
 	}
 	for _, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
-			Name:     series,
-			Metric:   series,
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
 		}
@@ -79,8 +133,9 @@ func Init() {
 
 	for _, series := range cpuMetrics(5, 100, 950, 32, "collectd") {
 		data = &schema.MetricData{
-			Name:     series,
-			Metric:   series,
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
 		}
@@ -89,8 +144,9 @@ func Init() {
 	}
 	for _, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
-			Name:     series,
-			Metric:   series,
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
 		}
@@ -133,6 +189,24 @@ func Init() {
 		{Pattern: "*.dc3.{host,server}96{1,3}.cpu.1.*", ExpectedResults: 16},
 
 		{Pattern: "*.dc3.{host,server}9[6-9]{1,3}.cpu.1.*", ExpectedResults: 64},
+	}
+
+	tagQueries = []tagQuery{
+		// simple matching
+		{Expressions: []string{"dc=dc1", "host=host960", "disk=disk1", "metric=disk_ops"}, ExpectedResults: 2},
+		{Expressions: []string{"dc=dc3", "host=host960", "disk=disk2", "direction=read"}, ExpectedResults: 4},
+
+		// regular expressions
+		{Expressions: []string{"dc=~dc[1-3]", "host=~host3[5-9]{2}", "metric=disk_ops"}, ExpectedResults: 1500},
+		{Expressions: []string{"dc=~dc[0-9]", "host=~host97[0-9]", "disk=disk2", "metric=disk_ops"}, ExpectedResults: 100},
+
+		// matching and filtering
+		{Expressions: []string{"dc=dc1", "host=host666", "cpu=cpu12", "device=cpu", "metric!=softirq"}, ExpectedResults: 7},
+		{Expressions: []string{"dc=dc1", "host=host966", "cpu!=cpu12", "device!=disk", "metric!=softirq"}, ExpectedResults: 217},
+
+		// matching and filtering by regular expressions
+		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 16},
+		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 1500},
 	}
 }
 
@@ -222,4 +296,67 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
+}
+
+func ixFindByTag(org, q int) {
+	series, err := ix.IdsByTagExpressions(org, tagQueries[q].Expressions)
+	if err != nil {
+		panic(err)
+	}
+	if len(series) != tagQueries[q].ExpectedResults {
+		for _, s := range series {
+			fmt.Println(s)
+		}
+		panic(fmt.Sprintf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series)))
+	}
+}
+
+func BenchmarkTagFindSimpleIntersect(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	fmt.Println("bench count ", b.N)
+	for n := 0; n < b.N; n++ {
+		q := n % 2
+		org := (n % 2) + 1
+		fmt.Println("running ", q)
+		ixFindByTag(org, q)
+	}
+}
+
+func BenchmarkTagFindRegexIntersect(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	fmt.Println("bench count ", b.N)
+	for n := 0; n < b.N; n++ {
+		q := (n % 2) + 2
+		org := (n % 2) + 1
+		fmt.Println("running ", q)
+		ixFindByTag(org, q)
+	}
+}
+
+func BenchmarkConcurrent8TagFind(b *testing.B) {
+	var wg sync.WaitGroup
+	ch := make(chan testQ)
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			for q := range ch {
+				fmt.Println("running ", q.q)
+				ixFindByTag(q.org, q.q)
+			}
+			wg.Done()
+		}()
+	}
+
+	queryCount := len(tagQueries)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		q := n % queryCount
+		org := (n % 2) + 1
+		ch <- testQ{q: q, org: org}
+	}
+	close(ch)
+	wg.Wait()
 }
