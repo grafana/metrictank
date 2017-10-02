@@ -246,7 +246,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 	}
 }
 
-func TestExpressionParsing1(t *testing.T) {
+func TestExpressionParsing(t *testing.T) {
 	type testCase struct {
 		expression string
 		key        string
@@ -276,9 +276,9 @@ func TestExpressionParsing1(t *testing.T) {
 			value:      "",
 			operator:   MATCH,
 		}, {
-			expression: "key=~value",
+			expression: "key=~v_alue",
 			key:        "key",
-			value:      "value",
+			value:      "v_alue",
 			operator:   MATCH,
 		}, {
 			expression: "k!=~v",

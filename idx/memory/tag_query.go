@@ -74,8 +74,8 @@ func parseExpression(expr string) (string, string, int) {
 
 	var value []byte
 	for ; pos < len(expr); pos++ {
-		// enforce a-z A-Z 0-9 if query is not regex
-		if !regex && !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) {
+		// enforce a-z A-Z 0-9 -_ if query is not regex
+		if !regex && !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) && expr[pos] != 45 && expr[pos] != 95 {
 			return "", "", PARSING_ERROR
 		}
 
@@ -206,37 +206,33 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string
 			return nil, err
 		}
 		if i == 0 {
+		BUILD_INITIAL:
 			for k, v := range res {
+				for _, f := range q.filters {
+					var def *idx.Archive
+					var ok bool
+					if def, ok = byId[k]; !ok {
+						return nil, errUnknownId
+					}
+					keep, err := f(def)
+					if err != nil {
+						return nil, err
+					}
+					if !keep {
+						continue BUILD_INITIAL
+					}
+				}
+
 				intersect[k] = v
 			}
 			continue
 		}
 
-	INTERSECT:
-		for id1 := range intersect {
-			for id2 := range res {
-				if id1 == id2 {
-					continue INTERSECT
-				}
+		for id := range intersect {
+			if _, ok := res[id]; ok {
+				continue
 			}
-			delete(intersect, id1)
-		}
-	}
-
-	for id := range intersect {
-		var def *idx.Archive
-		var ok bool
-		if def, ok = byId[id]; !ok {
-			return nil, errUnknownId
-		}
-		for _, f := range q.filters {
-			keep, err := f(def)
-			if err != nil {
-				return nil, err
-			}
-			if !keep {
-				delete(intersect, id)
-			}
+			delete(intersect, id)
 		}
 	}
 
