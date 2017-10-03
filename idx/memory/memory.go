@@ -380,7 +380,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string) map[string]uint32 {
 	return result
 }
 
-func (m *MemoryIdx) TagList(orgId int, from uint32) []string {
+func (m *MemoryIdx) TagList(orgId int) []string {
 	if !tagSupport {
 		log.Debug("memory-idx: received tag query, but tag support is disabled")
 		return nil
