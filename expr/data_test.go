@@ -88,6 +88,24 @@ var avgabc = []schema.Point{
 	{Val: float64(1234567894) / 2, Ts: 60},
 }
 
+var maxab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64, Ts: 20},
+	{Val: math.MaxFloat64 - 20, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1234567890, Ts: 50}, // in accordance with graphite, max(5,null) = 5
+	{Val: 1234567890, Ts: 60},
+}
+
+var maxabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64, Ts: 20},
+	{Val: math.MaxFloat64 - 20, Ts: 30},
+	{Val: 2, Ts: 40},
+	{Val: 1234567890, Ts: 50},
+	{Val: 1234567890, Ts: 60},
+}
+
 // make sure we test with the correct data, don't mask if processing accidentally modifies our input data
 func getCopy(in []schema.Point) []schema.Point {
 	out := make([]schema.Point, len(in))
