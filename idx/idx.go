@@ -112,7 +112,7 @@ type MetricIndex interface {
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive
 	Prune(int, time.Time) ([]Archive, error)
-	TagList(int, uint32) []string
+	TagList(int) []string
 	Tag(int, string) map[string]uint32
 	IdsByTagExpressions(int, []string) ([]string, error)
 }
