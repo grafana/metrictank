@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"sync"
+	//"sync"
 	"testing"
 
 	"github.com/grafana/metrictank/idx"
@@ -205,7 +205,7 @@ func Init() {
 		{Expressions: []string{"dc=dc1", "host=host966", "cpu!=cpu12", "device!=disk", "metric!=softirq"}, ExpectedResults: 217},
 
 		// matching and filtering by regular expressions
-		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 16},
+		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
 		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 1500},
 	}
 }
@@ -331,27 +331,20 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 	}
 }
 
-func BenchmarkConcurrent8TagFind(b *testing.B) {
-	var wg sync.WaitGroup
-	ch := make(chan testQ)
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			for q := range ch {
-				ixFindByTag(q.org, q.q)
-			}
-			wg.Done()
-		}()
-	}
-
-	queryCount := len(tagQueries)
+func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		q := n % queryCount
+		q := (n % 2) + 4
 		org := (n % 2) + 1
-		ch <- testQ{q: q, org: org}
+		ixFindByTag(org, q)
 	}
-	close(ch)
-	wg.Wait()
+}
+
+func BenchmarkTagFindMatchingAndFilteringRegex1(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		ixFindByTag(1, 6)
+	}
 }
