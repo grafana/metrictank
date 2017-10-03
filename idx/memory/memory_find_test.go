@@ -314,11 +314,9 @@ func ixFindByTag(org, q int) {
 func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	fmt.Println("bench count ", b.N)
 	for n := 0; n < b.N; n++ {
 		q := n % 2
 		org := (n % 2) + 1
-		fmt.Println("running ", q)
 		ixFindByTag(org, q)
 	}
 }
@@ -326,11 +324,9 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 func BenchmarkTagFindRegexIntersect(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
-	fmt.Println("bench count ", b.N)
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 2
 		org := (n % 2) + 1
-		fmt.Println("running ", q)
 		ixFindByTag(org, q)
 	}
 }
@@ -342,7 +338,6 @@ func BenchmarkConcurrent8TagFind(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			for q := range ch {
-				fmt.Println("running ", q.q)
 				ixFindByTag(q.org, q.q)
 			}
 			wg.Done()
