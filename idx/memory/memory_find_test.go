@@ -350,7 +350,7 @@ func BenchmarkTagFindMatchingAndFilteringRegex1(b *testing.B) {
 }
 
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
-	q := tagQuery{Expressions: []string{"direction!=~read", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}, ExpectedResults: 90}
+	q := tagQuery{Expressions: []string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}, ExpectedResults: 90}
 	b.ReportAllocs()
 	b.ResetTimer()
 
