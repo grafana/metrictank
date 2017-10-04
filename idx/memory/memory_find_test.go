@@ -348,3 +348,22 @@ func BenchmarkTagFindMatchingAndFilteringRegex1(b *testing.B) {
 		ixFindByTag(1, 6)
 	}
 }
+
+func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
+	q := tagQuery{Expressions: []string{"direction!=~read", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}, ExpectedResults: 90}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		series, err := ix.IdsByTagExpressions(1, q.Expressions)
+		if err != nil {
+			panic(err)
+		}
+		if len(series) != q.ExpectedResults {
+			for _, s := range series {
+				fmt.Println(s)
+			}
+			panic(fmt.Sprintf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series)))
+		}
+	}
+}
