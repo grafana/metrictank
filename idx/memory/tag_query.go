@@ -172,6 +172,16 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, map[string]struct{}, 
 		}
 	}
 
+	// shortcut if pattern is ^.+ (f.e. expression "key!=~" will be translated to "key=~^.+")
+	if q.match[startId].value == "^.+" {
+		for _, ids := range index[q.match[startId].key] {
+			for id := range ids {
+				resultSet[id] = struct{}{}
+			}
+		}
+		return startId, resultSet, nil
+	}
+
 	re, err := regexp.Compile(q.match[startId].value)
 	if err != nil {
 		return 0, nil, errInvalidQuery
@@ -253,9 +263,18 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 			continue
 		}
 
-		re, err := regexp.Compile(e.value)
-		if err != nil {
-			return errInvalidQuery
+		var shortCut bool
+		var re *regexp.Regexp
+		var err error
+
+		// shortcut if pattern is ^.+ (f.e. expression "key!=" will be translated to "key=~^.+")
+		if e.value == "^.+" {
+			shortCut = true
+		} else {
+			re, err = regexp.Compile(e.value)
+			if err != nil {
+				return errInvalidQuery
+			}
 		}
 
 		matchingTags := make(map[string]struct{})
@@ -268,6 +287,7 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 				delete(resultSet, id)
 				continue IDS
 			}
+
 			for _, tag := range def.Tags {
 				// optimization to reduce regex matching
 				if _, ok := matchingTags[tag]; ok {
@@ -283,7 +303,7 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 					continue IDS
 				}
 
-				if e.key == tagSplits[0] && re.MatchString(tagSplits[1]) {
+				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
 					matchingTags[tag] = struct{}{}
 					continue IDS
 				}
