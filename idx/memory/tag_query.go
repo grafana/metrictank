@@ -2,6 +2,7 @@ package memory
 
 import (
 	"errors"
+	"math"
 	"regexp"
 	"strings"
 
@@ -15,9 +16,9 @@ var (
 	errInvalidQuery = errors.New("invalid query")
 )
 
-type TagQuery struct {
-	selects []func(TagIndex) (map[string]struct{}, error)
-	filters []func(def *idx.Archive) (bool, error)
+type kv struct {
+	key   string
+	value string
 }
 
 const (
@@ -28,9 +29,21 @@ const (
 	NOT_MATCH
 )
 
-// returns key, value, operator
+type expression struct {
+	kv
+	operator int
+}
+
+type TagQuery struct {
+	equal    []kv
+	match    []kv
+	notEqual []kv
+	notMatch []kv
+}
+
+// returns expression,
 // in case of error the operator will be PARSING_ERROR
-func parseExpression(expr string) (string, string, int) {
+func parseExpression(expr string) expression {
 	var key []byte
 	regex, not := false, false
 	var pos int
@@ -41,14 +54,14 @@ func parseExpression(expr string) (string, string, int) {
 		if expr[pos] == 33 || expr[pos] == 61 {
 			// key must not be empty
 			if len(key) == 0 {
-				return "", "", PARSING_ERROR
+				return expression{operator: PARSING_ERROR}
 			}
 			break
 		}
 
 		// a-z A-Z 0-9
 		if !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) {
-			return "", "", PARSING_ERROR
+			return expression{operator: PARSING_ERROR}
 		}
 
 		key = append(key, expr[pos])
@@ -62,7 +75,7 @@ func parseExpression(expr string) (string, string, int) {
 
 	// expecting a =
 	if expr[pos] != 61 {
-		return "", "", PARSING_ERROR
+		return expression{operator: PARSING_ERROR}
 	}
 	pos++
 
@@ -76,7 +89,7 @@ func parseExpression(expr string) (string, string, int) {
 	for ; pos < len(expr); pos++ {
 		// enforce a-z A-Z 0-9 -_ if query is not regex
 		if !regex && !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) && expr[pos] != 45 && expr[pos] != 95 {
-			return "", "", PARSING_ERROR
+			return expression{operator: PARSING_ERROR}
 		}
 
 		value = append(value, expr[pos])
@@ -84,157 +97,277 @@ func parseExpression(expr string) (string, string, int) {
 
 	if not {
 		if regex {
-			return string(key), string(value), NOT_MATCH
+			return expression{kv: kv{key: string(key), value: string(value)}, operator: NOT_MATCH}
 		} else {
-			return string(key), string(value), NOT_EQUAL
+			return expression{kv: kv{key: string(key), value: string(value)}, operator: NOT_EQUAL}
 		}
 	} else {
 		if regex {
-			return string(key), string(value), MATCH
+			return expression{kv: kv{key: string(key), value: string(value)}, operator: MATCH}
 		} else {
-			return string(key), string(value), EQUAL
+			return expression{kv: kv{key: string(key), value: string(value)}, operator: EQUAL}
 		}
 	}
 }
 
 func NewTagQuery(expressions []string) (TagQuery, error) {
-	query := TagQuery{}
+	q := TagQuery{}
 
 	if len(expressions) == 0 {
-		return query, errInvalidQuery
+		return q, errInvalidQuery
 	}
 
 	for _, expr := range expressions {
-		key, value, operator := parseExpression(expr)
-		if operator == PARSING_ERROR {
-			return query, errInvalidQuery
+		e := parseExpression(expr)
+		if e.operator == PARSING_ERROR {
+			return q, errInvalidQuery
 		}
 
 		// special case of empty value
-		if len(value) == 0 {
-			if operator == EQUAL || operator == MATCH {
-				operator = NOT_MATCH
-				value = ".+"
+		if len(e.value) == 0 {
+			if e.operator == EQUAL || e.operator == MATCH {
+				q.notMatch = append(q.notMatch, kv{
+					key:   e.key,
+					value: "^.+",
+				})
 			} else {
-				operator = MATCH
-				value = ".+"
+				q.match = append(q.match, kv{
+					key:   e.key,
+					value: "^.+",
+				})
+			}
+		} else {
+			// always anchor all regular expressions at the beginning
+			if (e.operator == MATCH || e.operator == NOT_MATCH) && len(e.value) > 0 && e.value[0] != byte('^') {
+				e.value = "^" + e.value
+			}
+
+			switch e.operator {
+			case EQUAL:
+				q.equal = append(q.equal, e.kv)
+			case NOT_EQUAL:
+				q.notEqual = append(q.notEqual, e.kv)
+			case MATCH:
+				q.match = append(q.match, e.kv)
+			case NOT_MATCH:
+				q.notMatch = append(q.notMatch, e.kv)
 			}
 		}
-
-		// always anchor all regular expressions at the beginning
-		if (operator == MATCH || operator == NOT_MATCH) && len(value) > 0 && value[0] != byte('^') {
-			value = "^" + value
-		}
-
-		switch operator {
-		case EQUAL:
-			query.selects = append(query.selects, func(idx TagIndex) (map[string]struct{}, error) {
-				return idx[key][value], nil
-			})
-		case MATCH:
-			query.selects = append(query.selects, func(idx TagIndex) (map[string]struct{}, error) {
-				re, err := regexp.Compile(value)
-				if err != nil {
-					return nil, err
-				}
-
-				res := make(map[string]struct{})
-
-				for v, ids := range idx[key] {
-					if re.MatchString(v) {
-						for id := range ids {
-							res[id] = struct{}{}
-						}
-					}
-				}
-
-				return res, nil
-			})
-		case NOT_EQUAL:
-			query.filters = append(query.filters,
-				func(def *idx.Archive) (bool, error) {
-					for _, tag := range def.Tags {
-						tagSplits := strings.Split(tag, "=")
-						if len(tagSplits) < 2 {
-							return false, errInvalidTag
-						}
-						if tagSplits[0] == key && tagSplits[1] == value {
-							return false, nil
-						}
-					}
-					return true, nil
-				},
-			)
-		case NOT_MATCH:
-			query.filters = append(query.filters,
-				func(def *idx.Archive) (bool, error) {
-					re, err := regexp.Compile(value)
-					if err != nil {
-						return false, err
-					}
-					for _, tag := range def.Tags {
-						tagSplits := strings.Split(tag, "=")
-						if len(tagSplits) < 2 {
-							return false, errInvalidTag
-						}
-						if tagSplits[0] == key && re.MatchString(tagSplits[1]) {
-							return false, nil
-						}
-					}
-					return true, nil
-				},
-			)
-		}
 	}
 
-	if len(query.selects) == 0 {
-		return query, errInvalidQuery
-	}
-
-	return query, nil
+	return q, nil
 }
 
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string]struct{}, error) {
-	if len(q.selects) == 0 {
-		return nil, errInvalidQuery
+func (q *TagQuery) getInitialByMatch(index TagIndex) (int, map[string]struct{}, error) {
+	resultSet := make(map[string]struct{})
+	lowestCount := math.MaxUint32
+	startId := 0
+
+	// choose key that has the smallest number of values
+	for i := range q.match {
+		l := len(index[q.match[i].key])
+		if l < lowestCount {
+			lowestCount = l
+			startId = i
+		}
 	}
 
-	intersect := make(map[string]struct{})
-	for i, s := range q.selects {
-		res, err := s(index)
-		if err != nil {
-			return nil, err
-		}
-		if i == 0 {
-		BUILD_INITIAL:
-			for k, v := range res {
-				for _, f := range q.filters {
-					var def *idx.Archive
-					var ok bool
-					if def, ok = byId[k]; !ok {
-						return nil, errUnknownId
-					}
-					keep, err := f(def)
-					if err != nil {
-						return nil, err
-					}
-					if !keep {
-						continue BUILD_INITIAL
-					}
-				}
+	re, err := regexp.Compile(q.match[startId].value)
+	if err != nil {
+		return 0, nil, errInvalidQuery
+	}
 
-				intersect[k] = v
-			}
+	for v, ids := range index[q.match[startId].key] {
+		if !re.MatchString(v) {
 			continue
 		}
 
-		for id := range intersect {
-			if _, ok := res[id]; ok {
-				continue
-			}
-			delete(intersect, id)
+		for id := range ids {
+			resultSet[id] = struct{}{}
+		}
+	}
+	return startId, resultSet, nil
+}
+
+func (q *TagQuery) getInitialByEqual(index TagIndex) (int, map[string]struct{}) {
+	resultSet := make(map[string]struct{})
+	lowestCount := math.MaxUint32
+	startId := 0
+
+	// choose key-value combo that has the smallest number of ids
+	for i := range q.equal {
+		l := len(index[q.equal[i].key][q.equal[i].value])
+		if l < lowestCount {
+			lowestCount = l
+			startId = i
 		}
 	}
 
-	return intersect, nil
+	// copy the map, because we'll later delete items from it
+	for k, v := range index[q.equal[startId].key][q.equal[startId].value] {
+		resultSet[k] = v
+	}
+
+	return startId, resultSet
+}
+
+func (q *TagQuery) filterByEqual(skipEqual int, resultSet map[string]struct{}, index TagIndex) {
+	for i, e := range q.equal {
+		if i == skipEqual {
+			continue
+		}
+
+		for id := range resultSet {
+			if _, ok := index[e.key][e.value][id]; !ok {
+				delete(resultSet, id)
+			}
+		}
+	}
+}
+
+func (q *TagQuery) filterByNotEqual(resultSet map[string]struct{}, index TagIndex, byId map[string]*idx.Archive) {
+	for _, e := range q.notEqual {
+		fullTag := e.key + "=" + e.value
+	IDS:
+		for id := range resultSet {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = byId[id]; !ok {
+				// corrupt index
+				delete(resultSet, id)
+				continue IDS
+			}
+			for _, tag := range def.Tags {
+				if tag == fullTag {
+					delete(resultSet, id)
+					continue IDS
+				}
+			}
+		}
+	}
+}
+
+func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
+	for i, e := range q.match {
+		if i == skipMatch {
+			continue
+		}
+
+		re, err := regexp.Compile(e.value)
+		if err != nil {
+			return errInvalidQuery
+		}
+
+		matchingTags := make(map[string]struct{})
+	IDS:
+		for id := range resultSet {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = byId[id]; !ok {
+				// corrupt index
+				delete(resultSet, id)
+				continue IDS
+			}
+			for _, tag := range def.Tags {
+				// optimization to reduce regex matching
+				if _, ok := matchingTags[tag]; ok {
+					continue IDS
+				}
+			}
+
+			for _, tag := range def.Tags {
+				tagSplits := strings.SplitN(tag, "=", 2)
+				if len(tagSplits) != 2 {
+					// corrupt index
+					delete(resultSet, id)
+					continue IDS
+				}
+
+				if e.key == tagSplits[0] && re.MatchString(tagSplits[1]) {
+					matchingTags[tag] = struct{}{}
+					continue IDS
+				}
+			}
+			delete(resultSet, id)
+		}
+	}
+	return nil
+}
+
+func (q *TagQuery) filterByNotMatch(skipMatch int, resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
+	for _, e := range q.notMatch {
+		re, err := regexp.Compile(e.value)
+		if err != nil {
+			return errInvalidQuery
+		}
+
+		matchingTags := make(map[string]struct{})
+	IDS:
+		for id := range resultSet {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = byId[id]; !ok {
+				// corrupt index
+				delete(resultSet, id)
+				continue IDS
+			}
+
+			// optimization to reduce regex matching
+			for _, tag := range def.Tags {
+				if _, ok := matchingTags[tag]; ok {
+					delete(resultSet, id)
+					continue IDS
+				}
+			}
+
+			for _, tag := range def.Tags {
+				tagSplits := strings.SplitN(tag, "=", 2)
+				if len(tagSplits) != 2 {
+					// corrupt index
+					delete(resultSet, id)
+					continue IDS
+				}
+
+				if e.key == tagSplits[0] && re.MatchString(tagSplits[1]) {
+					matchingTags[tag] = struct{}{}
+					delete(resultSet, id)
+					continue IDS
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string]struct{}, error) {
+	var skipMatch, skipEqual = -1, -1
+	var resultSet map[string]struct{}
+	var err error
+
+	// find the best expression to start with
+	if len(q.equal) == 0 {
+		if len(q.match) == 0 {
+			return nil, errInvalidQuery
+		}
+
+		skipMatch, resultSet, err = q.getInitialByMatch(index)
+		if err != nil {
+			return nil, errInvalidQuery
+		}
+	} else {
+		skipEqual, resultSet = q.getInitialByEqual(index)
+	}
+
+	q.filterByEqual(skipEqual, resultSet, index)
+	q.filterByNotEqual(resultSet, index, byId)
+	err = q.filterByMatch(skipMatch, resultSet, byId)
+	if err != nil {
+		return nil, err
+	}
+	err = q.filterByNotMatch(skipMatch, resultSet, byId)
+	if err != nil {
+		return nil, err
+	}
+
+	return resultSet, nil
 }

@@ -108,7 +108,9 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {
-	_, err := NewTagQuery([]string{"key!=value1"})
+	q, _ := NewTagQuery([]string{"key!=value1"})
+	tagIdx, byId := getTestIndex()
+	_, err := q.Run(tagIdx, byId)
 	if err != errInvalidQuery {
 		t.Fatalf("Expected an error, but didn't get it")
 	}
@@ -304,9 +306,9 @@ func TestExpressionParsing(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		k, v, o := parseExpression(tc.expression)
-		if k != tc.key || v != tc.value || o != tc.operator {
-			t.Fatalf("Expected the values %s, %s, %d, but got %s, %s, %d", tc.key, tc.value, tc.operator, k, v, o)
+		expression := parseExpression(tc.expression)
+		if expression.key != tc.key || expression.value != tc.value || expression.operator != tc.operator {
+			t.Fatalf("Expected the values %s, %s, %d, but got %s, %s, %d", tc.key, tc.value, tc.operator, expression.key, expression.value, expression.operator)
 		}
 	}
 }
