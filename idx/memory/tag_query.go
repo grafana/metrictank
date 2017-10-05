@@ -314,11 +314,20 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 	return nil
 }
 
-func (q *TagQuery) filterByNotMatch(skipMatch int, resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
+func (q *TagQuery) filterByNotMatch(resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
 	for _, e := range q.notMatch {
-		re, err := regexp.Compile(e.value)
-		if err != nil {
-			return errInvalidQuery
+		var shortCut bool
+		var re *regexp.Regexp
+		var err error
+
+		// shortcut if pattern is ^.+ (f.e. expression "key=" will be translated to "key!=~^.+")
+		if e.value == "^.+" {
+			shortCut = true
+		} else {
+			re, err = regexp.Compile(e.value)
+			if err != nil {
+				return errInvalidQuery
+			}
 		}
 
 		matchingTags := make(map[string]struct{})
@@ -348,7 +357,7 @@ func (q *TagQuery) filterByNotMatch(skipMatch int, resultSet map[string]struct{}
 					continue IDS
 				}
 
-				if e.key == tagSplits[0] && re.MatchString(tagSplits[1]) {
+				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
 					matchingTags[tag] = struct{}{}
 					delete(resultSet, id)
 					continue IDS
@@ -384,7 +393,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string
 	if err != nil {
 		return nil, err
 	}
-	err = q.filterByNotMatch(skipMatch, resultSet, byId)
+	err = q.filterByNotMatch(resultSet, byId)
 	if err != nil {
 		return nil, err
 	}
