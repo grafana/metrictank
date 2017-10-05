@@ -299,7 +299,7 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 }
 
 func ixFindByTag(org, q int) {
-	series, err := ix.IdsByTagExpressions(org, tagQueries[q].Expressions)
+	series, err := ix.IdsByTagExpressions(org, tagQueries[q].Expressions, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -358,7 +358,7 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		series, err := ix.IdsByTagExpressions(1, q.Expressions)
+		series, err := ix.IdsByTagExpressions(1, q.Expressions, 0)
 		if err != nil {
 			panic(err)
 		}

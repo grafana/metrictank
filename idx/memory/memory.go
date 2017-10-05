@@ -356,7 +356,7 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 	return archives
 }
 
-func (m *MemoryIdx) Tag(orgId int, tag string) map[string]uint32 {
+func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 	if !tagSupport {
 		log.Debug("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -373,8 +373,25 @@ func (m *MemoryIdx) Tag(orgId int, tag string) map[string]uint32 {
 
 	result := make(map[string]uint32)
 
-	for k, values := range tags[tag] {
-		result[k] = uint32(len(values))
+	for value, ids := range tags[tag] {
+		valueCnt := uint32(0)
+		for id := range ids {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = m.DefById[id]; !ok {
+				// corrupt index
+				continue
+			}
+
+			if def.LastUpdate < from {
+				continue
+			}
+
+			valueCnt++
+		}
+		if valueCnt > 0 {
+			result[value] = valueCnt
+		}
 	}
 
 	return result
@@ -404,8 +421,8 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 	return results
 }
 
-func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string) ([]string, error) {
-	query, err := NewTagQuery(expressions)
+func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) ([]string, error) {
+	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err
 	}
