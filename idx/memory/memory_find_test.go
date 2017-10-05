@@ -206,7 +206,7 @@ func Init() {
 
 		// matching and filtering by regular expressions
 		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
-		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 1500},
+		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
 	}
 }
 
@@ -305,7 +305,8 @@ func ixFindByTag(org, q int) {
 	}
 	if len(series) != tagQueries[q].ExpectedResults {
 		for _, s := range series {
-			fmt.Println(s)
+			memoryIdx := ix.(*MemoryIdx)
+			fmt.Println(memoryIdx.DefById[s].Tags)
 		}
 		panic(fmt.Sprintf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series)))
 	}
@@ -341,11 +342,13 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	}
 }
 
-func BenchmarkTagFindMatchingAndFilteringRegex1(b *testing.B) {
+func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		ixFindByTag(1, 6)
+		q := (n % 2) + 6
+		org := (n % 2) + 1
+		ixFindByTag(org, q)
 	}
 }
 
