@@ -159,8 +159,8 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	return q, nil
 }
 
-func (q *TagQuery) getInitialByMatch(index TagIndex) (int, map[string]struct{}, error) {
-	resultSet := make(map[string]struct{})
+func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs, error) {
+	resultSet := make(TagIDs)
 	lowestCount := math.MaxUint32
 	startId := 0
 
@@ -200,8 +200,8 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, map[string]struct{}, 
 	return startId, resultSet, nil
 }
 
-func (q *TagQuery) getInitialByEqual(index TagIndex) (int, map[string]struct{}) {
-	resultSet := make(map[string]struct{})
+func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
+	resultSet := make(TagIDs)
 	lowestCount := math.MaxUint32
 	startId := 0
 
@@ -222,7 +222,7 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, map[string]struct{}) 
 	return startId, resultSet
 }
 
-func (q *TagQuery) filterByEqual(skipEqual int, resultSet map[string]struct{}, index TagIndex) {
+func (q *TagQuery) filterByEqual(skipEqual int, resultSet TagIDs, index TagIndex) {
 	for i, e := range q.equal {
 		if i == skipEqual {
 			continue
@@ -236,7 +236,7 @@ func (q *TagQuery) filterByEqual(skipEqual int, resultSet map[string]struct{}, i
 	}
 }
 
-func (q *TagQuery) filterByNotEqual(resultSet map[string]struct{}, index TagIndex, byId map[string]*idx.Archive) {
+func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[string]*idx.Archive) {
 	for _, e := range q.notEqual {
 		fullTag := e.key + "=" + e.value
 	IDS:
@@ -258,7 +258,7 @@ func (q *TagQuery) filterByNotEqual(resultSet map[string]struct{}, index TagInde
 	}
 }
 
-func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
+func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive) error {
 	for i, e := range q.match {
 		if i == skipMatch {
 			continue
@@ -278,7 +278,7 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 			}
 		}
 
-		matchingTags := make(map[string]struct{})
+		matchingTags := make(TagIDs)
 	IDS:
 		for id := range resultSet {
 			var def *idx.Archive
@@ -315,7 +315,7 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet map[string]struct{}, b
 	return nil
 }
 
-func (q *TagQuery) filterByNotMatch(resultSet map[string]struct{}, byId map[string]*idx.Archive) error {
+func (q *TagQuery) filterByNotMatch(resultSet TagIDs, byId map[string]*idx.Archive) error {
 	for _, e := range q.notMatch {
 		var shortCut bool
 		var re *regexp.Regexp
@@ -331,7 +331,7 @@ func (q *TagQuery) filterByNotMatch(resultSet map[string]struct{}, byId map[stri
 			}
 		}
 
-		matchingTags := make(map[string]struct{})
+		matchingTags := make(TagIDs)
 	IDS:
 		for id := range resultSet {
 			var def *idx.Archive
@@ -369,7 +369,7 @@ func (q *TagQuery) filterByNotMatch(resultSet map[string]struct{}, byId map[stri
 	return nil
 }
 
-func (q *TagQuery) filterByFrom(resultSet map[string]struct{}, byId map[string]*idx.Archive) {
+func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) {
 	if q.from <= 0 {
 		return
 	}
@@ -389,9 +389,9 @@ func (q *TagQuery) filterByFrom(resultSet map[string]struct{}, byId map[string]*
 	}
 }
 
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string]struct{}, error) {
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, error) {
 	var skipMatch, skipEqual = -1, -1
-	var resultSet map[string]struct{}
+	var resultSet TagIDs
 	var err error
 
 	// find the best expression to start with

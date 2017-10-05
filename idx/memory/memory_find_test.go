@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	//"sync"
 	"testing"
 
 	"github.com/grafana/metrictank/idx"
