@@ -315,10 +315,10 @@ func TestExpressionParsing(t *testing.T) {
 
 func BenchmarkExpressionParsing(b *testing.B) {
 	expressions := [][]string{
-		[]string{"key=value", "key!=value"},
-		[]string{"key=~value", "key!=~value"},
-		[]string{"key1=~", "key2=~"},
-		[]string{"key1!=~aaa", "key2=~abc"},
+		{"key=value", "key!=value"},
+		{"key=~value", "key!=~value"},
+		{"key1=~", "key2=~"},
+		{"key1!=~aaa", "key2=~abc"},
 	}
 
 	b.ReportAllocs()
