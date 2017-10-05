@@ -95,8 +95,6 @@ func TestMain(m *testing.M) {
 	_tagSupport := tagSupport
 	defer func() { tagSupport = _tagSupport }()
 	tagSupport = true
-
-	Init()
 	os.Exit(m.Run())
 }
 
@@ -245,11 +243,7 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-
 	queryCount := len(queries)
-	if ix == nil {
-		Init()
-	}
 
 	ch := make(chan testQ)
 	for i := 0; i < 4; i++ {
@@ -273,11 +267,7 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-
 	queryCount := len(queries)
-	if ix == nil {
-		Init()
-	}
 
 	ch := make(chan testQ)
 	for i := 0; i < 8; i++ {
@@ -312,6 +302,9 @@ func ixFindByTag(org, q int) {
 }
 
 func BenchmarkTagFindSimpleIntersect(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -322,6 +315,9 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindRegexIntersect(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -332,6 +328,9 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -342,6 +341,9 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -352,7 +354,11 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 }
 
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
 	q := tagQuery{Expressions: []string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}, ExpectedResults: 90}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
