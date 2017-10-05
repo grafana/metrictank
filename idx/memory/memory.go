@@ -57,8 +57,9 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-// key -> value -> id
-type TagIndex map[string]map[string]map[string]struct{}
+type TagIDs map[string]struct{}   // set of ids
+type TagValue map[string]TagIDs   // value -> set of ids
+type TagIndex map[string]TagValue // key -> list of values
 
 type Node struct {
 	Path     string
@@ -163,11 +164,11 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tagValue := tagSplits[1]
 
 		if _, ok = tags[tagName]; !ok {
-			tags[tagName] = make(map[string]map[string]struct{})
+			tags[tagName] = make(TagValue)
 		}
 
 		if _, ok = tags[tagName][tagValue]; !ok {
-			tags[tagName][tagValue] = make(map[string]struct{})
+			tags[tagName][tagValue] = make(TagIDs)
 		}
 
 		tags[tagName][tagValue][def.Id] = struct{}{}
@@ -435,7 +436,7 @@ func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from in
 	return res, nil
 }
 
-func (m *MemoryIdx) IdsByTagQuery(orgId int, query TagQuery) map[string]struct{} {
+func (m *MemoryIdx) IdsByTagQuery(orgId int, query TagQuery) TagIDs {
 	m.RLock()
 	defer m.RUnlock()
 
