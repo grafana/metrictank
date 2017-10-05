@@ -205,7 +205,7 @@ func getMetricName(file string) string {
 		file = file[1:]
 	}
 
-	return *namePrefix + strings.Replace(strings.TrimSuffix(file, ".wsp"), "/", ".", -1)
+	return *namePrefix + strings.Replace(strings.TrimSuffix(strings.TrimPrefix(file, *whisperDirectory), ".wsp"), "/", ".", -1)
 }
 
 // pointSorter sorts points by timestamp
