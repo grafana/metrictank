@@ -35,6 +35,7 @@ type expression struct {
 }
 
 type TagQuery struct {
+	from     int64
 	equal    []kv
 	match    []kv
 	notEqual []kv
@@ -110,8 +111,8 @@ func parseExpression(expr string) expression {
 	}
 }
 
-func NewTagQuery(expressions []string) (TagQuery, error) {
-	q := TagQuery{}
+func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
+	q := TagQuery{from: from}
 
 	if len(expressions) == 0 {
 		return q, errInvalidQuery
@@ -368,6 +369,26 @@ func (q *TagQuery) filterByNotMatch(resultSet map[string]struct{}, byId map[stri
 	return nil
 }
 
+func (q *TagQuery) filterByFrom(resultSet map[string]struct{}, byId map[string]*idx.Archive) {
+	if q.from <= 0 {
+		return
+	}
+
+	for id := range resultSet {
+		var def *idx.Archive
+		var ok bool
+		if def, ok = byId[id]; !ok {
+			// corrupt index
+			delete(resultSet, id)
+			continue
+		}
+
+		if def.LastUpdate < q.from {
+			delete(resultSet, id)
+		}
+	}
+}
+
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string]struct{}, error) {
 	var skipMatch, skipEqual = -1, -1
 	var resultSet map[string]struct{}
@@ -387,6 +408,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (map[string
 		skipEqual, resultSet = q.getInitialByEqual(index)
 	}
 
+	q.filterByFrom(resultSet, byId)
 	q.filterByEqual(skipEqual, resultSet, index)
 	q.filterByNotEqual(resultSet, index, byId)
 	err = q.filterByMatch(skipMatch, resultSet, byId)

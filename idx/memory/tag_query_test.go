@@ -11,23 +11,29 @@ import (
 )
 
 func getTestIndex() (TagIndex, map[string]*idx.Archive) {
-	data := [][]string{
-		{"id1", "key1=value1", "key2=value2"},
-		{"id2", "key1=value1", "key3=value3"},
-		{"id3", "key1=value1", "key4=value4"},
-		{"id4", "key1=value1", "key4=value3", "key3=value3"},
-		{"id5", "key2=value1", "key5=value4", "key3=value3"},
-		{"id6", "key2=value2", "key4=value5"},
-		{"id7", "key3=value1", "key4=value4"},
+	type testCase struct {
+		id         string
+		lastUpdate int64
+		tags       []string
+	}
+	data := []testCase{
+		{"id1", 1, []string{"key1=value1", "key2=value2"}},
+		{"id2", 2, []string{"key1=value1", "key3=value3"}},
+		{"id3", 3, []string{"key1=value1", "key4=value4"}},
+		{"id4", 4, []string{"key1=value1", "key4=value3", "key3=value3"}},
+		{"id5", 5, []string{"key2=value1", "key5=value4", "key3=value3"}},
+		{"id6", 6, []string{"key2=value2", "key4=value5"}},
+		{"id7", 7, []string{"key3=value1", "key4=value4"}},
 	}
 
 	tagIdx := make(TagIndex)
 	byId := make(map[string]*idx.Archive)
 
 	for _, d := range data {
-		byId[d[0]] = &idx.Archive{}
-		byId[d[0]].Tags = d[1:]
-		for _, tag := range d[1:] {
+		byId[d.id] = &idx.Archive{}
+		byId[d.id].Tags = d.tags
+		byId[d.id].LastUpdate = d.lastUpdate
+		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
 			if _, ok := tagIdx[tagSplits[0]]; !ok {
 				tagIdx[tagSplits[0]] = make(map[string]map[string]struct{})
@@ -37,7 +43,7 @@ func getTestIndex() (TagIndex, map[string]*idx.Archive) {
 				tagIdx[tagSplits[0]][tagSplits[1]] = make(map[string]struct{})
 			}
 
-			tagIdx[tagSplits[0]][tagSplits[1]][d[0]] = struct{}{}
+			tagIdx[tagSplits[0]][tagSplits[1]][d.id] = struct{}{}
 		}
 	}
 
@@ -59,7 +65,7 @@ func queryAndCompareResults(t *testing.T, q TagQuery, expectedData map[string]st
 }
 
 func TestQueryByTagSimpleEqual(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3"})
+	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3"}, 0)
 	expect := make(map[string]struct{})
 	expect["id2"] = struct{}{}
 	expect["id4"] = struct{}{}
@@ -67,7 +73,7 @@ func TestQueryByTagSimpleEqual(t *testing.T) {
 }
 
 func TestQueryByTagSimplePattern(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key4=~value[43]", "key3=~value[1-3]"})
+	q, _ := NewTagQuery([]string{"key4=~value[43]", "key3=~value[1-3]"}, 0)
 	expect := make(map[string]struct{})
 	expect["id7"] = struct{}{}
 	expect["id4"] = struct{}{}
@@ -75,7 +81,7 @@ func TestQueryByTagSimplePattern(t *testing.T) {
 }
 
 func TestQueryByTagSimpleUnequal(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key1=value1", "key4!=value4"})
+	q, _ := NewTagQuery([]string{"key1=value1", "key4!=value4"}, 0)
 	expect := make(map[string]struct{})
 	expect["id1"] = struct{}{}
 	expect["id2"] = struct{}{}
@@ -84,14 +90,14 @@ func TestQueryByTagSimpleUnequal(t *testing.T) {
 }
 
 func TestQueryByTagSimpleNotPattern(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"})
+	q, _ := NewTagQuery([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0)
 	expect := make(map[string]struct{})
 	expect["id2"] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagWithEqualEmpty(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key1=value1", "key2=", "key2=~"})
+	q, _ := NewTagQuery([]string{"key1=value1", "key2=", "key2=~"}, 0)
 	expect := make(map[string]struct{})
 	expect["id2"] = struct{}{}
 	expect["id3"] = struct{}{}
@@ -100,7 +106,7 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 }
 
 func TestQueryByTagWithUnequalEmpty(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key1=value1", "key3!=", "key3!=~"})
+	q, _ := NewTagQuery([]string{"key1=value1", "key3!=", "key3!=~"}, 0)
 	expect := make(map[string]struct{})
 	expect["id2"] = struct{}{}
 	expect["id4"] = struct{}{}
@@ -108,11 +114,66 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key!=value1"})
+	q, _ := NewTagQuery([]string{"key!=value1"}, 0)
 	tagIdx, byId := getTestIndex()
 	_, err := q.Run(tagIdx, byId)
 	if err != errInvalidQuery {
 		t.Fatalf("Expected an error, but didn't get it")
+	}
+}
+
+func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
+	tagIdx, byId := getTestIndex()
+
+	q, _ := NewTagQuery([]string{"key1=value1"}, 4)
+	res, _ := q.Run(tagIdx, byId)
+	if len(res) != 1 {
+		t.Fatalf("Expected %d results, but got %d", 1, len(res))
+	}
+
+	q, _ = NewTagQuery([]string{"key1=value1"}, 3)
+	res, _ = q.Run(tagIdx, byId)
+	if len(res) != 2 {
+		t.Fatalf("Expected %d results, but got %d", 2, len(res))
+	}
+
+	q, _ = NewTagQuery([]string{"key1=value1"}, 2)
+	res, _ = q.Run(tagIdx, byId)
+	if len(res) != 3 {
+		t.Fatalf("Expected %d results, but got %d", 3, len(res))
+	}
+
+	q, _ = NewTagQuery([]string{"key1=value1"}, 1)
+	res, _ = q.Run(tagIdx, byId)
+	if len(res) != 4 {
+		t.Fatalf("Expected %d results, but got %d", 4, len(res))
+	}
+}
+
+func TestSingleTagQueryByTagWithFrom(t *testing.T) {
+	tagIdx, byId := getTestIndex()
+	memIdx := New()
+	memIdx.Tags[1] = tagIdx
+	memIdx.DefById = byId
+
+	res := memIdx.Tag(1, "key1", 0)
+	if res["value1"] != 4 {
+		t.Fatalf("Expected %d results, but got %d", 4, len(res))
+	}
+
+	res = memIdx.Tag(1, "key1", 2)
+	if res["value1"] != 3 {
+		t.Fatalf("Expected %d results, but got %d", 4, len(res))
+	}
+
+	res = memIdx.Tag(1, "key1", 3)
+	if res["value1"] != 2 {
+		t.Fatalf("Expected %d results, but got %d", 4, len(res))
+	}
+
+	res = memIdx.Tag(1, "key1", 4)
+	if res["value1"] != 1 {
+		t.Fatalf("Expected %d results, but got %d", 4, len(res))
 	}
 }
 
@@ -182,7 +243,7 @@ func TestGetByTag(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tagQuery, err := NewTagQuery(tc.expressions)
+		tagQuery, err := NewTagQuery(tc.expressions, 0)
 		if err != nil {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
@@ -217,7 +278,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		ix.AddOrUpdate(md, 1)
 	}
 
-	tagQuery, _ := NewTagQuery([]string{"key1=value1", "key2=value2"})
+	tagQuery, _ := NewTagQuery([]string{"key1=value1", "key2=value2"}, 0)
 	res := ix.IdsByTagQuery(orgId, tagQuery)
 
 	if len(res) != 1 {
@@ -325,7 +386,7 @@ func BenchmarkExpressionParsing(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < 4; i++ {
-			NewTagQuery(expressions[i])
+			NewTagQuery(expressions[i], 0)
 		}
 	}
 }
