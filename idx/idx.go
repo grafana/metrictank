@@ -4,14 +4,19 @@ package idx
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	schema "gopkg.in/raintank/schema.v1"
 )
 
 var (
-	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
-	BranchUnderLeaf   = errors.New("can't add branch under leaf")
+	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
+	BranchUnderLeaf    = errors.New("can't add branch under leaf")
+	errInvalidQuery    = errors.New("invalid query")
+	errInvalidIdString = errors.New("invalid ID string")
 )
 
 //go:generate msgp
@@ -27,6 +32,43 @@ type Archive struct {
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+}
+
+type MetricID struct {
+	org   int
+	part1 uint64
+	part2 uint64
+}
+
+func NewMetricIDFromString(s string) (MetricID, error) {
+	id := MetricID{}
+	err := id.FromString(s)
+	return id, err
+}
+
+func (id *MetricID) FromString(s string) error {
+	splits := strings.Split(s, ".")
+	if len(splits) != 2 || len(splits[1]) != 32 {
+		return errInvalidIdString
+	}
+	var err error
+	id.org, err = strconv.Atoi(splits[0])
+	if err != nil {
+		return err
+	}
+	id.part1, err = strconv.ParseUint(splits[1][:16], 16, 64)
+	if err != nil {
+		return err
+	}
+	id.part2, err = strconv.ParseUint(splits[1][16:], 16, 64)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (id *MetricID) ToString() string {
+	return fmt.Sprintf("%d.%016x%016x", id.org, id.part1, id.part2)
 }
 
 // used primarily by tests, for convenience
@@ -132,5 +174,5 @@ type MetricIndex interface {
 	Prune(int, time.Time) ([]Archive, error)
 	TagList(int) []string
 	Tag(int, string, int64) map[string]uint32
-	IdsByTagExpressions(int, []string, int64) (map[string]struct{}, error)
+	IdsByTagExpressions(int, []string, int64) (map[MetricID]struct{}, error)
 }

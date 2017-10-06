@@ -10,29 +10,60 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func getTestIndex() (TagIndex, map[string]*idx.Archive) {
+var ids []idx.MetricID
+
+func getTestIDs(t *testing.T) []idx.MetricID {
+	if len(ids) > 0 {
+		return ids
+	}
+
+	idStrings := []string{
+		"1.02345678901234567890123456789012",
+		"1.12345678901234567890123456789012",
+		"1.22345678901234567890123456789012",
+		"1.32345678901234567890123456789012",
+		"1.42345678901234567890123456789012",
+		"1.52345678901234567890123456789012",
+		"1.62345678901234567890123456789012",
+	}
+	for _, idStr := range idStrings {
+		id, err := idx.NewMetricIDFromString(idStr)
+		if err != nil {
+			t.Fatalf("Did not expect an error when converting id string to object: %s", idStr)
+		}
+		ids = append(ids, id)
+	}
+
+	return ids
+}
+
+func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	type testCase struct {
-		id         string
+		id         idx.MetricID
 		lastUpdate int64
 		tags       []string
 	}
+
+	ids := getTestIDs(t)
+
 	data := []testCase{
-		{"id1", 1, []string{"key1=value1", "key2=value2"}},
-		{"id2", 2, []string{"key1=value1", "key3=value3"}},
-		{"id3", 3, []string{"key1=value1", "key4=value4"}},
-		{"id4", 4, []string{"key1=value1", "key4=value3", "key3=value3"}},
-		{"id5", 5, []string{"key2=value1", "key5=value4", "key3=value3"}},
-		{"id6", 6, []string{"key2=value2", "key4=value5"}},
-		{"id7", 7, []string{"key3=value1", "key4=value4"}},
+		{ids[0], 1, []string{"key1=value1", "key2=value2"}},
+		{ids[1], 2, []string{"key1=value1", "key3=value3"}},
+		{ids[2], 3, []string{"key1=value1", "key4=value4"}},
+		{ids[3], 4, []string{"key1=value1", "key4=value3", "key3=value3"}},
+		{ids[4], 5, []string{"key2=value1", "key5=value4", "key3=value3"}},
+		{ids[5], 6, []string{"key2=value2", "key4=value5"}},
+		{ids[6], 7, []string{"key3=value1", "key4=value4"}},
 	}
 
 	tagIdx := make(TagIndex)
 	byId := make(map[string]*idx.Archive)
 
 	for _, d := range data {
-		byId[d.id] = &idx.Archive{}
-		byId[d.id].Tags = d.tags
-		byId[d.id].LastUpdate = d.lastUpdate
+		idStr := d.id.ToString()
+		byId[idStr] = &idx.Archive{}
+		byId[idStr].Tags = d.tags
+		byId[idStr].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
 			if _, ok := tagIdx[tagSplits[0]]; !ok {
@@ -52,7 +83,7 @@ func getTestIndex() (TagIndex, map[string]*idx.Archive) {
 
 func queryAndCompareResults(t *testing.T, q TagQuery, expectedData TagIDs) {
 	t.Helper()
-	tagIdx, byId := getTestIndex()
+	tagIdx, byId := getTestIndex(t)
 
 	res, err := q.Run(tagIdx, byId)
 	if err != nil {
@@ -65,57 +96,76 @@ func queryAndCompareResults(t *testing.T, q TagQuery, expectedData TagIDs) {
 }
 
 func TestQueryByTagSimpleEqual(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3"}, 0)
 	expect := make(TagIDs)
-	expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
+	/*expect["id2"] = struct{}{}
+	expect["id4"] = struct{}{}*/
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagSimplePattern(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key4=~value[43]", "key3=~value[1-3]"}, 0)
 	expect := make(TagIDs)
-	expect["id7"] = struct{}{}
-	expect["id4"] = struct{}{}
+	/*expect["id7"] = struct{}{}
+	expect["id4"] = struct{}{}*/
+	expect[ids[6]] = struct{}{}
+	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagSimpleUnequal(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key4!=value4"}, 0)
 	expect := make(TagIDs)
-	expect["id1"] = struct{}{}
+	/*expect["id1"] = struct{}{}
 	expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}
+	expect["id4"] = struct{}{}*/
+	expect[ids[0]] = struct{}{}
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagSimpleNotPattern(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0)
 	expect := make(TagIDs)
-	expect["id2"] = struct{}{}
+	//expect["id2"] = struct{}{}
+	expect[ids[1]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagWithEqualEmpty(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key2=", "key2=~"}, 0)
 	expect := make(TagIDs)
-	expect["id2"] = struct{}{}
+	/*expect["id2"] = struct{}{}
 	expect["id3"] = struct{}{}
-	expect["id4"] = struct{}{}
+	expect["id4"] = struct{}{}*/
+	expect[ids[1]] = struct{}{}
+	expect[ids[2]] = struct{}{}
+	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagWithUnequalEmpty(t *testing.T) {
+	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3!=", "key3!=~"}, 0)
 	expect := make(TagIDs)
-	expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}
+	/*expect["id2"] = struct{}{}
+	expect["id4"] = struct{}{}*/
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {
 	q, _ := NewTagQuery([]string{"key!=value1"}, 0)
-	tagIdx, byId := getTestIndex()
+	tagIdx, byId := getTestIndex(t)
 	_, err := q.Run(tagIdx, byId)
 	if err != errInvalidQuery {
 		t.Fatalf("Expected an error, but didn't get it")
@@ -123,7 +173,7 @@ func TestQueryByTagInvalidQuery(t *testing.T) {
 }
 
 func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
-	tagIdx, byId := getTestIndex()
+	tagIdx, byId := getTestIndex(t)
 
 	q, _ := NewTagQuery([]string{"key1=value1"}, 4)
 	res, _ := q.Run(tagIdx, byId)
@@ -151,7 +201,7 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 }
 
 func TestSingleTagQueryByTagWithFrom(t *testing.T) {
-	tagIdx, byId := getTestIndex()
+	tagIdx, byId := getTestIndex(t)
 	memIdx := New()
 	memIdx.Tags[1] = tagIdx
 	memIdx.DefById = byId
@@ -185,11 +235,14 @@ func TestGetByTag(t *testing.T) {
 	ix := New()
 	ix.Init()
 
+	idString := "1.000000000000000000000000000000%02x"
 	mds := make([]schema.MetricData, 20)
+	ids := make([]idx.MetricID, 20)
 	for i := range mds {
+		ids[i], _ = idx.NewMetricIDFromString(fmt.Sprintf(idString, i))
 		mds[i].Metric = fmt.Sprintf("metric.%d", i)
 		mds[i].Name = mds[i].Metric
-		mds[i].Id = mds[i].Metric
+		mds[i].Id = ids[i].ToString()
 		mds[i].OrgId = 1
 		mds[i].Interval = 1
 		mds[i].Time = 12345
@@ -205,40 +258,40 @@ func TestGetByTag(t *testing.T) {
 
 	type testCase struct {
 		expressions []string
-		expectation []string
+		expectation []idx.MetricID
 	}
 
 	testCases := []testCase{
 		{
 			expressions: []string{"key1=value1"},
-			expectation: []string{"metric.1", "metric.11", "metric.3"},
+			expectation: []idx.MetricID{ids[1], ids[11], ids[3]},
 		}, {
 			expressions: []string{"key1=value2"},
-			expectation: []string{"metric.18"},
+			expectation: []idx.MetricID{ids[18]},
 		}, {
 			expressions: []string{"key1=~value[0-9]"},
-			expectation: []string{"metric.1", "metric.11", "metric.18", "metric.3"},
+			expectation: []idx.MetricID{ids[1], ids[11], ids[18], ids[3]},
 		}, {
 			expressions: []string{"key1=~value[23]"},
-			expectation: []string{"metric.18"},
+			expectation: []idx.MetricID{ids[18]},
 		}, {
 			expressions: []string{"key1=value1", "key2=value1"},
-			expectation: []string{},
+			expectation: []idx.MetricID{},
 		}, {
 			expressions: []string{"key1=value1", "key2=value2"},
-			expectation: []string{"metric.1"},
+			expectation: []idx.MetricID{ids[1]},
 		}, {
 			expressions: []string{"key1=~value[12]", "key2=value2"},
-			expectation: []string{"metric.1", "metric.18"},
+			expectation: []idx.MetricID{ids[1], ids[18]},
 		}, {
 			expressions: []string{"key1=~value1", "key1=value2"},
-			expectation: []string{},
+			expectation: []idx.MetricID{},
 		}, {
 			expressions: []string{"key1=~value[0-9]", "key2=~", "key3!=value3"},
-			expectation: []string{"metric.11"},
+			expectation: []idx.MetricID{ids[11]},
 		}, {
 			expressions: []string{"key2=", "key1=value1"},
-			expectation: []string{"metric.11", "metric.3"},
+			expectation: []idx.MetricID{ids[11], ids[3]},
 		},
 	}
 

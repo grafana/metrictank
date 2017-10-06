@@ -57,9 +57,9 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type TagIDs map[string]struct{}   // set of ids
-type TagValue map[string]TagIDs   // value -> set of ids
-type TagIndex map[string]TagValue // key -> list of values
+type TagIDs map[idx.MetricID]struct{} // set of ids
+type TagValue map[string]TagIDs       // value -> set of ids
+type TagIndex map[string]TagValue     // key -> list of values
 
 type Node struct {
 	Path     string
@@ -172,7 +172,12 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 			tags[tagName][tagValue] = make(TagIDs)
 		}
 
-		tags[tagName][tagValue][def.Id] = struct{}{}
+		id, err := idx.NewMetricIDFromString(def.Id)
+		if err != nil {
+			// invalid id
+			continue
+		}
+		tags[tagName][tagValue][id] = struct{}{}
 	}
 }
 
@@ -203,7 +208,12 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 			continue
 		}
 
-		delete(tags[tagName][tagValue], def.Id)
+		id, err := idx.NewMetricIDFromString(def.Id)
+		if err != nil {
+			// invalid id
+			continue
+		}
+		delete(tags[tagName][tagValue], id)
 
 		if len(tags[tagName][tagValue]) == 0 {
 			delete(tags[tagName], tagValue)
@@ -381,7 +391,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 		for id := range ids {
 			var def *idx.Archive
 			var ok bool
-			if def, ok = m.DefById[id]; !ok {
+			if def, ok = m.DefById[id.ToString()]; !ok {
 				// corrupt index
 				continue
 			}
@@ -424,7 +434,7 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 	return results
 }
 
-func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) (map[string]struct{}, error) {
+func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err

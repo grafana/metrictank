@@ -246,7 +246,7 @@ func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[s
 		for id := range resultSet {
 			var def *idx.Archive
 			var ok bool
-			if def, ok = byId[id]; !ok {
+			if def, ok = byId[id.ToString()]; !ok {
 				// corrupt index
 				delete(resultSet, id)
 				continue IDS
@@ -296,12 +296,12 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 		// this is based on the assumption that many matching tags will be repeated
 		// over multiple series, so there's no need to run the regex for each of them
 		// because once we know that a tag matches we can just compare strings
-		matchingTags := make(TagIDs)
+		matchingTags := make(map[string]struct{})
 	IDS:
 		for id := range resultSet {
 			var def *idx.Archive
 			var ok bool
-			if def, ok = byId[id]; !ok {
+			if def, ok = byId[id.ToString()]; !ok {
 				// corrupt index
 				delete(resultSet, id)
 				continue IDS
@@ -349,7 +349,7 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 	for id := range resultSet {
 		var def *idx.Archive
 		var ok bool
-		if def, ok = byId[id]; !ok {
+		if def, ok = byId[id.ToString()]; !ok {
 			// corrupt index
 			delete(resultSet, id)
 			continue
