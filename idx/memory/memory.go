@@ -147,6 +147,7 @@ func (m *MemoryIdx) Update(entry idx.Archive) {
 
 // reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it.
+// assumes a lock is already held.
 func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
@@ -177,6 +178,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 // takes a given metric definition and removes all references
 // to it from the tag index.
+// assumes a lock is already held.
 func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
@@ -422,18 +424,14 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 	return results
 }
 
-func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) ([]string, error) {
+func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) (map[string]struct{}, error) {
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err
 	}
 
 	seriesMap := m.IdsByTagQuery(orgId, query)
-	res := make([]string, 0, len(seriesMap))
-	for s := range seriesMap {
-		res = append(res, s)
-	}
-	return res, nil
+	return seriesMap, nil
 }
 
 func (m *MemoryIdx) IdsByTagQuery(orgId int, query TagQuery) TagIDs {
