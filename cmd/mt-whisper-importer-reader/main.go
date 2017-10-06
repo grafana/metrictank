@@ -201,11 +201,12 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 // generate the metric name based on the file name and given prefix
 func getMetricName(file string) string {
 	// remove all leading '/' from file name
+	file = strings.TrimPrefix(file, *whisperDirectory)
 	for file[0] == '/' {
 		file = file[1:]
 	}
 
-	return *namePrefix + strings.Replace(strings.TrimSuffix(strings.TrimPrefix(file, *whisperDirectory), ".wsp"), "/", ".", -1)
+	return *namePrefix + strings.Replace(strings.TrimSuffix(file, ".wsp"), "/", ".", -1)
 }
 
 // pointSorter sorts points by timestamp
