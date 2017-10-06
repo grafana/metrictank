@@ -295,7 +295,7 @@ func ixFindByTag(org, q int) {
 	if len(series) != tagQueries[q].ExpectedResults {
 		for s := range series {
 			memoryIdx := ix.(*MemoryIdx)
-			fmt.Println(memoryIdx.DefById[s].Tags)
+			fmt.Println(memoryIdx.DefById[s.ToString()].Tags)
 		}
 		panic(fmt.Sprintf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series)))
 	}
