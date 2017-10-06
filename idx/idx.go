@@ -132,5 +132,5 @@ type MetricIndex interface {
 	Prune(int, time.Time) ([]Archive, error)
 	TagList(int) []string
 	Tag(int, string, int64) map[string]uint32
-	IdsByTagExpressions(int, []string, int64) ([]string, error)
+	IdsByTagExpressions(int, []string, int64) (map[string]struct{}, error)
 }

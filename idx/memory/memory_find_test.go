@@ -293,7 +293,7 @@ func ixFindByTag(org, q int) {
 		panic(err)
 	}
 	if len(series) != tagQueries[q].ExpectedResults {
-		for _, s := range series {
+		for s := range series {
 			memoryIdx := ix.(*MemoryIdx)
 			fmt.Println(memoryIdx.DefById[s].Tags)
 		}
