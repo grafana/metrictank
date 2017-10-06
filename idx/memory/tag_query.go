@@ -247,7 +247,9 @@ func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[s
 			var def *idx.Archive
 			var ok bool
 			if def, ok = byId[id.ToString()]; !ok {
-				// corrupt index
+				// should never happen because every ID in the tag index
+				// must be present in the byId lookup table
+				CorruptIndex.Inc()
 				delete(resultSet, id)
 				continue IDS
 			}
@@ -302,7 +304,9 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 			var def *idx.Archive
 			var ok bool
 			if def, ok = byId[id.ToString()]; !ok {
-				// corrupt index
+				// should never happen because every ID in the tag index
+				// must be present in the byId lookup table
+				CorruptIndex.Inc()
 				delete(resultSet, id)
 				continue IDS
 			}
@@ -320,7 +324,9 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 			for _, tag := range def.Tags {
 				tagSplits := strings.SplitN(tag, "=", 2)
 				if len(tagSplits) != 2 {
-					// corrupt index
+					// should never happen because every tag in the index
+					// must have a valid format
+					InvalidTagInIndex.Inc()
 					delete(resultSet, id)
 					continue IDS
 				}
@@ -350,7 +356,9 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 		var def *idx.Archive
 		var ok bool
 		if def, ok = byId[id.ToString()]; !ok {
-			// corrupt index
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			CorruptIndex.Inc()
 			delete(resultSet, id)
 			continue
 		}

@@ -157,7 +157,9 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
-			// invalid
+			// should never happen because every tag in the index
+			// must have a valid format
+			InvalidTagInIndex.Inc()
 			continue
 		}
 
@@ -174,7 +176,9 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 		id, err := idx.NewMetricIDFromString(def.Id)
 		if err != nil {
-			// invalid id
+			// should never happen because all IDs in the index must have
+			// a valid format
+			CorruptIndex.Inc()
 			continue
 		}
 		tags[tagName][tagValue][id] = struct{}{}
@@ -193,7 +197,9 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
-			// invalid
+			// should never happen because every tag in the index
+			// must have a valid format
+			InvalidTagInIndex.Inc()
 			continue
 		}
 
@@ -210,7 +216,9 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 
 		id, err := idx.NewMetricIDFromString(def.Id)
 		if err != nil {
-			// invalid id
+			// should never happen because all IDs in the index must have
+			// a valid format
+			CorruptIndex.Inc()
 			continue
 		}
 		delete(tags[tagName][tagValue], id)
@@ -392,7 +400,9 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 			var def *idx.Archive
 			var ok bool
 			if def, ok = m.DefById[id.ToString()]; !ok {
-				// corrupt index
+				// should never happen because every ID that is in the tag index
+				// must be present in the byId lookup table
+				CorruptIndex.Inc()
 				continue
 			}
 
