@@ -161,7 +161,10 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs, error) {
 	lowestCount := math.MaxUint32
 	startId := 0
 
-	// choose key that has the smallest number of values
+	// choose key that has the smallest number of values because we want to
+	// reduce the number of matches and start with the smallest possible resultSet.
+	// the smaller the resultSet the less time will have to be spent to further
+	// filter its values in the following expressions.
 	for i := range q.match {
 		l := len(index[q.match[i].key])
 		if l < lowestCount {
@@ -202,7 +205,10 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 	lowestCount := math.MaxUint32
 	startId := 0
 
-	// choose key-value combo that has the smallest number of ids
+	// choose key-value combo that has the smallest number of series IDs because
+	// we want to start with the smallest possible resultSet.
+	// the smaller the resultSet the less time will have to be spent to further
+	// filter its values in the following expressions.
 	for i := range q.equal {
 		l := len(index[q.equal[i].key][q.equal[i].value])
 		if l < lowestCount {
@@ -255,13 +261,16 @@ func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[s
 	}
 }
 
-func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) error {
-	var expressions []kv
-	if not {
-		expressions = q.notMatch
-	} else {
-		expressions = q.match
-	}
+// filters a list of metric ids by the expressions give. it is assumed that the
+// given expressions are all based on regular expressions.
+//
+// expressions: the list of key & value pairs
+// skipMatch:   an integer specifying an expression index that should be skipped
+// resultSet:   list of series IDs that should be filtered
+// byId:        ID keyed index of metric definitions, used to lookup the tags of IDs
+// not:         whether the resultSet shall be filtered by the =~ or !=~ condition
+//
+func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) error {
 	for i, e := range expressions {
 		if i == skipMatch {
 			continue
@@ -378,11 +387,11 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	q.filterByFrom(resultSet, byId)
 	q.filterByEqual(skipEqual, resultSet, index)
 	q.filterByNotEqual(resultSet, index, byId)
-	err = q.filterByMatch(skipMatch, resultSet, byId, false)
+	err = q.filterByMatch(q.match, skipMatch, resultSet, byId, false)
 	if err != nil {
 		return nil, err
 	}
-	err = q.filterByMatch(-1, resultSet, byId, true)
+	err = q.filterByMatch(q.notMatch, -1, resultSet, byId, true)
 	if err != nil {
 		return nil, err
 	}
