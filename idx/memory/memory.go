@@ -379,7 +379,7 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 
 func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 	if !tagSupport {
-		log.Debug("memory-idx: received tag query, but tag support is disabled")
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
 	}
 
@@ -422,7 +422,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 
 func (m *MemoryIdx) TagList(orgId int) []string {
 	if !tagSupport {
-		log.Debug("memory-idx: received tag query, but tag support is disabled")
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
 	}
 
