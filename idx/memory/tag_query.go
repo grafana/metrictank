@@ -10,16 +10,8 @@ import (
 )
 
 var (
-	expressionRe    = regexp.MustCompile("^([^!=~]+)([!=~]{1,3})(.*)$")
-	errUnknownId    = errors.New("id does not exist")
-	errInvalidTag   = errors.New("found an invalid tag in the index")
 	errInvalidQuery = errors.New("invalid query")
 )
-
-type kv struct {
-	key   string
-	value string
-}
 
 const (
 	PARSING_ERROR = iota
@@ -28,6 +20,11 @@ const (
 	MATCH
 	NOT_MATCH
 )
+
+type kv struct {
+	key   string
+	value string
+}
 
 type expression struct {
 	kv
@@ -46,8 +43,8 @@ type TagQuery struct {
 // in case of error the operator will be PARSING_ERROR
 func parseExpression(expr string) expression {
 	var key []byte
-	regex, not := false, false
 	var pos int
+	regex, not := false, false
 
 	// get key
 	for ; pos < len(expr); pos++ {
@@ -258,8 +255,14 @@ func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[s
 	}
 }
 
-func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive) error {
-	for i, e := range q.match {
+func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) error {
+	var expressions []kv
+	if not {
+		expressions = q.notMatch
+	} else {
+		expressions = q.match
+	}
+	for i, e := range expressions {
 		if i == skipMatch {
 			continue
 		}
@@ -268,7 +271,9 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[strin
 		var re *regexp.Regexp
 		var err error
 
-		// shortcut if pattern is ^.+ (f.e. expression "key!=" will be translated to "key=~^.+")
+		// shortcut if pattern is ^.+, any value will match so there's no need
+		// to actually run the regular expression.
+		// (f.e. expression "key!=" will be translated to "key=~^.+")
 		if e.value == "^.+" {
 			shortCut = true
 		} else {
@@ -278,6 +283,10 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[strin
 			}
 		}
 
+		// cache all tags that have once matched the regular expression.
+		// this is based on the assumption that many matching tags will be repeated
+		// over multiple series, so there's no need to run the regex for each of them
+		// because once we know that a tag matches we can just compare strings
 		matchingTags := make(TagIDs)
 	IDS:
 		for id := range resultSet {
@@ -290,8 +299,11 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[strin
 			}
 
 			for _, tag := range def.Tags {
-				// optimization to reduce regex matching
+				// reduce regex matching by looking up cached matches
 				if _, ok := matchingTags[tag]; ok {
+					if not {
+						delete(resultSet, id)
+					}
 					continue IDS
 				}
 			}
@@ -306,63 +318,14 @@ func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[strin
 
 				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
 					matchingTags[tag] = struct{}{}
+					if not {
+						delete(resultSet, id)
+					}
 					continue IDS
 				}
 			}
-			delete(resultSet, id)
-		}
-	}
-	return nil
-}
-
-func (q *TagQuery) filterByNotMatch(resultSet TagIDs, byId map[string]*idx.Archive) error {
-	for _, e := range q.notMatch {
-		var shortCut bool
-		var re *regexp.Regexp
-		var err error
-
-		// shortcut if pattern is ^.+ (f.e. expression "key=" will be translated to "key!=~^.+")
-		if e.value == "^.+" {
-			shortCut = true
-		} else {
-			re, err = regexp.Compile(e.value)
-			if err != nil {
-				return errInvalidQuery
-			}
-		}
-
-		matchingTags := make(TagIDs)
-	IDS:
-		for id := range resultSet {
-			var def *idx.Archive
-			var ok bool
-			if def, ok = byId[id]; !ok {
-				// corrupt index
+			if !not {
 				delete(resultSet, id)
-				continue IDS
-			}
-
-			// optimization to reduce regex matching
-			for _, tag := range def.Tags {
-				if _, ok := matchingTags[tag]; ok {
-					delete(resultSet, id)
-					continue IDS
-				}
-			}
-
-			for _, tag := range def.Tags {
-				tagSplits := strings.SplitN(tag, "=", 2)
-				if len(tagSplits) != 2 {
-					// corrupt index
-					delete(resultSet, id)
-					continue IDS
-				}
-
-				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
-					matchingTags[tag] = struct{}{}
-					delete(resultSet, id)
-					continue IDS
-				}
 			}
 		}
 	}
@@ -394,7 +357,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	var resultSet TagIDs
 	var err error
 
-	// find the best expression to start with
+	// find the best expression to start with and retrieve its resultSet
 	if len(q.equal) == 0 {
 		if len(q.match) == 0 {
 			return nil, errInvalidQuery
@@ -408,14 +371,18 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 		skipEqual, resultSet = q.getInitialByEqual(index)
 	}
 
+	// filter the resultSet by the from condition and all other expressions given.
+	// the order of those filters should to be increasing by the cpu required
+	// to process them. that way the most cpu intesive filters only get applied
+	// to the smallest possible resultSet
 	q.filterByFrom(resultSet, byId)
 	q.filterByEqual(skipEqual, resultSet, index)
 	q.filterByNotEqual(resultSet, index, byId)
-	err = q.filterByMatch(skipMatch, resultSet, byId)
+	err = q.filterByMatch(skipMatch, resultSet, byId, false)
 	if err != nil {
 		return nil, err
 	}
-	err = q.filterByNotMatch(resultSet, byId)
+	err = q.filterByMatch(-1, resultSet, byId, true)
 	if err != nil {
 		return nil, err
 	}
