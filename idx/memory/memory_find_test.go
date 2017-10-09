@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -212,16 +211,16 @@ func Init() {
 	}
 }
 
-func ixFind(org, q int) {
+func ixFind(b *testing.B, org, q int) {
 	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
 		panic(err)
 	}
 	if len(nodes) != queries[q].ExpectedResults {
 		for _, n := range nodes {
-			fmt.Println(n.Path)
+			b.Log(n.Path)
 		}
-		panic(fmt.Sprintf("%s expected %d got %d results instead", queries[q].Pattern, queries[q].ExpectedResults, len(nodes)))
+		b.Fatalf("%s expected %d got %d results instead", queries[q].Pattern, queries[q].ExpectedResults, len(nodes))
 	}
 }
 
@@ -235,7 +234,7 @@ func BenchmarkFind(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
 		org := (n % 2) + 1
-		ixFind(org, q)
+		ixFind(b, org, q)
 	}
 }
 
@@ -254,7 +253,7 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 	for i := 0; i < 4; i++ {
 		go func() {
 			for q := range ch {
-				ixFind(q.org, q.q)
+				ixFind(b, q.org, q.q)
 			}
 		}()
 	}
@@ -278,7 +277,7 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	for i := 0; i < 8; i++ {
 		go func() {
 			for q := range ch {
-				ixFind(q.org, q.q)
+				ixFind(b, q.org, q.q)
 			}
 		}()
 	}
@@ -292,7 +291,7 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	close(ch)
 }
 
-func ixFindByTag(org, q int) {
+func ixFindByTag(b *testing.B, org, q int) {
 	series, err := ix.IdsByTagExpressions(org, tagQueries[q].Expressions, 0)
 	if err != nil {
 		panic(err)
@@ -300,9 +299,9 @@ func ixFindByTag(org, q int) {
 	if len(series) != tagQueries[q].ExpectedResults {
 		for s := range series {
 			memoryIdx := ix.(*MemoryIdx)
-			fmt.Println(memoryIdx.DefById[s.ToString()].Tags)
+			b.Log(memoryIdx.DefById[s.ToString()].Tags)
 		}
-		panic(fmt.Sprintf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series)))
+		b.Fatalf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series))
 	}
 }
 
@@ -315,7 +314,7 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		q := n % 2
 		org := (n % 2) + 1
-		ixFindByTag(org, q)
+		ixFindByTag(b, org, q)
 	}
 }
 
@@ -328,7 +327,7 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 2
 		org := (n % 2) + 1
-		ixFindByTag(org, q)
+		ixFindByTag(b, org, q)
 	}
 }
 
@@ -341,7 +340,7 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 4
 		org := (n % 2) + 1
-		ixFindByTag(org, q)
+		ixFindByTag(b, org, q)
 	}
 }
 
@@ -354,7 +353,7 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 6
 		org := (n % 2) + 1
-		ixFindByTag(org, q)
+		ixFindByTag(b, org, q)
 	}
 }
 
@@ -370,13 +369,10 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		series, err := ix.IdsByTagExpressions(1, q.Expressions, 150000)
 		if err != nil {
-			panic(err)
+			b.Fatalf(err.Error())
 		}
 		if len(series) != q.ExpectedResults {
-			for _, s := range series {
-				fmt.Println(s)
-			}
-			panic(fmt.Sprintf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series)))
+			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
 		}
 	}
 }
@@ -393,10 +389,10 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		series, err := ix.IdsByTagExpressions(1, q.Expressions, 0)
 		if err != nil {
-			panic(err)
+			b.Fatalf(err.Error())
 		}
 		if len(series) != q.ExpectedResults {
-			panic(fmt.Sprintf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series)))
+			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
 		}
 	}
 }
