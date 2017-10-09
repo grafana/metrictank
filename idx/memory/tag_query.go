@@ -42,28 +42,27 @@ type TagQuery struct {
 // returns expression,
 // in case of error the operator will be PARSING_ERROR
 func parseExpression(expr string) expression {
-	var key []byte
 	var pos int
 	regex, not := false, false
 
-	// get key
+	// scan up to operator to get key
 	for ; pos < len(expr); pos++ {
 		// ! || =
 		if expr[pos] == 33 || expr[pos] == 61 {
 			// key must not be empty
-			if len(key) == 0 {
+			if pos == 0 {
 				return expression{operator: PARSING_ERROR}
 			}
 			break
 		}
 
-		// a-z A-Z 0-9
-		if !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) {
+		// disallow ; in key
+		if expr[pos] == 59 {
 			return expression{operator: PARSING_ERROR}
 		}
-
-		key = append(key, expr[pos])
 	}
+
+	key := expr[:pos]
 
 	// if !
 	if expr[pos] == 33 {
@@ -83,15 +82,14 @@ func parseExpression(expr string) expression {
 		pos++
 	}
 
-	var value []byte
+	valuePos := pos
 	for ; pos < len(expr); pos++ {
-		// enforce a-z A-Z 0-9 -_ if query is not regex
-		if !regex && !(expr[pos] >= 97 && expr[pos] <= 122) && !(expr[pos] >= 65 && expr[pos] <= 90) && !(expr[pos] >= 48 && expr[pos] <= 57) && expr[pos] != 45 && expr[pos] != 95 {
+		// disallow ; in value
+		if expr[pos] == 59 {
 			return expression{operator: PARSING_ERROR}
 		}
-
-		value = append(value, expr[pos])
 	}
+	value := expr[valuePos:]
 
 	if not {
 		if regex {
