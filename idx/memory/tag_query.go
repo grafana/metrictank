@@ -289,7 +289,7 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 		for id := range resultSet {
 			var def *idx.Archive
 			var ok bool
-			if def, ok = byId[id.ToString()]; !ok {
+			if def, ok = byId[id.String()]; !ok {
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
 				CorruptIndex.Inc()
@@ -352,7 +352,7 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 	for id := range resultSet {
 		var def *idx.Archive
 		var ok bool
-		if def, ok = byId[id.ToString()]; !ok {
+		if def, ok = byId[id.String()]; !ok {
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			CorruptIndex.Inc()

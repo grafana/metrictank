@@ -67,7 +67,7 @@ func (id *MetricID) FromString(s string) error {
 	return nil
 }
 
-func (id *MetricID) ToString() string {
+func (id *MetricID) String() string {
 	return fmt.Sprintf("%d.%016x%016x", id.org, id.part1, id.part2)
 }
 

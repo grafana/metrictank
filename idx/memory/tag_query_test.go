@@ -60,7 +60,7 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	byId := make(map[string]*idx.Archive)
 
 	for _, d := range data {
-		idStr := d.id.ToString()
+		idStr := d.id.String()
 		byId[idStr] = &idx.Archive{}
 		byId[idStr].Tags = d.tags
 		byId[idStr].LastUpdate = d.lastUpdate
@@ -229,7 +229,7 @@ func TestGetByTag(t *testing.T) {
 		ids[i], _ = idx.NewMetricIDFromString(fmt.Sprintf(idString, i))
 		mds[i].Metric = fmt.Sprintf("metric.%d", i)
 		mds[i].Name = mds[i].Metric
-		mds[i].Id = ids[i].ToString()
+		mds[i].Id = ids[i].String()
 		mds[i].OrgId = 1
 		mds[i].Interval = 1
 		mds[i].Time = 12345
