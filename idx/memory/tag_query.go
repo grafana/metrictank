@@ -241,7 +241,7 @@ func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagI
 		}
 
 		for id := range resultSet {
-			if _, ok := index[e.key][e.value][id]; (!ok && !not) || (ok && not) {
+			if _, ok := index[e.key][e.value][id]; ok == not {
 				delete(resultSet, id)
 			}
 		}
