@@ -377,9 +377,9 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	// filters should be in ascending order by the cpu required to process them,
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	q.filterByFrom(resultSet, byId)
 	q.filterByEqual(q.equal, skipEqual, resultSet, index, false)
 	q.filterByEqual(q.notEqual, -1, resultSet, index, true)
+	q.filterByFrom(resultSet, byId)
 	err = q.filterByMatch(q.match, skipMatch, resultSet, byId, false)
 	if err != nil {
 		return nil, err
