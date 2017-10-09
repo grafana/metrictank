@@ -284,6 +284,7 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 		// over multiple series, so there's no need to run the regex for each of them
 		// because once we know that a tag matches we can just compare strings
 		matchingTags := make(map[string]struct{})
+		notMatchingTags := make(map[string]struct{})
 	IDS:
 		for id := range resultSet {
 			var def *idx.Archive
@@ -307,6 +308,11 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 			}
 
 			for _, tag := range def.Tags {
+				// reduce regex matching by looking up cached non-matches
+				if _, ok := notMatchingTags[tag]; ok {
+					continue
+				}
+
 				tagSplits := strings.SplitN(tag, "=", 2)
 				if len(tagSplits) != 2 {
 					// should never happen because every tag in the index
@@ -317,11 +323,17 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 				}
 
 				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
-					matchingTags[tag] = struct{}{}
+					if len(matchingTags) < matchCacheSize {
+						matchingTags[tag] = struct{}{}
+					}
 					if not {
 						delete(resultSet, id)
 					}
 					continue IDS
+				} else {
+					if len(notMatchingTags) < matchCacheSize {
+						notMatchingTags[tag] = struct{}{}
+					}
 				}
 			}
 			if !not {
@@ -388,6 +400,5 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	if err != nil {
 		return nil, err
 	}
-
 	return resultSet, nil
 }
