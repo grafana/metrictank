@@ -42,8 +42,9 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled    bool
-	tagSupport bool
+	Enabled        bool
+	matchCacheSize int
+	tagSupport     bool
 )
 
 func ConfigSetup() {
