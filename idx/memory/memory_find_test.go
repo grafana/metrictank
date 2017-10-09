@@ -103,6 +103,7 @@ func Init() {
 	ix.Init()
 
 	var data *schema.MetricData
+	matchCacheSize = 1000
 
 	for i, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
@@ -375,6 +376,26 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 			for _, s := range series {
 				fmt.Println(s)
 			}
+			panic(fmt.Sprintf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series)))
+		}
+	}
+}
+
+func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
+	q := tagQuery{Expressions: []string{"metric!=~.*_time$", "dc=~.*0$", "direction=~wri", "host=~host9[0-9]0", "disk!=~disk[5-9]{1}"}, ExpectedResults: 150}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		series, err := ix.IdsByTagExpressions(1, q.Expressions, 0)
+		if err != nil {
+			panic(err)
+		}
+		if len(series) != q.ExpectedResults {
 			panic(fmt.Sprintf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series)))
 		}
 	}
