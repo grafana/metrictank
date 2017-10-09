@@ -408,9 +408,9 @@ func TestExpressionParsing(t *testing.T) {
 			operator:   PARSING_ERROR,
 		}, {
 			expression: "key==value",
-			key:        "",
-			value:      "",
-			operator:   PARSING_ERROR,
+			key:        "key",
+			value:      "=value",
+			operator:   EQUAL,
 		}, {
 			expression: "key=~=value",
 			key:        "key",
