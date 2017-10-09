@@ -401,7 +401,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 		for id := range ids {
 			var def *idx.Archive
 			var ok bool
-			if def, ok = m.DefById[id.ToString()]; !ok {
+			if def, ok = m.DefById[id.String()]; !ok {
 				// should never happen because every ID that is in the tag index
 				// must be present in the byId lookup table
 				CorruptIndex.Inc()

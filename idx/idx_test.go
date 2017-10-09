@@ -17,7 +17,7 @@ func TestMetricIDStringConversion(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error parsing id %s: %s", idStr, err)
 		}
-		idStr2 := id.ToString()
+		idStr2 := id.String()
 		if idStr != idStr2 {
 			t.Fatalf("Converted id string has changed: %s %s", idStr, idStr2)
 		}
