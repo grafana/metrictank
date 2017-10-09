@@ -104,48 +104,52 @@ func Init() {
 
 	var data *schema.MetricData
 
-	for _, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
+	for i, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
 			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
+			Time:     int64(i + 100),
 		}
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
-	for _, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
+	for i, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
 			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
+			Time:     int64(i + 100),
 		}
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
 	// orgId has 1,680,000 series
 
-	for _, series := range cpuMetrics(5, 100, 950, 32, "collectd") {
+	for i, series := range cpuMetrics(5, 100, 950, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
 			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
+			Time:     int64(i + 100),
 		}
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
-	for _, series := range diskMetrics(5, 100, 950, 10, "collectd") {
+	for i, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
 			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
+			Time:     int64(i + 100),
 		}
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
@@ -363,7 +367,7 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		series, err := ix.IdsByTagExpressions(1, q.Expressions, 0)
+		series, err := ix.IdsByTagExpressions(1, q.Expressions, 150000)
 		if err != nil {
 			panic(err)
 		}
