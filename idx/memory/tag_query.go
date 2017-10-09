@@ -387,9 +387,9 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	}
 
 	// filter the resultSet by the from condition and all other expressions given.
-	// the order of those filters should to be increasing by the cpu required
-	// to process them. that way the most cpu intesive filters only get applied
-	// to the smallest possible resultSet
+	// filters should be in ascending order by the cpu required to process them,
+	// that way the most cpu intensive filters only get applied to the smallest
+	// possible resultSet.
 	q.filterByFrom(resultSet, byId)
 	q.filterByEqual(skipEqual, resultSet, index)
 	q.filterByNotEqual(resultSet, index, byId)
