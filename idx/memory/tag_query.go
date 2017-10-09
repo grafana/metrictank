@@ -223,45 +223,32 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 	return startId, resultSet
 }
 
-func (q *TagQuery) filterByEqual(skipEqual int, resultSet TagIDs, index TagIndex) {
-	for i, e := range q.equal {
+// filters a list of metric ids by the given expressions. if "not" is true it will
+// remove all ids of which at least one expression is equal to one of its tags.
+// if "not" is false the functionality is inverted, so it removes all the ids
+// where no tag is equal to at least one of the expressions.
+//
+// expressions: the list of key & value pairs
+// skipEqual:   an integer specifying an expression index that should be skipped
+// resultSet:   list of series IDs that should be filtered
+// index:       the tag index based on which to evaluate the conditions
+// not:         whether the resultSet shall be filtered by a = or != condition
+//
+func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagIDs, index TagIndex, not bool) {
+	for i, e := range expressions {
 		if i == skipEqual {
 			continue
 		}
 
 		for id := range resultSet {
-			if _, ok := index[e.key][e.value][id]; !ok {
+			if _, ok := index[e.key][e.value][id]; (!ok && !not) || (ok && not) {
 				delete(resultSet, id)
 			}
 		}
 	}
 }
 
-func (q *TagQuery) filterByNotEqual(resultSet TagIDs, index TagIndex, byId map[string]*idx.Archive) {
-	for _, e := range q.notEqual {
-		fullTag := e.key + "=" + e.value
-	IDS:
-		for id := range resultSet {
-			var def *idx.Archive
-			var ok bool
-			if def, ok = byId[id.ToString()]; !ok {
-				// should never happen because every ID in the tag index
-				// must be present in the byId lookup table
-				CorruptIndex.Inc()
-				delete(resultSet, id)
-				continue IDS
-			}
-			for _, tag := range def.Tags {
-				if tag == fullTag {
-					delete(resultSet, id)
-					continue IDS
-				}
-			}
-		}
-	}
-}
-
-// filters a list of metric ids by the expressions give. it is assumed that the
+// filters a list of metric ids by the given expressions. it is assumed that the
 // given expressions are all based on regular expressions.
 //
 // expressions: the list of key & value pairs
@@ -391,8 +378,8 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
 	q.filterByFrom(resultSet, byId)
-	q.filterByEqual(skipEqual, resultSet, index)
-	q.filterByNotEqual(resultSet, index, byId)
+	q.filterByEqual(q.equal, skipEqual, resultSet, index, false)
+	q.filterByEqual(q.notEqual, -1, resultSet, index, true)
 	err = q.filterByMatch(q.match, skipMatch, resultSet, byId, false)
 	if err != nil {
 		return nil, err

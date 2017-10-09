@@ -101,8 +101,6 @@ func TestQueryByTagSimpleEqual(t *testing.T) {
 	expect := make(TagIDs)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
-	/*expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}*/
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -110,8 +108,6 @@ func TestQueryByTagSimplePattern(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key4=~value[43]", "key3=~value[1-3]"}, 0)
 	expect := make(TagIDs)
-	/*expect["id7"] = struct{}{}
-	expect["id4"] = struct{}{}*/
 	expect[ids[6]] = struct{}{}
 	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
@@ -121,9 +117,6 @@ func TestQueryByTagSimpleUnequal(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key4!=value4"}, 0)
 	expect := make(TagIDs)
-	/*expect["id1"] = struct{}{}
-	expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}*/
 	expect[ids[0]] = struct{}{}
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -134,7 +127,6 @@ func TestQueryByTagSimpleNotPattern(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0)
 	expect := make(TagIDs)
-	//expect["id2"] = struct{}{}
 	expect[ids[1]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
@@ -143,9 +135,6 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key2=", "key2=~"}, 0)
 	expect := make(TagIDs)
-	/*expect["id2"] = struct{}{}
-	expect["id3"] = struct{}{}
-	expect["id4"] = struct{}{}*/
 	expect[ids[1]] = struct{}{}
 	expect[ids[2]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -156,8 +145,6 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3!=", "key3!=~"}, 0)
 	expect := make(TagIDs)
-	/*expect["id2"] = struct{}{}
-	expect["id4"] = struct{}{}*/
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
