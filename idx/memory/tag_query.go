@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math"
 	"regexp"
-	"strings"
 
 	"github.com/grafana/metrictank/idx"
 )
@@ -308,21 +307,17 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 			}
 
 			for _, tag := range def.Tags {
+				// length of key doesn't match
+				if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
+					continue
+				}
+
 				// reduce regex matching by looking up cached non-matches
 				if _, ok := notMatchingTags[tag]; ok {
 					continue
 				}
 
-				tagSplits := strings.SplitN(tag, "=", 2)
-				if len(tagSplits) != 2 {
-					// should never happen because every tag in the index
-					// must have a valid format
-					InvalidTagInIndex.Inc()
-					delete(resultSet, id)
-					continue IDS
-				}
-
-				if e.key == tagSplits[0] && (shortCut || re.MatchString(tagSplits[1])) {
+				if e.key == tag[:len(e.key)] && (shortCut || re.MatchString(tag[len(e.key)+1:])) {
 					if len(matchingTags) < matchCacheSize {
 						matchingTags[tag] = struct{}{}
 					}
