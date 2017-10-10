@@ -239,8 +239,17 @@ func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagI
 			continue
 		}
 
+		indexIds := index[e.key][e.value]
+
+		// shortcut if key=value combo does not exist at all
+		if len(indexIds) == 0 && !not {
+			for id := range resultSet {
+				delete(resultSet, id)
+			}
+		}
+
 		for id := range resultSet {
-			if _, ok := index[e.key][e.value][id]; ok == not {
+			if _, ok := indexIds[id]; ok == not {
 				delete(resultSet, id)
 			}
 		}
