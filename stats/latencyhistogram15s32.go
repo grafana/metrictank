@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/Dieterbe/artisanalhistogram/hist15s"
@@ -10,6 +11,7 @@ import (
 type LatencyHistogram15s32 struct {
 	hist  hist15s.Hist15s
 	since time.Time
+	sum   uint64 // in micros. to generate more accurate mean
 }
 
 func NewLatencyHistogram15s32(name string) *LatencyHistogram15s32 {
@@ -21,6 +23,7 @@ func NewLatencyHistogram15s32(name string) *LatencyHistogram15s32 {
 }
 
 func (l *LatencyHistogram15s32) Value(t time.Duration) {
+	atomic.AddUint64(&l.sum, uint64(t.Nanoseconds()/1000))
 	l.hist.AddDuration(t)
 }
 
@@ -30,8 +33,9 @@ func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now time.Time
 	// for now, only report the summaries :(
 	r, ok := l.hist.Report(snap)
 	if ok {
+		sum := atomic.SwapUint64(&l.sum, 0)
 		buf = WriteUint32(buf, prefix, []byte("latency.min.gauge32"), r.Min/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.mean.gauge32"), r.Mean/1000, now)
+		buf = WriteUint32(buf, prefix, []byte("latency.mean.gauge32"), uint32((sum / uint64(r.Count) / 1000)), now)
 		buf = WriteUint32(buf, prefix, []byte("latency.median.gauge32"), r.Median/1000, now)
 		buf = WriteUint32(buf, prefix, []byte("latency.p75.gauge32"), r.P75/1000, now)
 		buf = WriteUint32(buf, prefix, []byte("latency.p90.gauge32"), r.P90/1000, now)
