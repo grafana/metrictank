@@ -3,6 +3,7 @@
 package idx
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -35,9 +36,8 @@ type Archive struct {
 }
 
 type MetricID struct {
-	org   int
-	part1 uint64
-	part2 uint64
+	org int
+	key [16]byte
 }
 
 func NewMetricIDFromString(s string) (MetricID, error) {
@@ -51,24 +51,24 @@ func (id *MetricID) FromString(s string) error {
 	if len(splits) != 2 || len(splits[1]) != 32 {
 		return errInvalidIdString
 	}
+
 	var err error
 	id.org, err = strconv.Atoi(splits[0])
 	if err != nil {
 		return err
 	}
-	id.part1, err = strconv.ParseUint(splits[1][:16], 16, 64)
-	if err != nil {
-		return err
+
+	dst := make([]byte, 16)
+	n, err := hex.Decode(dst, []byte(splits[1]))
+	if n != 16 {
+		return errInvalidIdString
 	}
-	id.part2, err = strconv.ParseUint(splits[1][16:], 16, 64)
-	if err != nil {
-		return err
-	}
+	copy(id.key[:], dst)
 	return nil
 }
 
 func (id *MetricID) String() string {
-	return fmt.Sprintf("%d.%016x%016x", id.org, id.part1, id.part2)
+	return fmt.Sprintf("%d.%032x", id.org, id.key)
 }
 
 // used primarily by tests, for convenience
