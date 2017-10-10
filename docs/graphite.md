@@ -35,6 +35,7 @@ aliasSub(seriesList, pattern, replacement) seriesList |              | Stable
 averageSeries(seriesLists) series                     | avg          | Stable
 consolidateBy(seriesList, func) seriesList            |              | Stable
 divideSeries(seriesList, dividend, divisor) seriesList|              | Stable
+maxSeries(seriesList) series                          | max          | Stable
 movingAverage(seriesLists, windowSize) seriesList     |              | Unstable
 perSecond(seriesLists) seriesList                     |              | Stable
 scale(seriesLists, num) series                        | sum          | Stable

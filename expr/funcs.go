@@ -53,6 +53,8 @@ func init() {
 		"averageSeries":  {NewAvgSeries, true},
 		"consolidateBy":  {NewConsolidateBy, true},
 		"divideSeries":   {NewDivideSeries, true},
+		"max":            {NewMaxSeries, true},
+		"maxSeries":      {NewMaxSeries, true},
 		"movingAverage":  {NewMovingAverage, false},
 		"perSecond":      {NewPerSecond, true},
 		"scale":          {NewScale, true},
