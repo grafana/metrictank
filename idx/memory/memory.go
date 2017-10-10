@@ -147,9 +147,9 @@ func (m *MemoryIdx) Update(entry idx.Archive) {
 	m.Unlock()
 }
 
-// reads the tags of a given metric definition and creates the
-// corresponding tag index entries to refer to it.
-// assumes a lock is already held.
+// indexTags reads the tags of a given metric definition and creates the
+// corresponding tag index entries to refer to it. It assumes a lock is
+// already held.
 func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
@@ -187,9 +187,8 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 	}
 }
 
-// takes a given metric definition and removes all references
-// to it from the tag index.
-// assumes a lock is already held.
+// deindexTags takes a given metric definition and removes all references
+// to it from the tag index. It assumes a lock is already held.
 func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {

@@ -145,19 +145,20 @@ Interface
   error encountered.
 
 * TagList(int) []string:
-  Returns a list of all tag keys associated with the metrics of a given organization.o
+  This method returns a list of all tag keys associated with the metrics of a given
+  organization.
 
 * Tag(int, string, int64) map[string]uint32:
-  Returns a list of all values associated with a given tag key in the given org. The
-  occurences of each value is counted and the count is referred to by the series ids
-  in the returned map. If the third parameter is > 0 then the metrics will be filtered
-  and only those of which the LastUpdate time is >= the from timestamp will be
-  considered while the others are being ignored.
+  This method returns a list of all values associated with a given tag key in the
+  given org. The occurences of each value is counted and the count is referred to by
+  the series ids in the returned map. If the third parameter is > 0 then the metrics
+  will be filtered and only those of which the LastUpdate time is >= the from
+  timestamp will be considered while the others are being ignored.
 
 * IdsByTagExpression(int, []string, int64) ([]string, error):
-  Takes a list of expressions in the format key=value.
+  This method takes a list of expressions in the format key=value.
   The allowed operators are: =, !=, =~, !=~.
-  Returns a slice of IDs that match the given conditions, the conditions are
+  It returns a slice of IDs that match the given conditions, the conditions are
   logically AND-ed. If the third argument is > 0 then the results will be filtered
   and only those where the LastUpdate time is >= from will be returned as results.
 */

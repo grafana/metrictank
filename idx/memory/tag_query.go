@@ -39,8 +39,8 @@ type TagQuery struct {
 	notMatch []kv
 }
 
-// returns expression,
-// in case of error the operator will be PARSING_ERROR
+// parseExpression returns an expression that's been generated from the given
+// string, in case of error the operator will be PARSING_ERROR.
 func parseExpression(expr string) expression {
 	var pos int
 	regex, not := false, false
@@ -223,10 +223,10 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 	return startId, resultSet
 }
 
-// filters a list of metric ids by the given expressions. if "not" is true it will
-// remove all ids of which at least one expression is equal to one of its tags.
-// if "not" is false the functionality is inverted, so it removes all the ids
-// where no tag is equal to at least one of the expressions.
+// filterByEqual filters a list of metric ids by the given expressions. if "not"
+// is true it will remove all ids of which at least one expression is equal to
+// one of its tags. if "not" is false the functionality is inverted, so it
+// removes all the ids where no tag is equal to at least one of the expressions.
 //
 // expressions: the list of key & value pairs
 // skipEqual:   an integer specifying an expression index that should be skipped
@@ -248,8 +248,8 @@ func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagI
 	}
 }
 
-// filters a list of metric ids by the given expressions. it is assumed that the
-// given expressions are all based on regular expressions.
+// filterByMatch filters a list of metric ids by the given expressions. it is
+// assumed that the given expressions are all based on regular expressions.
 //
 // expressions: the list of key & value pairs
 // skipMatch:   an integer specifying an expression index that should be skipped
