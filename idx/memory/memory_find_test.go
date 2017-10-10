@@ -91,8 +91,7 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 }
 
 func TestMain(m *testing.M) {
-	_tagSupport := tagSupport
-	defer func() { tagSupport = _tagSupport }()
+	defer func(t bool) { tagSupport = t }(tagSupport)
 	tagSupport = true
 	os.Exit(m.Run())
 }
