@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/grafana/metrictank/idx"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
@@ -301,6 +302,7 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
 				CorruptIndex.Inc()
+				log.Error(3, "memory-idx: ID %s is in tag index but not in the byId lookup table", id.String())
 				delete(resultSet, id)
 				continue IDS
 			}
@@ -360,6 +362,7 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			CorruptIndex.Inc()
+			log.Error(3, "memory-idx: ID %s is in tag index but not in the byId lookup table", id.String())
 			delete(resultSet, id)
 			continue
 		}
