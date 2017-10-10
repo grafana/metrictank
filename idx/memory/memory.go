@@ -207,14 +207,6 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
 
-		if _, ok = tags[tagName]; !ok {
-			continue
-		}
-
-		if _, ok = tags[tagName][tagValue]; !ok {
-			continue
-		}
-
 		id, err := idx.NewMetricIDFromString(def.Id)
 		if err != nil {
 			// should never happen because all IDs in the index must have
