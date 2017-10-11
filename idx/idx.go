@@ -68,7 +68,7 @@ func (id *MetricID) FromString(s string) error {
 }
 
 func (id *MetricID) String() string {
-	return fmt.Sprintf("%d.%032x", id.org, id.key)
+	return fmt.Sprintf("%d.%x", id.org, id.key)
 }
 
 // used primarily by tests, for convenience
