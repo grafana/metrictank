@@ -287,7 +287,7 @@ func TestGetByTag(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
-		res := ix.IdsByTagQuery(1, tagQuery)
+		res := ix.idsByTagQuery(1, tagQuery)
 		if len(res) != len(tc.expectation) {
 			t.Fatalf("Result does not match expectation for expressions %+v\nGot:\n%+v\nExpected:\n%+v\n", tc.expressions, res, tc.expectation)
 		}
@@ -319,7 +319,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 	}
 
 	tagQuery, _ := NewTagQuery([]string{"key1=value1", "key2=value2"}, 0)
-	res := ix.IdsByTagQuery(orgId, tagQuery)
+	res := ix.idsByTagQuery(orgId, tagQuery)
 
 	if len(res) != 1 {
 		t.Fatalf("Expected to get 1 result, but got %d", len(res))
@@ -338,7 +338,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected 1 metric to get deleted, but got %d", len(deleted))
 	}
 
-	res = ix.IdsByTagQuery(orgId, tagQuery)
+	res = ix.idsByTagQuery(orgId, tagQuery)
 
 	if len(res) != 0 {
 		t.Fatalf("Expected to get 0 results, but got %d", len(res))
