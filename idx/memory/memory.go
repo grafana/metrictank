@@ -162,7 +162,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 			// should never happen because every tag in the index
 			// must have a valid format
 			InvalidTagInIndex.Inc()
-			log.Error(3, "memory-idx: Tag %s has an invalid format", tag)
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
 
@@ -182,7 +182,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 			// should never happen because all IDs in the index must have
 			// a valid format
 			CorruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %s has invalid format", def.Id)
+			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 			continue
 		}
 		tags[tagName][tagValue][id] = struct{}{}
@@ -203,7 +203,7 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 			// should never happen because every tag in the index
 			// must have a valid format
 			InvalidTagInIndex.Inc()
-			log.Error(3, "memory-idx: Tag %s has an invalid format", tag)
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
 
@@ -215,7 +215,7 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 			// should never happen because all IDs in the index must have
 			// a valid format
 			CorruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %s has invalid format", def.Id)
+			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 			continue
 		}
 		delete(tags[tagName][tagValue], id)
@@ -400,7 +400,7 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 				// should never happen because every ID that is in the tag index
 				// must be present in the byId lookup table
 				CorruptIndex.Inc()
-				log.Error(3, "memory-idx: ID %s is in tag index but not in the byId lookup table", id.String())
+				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
 				continue
 			}
 
