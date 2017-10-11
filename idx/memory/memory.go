@@ -448,11 +448,11 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[
 		return nil, err
 	}
 
-	seriesMap := m.IdsByTagQuery(orgId, query)
+	seriesMap := m.idsByTagQuery(orgId, query)
 	return seriesMap, nil
 }
 
-func (m *MemoryIdx) IdsByTagQuery(orgId int, query TagQuery) TagIDs {
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
 	m.RLock()
 	defer m.RUnlock()
 
