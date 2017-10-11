@@ -65,13 +65,13 @@ func parseExpression(expr string) expression {
 	key := expr[:pos]
 
 	// if !
-	if expr[pos] == 33 {
+	if len(expr) > pos && expr[pos] == 33 {
 		not = true
 		pos++
 	}
 
 	// expecting a =
-	if expr[pos] != 61 {
+	if len(expr) <= pos || expr[pos] != 61 {
 		return expression{operator: PARSING_ERROR}
 	}
 	pos++
