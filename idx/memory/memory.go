@@ -433,10 +433,11 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 		return nil
 	}
 
-	results := make([]string, 0, len(tags))
-
+	results := make([]string, len(tags))
+	i := 0
 	for k := range tags {
-		results = append(results, k)
+		results[i] = k
+		i++
 	}
 
 	return results
