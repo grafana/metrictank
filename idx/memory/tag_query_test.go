@@ -355,6 +355,7 @@ func TestExpressionParsing(t *testing.T) {
 		key        string
 		value      string
 		operator   int
+		err        error
 	}
 
 	testCases := []testCase{
@@ -363,58 +364,62 @@ func TestExpressionParsing(t *testing.T) {
 			key:        "key",
 			value:      "value",
 			operator:   EQUAL,
+			err:        nil,
 		}, {
 			expression: "key!=",
 			key:        "key",
 			value:      "",
 			operator:   NOT_EQUAL,
+			err:        nil,
 		}, {
 			expression: "key=",
 			key:        "key",
 			value:      "",
 			operator:   EQUAL,
+			err:        nil,
 		}, {
 			expression: "key=~",
 			key:        "key",
 			value:      "",
 			operator:   MATCH,
+			err:        nil,
 		}, {
 			expression: "key=~v_alue",
 			key:        "key",
 			value:      "v_alue",
 			operator:   MATCH,
+			err:        nil,
 		}, {
 			expression: "k!=~v",
 			key:        "k",
 			value:      "v",
 			operator:   NOT_MATCH,
+			err:        nil,
 		}, {
 			expression: "key!!=value",
-			key:        "",
-			value:      "",
-			operator:   PARSING_ERROR,
+			err:        errInvalidQuery,
 		}, {
 			expression: "key==value",
 			key:        "key",
 			value:      "=value",
 			operator:   EQUAL,
+			err:        nil,
 		}, {
 			expression: "key=~=value",
 			key:        "key",
 			value:      "=value",
 			operator:   MATCH,
+			err:        nil,
 		}, {
 			expression: "key",
-			key:        "",
-			value:      "",
-			operator:   PARSING_ERROR,
+			err:        errInvalidQuery,
 		},
 	}
 
 	for _, tc := range testCases {
-		expression := parseExpression(tc.expression)
-		if expression.key != tc.key || expression.value != tc.value || expression.operator != tc.operator {
-			t.Fatalf("Expected the values %s, %s, %d, but got %s, %s, %d", tc.key, tc.value, tc.operator, expression.key, expression.value, expression.operator)
+		expression, err := parseExpression(tc.expression)
+		if err != tc.err || (err == nil && (expression.key != tc.key || expression.value != tc.value || expression.operator != tc.operator)) {
+			t.Fatalf("Expected the values %s, %s, %d, %q, but got %s, %s, %d, %q", tc.key, tc.value, tc.operator, tc.err, expression.key, expression.value, expression.operator, err)
 		}
 	}
 }

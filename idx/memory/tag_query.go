@@ -14,8 +14,7 @@ var (
 )
 
 const (
-	PARSING_ERROR = iota
-	EQUAL
+	EQUAL = iota
 	NOT_EQUAL
 	MATCH
 	NOT_MATCH
@@ -41,9 +40,10 @@ type TagQuery struct {
 
 // parseExpression returns an expression that's been generated from the given
 // string, in case of error the operator will be PARSING_ERROR.
-func parseExpression(expr string) expression {
+func parseExpression(expr string) (expression, error) {
 	var pos int
 	regex, not := false, false
+	res := expression{}
 
 	// scan up to operator to get key
 	for ; pos < len(expr); pos++ {
@@ -60,16 +60,16 @@ func parseExpression(expr string) expression {
 
 		// disallow ; in key
 		if expr[pos] == 59 {
-			return expression{operator: PARSING_ERROR}
+			return res, errInvalidQuery
 		}
 	}
 
 	// key must not be empty
 	if pos == 0 {
-		return expression{operator: PARSING_ERROR}
+		return res, errInvalidQuery
 	}
 
-	key := expr[:pos]
+	res.key = expr[:pos]
 
 	// shift over the ! character
 	if not {
@@ -78,7 +78,7 @@ func parseExpression(expr string) expression {
 
 	// expecting a =
 	if len(expr) <= pos || expr[pos] != 61 {
-		return expression{operator: PARSING_ERROR}
+		return res, errInvalidQuery
 	}
 	pos++
 
@@ -92,24 +92,25 @@ func parseExpression(expr string) expression {
 	for ; pos < len(expr); pos++ {
 		// disallow ; in value
 		if expr[pos] == 59 {
-			return expression{operator: PARSING_ERROR}
+			return res, errInvalidQuery
 		}
 	}
-	value := expr[valuePos:]
+	res.value = expr[valuePos:]
 
 	if not {
 		if regex {
-			return expression{kv: kv{key: string(key), value: string(value)}, operator: NOT_MATCH}
+			res.operator = NOT_MATCH
 		} else {
-			return expression{kv: kv{key: string(key), value: string(value)}, operator: NOT_EQUAL}
+			res.operator = NOT_EQUAL
 		}
 	} else {
 		if regex {
-			return expression{kv: kv{key: string(key), value: string(value)}, operator: MATCH}
+			res.operator = MATCH
 		} else {
-			return expression{kv: kv{key: string(key), value: string(value)}, operator: EQUAL}
+			res.operator = EQUAL
 		}
 	}
+	return res, nil
 }
 
 func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
@@ -120,9 +121,9 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	}
 
 	for _, expr := range expressions {
-		e := parseExpression(expr)
-		if e.operator == PARSING_ERROR {
-			return q, errInvalidQuery
+		e, err := parseExpression(expr)
+		if err != nil {
+			return q, err
 		}
 
 		// special case of empty value
