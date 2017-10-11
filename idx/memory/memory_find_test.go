@@ -356,16 +356,52 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	}
 }
 
+func permutations(lst []string) [][]string {
+	if len(lst) == 0 {
+		return [][]string{}
+	}
+	if len(lst) == 1 {
+		return [][]string{lst}
+	}
+
+	l := make([][]string, 0)
+	for i, e1 := range lst {
+		remaining := make([]string, 0, len(lst)-1)
+		for j, e2 := range lst {
+			if i == j {
+				continue
+			}
+			remaining = append(remaining, e2)
+		}
+		for _, perms := range permutations(remaining) {
+			perm := []string{e1}
+			for _, p := range perms {
+				perm = append(perm, p)
+			}
+			l = append(l, perm)
+		}
+	}
+	return l
+}
+
+// since that's going through a lot of permutations it needs an increased
+// benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
+// is enough for it to go through all the 6! permutations
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-	q := tagQuery{Expressions: []string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}, ExpectedResults: 90}
+
+	queries := make([]tagQuery, 0)
+	for _, expressions := range permutations([]string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}) {
+		queries = append(queries, tagQuery{Expressions: expressions, ExpectedResults: 90})
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
+		q := queries[n%len(queries)]
 		series, err := ix.FindByTag(1, q.Expressions, 150000)
 		if err != nil {
 			b.Fatalf(err.Error())
@@ -376,16 +412,24 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	}
 }
 
+// since that's going through a lot of permutations it needs an increased
+// benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
+// is enough for it to go through all the 5! permutations
 func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 	if ix == nil {
 		Init()
 	}
-	q := tagQuery{Expressions: []string{"metric!=~.*_time$", "dc=~.*0$", "direction=~wri", "host=~host9[0-9]0", "disk!=~disk[5-9]{1}"}, ExpectedResults: 150}
+
+	queries := make([]tagQuery, 0)
+	for _, expressions := range permutations([]string{"metric!=~.*_time$", "dc=~.*0$", "direction=~wri", "host=~host9[0-9]0", "disk!=~disk[5-9]{1}"}) {
+		queries = append(queries, tagQuery{Expressions: expressions, ExpectedResults: 150})
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
+		q := queries[n%len(queries)]
 		series, err := ix.FindByTag(1, q.Expressions, 0)
 		if err != nil {
 			b.Fatalf(err.Error())
