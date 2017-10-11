@@ -30,12 +30,17 @@ type expression struct {
 	operator int
 }
 
+type kvRe struct {
+	key   string
+	value *regexp.Regexp
+}
+
 type TagQuery struct {
 	from      int64
 	equal     []kv
-	match     []kv
+	match     []kvRe
 	notEqual  []kv
-	notMatch  []kv
+	notMatch  []kvRe
 	startWith int
 }
 
@@ -130,14 +135,14 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		// special case of empty value
 		if len(e.value) == 0 {
 			if e.operator == EQUAL || e.operator == MATCH {
-				q.notMatch = append(q.notMatch, kv{
+				q.notMatch = append(q.notMatch, kvRe{
 					key:   e.key,
-					value: "^.+",
+					value: nil,
 				})
 			} else {
-				q.match = append(q.match, kv{
+				q.match = append(q.match, kvRe{
 					key:   e.key,
-					value: "^.+",
+					value: nil,
 				})
 			}
 		} else {
@@ -152,9 +157,23 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			case NOT_EQUAL:
 				q.notEqual = append(q.notEqual, e.kv)
 			case MATCH:
-				q.match = append(q.match, e.kv)
+				var re *regexp.Regexp
+				if e.value != "^.+" {
+					re, err = regexp.Compile(e.value)
+					if err != nil {
+						return q, errInvalidQuery
+					}
+				}
+				q.match = append(q.match, kvRe{key: e.key, value: re})
 			case NOT_MATCH:
-				q.notMatch = append(q.notMatch, e.kv)
+				var re *regexp.Regexp
+				if e.value != "^.+" {
+					re, err = regexp.Compile(e.value)
+					if err != nil {
+						return q, errInvalidQuery
+					}
+				}
+				q.notMatch = append(q.notMatch, kvRe{key: e.key, value: re})
 			}
 		}
 	}
@@ -171,7 +190,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	return q, nil
 }
 
-func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs, error) {
+func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
 	resultSet := make(TagIDs)
 	lowestCount := math.MaxUint32
 	startId := 0
@@ -188,23 +207,18 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs, error) {
 		}
 	}
 
-	// shortcut if pattern is ^.+ (f.e. expression "key!=~" will be translated to "key=~^.+")
-	if q.match[startId].value == "^.+" {
+	// shortcut if value == nil
+	if q.match[startId].value == nil {
 		for _, ids := range index[q.match[startId].key] {
 			for id := range ids {
 				resultSet[id] = struct{}{}
 			}
 		}
-		return startId, resultSet, nil
-	}
-
-	re, err := regexp.Compile(q.match[startId].value)
-	if err != nil {
-		return 0, nil, errInvalidQuery
+		return startId, resultSet
 	}
 
 	for v, ids := range index[q.match[startId].key] {
-		if !re.MatchString(v) {
+		if !q.match[startId].value.MatchString(v) {
 			continue
 		}
 
@@ -212,7 +226,7 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs, error) {
 			resultSet[id] = struct{}{}
 		}
 	}
-	return startId, resultSet, nil
+	return startId, resultSet
 }
 
 func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
@@ -245,13 +259,19 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 // one of its tags. if "not" is false the functionality is inverted, so it
 // removes all the ids where no tag is equal to at least one of the expressions.
 //
-// expressions: the list of key & value pairs
 // skipEqual:   an integer specifying an expression index that should be skipped
 // resultSet:   list of series IDs that should be filtered
 // index:       the tag index based on which to evaluate the conditions
 // not:         whether the resultSet shall be filtered by a = or != condition
 //
-func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagIDs, index TagIndex, not bool) {
+func (q *TagQuery) filterByEqual(skipEqual int, resultSet TagIDs, index TagIndex, not bool) {
+	var expressions []kv
+	if not {
+		expressions = q.notEqual
+	} else {
+		expressions = q.equal
+	}
+
 	for i, e := range expressions {
 		if i == skipEqual {
 			continue
@@ -274,35 +294,24 @@ func (q *TagQuery) filterByEqual(expressions []kv, skipEqual int, resultSet TagI
 	}
 }
 
-// filterByMatch filters a list of metric ids by the given expressions. it is
-// assumed that the given expressions are all based on regular expressions.
+// filterByMatch filters a list of metric ids by the given expressions.
 //
-// expressions: the list of key & value pairs
 // skipMatch:   an integer specifying an expression index that should be skipped
 // resultSet:   list of series IDs that should be filtered
 // byId:        ID keyed index of metric definitions, used to lookup the tags of IDs
 // not:         whether the resultSet shall be filtered by the =~ or !=~ condition
 //
-func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) error {
+func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) {
+	var expressions []kvRe
+	if not {
+		expressions = q.notMatch
+	} else {
+		expressions = q.match
+	}
+
 	for i, e := range expressions {
 		if i == skipMatch {
 			continue
-		}
-
-		var shortCut bool
-		var re *regexp.Regexp
-		var err error
-
-		// shortcut if pattern is ^.+, any value will match so there's no need
-		// to actually run the regular expression.
-		// (f.e. expression "key!=" will be translated to "key=~^.+")
-		if e.value == "^.+" {
-			shortCut = true
-		} else {
-			re, err = regexp.Compile(e.value)
-			if err != nil {
-				return errInvalidQuery
-			}
 		}
 
 		// cache all tags that have once matched the regular expression.
@@ -345,7 +354,9 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 					continue
 				}
 
-				if e.key == tag[:len(e.key)] && (shortCut || re.MatchString(tag[len(e.key)+1:])) {
+				// value == nil means that this expression can be short cut
+				// by not evaluating it
+				if e.key == tag[:len(e.key)] && (e.value == nil || e.value.MatchString(tag[len(e.key)+1:])) {
 					if len(matchingTags) < matchCacheSize {
 						matchingTags[tag] = struct{}{}
 					}
@@ -364,7 +375,6 @@ func (q *TagQuery) filterByMatch(expressions []kv, skipMatch int, resultSet TagI
 			}
 		}
 	}
-	return nil
 }
 
 func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) {
@@ -390,31 +400,24 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 	}
 }
 
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, error) {
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	var skipMatch, skipEqual = -1, -1
 	var resultSet TagIDs
-	var err error
 
 	if q.startWith == EQUAL {
 		skipEqual, resultSet = q.getInitialByEqual(index)
 	} else {
-		skipMatch, resultSet, err = q.getInitialByMatch(index)
+		skipMatch, resultSet = q.getInitialByMatch(index)
 	}
 
 	// filter the resultSet by the from condition and all other expressions given.
 	// filters should be in ascending order by the cpu required to process them,
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	q.filterByEqual(q.equal, skipEqual, resultSet, index, false)
-	q.filterByEqual(q.notEqual, -1, resultSet, index, true)
+	q.filterByEqual(skipEqual, resultSet, index, false)
+	q.filterByEqual(-1, resultSet, index, true)
 	q.filterByFrom(resultSet, byId)
-	err = q.filterByMatch(q.match, skipMatch, resultSet, byId, false)
-	if err != nil {
-		return nil, err
-	}
-	err = q.filterByMatch(q.notMatch, -1, resultSet, byId, true)
-	if err != nil {
-		return nil, err
-	}
-	return resultSet, nil
+	q.filterByMatch(skipMatch, resultSet, byId, false)
+	q.filterByMatch(-1, resultSet, byId, true)
+	return resultSet
 }
