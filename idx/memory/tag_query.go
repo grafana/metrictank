@@ -47,12 +47,14 @@ func parseExpression(expr string) expression {
 
 	// scan up to operator to get key
 	for ; pos < len(expr); pos++ {
-		// ! || =
-		if expr[pos] == 33 || expr[pos] == 61 {
-			// key must not be empty
-			if pos == 0 {
-				return expression{operator: PARSING_ERROR}
-			}
+		// =
+		if expr[pos] == 61 {
+			break
+		}
+
+		// !
+		if expr[pos] == 33 {
+			not = true
 			break
 		}
 
@@ -62,11 +64,15 @@ func parseExpression(expr string) expression {
 		}
 	}
 
+	// key must not be empty
+	if pos == 0 {
+		return expression{operator: PARSING_ERROR}
+	}
+
 	key := expr[:pos]
 
-	// if !
-	if len(expr) > pos && expr[pos] == 33 {
-		not = true
+	// shift over the ! character
+	if not {
 		pos++
 	}
 
