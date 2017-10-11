@@ -31,11 +31,12 @@ type expression struct {
 }
 
 type TagQuery struct {
-	from     int64
-	equal    []kv
-	match    []kv
-	notEqual []kv
-	notMatch []kv
+	from      int64
+	equal     []kv
+	match     []kv
+	notEqual  []kv
+	notMatch  []kv
+	startWith int
 }
 
 // parseExpression returns an expression that's been generated from the given
@@ -156,6 +157,15 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 				q.notMatch = append(q.notMatch, e.kv)
 			}
 		}
+	}
+
+	if len(q.equal) == 0 {
+		if len(q.match) == 0 {
+			return q, errInvalidQuery
+		}
+		q.startWith = MATCH
+	} else {
+		q.startWith = EQUAL
 	}
 
 	return q, nil
@@ -385,18 +395,10 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) (TagIDs, er
 	var resultSet TagIDs
 	var err error
 
-	// find the best expression to start with and retrieve its resultSet
-	if len(q.equal) == 0 {
-		if len(q.match) == 0 {
-			return nil, errInvalidQuery
-		}
-
-		skipMatch, resultSet, err = q.getInitialByMatch(index)
-		if err != nil {
-			return nil, errInvalidQuery
-		}
-	} else {
+	if q.startWith == EQUAL {
 		skipEqual, resultSet = q.getInitialByEqual(index)
+	} else {
+		skipMatch, resultSet, err = q.getInitialByMatch(index)
 	}
 
 	// filter the resultSet by the from condition and all other expressions given.

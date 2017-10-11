@@ -151,9 +151,7 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {
-	q, _ := NewTagQuery([]string{"key!=value1"}, 0)
-	tagIdx, byId := getTestIndex(t)
-	_, err := q.Run(tagIdx, byId)
+	_, err := NewTagQuery([]string{"key!=value1"}, 0)
 	if err != errInvalidQuery {
 		t.Fatalf("Expected an error, but didn't get it")
 	}
