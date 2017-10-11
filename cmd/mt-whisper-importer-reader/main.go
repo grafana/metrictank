@@ -201,6 +201,7 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 // generate the metric name based on the file name and given prefix
 func getMetricName(file string) string {
 	// remove all leading '/' from file name
+	file = strings.TrimPrefix(file, *whisperDirectory)
 	for file[0] == '/' {
 		file = file[1:]
 	}

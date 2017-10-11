@@ -3,6 +3,10 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
+# make sure CircleCI gets all tags properly.
+# see https://discuss.circleci.com/t/where-are-my-git-tags/2371
+git fetch --unshallow
+
 GITVERSION=`git describe --always`
 SOURCEDIR=${DIR}/..
 BUILDDIR=$SOURCEDIR/build
