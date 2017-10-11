@@ -156,7 +156,7 @@ Interface
   timestamp will be considered while the others are being ignored.
 
 * IdsByTagExpression(int, []string, int64) ([]string, error):
-  This method takes a list of expressions in the format key=value.
+  This method takes a list of expressions in the format key<operator>value.
   The allowed operators are: =, !=, =~, !=~.
   It returns a slice of IDs that match the given conditions, the conditions are
   logically AND-ed. If the third argument is > 0 then the results will be filtered
