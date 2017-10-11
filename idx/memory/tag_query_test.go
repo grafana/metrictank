@@ -403,6 +403,11 @@ func TestExpressionParsing(t *testing.T) {
 			key:        "key",
 			value:      "=value",
 			operator:   MATCH,
+		}, {
+			expression: "key",
+			key:        "",
+			value:      "",
+			operator:   PARSING_ERROR,
 		},
 	}
 
