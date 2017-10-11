@@ -467,10 +467,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
 		return nil
 	}
 
-	res, err := query.Run(tree, m.DefById)
-	if err != nil {
-		return nil
-	}
+	res := query.Run(tree, m.DefById)
 
 	return res
 }

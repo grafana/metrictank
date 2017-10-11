@@ -85,10 +85,7 @@ func queryAndCompareResults(t *testing.T, q TagQuery, expectedData TagIDs) {
 	t.Helper()
 	tagIdx, byId := getTestIndex(t)
 
-	res, err := q.Run(tagIdx, byId)
-	if err != nil {
-		t.Fatalf("Unexpected error when running query: %q", err)
-	}
+	res := q.Run(tagIdx, byId)
 
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Returned data does not match expected data:\nExpected: %+v\nGot: %+v", expectedData, res)
@@ -161,25 +158,25 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	tagIdx, byId := getTestIndex(t)
 
 	q, _ := NewTagQuery([]string{"key1=value1"}, 4)
-	res, _ := q.Run(tagIdx, byId)
+	res := q.Run(tagIdx, byId)
 	if len(res) != 1 {
 		t.Fatalf("Expected %d results, but got %d", 1, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 3)
-	res, _ = q.Run(tagIdx, byId)
+	res = q.Run(tagIdx, byId)
 	if len(res) != 2 {
 		t.Fatalf("Expected %d results, but got %d", 2, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 2)
-	res, _ = q.Run(tagIdx, byId)
+	res = q.Run(tagIdx, byId)
 	if len(res) != 3 {
 		t.Fatalf("Expected %d results, but got %d", 3, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 1)
-	res, _ = q.Run(tagIdx, byId)
+	res = q.Run(tagIdx, byId)
 	if len(res) != 4 {
 		t.Fatalf("Expected %d results, but got %d", 4, len(res))
 	}
