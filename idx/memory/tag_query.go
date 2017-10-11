@@ -207,7 +207,9 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
 		}
 	}
 
-	// shortcut if value == nil
+	// shortcut if value == nil.
+	// this will simply match any value, like ^.+. since we know that every value
+	// in the index must not be empty, we can skip the matching.
 	if q.match[startId].value == nil {
 		for _, ids := range index[q.match[startId].key] {
 			for id := range ids {
