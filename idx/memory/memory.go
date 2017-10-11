@@ -442,7 +442,7 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 	return results
 }
 
-func (m *MemoryIdx) IdsByTagExpressions(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err
