@@ -444,6 +444,11 @@ func (m *MemoryIdx) TagList(orgId int) []string {
 }
 
 func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err
