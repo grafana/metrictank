@@ -2,8 +2,8 @@ package memory
 
 import (
 	"errors"
-	"math"
 	"regexp"
+	"sort"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -20,20 +20,34 @@ const (
 	NOT_MATCH
 )
 
-type kv struct {
-	key   string
-	value string
-}
-
 type expression struct {
 	kv
 	operator int
 }
 
+type kv struct {
+	cost  uint // cost of evaluating expression, compared to other kv objects
+	key   string
+	value string
+}
+
 type kvRe struct {
+	cost  uint // cost of evaluating expression, compared to other kvRe objects
 	key   string
 	value *regexp.Regexp
 }
+
+type KvByCost []kv
+
+func (a KvByCost) Len() int           { return len(a) }
+func (a KvByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a KvByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
+
+type KvReByCost []kvRe
+
+func (a KvReByCost) Len() int           { return len(a) }
+func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
 type TagQuery struct {
 	from      int64
@@ -192,20 +206,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 
 func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
 	resultSet := make(TagIDs)
-	lowestCount := math.MaxUint32
 	startId := 0
-
-	// choose key that has the smallest number of values because we want to
-	// reduce the number of matches and start with the smallest possible resultSet.
-	// the smaller the resultSet the less time will have to be spent to further
-	// filter its values in the following expressions.
-	for i := range q.match {
-		l := len(index[q.match[i].key])
-		if l < lowestCount {
-			lowestCount = l
-			startId = i
-		}
-	}
 
 	// shortcut if value == nil.
 	// this will simply match any value, like ^.+. since we know that every value
@@ -233,20 +234,7 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
 
 func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 	resultSet := make(TagIDs)
-	lowestCount := math.MaxUint32
 	startId := 0
-
-	// choose key-value combo that has the smallest number of series IDs because
-	// we want to start with the smallest possible resultSet.
-	// the smaller the resultSet the less time will have to be spent to further
-	// filter its values in the following expressions.
-	for i := range q.equal {
-		l := len(index[q.equal[i].key][q.equal[i].value])
-		if l < lowestCount {
-			lowestCount = l
-			startId = i
-		}
-	}
 
 	// copy the map, because we'll later delete items from it
 	for k, v := range index[q.equal[startId].key][q.equal[startId].value] {
@@ -405,6 +393,19 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	var skipMatch, skipEqual = -1, -1
 	var resultSet TagIDs
+
+	for i := range q.equal {
+		q.equal[i].cost = uint(len(index[q.equal[i].key][q.equal[i].value]))
+	}
+
+	for i := range q.match {
+		q.match[i].cost = uint(len(index[q.match[i].key]))
+	}
+
+	sort.Sort(KvByCost(q.equal))
+	sort.Sort(KvByCost(q.notEqual))
+	sort.Sort(KvReByCost(q.match))
+	sort.Sort(KvReByCost(q.notMatch))
 
 	if q.startWith == EQUAL {
 		skipEqual, resultSet = q.getInitialByEqual(index)
