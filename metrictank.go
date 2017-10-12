@@ -374,11 +374,12 @@ func main() {
 	/***********************************
 		Start our inputs
 	***********************************/
+	pluginFatal := make(chan struct{})
 	for _, plugin := range inputs {
 		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
 			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
 		}
-		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()))
+		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()), pluginFatal)
 		plugin.MaintainPriority()
 	}
 
@@ -402,8 +403,12 @@ func main() {
 	/***********************************
 		Wait for Shutdown
 	***********************************/
-	sig := <-sigChan
-	log.Info("Received signal %q. Shutting down", sig)
+	select {
+	case sig := <-sigChan:
+		log.Info("Received signal %q. Shutting down", sig)
+	case <-pluginFatal:
+		log.Info("An input plugin signalled a fatal error. Shutting down")
+	}
 
 	// Leave the cluster. All other nodes will be notified we have left
 	// and so will stop sending us requests.

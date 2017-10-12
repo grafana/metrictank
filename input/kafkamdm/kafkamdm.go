@@ -34,6 +34,8 @@ type KafkaMdm struct {
 
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
+	// signal to caller that it should shutdown
+	fatal chan struct{}
 }
 
 func (k *KafkaMdm) Name() string {
@@ -194,8 +196,9 @@ func New() *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(handler input.Handler) {
+func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) {
 	k.Handler = handler
+	k.fatal = fatal
 	var err error
 	for _, topic := range topics {
 		for _, partition := range partitions {
@@ -211,7 +214,8 @@ func (k *KafkaMdm) Start(handler input.Handler) {
 				offset, err = k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 			}
 			if err != nil {
-				log.Fatal(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+				log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+				close(k.fatal)
 			}
 			go k.consumePartition(topic, partition, offset)
 		}
@@ -265,14 +269,18 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	// determine the pos of the topic and the initial offset of our consumer
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
 	if err != nil {
-		log.Fatal(3, "kafka-mdm %s", err)
+		log.Error(3, "kafka-mdm %s", err)
+		close(k.fatal)
+		return
 	}
 	if currentOffset == sarama.OffsetNewest {
 		currentOffset = newest
 	} else if currentOffset == sarama.OffsetOldest {
 		currentOffset, err = k.tryGetOffset(topic, partition, sarama.OffsetOldest, 7, time.Second*10)
 		if err != nil {
-			log.Fatal(3, "kafka-mdm %s", err)
+			log.Error(3, "kafka-mdm %s", err)
+			close(k.fatal)
+			return
 		}
 	}
 
@@ -283,13 +291,24 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
-		log.Fatal(4, "kafka-mdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+		log.Error(4, "kafka-mdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+		close(k.fatal)
+		return
 	}
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
 	for {
 		select {
-		case msg := <-messages:
+		case msg, ok := <-messages:
+			// https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions#why-am-i-getting-a-nil-message-from-the-sarama-consumer
+			if !ok {
+				log.Error(3, "kafka-mdm: kafka consumer for %s:%d has shutdown. stop consuming", topic, partition)
+				if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
+					log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+				}
+				close(k.fatal)
+				return
+			}
 			if LogLevel < 2 {
 				log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}

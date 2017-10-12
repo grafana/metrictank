@@ -106,7 +106,7 @@ func (c *Carbon) IntervalGetter(i IntervalGetter) {
 	c.intervalGetter = i
 }
 
-func (c *Carbon) Start(handler input.Handler) {
+func (c *Carbon) Start(handler input.Handler, fatal chan struct{}) {
 	c.Handler = handler
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
