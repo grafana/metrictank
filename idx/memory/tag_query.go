@@ -386,22 +386,20 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	if q.startWith == EQUAL {
 		resultSet = q.getInitialByEqual(index, q.equal[0])
+		q.equal = q.equal[1:]
 	} else {
 		resultSet = q.getInitialByMatch(index, q.match[0])
+		q.match = q.match[1:]
 	}
 
 	// filter the resultSet by the from condition and all other expressions given.
 	// filters should be in ascending order by the cpu required to process them,
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	if len(q.equal) > 1 {
-		q.filterByEqual(resultSet, index, q.equal[1:], false)
-	}
+	q.filterByEqual(resultSet, index, q.equal, false)
 	q.filterByEqual(resultSet, index, q.notEqual, true)
 	q.filterByFrom(resultSet, byId)
-	if len(q.match) > 1 {
-		q.filterByMatch(resultSet, byId, q.match[1:], false)
-	}
+	q.filterByMatch(resultSet, byId, q.match, false)
 	q.filterByMatch(resultSet, byId, q.notMatch, true)
 	return resultSet
 }
