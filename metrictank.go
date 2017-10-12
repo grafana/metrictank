@@ -400,7 +400,8 @@ func main() {
 	/***********************************
 		Wait for Shutdown
 	***********************************/
-	<-sigChan
+	sig := <-sigChan
+	log.Info("Received signal %q. Shutting down", sig)
 
 	// Leave the cluster. All other nodes will be notified we have left
 	// and so will stop sending us requests.
