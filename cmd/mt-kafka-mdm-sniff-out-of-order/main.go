@@ -149,10 +149,15 @@ func main() {
 	stats.NewDevnull() // make sure metrics don't pile up without getting discarded
 
 	mdm := inKafkaMdm.New()
-	mdm.Start(newInputOOOFinder(*format))
+	pluginFatal := make(chan struct{})
+	mdm.Start(newInputOOOFinder(*format), pluginFatal)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-	log.Info("stopping")
+	select {
+	case sig := <-sigChan:
+		log.Info("Received signal %q. Shutting down", sig)
+	case <-pluginFatal:
+		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
+	}
 	mdm.Stop()
 }

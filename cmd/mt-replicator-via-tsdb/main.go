@@ -105,10 +105,14 @@ func main() {
 	replicator := NewMetricsReplicator(*destinationURL, *destinationKey)
 	replicator.Start()
 	log.Info("starting metrics replicator")
-	consumer.Start(replicator)
-
-	<-sigChan
-	log.Info("metrics replicator shutdown started.")
+	pluginFatal := make(chan struct{})
+	consumer.Start(replicator, pluginFatal)
+	select {
+	case sig := <-sigChan:
+		log.Info("Received signal %q. Shutting down", sig)
+	case <-pluginFatal:
+		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
+	}
 	consumer.Stop()
 	replicator.Stop()
 	log.Info("shutdown complete")
