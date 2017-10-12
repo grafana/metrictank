@@ -317,14 +317,20 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 					continue
 				}
 
+				if e.key != tag[:len(e.key)] {
+					continue
+				}
+
+				value := tag[len(e.key)+1:]
+
 				// reduce regex matching by looking up cached non-matches
-				if _, ok := notMatchingTags[tag]; ok {
+				if _, ok := notMatchingTags[value]; ok {
 					continue
 				}
 
 				// value == nil means that this expression can be short cut
 				// by not evaluating it
-				if e.key == tag[:len(e.key)] && (e.value == nil || e.value.MatchString(tag[len(e.key)+1:])) {
+				if e.value == nil || e.value.MatchString(value) {
 					if len(matchingTags) < matchCacheSize {
 						matchingTags[tag] = struct{}{}
 					}
@@ -334,7 +340,7 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 					continue IDS
 				} else {
 					if len(notMatchingTags) < matchCacheSize {
-						notMatchingTags[tag] = struct{}{}
+						notMatchingTags[value] = struct{}{}
 					}
 				}
 			}
