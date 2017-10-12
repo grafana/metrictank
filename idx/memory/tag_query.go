@@ -204,24 +204,24 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	return q, nil
 }
 
-func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
+// getInitialByMatch returns the initial resultset by executing the given match expression
+func (q *TagQuery) getInitialByMatch(index TagIndex, expr kvRe) TagIDs {
 	resultSet := make(TagIDs)
-	startId := 0
 
 	// shortcut if value == nil.
 	// this will simply match any value, like ^.+. since we know that every value
 	// in the index must not be empty, we can skip the matching.
-	if q.match[startId].value == nil {
-		for _, ids := range index[q.match[startId].key] {
+	if expr.value == nil {
+		for _, ids := range index[expr.key] {
 			for id := range ids {
 				resultSet[id] = struct{}{}
 			}
 		}
-		return startId, resultSet
+		return resultSet
 	}
 
-	for v, ids := range index[q.match[startId].key] {
-		if !q.match[startId].value.MatchString(v) {
+	for v, ids := range index[expr.key] {
+		if !expr.value.MatchString(v) {
 			continue
 		}
 
@@ -229,19 +229,19 @@ func (q *TagQuery) getInitialByMatch(index TagIndex) (int, TagIDs) {
 			resultSet[id] = struct{}{}
 		}
 	}
-	return startId, resultSet
+	return resultSet
 }
 
-func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
+// getInitialByEqual returns the initial resultset by executing the given equal expression
+func (q *TagQuery) getInitialByEqual(index TagIndex, expr kv) TagIDs {
 	resultSet := make(TagIDs)
-	startId := 0
 
 	// copy the map, because we'll later delete items from it
-	for k, v := range index[q.equal[startId].key][q.equal[startId].value] {
+	for k, v := range index[expr.key][expr.value] {
 		resultSet[k] = v
 	}
 
-	return startId, resultSet
+	return resultSet
 }
 
 // filterByEqual filters a list of metric ids by the given expressions. if "not"
@@ -249,24 +249,13 @@ func (q *TagQuery) getInitialByEqual(index TagIndex) (int, TagIDs) {
 // one of its tags. if "not" is false the functionality is inverted, so it
 // removes all the ids where no tag is equal to at least one of the expressions.
 //
-// skipEqual:   an integer specifying an expression index that should be skipped
 // resultSet:   list of series IDs that should be filtered
 // index:       the tag index based on which to evaluate the conditions
 // not:         whether the resultSet shall be filtered by a = or != condition
 //
-func (q *TagQuery) filterByEqual(skipEqual int, resultSet TagIDs, index TagIndex, not bool) {
-	var expressions []kv
-	if not {
-		expressions = q.notEqual
-	} else {
-		expressions = q.equal
-	}
+func (q *TagQuery) filterByEqual(resultSet TagIDs, index TagIndex, exprs []kv, not bool) {
 
-	for i, e := range expressions {
-		if i == skipEqual {
-			continue
-		}
-
+	for _, e := range exprs {
 		indexIds := index[e.key][e.value]
 
 		// shortcut if key=value combo does not exist at all
@@ -286,24 +275,13 @@ func (q *TagQuery) filterByEqual(skipEqual int, resultSet TagIDs, index TagIndex
 
 // filterByMatch filters a list of metric ids by the given expressions.
 //
-// skipMatch:   an integer specifying an expression index that should be skipped
 // resultSet:   list of series IDs that should be filtered
 // byId:        ID keyed index of metric definitions, used to lookup the tags of IDs
 // not:         whether the resultSet shall be filtered by the =~ or !=~ condition
 //
-func (q *TagQuery) filterByMatch(skipMatch int, resultSet TagIDs, byId map[string]*idx.Archive, not bool) {
-	var expressions []kvRe
-	if not {
-		expressions = q.notMatch
-	} else {
-		expressions = q.match
-	}
+func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive, exprs []kvRe, not bool) {
 
-	for i, e := range expressions {
-		if i == skipMatch {
-			continue
-		}
-
+	for _, e := range exprs {
 		// cache all tags that have once matched the regular expression.
 		// this is based on the assumption that many matching tags will be repeated
 		// over multiple series, so there's no need to run the regex for each of them
@@ -391,7 +369,6 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 }
 
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
-	var skipMatch, skipEqual = -1, -1
 	var resultSet TagIDs
 
 	for i := range q.equal {
@@ -408,19 +385,23 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	sort.Sort(KvReByCost(q.notMatch))
 
 	if q.startWith == EQUAL {
-		skipEqual, resultSet = q.getInitialByEqual(index)
+		resultSet = q.getInitialByEqual(index, q.equal[0])
 	} else {
-		skipMatch, resultSet = q.getInitialByMatch(index)
+		resultSet = q.getInitialByMatch(index, q.match[0])
 	}
 
 	// filter the resultSet by the from condition and all other expressions given.
 	// filters should be in ascending order by the cpu required to process them,
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	q.filterByEqual(skipEqual, resultSet, index, false)
-	q.filterByEqual(-1, resultSet, index, true)
+	if len(q.equal) > 1 {
+		q.filterByEqual(resultSet, index, q.equal[1:], false)
+	}
+	q.filterByEqual(resultSet, index, q.notEqual, true)
 	q.filterByFrom(resultSet, byId)
-	q.filterByMatch(skipMatch, resultSet, byId, false)
-	q.filterByMatch(-1, resultSet, byId, true)
+	if len(q.match) > 1 {
+		q.filterByMatch(resultSet, byId, q.match[1:], false)
+	}
+	q.filterByMatch(resultSet, byId, q.notMatch, true)
 	return resultSet
 }
