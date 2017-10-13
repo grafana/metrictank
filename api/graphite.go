@@ -27,6 +27,7 @@ import (
 	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/tinylib/msgp/msgp"
 )
 
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
@@ -677,6 +678,11 @@ func getLocation(desc string) (*time.Location, error) {
 
 func (s *Server) graphiteTag(ctx *middleware.Context, request models.GraphiteTag) {
 	tag := ctx.Params(":tag")
+	if len(tag) <= 0 {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, "not tag specified"))
+		return
+	}
+
 	tagValues, err := s.clusterTag(ctx.Req.Context(), ctx.OrgId, tag)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
@@ -699,67 +705,33 @@ func (s *Server) graphiteTag(ctx *middleware.Context, request models.GraphiteTag
 }
 
 func (s *Server) clusterTag(ctx context.Context, orgId int, tag string) (map[string]uint32, error) {
-	peers, err := cluster.MembersForQuery()
-	if err != nil {
-		log.Error(3, "HTTP unable to get peers for tag, %s", err)
-		return nil, err
-	}
-
-	log.Debug("HTTP getting tag across %d instances", len(peers))
-	errors := make([]error, 0)
-
-	var mu sync.Mutex
 	var wg sync.WaitGroup
 	result := make(map[string]uint32)
 
-	for _, peer := range peers {
-		wg.Add(1)
-		if peer.IsLocal() {
-			go func() {
-				values := s.MetricIndex.Tag(orgId, tag)
-				mu.Lock()
-				for k, v := range values {
-					result[k] = result[k] + v
-				}
-				mu.Unlock()
-				wg.Done()
-			}()
-		} else {
-			go func(peer cluster.Node) {
-				log.Debug("HTTP Render querying %s/index/tags/%s for %d", peer.Name, tag, orgId)
-				data := models.IndexTag{OrgId: orgId, Tag: tag}
-				buf, err := peer.Post(ctx, "indexTag", fmt.Sprintf("/index/tags/%s", tag), data)
-
-				if err != nil {
-					log.Error(4, "HTTP Cluster tag error querying %s/index/tags/%s: %q", peer.Name, tag, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				resp := models.IndexTagResp{}
-				_, err = resp.UnmarshalMsg(buf)
-				if err != nil {
-					log.Error(4, "HTTP Cluster tag error unmarshaling body from %s/index/tags/%s: %q", peer.Name, tag, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				mu.Lock()
-				for k, v := range resp.Values {
-					result[k] = result[k] + v
-				}
-				mu.Unlock()
-				wg.Done()
-			}(peer)
+	wg.Add(1)
+	go func() {
+		values := s.MetricIndex.Tag(orgId, tag, 0)
+		for k, v := range values {
+			result[k] = result[k] + v
 		}
+		wg.Done()
+	}()
+
+	path := fmt.Sprintf("/index/tags/%s", tag)
+	data := models.IndexTag{OrgId: orgId, Tag: tag}
+	resp := &models.IndexTagResp{}
+	responses, err := s.clusterQuery(ctx, data, "clusterTag", path, resp)
+	if err != nil {
+		return nil, err
 	}
+
+	// wait for the local response to be processed
 	wg.Wait()
-	if len(errors) > 0 {
-		return nil, errors[0]
+
+	for _, resp := range responses {
+		for k, v := range resp.(*models.IndexTagResp).Values {
+			result[k] = result[k] + v
+		}
 	}
 
 	return result, nil
@@ -776,72 +748,42 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 }
 
 func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expressions []string) ([]string, error) {
-	peers, err := cluster.MembersForQuery()
+	var wg sync.WaitGroup
+	var errors []error
+	seriesSet := make(map[string]struct{})
+
+	wg.Add(1)
+	go func() {
+		result, err := s.MetricIndex.FindByTag(orgId, expressions, 0)
+		defer wg.Done()
+		if err != nil {
+			log.Error(4, "HTTP Render error querying /index/tags/findSeries: %q", err)
+			errors = append(errors, err)
+			return
+		}
+		for series := range result {
+			seriesSet[series.String()] = struct{}{}
+		}
+	}()
+
+	if len(errors) > 0 {
+		return nil, errors[0]
+	}
+
+	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions}
+	resp := &models.IndexTagFindSeriesResp{}
+	responses, err := s.clusterQuery(ctx, data, "clusterTagFindSeries", "/index/tags/FindSeries", resp)
 	if err != nil {
-		log.Error(3, "HTTP tagList unable to get peers, %s", err)
 		return nil, err
 	}
 
-	log.Debug("HTTP tagFindSeries across %d instances", len(peers))
-	seriesSet := make(map[string]struct{})
-	var errors []error
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		wg.Add(1)
-		if peer.IsLocal() {
-			go func() {
-				result, err := s.MetricIndex.IdsByTagExpressions(orgId, expressions)
-				if err != nil {
-					log.Error(4, "HTTP Render error querying %s/index/tags/findSeries: %q", peer.Name, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-				mu.Lock()
-				for _, series := range result {
-					seriesSet[series] = struct{}{}
-				}
-				mu.Unlock()
-				wg.Done()
-			}()
-		} else {
-			go func(peer cluster.Node) {
-				log.Debug("HTTP Render querying %s/index/tags/findSeries for %d", peer.Name, orgId)
-				data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions}
-				buf, err := peer.Post(ctx, "indexTagFindSeries", "/index/tags/findSeries", data)
-
-				if err != nil {
-					log.Error(4, "HTTP Render error querying %s/index/tags/findSeries: %q", peer.Name, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				resp := models.IndexTagFindSeriesResp{}
-				_, err = resp.UnmarshalMsg(buf)
-				if err != nil {
-					log.Error(4, "HTTP Find() error unmarshaling body from %s/index/tags/findSeries: %q", peer.Name, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				mu.Lock()
-				for _, series := range resp.Series {
-					seriesSet[series] = struct{}{}
-				}
-				mu.Unlock()
-				wg.Done()
-			}(peer)
-		}
-	}
+	// wait for the local response to be processed
 	wg.Wait()
-	if len(errors) > 0 {
-		return nil, errors[0]
+
+	for _, resp := range responses {
+		for _, series := range resp.(*models.IndexTagFindSeriesResp).Series {
+			seriesSet[series] = struct{}{}
+		}
 	}
 
 	series := make([]string, 0, len(seriesSet))
@@ -863,66 +805,32 @@ func (s *Server) graphiteTagList(ctx *middleware.Context, request models.Graphit
 }
 
 func (s *Server) clusterTagList(ctx context.Context, orgId int, from uint32) ([]string, error) {
-	peers, err := cluster.MembersForQuery()
+	var wg sync.WaitGroup
+	tagSet := make(map[string]struct{})
+
+	wg.Add(1)
+	go func() {
+		result := s.MetricIndex.TagList(orgId)
+		for _, tag := range result {
+			tagSet[tag] = struct{}{}
+		}
+		wg.Done()
+	}()
+
+	data := models.IndexTagList{OrgId: orgId, From: from}
+	resp := &models.IndexTagListResp{}
+	responses, err := s.clusterQuery(ctx, data, "clusterTagList", "/index/tags", resp)
 	if err != nil {
-		log.Error(3, "HTTP tagList unable to get peers, %s", err)
 		return nil, err
 	}
 
-	log.Debug("HTTP tagList across %d instances", len(peers))
-	errors := make([]error, 0)
-	tagSet := make(map[string]struct{})
-
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		wg.Add(1)
-		if peer.IsLocal() {
-			go func() {
-				result := s.MetricIndex.TagList(orgId, from)
-				mu.Lock()
-				for _, v := range result {
-					tagSet[v] = struct{}{}
-				}
-				mu.Unlock()
-				wg.Done()
-			}()
-		} else {
-			go func(peer cluster.Node) {
-				log.Debug("HTTP Render querying %s/index/tags for %d", peer.Name, orgId)
-				data := models.IndexTagList{OrgId: orgId, From: from}
-				buf, err := peer.Post(ctx, "indexTagList", "/index/tags", data)
-
-				if err != nil {
-					log.Error(4, "HTTP Render error querying %s/index/tags: %q", peer.Name, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				resp := models.IndexTagListResp{}
-				_, err = resp.UnmarshalMsg(buf)
-				if err != nil {
-					log.Error(4, "HTTP Find() error unmarshaling body from %s/index/tags: %q", peer.Name, err)
-					mu.Lock()
-					errors = append(errors, err)
-					mu.Unlock()
-					return
-				}
-
-				mu.Lock()
-				for _, tag := range resp.Tags {
-					tagSet[tag] = struct{}{}
-				}
-				mu.Unlock()
-				wg.Done()
-			}(peer)
-		}
-	}
+	// wait for the local response to be processed
 	wg.Wait()
-	if len(errors) > 0 {
-		return nil, errors[0]
+
+	for _, resp := range responses {
+		for _, tag := range resp.(*models.IndexTagListResp).Tags {
+			tagSet[tag] = struct{}{}
+		}
 	}
 
 	tags := make([]string, 0, len(tagSet))
@@ -931,4 +839,59 @@ func (s *Server) clusterTagList(ctx context.Context, orgId int, from uint32) ([]
 	}
 
 	return tags, nil
+}
+
+func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		log.Error(3, "HTTP clusterQuery unable to get peers, %s", err)
+		return nil, err
+	}
+	log.Debug("HTTP %s across %d instances", name, len(peers))
+
+	errors := make([]error, 0)
+	result := make([]msgp.Unmarshaler, 0, len(peers)-1)
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		if peer.IsLocal() {
+			continue
+		}
+		wg.Add(1)
+		go func(peer cluster.Node) {
+			defer wg.Done()
+			log.Debug("HTTP Render querying %s%s", peer.Name, path)
+			buf, err := peer.Post(ctx, name, path, data)
+
+			if err != nil {
+				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
+				mu.Lock()
+				errors = append(errors, err)
+				mu.Unlock()
+				return
+			}
+
+			resp := respTemplate
+			_, err = resp.UnmarshalMsg(buf)
+			if err != nil {
+				log.Error(4, "HTTP error unmarshaling body from %s%s: %q", peer.Name, path, err)
+				mu.Lock()
+				errors = append(errors, err)
+				mu.Unlock()
+				return
+			}
+
+			mu.Lock()
+			result = append(result, resp)
+			mu.Unlock()
+		}(peer)
+	}
+	wg.Wait()
+
+	if len(errors) > 0 {
+		return nil, errors[0]
+	}
+
+	return result, nil
 }

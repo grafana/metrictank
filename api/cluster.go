@@ -107,22 +107,27 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 }
 
 func (s *Server) indexTag(ctx *middleware.Context, req models.IndexTag) {
-	values := s.MetricIndex.Tag(req.OrgId, req.Tag)
+	values := s.MetricIndex.Tag(req.OrgId, req.Tag, 0)
+	fmt.Println(fmt.Sprintf("returning values: %+v", values))
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagResp{Values: values}))
 }
 
 func (s *Server) indexTagList(ctx *middleware.Context, req models.IndexTagList) {
-	tags := s.MetricIndex.TagList(req.OrgId, req.From)
+	tags := s.MetricIndex.TagList(req.OrgId)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagListResp{Tags: tags}))
 }
 
 func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTagFindSeries) {
-	ids, err := s.MetricIndex.IdsByTagExpressions(ctx.OrgId, req.Expressions)
+	ids, err := s.MetricIndex.FindByTag(ctx.OrgId, req.Expressions, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: ids}))
+	idStrings := make([]string, 0, len(ids))
+	for id := range ids {
+		idStrings = append(idStrings, id.String())
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: idStrings}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition

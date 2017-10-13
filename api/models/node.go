@@ -45,6 +45,9 @@ func (t IndexTagFindSeries) Trace(span opentracing.Span) {
 	span.SetTag("expressions", t.Expressions)
 }
 
+func (i IndexTagFindSeries) TraceDebug(span opentracing.Span) {
+}
+
 type IndexTag struct {
 	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
 	Tag   string `json:"tag"`
@@ -55,6 +58,9 @@ func (t IndexTag) Trace(span opentracing.Span) {
 	span.SetTag("tag", t.Tag)
 }
 
+func (i IndexTag) TraceDebug(span opentracing.Span) {
+}
+
 type IndexTagList struct {
 	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
 	From  uint32 `json:"from" form:"from"`
@@ -63,6 +69,9 @@ type IndexTagList struct {
 func (t IndexTagList) Trace(span opentracing.Span) {
 	span.SetTag("org", t.OrgId)
 	span.SetTag("from", t.From)
+}
+
+func (i IndexTagList) TraceDebug(span opentracing.Span) {
 }
 
 type IndexGet struct {
