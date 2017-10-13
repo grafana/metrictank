@@ -520,6 +520,7 @@ func TestPrune(t *testing.T) {
 	})
 
 }
+
 func TestSingleNodeMetric(t *testing.T) {
 	ix := New()
 	ix.Init()

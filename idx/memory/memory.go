@@ -42,18 +42,26 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled bool
+	Enabled        bool
+	matchCacheSize int
+	tagSupport     bool
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
+	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }
 
 type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
+
+type TagIDs map[idx.MetricID]struct{} // set of ids
+type TagValue map[string]TagIDs       // value -> set of ids
+type TagIndex map[string]TagValue     // key -> list of values
 
 type Node struct {
 	Path     string
@@ -81,12 +89,16 @@ type MemoryIdx struct {
 	sync.RWMutex
 	DefById map[string]*idx.Archive
 	Tree    map[int]*Tree
+
+	// org id -> key name -> key value -> id
+	Tags map[int]TagIndex
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
 		DefById: make(map[string]*idx.Archive),
 		Tree:    make(map[int]*Tree),
+		Tags:    make(map[int]TagIndex),
 	}
 }
 
@@ -117,6 +129,11 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	archive := m.add(def)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
+
+	if tagSupport {
+		m.indexTags(def)
+	}
+
 	return archive
 }
 
@@ -128,6 +145,90 @@ func (m *MemoryIdx) Update(entry idx.Archive) {
 	}
 	*(m.DefById[entry.Id]) = entry
 	m.Unlock()
+}
+
+// indexTags reads the tags of a given metric definition and creates the
+// corresponding tag index entries to refer to it. It assumes a lock is
+// already held.
+func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
+	tags, ok := m.Tags[def.OrgId]
+	if !ok {
+		tags = make(TagIndex)
+		m.Tags[def.OrgId] = tags
+	}
+	for _, tag := range def.Tags {
+		tagSplits := strings.SplitN(tag, "=", 2)
+		if len(tagSplits) < 2 {
+			// should never happen because every tag in the index
+			// must have a valid format
+			invalidTag.Inc()
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
+			continue
+		}
+
+		tagName := tagSplits[0]
+		tagValue := tagSplits[1]
+
+		if _, ok = tags[tagName]; !ok {
+			tags[tagName] = make(TagValue)
+		}
+
+		if _, ok = tags[tagName][tagValue]; !ok {
+			tags[tagName][tagValue] = make(TagIDs)
+		}
+
+		id, err := idx.NewMetricIDFromString(def.Id)
+		if err != nil {
+			// should never happen because all IDs in the index must have
+			// a valid format
+			invalidId.Inc()
+			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+			continue
+		}
+		tags[tagName][tagValue][id] = struct{}{}
+	}
+}
+
+// deindexTags takes a given metric definition and removes all references
+// to it from the tag index. It assumes a lock is already held.
+func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
+	tags, ok := m.Tags[def.OrgId]
+	if !ok {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
+		return
+	}
+
+	for _, tag := range def.Tags {
+		tagSplits := strings.SplitN(tag, "=", 2)
+		if len(tagSplits) < 2 {
+			// should never happen because every tag in the index
+			// must have a valid format
+			invalidTag.Inc()
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
+			continue
+		}
+
+		tagName := tagSplits[0]
+		tagValue := tagSplits[1]
+
+		id, err := idx.NewMetricIDFromString(def.Id)
+		if err != nil {
+			// should never happen because all IDs in the index must have
+			// a valid format
+			invalidId.Inc()
+			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+			continue
+		}
+		delete(tags[tagName][tagValue], id)
+
+		if len(tags[tagName][tagValue]) == 0 {
+			delete(tags[tagName], tagValue)
+			if len(tags[tagName]) == 0 {
+				delete(tags, tagName)
+			}
+		}
+	}
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -142,6 +243,11 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 			continue
 		}
 		m.add(def)
+
+		if tagSupport {
+			m.indexTags(def)
+		}
+
 		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This wont exactly match the true lastSave Timstamp,
 		// but it will be close enough and it will always be true that the lastSave was at
@@ -233,6 +339,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	}
 	m.DefById[def.Id] = archive
 	statAdd.Inc()
+
 	return *archive
 }
 
@@ -267,6 +374,101 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 		archives[i] = *archive
 	}
 	return archives
+}
+
+func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	var tags TagIndex
+	var ok bool
+	if tags, ok = m.Tags[orgId]; !ok {
+		return nil
+	}
+
+	result := make(map[string]uint32)
+
+	for value, ids := range tags[tag] {
+		valueCnt := uint32(0)
+		for id := range ids {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = m.DefById[id.String()]; !ok {
+				// should never happen because every ID that is in the tag index
+				// must be present in the byId lookup table
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+				continue
+			}
+
+			if def.LastUpdate < from {
+				continue
+			}
+
+			valueCnt++
+		}
+		if valueCnt > 0 {
+			result[value] = valueCnt
+		}
+	}
+
+	return result
+}
+
+func (m *MemoryIdx) TagList(orgId int) []string {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	var tags TagIndex
+	var ok bool
+	if tags, ok = m.Tags[orgId]; !ok {
+		return nil
+	}
+
+	results := make([]string, len(tags))
+	i := 0
+	for k := range tags {
+		results[i] = k
+		i++
+	}
+
+	return results
+}
+
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	query, err := NewTagQuery(expressions, from)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.idsByTagQuery(orgId, query), nil
+}
+
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
+	m.RLock()
+	defer m.RUnlock()
+
+	tree, ok := m.Tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	return query.Run(tree, m.DefById)
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
@@ -450,6 +652,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 		deletedDefs = append(deletedDefs, deleted...)
 	}
 	statDeleteDuration.Value(time.Since(pre))
+
 	return deletedDefs, nil
 }
 
@@ -462,6 +665,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		for _, child := range n.Children {
 			node, ok := tree.Items[n.Path+"."+child]
 			if !ok {
+				corruptIndex.Inc()
 				log.Error(3, "memory-idx: node %s missing. Index is corrupt.", n.Path+"."+child)
 				continue
 			}
@@ -496,6 +700,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		log.Debug("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", branch)
 			continue
 		}
@@ -516,11 +721,13 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		}
 
 		if len(bNode.Children) == 0 {
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
 			break
 		}
 
 		if bNode.Children[0] != nodes[i] {
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
@@ -531,6 +738,12 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		}
 		log.Debug("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
 		delete(tree.Items, branch)
+	}
+
+	if tagSupport {
+		for _, def := range deletedDefs {
+			m.deindexTags(&(def.MetricDefinition))
+		}
 	}
 
 	return deletedDefs

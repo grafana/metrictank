@@ -29,6 +29,7 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 * `metrictank.stats.$environment.$instance.store.cassandra.chunk_operations.save_ok.counter32`: number of saved chunks (based on your chunkspan settings)
 * `metrictank.stats.$environment.$instance.api.request_handle.values.rate32` : rate per second of render requests
+* `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
 
 
 

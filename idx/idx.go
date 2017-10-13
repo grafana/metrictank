@@ -3,15 +3,21 @@
 package idx
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	schema "gopkg.in/raintank/schema.v1"
 )
 
 var (
-	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
-	BranchUnderLeaf   = errors.New("can't add branch under leaf")
+	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
+	BranchUnderLeaf    = errors.New("can't add branch under leaf")
+	errInvalidQuery    = errors.New("invalid query")
+	errInvalidIdString = errors.New("invalid ID string")
 )
 
 //go:generate msgp
@@ -27,6 +33,42 @@ type Archive struct {
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+}
+
+type MetricID struct {
+	org int
+	key [16]byte
+}
+
+func NewMetricIDFromString(s string) (MetricID, error) {
+	id := MetricID{}
+	err := id.FromString(s)
+	return id, err
+}
+
+func (id *MetricID) FromString(s string) error {
+	splits := strings.Split(s, ".")
+	if len(splits) != 2 || len(splits[1]) != 32 {
+		return errInvalidIdString
+	}
+
+	var err error
+	id.org, err = strconv.Atoi(splits[0])
+	if err != nil {
+		return err
+	}
+
+	dst := make([]byte, 16)
+	n, err := hex.Decode(dst, []byte(splits[1]))
+	if n != 16 {
+		return errInvalidIdString
+	}
+	copy(id.key[:], dst)
+	return nil
+}
+
+func (id *MetricID) String() string {
+	return fmt.Sprintf("%d.%x", id.org, id.key)
 }
 
 // used primarily by tests, for convenience
@@ -101,7 +143,26 @@ Interface
   passed is -1, then the all orgs should be examined for stale metrics to be deleted.
   The method returns a list of the metricDefinitions deleted from the index and any
   error encountered.
+
+* TagList(int) []string:
+  This method returns a list of all tag keys associated with the metrics of a given
+  organization.
+
+* Tag(int, string, int64) map[string]uint32:
+  This method returns a list of all values associated with a given tag key in the
+  given org. The occurences of each value is counted and the count is referred to by
+  the series ids in the returned map. If the third parameter is > 0 then the metrics
+  will be filtered and only those of which the LastUpdate time is >= the from
+  timestamp will be considered while the others are being ignored.
+
+* FindByTag(int, []string, int64) ([]string, error):
+  This method takes a list of expressions in the format key<operator>value.
+  The allowed operators are: =, !=, =~, !=~.
+  It returns a slice of IDs that match the given conditions, the conditions are
+  logically AND-ed. If the third argument is > 0 then the results will be filtered
+  and only those where the LastUpdate time is >= from will be returned as results.
 */
+
 type MetricIndex interface {
 	Init() error
 	Stop()
@@ -112,4 +173,7 @@ type MetricIndex interface {
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive
 	Prune(int, time.Time) ([]Archive, error)
+	TagList(int) []string
+	Tag(int, string, int64) map[string]uint32
+	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
 }

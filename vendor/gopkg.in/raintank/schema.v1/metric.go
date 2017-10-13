@@ -15,6 +15,7 @@ var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var errInvalidEmptyName = errors.New("name cannot be empty")
 var errInvalidEmptyMetric = errors.New("metric cannot be empty")
 var errInvalidMtype = errors.New("invalid mtype")
+var errInvalidTagFormat = errors.New("invalid tag format")
 
 type PartitionedMetric interface {
 	Validate() error
@@ -60,6 +61,9 @@ func (m *MetricData) Validate() error {
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
+	}
+	if !validateTags(m.Tags) {
+		return errInvalidTagFormat
 	}
 	return nil
 }
@@ -155,6 +159,9 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
 	}
+	if !validateTags(m.Tags) {
+		return errInvalidTagFormat
+	}
 	return nil
 }
 
@@ -201,4 +208,52 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		Unit:       d.Unit,
 		Tags:       tags,
 	}
+}
+
+// validateTags verifies that all the tags are of a valid format. If one or more
+// are invalid it returns false, otherwise true.
+// a valid format is anything that looks like key=value, the length of key and
+// value must be >0 and both must not contain the ; character.
+func validateTags(tags []string) bool {
+	for _, t := range tags {
+		if len(t) == 0 {
+			return false
+		}
+
+		// any = must not be the first character
+		if t[0] == 61 {
+			return false
+		}
+
+		foundEqual := false
+		for pos := 0; pos < len(t); pos++ {
+			// no ; allowed
+			if t[pos] == 59 {
+				return false
+			}
+
+			if !foundEqual {
+				// no ! allowed in key
+				if t[pos] == 33 {
+					return false
+				}
+
+				// found the first =, so this will be the separator between key & value
+				if t[pos] == 61 {
+					// first equal sign must not be the last character
+					if pos == len(t)-1 {
+						return false
+					}
+
+					foundEqual = true
+				}
+			}
+		}
+
+		if !foundEqual {
+			return false
+		}
+	}
+
+	return true
 }
