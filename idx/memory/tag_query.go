@@ -301,6 +301,7 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 				continue IDS
 			}
 
+		TAGS:
 			for _, tag := range def.Tags {
 				// length of key doesn't match
 				if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
@@ -315,7 +316,9 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 
 				// reduce regex matching by looking up cached non-matches
 				if _, ok := notMatchingTags[value]; ok {
-					continue
+					// each key should only be present once per `def`, so if
+					// the key matches but the value doesn't we can skip the def
+					break TAGS
 				}
 
 				// reduce regex matching by looking up cached matches
