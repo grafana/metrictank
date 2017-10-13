@@ -50,8 +50,8 @@ var (
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
-	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "")
-	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "")
+	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }
 
