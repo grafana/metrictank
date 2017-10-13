@@ -295,7 +295,7 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 			if def, ok = byId[id.String()]; !ok {
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
-				CorruptIndex.Inc()
+				corruptIndex.Inc()
 				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
 				delete(resultSet, id)
 				continue IDS
@@ -360,7 +360,7 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 		if def, ok = byId[id.String()]; !ok {
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
-			CorruptIndex.Inc()
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
 			delete(resultSet, id)
 			continue

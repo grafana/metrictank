@@ -161,7 +161,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		if len(tagSplits) < 2 {
 			// should never happen because every tag in the index
 			// must have a valid format
-			InvalidTagInIndex.Inc()
+			invalidTag.Inc()
 			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
@@ -181,7 +181,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		if err != nil {
 			// should never happen because all IDs in the index must have
 			// a valid format
-			CorruptIndex.Inc()
+			invalidId.Inc()
 			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 			continue
 		}
@@ -194,6 +194,8 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	tags, ok := m.Tags[def.OrgId]
 	if !ok {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
 		return
 	}
 
@@ -202,7 +204,7 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 		if len(tagSplits) < 2 {
 			// should never happen because every tag in the index
 			// must have a valid format
-			InvalidTagInIndex.Inc()
+			invalidTag.Inc()
 			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
@@ -214,7 +216,7 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 		if err != nil {
 			// should never happen because all IDs in the index must have
 			// a valid format
-			CorruptIndex.Inc()
+			invalidId.Inc()
 			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 			continue
 		}
@@ -399,8 +401,8 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 			if def, ok = m.DefById[id.String()]; !ok {
 				// should never happen because every ID that is in the tag index
 				// must be present in the byId lookup table
-				CorruptIndex.Inc()
-				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
 				continue
 			}
 
@@ -663,7 +665,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		for _, child := range n.Children {
 			node, ok := tree.Items[n.Path+"."+child]
 			if !ok {
-				CorruptIndex.Inc()
+				corruptIndex.Inc()
 				log.Error(3, "memory-idx: node %s missing. Index is corrupt.", n.Path+"."+child)
 				continue
 			}
@@ -698,7 +700,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		log.Debug("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {
-			CorruptIndex.Inc()
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", branch)
 			continue
 		}
@@ -719,13 +721,13 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		}
 
 		if len(bNode.Children) == 0 {
-			CorruptIndex.Inc()
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
 			break
 		}
 
 		if bNode.Children[0] != nodes[i] {
-			CorruptIndex.Inc()
+			corruptIndex.Inc()
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
