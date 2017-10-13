@@ -302,16 +302,6 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 			}
 
 			for _, tag := range def.Tags {
-				// reduce regex matching by looking up cached matches
-				if _, ok := matchingTags[tag]; ok {
-					if not {
-						delete(resultSet, id)
-					}
-					continue IDS
-				}
-			}
-
-			for _, tag := range def.Tags {
 				// length of key doesn't match
 				if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
 					continue
@@ -328,11 +318,19 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 					continue
 				}
 
+				// reduce regex matching by looking up cached matches
+				if _, ok := matchingTags[value]; ok {
+					if not {
+						delete(resultSet, id)
+					}
+					continue IDS
+				}
+
 				// value == nil means that this expression can be short cut
 				// by not evaluating it
 				if e.value == nil || e.value.MatchString(value) {
 					if len(matchingTags) < matchCacheSize {
-						matchingTags[tag] = struct{}{}
+						matchingTags[value] = struct{}{}
 					}
 					if not {
 						delete(resultSet, id)
