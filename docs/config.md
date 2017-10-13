@@ -350,6 +350,10 @@ create-keyspace = true
 ```
 [memory-idx]
 enabled = false
+# enables/disables querying based on tags
+tag-support = false
+# size of regular expression cache in tag query evaluation
+match-cache-size = 1000
 ```
 
 # storage-schemas.conf
