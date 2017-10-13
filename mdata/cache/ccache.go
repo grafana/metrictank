@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	maxSize        uint64
-	cacheMetricBug = stats.NewCounter32("cache.ops.metric.searchForward-bug-surpressed")
+	maxSize      uint64
+	searchFwdBug = stats.NewCounter32("recovered_errors.cache.metric.searchForwardBug")
 )
 
 func init() {
