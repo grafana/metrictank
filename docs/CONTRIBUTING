@@ -14,5 +14,6 @@ When contributing PR's:
    * all other config files should also be in sync with metrictank-sample.ini except where the file should differ on purpose.
    (example: `docker/docker-cluster/metrictank.ini` is the same as metrictank-sample.ini except for the options that support the use case of running metrictank in a cluster)
    Use `scripts/sync-configs.sh` which helps with the process of updating all configs based on metrictank-sample.ini.
+   Use `scripts/configs-to-doc.sh` to sync the sample configuration into the documentation.
 9. PR's will only be merged if all tests pass
 10. Any errors which can be recovered from sanely, must do so. And must trigger a high-level recovery metric (see other recovered_errors metrics) and an error message describing the problem.
