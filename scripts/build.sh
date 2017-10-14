@@ -5,7 +5,8 @@ cd ${DIR}
 
 # make sure CircleCI gets all tags properly.
 # see https://discuss.circleci.com/t/where-are-my-git-tags/2371
-git fetch --unshallow
+# and https://stackoverflow.com/questions/37531605/how-to-test-if-git-repository-is-shallow
+[ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
 GITVERSION=`git describe --always`
 SOURCEDIR=${DIR}/..
