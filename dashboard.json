@@ -2740,12 +2740,16 @@
             {
               "refId": "B",
               "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.idx.cassandra.save.skipped.counter32), 7, 'sum')"
+            },
+            {
+              "refId": "C",
+              "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.recovered_errors.idx.*.*.counter32), 7, 'sum')"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "cassandra idx errors",
+          "title": "idx errors",
           "tooltip": {
             "msResolution": false,
             "shared": true,
@@ -3217,7 +3221,7 @@
             },
             {
               "refId": "D",
-              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.cache.ops.metric.searchForward-bug-surpressed.counter32)), 'cache-bug-surpress')"
+              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.recovered_errors.cache.metric.searchForwardBug.counter32)), 'cache-bug-surpress')"
             }
           ],
           "thresholds": [],
