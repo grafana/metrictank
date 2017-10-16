@@ -112,7 +112,11 @@ func (s *Server) indexTag(ctx *middleware.Context, req models.IndexTag) {
 }
 
 func (s *Server) indexTagList(ctx *middleware.Context, req models.IndexTagList) {
-	tags := s.MetricIndex.TagList(req.OrgId)
+	tags, err := s.MetricIndex.TagList(req.OrgId, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagListResp{Tags: tags}))
 }
 
