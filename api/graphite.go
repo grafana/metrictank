@@ -754,8 +754,8 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 
 	wg.Add(1)
 	go func() {
-		result, err := s.MetricIndex.FindByTag(orgId, expressions, 0)
 		defer wg.Done()
+		result, err := s.MetricIndex.FindByTag(orgId, expressions, 0)
 		if err != nil {
 			log.Error(4, "HTTP Render error querying /index/tags/findSeries: %q", err)
 			errors = append(errors, err)
@@ -772,7 +772,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 
 	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions}
 	resp := &models.IndexTagFindSeriesResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTagFindSeries", "/index/tags/FindSeries", resp)
+	responses, err := s.clusterQuery(ctx, data, "clusterTagFindSeries", "/index/tags/findSeries", resp)
 	if err != nil {
 		return nil, err
 	}
