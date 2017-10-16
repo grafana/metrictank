@@ -7,6 +7,9 @@ http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
 package tsz
 
 import (
+	"bytes"
+	"encoding/binary"
+	"io"
 	"math"
 	"sync"
 
@@ -31,6 +34,7 @@ type Series struct {
 	tDelta uint32
 }
 
+// New series
 func New(t0 uint32) *Series {
 	s := Series{
 		T0:      t0,
@@ -44,6 +48,7 @@ func New(t0 uint32) *Series {
 
 }
 
+// Bytes value of the series stream
 func (s *Series) Bytes() []byte {
 	s.Lock()
 	defer s.Unlock()
@@ -57,6 +62,7 @@ func finish(w *bstream) {
 	w.writeBit(zero)
 }
 
+// Finish the series by writing an end-of-stream record
 func (s *Series) Finish() {
 	s.Lock()
 	if !s.finished {
@@ -66,6 +72,7 @@ func (s *Series) Finish() {
 	s.Unlock()
 }
 
+// Push a timestamp and value to the series
 func (s *Series) Push(t uint32, v float64) {
 	s.Lock()
 	defer s.Unlock()
@@ -140,6 +147,7 @@ func (s *Series) Push(t uint32, v float64) {
 
 }
 
+// Iter lets you iterate over a series.  It is not concurrency-safe.
 func (s *Series) Iter() *Iter {
 	s.Lock()
 	w := s.bw.clone()
@@ -182,10 +190,12 @@ func bstreamIterator(br *bstream) (*Iter, error) {
 	}, nil
 }
 
+// NewIterator for the series
 func NewIterator(b []byte) (*Iter, error) {
 	return bstreamIterator(newBReader(b))
 }
 
+// Next iteration of the series iterator
 func (it *Iter) Next() bool {
 
 	if it.err != nil || it.finished {
@@ -282,8 +292,8 @@ func (it *Iter) Next() bool {
 	if bit == zero {
 		// it.val = it.val
 	} else {
-		bit, err := it.br.readBit()
-		if err != nil {
+		bit, itErr := it.br.readBit()
+		if itErr != nil {
 			it.err = err
 			return false
 		}
@@ -325,10 +335,75 @@ func (it *Iter) Next() bool {
 	return true
 }
 
+// Values at the current iterator position
 func (it *Iter) Values() (uint32, float64) {
 	return it.t, it.val
 }
 
+// Err error at the current iterator position
 func (it *Iter) Err() error {
 	return it.err
+}
+
+type errMarshal struct {
+	w   io.Writer
+	r   io.Reader
+	err error
+}
+
+func (em *errMarshal) write(t interface{}) {
+	if em.err != nil {
+		return
+	}
+	em.err = binary.Write(em.w, binary.BigEndian, t)
+}
+
+func (em *errMarshal) read(t interface{}) {
+	if em.err != nil {
+		return
+	}
+	em.err = binary.Read(em.r, binary.BigEndian, t)
+}
+
+// MarshalBinary implements the encoding.BinaryMarshaler interface
+func (s *Series) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	em := &errMarshal{w: buf}
+	em.write(s.T0)
+	em.write(s.leading)
+	em.write(s.t)
+	em.write(s.tDelta)
+	em.write(s.trailing)
+	em.write(s.val)
+	bStream, err := s.bw.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	em.write(bStream)
+	if em.err != nil {
+		return nil, em.err
+	}
+	return buf.Bytes(), nil
+}
+
+// UnmarshalBinary implements the encoding.BinaryUnmarshaler interface
+func (s *Series) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewReader(b)
+	em := &errMarshal{r: buf}
+	em.read(&s.T0)
+	em.read(&s.leading)
+	em.read(&s.t)
+	em.read(&s.tDelta)
+	em.read(&s.trailing)
+	em.read(&s.val)
+	outBuf := make([]byte, buf.Len())
+	em.read(outBuf)
+	err := s.bw.UnmarshalBinary(outBuf)
+	if err != nil {
+		return err
+	}
+	if em.err != nil {
+		return em.err
+	}
+	return nil
 }

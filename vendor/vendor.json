@@ -93,10 +93,10 @@
 			"revisionTime": "2016-05-05T06:20:16Z"
 		},
 		{
-			"checksumSHA1": "bJkM/x02zeuwA6avbGn2yvqjp20=",
+			"checksumSHA1": "zC6krCicqnGbnoIlFwxwcRdXq2g=",
 			"path": "github.com/dgryski/go-tsz",
-			"revision": "5f4c484a9e838989c201ff437b3cab59cfdc46c8",
-			"revisionTime": "2016-03-17T11:56:01Z"
+			"revision": "6d3fe56fbb2a1013b1f7dc4d05cc4a3a793ce13f",
+			"revisionTime": "2016-09-04T10:19:19Z"
 		},
 		{
 			"checksumSHA1": "dn4hgSC9vkkMREpbcoMihPGCA88=",

@@ -1,6 +1,8 @@
 package tsz
 
 import (
+	"bytes"
+	"encoding/binary"
 	"io"
 )
 
@@ -156,18 +158,52 @@ func (b *bstream) readBits(nbits int) (uint64, error) {
 		nbits -= 8
 	}
 
-	var err error
-	for nbits > 0 && err != io.EOF {
-		byt, err := b.readBit()
-		if err != nil {
-			return 0, err
-		}
-		u <<= 1
-		if byt {
-			u |= 1
-		}
-		nbits--
+	if nbits == 0 {
+		return u, nil
 	}
 
+	if nbits > int(b.count) {
+		u = (u << uint(b.count)) | uint64(b.stream[0]>>(8-b.count))
+		nbits -= int(b.count)
+		b.stream = b.stream[1:]
+
+		if len(b.stream) == 0 {
+			return 0, io.EOF
+		}
+		b.count = 8
+	}
+
+	u = (u << uint(nbits)) | uint64(b.stream[0]>>(8-uint(nbits)))
+	b.stream[0] <<= uint(nbits)
+	b.count -= uint8(nbits)
 	return u, nil
+}
+
+// MarshalBinary implements the encoding.BinaryMarshaler interface
+func (b *bstream) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.BigEndian, b.count)
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Write(buf, binary.BigEndian, b.stream)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// UnmarshalBinary implements the encoding.BinaryUnmarshaler interface
+func (b *bstream) UnmarshalBinary(bIn []byte) error {
+	buf := bytes.NewReader(bIn)
+	err := binary.Read(buf, binary.BigEndian, &b.count)
+	if err != nil {
+		return err
+	}
+	b.stream = make([]byte, buf.Len())
+	err = binary.Read(buf, binary.BigEndian, &b.stream)
+	if err != nil {
+		return err
+	}
+	return nil
 }
