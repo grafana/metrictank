@@ -144,9 +144,9 @@ Interface
   The method returns a list of the metricDefinitions deleted from the index and any
   error encountered.
 
-* TagList(int) []string:
+* TagList(int, string, int64) ([]string, error):
   This method returns a list of all tag keys associated with the metrics of a given
-  organization.
+  organization. The return values are filtered by the regex in the second parameter.
 
 * Tag(int, string, int64) map[string]uint32:
   This method returns a list of all values associated with a given tag key in the
@@ -173,7 +173,7 @@ type MetricIndex interface {
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive
 	Prune(int, time.Time) ([]Archive, error)
-	TagList(int) []string
+	TagList(int, string, int64) ([]string, error)
 	Tag(int, string, int64) map[string]uint32
 	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
 }

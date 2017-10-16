@@ -62,8 +62,9 @@ func (i IndexTag) TraceDebug(span opentracing.Span) {
 }
 
 type IndexTagList struct {
-	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
-	From  uint32 `json:"from" form:"from"`
+	OrgId  int    `json:"orgId" binding:"Required"`
+	Filter string `json:"filter"`
+	From   int64  `json:"from"`
 }
 
 func (t IndexTagList) Trace(span opentracing.Span) {

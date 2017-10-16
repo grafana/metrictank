@@ -420,29 +420,108 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 	return result
 }
 
-func (m *MemoryIdx) TagList(orgId int) []string {
+func (m *MemoryIdx) TagList(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
+		return nil, nil
+	}
+
+	var re *regexp.Regexp
+	if len(filter) > 0 {
+		var err error
+		if filter[0] != byte('^') {
+			filter = "^(" + filter + ")"
+		}
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// if from is not given we can simplify the querying
+	if from == 0 {
+		m.RLock()
+		defer m.RUnlock()
+
+		tree, ok := m.Tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		keys := make([]string, 0, len(tree))
+		for key := range tree {
+			if re != nil && !re.MatchString(key) {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		return keys, nil
+	}
+
+	// need to get all ids filtered only by from
+	expressions := []string{"name!="}
+	query, err := NewTagQuery(expressions, from)
+	if err != nil {
+		return nil, err
 	}
 
 	m.RLock()
 	defer m.RUnlock()
 
-	var tags TagIndex
-	var ok bool
-	if tags, ok = m.Tags[orgId]; !ok {
-		return nil
+	tree, ok := m.Tags[orgId]
+	if !ok {
+		return nil, nil
 	}
 
-	results := make([]string, len(tags))
-	i := 0
-	for k := range tags {
-		results[i] = k
+	ids := query.Run(tree, m.DefById)
+	tagKeysMap := make(map[string]struct{})
+	for id := range ids {
+		def, ok := m.DefById[id.String()]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+			continue
+		}
+		for _, tag := range def.Tags {
+			tagSplits := strings.SplitN(tag, "=", 2)
+			if len(tagSplits) < 2 {
+				// should never happen because every tag in the index
+				// must have a valid format
+				invalidTag.Inc()
+				log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
+				continue
+			}
+			if re != nil && !re.MatchString(tagSplits[0]) {
+				continue
+			}
+			tagKeysMap[tagSplits[0]] = struct{}{}
+		}
+	}
+
+	tagKeys := make([]string, len(tagKeysMap))
+	i := uint32(0)
+	for key := range tagKeysMap {
+		tagKeys[i] = key
 		i++
 	}
 
-	return results
+	return tagKeys, nil
+}
+
+// resolves a list of ids (TagIDs) into a list of metric names
+// assumes that at least a read lock is already held by the caller
+func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
+	res := make([]string, len(ids))
+	i := uint32(0)
+	for id := range ids {
+		def, ok := m.DefById[id.String()]
+		if !ok {
+			continue
+		}
+		res[i] = def.Name
+		i++
+	}
+	return res
 }
 
 func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
