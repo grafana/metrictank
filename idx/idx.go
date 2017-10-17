@@ -176,4 +176,5 @@ type MetricIndex interface {
 	TagList(int, string, int64) ([]string, error)
 	Tag(int, string, int64) map[string]uint32
 	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
+	TagKeys(int, string, int64) ([]string, error)
 }
