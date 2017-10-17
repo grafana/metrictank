@@ -40,6 +40,11 @@ type MetricID struct {
 	key [16]byte
 }
 
+type TagValueDetail struct {
+	Value string
+	Count uint64
+}
+
 func NewMetricIDFromString(s string) (MetricID, error) {
 	id := MetricID{}
 	err := id.FromString(s)
@@ -177,4 +182,5 @@ type MetricIndex interface {
 	Tag(int, string, int64) map[string]uint32
 	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
 	TagKeys(int, string, int64) ([]string, error)
+	TagValues(int, string, string, int64) ([]TagValueDetail, error)
 }

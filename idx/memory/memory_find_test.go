@@ -210,19 +210,137 @@ func Init() {
 	}
 }
 
+func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected []idx.TagValueDetail) {
+	values, err := ix.TagValues(1, key, filter, from)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	if len(values) != len(expected) {
+		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
+	}
+
+	for _, e := range expected {
+		found := false
+		for _, v := range values {
+			if e.Value == v.Value {
+				found = true
+				if e.Count != v.Count {
+					t.Fatalf("Expected count %d for %s, but got %d", e.Count, e.Value, v.Count)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("Expected value %s, but did not find it", e.Value)
+		}
+	}
+}
+
+func TestTagValuesWithoutFilters(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	expected := []idx.TagValueDetail{
+		{
+			Value: "dc0",
+			Count: 336000,
+		}, {
+			Value: "dc1",
+			Count: 336000,
+		}, {
+			Value: "dc2",
+			Count: 336000,
+		}, {
+			Value: "dc3",
+			Count: 336000,
+		}, {
+			Value: "dc4",
+			Count: 336000,
+		},
+	}
+	queryAndCompareTagValues(t, "dc", "", 0, expected)
+}
+
+func TestTagValuesWithFrom(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	expected := []idx.TagValueDetail{
+		{
+			Value: "dc3",
+			Count: 24100,
+		}, {
+			Value: "dc4",
+			Count: 256000,
+		},
+	}
+
+	queryAndCompareTagValues(t, "dc", "", 1000000, expected)
+}
+
+func TestTagValuesWithFilter(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	expected := []idx.TagValueDetail{
+		{
+			Value: "dc3",
+			Count: 336000,
+		}, {
+			Value: "dc4",
+			Count: 336000,
+		},
+	}
+
+	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", 0, expected)
+}
+
+func TestTagValuesWithFilterAndFrom(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	expected := []idx.TagValueDetail{
+		{
+			Value: "dc4",
+			Count: 256000,
+		},
+	}
+
+	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 1000000, expected)
+}
+
+func queryAndCompareTagKeys(t *testing.T, filter string, from int64, expected []string) {
+	values, err := ix.TagKeys(1, filter, from)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	if len(values) != len(expected) {
+		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
+	}
+
+	for _, e := range expected {
+		found := false
+		for _, v := range values {
+			if e == v {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("Expected value %s, but did not find it", e)
+		}
+	}
+}
+
 func TestTagKeysWithoutFilters(t *testing.T) {
 	if ix == nil {
 		Init()
 	}
 
-	keys, err := ix.TagKeys(1, "", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err.Error())
-	}
-	expected := 7
-	if len(keys) != expected {
-		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
-	}
+	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk"}
+	queryAndCompareTagKeys(t, "", 0, expected)
 }
 
 func TestTagKeysWithFrom(t *testing.T) {
@@ -230,25 +348,9 @@ func TestTagKeysWithFrom(t *testing.T) {
 		Init()
 	}
 
-	data := &schema.MetricData{
-		Name:     "very.new.series",
-		Metric:   "very.new.series",
-		Tags:     []string{"key1=value1", "key2=value2"},
-		Interval: 1,
-		OrgId:    1,
-		Time:     int64(11000000),
-	}
-	data.SetId()
-	ix.AddOrUpdate(data, 1)
-
-	keys, err := ix.TagKeys(1, "", 10000000)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err.Error())
-	}
-	expected := 2
-	if len(keys) != expected {
-		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
-	}
+	// not getting disk metrics beyond 1000000
+	expected := []string{"dc", "host", "device", "cpu", "metric"}
+	queryAndCompareTagKeys(t, "", 1000000, expected)
 }
 
 func TestTagKeysWithFilter(t *testing.T) {
@@ -256,25 +358,11 @@ func TestTagKeysWithFilter(t *testing.T) {
 		Init()
 	}
 
-	// expecting disk, direction, device, dc
-	keys, err := ix.TagKeys(1, "d", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err.Error())
-	}
-	expected := 4
-	if len(keys) != expected {
-		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
-	}
+	expected := []string{"dc", "device", "disk", "direction"}
+	queryAndCompareTagKeys(t, "d", 0, expected)
 
-	// expecting disk & direction
-	keys, err = ix.TagKeys(1, "di", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err.Error())
-	}
-	expected = 2
-	if len(keys) != expected {
-		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
-	}
+	expected = []string{"disk", "direction"}
+	queryAndCompareTagKeys(t, "di", 0, expected)
 }
 
 func TestTagKeysWithFromAndFilter(t *testing.T) {
@@ -282,25 +370,11 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 		Init()
 	}
 
-	data := &schema.MetricData{
-		Name:     "very.new.series",
-		Metric:   "very.new.series",
-		Tags:     []string{"aaa=value1", "abc=value2", "ccc=value3"},
-		Interval: 1,
-		OrgId:    1,
-		Time:     int64(11000000),
-	}
-	data.SetId()
-	ix.AddOrUpdate(data, 1)
+	expected := []string{"dc", "device"}
+	queryAndCompareTagKeys(t, "d", 1000000, expected)
 
-	keys, err := ix.TagKeys(1, "a", 10000000)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err.Error())
-	}
-	expected := 2
-	if len(keys) != expected {
-		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
-	}
+	expected = []string{}
+	queryAndCompareTagKeys(t, "di", 1000000, expected)
 }
 
 func ixFind(b *testing.B, org, q int) {

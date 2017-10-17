@@ -420,6 +420,73 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 	return result
 }
 
+func (m *MemoryIdx) TagValues(orgId int, key, filter string, from int64) ([]idx.TagValueDetail, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	var re *regexp.Regexp
+	if len(filter) > 0 {
+		if filter[0] != byte('^') {
+			filter = "^(" + filter + ")"
+		}
+		if filter != "^(.+)" && filter != "^.+" && filter != "^.*" && filter != "^(.*)" {
+			var err error
+			re, err = regexp.Compile(filter)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tree, ok := m.Tags[orgId]
+	if !ok {
+		return nil, nil
+	}
+
+	values, ok := tree[key]
+	if !ok {
+		return nil, nil
+	}
+
+	var res []idx.TagValueDetail
+	for value, ids := range values {
+		if re != nil && !re.MatchString(value) {
+			continue
+		}
+
+		valRes := idx.TagValueDetail{Value: value}
+		if from > 0 {
+			for id := range ids {
+				def, ok := m.DefById[id.String()]
+				if !ok {
+					corruptIndex.Inc()
+					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+					continue
+				}
+
+				if def.LastUpdate < from {
+					continue
+				}
+
+				valRes.Count++
+			}
+		} else {
+			valRes.Count = uint64(len(ids))
+		}
+
+		if valRes.Count > 0 {
+			res = append(res, valRes)
+		}
+	}
+
+	return res, nil
+}
+
 func (m *MemoryIdx) TagKeys(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
@@ -431,7 +498,7 @@ func (m *MemoryIdx) TagKeys(orgId int, filter string, from int64) ([]string, err
 		if filter[0] != byte('^') {
 			filter = "^(" + filter + ")"
 		}
-		if filter != "^(.+)" && filter != "^.+" {
+		if filter != "^(.+)" && filter != "^.+" && filter != "^.*" && filter != "^(.*)" {
 			var err error
 			re, err = regexp.Compile(filter)
 			if err != nil {
