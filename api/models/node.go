@@ -48,31 +48,36 @@ func (t IndexTagFindSeries) Trace(span opentracing.Span) {
 func (i IndexTagFindSeries) TraceDebug(span opentracing.Span) {
 }
 
-type IndexTag struct {
-	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
-	Tag   string `json:"tag"`
+type IndexTagDetails struct {
+	OrgId  int    `json:"orgId" form:"orgId" binding:"Required"`
+	Filter string `json:"filter"`
+	Tag    string `json:"tag"`
+	From   int64  `json:"from"`
 }
 
-func (t IndexTag) Trace(span opentracing.Span) {
+func (t IndexTagDetails) Trace(span opentracing.Span) {
 	span.SetTag("org", t.OrgId)
+	span.SetTag("filter", t.Filter)
 	span.SetTag("tag", t.Tag)
+	span.SetTag("from", t.From)
 }
 
-func (i IndexTag) TraceDebug(span opentracing.Span) {
+func (i IndexTagDetails) TraceDebug(span opentracing.Span) {
 }
 
-type IndexTagList struct {
-	OrgId  int    `json:"orgId" binding:"Required"`
+type IndexTags struct {
+	OrgId  int    `json:"orgId" form:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
 	From   int64  `json:"from"`
 }
 
-func (t IndexTagList) Trace(span opentracing.Span) {
+func (t IndexTags) Trace(span opentracing.Span) {
 	span.SetTag("org", t.OrgId)
+	span.SetTag("filter", t.Filter)
 	span.SetTag("from", t.From)
 }
 
-func (i IndexTagList) TraceDebug(span opentracing.Span) {
+func (i IndexTags) TraceDebug(span opentracing.Span) {
 }
 
 type IndexGet struct {

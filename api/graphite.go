@@ -676,26 +676,26 @@ func getLocation(desc string) (*time.Location, error) {
 	return time.LoadLocation(desc)
 }
 
-func (s *Server) graphiteTag(ctx *middleware.Context, request models.GraphiteTag) {
+func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.GraphiteTagDetails) {
 	tag := ctx.Params(":tag")
 	if len(tag) <= 0 {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "not tag specified"))
 		return
 	}
 
-	tagValues, err := s.clusterTag(ctx.Req.Context(), ctx.OrgId, tag)
+	tagValues, err := s.clusterTagDetails(ctx.Req.Context(), ctx.OrgId, tag, request.Filter, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	resp := models.GraphiteTagResp{
+	resp := models.GraphiteTagDetailsResp{
 		Tag:    tag,
-		Values: make([]models.GraphiteTagValueResp, 0, len(tagValues)),
+		Values: make([]models.GraphiteTagDetailsValueResp, 0, len(tagValues)),
 	}
 
 	for k, v := range tagValues {
-		resp.Values = append(resp.Values, models.GraphiteTagValueResp{
+		resp.Values = append(resp.Values, models.GraphiteTagDetailsValueResp{
 			Value: k,
 			Count: v,
 		})
@@ -704,32 +704,28 @@ func (s *Server) graphiteTag(ctx *middleware.Context, request models.GraphiteTag
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTag(ctx context.Context, orgId int, tag string) (map[string]uint32, error) {
-	var wg sync.WaitGroup
-	result := make(map[string]uint32)
+func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter string, from int64) (map[string]uint64, error) {
+	result := make(map[string]uint64)
 
-	wg.Add(1)
-	go func() {
-		values := s.MetricIndex.Tag(orgId, tag, 0)
-		for k, v := range values {
-			result[k] = result[k] + v
-		}
-		wg.Done()
-	}()
-
-	path := fmt.Sprintf("/index/tags/%s", tag)
-	data := models.IndexTag{OrgId: orgId, Tag: tag}
-	resp := &models.IndexTagResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTag", path, resp)
+	values, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
 	if err != nil {
 		return nil, err
 	}
 
-	// wait for the local response to be processed
-	wg.Wait()
+	for k, v := range values {
+		result[k] = result[k] + v
+	}
+
+	path := fmt.Sprintf("/index/tags/%s", tag)
+	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
+	resp := &models.IndexTagDetailsResp{}
+	responses, err := s.clusterQuery(ctx, data, "clusterTagDetails", path, resp)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, resp := range responses {
-		for k, v := range resp.(*models.IndexTagResp).Values {
+		for k, v := range resp.(*models.IndexTagDetailsResp).Values {
 			result[k] = result[k] + v
 		}
 	}
@@ -794,22 +790,22 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 	return series, nil
 }
 
-func (s *Server) graphiteTagList(ctx *middleware.Context, request models.GraphiteTagList) {
-	tags, err := s.clusterTagList(ctx.Req.Context(), ctx.OrgId, request.Filter, request.From)
+func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
+	tags, err := s.clusterTags(ctx.Req.Context(), ctx.OrgId, request.Filter, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	var resp models.GraphiteTagListResp
+	var resp models.GraphiteTagsResp
 	for _, tag := range tags {
-		resp = append(resp, models.GraphiteTag{Tag: tag})
+		resp = append(resp, models.GraphiteTagResp{Tag: tag})
 	}
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTagList(ctx context.Context, orgId int, filter string, from int64) ([]string, error) {
-	result, err := s.MetricIndex.TagList(orgId, filter, from)
+func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from int64) ([]string, error) {
+	result, err := s.MetricIndex.Tags(orgId, filter, from)
 	if err != nil {
 		return nil, err
 	}
@@ -819,15 +815,15 @@ func (s *Server) clusterTagList(ctx context.Context, orgId int, filter string, f
 		tagSet[tag] = struct{}{}
 	}
 
-	data := models.IndexTagList{OrgId: orgId, Filter: filter, From: from}
-	resp := &models.IndexTagListResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTagList", "/index/tags", resp)
+	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
+	resp := &models.IndexTagsResp{}
+	responses, err := s.clusterQuery(ctx, data, "clusterTags", "/index/tags", resp)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, resp := range responses {
-		for _, tag := range resp.(*models.IndexTagListResp).Tags {
+		for _, tag := range resp.(*models.IndexTagsResp).Tags {
 			tagSet[tag] = struct{}{}
 		}
 	}
