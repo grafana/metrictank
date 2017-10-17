@@ -235,7 +235,7 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expe
 	}
 }
 
-func TestTagValuesWithoutFilters(t *testing.T) {
+func TestTagDetailsWithoutFilters(t *testing.T) {
 	if ix == nil {
 		Init()
 	}
@@ -249,7 +249,7 @@ func TestTagValuesWithoutFilters(t *testing.T) {
 	queryAndCompareTagValues(t, "dc", "", 0, expected)
 }
 
-func TestTagValuesWithFrom(t *testing.T) {
+func TestTagDetailsWithFrom(t *testing.T) {
 	if ix == nil {
 		Init()
 	}
@@ -261,7 +261,7 @@ func TestTagValuesWithFrom(t *testing.T) {
 	queryAndCompareTagValues(t, "dc", "", 1000000, expected)
 }
 
-func TestTagValuesWithFilter(t *testing.T) {
+func TestTagDetailsWithFilter(t *testing.T) {
 	if ix == nil {
 		Init()
 	}
@@ -273,7 +273,7 @@ func TestTagValuesWithFilter(t *testing.T) {
 	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", 0, expected)
 }
 
-func TestTagValuesWithFilterAndFrom(t *testing.T) {
+func TestTagDetailsWithFilterAndFrom(t *testing.T) {
 	if ix == nil {
 		Init()
 	}
@@ -284,7 +284,7 @@ func TestTagValuesWithFilterAndFrom(t *testing.T) {
 	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 1000000, expected)
 }
 
-func queryAndCompareTagKeys(t *testing.T, filter string, from int64, expected []string) {
+func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []string) {
 	values, err := ix.Tags(1, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
@@ -347,6 +347,76 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 
 	expected = []string{}
 	queryAndCompareTagKeys(t, "di", 1000000, expected)
+}
+
+func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	expectedCount := uint64(100000)
+	for n := 0; n < b.N; n++ {
+		val, _ := ix.TagDetails(1, "metric", "", int64(0))
+		if val["disk_ops"] != expectedCount {
+			b.Fatalf("Expected count %d, but got %d: %+v", expectedCount, val["disk_ops"], val)
+		}
+	}
+}
+
+func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
+
+	filters := []string{"i", ".+rr", ".+t", "interrupt"}
+	expectedCounts := []uint64{158762, 158750, 158737, 158725}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		q := n % len(filters)
+		val, _ := ix.TagDetails(1, "metric", filters[q], int64(10000+(q*100)))
+		if val["interrupt"] != expectedCounts[q] {
+			b.Fatalf("Expected count %d, but got %d: %+v", expectedCounts[q], val["interrupt"], val)
+		}
+	}
+}
+
+func BenchmarkTagsWithFromAndFilter(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
+	filters := []string{"d", "di", "c"}
+	expected := [][]string{
+		[]string{"dc", "device", "direction", "disk"},
+		[]string{"direction", "disk"},
+		[]string{"cpu"},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		q := n % len(filters)
+		from := int64(q % 1000)
+		queryAndCompareTagKeys(b, filters[q], from, expected[q])
+	}
+}
+
+func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
+	if ix == nil {
+		Init()
+	}
+	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "host"}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		queryAndCompareTagKeys(b, "", 0, expected)
+	}
 }
 
 func ixFind(b *testing.B, org, q int) {
