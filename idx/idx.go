@@ -40,11 +40,6 @@ type MetricID struct {
 	key [16]byte
 }
 
-type TagValueDetail struct {
-	Value string
-	Count uint64
-}
-
 func NewMetricIDFromString(s string) (MetricID, error) {
 	id := MetricID{}
 	err := id.FromString(s)
@@ -152,11 +147,16 @@ Interface
 * TagList(int, string, int64) ([]string, error):
   This method returns a list of all tag keys associated with the metrics of a given
   organization. The return values are filtered by the regex in the second parameter.
+  If the third parameter is >0 then only metrics will be account of which the
+  LastUpdate time is >= the given value.
 
-* Tag(int, string, int64) map[string]uint32:
+* TagDetails(int, string, string, int64) map[string]uint32:
   This method returns a list of all values associated with a given tag key in the
   given org. The occurences of each value is counted and the count is referred to by
-  the series ids in the returned map. If the third parameter is > 0 then the metrics
+  the series ids in the returned map.
+  If the third parameter is not "" it will be used as a regular expression to filter
+  the values before accouting for them.
+  If the fourth parameter is > 0 then the metrics
   will be filtered and only those of which the LastUpdate time is >= the from
   timestamp will be considered while the others are being ignored.
 
@@ -178,9 +178,7 @@ type MetricIndex interface {
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive
 	Prune(int, time.Time) ([]Archive, error)
-	TagList(int, string, int64) ([]string, error)
-	Tag(int, string, int64) map[string]uint32
 	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
-	TagKeys(int, string, int64) ([]string, error)
-	TagValues(int, string, string, int64) ([]TagValueDetail, error)
+	Tags(int, string, int64) ([]string, error)
+	TagDetails(int, string, string, int64) (map[string]uint64, error)
 }

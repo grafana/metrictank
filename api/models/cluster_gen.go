@@ -166,7 +166,7 @@ func (z *IndexFindResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			if z.Nodes == nil && msz > 0 {
 				z.Nodes = make(map[string][]idx.Node, msz)
 			} else if len(z.Nodes) > 0 {
-				for key := range z.Nodes {
+				for key, _ := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}
@@ -282,7 +282,7 @@ func (z *IndexFindResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if z.Nodes == nil && msz > 0 {
 				z.Nodes = make(map[string][]idx.Node, msz)
 			} else if len(z.Nodes) > 0 {
-				for key := range z.Nodes {
+				for key, _ := range z.Nodes {
 					delete(z.Nodes, key)
 				}
 			}
@@ -338,6 +338,163 @@ func (z *IndexFindResp) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
+func (z *IndexTagDetailsResp) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var isz uint32
+	isz, err = dc.ReadMapHeader()
+	if err != nil {
+		return
+	}
+	for isz > 0 {
+		isz--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Values":
+			var msz uint32
+			msz, err = dc.ReadMapHeader()
+			if err != nil {
+				return
+			}
+			if z.Values == nil && msz > 0 {
+				z.Values = make(map[string]uint64, msz)
+			} else if len(z.Values) > 0 {
+				for key, _ := range z.Values {
+					delete(z.Values, key)
+				}
+			}
+			for msz > 0 {
+				msz--
+				var ajw string
+				var wht uint64
+				ajw, err = dc.ReadString()
+				if err != nil {
+					return
+				}
+				wht, err = dc.ReadUint64()
+				if err != nil {
+					return
+				}
+				z.Values[ajw] = wht
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *IndexTagDetailsResp) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 1
+	// write "Values"
+	err = en.Append(0x81, 0xa6, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73)
+	if err != nil {
+		return err
+	}
+	err = en.WriteMapHeader(uint32(len(z.Values)))
+	if err != nil {
+		return
+	}
+	for ajw, wht := range z.Values {
+		err = en.WriteString(ajw)
+		if err != nil {
+			return
+		}
+		err = en.WriteUint64(wht)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *IndexTagDetailsResp) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "Values"
+	o = append(o, 0x81, 0xa6, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73)
+	o = msgp.AppendMapHeader(o, uint32(len(z.Values)))
+	for ajw, wht := range z.Values {
+		o = msgp.AppendString(o, ajw)
+		o = msgp.AppendUint64(o, wht)
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *IndexTagDetailsResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var isz uint32
+	isz, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for isz > 0 {
+		isz--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Values":
+			var msz uint32
+			msz, bts, err = msgp.ReadMapHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if z.Values == nil && msz > 0 {
+				z.Values = make(map[string]uint64, msz)
+			} else if len(z.Values) > 0 {
+				for key, _ := range z.Values {
+					delete(z.Values, key)
+				}
+			}
+			for msz > 0 {
+				var ajw string
+				var wht uint64
+				msz--
+				ajw, bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					return
+				}
+				wht, bts, err = msgp.ReadUint64Bytes(bts)
+				if err != nil {
+					return
+				}
+				z.Values[ajw] = wht
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+func (z *IndexTagDetailsResp) Msgsize() (s int) {
+	s = 1 + 7 + msgp.MapHeaderSize
+	if z.Values != nil {
+		for ajw, wht := range z.Values {
+			_ = wht
+			s += msgp.StringPrefixSize + len(ajw) + msgp.Uint64Size
+		}
+	}
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
 func (z *IndexTagFindSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
@@ -364,8 +521,8 @@ func (z *IndexTagFindSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			} else {
 				z.Series = make([]string, xsz)
 			}
-			for ajw := range z.Series {
-				z.Series[ajw], err = dc.ReadString()
+			for hct := range z.Series {
+				z.Series[hct], err = dc.ReadString()
 				if err != nil {
 					return
 				}
@@ -392,8 +549,8 @@ func (z *IndexTagFindSeriesResp) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for ajw := range z.Series {
-		err = en.WriteString(z.Series[ajw])
+	for hct := range z.Series {
+		err = en.WriteString(z.Series[hct])
 		if err != nil {
 			return
 		}
@@ -408,8 +565,8 @@ func (z *IndexTagFindSeriesResp) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Series"
 	o = append(o, 0x81, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Series)))
-	for ajw := range z.Series {
-		o = msgp.AppendString(o, z.Series[ajw])
+	for hct := range z.Series {
+		o = msgp.AppendString(o, z.Series[hct])
 	}
 	return
 }
@@ -441,8 +598,8 @@ func (z *IndexTagFindSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error) 
 			} else {
 				z.Series = make([]string, xsz)
 			}
-			for ajw := range z.Series {
-				z.Series[ajw], bts, err = msgp.ReadStringBytes(bts)
+			for hct := range z.Series {
+				z.Series[hct], bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
 					return
 				}
@@ -460,14 +617,14 @@ func (z *IndexTagFindSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error) 
 
 func (z *IndexTagFindSeriesResp) Msgsize() (s int) {
 	s = 1 + 7 + msgp.ArrayHeaderSize
-	for ajw := range z.Series {
-		s += msgp.StringPrefixSize + len(z.Series[ajw])
+	for hct := range z.Series {
+		s += msgp.StringPrefixSize + len(z.Series[hct])
 	}
 	return
 }
 
 // DecodeMsg implements msgp.Decodable
-func (z *IndexTagListResp) DecodeMsg(dc *msgp.Reader) (err error) {
+func (z *IndexTagsResp) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
 	var isz uint32
@@ -493,8 +650,8 @@ func (z *IndexTagListResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			} else {
 				z.Tags = make([]string, xsz)
 			}
-			for wht := range z.Tags {
-				z.Tags[wht], err = dc.ReadString()
+			for cua := range z.Tags {
+				z.Tags[cua], err = dc.ReadString()
 				if err != nil {
 					return
 				}
@@ -510,7 +667,7 @@ func (z *IndexTagListResp) DecodeMsg(dc *msgp.Reader) (err error) {
 }
 
 // EncodeMsg implements msgp.Encodable
-func (z *IndexTagListResp) EncodeMsg(en *msgp.Writer) (err error) {
+func (z *IndexTagsResp) EncodeMsg(en *msgp.Writer) (err error) {
 	// map header, size 1
 	// write "Tags"
 	err = en.Append(0x81, 0xa4, 0x54, 0x61, 0x67, 0x73)
@@ -521,8 +678,8 @@ func (z *IndexTagListResp) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for wht := range z.Tags {
-		err = en.WriteString(z.Tags[wht])
+	for cua := range z.Tags {
+		err = en.WriteString(z.Tags[cua])
 		if err != nil {
 			return
 		}
@@ -531,20 +688,20 @@ func (z *IndexTagListResp) EncodeMsg(en *msgp.Writer) (err error) {
 }
 
 // MarshalMsg implements msgp.Marshaler
-func (z *IndexTagListResp) MarshalMsg(b []byte) (o []byte, err error) {
+func (z *IndexTagsResp) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 1
 	// string "Tags"
 	o = append(o, 0x81, 0xa4, 0x54, 0x61, 0x67, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Tags)))
-	for wht := range z.Tags {
-		o = msgp.AppendString(o, z.Tags[wht])
+	for cua := range z.Tags {
+		o = msgp.AppendString(o, z.Tags[cua])
 	}
 	return
 }
 
 // UnmarshalMsg implements msgp.Unmarshaler
-func (z *IndexTagListResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
+func (z *IndexTagsResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
 	var isz uint32
@@ -570,8 +727,8 @@ func (z *IndexTagListResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			} else {
 				z.Tags = make([]string, xsz)
 			}
-			for wht := range z.Tags {
-				z.Tags[wht], bts, err = msgp.ReadStringBytes(bts)
+			for cua := range z.Tags {
+				z.Tags[cua], bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
 					return
 				}
@@ -587,167 +744,10 @@ func (z *IndexTagListResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	return
 }
 
-func (z *IndexTagListResp) Msgsize() (s int) {
+func (z *IndexTagsResp) Msgsize() (s int) {
 	s = 1 + 5 + msgp.ArrayHeaderSize
-	for wht := range z.Tags {
-		s += msgp.StringPrefixSize + len(z.Tags[wht])
-	}
-	return
-}
-
-// DecodeMsg implements msgp.Decodable
-func (z *IndexTagResp) DecodeMsg(dc *msgp.Reader) (err error) {
-	var field []byte
-	_ = field
-	var isz uint32
-	isz, err = dc.ReadMapHeader()
-	if err != nil {
-		return
-	}
-	for isz > 0 {
-		isz--
-		field, err = dc.ReadMapKeyPtr()
-		if err != nil {
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		case "Values":
-			var msz uint32
-			msz, err = dc.ReadMapHeader()
-			if err != nil {
-				return
-			}
-			if z.Values == nil && msz > 0 {
-				z.Values = make(map[string]uint32, msz)
-			} else if len(z.Values) > 0 {
-				for key, _ := range z.Values {
-					delete(z.Values, key)
-				}
-			}
-			for msz > 0 {
-				msz--
-				var hct string
-				var cua uint32
-				hct, err = dc.ReadString()
-				if err != nil {
-					return
-				}
-				cua, err = dc.ReadUint32()
-				if err != nil {
-					return
-				}
-				z.Values[hct] = cua
-			}
-		default:
-			err = dc.Skip()
-			if err != nil {
-				return
-			}
-		}
-	}
-	return
-}
-
-// EncodeMsg implements msgp.Encodable
-func (z *IndexTagResp) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 1
-	// write "Values"
-	err = en.Append(0x81, 0xa6, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73)
-	if err != nil {
-		return err
-	}
-	err = en.WriteMapHeader(uint32(len(z.Values)))
-	if err != nil {
-		return
-	}
-	for hct, cua := range z.Values {
-		err = en.WriteString(hct)
-		if err != nil {
-			return
-		}
-		err = en.WriteUint32(cua)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-// MarshalMsg implements msgp.Marshaler
-func (z *IndexTagResp) MarshalMsg(b []byte) (o []byte, err error) {
-	o = msgp.Require(b, z.Msgsize())
-	// map header, size 1
-	// string "Values"
-	o = append(o, 0x81, 0xa6, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x73)
-	o = msgp.AppendMapHeader(o, uint32(len(z.Values)))
-	for hct, cua := range z.Values {
-		o = msgp.AppendString(o, hct)
-		o = msgp.AppendUint32(o, cua)
-	}
-	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *IndexTagResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	var field []byte
-	_ = field
-	var isz uint32
-	isz, bts, err = msgp.ReadMapHeaderBytes(bts)
-	if err != nil {
-		return
-	}
-	for isz > 0 {
-		isz--
-		field, bts, err = msgp.ReadMapKeyZC(bts)
-		if err != nil {
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		case "Values":
-			var msz uint32
-			msz, bts, err = msgp.ReadMapHeaderBytes(bts)
-			if err != nil {
-				return
-			}
-			if z.Values == nil && msz > 0 {
-				z.Values = make(map[string]uint32, msz)
-			} else if len(z.Values) > 0 {
-				for key, _ := range z.Values {
-					delete(z.Values, key)
-				}
-			}
-			for msz > 0 {
-				var hct string
-				var cua uint32
-				msz--
-				hct, bts, err = msgp.ReadStringBytes(bts)
-				if err != nil {
-					return
-				}
-				cua, bts, err = msgp.ReadUint32Bytes(bts)
-				if err != nil {
-					return
-				}
-				z.Values[hct] = cua
-			}
-		default:
-			bts, err = msgp.Skip(bts)
-			if err != nil {
-				return
-			}
-		}
-	}
-	o = bts
-	return
-}
-
-func (z *IndexTagResp) Msgsize() (s int) {
-	s = 1 + 7 + msgp.MapHeaderSize
-	if z.Values != nil {
-		for hct, cua := range z.Values {
-			_ = cua
-			s += msgp.StringPrefixSize + len(hct) + msgp.Uint32Size
-		}
+	for cua := range z.Tags {
+		s += msgp.StringPrefixSize + len(z.Tags[cua])
 	}
 	return
 }

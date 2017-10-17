@@ -26,13 +26,13 @@ type MetricsDeleteResp struct {
 }
 
 //go:generate msgp
-type IndexTagListResp struct {
+type IndexTagsResp struct {
 	Tags []string `json:"tags"`
 }
 
 //go:generate msgp
-type IndexTagResp struct {
-	Values map[string]uint32 `json:"values"`
+type IndexTagDetailsResp struct {
+	Values map[string]uint64 `json:"values"`
 }
 
 //go:generate msgp

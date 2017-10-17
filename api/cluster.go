@@ -106,18 +106,22 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	response.Write(ctx, response.NewMsgp(200, resp))
 }
 
-func (s *Server) indexTag(ctx *middleware.Context, req models.IndexTag) {
-	values := s.MetricIndex.Tag(req.OrgId, req.Tag, 0)
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagResp{Values: values}))
-}
-
-func (s *Server) indexTagList(ctx *middleware.Context, req models.IndexTagList) {
-	tags, err := s.MetricIndex.TagList(req.OrgId, req.Filter, req.From)
+func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDetails) {
+	values, err := s.MetricIndex.TagDetails(req.OrgId, req.Tag, req.Filter, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagListResp{Tags: tags}))
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{Values: values}))
+}
+
+func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
+	tags, err := s.MetricIndex.Tags(req.OrgId, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
 }
 
 func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTagFindSeries) {

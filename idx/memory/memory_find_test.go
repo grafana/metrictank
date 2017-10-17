@@ -210,8 +210,8 @@ func Init() {
 	}
 }
 
-func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected []idx.TagValueDetail) {
-	values, err := ix.TagValues(1, key, filter, from)
+func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected map[string]uint64) {
+	values, err := ix.TagDetails(1, key, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
 	}
@@ -219,18 +219,18 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expe
 		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
 	}
 
-	for _, e := range expected {
+	for ev, ec := range expected {
 		found := false
-		for _, v := range values {
-			if e.Value == v.Value {
+		for v, c := range values {
+			if ev == v {
 				found = true
-				if e.Count != v.Count {
-					t.Fatalf("Expected count %d for %s, but got %d", e.Count, e.Value, v.Count)
+				if ec != c {
+					t.Fatalf("Expected count %d for %s, but got %d", ec, ev, c)
 				}
 			}
 		}
 		if !found {
-			t.Fatalf("Expected value %s, but did not find it", e.Value)
+			t.Fatalf("Expected value %s, but did not find it", ev)
 		}
 	}
 }
@@ -240,24 +240,12 @@ func TestTagValuesWithoutFilters(t *testing.T) {
 		Init()
 	}
 
-	expected := []idx.TagValueDetail{
-		{
-			Value: "dc0",
-			Count: 336000,
-		}, {
-			Value: "dc1",
-			Count: 336000,
-		}, {
-			Value: "dc2",
-			Count: 336000,
-		}, {
-			Value: "dc3",
-			Count: 336000,
-		}, {
-			Value: "dc4",
-			Count: 336000,
-		},
-	}
+	expected := make(map[string]uint64)
+	expected["dc0"] = 336000
+	expected["dc1"] = 336000
+	expected["dc2"] = 336000
+	expected["dc3"] = 336000
+	expected["dc4"] = 336000
 	queryAndCompareTagValues(t, "dc", "", 0, expected)
 }
 
@@ -266,15 +254,9 @@ func TestTagValuesWithFrom(t *testing.T) {
 		Init()
 	}
 
-	expected := []idx.TagValueDetail{
-		{
-			Value: "dc3",
-			Count: 24100,
-		}, {
-			Value: "dc4",
-			Count: 256000,
-		},
-	}
+	expected := make(map[string]uint64)
+	expected["dc3"] = 24100
+	expected["dc4"] = 256000
 
 	queryAndCompareTagValues(t, "dc", "", 1000000, expected)
 }
@@ -284,15 +266,9 @@ func TestTagValuesWithFilter(t *testing.T) {
 		Init()
 	}
 
-	expected := []idx.TagValueDetail{
-		{
-			Value: "dc3",
-			Count: 336000,
-		}, {
-			Value: "dc4",
-			Count: 336000,
-		},
-	}
+	expected := make(map[string]uint64)
+	expected["dc3"] = 336000
+	expected["dc4"] = 336000
 
 	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", 0, expected)
 }
@@ -302,18 +278,14 @@ func TestTagValuesWithFilterAndFrom(t *testing.T) {
 		Init()
 	}
 
-	expected := []idx.TagValueDetail{
-		{
-			Value: "dc4",
-			Count: 256000,
-		},
-	}
+	expected := make(map[string]uint64)
+	expected["dc4"] = 256000
 
 	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 1000000, expected)
 }
 
 func queryAndCompareTagKeys(t *testing.T, filter string, from int64, expected []string) {
-	values, err := ix.TagKeys(1, filter, from)
+	values, err := ix.Tags(1, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
 	}

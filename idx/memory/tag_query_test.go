@@ -182,33 +182,6 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	}
 }
 
-func TestSingleTagQueryByTagWithFrom(t *testing.T) {
-	tagIdx, byId := getTestIndex(t)
-	memIdx := New()
-	memIdx.Tags[1] = tagIdx
-	memIdx.DefById = byId
-
-	res := memIdx.Tag(1, "key1", 0)
-	if res["value1"] != 4 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 2)
-	if res["value1"] != 3 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 3)
-	if res["value1"] != 2 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 4)
-	if res["value1"] != 1 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-}
-
 func TestGetByTag(t *testing.T) {
 	_tagSupport := tagSupport
 	defer func() { tagSupport = _tagSupport }()
@@ -320,7 +293,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 1 result, but got %d", len(res))
 	}
 
-	if len(ix.Tags[orgId]) != 2 {
+	if len(ix.tags[orgId]) != 2 {
 		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.Tags)
 	}
 
@@ -339,7 +312,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 0 results, but got %d", len(res))
 	}
 
-	if len(ix.Tags[orgId]) > 0 {
+	if len(ix.tags[orgId]) > 0 {
 		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.Tags)
 	}
 }
