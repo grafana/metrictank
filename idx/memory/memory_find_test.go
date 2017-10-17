@@ -127,7 +127,7 @@ func Init() {
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 	}
-	// orgId has 1,680,000 series
+	// orgId 1 has 1,680,000 series
 
 	for i, series := range cpuMetrics(5, 100, 950, 32, "collectd") {
 		data = &schema.MetricData{
@@ -207,6 +207,99 @@ func Init() {
 		// matching and filtering by regular expressions
 		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
 		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
+	}
+}
+
+func TestTagKeysWithoutFilters(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	keys, err := ix.TagKeys(1, "", 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	expected := 7
+	if len(keys) != expected {
+		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
+	}
+}
+
+func TestTagKeysWithFrom(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	data := &schema.MetricData{
+		Name:     "very.new.series",
+		Metric:   "very.new.series",
+		Tags:     []string{"key1=value1", "key2=value2"},
+		Interval: 1,
+		OrgId:    1,
+		Time:     int64(11000000),
+	}
+	data.SetId()
+	ix.AddOrUpdate(data, 1)
+
+	keys, err := ix.TagKeys(1, "", 10000000)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	expected := 2
+	if len(keys) != expected {
+		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
+	}
+}
+
+func TestTagKeysWithFilter(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	// expecting disk, direction, device, dc
+	keys, err := ix.TagKeys(1, "d", 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	expected := 4
+	if len(keys) != expected {
+		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
+	}
+
+	// expecting disk & direction
+	keys, err = ix.TagKeys(1, "di", 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	expected = 2
+	if len(keys) != expected {
+		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
+	}
+}
+
+func TestTagKeysWithFromAndFilter(t *testing.T) {
+	if ix == nil {
+		Init()
+	}
+
+	data := &schema.MetricData{
+		Name:     "very.new.series",
+		Metric:   "very.new.series",
+		Tags:     []string{"aaa=value1", "abc=value2", "ccc=value3"},
+		Interval: 1,
+		OrgId:    1,
+		Time:     int64(11000000),
+	}
+	data.SetId()
+	ix.AddOrUpdate(data, 1)
+
+	keys, err := ix.TagKeys(1, "a", 10000000)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+	expected := 2
+	if len(keys) != expected {
+		t.Fatalf("Expected to get %d keys, but got %d: %+v", expected, len(keys), keys)
 	}
 }
 

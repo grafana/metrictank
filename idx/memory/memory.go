@@ -420,6 +420,84 @@ func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
 	return result
 }
 
+func (m *MemoryIdx) TagKeys(orgId int, filter string, from int64) ([]string, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	var re *regexp.Regexp
+	if len(filter) > 0 {
+		if filter[0] != byte('^') {
+			filter = "^(" + filter + ")"
+		}
+		if filter != "^(.+)" && filter != "^.+" {
+			var err error
+			re, err = regexp.Compile(filter)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tree, ok := m.Tags[orgId]
+	if !ok {
+		return nil, nil
+	}
+
+	var res []string
+
+	// if there is no filter/from given we know how much space we'll need
+	// and can preallocate it
+	if re == nil && from == 0 {
+		res = make([]string, 0, len(tree))
+	}
+
+KEYS:
+	for key := range tree {
+		// filter by pattern if one was given
+		if re != nil && !re.MatchString(key) {
+			continue
+		}
+
+		// if from is > 0 we need to find at least one metric definition where
+		// LastUpdate >= from before we add the key to the result set
+		if from > 0 {
+			found := false
+		VALUES:
+			for _, ids := range tree[key] {
+			IDS:
+				for id := range ids {
+					def, ok := m.DefById[id.String()]
+					if !ok {
+						corruptIndex.Inc()
+						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+						continue IDS
+					}
+
+					// as soon as we found one metric definition with LastUpdate >= from
+					// we can continue and add the current key to the result set
+					if def.LastUpdate >= from {
+						found = true
+						break VALUES
+					}
+				}
+			}
+
+			if !found {
+				continue KEYS
+			}
+		}
+
+		res = append(res, key)
+	}
+
+	return res, nil
+}
+
 func (m *MemoryIdx) TagList(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
