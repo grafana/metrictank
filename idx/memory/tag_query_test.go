@@ -293,7 +293,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 	}
 
 	if len(ix.tags[orgId]) != 2 {
-		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.Tags)
+		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.tags)
 	}
 
 	deleted, err := ix.Delete(orgId, mds[10].Metric)
@@ -312,7 +312,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 	}
 
 	if len(ix.tags[orgId]) > 0 {
-		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.Tags)
+		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.tags)
 	}
 }
 

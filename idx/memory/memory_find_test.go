@@ -3,6 +3,7 @@ package memory
 import (
 	"os"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -12,9 +13,8 @@ import (
 )
 
 var (
-	ix         idx.MetricIndex
-	queries    []query
-	tagQueries []tagQuery
+	ix           idx.MetricIndex
+	currentIndex int // 1 small; 2 large
 )
 
 type query struct {
@@ -30,6 +30,60 @@ type tagQuery struct {
 type metric struct {
 	Name string
 	Tags []string
+}
+
+var queries = []query{
+	//LEAF queries
+	{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.read", ExpectedResults: 1},
+	{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
+	{Pattern: "collectd.*.host960.disk.disk1.disk_ops.read", ExpectedResults: 5},
+	{Pattern: "collectd.*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
+	{Pattern: "collectd.d*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
+	{Pattern: "collectd.[abcd]*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
+	{Pattern: "collectd.{dc1,dc50}.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
+
+	{Pattern: "collectd.dc3.host960.cpu.1.idle", ExpectedResults: 1},
+	{Pattern: "collectd.dc30.host960.cpu.1.idle", ExpectedResults: 0},
+	{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
+	{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
+
+	{Pattern: "collectd.dc3.host96[0-9].cpu.1.idle", ExpectedResults: 10},
+	{Pattern: "collectd.dc30.host96[0-9].cpu.1.idle", ExpectedResults: 0},
+	{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
+	{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
+
+	{Pattern: "collectd.{dc1,dc2,dc3}.host960.cpu.1.idle", ExpectedResults: 3},
+	{Pattern: "collectd.{dc*, a*}.host960.cpu.1.idle", ExpectedResults: 5},
+
+	//Branch queries
+	{Pattern: "collectd.dc1.host960.*", ExpectedResults: 2},
+	{Pattern: "collectd.*.host960.disk.disk1.*", ExpectedResults: 20},
+	{Pattern: "collectd.[abcd]*.host960.disk.disk1.*", ExpectedResults: 20},
+
+	{Pattern: "collectd.*.host960.disk.*.*", ExpectedResults: 200},
+	{Pattern: "*.dc3.host960.cpu.1.*", ExpectedResults: 8},
+	{Pattern: "*.dc3.host96{1,3}.cpu.1.*", ExpectedResults: 16},
+	{Pattern: "*.dc3.{host,server}96{1,3}.cpu.1.*", ExpectedResults: 16},
+
+	{Pattern: "*.dc3.{host,server}9[6-9]{1,3}.cpu.1.*", ExpectedResults: 64},
+}
+
+var tagQueries = []tagQuery{
+	// simple matching
+	{Expressions: []string{"dc=dc1", "host=host960", "disk=disk1", "metric=disk_ops"}, ExpectedResults: 2},
+	{Expressions: []string{"dc=dc3", "host=host960", "disk=disk2", "direction=read"}, ExpectedResults: 4},
+
+	// regular expressions
+	{Expressions: []string{"dc=~dc[1-3]", "host=~host3[5-9]{2}", "metric=disk_ops"}, ExpectedResults: 1500},
+	{Expressions: []string{"dc=~dc[0-9]", "host=~host97[0-9]", "disk=disk2", "metric=disk_ops"}, ExpectedResults: 100},
+
+	// matching and filtering
+	{Expressions: []string{"dc=dc1", "host=host666", "cpu=cpu12", "device=cpu", "metric!=softirq"}, ExpectedResults: 7},
+	{Expressions: []string{"dc=dc1", "host=host966", "cpu!=cpu12", "device!=disk", "metric!=softirq"}, ExpectedResults: 217},
+
+	// matching and filtering by regular expressions
+	{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
+	{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
 }
 
 func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []metric {
@@ -95,15 +149,71 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 func TestMain(m *testing.M) {
 	defer func(t bool) { tagSupport = t }(tagSupport)
 	tagSupport = true
+	matchCacheSize = 1000
 	os.Exit(m.Run())
 }
 
-func Init() {
-	ix = New()
-	ix.Init()
+func InitSmallIndex() {
+	// if the current index is not the small index then initialize it
+	if currentIndex != 1 {
+		ix = nil
+
+		// run GC because we only get 4G on CircleCI
+		runtime.GC()
+
+		ix = New()
+		ix.Init()
+
+		currentIndex = 1
+	} else {
+		return
+	}
 
 	var data *schema.MetricData
-	matchCacheSize = 1000
+
+	for i, series := range cpuMetrics(5, 100, 0, 32, "collectd") {
+		data = &schema.MetricData{
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
+			Interval: 10,
+			OrgId:    1,
+			Time:     int64(i + 100),
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 1)
+	}
+	for i, series := range diskMetrics(5, 100, 0, 10, "collectd") {
+		data = &schema.MetricData{
+			Name:     series.Name,
+			Metric:   series.Name,
+			Tags:     series.Tags,
+			Interval: 10,
+			OrgId:    1,
+			Time:     int64(i + 100),
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 1)
+	}
+}
+
+func InitLargeIndex() {
+	// if the current index is not the large index then initialize it
+	if currentIndex != 2 {
+		ix = nil
+
+		// run GC because we only get 4G on CircleCI
+		runtime.GC()
+
+		ix = New()
+		ix.Init()
+
+		currentIndex = 2
+	} else {
+		return
+	}
+
+	var data *schema.MetricData
 
 	for i, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
@@ -156,64 +266,11 @@ func Init() {
 		ix.AddOrUpdate(data, 1)
 	}
 	//orgId 2 has 168,000 mertics
-
-	queries = []query{
-		//LEAF queries
-		{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.read", ExpectedResults: 1},
-		{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
-		{Pattern: "collectd.*.host960.disk.disk1.disk_ops.read", ExpectedResults: 5},
-		{Pattern: "collectd.*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
-		{Pattern: "collectd.d*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
-		{Pattern: "collectd.[abcd]*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
-		{Pattern: "collectd.{dc1,dc50}.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
-
-		{Pattern: "collectd.dc3.host960.cpu.1.idle", ExpectedResults: 1},
-		{Pattern: "collectd.dc30.host960.cpu.1.idle", ExpectedResults: 0},
-		{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
-		{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
-
-		{Pattern: "collectd.dc3.host96[0-9].cpu.1.idle", ExpectedResults: 10},
-		{Pattern: "collectd.dc30.host96[0-9].cpu.1.idle", ExpectedResults: 0},
-		{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
-		{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
-
-		{Pattern: "collectd.{dc1,dc2,dc3}.host960.cpu.1.idle", ExpectedResults: 3},
-		{Pattern: "collectd.{dc*, a*}.host960.cpu.1.idle", ExpectedResults: 5},
-
-		//Branch queries
-		{Pattern: "collectd.dc1.host960.*", ExpectedResults: 2},
-		{Pattern: "collectd.*.host960.disk.disk1.*", ExpectedResults: 20},
-		{Pattern: "collectd.[abcd]*.host960.disk.disk1.*", ExpectedResults: 20},
-
-		{Pattern: "collectd.*.host960.disk.*.*", ExpectedResults: 200},
-		{Pattern: "*.dc3.host960.cpu.1.*", ExpectedResults: 8},
-		{Pattern: "*.dc3.host96{1,3}.cpu.1.*", ExpectedResults: 16},
-		{Pattern: "*.dc3.{host,server}96{1,3}.cpu.1.*", ExpectedResults: 16},
-
-		{Pattern: "*.dc3.{host,server}9[6-9]{1,3}.cpu.1.*", ExpectedResults: 64},
-	}
-
-	tagQueries = []tagQuery{
-		// simple matching
-		{Expressions: []string{"dc=dc1", "host=host960", "disk=disk1", "metric=disk_ops"}, ExpectedResults: 2},
-		{Expressions: []string{"dc=dc3", "host=host960", "disk=disk2", "direction=read"}, ExpectedResults: 4},
-
-		// regular expressions
-		{Expressions: []string{"dc=~dc[1-3]", "host=~host3[5-9]{2}", "metric=disk_ops"}, ExpectedResults: 1500},
-		{Expressions: []string{"dc=~dc[0-9]", "host=~host97[0-9]", "disk=disk2", "metric=disk_ops"}, ExpectedResults: 100},
-
-		// matching and filtering
-		{Expressions: []string{"dc=dc1", "host=host666", "cpu=cpu12", "device=cpu", "metric!=softirq"}, ExpectedResults: 7},
-		{Expressions: []string{"dc=dc1", "host=host966", "cpu!=cpu12", "device!=disk", "metric!=softirq"}, ExpectedResults: 217},
-
-		// matching and filtering by regular expressions
-		{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
-		{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
-	}
 }
 
 func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected map[string]uint64) {
 	t.Helper()
+
 	values, err := ix.TagDetails(1, key, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
@@ -236,55 +293,48 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expe
 			t.Fatalf("Expected value %s, but did not find it", ev)
 		}
 	}
+
 }
 
 func TestTagDetailsWithoutFilters(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := make(map[string]uint64)
-	expected["dc0"] = 336000
-	expected["dc1"] = 336000
-	expected["dc2"] = 336000
-	expected["dc3"] = 336000
-	expected["dc4"] = 336000
+	expected["dc0"] = 33600
+	expected["dc1"] = 33600
+	expected["dc2"] = 33600
+	expected["dc3"] = 33600
+	expected["dc4"] = 33600
 	queryAndCompareTagValues(t, "dc", "", 0, expected)
 }
 
 func TestTagDetailsWithFrom(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := make(map[string]uint64)
-	expected["dc3"] = 24100
-	expected["dc4"] = 256000
+	expected["dc3"] = 2500
+	expected["dc4"] = 25600
 
-	queryAndCompareTagValues(t, "dc", "", 1000000, expected)
+	queryAndCompareTagValues(t, "dc", "", 100000, expected)
 }
 
 func TestTagDetailsWithFilter(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := make(map[string]uint64)
-	expected["dc3"] = 336000
-	expected["dc4"] = 336000
+	expected["dc3"] = 33600
+	expected["dc4"] = 33600
 
 	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", 0, expected)
 }
 
 func TestTagDetailsWithFilterAndFrom(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := make(map[string]uint64)
-	expected["dc4"] = 256000
+	expected["dc4"] = 25600
 
-	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 1000000, expected)
+	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 100000, expected)
 }
 
 func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []string) {
@@ -303,31 +353,26 @@ func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []
 	if !reflect.DeepEqual(values, expected) {
 		t.Fatalf("Expected values:\n%+v\nGot:\n%+v", expected, values)
 	}
+
 }
 
 func TestTagKeysWithoutFilters(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk"}
 	queryAndCompareTagKeys(t, "", 0, expected)
 }
 
 func TestTagKeysWithFrom(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	// disk metrics should all have been added before ts 1000000
 	expected := []string{"dc", "host", "device", "cpu", "metric"}
-	queryAndCompareTagKeys(t, "", 1000000, expected)
+	queryAndCompareTagKeys(t, "", 100000, expected)
 }
 
 func TestTagKeysWithFilter(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := []string{"dc", "device", "disk", "direction"}
 	queryAndCompareTagKeys(t, "d", 0, expected)
@@ -337,21 +382,17 @@ func TestTagKeysWithFilter(t *testing.T) {
 }
 
 func TestTagKeysWithFromAndFilter(t *testing.T) {
-	if ix == nil {
-		Init()
-	}
+	InitSmallIndex()
 
 	expected := []string{"dc", "device"}
-	queryAndCompareTagKeys(t, "d", 1000000, expected)
+	queryAndCompareTagKeys(t, "d", 100000, expected)
 
 	// reflect.DeepEqual treats nil & []string{} as not equal
 	queryAndCompareTagKeys(t, "di", 1000000, nil)
 }
 
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -366,9 +407,7 @@ func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 }
 
 func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 
 	filters := []string{"i", ".+rr", ".+t", "interrupt"}
 	expectedCounts := []uint64{158762, 158750, 158737, 158725}
@@ -386,14 +425,12 @@ func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 }
 
 func BenchmarkTagsWithFromAndFilter(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	filters := []string{"d", "di", "c"}
 	expected := [][]string{
-		[]string{"dc", "device", "direction", "disk"},
-		[]string{"direction", "disk"},
-		[]string{"cpu"},
+		{"dc", "device", "direction", "disk"},
+		{"direction", "disk"},
+		{"cpu"},
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -406,9 +443,7 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 }
 
 func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "host"}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -432,9 +467,7 @@ func ixFind(b *testing.B, org, q int) {
 }
 
 func BenchmarkFind(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	queryCount := len(queries)
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -451,9 +484,7 @@ type testQ struct {
 }
 
 func BenchmarkConcurrent4Find(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	queryCount := len(queries)
 
 	ch := make(chan testQ)
@@ -475,9 +506,7 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 }
 
 func BenchmarkConcurrent8Find(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	queryCount := len(queries)
 
 	ch := make(chan testQ)
@@ -513,9 +542,7 @@ func ixFindByTag(b *testing.B, org, q int) {
 }
 
 func BenchmarkTagFindSimpleIntersect(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -526,9 +553,7 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindRegexIntersect(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -539,9 +564,7 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -552,9 +575,7 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -596,9 +617,7 @@ func permutations(lst []string) [][]string {
 // benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
 // is enough for it to go through all the 6! permutations
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 
 	queries := make([]tagQuery, 0)
 	for _, expressions := range permutations([]string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}) {
@@ -624,9 +643,7 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 // benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
 // is enough for it to go through all the 5! permutations
 func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
-	if ix == nil {
-		Init()
-	}
+	InitLargeIndex()
 
 	queries := make([]tagQuery, 0)
 	for _, expressions := range permutations([]string{"metric!=~.*_time$", "dc=~.*0$", "direction=~wri", "host=~host9[0-9]0", "disk!=~disk[5-9]{1}"}) {
