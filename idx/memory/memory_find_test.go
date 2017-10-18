@@ -505,9 +505,9 @@ func ixFindByTag(b *testing.B, org, q int) {
 		panic(err)
 	}
 	if len(series) != tagQueries[q].ExpectedResults {
-		for s := range series {
+		for _, s := range series {
 			memoryIdx := ix.(*MemoryIdx)
-			b.Log(memoryIdx.DefById[s.String()].Tags)
+			b.Log(memoryIdx.DefById[s].Tags)
 		}
 		b.Fatalf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series))
 	}
