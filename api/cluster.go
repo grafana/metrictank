@@ -125,16 +125,16 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 }
 
 func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTagFindSeries) {
-	ids, err := s.MetricIndex.FindByTag(req.OrgId, req.Expressions, req.From)
+	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	idStrings := make([]string, 0, len(ids))
-	for _, id := range ids {
-		idStrings = append(idStrings, id)
+	metricNames := make([]string, 0, len(metrics))
+	for _, metric := range metrics {
+		metricNames = append(metricNames, metric)
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: idStrings}))
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: metricNames}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
