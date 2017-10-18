@@ -385,14 +385,12 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	var re *regexp.Regexp
 	if len(filter) > 0 {
 		if filter[0] != byte('^') {
-			filter = "^(" + filter + ")"
+			filter = "^(?:" + filter + ")"
 		}
-		if filter != "^(.+)" && filter != "^.+" && filter != "^.*" && filter != "^(.*)" {
-			var err error
-			re, err = regexp.Compile(filter)
-			if err != nil {
-				return nil, err
-			}
+		var err error
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -452,14 +450,12 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 	var re *regexp.Regexp
 	if len(filter) > 0 {
 		if filter[0] != byte('^') {
-			filter = "^(" + filter + ")"
+			filter = "^(?:" + filter + ")"
 		}
-		if filter != "^(.+)" && filter != "^.+" && filter != "^.*" && filter != "^(.*)" {
-			var err error
-			re, err = regexp.Compile(filter)
-			if err != nil {
-				return nil, err
-			}
+		var err error
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -489,30 +485,27 @@ KEYS:
 		// if from is > 0 we need to find at least one metric definition where
 		// LastUpdate >= from before we add the key to the result set
 		if from > 0 {
-			found := false
-		VALUES:
 			for _, ids := range tree[key] {
-			IDS:
 				for id := range ids {
 					def, ok := m.DefById[id.String()]
 					if !ok {
 						corruptIndex.Inc()
 						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-						continue IDS
+						continue
 					}
 
 					// as soon as we found one metric definition with LastUpdate >= from
-					// we can continue and add the current key to the result set
+					// we can add the current key to the result set and move on to the next
 					if def.LastUpdate >= from {
-						found = true
-						break VALUES
+						res = append(res, key)
+						continue KEYS
 					}
 				}
 			}
 
-			if !found {
-				continue KEYS
-			}
+			// no metric definition with LastUpdate >= from has been found,
+			// continue with the next key
+			continue KEYS
 		}
 
 		res = append(res, key)
