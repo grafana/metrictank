@@ -548,10 +548,10 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]st
 		return nil, err
 	}
 
-	return m.resolveIDs(m.idsByTagQuery(orgId, query)), nil
+	return m.idsByTagQuery(orgId, query), nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -560,7 +560,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
 		return nil
 	}
 
-	return query.Run(tree, m.DefById)
+	return m.resolveIDs(query.Run(tree, m.DefById))
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
