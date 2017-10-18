@@ -125,7 +125,7 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 }
 
 func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTagFindSeries) {
-	ids, err := s.MetricIndex.FindByTag(req.OrgId, req.Expressions, 0)
+	ids, err := s.MetricIndex.FindByTag(req.OrgId, req.Expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

@@ -81,6 +81,7 @@ type GraphiteTagDetailsResp struct {
 
 type GraphiteTagFindSeries struct {
 	Expr []string `json:"expr" form:"expr"`
+	From int64    `json:"from"`
 }
 
 type GraphiteTagFindSeriesResp struct {
