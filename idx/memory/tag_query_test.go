@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -213,40 +214,40 @@ func TestGetByTag(t *testing.T) {
 
 	type testCase struct {
 		expressions []string
-		expectation []idx.MetricID
+		expectation []string
 	}
 
 	testCases := []testCase{
 		{
 			expressions: []string{"key1=value1"},
-			expectation: []idx.MetricID{ids[1], ids[11], ids[3]},
+			expectation: []string{mds[1].Metric, mds[11].Metric, mds[3].Metric},
 		}, {
 			expressions: []string{"key1=value2"},
-			expectation: []idx.MetricID{ids[18]},
+			expectation: []string{mds[18].Metric},
 		}, {
 			expressions: []string{"key1=~value[0-9]"},
-			expectation: []idx.MetricID{ids[1], ids[11], ids[18], ids[3]},
+			expectation: []string{mds[1].Metric, mds[11].Metric, mds[18].Metric, mds[3].Metric},
 		}, {
 			expressions: []string{"key1=~value[23]"},
-			expectation: []idx.MetricID{ids[18]},
+			expectation: []string{mds[18].Metric},
 		}, {
 			expressions: []string{"key1=value1", "key2=value1"},
-			expectation: []idx.MetricID{},
+			expectation: []string{},
 		}, {
 			expressions: []string{"key1=value1", "key2=value2"},
-			expectation: []idx.MetricID{ids[1]},
+			expectation: []string{mds[1].Metric},
 		}, {
 			expressions: []string{"key1=~value[12]", "key2=value2"},
-			expectation: []idx.MetricID{ids[1], ids[18]},
+			expectation: []string{mds[1].Metric, mds[18].Metric},
 		}, {
 			expressions: []string{"key1=~value1", "key1=value2"},
-			expectation: []idx.MetricID{},
+			expectation: []string{},
 		}, {
 			expressions: []string{"key1=~value[0-9]", "key2=~", "key3!=value3"},
-			expectation: []idx.MetricID{ids[11]},
+			expectation: []string{mds[11].Metric},
 		}, {
 			expressions: []string{"key2=", "key1=value1"},
-			expectation: []idx.MetricID{ids[11], ids[3]},
+			expectation: []string{mds[11].Metric, mds[3].Metric},
 		},
 	}
 
@@ -259,11 +260,9 @@ func TestGetByTag(t *testing.T) {
 		if len(res) != len(tc.expectation) {
 			t.Fatalf("Result does not match expectation for expressions %+v\nGot:\n%+v\nExpected:\n%+v\n", tc.expressions, res, tc.expectation)
 		}
-		expectationMap := make(TagIDs)
-		for _, v := range tc.expectation {
-			expectationMap[v] = struct{}{}
-		}
-		if !reflect.DeepEqual(res, expectationMap) {
+		sort.Strings(tc.expectation)
+		sort.Strings(res)
+		if !reflect.DeepEqual(res, tc.expectation) {
 			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", res, tc.expectation)
 		}
 	}
