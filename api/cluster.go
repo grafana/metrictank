@@ -131,8 +131,8 @@ func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTag
 		return
 	}
 	idStrings := make([]string, 0, len(ids))
-	for id := range ids {
-		idStrings = append(idStrings, id.String())
+	for _, id := range ids {
+		idStrings = append(idStrings, id)
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: idStrings}))
 }

@@ -537,7 +537,7 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 	return res
 }
 
-func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -548,7 +548,7 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[
 		return nil, err
 	}
 
-	return m.idsByTagQuery(orgId, query), nil
+	return m.resolveIDs(m.idsByTagQuery(orgId, query)), nil
 }
 
 func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
