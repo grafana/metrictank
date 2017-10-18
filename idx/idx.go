@@ -178,7 +178,7 @@ type MetricIndex interface {
 	Find(int, string, int64) ([]Node, error)
 	List(int) []Archive
 	Prune(int, time.Time) ([]Archive, error)
-	FindByTag(int, []string, int64) (map[MetricID]struct{}, error)
+	FindByTag(int, []string, int64) ([]string, error)
 	Tags(int, string, int64) ([]string, error)
 	TagDetails(int, string, string, int64) (map[string]uint64, error)
 }

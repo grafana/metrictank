@@ -757,8 +757,8 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 			errors = append(errors, err)
 			return
 		}
-		for series := range result {
-			seriesSet[series.String()] = struct{}{}
+		for _, series := range result {
+			seriesSet[series] = struct{}{}
 		}
 	}()
 
