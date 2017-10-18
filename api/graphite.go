@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"strings"
@@ -705,18 +704,12 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 }
 
 func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter string, from int64) (map[string]uint64, error) {
-	result := make(map[string]uint64)
-
-	values, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
+	result, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range values {
-		result[k] = result[k] + v
-	}
-
-	path := fmt.Sprintf("/index/tags/%s", tag)
+	path := "/index/tags/" + tag
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
 	resp := &models.IndexTagDetailsResp{}
 	responses, err := s.clusterQuery(ctx, data, "clusterTagDetails", path, resp)
@@ -744,26 +737,15 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 }
 
 func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
-	var wg sync.WaitGroup
-	var errors []error
 	seriesSet := make(map[string]struct{})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
-		if err != nil {
-			log.Error(4, "HTTP Render error querying /index/tags/findSeries: %q", err)
-			errors = append(errors, err)
-			return
-		}
-		for _, series := range result {
-			seriesSet[series] = struct{}{}
-		}
-	}()
+	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(errors) > 0 {
-		return nil, errors[0]
+	for _, series := range result {
+		seriesSet[series] = struct{}{}
 	}
 
 	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
@@ -772,9 +754,6 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 	if err != nil {
 		return nil, err
 	}
-
-	// wait for the local response to be processed
-	wg.Wait()
 
 	for _, resp := range responses {
 		for _, series := range resp.(*models.IndexTagFindSeriesResp).Series {
