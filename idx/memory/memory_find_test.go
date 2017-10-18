@@ -2,6 +2,8 @@ package memory
 
 import (
 	"os"
+	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -211,6 +213,7 @@ func Init() {
 }
 
 func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected map[string]uint64) {
+	t.Helper()
 	values, err := ix.TagDetails(1, key, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
@@ -285,6 +288,7 @@ func TestTagDetailsWithFilterAndFrom(t *testing.T) {
 }
 
 func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []string) {
+	t.Helper()
 	values, err := ix.Tags(1, filter, from)
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err.Error())
@@ -293,16 +297,11 @@ func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []
 		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
 	}
 
-	for _, e := range expected {
-		found := false
-		for _, v := range values {
-			if e == v {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("Expected value %s, but did not find it", e)
-		}
+	sort.Strings(expected)
+	sort.Strings(values)
+
+	if !reflect.DeepEqual(values, expected) {
+		t.Fatalf("Expected values:\n%+v\nGot:\n%+v", expected, values)
 	}
 }
 
@@ -320,7 +319,7 @@ func TestTagKeysWithFrom(t *testing.T) {
 		Init()
 	}
 
-	// not getting disk metrics beyond 1000000
+	// disk metrics should all have been added before ts 1000000
 	expected := []string{"dc", "host", "device", "cpu", "metric"}
 	queryAndCompareTagKeys(t, "", 1000000, expected)
 }
@@ -345,8 +344,8 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 	expected := []string{"dc", "device"}
 	queryAndCompareTagKeys(t, "d", 1000000, expected)
 
-	expected = []string{}
-	queryAndCompareTagKeys(t, "di", 1000000, expected)
+	// reflect.DeepEqual treats nil & []string{} as not equal
+	queryAndCompareTagKeys(t, "di", 1000000, nil)
 }
 
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
