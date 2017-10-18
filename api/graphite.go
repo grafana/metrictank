@@ -815,18 +815,29 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	return tags, nil
 }
 
+// clusterQuery takes a request and the path to request it on, then fans it out
+// across the cluster, except to the local peer.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+// respTemplate: the response object into which the responses shall
+//               be deserialized. each sub-request will get a copy of this
+//               template and the response will be unarshalled into that copy.
+//               (generic without generics)
 func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
 		log.Error(3, "HTTP clusterQuery unable to get peers, %s", err)
 		return nil, err
 	}
-	log.Debug("HTTP %s across %d instances", name, len(peers))
+	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
 
-	errors := make([]error, 0)
 	result := make([]msgp.Unmarshaler, 0, len(peers)-1)
 
-	var mu sync.Mutex
+	var errors []error
+	var errLock sync.Mutex
+	var resLock sync.Mutex
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		if peer.IsLocal() {
@@ -840,9 +851,9 @@ func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name,
 
 			if err != nil {
 				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
-				mu.Lock()
+				errLock.Lock()
 				errors = append(errors, err)
-				mu.Unlock()
+				errLock.Unlock()
 				return
 			}
 
@@ -850,15 +861,15 @@ func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name,
 			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				log.Error(4, "HTTP error unmarshaling body from %s%s: %q", peer.Name, path, err)
-				mu.Lock()
+				errLock.Lock()
 				errors = append(errors, err)
-				mu.Unlock()
+				errLock.Unlock()
 				return
 			}
 
-			mu.Lock()
+			resLock.Lock()
 			result = append(result, resp)
-			mu.Unlock()
+			resLock.Unlock()
 		}(peer)
 	}
 	wg.Wait()
