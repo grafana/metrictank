@@ -162,7 +162,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		} else {
 			// always anchor all regular expressions at the beginning
 			if (e.operator == MATCH || e.operator == NOT_MATCH) && e.value[0] != byte('^') {
-				e.value = "^(" + e.value + ")"
+				e.value = "^(?:" + e.value + ")"
 			}
 
 			switch e.operator {
