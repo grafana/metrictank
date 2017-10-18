@@ -734,7 +734,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 }
 
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
-	series, err := s.clusterTagFindSeries(ctx.Req.Context(), ctx.OrgId, request.Expr)
+	series, err := s.clusterTagFindSeries(ctx.Req.Context(), ctx.OrgId, request.Expr, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -743,7 +743,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, series, ""))
 }
 
-func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expressions []string) ([]string, error) {
+func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
 	var wg sync.WaitGroup
 	var errors []error
 	seriesSet := make(map[string]struct{})
@@ -751,7 +751,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		result, err := s.MetricIndex.FindByTag(orgId, expressions, 0)
+		result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
 		if err != nil {
 			log.Error(4, "HTTP Render error querying /index/tags/findSeries: %q", err)
 			errors = append(errors, err)
@@ -766,7 +766,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 		return nil, errors[0]
 	}
 
-	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions}
+	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
 	resp := &models.IndexTagFindSeriesResp{}
 	responses, err := s.clusterQuery(ctx, data, "clusterTagFindSeries", "/index/tags/findSeries", resp)
 	if err != nil {
