@@ -60,7 +60,7 @@ type GraphiteTags struct {
 type GraphiteTagsResp []GraphiteTagResp
 
 type GraphiteTagResp struct {
-	Tag string `json:"tag" form:"tag"`
+	Tag string `json:"tag"`
 }
 
 type GraphiteTagDetails struct {
@@ -75,12 +75,12 @@ type GraphiteTagDetailsValueResp struct {
 }
 
 type GraphiteTagDetailsResp struct {
-	Tag    string                        `json:"tag" form:"tag"`
+	Tag    string                        `json:"tag"`
 	Values []GraphiteTagDetailsValueResp `json:"values"`
 }
 
 type GraphiteTagFindSeries struct {
-	Expr []string `json:"expr" form:"expr"`
+	Expr []string `json:"expr"`
 	From int64    `json:"from"`
 }
 
