@@ -26,7 +26,6 @@ import (
 	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
-	"github.com/tinylib/msgp/msgp"
 )
 
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
@@ -813,70 +812,4 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	return tags, nil
-}
-
-// clusterQuery takes a request and the path to request it on, then fans it out
-// across the cluster, except to the local peer.
-// ctx:          request context
-// data:         request to be submitted
-// name:         name to be used in logging & tracing
-// path:         path to request on
-// respTemplate: the response object into which the responses shall
-//               be deserialized. each sub-request will get a copy of this
-//               template and the response will be unarshalled into that copy.
-//               (generic without generics)
-func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
-	peers, err := cluster.MembersForQuery()
-	if err != nil {
-		log.Error(3, "HTTP clusterQuery unable to get peers, %s", err)
-		return nil, err
-	}
-	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
-
-	result := make([]msgp.Unmarshaler, 0, len(peers)-1)
-
-	var errors []error
-	var errLock sync.Mutex
-	var resLock sync.Mutex
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		if peer.IsLocal() {
-			continue
-		}
-		wg.Add(1)
-		go func(peer cluster.Node) {
-			defer wg.Done()
-			log.Debug("HTTP Render querying %s%s", peer.Name, path)
-			buf, err := peer.Post(ctx, name, path, data)
-
-			if err != nil {
-				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
-				errLock.Lock()
-				errors = append(errors, err)
-				errLock.Unlock()
-				return
-			}
-
-			resp := respTemplate
-			_, err = resp.UnmarshalMsg(buf)
-			if err != nil {
-				log.Error(4, "HTTP error unmarshaling body from %s%s: %q", peer.Name, path, err)
-				errLock.Lock()
-				errors = append(errors, err)
-				errLock.Unlock()
-				return
-			}
-
-			resLock.Lock()
-			result = append(result, resp)
-			resLock.Unlock()
-		}(peer)
-	}
-	wg.Wait()
-
-	if len(errors) > 0 {
-		return nil, errors[0]
-	}
-
-	return result, nil
 }
