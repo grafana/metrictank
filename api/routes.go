@@ -52,7 +52,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/find", withOrg, ready, bind(models.GraphiteFind{})).Get(s.metricsFind).Post(s.metricsFind)
 	r.Get("/metrics/index.json", withOrg, ready, s.metricsIndex)
 	r.Post("/metrics/delete", withOrg, ready, bind(models.MetricsDelete{}), s.metricsDelete)
-	r.Combo("/tags", withOrg, ready, bind(models.GraphiteTags{})).Get(s.graphiteTags).Post(s.graphiteTags)
-	r.Combo("/tags/:tag([0-9a-zA-Z]+)", withOrg, ready, bind(models.GraphiteTagDetails{})).Get(s.graphiteTagDetails).Post(s.graphiteTagDetails)
-	r.Combo("/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
+	r.Combo("/metrics/tags", withOrg, ready, bind(models.GraphiteTags{})).Get(s.graphiteTags).Post(s.graphiteTags)
+	r.Combo("/metrics/tags/:tag([0-9a-zA-Z]+)", withOrg, ready, bind(models.GraphiteTagDetails{})).Get(s.graphiteTagDetails).Post(s.graphiteTagDetails)
+	r.Combo("/metrics/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
 }
