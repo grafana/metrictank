@@ -711,7 +711,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	path := "/index/tags/" + tag
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
 	resp := &models.IndexTagDetailsResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTagDetails", path, resp)
+	responses, err := s.peerQuery(ctx, data, "clusterTagDetails", path, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -749,7 +749,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 
 	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
 	resp := &models.IndexTagFindSeriesResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTagFindSeries", "/index/tags/findSeries", resp)
+	responses, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/tags/findSeries", resp)
 	if err != nil {
 		return nil, err
 	}
@@ -795,7 +795,7 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
 	resp := &models.IndexTagsResp{}
-	responses, err := s.clusterQuery(ctx, data, "clusterTags", "/index/tags", resp)
+	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags", resp)
 	if err != nil {
 		return nil, err
 	}

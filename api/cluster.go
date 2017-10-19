@@ -187,7 +187,7 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 	response.Write(ctx, response.NewMsgp(200, &resp))
 }
 
-// clusterQuery takes a request and the path to request it on, then fans it out
+// peerQuery takes a request and the path to request it on, then fans it out
 // across the cluster, except to the local peer.
 // ctx:          request context
 // data:         request to be submitted
@@ -197,10 +197,10 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 //               be deserialized. each sub-request will get a copy of this
 //               template and the response will be unarshalled into that copy.
 //               (generic without generics)
-func (s *Server) clusterQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
-		log.Error(3, "HTTP clusterQuery unable to get peers, %s", err)
+		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
 		return nil, err
 	}
 	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
