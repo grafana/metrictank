@@ -397,12 +397,12 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	m.RLock()
 	defer m.RUnlock()
 
-	tree, ok := m.tags[orgId]
+	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil, nil
 	}
 
-	values, ok := tree[key]
+	values, ok := tags[key]
 	if !ok {
 		return nil, nil
 	}
@@ -462,7 +462,7 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 	m.RLock()
 	defer m.RUnlock()
 
-	tree, ok := m.tags[orgId]
+	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil, nil
 	}
@@ -472,11 +472,11 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 	// if there is no filter/from given we know how much space we'll need
 	// and can preallocate it
 	if re == nil && from == 0 {
-		res = make([]string, 0, len(tree))
+		res = make([]string, 0, len(tags))
 	}
 
 KEYS:
-	for key := range tree {
+	for key := range tags {
 		// filter by pattern if one was given
 		if re != nil && !re.MatchString(key) {
 			continue
@@ -485,7 +485,7 @@ KEYS:
 		// if from is > 0 we need to find at least one metric definition where
 		// LastUpdate >= from before we add the key to the result set
 		if from > 0 {
-			for _, ids := range tree[key] {
+			for _, ids := range tags[key] {
 				for id := range ids {
 					def, ok := m.DefById[id.String()]
 					if !ok {
@@ -548,12 +548,12 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
 	m.RLock()
 	defer m.RUnlock()
 
-	tree, ok := m.tags[orgId]
+	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
 	}
 
-	return m.resolveIDs(query.Run(tree, m.DefById))
+	return m.resolveIDs(query.Run(tags, m.DefById))
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
