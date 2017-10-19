@@ -69,14 +69,14 @@ type GraphiteTagDetails struct {
 	From   int64  `json:"from"`
 }
 
-type GraphiteTagDetailsValueResp struct {
-	Count uint64 `json:"count"`
-	Value string `json:"value"`
-}
-
 type GraphiteTagDetailsResp struct {
 	Tag    string                        `json:"tag"`
 	Values []GraphiteTagDetailsValueResp `json:"values"`
+}
+
+type GraphiteTagDetailsValueResp struct {
+	Count uint64 `json:"count"`
+	Value string `json:"value"`
 }
 
 type GraphiteTagFindSeries struct {
