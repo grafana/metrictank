@@ -53,7 +53,7 @@ func (i IndexTagFindSeries) TraceDebug(span opentracing.Span) {
 type IndexTagDetails struct {
 	OrgId  int    `json:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
-	Tag    string `json:"tag"`
+	Tag    string `json:"tag" binding:"Required"`
 	From   int64  `json:"from"`
 }
 
