@@ -707,11 +707,13 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		result = make(map[string]uint64)
+	}
 
-	path := "/index/tags/" + tag
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
 	resp := &models.IndexTagDetailsResp{}
-	responses, err := s.peerQuery(ctx, data, "clusterTagDetails", path, resp)
+	responses, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details", resp)
 	if err != nil {
 		return nil, err
 	}
@@ -749,7 +751,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 
 	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
 	resp := &models.IndexTagFindSeriesResp{}
-	responses, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/tags/findSeries", resp)
+	responses, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/find_by_tag", resp)
 	if err != nil {
 		return nil, err
 	}

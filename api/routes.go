@@ -40,8 +40,8 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/delete", ready, bind(models.IndexDelete{})).Get(s.indexDelete).Post(s.indexDelete)
 	r.Combo("/index/get", ready, bind(models.IndexGet{})).Get(s.indexGet).Post(s.indexGet)
 	r.Combo("/index/tags", ready, bind(models.IndexTags{})).Get(s.indexTags).Post(s.indexTags)
-	r.Combo("/index/tags/findSeries", ready, bind(models.IndexTagFindSeries{})).Get(s.indexTagFindSeries).Post(s.indexTagFindSeries)
-	r.Combo("/index/tags/:tag([0-9a-zA-Z]+)", ready, bind(models.IndexTagDetails{})).Get(s.indexTagDetails).Post(s.indexTagDetails)
+	r.Combo("/index/find_by_tag", ready, bind(models.IndexTagFindSeries{})).Get(s.indexTagFindSeries).Post(s.indexTagFindSeries)
+	r.Combo("/index/tag_details", ready, bind(models.IndexTagDetails{})).Get(s.indexTagDetails).Post(s.indexTagDetails)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
