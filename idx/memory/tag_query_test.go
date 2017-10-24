@@ -258,7 +258,7 @@ func TestGetByTag(t *testing.T) {
 		}
 		res := ix.idsByTagQuery(1, tagQuery)
 		if len(tc.expectation) != len(res) {
-			t.Fatalf("Result does not match expectation for expressions %+v\nGot:\n%+v\nExpected:\n%+v\n", tc.expressions, res, tc.expectation)
+			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, res)
 		}
 		sort.Strings(tc.expectation)
 		sort.Strings(res)
