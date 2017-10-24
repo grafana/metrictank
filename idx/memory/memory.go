@@ -514,8 +514,8 @@ KEYS:
 	return res, nil
 }
 
-// resolves a list of ids (TagIDs) into a list of metric names
-// assumes that at least a read lock is already held by the caller
+// resolveIDs resolves a list of ids (TagIDs) into a list of metric names
+// it assumes that at least a read lock is already held by the caller
 func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 	res := make([]string, len(ids))
 	i := uint32(0)
