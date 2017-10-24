@@ -132,7 +132,7 @@ func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTag
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: metrics}))
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Metrics: metrics}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
