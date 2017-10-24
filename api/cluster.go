@@ -189,11 +189,7 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-// respTemplate: the response object into which the responses shall
-//               be deserialized. each sub-request will get a copy of this
-//               template and the response will be unarshalled into that copy.
-//               (generic without generics)
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string, respTemplate msgp.Unmarshaler) ([]msgp.Unmarshaler, error) {
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([][]byte, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
 		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
@@ -201,7 +197,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	}
 	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
 
-	result := make([]msgp.Unmarshaler, 0, len(peers)-1)
+	result := make([][]byte, 0, len(peers)-1)
 
 	var errors []error
 	var errLock sync.Mutex
@@ -216,7 +212,6 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 			defer wg.Done()
 			log.Debug("HTTP Render querying %s%s", peer.Name, path)
 			buf, err := peer.Post(ctx, name, path, data)
-
 			if err != nil {
 				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
 				errLock.Lock()
@@ -225,18 +220,8 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 				return
 			}
 
-			resp := respTemplate
-			_, err = resp.UnmarshalMsg(buf)
-			if err != nil {
-				log.Error(4, "HTTP error unmarshaling body from %s%s: %q", peer.Name, path, err)
-				errLock.Lock()
-				errors = append(errors, err)
-				errLock.Unlock()
-				return
-			}
-
 			resLock.Lock()
-			result = append(result, resp)
+			result = append(result, buf)
 			resLock.Unlock()
 		}(peer)
 	}

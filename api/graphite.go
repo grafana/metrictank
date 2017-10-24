@@ -712,14 +712,17 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	}
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
-	resp := &models.IndexTagDetailsResp{}
-	responses, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details", resp)
+	bufs, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
 	}
-
-	for _, resp := range responses {
-		for k, v := range resp.(*models.IndexTagDetailsResp).Values {
+	resp := models.IndexTagDetailsResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range resp.Values {
 			result[k] = result[k] + v
 		}
 	}
@@ -750,14 +753,18 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 	}
 
 	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
-	resp := &models.IndexTagFindSeriesResp{}
-	responses, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/find_by_tag", resp)
+	bufs, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, resp := range responses {
-		for _, series := range resp.(*models.IndexTagFindSeriesResp).Series {
+	resp := models.IndexTagFindSeriesResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, series := range resp.Series {
 			seriesSet[series] = struct{}{}
 		}
 	}
@@ -796,14 +803,18 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
-	resp := &models.IndexTagsResp{}
-	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags", resp)
+	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, resp := range responses {
-		for _, tag := range resp.(*models.IndexTagsResp).Tags {
+	resp := models.IndexTagsResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp.Tags {
 			tagSet[tag] = struct{}{}
 		}
 	}
