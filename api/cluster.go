@@ -132,11 +132,7 @@ func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTag
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	metricNames := make([]string, 0, len(metrics))
-	for _, metric := range metrics {
-		metricNames = append(metricNames, metric)
-	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: metricNames}))
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Series: metrics}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
