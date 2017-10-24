@@ -137,6 +137,8 @@ type MetricIndex interface {
 	// conditions are logically AND-ed.
 	// If the third argument is > 0 then the results will be filtered and only those
 	// where the LastUpdate time is >= from will be returned as results.
+	// The returned results are not deduplicated and in certain cases it is possible
+	// that duplicate entries will be returned.
 	FindByTag(int, []string, int64) ([]string, error)
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
