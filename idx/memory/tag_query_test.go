@@ -257,7 +257,7 @@ func TestGetByTag(t *testing.T) {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
 		res := ix.idsByTagQuery(1, tagQuery)
-		if len(res) != len(tc.expectation) {
+		if len(tc.expectation) != len(res) {
 			t.Fatalf("Result does not match expectation for expressions %+v\nGot:\n%+v\nExpected:\n%+v\n", tc.expressions, res, tc.expectation)
 		}
 		sort.Strings(tc.expectation)
