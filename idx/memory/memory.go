@@ -522,6 +522,8 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
 		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id.String())
 			continue
 		}
 		res[i] = def.Name
