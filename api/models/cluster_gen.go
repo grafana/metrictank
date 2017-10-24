@@ -510,19 +510,19 @@ func (z *IndexTagFindSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "Series":
+		case "Metrics":
 			var xsz uint32
 			xsz, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Series) >= int(xsz) {
-				z.Series = z.Series[:xsz]
+			if cap(z.Metrics) >= int(xsz) {
+				z.Metrics = z.Metrics[:xsz]
 			} else {
-				z.Series = make([]string, xsz)
+				z.Metrics = make([]string, xsz)
 			}
-			for hct := range z.Series {
-				z.Series[hct], err = dc.ReadString()
+			for hct := range z.Metrics {
+				z.Metrics[hct], err = dc.ReadString()
 				if err != nil {
 					return
 				}
@@ -540,17 +540,17 @@ func (z *IndexTagFindSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 // EncodeMsg implements msgp.Encodable
 func (z *IndexTagFindSeriesResp) EncodeMsg(en *msgp.Writer) (err error) {
 	// map header, size 1
-	// write "Series"
-	err = en.Append(0x81, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+	// write "Metrics"
+	err = en.Append(0x81, 0xa7, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73)
 	if err != nil {
 		return err
 	}
-	err = en.WriteArrayHeader(uint32(len(z.Series)))
+	err = en.WriteArrayHeader(uint32(len(z.Metrics)))
 	if err != nil {
 		return
 	}
-	for hct := range z.Series {
-		err = en.WriteString(z.Series[hct])
+	for hct := range z.Metrics {
+		err = en.WriteString(z.Metrics[hct])
 		if err != nil {
 			return
 		}
@@ -562,11 +562,11 @@ func (z *IndexTagFindSeriesResp) EncodeMsg(en *msgp.Writer) (err error) {
 func (z *IndexTagFindSeriesResp) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 1
-	// string "Series"
-	o = append(o, 0x81, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
-	o = msgp.AppendArrayHeader(o, uint32(len(z.Series)))
-	for hct := range z.Series {
-		o = msgp.AppendString(o, z.Series[hct])
+	// string "Metrics"
+	o = append(o, 0x81, 0xa7, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Metrics)))
+	for hct := range z.Metrics {
+		o = msgp.AppendString(o, z.Metrics[hct])
 	}
 	return
 }
@@ -587,19 +587,19 @@ func (z *IndexTagFindSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error) 
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "Series":
+		case "Metrics":
 			var xsz uint32
 			xsz, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Series) >= int(xsz) {
-				z.Series = z.Series[:xsz]
+			if cap(z.Metrics) >= int(xsz) {
+				z.Metrics = z.Metrics[:xsz]
 			} else {
-				z.Series = make([]string, xsz)
+				z.Metrics = make([]string, xsz)
 			}
-			for hct := range z.Series {
-				z.Series[hct], bts, err = msgp.ReadStringBytes(bts)
+			for hct := range z.Metrics {
+				z.Metrics[hct], bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
 					return
 				}
@@ -616,9 +616,9 @@ func (z *IndexTagFindSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error) 
 }
 
 func (z *IndexTagFindSeriesResp) Msgsize() (s int) {
-	s = 1 + 7 + msgp.ArrayHeaderSize
-	for hct := range z.Series {
-		s += msgp.StringPrefixSize + len(z.Series[hct])
+	s = 1 + 8 + msgp.ArrayHeaderSize
+	for hct := range z.Metrics {
+		s += msgp.StringPrefixSize + len(z.Metrics[hct])
 	}
 	return
 }
