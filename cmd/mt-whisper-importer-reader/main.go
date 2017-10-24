@@ -265,7 +265,7 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 		OrgId:    *orgId,
 	}
 	md.SetId()
-	_, schema := schemas.Match(md.Name, 0)
+	_, schema := schemas.Match(md.Name, w.Header.Archives[0].SecondsPerPoint)
 
 	points := make(map[int][]whisper.Point)
 	for i := range w.Header.Archives {
