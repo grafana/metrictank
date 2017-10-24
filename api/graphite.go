@@ -752,7 +752,7 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 		seriesSet[series] = struct{}{}
 	}
 
-	data := models.IndexTagFindSeries{OrgId: orgId, Expressions: expressions, From: from}
+	data := models.IndexTagFindSeries{OrgId: orgId, Expr: expressions, From: from}
 	bufs, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
