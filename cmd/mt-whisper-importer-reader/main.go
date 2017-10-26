@@ -265,7 +265,7 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 		OrgId:    *orgId,
 	}
 	md.SetId()
-	_, schema := schemas.Match(md.Name, 0)
+	_, schema := schemas.Match(md.Name, int(w.Header.Archives[0].SecondsPerPoint))
 
 	points := make(map[int][]whisper.Point)
 	for i := range w.Header.Archives {
@@ -361,6 +361,9 @@ func getFileListIntoChan(fileChan chan string) {
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
+			if path == *whisperDirectory {
+				return nil
+			}
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
 				log.Debugf("Skipping file %s with name %s", path, name)
