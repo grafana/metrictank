@@ -264,11 +264,16 @@ func parseConst(s string) (*expr, string, error) {
 func parseName(s string) (string, string) {
 
 	var i int
+	allowEqual := false
 
 FOR:
 	for braces := 0; i < len(s); i++ {
-
-		if isNameChar(s[i]) {
+		// if the current expression is a metric name with ";" (59) we should
+		// allow the "=" (61) character to be part of the metric name
+		if isNameChar(s[i]) || (allowEqual && s[i] == 61) {
+			if s[i] == 59 {
+				allowEqual = true
+			}
 			continue
 		}
 
@@ -289,6 +294,7 @@ FOR:
 			break FOR
 		}
 
+		allowEqual = false
 	}
 
 	if i == len(s) {

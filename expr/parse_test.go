@@ -29,6 +29,24 @@ func TestParse(t *testing.T) {
 			nil,
 		},
 		{
+			"a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2",
+			&expr{str: "a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2"},
+			nil,
+		},
+		{
+			"func(metric;tag1=value1, key='value')",
+			&expr{
+				str:     "func",
+				etype:   etFunc,
+				args:    []*expr{{str: "metric;tag1=value1"}},
+				argsStr: "metric;tag1=value1, key='value'",
+				namedArgs: map[string]*expr{
+					"key": {etype: etString, str: "value"},
+				},
+			},
+			nil,
+		},
+		{
 			"func(metric)",
 			&expr{
 				str:     "func",
