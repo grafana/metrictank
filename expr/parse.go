@@ -293,8 +293,6 @@ FOR:
 		default:
 			break FOR
 		}
-
-		allowEqual = false
 	}
 
 	if i == len(s) {
