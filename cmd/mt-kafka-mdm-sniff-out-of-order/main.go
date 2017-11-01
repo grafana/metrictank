@@ -41,7 +41,7 @@ type TplData struct {
 // find out of order metrics
 type inputOOOFinder struct {
 	template.Template
-	data map[string]Data // by metric name
+	data map[string]Data // by metric id
 	lock sync.Mutex
 }
 
@@ -67,12 +67,12 @@ func (ip *inputOOOFinder) Process(metric *schema.MetricData, partition int32) {
 		MetricData: *metric,
 	}
 	ip.lock.Lock()
-	first, ok := ip.data[metric.Name]
+	first, ok := ip.data[metric.Id]
 	if !ok {
-		ip.data[metric.Name] = now
+		ip.data[metric.Id] = now
 	} else {
 		if metric.Time > first.Time {
-			ip.data[metric.Name] = now
+			ip.data[metric.Id] = now
 		} else {
 			t := TplData{now, first}
 			err := ip.Execute(os.Stdout, t)
