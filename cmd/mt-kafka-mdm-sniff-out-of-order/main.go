@@ -22,7 +22,7 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	format   = flag.String("format", "{{.Last.Seen}} {{.Last.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with. data under .Last represents the 'head' of the series, the most recent successfully added point (e.g. it had a higher timestamp than previous values)")
+	format   = flag.String("format", "{{.Last.Seen}} {{.Last.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render event with")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
 )
@@ -89,7 +89,18 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-kafka-mdm-sniff-out-of-order")
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Inspects what's flowing through kafka (in mdm format) and reports it to you")
+		fmt.Fprintln(os.Stderr, "Inspects what's flowing through kafka (in mdm format) and reports out of order data")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "# Mechanism")
+		fmt.Fprintln(os.Stderr, "* it sniffs points being added on a per-series (metric Id) level")
+		fmt.Fprintln(os.Stderr, "* for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp")
+		fmt.Fprintln(os.Stderr, "* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point")
+		fmt.Fprintln(os.Stderr, "every event is printed using the specified format")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "# Event formatting")
+		fmt.Fprintln(os.Stderr, "You can print any property of the out-of-order MetricData: {{.Time}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+		fmt.Fprintln(os.Stderr, "Additionally you can print {{.Part}} (partition) and {{.Seen}} (seen timestamp)")
+		fmt.Fprintln(os.Stderr, "All the same data is also available for the last correct point, under .Last, so {{.Last.Seen}} {{.Last.Time}} etc")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}
