@@ -35,19 +35,19 @@ func (i IndexList) Trace(span opentracing.Span) {
 func (i IndexList) TraceDebug(span opentracing.Span) {
 }
 
-type IndexTagFindSeries struct {
+type IndexFindByTag struct {
 	OrgId int      `json:"orgId" binding:"Required"`
 	Expr  []string `json:"expressions"`
 	From  int64    `json:"from"`
 }
 
-func (t IndexTagFindSeries) Trace(span opentracing.Span) {
+func (t IndexFindByTag) Trace(span opentracing.Span) {
 	span.SetTag("org", t.OrgId)
 	span.SetTag("expressions", t.Expr)
 	span.SetTag("from", t.From)
 }
 
-func (i IndexTagFindSeries) TraceDebug(span opentracing.Span) {
+func (i IndexFindByTag) TraceDebug(span opentracing.Span) {
 }
 
 type IndexTagDetails struct {

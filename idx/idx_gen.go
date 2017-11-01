@@ -4,19 +4,21 @@ package idx
 // MSGP CODE GENERATION TOOL (github.com/tinylib/msgp)
 // DO NOT EDIT
 
-import "github.com/tinylib/msgp/msgp"
+import (
+	"github.com/tinylib/msgp/msgp"
+)
 
 // DecodeMsg implements msgp.Decodable
 func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zxvk uint32
-	zxvk, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zxvk > 0 {
-		zxvk--
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -120,13 +122,13 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zbzg uint32
-	zbzg, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zbzg > 0 {
-		zbzg--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -170,16 +172,93 @@ func (z *Archive) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
-func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
+func (z *MetricID) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zcmr uint32
-	zcmr, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zcmr > 0 {
-		zcmr--
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		default:
+			err = dc.Skip()
+			if err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z MetricID) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 0
+	err = en.Append(0x80)
+	if err != nil {
+		return err
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z MetricID) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 0
+	o = append(o, 0x80)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *MetricID) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z MetricID) Msgsize() (s int) {
+	s = 1
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
+func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -196,18 +275,18 @@ func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Defs":
-			var zajw uint32
-			zajw, err = dc.ReadArrayHeader()
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Defs) >= int(zajw) {
-				z.Defs = (z.Defs)[:zajw]
+			if cap(z.Defs) >= int(zb0002) {
+				z.Defs = (z.Defs)[:zb0002]
 			} else {
-				z.Defs = make([]Archive, zajw)
+				z.Defs = make([]Archive, zb0002)
 			}
-			for zbai := range z.Defs {
-				err = z.Defs[zbai].DecodeMsg(dc)
+			for za0001 := range z.Defs {
+				err = z.Defs[za0001].DecodeMsg(dc)
 				if err != nil {
 					return
 				}
@@ -257,8 +336,8 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zbai := range z.Defs {
-		err = z.Defs[zbai].EncodeMsg(en)
+	for za0001 := range z.Defs {
+		err = z.Defs[za0001].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -288,8 +367,8 @@ func (z *Node) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Defs"
 	o = append(o, 0xa4, 0x44, 0x65, 0x66, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Defs)))
-	for zbai := range z.Defs {
-		o, err = z.Defs[zbai].MarshalMsg(o)
+	for za0001 := range z.Defs {
+		o, err = z.Defs[za0001].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -304,13 +383,13 @@ func (z *Node) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zwht uint32
-	zwht, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zwht > 0 {
-		zwht--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -327,18 +406,18 @@ func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Defs":
-			var zhct uint32
-			zhct, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Defs) >= int(zhct) {
-				z.Defs = (z.Defs)[:zhct]
+			if cap(z.Defs) >= int(zb0002) {
+				z.Defs = (z.Defs)[:zb0002]
 			} else {
-				z.Defs = make([]Archive, zhct)
+				z.Defs = make([]Archive, zb0002)
 			}
-			for zbai := range z.Defs {
-				bts, err = z.Defs[zbai].UnmarshalMsg(bts)
+			for za0001 := range z.Defs {
+				bts, err = z.Defs[za0001].UnmarshalMsg(bts)
 				if err != nil {
 					return
 				}
@@ -362,8 +441,8 @@ func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Node) Msgsize() (s int) {
 	s = 1 + 5 + msgp.StringPrefixSize + len(z.Path) + 5 + msgp.BoolSize + 5 + msgp.ArrayHeaderSize
-	for zbai := range z.Defs {
-		s += z.Defs[zbai].Msgsize()
+	for za0001 := range z.Defs {
+		s += z.Defs[za0001].Msgsize()
 	}
 	s += 12 + msgp.BoolSize
 	return

@@ -731,7 +731,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 }
 
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
-	series, err := s.clusterTagFindSeries(ctx.Req.Context(), ctx.OrgId, request.Expr, request.From)
+	series, err := s.clusterFindByTag(ctx.Req.Context(), ctx.OrgId, request.Expr, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -740,7 +740,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, series, ""))
 }
 
-func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
+func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
 	seriesSet := make(map[string]struct{})
 
 	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
@@ -752,13 +752,13 @@ func (s *Server) clusterTagFindSeries(ctx context.Context, orgId int, expression
 		seriesSet[series] = struct{}{}
 	}
 
-	data := models.IndexTagFindSeries{OrgId: orgId, Expr: expressions, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterTagFindSeries", "/index/find_by_tag")
+	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
 	}
 
-	resp := models.IndexTagFindSeriesResp{}
+	resp := models.IndexFindByTagResp{}
 	for _, buf := range bufs {
 		_, err = resp.UnmarshalMsg(buf)
 		if err != nil {

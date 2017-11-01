@@ -126,13 +126,13 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
 }
 
-func (s *Server) indexTagFindSeries(ctx *middleware.Context, req models.IndexTagFindSeries) {
+func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
 	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagFindSeriesResp{Metrics: metrics}))
+	response.Write(ctx, response.NewMsgp(200, &models.IndexFindByTagResp{Metrics: metrics}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition

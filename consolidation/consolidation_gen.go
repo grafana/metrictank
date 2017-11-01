@@ -11,12 +11,12 @@ import (
 // DecodeMsg implements msgp.Decodable
 func (z *Consolidator) DecodeMsg(dc *msgp.Reader) (err error) {
 	{
-		var zxvk int
-		zxvk, err = dc.ReadInt()
-		(*z) = Consolidator(zxvk)
-	}
-	if err != nil {
-		return
+		var zb0001 int
+		zb0001, err = dc.ReadInt()
+		if err != nil {
+			return
+		}
+		(*z) = Consolidator(zb0001)
 	}
 	return
 }
@@ -40,12 +40,12 @@ func (z Consolidator) MarshalMsg(b []byte) (o []byte, err error) {
 // UnmarshalMsg implements msgp.Unmarshaler
 func (z *Consolidator) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	{
-		var zbzg int
-		zbzg, bts, err = msgp.ReadIntBytes(bts)
-		(*z) = Consolidator(zbzg)
-	}
-	if err != nil {
-		return
+		var zb0001 int
+		zb0001, bts, err = msgp.ReadIntBytes(bts)
+		if err != nil {
+			return
+		}
+		(*z) = Consolidator(zb0001)
 	}
 	o = bts
 	return
