@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
@@ -106,6 +108,33 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	response.Write(ctx, response.NewMsgp(200, resp))
 }
 
+func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDetails) {
+	values, err := s.MetricIndex.TagDetails(req.OrgId, req.Tag, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{Values: values}))
+}
+
+func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
+	tags, err := s.MetricIndex.Tags(req.OrgId, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
+}
+
+func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
+	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexFindByTagResp{Metrics: metrics}))
+}
+
 // IndexGet returns a msgp encoded schema.MetricDefinition
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 	def, ok := s.MetricIndex.Get(req.Id)
@@ -152,4 +181,55 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 		DeletedDefs: len(defs),
 	}
 	response.Write(ctx, response.NewMsgp(200, &resp))
+}
+
+// peerQuery takes a request and the path to request it on, then fans it out
+// across the cluster, except to the local peer.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([][]byte, error) {
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+		return nil, err
+	}
+	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
+
+	result := make([][]byte, 0, len(peers)-1)
+
+	var errors []error
+	var errLock sync.Mutex
+	var resLock sync.Mutex
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		if peer.IsLocal() {
+			continue
+		}
+		wg.Add(1)
+		go func(peer cluster.Node) {
+			defer wg.Done()
+			log.Debug("HTTP Render querying %s%s", peer.Name, path)
+			buf, err := peer.Post(ctx, name, path, data)
+			if err != nil {
+				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
+				errLock.Lock()
+				errors = append(errors, err)
+				errLock.Unlock()
+				return
+			}
+
+			resLock.Lock()
+			result = append(result, buf)
+			resLock.Unlock()
+		}(peer)
+	}
+	wg.Wait()
+
+	if len(errors) > 0 {
+		return nil, errors[0]
+	}
+
+	return result, nil
 }

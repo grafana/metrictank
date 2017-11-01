@@ -29,6 +29,24 @@ func TestParse(t *testing.T) {
 			nil,
 		},
 		{
+			"a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2",
+			&expr{str: "a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2"},
+			nil,
+		},
+		{
+			"func(metric;tag1=value1, key='value')",
+			&expr{
+				str:     "func",
+				etype:   etFunc,
+				args:    []*expr{{str: "metric;tag1=value1"}},
+				argsStr: "metric;tag1=value1, key='value'",
+				namedArgs: map[string]*expr{
+					"key": {etype: etString, str: "value"},
+				},
+			},
+			nil,
+		},
+		{
 			"func(metric)",
 			&expr{
 				str:     "func",
@@ -284,6 +302,26 @@ func TestParse(t *testing.T) {
 					"key1": {etype: etString, str: "value1"},
 				},
 				argsStr: "metric, key2='value2', key1='value1'",
+			},
+			nil,
+		},
+		{
+			"func(metric1;tag1=val1, key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1;tag1=val1"},
+					{str: "metric2;tag2=val2"},
+					{str: "metric3;tag3=val3"},
+					{str: "metric4;tag4=val4"},
+				},
+				namedArgs: map[string]*expr{
+					"key1": {etype: etString, str: "value1"},
+					"key2": {etype: etBool, str: "true", bool: true},
+					"key3": {etype: etName, str: "None"},
+				},
+				argsStr: "metric1;tag1=val1, key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4",
 			},
 			nil,
 		},

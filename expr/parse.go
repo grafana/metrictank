@@ -177,6 +177,8 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		}
 
 		// we now know we're parsing a key-value pair
+		// in the future we should probably add validation here that the key
+		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
 			argCont, eCont, errCont := Parse(e)
@@ -261,14 +263,28 @@ func parseConst(s string) (*expr, string, error) {
 	return &expr{int: v, str: s[:i], etype: etInt}, s[i:], err
 }
 
+// parseName parses a "name" which is either:
+// 1) a metric expression
+// 2) the key of a keyword argument
+// 3) a function name
+// It's up to the caller to determine which, based on context. E.g.:
+// * if leftover data starts with '(' then assume 3 and validate function name
+// * if leftover data starts with '=' assume 2
+// * fallback to assuming 1.
+// it returns the parsed name and any leftover data
 func parseName(s string) (string, string) {
 
 	var i int
+	allowEqual := false
 
 FOR:
 	for braces := 0; i < len(s); i++ {
-
-		if isNameChar(s[i]) {
+		// if the current expression is a metric name with ";" (59) we should
+		// allow the "=" (61) character to be part of the metric name
+		if isNameChar(s[i]) || (allowEqual && s[i] == 61) {
+			if s[i] == 59 {
+				allowEqual = true
+			}
 			continue
 		}
 
@@ -288,7 +304,6 @@ FOR:
 		default:
 			break FOR
 		}
-
 	}
 
 	if i == len(s) {

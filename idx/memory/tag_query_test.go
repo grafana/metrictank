@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -182,33 +183,6 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	}
 }
 
-func TestSingleTagQueryByTagWithFrom(t *testing.T) {
-	tagIdx, byId := getTestIndex(t)
-	memIdx := New()
-	memIdx.Tags[1] = tagIdx
-	memIdx.DefById = byId
-
-	res := memIdx.Tag(1, "key1", 0)
-	if res["value1"] != 4 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 2)
-	if res["value1"] != 3 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 3)
-	if res["value1"] != 2 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-
-	res = memIdx.Tag(1, "key1", 4)
-	if res["value1"] != 1 {
-		t.Fatalf("Expected %d results, but got %d", 4, len(res))
-	}
-}
-
 func TestGetByTag(t *testing.T) {
 	_tagSupport := tagSupport
 	defer func() { tagSupport = _tagSupport }()
@@ -240,40 +214,40 @@ func TestGetByTag(t *testing.T) {
 
 	type testCase struct {
 		expressions []string
-		expectation []idx.MetricID
+		expectation []string
 	}
 
 	testCases := []testCase{
 		{
 			expressions: []string{"key1=value1"},
-			expectation: []idx.MetricID{ids[1], ids[11], ids[3]},
+			expectation: []string{mds[1].Metric, mds[11].Metric, mds[3].Metric},
 		}, {
 			expressions: []string{"key1=value2"},
-			expectation: []idx.MetricID{ids[18]},
+			expectation: []string{mds[18].Metric},
 		}, {
 			expressions: []string{"key1=~value[0-9]"},
-			expectation: []idx.MetricID{ids[1], ids[11], ids[18], ids[3]},
+			expectation: []string{mds[1].Metric, mds[11].Metric, mds[18].Metric, mds[3].Metric},
 		}, {
 			expressions: []string{"key1=~value[23]"},
-			expectation: []idx.MetricID{ids[18]},
+			expectation: []string{mds[18].Metric},
 		}, {
 			expressions: []string{"key1=value1", "key2=value1"},
-			expectation: []idx.MetricID{},
+			expectation: []string{},
 		}, {
 			expressions: []string{"key1=value1", "key2=value2"},
-			expectation: []idx.MetricID{ids[1]},
+			expectation: []string{mds[1].Metric},
 		}, {
 			expressions: []string{"key1=~value[12]", "key2=value2"},
-			expectation: []idx.MetricID{ids[1], ids[18]},
+			expectation: []string{mds[1].Metric, mds[18].Metric},
 		}, {
 			expressions: []string{"key1=~value1", "key1=value2"},
-			expectation: []idx.MetricID{},
+			expectation: []string{},
 		}, {
 			expressions: []string{"key1=~value[0-9]", "key2=~", "key3!=value3"},
-			expectation: []idx.MetricID{ids[11]},
+			expectation: []string{mds[11].Metric},
 		}, {
 			expressions: []string{"key2=", "key1=value1"},
-			expectation: []idx.MetricID{ids[11], ids[3]},
+			expectation: []string{mds[11].Metric, mds[3].Metric},
 		},
 	}
 
@@ -283,14 +257,12 @@ func TestGetByTag(t *testing.T) {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
 		res := ix.idsByTagQuery(1, tagQuery)
-		if len(res) != len(tc.expectation) {
-			t.Fatalf("Result does not match expectation for expressions %+v\nGot:\n%+v\nExpected:\n%+v\n", tc.expressions, res, tc.expectation)
+		if len(tc.expectation) != len(res) {
+			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, res)
 		}
-		expectationMap := make(TagIDs)
-		for _, v := range tc.expectation {
-			expectationMap[v] = struct{}{}
-		}
-		if !reflect.DeepEqual(res, expectationMap) {
+		sort.Strings(tc.expectation)
+		sort.Strings(res)
+		if !reflect.DeepEqual(res, tc.expectation) {
 			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", res, tc.expectation)
 		}
 	}
@@ -320,8 +292,8 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 1 result, but got %d", len(res))
 	}
 
-	if len(ix.Tags[orgId]) != 2 {
-		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.Tags)
+	if len(ix.tags[orgId]) != 2 {
+		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.tags)
 	}
 
 	deleted, err := ix.Delete(orgId, mds[10].Metric)
@@ -339,8 +311,8 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 0 results, but got %d", len(res))
 	}
 
-	if len(ix.Tags[orgId]) > 0 {
-		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.Tags)
+	if len(ix.tags[orgId]) > 0 {
+		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.tags)
 	}
 }
 

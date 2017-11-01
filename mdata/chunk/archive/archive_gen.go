@@ -13,13 +13,13 @@ import (
 func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zbzg uint32
-	zbzg, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zbzg > 0 {
-		zbzg--
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -41,18 +41,18 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Chunks":
-			var zbai uint32
-			zbai, err = dc.ReadArrayHeader()
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Chunks) >= int(zbai) {
-				z.Chunks = (z.Chunks)[:zbai]
+			if cap(z.Chunks) >= int(zb0002) {
+				z.Chunks = (z.Chunks)[:zb0002]
 			} else {
-				z.Chunks = make([]chunk.IterGen, zbai)
+				z.Chunks = make([]chunk.IterGen, zb0002)
 			}
-			for zxvk := range z.Chunks {
-				err = z.Chunks[zxvk].DecodeMsg(dc)
+			for za0001 := range z.Chunks {
+				err = z.Chunks[za0001].DecodeMsg(dc)
 				if err != nil {
 					return
 				}
@@ -106,8 +106,8 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zxvk := range z.Chunks {
-		err = z.Chunks[zxvk].EncodeMsg(en)
+	for za0001 := range z.Chunks {
+		err = z.Chunks[za0001].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -131,8 +131,8 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Chunks"
 	o = append(o, 0xa6, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Chunks)))
-	for zxvk := range z.Chunks {
-		o, err = z.Chunks[zxvk].MarshalMsg(o)
+	for za0001 := range z.Chunks {
+		o, err = z.Chunks[za0001].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -144,13 +144,13 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zcmr uint32
-	zcmr, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zcmr > 0 {
-		zcmr--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -172,18 +172,18 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Chunks":
-			var zajw uint32
-			zajw, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Chunks) >= int(zajw) {
-				z.Chunks = (z.Chunks)[:zajw]
+			if cap(z.Chunks) >= int(zb0002) {
+				z.Chunks = (z.Chunks)[:zb0002]
 			} else {
-				z.Chunks = make([]chunk.IterGen, zajw)
+				z.Chunks = make([]chunk.IterGen, zb0002)
 			}
-			for zxvk := range z.Chunks {
-				bts, err = z.Chunks[zxvk].UnmarshalMsg(bts)
+			for za0001 := range z.Chunks {
+				bts, err = z.Chunks[za0001].UnmarshalMsg(bts)
 				if err != nil {
 					return
 				}
@@ -202,8 +202,8 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Archive) Msgsize() (s int) {
 	s = 1 + 7 + msgp.StringPrefixSize + len(z.RowKey) + 16 + msgp.Uint32Size + 7 + msgp.Uint32Size + 7 + msgp.ArrayHeaderSize
-	for zxvk := range z.Chunks {
-		s += z.Chunks[zxvk].Msgsize()
+	for za0001 := range z.Chunks {
+		s += z.Chunks[za0001].Msgsize()
 	}
 	return
 }
@@ -212,13 +212,13 @@ func (z *Archive) Msgsize() (s int) {
 func (z *Metric) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zhct uint32
-	zhct, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zhct > 0 {
-		zhct--
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -235,18 +235,18 @@ func (z *Metric) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Archives":
-			var zcua uint32
-			zcua, err = dc.ReadArrayHeader()
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Archives) >= int(zcua) {
-				z.Archives = (z.Archives)[:zcua]
+			if cap(z.Archives) >= int(zb0002) {
+				z.Archives = (z.Archives)[:zb0002]
 			} else {
-				z.Archives = make([]Archive, zcua)
+				z.Archives = make([]Archive, zb0002)
 			}
-			for zwht := range z.Archives {
-				err = z.Archives[zwht].DecodeMsg(dc)
+			for za0001 := range z.Archives {
+				err = z.Archives[za0001].DecodeMsg(dc)
 				if err != nil {
 					return
 				}
@@ -291,8 +291,8 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zwht := range z.Archives {
-		err = z.Archives[zwht].EncodeMsg(en)
+	for za0001 := range z.Archives {
+		err = z.Archives[za0001].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -316,8 +316,8 @@ func (z *Metric) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Archives"
 	o = append(o, 0xa8, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Archives)))
-	for zwht := range z.Archives {
-		o, err = z.Archives[zwht].MarshalMsg(o)
+	for za0001 := range z.Archives {
+		o, err = z.Archives[za0001].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -329,13 +329,13 @@ func (z *Metric) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Metric) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zxhx uint32
-	zxhx, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zxhx > 0 {
-		zxhx--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -352,18 +352,18 @@ func (z *Metric) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Archives":
-			var zlqf uint32
-			zlqf, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Archives) >= int(zlqf) {
-				z.Archives = (z.Archives)[:zlqf]
+			if cap(z.Archives) >= int(zb0002) {
+				z.Archives = (z.Archives)[:zb0002]
 			} else {
-				z.Archives = make([]Archive, zlqf)
+				z.Archives = make([]Archive, zb0002)
 			}
-			for zwht := range z.Archives {
-				bts, err = z.Archives[zwht].UnmarshalMsg(bts)
+			for za0001 := range z.Archives {
+				bts, err = z.Archives[za0001].UnmarshalMsg(bts)
 				if err != nil {
 					return
 				}
@@ -382,8 +382,8 @@ func (z *Metric) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Metric) Msgsize() (s int) {
 	s = 1 + 11 + z.MetricData.Msgsize() + 18 + msgp.Uint32Size + 9 + msgp.ArrayHeaderSize
-	for zwht := range z.Archives {
-		s += z.Archives[zwht].Msgsize()
+	for za0001 := range z.Archives {
+		s += z.Archives[za0001].Msgsize()
 	}
 	return
 }

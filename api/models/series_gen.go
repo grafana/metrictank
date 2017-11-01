@@ -13,13 +13,13 @@ import (
 func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zbzg uint32
-	zbzg, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zbzg > 0 {
-		zbzg--
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -31,18 +31,18 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "Datapoints":
-			var zbai uint32
-			zbai, err = dc.ReadArrayHeader()
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
 				return
 			}
-			if cap(z.Datapoints) >= int(zbai) {
-				z.Datapoints = (z.Datapoints)[:zbai]
+			if cap(z.Datapoints) >= int(zb0002) {
+				z.Datapoints = (z.Datapoints)[:zb0002]
 			} else {
-				z.Datapoints = make([]schema.Point, zbai)
+				z.Datapoints = make([]schema.Point, zb0002)
 			}
-			for zxvk := range z.Datapoints {
-				err = z.Datapoints[zxvk].DecodeMsg(dc)
+			for za0001 := range z.Datapoints {
+				err = z.Datapoints[za0001].DecodeMsg(dc)
 				if err != nil {
 					return
 				}
@@ -108,8 +108,8 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zxvk := range z.Datapoints {
-		err = z.Datapoints[zxvk].EncodeMsg(en)
+	for za0001 := range z.Datapoints {
+		err = z.Datapoints[za0001].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -181,8 +181,8 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Datapoints"
 	o = append(o, 0xaa, 0x44, 0x61, 0x74, 0x61, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Datapoints)))
-	for zxvk := range z.Datapoints {
-		o, err = z.Datapoints[zxvk].MarshalMsg(o)
+	for za0001 := range z.Datapoints {
+		o, err = z.Datapoints[za0001].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -218,13 +218,13 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zcmr uint32
-	zcmr, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zcmr > 0 {
-		zcmr--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return
@@ -236,18 +236,18 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "Datapoints":
-			var zajw uint32
-			zajw, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if cap(z.Datapoints) >= int(zajw) {
-				z.Datapoints = (z.Datapoints)[:zajw]
+			if cap(z.Datapoints) >= int(zb0002) {
+				z.Datapoints = (z.Datapoints)[:zb0002]
 			} else {
-				z.Datapoints = make([]schema.Point, zajw)
+				z.Datapoints = make([]schema.Point, zb0002)
 			}
-			for zxvk := range z.Datapoints {
-				bts, err = z.Datapoints[zxvk].UnmarshalMsg(bts)
+			for za0001 := range z.Datapoints {
+				bts, err = z.Datapoints[za0001].UnmarshalMsg(bts)
 				if err != nil {
 					return
 				}
@@ -296,8 +296,8 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Series) Msgsize() (s int) {
 	s = 1 + 7 + msgp.StringPrefixSize + len(z.Target) + 11 + msgp.ArrayHeaderSize
-	for zxvk := range z.Datapoints {
-		s += z.Datapoints[zxvk].Msgsize()
+	for za0001 := range z.Datapoints {
+		s += z.Datapoints[za0001].Msgsize()
 	}
 	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size + 10 + z.QueryCons.Msgsize() + 13 + z.Consolidator.Msgsize()
 	return
@@ -305,18 +305,18 @@ func (z *Series) Msgsize() (s int) {
 
 // DecodeMsg implements msgp.Decodable
 func (z *SeriesByTarget) DecodeMsg(dc *msgp.Reader) (err error) {
-	var zcua uint32
-	zcua, err = dc.ReadArrayHeader()
+	var zb0002 uint32
+	zb0002, err = dc.ReadArrayHeader()
 	if err != nil {
 		return
 	}
-	if cap((*z)) >= int(zcua) {
-		(*z) = (*z)[:zcua]
+	if cap((*z)) >= int(zb0002) {
+		(*z) = (*z)[:zb0002]
 	} else {
-		(*z) = make(SeriesByTarget, zcua)
+		(*z) = make(SeriesByTarget, zb0002)
 	}
-	for zhct := range *z {
-		err = (*z)[zhct].DecodeMsg(dc)
+	for zb0001 := range *z {
+		err = (*z)[zb0001].DecodeMsg(dc)
 		if err != nil {
 			return
 		}
@@ -330,8 +330,8 @@ func (z SeriesByTarget) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zxhx := range z {
-		err = z[zxhx].EncodeMsg(en)
+	for zb0003 := range z {
+		err = z[zb0003].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -343,8 +343,8 @@ func (z SeriesByTarget) EncodeMsg(en *msgp.Writer) (err error) {
 func (z SeriesByTarget) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	o = msgp.AppendArrayHeader(o, uint32(len(z)))
-	for zxhx := range z {
-		o, err = z[zxhx].MarshalMsg(o)
+	for zb0003 := range z {
+		o, err = z[zb0003].MarshalMsg(o)
 		if err != nil {
 			return
 		}
@@ -354,18 +354,18 @@ func (z SeriesByTarget) MarshalMsg(b []byte) (o []byte, err error) {
 
 // UnmarshalMsg implements msgp.Unmarshaler
 func (z *SeriesByTarget) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	var zdaf uint32
-	zdaf, bts, err = msgp.ReadArrayHeaderBytes(bts)
+	var zb0002 uint32
+	zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	if cap((*z)) >= int(zdaf) {
-		(*z) = (*z)[:zdaf]
+	if cap((*z)) >= int(zb0002) {
+		(*z) = (*z)[:zb0002]
 	} else {
-		(*z) = make(SeriesByTarget, zdaf)
+		(*z) = make(SeriesByTarget, zb0002)
 	}
-	for zlqf := range *z {
-		bts, err = (*z)[zlqf].UnmarshalMsg(bts)
+	for zb0001 := range *z {
+		bts, err = (*z)[zb0001].UnmarshalMsg(bts)
 		if err != nil {
 			return
 		}
@@ -377,8 +377,8 @@ func (z *SeriesByTarget) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z SeriesByTarget) Msgsize() (s int) {
 	s = msgp.ArrayHeaderSize
-	for zpks := range z {
-		s += z[zpks].Msgsize()
+	for zb0003 := range z {
+		s += z[zb0003].Msgsize()
 	}
 	return
 }

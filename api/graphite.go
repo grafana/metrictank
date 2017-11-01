@@ -673,3 +673,156 @@ func getLocation(desc string) (*time.Location, error) {
 	}
 	return time.LoadLocation(desc)
 }
+
+func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.GraphiteTagDetails) {
+	tag := ctx.Params(":tag")
+	if len(tag) <= 0 {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, "not tag specified"))
+		return
+	}
+
+	tagValues, err := s.clusterTagDetails(ctx.Req.Context(), ctx.OrgId, tag, request.Filter, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	resp := models.GraphiteTagDetailsResp{
+		Tag:    tag,
+		Values: make([]models.GraphiteTagDetailsValueResp, 0, len(tagValues)),
+	}
+
+	for k, v := range tagValues {
+		resp.Values = append(resp.Values, models.GraphiteTagDetailsValueResp{
+			Value: k,
+			Count: v,
+		})
+	}
+
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter string, from int64) (map[string]uint64, error) {
+	result, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = make(map[string]uint64)
+	}
+
+	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
+	if err != nil {
+		return nil, err
+	}
+	resp := models.IndexTagDetailsResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range resp.Values {
+			result[k] = result[k] + v
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
+	series, err := s.clusterFindByTag(ctx.Req.Context(), ctx.OrgId, request.Expr, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, series, ""))
+}
+
+func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
+	seriesSet := make(map[string]struct{})
+
+	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, series := range result {
+		seriesSet[series] = struct{}{}
+	}
+
+	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.IndexFindByTagResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, series := range resp.Metrics {
+			seriesSet[series] = struct{}{}
+		}
+	}
+
+	series := make([]string, 0, len(seriesSet))
+	for s := range seriesSet {
+		series = append(series, s)
+	}
+
+	return series, nil
+}
+
+func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
+	tags, err := s.clusterTags(ctx.Req.Context(), ctx.OrgId, request.Filter, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	var resp models.GraphiteTagsResp
+	for _, tag := range tags {
+		resp = append(resp, models.GraphiteTagResp{Tag: tag})
+	}
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from int64) ([]string, error) {
+	result, err := s.MetricIndex.Tags(orgId, filter, from)
+	if err != nil {
+		return nil, err
+	}
+
+	tagSet := make(map[string]struct{}, len(result))
+	for _, tag := range result {
+		tagSet[tag] = struct{}{}
+	}
+
+	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.IndexTagsResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp.Tags {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tags = append(tags, t)
+	}
+
+	return tags, nil
+}

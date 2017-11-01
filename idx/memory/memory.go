@@ -91,14 +91,14 @@ type MemoryIdx struct {
 	Tree    map[int]*Tree
 
 	// org id -> key name -> key value -> id
-	Tags map[int]TagIndex
+	tags map[int]TagIndex
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
 		DefById: make(map[string]*idx.Archive),
 		Tree:    make(map[int]*Tree),
-		Tags:    make(map[int]TagIndex),
+		tags:    make(map[int]TagIndex),
 	}
 }
 
@@ -151,10 +151,10 @@ func (m *MemoryIdx) Update(entry idx.Archive) {
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
 func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
-	tags, ok := m.Tags[def.OrgId]
+	tags, ok := m.tags[def.OrgId]
 	if !ok {
 		tags = make(TagIndex)
-		m.Tags[def.OrgId] = tags
+		m.tags[def.OrgId] = tags
 	}
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
@@ -192,7 +192,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 // deindexTags takes a given metric definition and removes all references
 // to it from the tag index. It assumes a lock is already held.
 func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
-	tags, ok := m.Tags[def.OrgId]
+	tags, ok := m.tags[def.OrgId]
 	if !ok {
 		corruptIndex.Inc()
 		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
@@ -376,76 +376,163 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 	return archives
 }
 
-func (m *MemoryIdx) Tag(orgId int, tag string, from int64) map[string]uint32 {
+func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[string]uint64, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
+		return nil, nil
+	}
+
+	var re *regexp.Regexp
+	if len(filter) > 0 {
+		if filter[0] != byte('^') {
+			filter = "^(?:" + filter + ")"
+		}
+		var err error
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	m.RLock()
 	defer m.RUnlock()
 
-	var tags TagIndex
-	var ok bool
-	if tags, ok = m.Tags[orgId]; !ok {
-		return nil
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil, nil
 	}
 
-	result := make(map[string]uint32)
+	values, ok := tags[key]
+	if !ok {
+		return nil, nil
+	}
 
-	for value, ids := range tags[tag] {
-		valueCnt := uint32(0)
-		for id := range ids {
-			var def *idx.Archive
-			var ok bool
-			if def, ok = m.DefById[id.String()]; !ok {
-				// should never happen because every ID that is in the tag index
-				// must be present in the byId lookup table
-				corruptIndex.Inc()
-				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-				continue
-			}
-
-			if def.LastUpdate < from {
-				continue
-			}
-
-			valueCnt++
+	res := make(map[string]uint64)
+	for value, ids := range values {
+		if re != nil && !re.MatchString(value) {
+			continue
 		}
-		if valueCnt > 0 {
-			result[value] = valueCnt
+
+		count := uint64(0)
+		if from > 0 {
+			for id := range ids {
+				def, ok := m.DefById[id.String()]
+				if !ok {
+					corruptIndex.Inc()
+					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+					continue
+				}
+
+				if def.LastUpdate < from {
+					continue
+				}
+
+				count++
+			}
+		} else {
+			count += uint64(len(ids))
+		}
+
+		if count > 0 {
+			res[value] = count
 		}
 	}
 
-	return result
+	return res, nil
 }
 
-func (m *MemoryIdx) TagList(orgId int) []string {
+func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
+		return nil, nil
+	}
+
+	var re *regexp.Regexp
+	if len(filter) > 0 {
+		if filter[0] != byte('^') {
+			filter = "^(?:" + filter + ")"
+		}
+		var err error
+		re, err = regexp.Compile(filter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	m.RLock()
 	defer m.RUnlock()
 
-	var tags TagIndex
-	var ok bool
-	if tags, ok = m.Tags[orgId]; !ok {
-		return nil
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil, nil
 	}
 
-	results := make([]string, len(tags))
-	i := 0
-	for k := range tags {
-		results[i] = k
+	var res []string
+
+	// if there is no filter/from given we know how much space we'll need
+	// and can preallocate it
+	if re == nil && from == 0 {
+		res = make([]string, 0, len(tags))
+	}
+
+KEYS:
+	for key := range tags {
+		// filter by pattern if one was given
+		if re != nil && !re.MatchString(key) {
+			continue
+		}
+
+		// if from is > 0 we need to find at least one metric definition where
+		// LastUpdate >= from before we add the key to the result set
+		if from > 0 {
+			for _, ids := range tags[key] {
+				for id := range ids {
+					def, ok := m.DefById[id.String()]
+					if !ok {
+						corruptIndex.Inc()
+						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+						continue
+					}
+
+					// as soon as we found one metric definition with LastUpdate >= from
+					// we can add the current key to the result set and move on to the next
+					if def.LastUpdate >= from {
+						res = append(res, key)
+						continue KEYS
+					}
+				}
+			}
+
+			// no metric definition with LastUpdate >= from has been found,
+			// continue with the next key
+			continue KEYS
+		}
+
+		res = append(res, key)
+	}
+
+	return res, nil
+}
+
+// resolveIDs resolves a list of ids (TagIDs) into a list of metric names
+// it assumes that at least a read lock is already held by the caller
+func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
+	res := make([]string, len(ids))
+	i := uint32(0)
+	for id := range ids {
+		def, ok := m.DefById[id.String()]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id.String())
+			continue
+		}
+		res[i] = def.Name
 		i++
 	}
-
-	return results
+	return res
 }
 
-func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[idx.MetricID]struct{}, error) {
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -459,16 +546,16 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) (map[
 	return m.idsByTagQuery(orgId, query), nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) TagIDs {
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
 	m.RLock()
 	defer m.RUnlock()
 
-	tree, ok := m.Tags[orgId]
+	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
 	}
 
-	return query.Run(tree, m.DefById)
+	return m.resolveIDs(query.Run(tags, m.DefById))
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
