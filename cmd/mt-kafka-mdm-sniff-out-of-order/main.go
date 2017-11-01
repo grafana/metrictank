@@ -22,7 +22,7 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	format   = flag.String("format", "{{.First.Seen}} {{.First.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
+	format   = flag.String("format", "{{.Last.Seen}} {{.Last.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with. data under .Last represents the 'head' of the series, the most recent successfully added point (e.g. it had a higher timestamp than previous values)")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
 )
@@ -34,8 +34,8 @@ type Data struct {
 }
 
 type TplData struct {
-	Data       // currently seen
-	First Data // seen the first time
+	Data      // currently seen
+	Last Data // last added point that could be added
 }
 
 // find out of order metrics
@@ -67,14 +67,15 @@ func (ip *inputOOOFinder) Process(metric *schema.MetricData, partition int32) {
 		MetricData: *metric,
 	}
 	ip.lock.Lock()
-	first, ok := ip.data[metric.Id]
+	last, ok := ip.data[metric.Id]
 	if !ok {
 		ip.data[metric.Id] = now
 	} else {
-		if metric.Time > first.Time {
+		if metric.Time > last.Time {
 			ip.data[metric.Id] = now
 		} else {
-			t := TplData{now, first}
+			// if metric time <= last time, print output
+			t := TplData{now, last}
 			err := ip.Execute(os.Stdout, t)
 			if err != nil {
 				log.Error(0, "executing template: %s", err)
