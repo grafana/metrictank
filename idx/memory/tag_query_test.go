@@ -217,37 +217,47 @@ func TestGetByTag(t *testing.T) {
 		expectation []string
 	}
 
+	fullName := func(md schema.MetricData) string {
+		name := md.Metric
+		sort.Strings(md.Tags)
+		for _, tag := range md.Tags {
+			name += ";"
+			name += tag
+		}
+		return name
+	}
+
 	testCases := []testCase{
 		{
 			expressions: []string{"key1=value1"},
-			expectation: []string{mds[1].Metric, mds[11].Metric, mds[3].Metric},
+			expectation: []string{fullName(mds[1]), fullName(mds[11]), fullName(mds[3])},
 		}, {
 			expressions: []string{"key1=value2"},
-			expectation: []string{mds[18].Metric},
+			expectation: []string{fullName(mds[18])},
 		}, {
 			expressions: []string{"key1=~value[0-9]"},
-			expectation: []string{mds[1].Metric, mds[11].Metric, mds[18].Metric, mds[3].Metric},
+			expectation: []string{fullName(mds[1]), fullName(mds[11]), fullName(mds[18]), fullName(mds[3])},
 		}, {
 			expressions: []string{"key1=~value[23]"},
-			expectation: []string{mds[18].Metric},
+			expectation: []string{fullName(mds[18])},
 		}, {
 			expressions: []string{"key1=value1", "key2=value1"},
 			expectation: []string{},
 		}, {
 			expressions: []string{"key1=value1", "key2=value2"},
-			expectation: []string{mds[1].Metric},
+			expectation: []string{fullName(mds[1])},
 		}, {
 			expressions: []string{"key1=~value[12]", "key2=value2"},
-			expectation: []string{mds[1].Metric, mds[18].Metric},
+			expectation: []string{fullName(mds[1]), fullName(mds[18])},
 		}, {
 			expressions: []string{"key1=~value1", "key1=value2"},
 			expectation: []string{},
 		}, {
 			expressions: []string{"key1=~value[0-9]", "key2=~", "key3!=value3"},
-			expectation: []string{mds[11].Metric},
+			expectation: []string{fullName(mds[11])},
 		}, {
 			expressions: []string{"key2=", "key1=value1"},
-			expectation: []string{mds[11].Metric, mds[3].Metric},
+			expectation: []string{fullName(mds[11]), fullName(mds[3])},
 		},
 	}
 
