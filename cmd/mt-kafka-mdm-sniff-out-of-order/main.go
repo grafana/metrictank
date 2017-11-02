@@ -22,17 +22,17 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	format   = flag.String("format", "{{.OOO.Id}} {{.OOO.Name}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumOOO}}", "template to render event with")
+	format   = flag.String("format", "{{.Bad.Id}} {{.Bad.Name}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}", "template to render event with")
 	prefix   = flag.String("prefix", "", "only show metrics with a name that has this prefix")
 	substr   = flag.String("substr", "", "only show metrics with a name that has this substring")
 )
 
 type Tracker struct {
 	Head      Msg   // last successfully added message
-	OOO       Msg   // current point that could not be added (assuming no re-order buffer)
-	NumOOO    int   // number of failed points since last successfull add
-	DeltaTime int64 // delta between Head and OOO time properties in seconds (point timestamps)
-	DeltaSeen int64 // delta between Head and OOO seen time in seconds (consumed from kafka)
+	Bad       Msg   // current point that could not be added (assuming no re-order buffer)
+	NumBad    int   // number of failed points since last successfull add
+	DeltaTime int64 // delta between Head and Bad time properties in seconds (point timestamps)
+	DeltaSeen int64 // delta between Head and Bad seen time in seconds (consumed from kafka)
 }
 
 type Msg struct {
@@ -78,12 +78,12 @@ func (ip *inputOOOFinder) Process(metric *schema.MetricData, partition int32) {
 	} else {
 		if metric.Time > tracker.Head.Time {
 			tracker.Head = now
-			tracker.NumOOO = 0
+			tracker.NumBad = 0
 			ip.data[metric.Id] = tracker
 		} else {
 			// if metric time <= head point time, generate event and print
-			tracker.OOO = now
-			tracker.NumOOO += 1
+			tracker.Bad = now
+			tracker.NumBad += 1
 			tracker.DeltaTime = tracker.Head.Time - metric.Time
 			tracker.DeltaSeen = now.Seen.Unix() - tracker.Head.Seen.Unix()
 			err := ip.Execute(os.Stdout, tracker)
@@ -111,11 +111,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "# Event formatting")
 		fmt.Fprintln(os.Stderr, "Uses standard golang templating. E.g. {{field}} with these available fields:")
 		fmt.Fprintln(os.Stderr, ".Head.subfield - head is last successfully added message")
-		fmt.Fprintln(os.Stderr, ".OOO.subfield - OOO is the current point that could not be added (assuming no re-order buffer)")
+		fmt.Fprintln(os.Stderr, ".Bad.subfield - Bad is the current point that could not be added (assuming no re-order buffer)")
 		fmt.Fprintln(os.Stderr, "(subfield is any property of the out-of-order MetricData: Time OrgId Id Name Metric Interval Value Unit Mtype Tags and also these 2 extra fileds: Part (partition) and Seen (when the msg was consumed from kafka)")
-		fmt.Fprintln(os.Stderr, "NumOOO - number of failed points since last successfull add")
-		fmt.Fprintln(os.Stderr, "DeltaTime - delta between Head and OOO time properties in seconds (point timestamps)")
-		fmt.Fprintln(os.Stderr, "DeltaSeen - delta between Head and OOO seen time in seconds (consumed from kafka)")
+		fmt.Fprintln(os.Stderr, "NumBad - number of failed points since last successfull add")
+		fmt.Fprintln(os.Stderr, "DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)")
+		fmt.Fprintln(os.Stderr, "DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}
