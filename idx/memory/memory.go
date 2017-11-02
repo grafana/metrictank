@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -242,6 +243,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		if _, ok := m.DefById[def.Id]; ok {
 			continue
 		}
+
 		m.add(def)
 
 		if tagSupport {
@@ -266,6 +268,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.Name
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
+	sort.Strings(def.Tags)
 	archive := &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
@@ -514,8 +517,9 @@ KEYS:
 	return res, nil
 }
 
-// resolveIDs resolves a list of ids (TagIDs) into a list of metric names
-// it assumes that at least a read lock is already held by the caller
+// resolveIDs resolves a list of ids (TagIDs) into a list of complete
+// metric names, including tags. it assumes that at least a read lock
+// is already held by the caller
 func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 	res := make([]string, len(ids))
 	i := uint32(0)
@@ -526,7 +530,20 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id.String())
 			continue
 		}
-		res[i] = def.Name
+
+		nameLen := len(def.Name)
+		for _, tag := range def.Tags {
+			nameLen += len(tag)
+		}
+		nameLen += len(def.Tags) // accounting for all the ";" between tags
+		b := make([]byte, nameLen)
+		pos := copy(b, def.Name)
+		for _, tag := range def.Tags {
+			pos += copy(b[pos:], ";")
+			pos += copy(b[pos:], tag)
+		}
+
+		res[i] = string(b)
 		i++
 	}
 	return res
