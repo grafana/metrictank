@@ -55,10 +55,11 @@ func (s *Schemas) BuildIndex() {
 	for _, schema := range s.raw {
 		for pos := range schema.Retentions {
 			s.index = append(s.index, Schema{
-				Name:       schema.Name,
-				Pattern:    schema.Pattern,
-				Retentions: schema.Retentions[pos:],
-				Priority:   schema.Priority,
+				Name:          schema.Name,
+				Pattern:       schema.Pattern,
+				Retentions:    schema.Retentions[pos:],
+				Priority:      schema.Priority,
+				ReorderWindow: schema.ReorderWindow,
 			})
 		}
 	}
