@@ -12,10 +12,8 @@ CONN_HOLD=${CONN_HOLD:-3}
 timeout_exec=$(basename "$(readlink $(which timeout))")
 if [ "$timeout_exec" = "busybox" ]
 then
-  log "using busybox"
   _using_busybox=1
 else
-  log "not using busybox"
   _using_busybox=0
 fi
 
@@ -43,7 +41,7 @@ do
     # connection stays up for $CONN_HOLD seconds.
     if [ $_using_busybox -eq 1 ]
     then
-      timeout -t $CONN_HOLD busybox nc $host $port -e busybox sleep $(( $CONN_HOLD + 1 ))
+      timeout -t $CONN_HOLD busybox nc $host $port -e busybox sleep $(( $CONN_HOLD + 1 )) 2>/dev/null
       retval=$?
 
       # busybox-timeout on alpine returns 0 on timeout
@@ -60,8 +58,6 @@ do
     then
       log "$endpoint is up. maintained connection for $CONN_HOLD seconds!"
       break
-    else
-      log "returned value $retval, expecting $expected"
     fi
 
     sleep 1
