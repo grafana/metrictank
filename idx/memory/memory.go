@@ -265,7 +265,19 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	path := def.Name
+	nameLen := len(def.Name)
+	for _, tag := range def.Tags {
+		nameLen += len(tag)
+	}
+	nameLen += len(def.Tags) // accounting for all the ";" between tags
+	b := make([]byte, nameLen)
+	pos := copy(b, def.Name)
+	for _, tag := range def.Tags {
+		pos += copy(b[pos:], ";")
+		pos += copy(b[pos:], tag)
+	}
+	path := string(b)
+
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
 	sort.Strings(def.Tags)
@@ -301,9 +313,16 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		}
 	}
 
+	pos = strings.Index(path, ";")
+
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
-	pos := strings.LastIndex(path, ".")
+	if pos == -1 {
+		pos = strings.LastIndex(path, ".")
+	} else {
+		pos = strings.LastIndex(path[:pos], ".")
+	}
+
 	prevPos := len(path)
 	for pos != -1 {
 		branch := path[:pos]
@@ -635,7 +654,12 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		return results, nil
 	}
 
-	nodes := strings.Split(pattern, ".")
+	nodes := strings.SplitN(pattern, ";", 2)
+	if len(nodes) == 2 {
+		tags := nodes[1]
+		nodes = strings.Split(nodes[0], ".")
+		nodes[len(nodes)-1] += ";" + tags
+	}
 
 	// pos is the index of the first node with special chars, or one past the last node if exact
 	// for a query like foo.bar.baz, pos is 3
