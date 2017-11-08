@@ -167,7 +167,7 @@ services:
 
   grafana:
     hostname: grafana
-    image: grafana/grafana:master
+    image: grafana/grafana:4.5.2
     ports:
       - "3000:3000"
 
