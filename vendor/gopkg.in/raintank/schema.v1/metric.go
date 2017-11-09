@@ -184,6 +184,21 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 	return b
 }
 
+func (m *MetricDefinition) FullNameWithTags() string {
+	nameLen := len(m.Name)
+	for _, tag := range m.Tags {
+		nameLen += len(tag)
+	}
+	nameLen += len(m.Tags) // accounting for all the ";" between tags
+	b := make([]byte, nameLen)
+	pos := copy(b, m.Name)
+	for _, tag := range m.Tags {
+		pos += copy(b[pos:], ";")
+		pos += copy(b[pos:], tag)
+	}
+	return string(b)
+}
+
 func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 	def := new(MetricDefinition)
 	if err := json.Unmarshal(b, &def); err != nil {
