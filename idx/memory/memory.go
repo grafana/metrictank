@@ -265,18 +265,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	nameLen := len(def.Name)
-	for _, tag := range def.Tags {
-		nameLen += len(tag)
-	}
-	nameLen += len(def.Tags) // accounting for all the ";" between tags
-	b := make([]byte, nameLen)
-	pos := copy(b, def.Name)
-	for _, tag := range def.Tags {
-		pos += copy(b[pos:], ";")
-		pos += copy(b[pos:], tag)
-	}
-	path := string(b)
+	path := def.FullNameWithTags()
 
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
@@ -313,7 +302,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		}
 	}
 
-	pos = strings.Index(path, ";")
+	pos := strings.Index(path, ";")
 
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
@@ -550,19 +539,7 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			continue
 		}
 
-		nameLen := len(def.Name)
-		for _, tag := range def.Tags {
-			nameLen += len(tag)
-		}
-		nameLen += len(def.Tags) // accounting for all the ";" between tags
-		b := make([]byte, nameLen)
-		pos := copy(b, def.Name)
-		for _, tag := range def.Tags {
-			pos += copy(b[pos:], ";")
-			pos += copy(b[pos:], tag)
-		}
-
-		res[i] = string(b)
+		res[i] = def.FullNameWithTags()
 		i++
 	}
 	return res

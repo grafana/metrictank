@@ -588,8 +588,9 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 					}
+
 					newReq := models.NewReq(
-						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+						archive.Id, archive.FullNameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
 				}
 			}
