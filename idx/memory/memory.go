@@ -303,15 +303,15 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	}
 
 	pos := strings.Index(path, ";")
-
-	// now walk backwards through the node path to find the first branch which exists that
-	// this path extends.
 	if pos == -1 {
 		pos = strings.LastIndex(path, ".")
 	} else {
+		// find the last '.' that is not part of a tag
 		pos = strings.LastIndex(path[:pos], ".")
 	}
 
+	// now walk backwards through the node path to find the first branch which exists that
+	// this path extends.
 	prevPos := len(path)
 	for pos != -1 {
 		branch := path[:pos]
@@ -631,8 +631,11 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		return results, nil
 	}
 
-	nodes := strings.SplitN(pattern, ";", 2)
-	if len(nodes) == 2 {
+	var nodes []string
+	if strings.Index(pattern, ";") == -1 {
+		nodes = strings.Split(pattern, ".")
+	} else {
+		nodes = strings.SplitN(pattern, ";", 2)
 		tags := nodes[1]
 		nodes = strings.Split(nodes[0], ".")
 		nodes[len(nodes)-1] += ";" + tags
