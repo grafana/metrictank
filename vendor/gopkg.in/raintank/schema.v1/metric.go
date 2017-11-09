@@ -186,13 +186,21 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 
 func (m *MetricDefinition) FullNameWithTags() string {
 	nameLen := len(m.Name)
+	count := 0
 	for _, tag := range m.Tags {
+		if len(tag) >= 5 && tag[:5] == "name=" {
+			continue
+		}
+		count++
 		nameLen += len(tag)
 	}
-	nameLen += len(m.Tags) // accounting for all the ";" between tags
+	nameLen += count // accounting for all the ";" between tags
 	b := make([]byte, nameLen)
 	pos := copy(b, m.Name)
 	for _, tag := range m.Tags {
+		if len(tag) >= 5 && tag[:5] == "name=" {
+			continue
+		}
 		pos += copy(b[pos:], ";")
 		pos += copy(b[pos:], tag)
 	}
