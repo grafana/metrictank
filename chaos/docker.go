@@ -46,10 +46,11 @@ func assertRunning(cli *client.Client, expected []string) error {
 // eg metrictank2
 func launch(name string) error {
 	cmd := exec.Command("docker-compose", "start", name)
-	cmd.Dir = "/home/dieter/go/src/github.com/grafana/metrictank/docker/docker-chaos"
+	cmd.Dir = path("docker/docker-chaos")
 	return cmd.Run()
 }
 
+// TODO: isolate only towards ip's of other instances, so we can still receive stats and query the api
 func isolate(name, dur string) error {
 	cmd := exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "netem", "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
 	return cmd.Start()

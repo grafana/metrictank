@@ -17,6 +17,7 @@ services:
       MT_CLUSTER_BIND_ADDR: "metrictank0:7946"
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank0
       MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
@@ -40,6 +41,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0
       MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank1
       MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
@@ -64,6 +66,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0
       MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank2
       MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
@@ -88,6 +91,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0
       MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank3
       MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
@@ -112,6 +116,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0
       MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank4
       MT_KAFKA_CLUSTER_PARTITIONS: 8,9,10,11
@@ -136,6 +141,7 @@ services:
       MT_CLUSTER_MODE: multi
       MT_CLUSTER_PEERS: metrictank0
       MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
       MT_HTTP_MULTI_TENANT: "false"
       MT_INSTANCE: metrictank5
       MT_KAFKA_CLUSTER_PARTITIONS: 8,9,10,11
