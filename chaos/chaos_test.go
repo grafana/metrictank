@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
-	"sync"
+	"reflect"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-// TODO: cleanup when ctrl-C go test (teardomwnall containers)
+// TODO: cleanup when ctrl-C go test (teardown all containers)
 
 const numPartitions = 12
 
@@ -42,7 +43,8 @@ func init() {
 
 func TestMain(m *testing.M) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "/home/dieter/go/src/github.com/grafana/metrictank/docker/launch.sh", "docker-chaos")
+	cmd := exec.CommandContext(ctx, path("docker/launch.sh"), "docker-chaos")
+	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	var err error
 	tracker, err = NewTracker(cmd, false, false)
@@ -127,7 +129,7 @@ func TestClusterBaseWorkload(t *testing.T) {
 		}
 	}()
 
-	suc6 := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp Response) bool {
+	suc6 := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp response) bool {
 		exp := []string{
 			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metrics_received.counter32)",
@@ -136,10 +138,10 @@ func TestClusterBaseWorkload(t *testing.T) {
 			"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metrics_received.counter32)",
 		}
-		if !validateTargets(resp, exp) {
+		if !validateTargets(exp)(resp) {
 			return false
 		}
-		for _, series := range resp {
+		for _, series := range resp.r {
 			var sum float64
 			if len(series.Datapoints) != 5 {
 				return false
@@ -151,6 +153,7 @@ func TestClusterBaseWorkload(t *testing.T) {
 				}
 				sum += p.Val
 			}
+			// avg of all (4) datapoints must be 4 (metrics ingested per second by each instance)
 			if sum/4 != 4 {
 				return false
 			}
@@ -161,70 +164,71 @@ func TestClusterBaseWorkload(t *testing.T) {
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second")
 	}
 
-	suc6 = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, func(resp Response) bool {
-		if len(resp) != 1 {
-			return false
-		}
-		points := resp[0].Datapoints
-		// last point can sometimes be null
-		for _, p := range points[:len(points)-1] {
-			if math.IsNaN(p.Val) {
-				return false
-			}
-			if p.Val != 12 {
-				return false
-			}
-		}
-		return true
-	})
+	suc6 = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, validateCorrect(12))
 	if !suc6 {
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12")
 	}
 }
+
+// TestIsolateOneInstance tests what happens during the isolation of one instance, when min-available-shards is 12
+// this should happen:
+// at all times, all queries to all of the remaining nodes should be successful
+// since they have at least 1 instance running for each shard.
+// the isolated shard should either return correct replies, or errors (in two cases: when it marks any shards as down,
+// but also before it does, but fails to get data via clustered requests from peers)
+//. TODO: in production do we stop querying isolated peers?
 
 func TestIsolateOneInstance(t *testing.T) {
 	t.Log("Starting TestIsolateOneInstance)")
 	tracker.LogStdout(true)
 	tracker.LogStderr(true)
 	pre := time.Now()
+	rand.Seed(pre.Unix())
+
+	mt4ResultsChan := make(chan checkResults, 1)
+	otherResultsChan := make(chan checkResults, 1)
+
+	go func() {
+		mt4ResultsChan <- checkMT([]int{6064}, "some.id.of.a.*", "-10s", time.Minute, 6000, validateCorrect(12), validateError)
+	}()
+	go func() {
+		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "some.id.of.a.*", "-10s", time.Minute, 6000, validateCorrect(12))
+	}()
+
+	// now go ahead and isolate for 30s
 	isolate("dockerchaos_metrictank4_1", "30s")
-	tick := time.NewTicker(10 * time.Millisecond)
-	wg := &sync.WaitGroup{}
-	check := func(wg *sync.WaitGroup) {
-		// only try this once. at this point, no request is allowed to fail. cluster should be 100% reliable
-		resp := renderQuery("http://localhost:6060", "sum(some.id.of.a.metric.*)", "-5s")
-		if len(resp) != 1 {
-			return false
-		}
-		points := resp[0].Datapoints
-		// last point can sometimes be null
-		for _, p := range points[:len(points)-1] {
-			if math.IsNaN(p.Val) {
-				return false
-			}
-			if p.Val != 12 {
-				return false
-			}
-		}
-		return true
-		if !suc6 {
-			t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12")
-		}
-		wg.Done()
+
+	// collect results of the minute long experiment
+	mt4Results := <-mt4ResultsChan
+	otherResults := <-otherResultsChan
+
+	// validate results of isolated node
+	if mt4Results.valid[0]+mt4Results.valid[1] != 6000 {
+		t.Fatalf("expected mt4 to return either correct or erroring responses. got %v", mt4Results)
 	}
-	for t := range tick.C {
-		if time.Since(pre) > 45*time.Second {
-			tick.Stop()
-			break
-		}
-		wg.Add(1)
-		go check()
+	if mt4Results.valid[1] < 30*6000/100 {
+		// the instance is completely down for 30s of the 60s experiment run, but we allow some slack
+		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %v", mt4Results)
 	}
-	wg.Wait()
-	if time.Since(pre) > 50*time.Second {
-		t.Fatalf("had to wait too long for requests to complete. system doesn't perform well enough to make sure we get enough requests")
+
+	if mt4Results.timeout != 0 {
+		t.Fatalf("expected mt4 to not timeout. got %v", mt4Results)
+	}
+	if mt4Results.invalid != 0 {
+		t.Fatalf("expected mt4 to not invalid. got %v", mt4Results)
+	}
+
+	// validate results of other cluster nodes
+	exp := checkResults{
+		valid:   []int{6000},
+		invalid: 0,
+		timeout: 0,
+	}
+	if !reflect.DeepEqual(exp, otherResults) {
+		t.Fatalf("expected only correct results for all cluster nodes. got %v", otherResults)
 	}
 }
+
 func TestHang(t *testing.T) {
 	t.Log("whatever happens, keep hanging for now, so that we can query grafana dashboards still")
 	var ch chan struct{}

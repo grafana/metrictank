@@ -2,14 +2,11 @@ package chaos
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"regexp"
 )
-
-var errTimeout = errors.New("timed out")
 
 // Tracker allows to track stdout and stderr of running commands
 // and wait for certain messages to appear
