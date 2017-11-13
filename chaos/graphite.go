@@ -33,7 +33,7 @@ func renderQuery(base, target, from string) response {
 		panic(err)
 	}
 	req.Header.Add("X-Org-Id", "1") // only really needed for MT, not for graphite. oh well...
-	fmt.Println("requesting", url)
+	//fmt.Println("requesting", url)
 	resp, err := renderClient.Do(req)
 	if err != nil {
 		r.httpErr = err
