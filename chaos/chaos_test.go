@@ -196,7 +196,7 @@ func TestIsolateOneInstance(t *testing.T) {
 	}()
 
 	// now go ahead and isolate for 30s
-	isolate("dockerchaos_metrictank4_1", "30s")
+	isolate("metrictank4", "30s", "metrictank0", "metrictank1", "metrictank2", "metrictank3", "metrictank5")
 
 	// collect results of the minute long experiment
 	mt4Results := <-mt4ResultsChan
@@ -234,3 +234,9 @@ func TestHang(t *testing.T) {
 	var ch chan struct{}
 	<-ch
 }
+
+// maybe useful in the future, test also clean exit and rejoin like so:
+//stop("metrictank4")
+//time.AfterFunc(30*time.Second, func() {
+//	start("metrictank4")
+//})

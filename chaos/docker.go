@@ -4,19 +4,21 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
 
-//cli, err := client.NewEnvClient()
-//if err != nil {
-//		panic(err)
-//	}
+var cli *client.Client
 
-//for _, container := range containers {
-//	fmt.Println(container.NetworkSettings.Networks["dockerchaos_default"].IPAddress)
-//	}
+func init() {
+	var err error
+	cli, err = client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
+}
 
 func assertRunning(cli *client.Client, expected []string) error {
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
@@ -44,14 +46,51 @@ func assertRunning(cli *client.Client, expected []string) error {
 }
 
 // eg metrictank2
-func launch(name string) error {
+func start(name string) error {
 	cmd := exec.Command("docker-compose", "start", name)
 	cmd.Dir = path("docker/docker-chaos")
 	return cmd.Run()
 }
 
-// TODO: isolate only towards ip's of other instances, so we can still receive stats and query the api
-func isolate(name, dur string) error {
-	cmd := exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "netem", "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
+// eg metrictank2
+func stop(name string) error {
+	cmd := exec.Command("docker-compose", "stop", name)
+	cmd.Dir = path("docker/docker-chaos")
+	return cmd.Run()
+}
+
+// isolate isolates traffic from the given docker container to all others matching the expression
+func isolate(name, dur string, targets ...string) error {
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	if err != nil {
+		return err
+	}
+	targetSet := make(map[string]struct{})
+	for _, target := range targets {
+		targetSet["dockerchaos_"+target+"_1"] = struct{}{}
+	}
+	var ips []string
+	name = "dockerchaos_" + name + "_1"
+
+	for _, container := range containers {
+		containerName := container.Names[0][1:] // docker puts a "/" in front of each name. not sure why
+		if _, ok := targetSet[containerName]; ok {
+			ips = append(ips, container.NetworkSettings.Networks["dockerchaos_default"].IPAddress)
+		}
+	}
+	var cmd *exec.Cmd
+	if len(ips) > 0 {
+		t := strings.Join(ips, ",")
+		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "--debug", "netem", "--target", t, "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
+	} else {
+		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "--debug", "netem", "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
+	}
+
+	// log all pumba's output
+	_, err = NewTracker(cmd, true, true)
+	if err != nil {
+		return err
+	}
+
 	return cmd.Start()
 }
