@@ -64,6 +64,30 @@ type TagIDs map[idx.MetricID]struct{} // set of ids
 type TagValue map[string]TagIDs       // value -> set of ids
 type TagIndex map[string]TagValue     // key -> list of values
 
+func (t *TagIndex) AddTagId(name, value string, id idx.MetricID) {
+	ti := *t
+	if _, ok := ti[name]; !ok {
+		ti[name] = make(TagValue)
+	}
+	if _, ok := ti[name][value]; !ok {
+		ti[name][value] = make(TagIDs)
+	}
+	ti[name][value][id] = struct{}{}
+}
+
+func (t *TagIndex) DelTagId(name, value string, id idx.MetricID) {
+	ti := *t
+
+	delete(ti[name][value], id)
+
+	if len(ti[name][value]) == 0 {
+		delete(ti[name], value)
+		if len(ti[name]) == 0 {
+			delete(ti, name)
+		}
+	}
+}
+
 type Node struct {
 	Path     string
 	Children []string
@@ -157,46 +181,13 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tags = make(TagIndex)
 		m.tags[def.OrgId] = tags
 	}
-	for _, tag := range def.Tags {
-		tagSplits := strings.SplitN(tag, "=", 2)
-		if len(tagSplits) < 2 {
-			// should never happen because every tag in the index
-			// must have a valid format
-			invalidTag.Inc()
-			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
-			continue
-		}
 
-		tagName := tagSplits[0]
-		tagValue := tagSplits[1]
-
-		if _, ok = tags[tagName]; !ok {
-			tags[tagName] = make(TagValue)
-		}
-
-		if _, ok = tags[tagName][tagValue]; !ok {
-			tags[tagName][tagValue] = make(TagIDs)
-		}
-
-		id, err := idx.NewMetricIDFromString(def.Id)
-		if err != nil {
-			// should never happen because all IDs in the index must have
-			// a valid format
-			invalidId.Inc()
-			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-			continue
-		}
-		tags[tagName][tagValue][id] = struct{}{}
-	}
-}
-
-// deindexTags takes a given metric definition and removes all references
-// to it from the tag index. It assumes a lock is already held.
-func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
-	tags, ok := m.tags[def.OrgId]
-	if !ok {
-		corruptIndex.Inc()
-		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
+	id, err := idx.NewMetricIDFromString(def.Id)
+	if err != nil {
+		// should never happen because all IDs in the index must have
+		// a valid format
+		invalidId.Inc()
+		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 		return
 	}
 
@@ -212,24 +203,46 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
+		tags.AddTagId(tagName, tagValue, id)
+	}
+	tags.AddTagId("name", def.Name, id)
+}
 
-		id, err := idx.NewMetricIDFromString(def.Id)
-		if err != nil {
-			// should never happen because all IDs in the index must have
-			// a valid format
-			invalidId.Inc()
-			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+// deindexTags takes a given metric definition and removes all references
+// to it from the tag index. It assumes a lock is already held.
+func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
+	tags, ok := m.tags[def.OrgId]
+	if !ok {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
+		return
+	}
+
+	id, err := idx.NewMetricIDFromString(def.Id)
+	if err != nil {
+		// should never happen because all IDs in the index must have
+		// a valid format
+		invalidId.Inc()
+		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+		return
+	}
+
+	for _, tag := range def.Tags {
+		tagSplits := strings.SplitN(tag, "=", 2)
+		if len(tagSplits) < 2 {
+			// should never happen because every tag in the index
+			// must have a valid format
+			invalidTag.Inc()
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
-		delete(tags[tagName][tagValue], id)
 
-		if len(tags[tagName][tagValue]) == 0 {
-			delete(tags[tagName], tagValue)
-			if len(tags[tagName]) == 0 {
-				delete(tags, tagName)
-			}
-		}
+		tagName := tagSplits[0]
+		tagValue := tagSplits[1]
+		tags.DelTagId(tagName, tagValue, id)
 	}
+
+	tags.DelTagId("name", def.Name, id)
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
