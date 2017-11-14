@@ -437,18 +437,9 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	tree := models.NewSeriesTree()
 	seen := make(map[string]struct{})
 
-	basepath := ""
-	i := strings.Index(query, ";")
-	if i == -1 {
-		i = len(query)
-	}
-	if i = strings.LastIndex(query[:i], "."); i != -1 {
-		basepath = query[:i+1]
-	}
-
 	for _, g := range nodes {
 		name := string(g.Path)
-		i = strings.Index(name, ";")
+		i := strings.Index(name, ";")
 		if i == -1 {
 			i = len(name)
 		}
@@ -472,7 +463,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 		}
 
 		t := models.SeriesTreeItem{
-			ID:            basepath + name,
+			ID:            g.Path,
 			Context:       treejsonContext,
 			Text:          name,
 			AllowChildren: allowChildren,
