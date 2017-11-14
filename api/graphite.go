@@ -404,7 +404,11 @@ func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 			c.IsLeaf = "0"
 		}
 
-		i := strings.LastIndex(c.Path, ".")
+		i := strings.Index(c.Path, ";")
+		if i == -1 {
+			i = len(c.Path)
+		}
+		i = strings.LastIndex(c.Path[:i], ".")
 
 		if i != -1 {
 			c.Name = c.Path[i+1:]
@@ -434,13 +438,21 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	seen := make(map[string]struct{})
 
 	basepath := ""
-	if i := strings.LastIndex(query, "."); i != -1 {
+	i := strings.Index(query, ";")
+	if i == -1 {
+		i = len(query)
+	}
+	if i = strings.LastIndex(query[:i], "."); i != -1 {
 		basepath = query[:i+1]
 	}
 
 	for _, g := range nodes {
 		name := string(g.Path)
-		if i := strings.LastIndex(name, "."); i != -1 {
+		i = strings.Index(name, ";")
+		if i == -1 {
+			i = len(name)
+		}
+		if i = strings.LastIndex(name[:i], "."); i != -1 {
 			name = name[i+1:]
 		}
 
