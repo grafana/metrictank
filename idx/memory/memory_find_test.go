@@ -391,65 +391,6 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 	queryAndCompareTagKeys(t, "di", 1000000, nil)
 }
 
-func TestTagSorting(t *testing.T) {
-	index := New()
-	index.Init()
-
-	md1 := &schema.MetricData{
-		Name:     "name1",
-		Metric:   "name1",
-		Tags:     []string{},
-		Interval: 10,
-		OrgId:    1,
-		Time:     int64(123),
-	}
-	md1.SetId()
-
-	// set out of order tags after SetId (because that would sort it)
-	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
-	index.AddOrUpdate(md1, 1)
-
-	res, err := index.FindByTag(1, []string{"b=a"}, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
-	}
-	if len(res) != 1 {
-		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
-	}
-	expected := "name1;a=a;b=a;c=a;d=a;e=a"
-	if res[0] != expected {
-		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
-	}
-
-	md2 := []schema.MetricDefinition{
-		{
-			Name:       "name2",
-			Metric:     "name2",
-			Tags:       []string{},
-			Interval:   10,
-			OrgId:      1,
-			LastUpdate: int64(123),
-		},
-	}
-	md2[0].SetId()
-
-	// set out of order tags after SetId (because that would sort it)
-	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
-	index.Load(md2)
-
-	res, err = index.FindByTag(1, []string{"3=a"}, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
-	}
-	if len(res) != 1 {
-		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
-	}
-	expected = "name2;1=a;2=a;3=a;4=a;5=a"
-	if res[0] != expected {
-		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
-	}
-}
-
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 
