@@ -113,16 +113,51 @@ type MetricDataArray []*MetricData
 
 // for ES
 type MetricDefinition struct {
-	Id         string   `json:"id"`
-	OrgId      int      `json:"org_id"`
-	Name       string   `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
-	Metric     string   `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
-	Interval   int      `json:"interval"`                                      // minimum 10
-	Unit       string   `json:"unit"`
-	Mtype      string   `json:"mtype"`
-	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
-	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
-	Partition  int32    `json:"partition"`
+	Id           string   `json:"id"`
+	OrgId        int      `json:"org_id"`
+	Name         string   `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
+	Metric       string   `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
+	Interval     int      `json:"interval"`                                      // minimum 10
+	Unit         string   `json:"unit"`
+	Mtype        string   `json:"mtype"`
+	Tags         []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	LastUpdate   int64    `json:"lastUpdate"` // unix timestamp
+	Partition    int32    `json:"partition"`
+	NameWithTags string   `json:"nameWithTags"`
+}
+
+func NewMetricDefinition(name string, tags []string) *MetricDefinition {
+	sort.Strings(tags)
+
+	m := &MetricDefinition{Name: name, Tags: tags}
+	m.DeduplicateNameWithTags()
+
+	return m
+}
+
+// DeduplicateNameWithTags deduplicates the name and tags strings by storing
+// their content as a single string in .NameWithTags and then makes .Name and
+// the .Tags slices of it.
+func (m *MetricDefinition) DeduplicateNameWithTags() {
+	nameWithTagsBuffer := bytes.NewBufferString(m.Name)
+	tagPositions := make([]int, 0, len(m.Tags)*2)
+	for _, t := range m.Tags {
+		if len(t) >= 5 && t[:5] == "name=" {
+			continue
+		}
+
+		nameWithTagsBuffer.WriteString(";")
+		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
+		nameWithTagsBuffer.WriteString(t)
+		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
+	}
+
+	m.NameWithTags = fmt.Sprintf("%s", nameWithTagsBuffer)
+	m.Tags = make([]string, len(tagPositions)/2)
+	for i := 0; i < len(m.Tags); i++ {
+		m.Tags[i] = m.NameWithTags[tagPositions[i*2]:tagPositions[i*2+1]]
+	}
+	m.Name = m.NameWithTags[:len(m.Name)]
 }
 
 func (m *MetricDefinition) SetId() {
@@ -136,10 +171,15 @@ func (m *MetricDefinition) SetId() {
 	buffer.WriteByte(0)
 	fmt.Fprintf(buffer, "%d", m.Interval)
 
-	for _, k := range m.Tags {
+	for _, t := range m.Tags {
+		if len(t) >= 5 && t[:5] == "name=" {
+			continue
+		}
+
 		buffer.WriteByte(0)
-		buffer.WriteString(k)
+		buffer.WriteString(t)
 	}
+
 	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
 }
 
@@ -184,34 +224,12 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 	return b
 }
 
-func (m *MetricDefinition) FullNameWithTags() string {
-	nameLen := len(m.Name)
-	count := 0
-	for _, tag := range m.Tags {
-		if len(tag) >= 5 && tag[:5] == "name=" {
-			continue
-		}
-		count++
-		nameLen += len(tag)
-	}
-	nameLen += count // accounting for all the ";" between tags
-	b := make([]byte, nameLen)
-	pos := copy(b, m.Name)
-	for _, tag := range m.Tags {
-		if len(tag) >= 5 && tag[:5] == "name=" {
-			continue
-		}
-		pos += copy(b[pos:], ";")
-		pos += copy(b[pos:], tag)
-	}
-	return string(b)
-}
-
 func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 	def := new(MetricDefinition)
 	if err := json.Unmarshal(b, &def); err != nil {
 		return nil, err
 	}
+	def.DeduplicateNameWithTags()
 	return def, nil
 }
 
@@ -220,7 +238,8 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	tags := make([]string, len(d.Tags))
 	copy(tags, d.Tags)
-	return &MetricDefinition{
+
+	md := &MetricDefinition{
 		Id:         d.Id,
 		Name:       d.Name,
 		OrgId:      d.OrgId,
@@ -231,6 +250,9 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		Unit:       d.Unit,
 		Tags:       tags,
 	}
+	md.DeduplicateNameWithTags()
+
+	return md
 }
 
 // validateTags verifies that all the tags are of a valid format. If one or more
