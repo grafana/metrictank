@@ -63,10 +63,12 @@ func validateCorrect(num float64) Validator {
 	}
 }
 
-// validaterError validates whether the response denotes an error
-func validateError(resp response) bool {
-	if resp.code == 500 {
-		return true
+// validaterCode results a validator that validates whether the response has the given code
+func validateCode(code int) Validator {
+	return func(resp response) bool {
+		if resp.code == code {
+			return true
+		}
+		return false
 	}
-	return false
 }
