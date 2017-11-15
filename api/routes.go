@@ -43,6 +43,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/find_by_tag", ready, bind(models.IndexFindByTag{})).Get(s.indexFindByTag).Post(s.indexFindByTag)
 	r.Combo("/index/tag_details", ready, bind(models.IndexTagDetails{})).Get(s.indexTagDetails).Post(s.indexTagDetails)
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
+	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)

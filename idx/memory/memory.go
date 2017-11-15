@@ -548,6 +548,11 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 	return resStrings, nil
 }
 
+func (m *MemoryIdx) AutoCompleteTagValues(orgId int, valPrefix string, tag string, expressions []string, from int64) ([]string, error) {
+	var resp []string
+	return resp, nil
+}
+
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
