@@ -70,7 +70,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestClusterStartup(t *testing.T) {
-	pre := time.Now()
 	// wait until MT's are up and connected to kafka and cassandra
 	matchers := []Matcher{
 		{
@@ -95,7 +94,6 @@ func TestClusterStartup(t *testing.T) {
 	ch := tracker.Match(matchers)
 	select {
 	case <-ch:
-		t.Logf("cluster started up in %s", time.Since(pre))
 		return
 	case <-time.After(time.Second * 40):
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
