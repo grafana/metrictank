@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 var renderClient *http.Client
@@ -45,26 +43,24 @@ func renderQuery(base, target, from string) response {
 	return r
 }
 
-func retryGraphite(query, from string, times int, validate Validator) bool {
+func retryGraphite(query, from string, times int, validate Validator) (bool, response) {
 	return retry(query, from, times, validate, "https://localhost:443")
 }
-func retryMT(query, from string, times int, validate Validator) bool {
+func retryMT(query, from string, times int, validate Validator) (bool, response) {
 	return retry(query, from, times, validate, "http://localhost:6060")
 }
-func retry(query, from string, times int, validate Validator, base string) bool {
+func retry(query, from string, times int, validate Validator, base string) (bool, response) {
+	var resp response
 	for i := 0; i < times; i++ {
 		if i > 0 {
 			time.Sleep(time.Second)
 		}
-		resp := renderQuery(base, query, from)
-		spew.Dump(resp)
+		resp = renderQuery(base, query, from)
 		if validate(resp) {
-			fmt.Println("VALID")
-			return true
+			return true, resp
 		}
-		fmt.Println("INVALID")
 	}
-	return false
+	return false, resp
 }
 
 type checkResults struct {
