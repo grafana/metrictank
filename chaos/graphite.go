@@ -65,9 +65,12 @@ func retry(query, from string, times int, validate Validator, base string) (bool
 
 type checkResults struct {
 	sync.Mutex
-	valid   []int // each position corresponds to a validator
-	invalid int
-	timeout int
+	valid []int // each position corresponds to a validator
+	// categories of invalid responses
+	empty      int
+	timeout    int
+	other      int
+	firstOther response
 }
 
 func newCheckResults(validators []Validator) *checkResults {
@@ -78,33 +81,40 @@ func newCheckResults(validators []Validator) *checkResults {
 
 func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResults, validators []Validator) {
 	r := renderQuery(base, query, from)
-	found := false
+	defer wg.Done()
 	for i, v := range validators {
 		if v(r) {
-			found = true
 			cr.Lock()
 			cr.valid[i] += 1
 			cr.Unlock()
+			return
 		}
+	}
+	// if not valid, try to categorize in the common buckets, or fall back to 'other'
+	if r.httpErr == nil && r.decodeErr == nil && len(r.r) == 0 {
+		cr.Lock()
+		cr.empty += 1
+		cr.Unlock()
+		return
 	}
 	if r.httpErr != nil {
 		if err2, ok := r.httpErr.(*url.Error); ok {
 			if err3, ok := err2.Err.(net.Error); ok {
 				if err3.Timeout() {
-					found = true
 					cr.Lock()
 					cr.timeout += 1
 					cr.Unlock()
+					return
 				}
 			}
 		}
 	}
-	if !found {
-		cr.Lock()
-		cr.invalid += 1
-		cr.Unlock()
+	cr.Lock()
+	if cr.other == 0 {
+		cr.firstOther = r
 	}
-	wg.Done()
+	cr.other += 1
+	cr.Unlock()
 }
 
 // checkMT queries all provided MT endpoints and provides a summary of all the outcomes;

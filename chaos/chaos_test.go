@@ -210,18 +210,13 @@ func TestIsolateOneInstance(t *testing.T) {
 		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %+v", mt4Results)
 	}
 
-	if mt4Results.timeout != 0 {
-		t.Fatalf("expected mt4 to not timeout. got %+v", mt4Results)
-	}
-	if mt4Results.invalid != 0 {
-		t.Fatalf("expected mt4 to not invalid. got %+v", mt4Results)
-	}
-
 	// validate results of other cluster nodes
 	exp := checkResults{
-		valid:   []int{6000},
-		invalid: 0,
-		timeout: 0,
+		valid:      []int{6000},
+		empty:      0,
+		timeout:    0,
+		other:      0,
+		firstOther: response{},
 	}
 	if !reflect.DeepEqual(exp, otherResults) {
 		t.Fatalf("expected only correct results for all cluster nodes. got %+v", otherResults)
