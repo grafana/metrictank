@@ -122,12 +122,25 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 }
 
 func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.IndexAutoCompleteTags) {
-	tags, err := s.MetricIndex.AutoCompleteTags(req.OrgId, req.TagPrefix, req.Expr, req.From)
+	var tags models.StringList
+	var err error
+	tags, err = s.MetricIndex.AutoCompleteTags(req.OrgId, req.TagPrefix, req.Expr, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
+	response.Write(ctx, response.NewMsgp(200, tags))
+}
+
+func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
+	var tags models.StringList
+	var err error
+	tags, err = s.MetricIndex.AutoCompleteTagValues(req.OrgId, req.ValPrefix, req.Tag, req.Expr, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, tags))
 }
 
 func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {

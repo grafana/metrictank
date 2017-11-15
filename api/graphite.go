@@ -894,13 +894,13 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 		return nil, err
 	}
 
-	resp := models.IndexTagsResp{}
+	resp := models.StringList{}
 	for _, buf := range bufs {
 		_, err = resp.UnmarshalMsg(buf)
 		if err != nil {
 			return nil, err
 		}
-		for _, tag := range resp.Tags {
+		for _, tag := range resp {
 			tagSet[tag] = struct{}{}
 		}
 	}
@@ -914,4 +914,47 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 }
 
 func (s *Server) graphiteTagAutoCompleteValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.ValPrefix, request.Tag, request.Expr, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, valPrefix, tag string, expressions []string, from int64) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, valPrefix, tag, expressions, from)
+	if err != nil {
+		return nil, err
+	}
+
+	valSet := make(map[string]struct{}, len(result))
+	for _, val := range result {
+		valSet[val] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, ValPrefix: valPrefix, Tag: tag, Expr: expressions, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/values")
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.StringList
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, val := range resp {
+			valSet[val] = struct{}{}
+		}
+	}
+
+	vals := make([]string, 0, len(valSet))
+	for t := range valSet {
+		vals = append(vals, t)
+	}
+
+	return vals, nil
 }

@@ -99,6 +99,25 @@ func (t IndexAutoCompleteTags) Trace(span opentracing.Span) {
 func (i IndexAutoCompleteTags) TraceDebug(span opentracing.Span) {
 }
 
+type IndexAutoCompleteTagValues struct {
+	OrgId     int      `json:"orgId" binding:"Required"`
+	ValPrefix string   `json:"valPrefix"`
+	Tag       string   `json:"tag"`
+	Expr      []string `json:"expressions"`
+	From      int64    `json:"from"`
+}
+
+func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
+	span.SetTag("org", t.OrgId)
+	span.SetTag("valPrefix", t.ValPrefix)
+	span.SetTag("tag", t.Tag)
+	span.SetTag("expressions", t.Expr)
+	span.SetTag("from", t.From)
+}
+
+func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	Id string `json:"id" form:"id" binding:"Required"`
 }
