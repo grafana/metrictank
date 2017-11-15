@@ -1037,3 +1037,56 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 
 	return tags, nil
 }
+
+func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request models.GraphiteAutoCompleteTags) {
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.TagPrefix, request.Expr, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	var resp models.GraphiteTagsResp
+	for _, tag := range tags {
+		resp = append(resp, models.GraphiteTagResp{Tag: tag})
+	}
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTags(orgId, tagPrefix, expressions, from)
+	if err != nil {
+		return nil, err
+	}
+
+	tagSet := make(map[string]struct{}, len(result))
+	for _, tag := range result {
+		tagSet[tag] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTags{OrgId: orgId, TagPrefix: tagPrefix, Expr: expressions, From: from}
+	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.IndexTagsResp{}
+	for _, buf := range bufs {
+		_, err = resp.UnmarshalMsg(buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp.Tags {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tags = append(tags, t)
+	}
+
+	return tags, nil
+}
+
+func (s *Server) graphiteTagAutoCompleteValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+}

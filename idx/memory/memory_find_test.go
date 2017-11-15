@@ -391,6 +391,149 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 	queryAndCompareTagKeys(t, "di", 1000000, nil)
 }
 
+<<<<<<< e1ab7742167853dc30acad63cbe72dee73034f36
+=======
+func TestTagSorting(t *testing.T) {
+	index := New()
+	index.Init()
+
+	md1 := &schema.MetricData{
+		Name:     "name1",
+		Metric:   "name1",
+		Tags:     []string{},
+		Interval: 10,
+		OrgId:    1,
+		Time:     int64(123),
+	}
+	md1.SetId()
+
+	// set out of order tags after SetId (because that would sort it)
+	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
+	index.AddOrUpdate(md1, 1)
+
+	res, err := index.FindByTag(1, []string{"b=a"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
+	}
+	expected := "name1;a=a;b=a;c=a;d=a;e=a"
+	if res[0] != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
+	}
+
+	md2 := []schema.MetricDefinition{
+		{
+			Name:       "name2",
+			Metric:     "name2",
+			Tags:       []string{},
+			Interval:   10,
+			OrgId:      1,
+			LastUpdate: int64(123),
+		},
+	}
+	md2[0].SetId()
+
+	// set out of order tags after SetId (because that would sort it)
+	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
+	index.Load(md2)
+
+	res, err = index.FindByTag(1, []string{"3=a"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
+	}
+	expected = "name2;1=a;2=a;3=a;4=a;5=a"
+	if res[0] != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
+	}
+}
+
+func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, expRes []string, expErr bool) {
+	t.Helper()
+	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from)
+
+	if (err != nil) != expErr {
+		if expErr {
+			t.Fatalf("Expected an error, but did not get one")
+		} else {
+			t.Fatalf("Expected no error, but got %s", err)
+		}
+	}
+
+	if len(res) != len(expRes) {
+		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+	}
+
+	sort.Strings(expRes)
+	sort.Strings(res)
+	for i := range res {
+		if expRes[i] != res[i] {
+			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+		}
+	}
+}
+
+func TestAutoCompleteTag(t *testing.T) {
+	InitSmallIndex()
+
+	type testCase struct {
+		tagPrefix string
+		expr      []string
+		from      int64
+		expRes    []string
+		expErr    bool
+	}
+
+	testCases := []testCase{
+		{
+			tagPrefix: "di",
+			expr:      []string{"direction=write", "host=host90"},
+			from:      100,
+			expRes:    []string{"disk", "direction"},
+			expErr:    false,
+		}, {
+			tagPrefix: "di",
+			expr:      []string{"direction=write", "host=host90", "device=cpu"},
+			from:      100,
+			expRes:    []string{},
+			expErr:    false,
+		}, {
+			tagPrefix: "",
+			expr:      []string{"direction=write", "host=host90"},
+			from:      100,
+			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction"},
+			expErr:    false,
+		}, {
+			tagPrefix: "ho",
+			expr:      []string{},
+			from:      100,
+			expRes:    []string{"host"},
+			expErr:    false,
+		}, {
+			tagPrefix: "host",
+			expr:      []string{},
+			from:      100,
+			expRes:    []string{"host"},
+			expErr:    false,
+		}, {
+			tagPrefix: "",
+			expr:      []string{},
+			from:      100,
+			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction", "cpu"},
+			expErr:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagsAndCompare(t, tc.tagPrefix, tc.expr, tc.from, tc.expRes, tc.expErr)
+	}
+}
+
+>>>>>>> implement autocomplete for tag keys
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 

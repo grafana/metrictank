@@ -465,6 +465,89 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
+func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64) ([]string, error) {
+	m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil, nil
+	}
+
+	res := make(map[string]struct{})
+
+	if len(expressions) > 0 {
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		query, err := NewTagQuery(expressions, from)
+		if err != nil {
+			return nil, err
+		}
+		ids := query.Run(tags, m.DefById)
+		for id := range ids {
+			def, ok := m.DefById[id.String()]
+			if !ok {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+				continue
+			}
+
+			for _, tag := range def.Tags {
+				i := strings.Index(tag, "=")
+				if i == -1 {
+					corruptIndex.Inc()
+					log.Error(3, "memory-idx: corrupt. Tag in index has no '=' sign: %s", tag)
+					continue
+				}
+
+				key := tag[:i]
+				if _, ok := res[key]; ok {
+					continue
+				}
+
+				if len(tagPrefix) > 0 {
+					if len(tagPrefix) <= len(key) && key[:len(tagPrefix)] == tagPrefix {
+						res[key] = struct{}{}
+					}
+				} else {
+					res[key] = struct{}{}
+				}
+			}
+		}
+	} else {
+	TAGS:
+		for tag, values := range tags {
+			if len(tagPrefix) > 0 && (len(tagPrefix) > len(tag) || tag[:len(tagPrefix)] != tagPrefix) {
+				continue
+			}
+
+			for _, ids := range values {
+				for id := range ids {
+					def, ok := m.DefById[id.String()]
+					if !ok {
+						corruptIndex.Inc()
+						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+						continue
+					}
+					if def.LastUpdate >= from {
+						res[tag] = struct{}{}
+						continue TAGS
+					}
+				}
+			}
+		}
+	}
+
+	resStrings := make([]string, 0, len(res))
+	for tag := range res {
+		resStrings = append(resStrings, tag)
+	}
+	return resStrings, nil
+}
+
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
