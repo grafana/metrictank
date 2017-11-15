@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/chaos/out/kafkamdm"
 	"github.com/raintank/met/helper"
 	"gopkg.in/raintank/schema.v1"
@@ -127,7 +128,7 @@ func TestClusterBaseWorkload(t *testing.T) {
 		}
 	}()
 
-	suc6 := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp response) bool {
+	suc6, resp := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp response) bool {
 		exp := []string{
 			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metrics_received.counter32)",
@@ -159,12 +160,12 @@ func TestClusterBaseWorkload(t *testing.T) {
 		return true
 	})
 	if !suc6 {
-		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second")
+		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 	}
 
-	suc6 = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, validateCorrect(12))
+	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, validateCorrect(12))
 	if !suc6 {
-		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12")
+		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
 	}
 }
 
