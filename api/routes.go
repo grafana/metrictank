@@ -42,6 +42,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags", ready, bind(models.IndexTags{})).Get(s.indexTags).Post(s.indexTags)
 	r.Combo("/index/find_by_tag", ready, bind(models.IndexFindByTag{})).Get(s.indexFindByTag).Post(s.indexFindByTag)
 	r.Combo("/index/tag_details", ready, bind(models.IndexTagDetails{})).Get(s.indexTagDetails).Post(s.indexTagDetails)
+	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
@@ -55,4 +56,6 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/tags", withOrg, ready, bind(models.GraphiteTags{})).Get(s.graphiteTags).Post(s.graphiteTags)
 	r.Combo("/metrics/tags/:tag([0-9a-zA-Z]+)", withOrg, ready, bind(models.GraphiteTagDetails{})).Get(s.graphiteTagDetails).Post(s.graphiteTagDetails)
 	r.Combo("/metrics/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
+	r.Combo("/metrics/tags/autoComplete/tags", withOrg, ready, bind(models.GraphiteAutoCompleteTags{})).Get(s.graphiteAutoCompleteTags).Post(s.graphiteAutoCompleteTags)
+	//r.Combo("/metrics/tags/autoComplete/values", withOrg, ready, bind(models.GraphiteAutoCompleteValues{})).Get(s.graphiteAutoCompleteValues).Post(s.graphiteAutoCompleteValues)
 }
