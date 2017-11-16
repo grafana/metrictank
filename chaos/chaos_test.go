@@ -203,23 +203,22 @@ func TestIsolateOneInstance(t *testing.T) {
 
 	// validate results of isolated node
 	if mt4Results.valid[0]+mt4Results.valid[1] != 6000 {
-		t.Fatalf("expected mt4 to return either correct or erroring responses. got %+v", mt4Results)
+		t.Fatalf("expected mt4 to return either correct or erroring responses. got %s", spew.Sdump(mt4Results))
 	}
 	if mt4Results.valid[1] < 30*6000/100 {
 		// the instance is completely down for 30s of the 60s experiment run, but we allow some slack
-		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %+v", mt4Results)
+		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %s", spew.Sdump(mt4Results))
 	}
 
 	// validate results of other cluster nodes
 	exp := checkResults{
-		valid:      []int{6000},
-		empty:      0,
-		timeout:    0,
-		other:      0,
-		firstOther: response{},
+		valid:   []int{6000},
+		empty:   0,
+		timeout: 0,
+		other:   0,
 	}
 	if !reflect.DeepEqual(exp, otherResults) {
-		t.Fatalf("expected only correct results for all cluster nodes. got %+v", otherResults)
+		t.Fatalf("expected only correct results for all cluster nodes. got %s", spew.Sdump(otherResults))
 	}
 }
 
