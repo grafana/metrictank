@@ -70,7 +70,7 @@ type checkResults struct {
 	empty      int
 	timeout    int
 	other      int
-	firstOther response
+	firstOther *response
 }
 
 func newCheckResults(validators []Validator) *checkResults {
@@ -111,7 +111,7 @@ func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResults,
 	}
 	cr.Lock()
 	if cr.other == 0 {
-		cr.firstOther = r
+		cr.firstOther = &r
 	}
 	cr.other += 1
 	cr.Unlock()
