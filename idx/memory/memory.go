@@ -278,7 +278,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	path := def.NameWithTags
+	path := def.NameWithTags()
 
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
@@ -552,7 +552,7 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			continue
 		}
 
-		res[i] = def.NameWithTags
+		res[i] = def.NameWithTags()
 		i++
 	}
 	return res
