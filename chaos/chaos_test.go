@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	var err error
-	tracker, err = NewTracker(cmd, false, false)
+	tracker, err = NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err)
 	}
