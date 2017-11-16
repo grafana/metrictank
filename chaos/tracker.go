@@ -19,9 +19,11 @@ type Tracker struct {
 	newMatcherCtx chan MatcherCtx
 	logStdout     chan bool
 	logStderr     chan bool
+	prefixStdout  string
+	prefixStderr  string
 }
 
-func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool) (*Tracker, error) {
+func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixStderr string) (*Tracker, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -39,6 +41,14 @@ func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool) (*Tracker, error) {
 		make(chan MatcherCtx),
 		make(chan bool),
 		make(chan bool),
+		prefixStdout,
+		prefixStderr,
+	}
+	if prefixStdout == "" {
+		t.prefixStdout = "stdout:"
+	}
+	if prefixStderr == "" {
+		t.prefixStderr = "stderr:"
 	}
 	go t.track(t.stdout, t.stdoutChan)
 	go t.track(t.stderr, t.stderrChan)
@@ -68,7 +78,7 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			matcherCtx = append(matcherCtx, m)
 		case str := <-t.stdoutChan:
 			if logStdout {
-				fmt.Println("stdout:", str)
+				fmt.Println(t.prefixStdout, str)
 			}
 			var tmp []MatcherCtx
 			for _, m := range matcherCtx {
@@ -79,7 +89,7 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			matcherCtx = tmp
 		case str := <-t.stderrChan:
 			if logStderr {
-				fmt.Println("stderr:", str)
+				fmt.Println(t.prefixStderr, str)
 			}
 			var tmp []MatcherCtx
 			for _, m := range matcherCtx {
