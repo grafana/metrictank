@@ -307,7 +307,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.tags)
 	}
 
-	deleted, err := ix.Delete(orgId, schema.MetricDefinitionFromMetricData(mds[10]).NameWithTags)
+	deleted, err := ix.Delete(orgId, schema.MetricDefinitionFromMetricData(mds[10]).NameWithTags())
 	if err != nil {
 		t.Fatalf("Error deleting metric: %s", err)
 	}

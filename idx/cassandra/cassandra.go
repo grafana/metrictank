@@ -369,7 +369,6 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema
 		mdef.Mtype = mtype
 		mdef.Tags = tags
 		mdef.LastUpdate = lastupdate
-		mdef.DeduplicateNameWithTags()
 		defs = append(defs, mdef)
 	}
 	if err := iter.Close(); err != nil {
