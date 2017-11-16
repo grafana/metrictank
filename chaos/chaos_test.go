@@ -188,10 +188,10 @@ func TestIsolateOneInstance(t *testing.T) {
 	otherResultsChan := make(chan checkResults, 1)
 
 	go func() {
-		mt4ResultsChan <- checkMT([]int{6064}, "some.id.of.a.*", "-10s", time.Minute, 6000, validateCorrect(12), validateCode(503))
+		mt4ResultsChan <- checkMT([]int{6064}, "some.id.of.a.metric.*", "-10s", time.Minute, 6000, validateCorrect(12), validateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "some.id.of.a.*", "-10s", time.Minute, 6000, validateCorrect(12))
+		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "some.id.of.a.metric.*", "-10s", time.Minute, 6000, validateCorrect(12))
 	}()
 
 	// now go ahead and isolate for 30s
