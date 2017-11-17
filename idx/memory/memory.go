@@ -64,7 +64,7 @@ type TagIDs map[idx.MetricID]struct{} // set of ids
 type TagValue map[string]TagIDs       // value -> set of ids
 type TagIndex map[string]TagValue     // key -> list of values
 
-func (t *TagIndex) AddTagId(name, value string, id idx.MetricID) {
+func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
 		ti[name] = make(TagValue)
@@ -75,7 +75,7 @@ func (t *TagIndex) AddTagId(name, value string, id idx.MetricID) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) DelTagId(name, value string, id idx.MetricID) {
+func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -203,9 +203,9 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
-		tags.AddTagId(tagName, tagValue, id)
+		tags.addTagId(tagName, tagValue, id)
 	}
-	tags.AddTagId("name", def.Name, id)
+	tags.addTagId("name", def.Name, id)
 }
 
 // deindexTags takes a given metric definition and removes all references
@@ -239,10 +239,10 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
-		tags.DelTagId(tagName, tagValue, id)
+		tags.delTagId(tagName, tagValue, id)
 	}
 
-	tags.DelTagId("name", def.Name, id)
+	tags.delTagId("name", def.Name, id)
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
