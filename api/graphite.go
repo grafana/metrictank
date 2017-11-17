@@ -1088,7 +1088,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	return tags, nil
 }
 
-func (s *Server) graphiteTagAutoCompleteValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
 	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.ValPrefix, request.Tag, request.Expr, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
