@@ -359,7 +359,7 @@ func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []
 func TestTagKeysWithoutFilters(t *testing.T) {
 	InitSmallIndex()
 
-	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk"}
+	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
 	queryAndCompareTagKeys(t, "", 0, expected)
 }
 
@@ -367,7 +367,7 @@ func TestTagKeysWithFrom(t *testing.T) {
 	InitSmallIndex()
 
 	// disk metrics should all have been added before ts 1000000
-	expected := []string{"dc", "host", "device", "cpu", "metric"}
+	expected := []string{"dc", "host", "device", "cpu", "metric", "name"}
 	queryAndCompareTagKeys(t, "", 100000, expected)
 }
 
