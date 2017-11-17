@@ -58,5 +58,5 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/tags/:tag([0-9a-zA-Z]+)", withOrg, ready, bind(models.GraphiteTagDetails{})).Get(s.graphiteTagDetails).Post(s.graphiteTagDetails)
 	r.Combo("/metrics/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
 	r.Combo("/metrics/tags/autoComplete/tags", withOrg, ready, bind(models.GraphiteAutoCompleteTags{})).Get(s.graphiteAutoCompleteTags).Post(s.graphiteAutoCompleteTags)
-	//r.Combo("/metrics/tags/autoComplete/values", withOrg, ready, bind(models.GraphiteAutoCompleteValues{})).Get(s.graphiteAutoCompleteValues).Post(s.graphiteAutoCompleteValues)
+	r.Combo("/metrics/tags/autoComplete/values", withOrg, ready, bind(models.GraphiteAutoCompleteTagValues{})).Get(s.graphiteAutoCompleteTagValues).Post(s.graphiteAutoCompleteTagValues)
 }
