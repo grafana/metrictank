@@ -26,6 +26,7 @@ func getTestIDs(t *testing.T) []idx.MetricID {
 		"1.42345678901234567890123456789012",
 		"1.52345678901234567890123456789012",
 		"1.62345678901234567890123456789012",
+		"1.72345678901234567890123456789012",
 	}
 	for _, idStr := range idStrings {
 		id, err := idx.NewMetricIDFromString(idStr)
@@ -53,8 +54,9 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 		{ids[2], 3, []string{"key1=value1", "key4=value4"}},
 		{ids[3], 4, []string{"key1=value1", "key4=value3", "key3=value3"}},
 		{ids[4], 5, []string{"key2=value1", "key5=value4", "key3=value3"}},
-		{ids[5], 6, []string{"key2=value2", "key4=value5"}},
+		{ids[5], 6, []string{"key2=value2", "key4=value5", "key3=vabc"}},
 		{ids[6], 7, []string{"key3=value1", "key4=value4"}},
+		{ids[7], 8, []string{"key3=valxxx"}},
 	}
 
 	tagIdx := make(TagIndex)
@@ -83,13 +85,44 @@ func queryAndCompareResults(t *testing.T, q TagQuery, expectedData TagIDs) {
 	res := q.Run(tagIdx, byId)
 
 	if !reflect.DeepEqual(expectedData, res) {
-		t.Fatalf("Returned data does not match expected data:\nExpected: %+v\nGot: %+v", expectedData, res)
+		toStr := func(ids TagIDs) string {
+			var res string
+			for id := range ids {
+				if len(res) > 0 {
+					res += " "
+				}
+				res += id.String()
+			}
+			return res
+		}
+		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", toStr(expectedData), toStr(res))
 	}
 }
 
 func TestQueryByTagSimpleEqual(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3"}, 0)
+	expect := make(TagIDs)
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagSimplePrefix(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"key3^=val"}, 0)
+	expect := make(TagIDs)
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
+	expect[ids[4]] = struct{}{}
+	expect[ids[6]] = struct{}{}
+	expect[ids[7]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByPrefix(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"key1=value1", "key3^=val"}, 0)
 	expect := make(TagIDs)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}

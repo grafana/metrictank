@@ -549,8 +549,19 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 }
 
 func (m *MemoryIdx) AutoCompleteTagValues(orgId int, valPrefix string, tag string, expressions []string, from int64) ([]string, error) {
-	var resp []string
-	return resp, nil
+	/*m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil, nil
+	}
+
+	expressions = append(expressions, tag+"^="+valPrefix)
+	query, err := NewTagQuery(expressions, from)*/
+
+	res := make([]string, 0)
+	return res, nil
 }
 
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {

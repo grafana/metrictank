@@ -18,6 +18,7 @@ const (
 	NOT_EQUAL
 	MATCH
 	NOT_MATCH
+	PREFIX
 )
 
 type expression struct {
@@ -55,6 +56,7 @@ type TagQuery struct {
 	match     []kvRe
 	notEqual  []kv
 	notMatch  []kvRe
+	prefix    []kv
 	startWith int
 }
 
@@ -62,7 +64,7 @@ type TagQuery struct {
 // string, in case of error the operator will be PARSING_ERROR.
 func parseExpression(expr string) (expression, error) {
 	var pos int
-	regex, not := false, false
+	prefix, regex, not := false, false, false
 	res := expression{}
 
 	// scan up to operator to get key
@@ -75,6 +77,12 @@ func parseExpression(expr string) (expression, error) {
 		// !
 		if expr[pos] == 33 {
 			not = true
+			break
+		}
+
+		// ^
+		if expr[pos] == 94 {
+			prefix = true
 			break
 		}
 
@@ -91,8 +99,8 @@ func parseExpression(expr string) (expression, error) {
 
 	res.key = expr[:pos]
 
-	// shift over the ! character
-	if not {
+	// shift over the !/^ characters
+	if not || prefix {
 		pos++
 	}
 
@@ -104,6 +112,9 @@ func parseExpression(expr string) (expression, error) {
 
 	// if ~
 	if len(expr) > pos && expr[pos] == 126 {
+		if prefix {
+			return res, errInvalidQuery
+		}
 		regex = true
 		pos++
 	}
@@ -126,6 +137,8 @@ func parseExpression(expr string) (expression, error) {
 	} else {
 		if regex {
 			res.operator = MATCH
+		} else if prefix {
+			res.operator = PREFIX
 		} else {
 			res.operator = EQUAL
 		}
@@ -188,17 +201,20 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 					}
 				}
 				q.notMatch = append(q.notMatch, kvRe{key: e.key, value: re})
+			case PREFIX:
+				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
 			}
 		}
 	}
 
-	if len(q.equal) == 0 {
-		if len(q.match) == 0 {
-			return q, errInvalidQuery
-		}
+	if len(q.equal) > 0 {
+		q.startWith = EQUAL
+	} else if len(q.prefix) > 0 {
+		q.startWith = PREFIX
+	} else if len(q.match) > 0 {
 		q.startWith = MATCH
 	} else {
-		q.startWith = EQUAL
+		return q, errInvalidQuery
 	}
 
 	return q, nil
@@ -229,6 +245,23 @@ func (q *TagQuery) getInitialByMatch(index TagIndex, expr kvRe) TagIDs {
 			resultSet[id] = struct{}{}
 		}
 	}
+	return resultSet
+}
+
+// getInitialByPrefix returns the initial resultset by executing the given prefix match expression
+func (q *TagQuery) getInitialByPrefix(index TagIndex, expr kv) TagIDs {
+	resultSet := make(TagIDs)
+
+	for v, ids := range index[expr.key] {
+		if len(v) < len(expr.value) || v[:len(expr.value)] != expr.value {
+			continue
+		}
+
+		for id := range ids {
+			resultSet[id] = struct{}{}
+		}
+	}
+
 	return resultSet
 }
 
@@ -269,6 +302,47 @@ func (q *TagQuery) filterByEqual(resultSet TagIDs, index TagIndex, exprs []kv, n
 			if _, ok := indexIds[id]; ok == not {
 				delete(resultSet, id)
 			}
+		}
+	}
+}
+
+// filterByPrefix filters a list of metric ids by the given prefix. deletes all
+// ids from the result set where the given prefix does not match
+//
+// resultSet:   list of series IDs that should be filtered
+// byId:        ID keyed index of metric definitions, used to lookup the tags of IDs
+//
+func (q *TagQuery) filterByPrefix(resultSet TagIDs, byId map[string]*idx.Archive, exprs []kv) {
+
+	for _, e := range exprs {
+	IDS:
+		for id := range resultSet {
+			var def *idx.Archive
+			var ok bool
+			if def, ok = byId[id.String()]; !ok {
+				// should never happen because every ID in the tag index
+				// must be present in the byId lookup table
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+				delete(resultSet, id)
+				continue IDS
+			}
+
+			for _, tag := range def.Tags {
+				// continue if any of these match:
+				// - length of tag is too short, so this can't be a match
+				// - the position where we expect the = is not a =
+				// - the key does not match
+				// - the prefix value does not match
+				if len(tag) < len(e.key)+len(e.value)+1 ||
+					tag[len(e.key)] != 61 ||
+					tag[:len(e.key)] != e.key ||
+					tag[len(e.key)+1:len(e.key)+len(e.value)+1] != e.value {
+					continue
+				}
+				continue IDS
+			}
+			delete(resultSet, id)
 		}
 	}
 }
@@ -387,19 +461,28 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 		q.equal[i].cost = uint(len(index[q.equal[i].key][q.equal[i].value]))
 	}
 
+	for i := range q.prefix {
+		q.prefix[i].cost = uint(len(index[q.prefix[i].key][q.prefix[i].value]))
+	}
+
 	for i := range q.match {
 		q.match[i].cost = uint(len(index[q.match[i].key]))
 	}
 
 	sort.Sort(KvByCost(q.equal))
 	sort.Sort(KvByCost(q.notEqual))
+	sort.Sort(KvByCost(q.prefix))
 	sort.Sort(KvReByCost(q.match))
 	sort.Sort(KvReByCost(q.notMatch))
 
-	if q.startWith == EQUAL {
+	switch q.startWith {
+	case EQUAL:
 		resultSet = q.getInitialByEqual(index, q.equal[0])
 		q.equal = q.equal[1:]
-	} else {
+	case PREFIX:
+		resultSet = q.getInitialByPrefix(index, q.prefix[0])
+		q.prefix = q.prefix[1:]
+	case MATCH:
 		resultSet = q.getInitialByMatch(index, q.match[0])
 		q.match = q.match[1:]
 	}
@@ -410,6 +493,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	// possible resultSet.
 	q.filterByEqual(resultSet, index, q.equal, false)
 	q.filterByEqual(resultSet, index, q.notEqual, true)
+	q.filterByPrefix(resultSet, byId, q.prefix)
 	q.filterByFrom(resultSet, byId)
 	q.filterByMatch(resultSet, byId, q.match, false)
 	q.filterByMatch(resultSet, byId, q.notMatch, true)
