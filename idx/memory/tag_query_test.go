@@ -290,6 +290,7 @@ func TestDeleteTaggedSeries(t *testing.T) {
 
 	mds := getMetricData(orgId, 2, 50, 10, "metric.public")
 	mds[10].Tags = []string{"key1=value1", "key2=value2"}
+	mds[10].SetId()
 
 	for _, md := range mds {
 		ix.AddOrUpdate(md, 1)
@@ -302,11 +303,11 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 1 result, but got %d", len(res))
 	}
 
-	if len(ix.tags[orgId]) != 2 {
-		t.Fatalf("Expected tag index to contain 2 keys, but it does not: %+v", ix.tags)
+	if len(ix.tags[orgId]) != 3 {
+		t.Fatalf("Expected tag index to contain 3 keys, but it has %d: %+v", len(ix.tags), ix.tags)
 	}
 
-	deleted, err := ix.Delete(orgId, mds[10].Metric)
+	deleted, err := ix.Delete(orgId, schema.MetricDefinitionFromMetricData(mds[10]).NameWithTags())
 	if err != nil {
 		t.Fatalf("Error deleting metric: %s", err)
 	}
@@ -321,8 +322,8 @@ func TestDeleteTaggedSeries(t *testing.T) {
 		t.Fatalf("Expected to get 0 results, but got %d", len(res))
 	}
 
-	if len(ix.tags[orgId]) > 0 {
-		t.Fatalf("Expected tag index to be empty, but it is not: %+v", ix.tags)
+	if len(ix.tags[orgId]) > 1 {
+		t.Fatalf("Expected tag index to only have one (name) tag, but it has more: %+v", ix.tags)
 	}
 }
 

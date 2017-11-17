@@ -64,6 +64,30 @@ type TagIDs map[idx.MetricID]struct{} // set of ids
 type TagValue map[string]TagIDs       // value -> set of ids
 type TagIndex map[string]TagValue     // key -> list of values
 
+func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
+	ti := *t
+	if _, ok := ti[name]; !ok {
+		ti[name] = make(TagValue)
+	}
+	if _, ok := ti[name][value]; !ok {
+		ti[name][value] = make(TagIDs)
+	}
+	ti[name][value][id] = struct{}{}
+}
+
+func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
+	ti := *t
+
+	delete(ti[name][value], id)
+
+	if len(ti[name][value]) == 0 {
+		delete(ti[name], value)
+		if len(ti[name]) == 0 {
+			delete(ti, name)
+		}
+	}
+}
+
 type Node struct {
 	Path     string
 	Children []string
@@ -157,46 +181,13 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tags = make(TagIndex)
 		m.tags[def.OrgId] = tags
 	}
-	for _, tag := range def.Tags {
-		tagSplits := strings.SplitN(tag, "=", 2)
-		if len(tagSplits) < 2 {
-			// should never happen because every tag in the index
-			// must have a valid format
-			invalidTag.Inc()
-			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
-			continue
-		}
 
-		tagName := tagSplits[0]
-		tagValue := tagSplits[1]
-
-		if _, ok = tags[tagName]; !ok {
-			tags[tagName] = make(TagValue)
-		}
-
-		if _, ok = tags[tagName][tagValue]; !ok {
-			tags[tagName][tagValue] = make(TagIDs)
-		}
-
-		id, err := idx.NewMetricIDFromString(def.Id)
-		if err != nil {
-			// should never happen because all IDs in the index must have
-			// a valid format
-			invalidId.Inc()
-			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-			continue
-		}
-		tags[tagName][tagValue][id] = struct{}{}
-	}
-}
-
-// deindexTags takes a given metric definition and removes all references
-// to it from the tag index. It assumes a lock is already held.
-func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
-	tags, ok := m.tags[def.OrgId]
-	if !ok {
-		corruptIndex.Inc()
-		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
+	id, err := idx.NewMetricIDFromString(def.Id)
+	if err != nil {
+		// should never happen because all IDs in the index must have
+		// a valid format
+		invalidId.Inc()
+		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
 		return
 	}
 
@@ -212,24 +203,46 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
+		tags.addTagId(tagName, tagValue, id)
+	}
+	tags.addTagId("name", def.Name, id)
+}
 
-		id, err := idx.NewMetricIDFromString(def.Id)
-		if err != nil {
-			// should never happen because all IDs in the index must have
-			// a valid format
-			invalidId.Inc()
-			log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+// deindexTags takes a given metric definition and removes all references
+// to it from the tag index. It assumes a lock is already held.
+func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
+	tags, ok := m.tags[def.OrgId]
+	if !ok {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
+		return
+	}
+
+	id, err := idx.NewMetricIDFromString(def.Id)
+	if err != nil {
+		// should never happen because all IDs in the index must have
+		// a valid format
+		invalidId.Inc()
+		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
+		return
+	}
+
+	for _, tag := range def.Tags {
+		tagSplits := strings.SplitN(tag, "=", 2)
+		if len(tagSplits) < 2 {
+			// should never happen because every tag in the index
+			// must have a valid format
+			invalidTag.Inc()
+			log.Error(3, "memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
 			continue
 		}
-		delete(tags[tagName][tagValue], id)
 
-		if len(tags[tagName][tagValue]) == 0 {
-			delete(tags[tagName], tagValue)
-			if len(tags[tagName]) == 0 {
-				delete(tags, tagName)
-			}
-		}
+		tagName := tagSplits[0]
+		tagValue := tagSplits[1]
+		tags.delTagId(tagName, tagValue, id)
 	}
+
+	tags.delTagId("name", def.Name, id)
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -265,7 +278,8 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	path := def.Name
+	path := def.NameWithTags()
+
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
 	sort.Strings(def.Tags)
@@ -301,9 +315,16 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		}
 	}
 
+	pos := strings.Index(path, ";")
+	if pos == -1 {
+		pos = strings.LastIndex(path, ".")
+	} else {
+		// find the last '.' that is not part of a tag
+		pos = strings.LastIndex(path[:pos], ".")
+	}
+
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
-	pos := strings.LastIndex(path, ".")
 	prevPos := len(path)
 	for pos != -1 {
 		branch := path[:pos]
@@ -531,19 +552,7 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			continue
 		}
 
-		nameLen := len(def.Name)
-		for _, tag := range def.Tags {
-			nameLen += len(tag)
-		}
-		nameLen += len(def.Tags) // accounting for all the ";" between tags
-		b := make([]byte, nameLen)
-		pos := copy(b, def.Name)
-		for _, tag := range def.Tags {
-			pos += copy(b[pos:], ";")
-			pos += copy(b[pos:], tag)
-		}
-
-		res[i] = string(b)
+		res[i] = def.NameWithTags()
 		i++
 	}
 	return res
@@ -635,7 +644,15 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		return results, nil
 	}
 
-	nodes := strings.Split(pattern, ".")
+	var nodes []string
+	if strings.Index(pattern, ";") == -1 {
+		nodes = strings.Split(pattern, ".")
+	} else {
+		nodes = strings.SplitN(pattern, ";", 2)
+		tags := nodes[1]
+		nodes = strings.Split(nodes[0], ".")
+		nodes[len(nodes)-1] += ";" + tags
+	}
 
 	// pos is the index of the first node with special chars, or one past the last node if exact
 	// for a query like foo.bar.baz, pos is 3

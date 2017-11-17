@@ -404,7 +404,11 @@ func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 			c.IsLeaf = "0"
 		}
 
-		i := strings.LastIndex(c.Path, ".")
+		i := strings.Index(c.Path, ";")
+		if i == -1 {
+			i = len(c.Path)
+		}
+		i = strings.LastIndex(c.Path[:i], ".")
 
 		if i != -1 {
 			c.Name = c.Path[i+1:]
@@ -433,14 +437,13 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	tree := models.NewSeriesTree()
 	seen := make(map[string]struct{})
 
-	basepath := ""
-	if i := strings.LastIndex(query, "."); i != -1 {
-		basepath = query[:i+1]
-	}
-
 	for _, g := range nodes {
 		name := string(g.Path)
-		if i := strings.LastIndex(name, "."); i != -1 {
+		i := strings.Index(name, ";")
+		if i == -1 {
+			i = len(name)
+		}
+		if i = strings.LastIndex(name[:i], "."); i != -1 {
 			name = name[i+1:]
 		}
 
@@ -460,7 +463,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 		}
 
 		t := models.SeriesTreeItem{
-			ID:            basepath + name,
+			ID:            g.Path,
 			Context:       treejsonContext,
 			Text:          name,
 			AllowChildren: allowChildren,
@@ -588,8 +591,9 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 					}
+
 					newReq := models.NewReq(
-						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
 				}
 			}
