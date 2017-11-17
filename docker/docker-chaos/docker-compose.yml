@@ -173,7 +173,7 @@ services:
 
   grafana:
     hostname: grafana
-    image: grafana/grafana:4.5.2
+    image: grafana/grafana:latest
     ports:
       - "3000:3000"
 
@@ -201,10 +201,10 @@ services:
   # easiest to just use a separate graphite server for monitoring
   graphitemon:
     hostname: graphitemon
-    image:  raintank/graphite-stack
+    image:  graphiteapp/graphite-statsd
     ports:
       - "2003:2003"
-      - "443:443"
+      - "80:80"
     volumes:
      - "./carbon.conf:/opt/graphite/conf/carbon.conf"
      - "./storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf"

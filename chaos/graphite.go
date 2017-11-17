@@ -1,7 +1,6 @@
 package chaos
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -14,12 +13,8 @@ import (
 var renderClient *http.Client
 
 func init() {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // only needed for graphite, not for MT. oh well..
-	}
 	renderClient = &http.Client{
-		Transport: tr,
-		Timeout:   time.Second * 2, // definitely works as timeout in waiting for response, not sure re dial timeout
+		Timeout: time.Second * 2, // definitely works as timeout in waiting for response, not sure re dial timeout
 	}
 }
 
@@ -48,7 +43,7 @@ func renderQuery(base, target, from string) response {
 }
 
 func retryGraphite(query, from string, times int, validate Validator) (bool, response) {
-	return retry(query, from, times, validate, "https://localhost:443")
+	return retry(query, from, times, validate, "http://localhost")
 }
 func retryMT(query, from string, times int, validate Validator) (bool, response) {
 	return retry(query, from, times, validate, "http://localhost:6060")
