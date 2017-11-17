@@ -3,10 +3,12 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	jaeger "github.com/uber/jaeger-client-go"
 	"gopkg.in/macaron.v1"
 )
 
@@ -49,6 +51,13 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		macCtx.MapTo(macCtx.Resp, (*http.ResponseWriter)(nil))
 
 		rw := macCtx.Resp.(*TracingResponseWriter)
+
+		headers := macCtx.Resp.Header()
+		spanStr := span.(*jaeger.Span).String()
+		pos := strings.Index(spanStr, ":")
+		traceID := spanStr[:pos]
+		headers["Trace-Id"] = []string{traceID}
+
 		// call next handler. This will return after all handlers
 		// have completed and the request has been sent.
 		macCtx.Next()
