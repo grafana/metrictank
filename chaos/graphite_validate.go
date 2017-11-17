@@ -9,6 +9,7 @@ type response struct {
 	httpErr   error
 	decodeErr error
 	code      int
+	traceID   string
 	r         Response
 }
 

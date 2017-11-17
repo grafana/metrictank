@@ -38,6 +38,10 @@ func renderQuery(base, target, from string) response {
 		return r
 	}
 	r.code = resp.StatusCode
+	traceHeader := resp.Header["Trace-Id"]
+	if len(traceHeader) > 0 {
+		r.traceID = traceHeader[0]
+	}
 	r.decodeErr = json.NewDecoder(resp.Body).Decode(&r.r)
 	resp.Body.Close()
 	return r
