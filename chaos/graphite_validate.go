@@ -51,8 +51,10 @@ func validateCorrect(num float64) Validator {
 			return false
 		}
 		points := resp.r[0].Datapoints
-		// last point can sometimes be null
-		for _, p := range points[:len(points)-1] {
+		// first point may be null; not sure why
+		// last 2 points may be NaN or incomplete sums because some terms are NaN
+		// this is standard graphite behavior unlike the faulty behavior where terms are missing across the time range
+		for _, p := range points[1 : len(points)-2] {
 			if math.IsNaN(p.Val) {
 				return false
 			}

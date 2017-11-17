@@ -102,7 +102,7 @@ func TestClusterStartup(t *testing.T) {
 }
 
 // 1 metric to each of 12 partitions, each partition replicated twice = expect total workload across cluster of 24Hz
-func TestClusterBaseWorkload(t *testing.T) {
+func TestClusterBaseIngestWorkload(t *testing.T) {
 
 	//	tracker.LogStdout(true)
 	//	tracker.LogStderr(true)
@@ -169,6 +169,23 @@ func TestClusterBaseWorkload(t *testing.T) {
 	}
 }
 
+func TestQueryWorkload(t *testing.T) {
+	pre := time.Now()
+	rand.Seed(pre.Unix())
+
+	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, 6000, validateCorrect(12))
+
+	exp := checkResults{
+		valid:   []int{6000},
+		empty:   0,
+		timeout: 0,
+		other:   0,
+	}
+	if !reflect.DeepEqual(exp, results) {
+		t.Fatalf("expected only correct results. got %s", spew.Sdump(results))
+	}
+}
+
 // TestIsolateOneInstance tests what happens during the isolation of one instance, when min-available-shards is 12
 // this should happen:
 // at all times, all queries to all of the remaining nodes should be successful
@@ -176,22 +193,22 @@ func TestClusterBaseWorkload(t *testing.T) {
 // the isolated shard should either return correct replies, or errors (in two cases: when it marks any shards as down,
 // but also before it does, but fails to get data via clustered requests from peers)
 //. TODO: in production do we stop querying isolated peers?
-
 func TestIsolateOneInstance(t *testing.T) {
 	t.Log("Starting TestIsolateOneInstance)")
-	tracker.LogStdout(true)
-	tracker.LogStderr(true)
+	//	tracker.LogStdout(true)
+	//	tracker.LogStderr(true)
 	pre := time.Now()
 	rand.Seed(pre.Unix())
+	numReqMt4 := 1200
 
 	mt4ResultsChan := make(chan checkResults, 1)
 	otherResultsChan := make(chan checkResults, 1)
 
 	go func() {
-		mt4ResultsChan <- checkMT([]int{6064}, "some.id.of.a.metric.*", "-10s", time.Minute, 6000, validateCorrect(12), validateCode(503))
+		mt4ResultsChan <- checkMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, numReqMt4, validateCorrect(12), validateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "some.id.of.a.metric.*", "-10s", time.Minute, 6000, validateCorrect(12))
+		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, 6000, validateCorrect(12))
 	}()
 
 	// now go ahead and isolate for 30s
@@ -202,10 +219,10 @@ func TestIsolateOneInstance(t *testing.T) {
 	otherResults := <-otherResultsChan
 
 	// validate results of isolated node
-	if mt4Results.valid[0]+mt4Results.valid[1] != 6000 {
+	if mt4Results.valid[0]+mt4Results.valid[1] != numReqMt4 {
 		t.Fatalf("expected mt4 to return either correct or erroring responses. got %s", spew.Sdump(mt4Results))
 	}
-	if mt4Results.valid[1] < 30*6000/100 {
+	if mt4Results.valid[1] < numReqMt4*30/100 {
 		// the instance is completely down for 30s of the 60s experiment run, but we allow some slack
 		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %s", spew.Sdump(mt4Results))
 	}
