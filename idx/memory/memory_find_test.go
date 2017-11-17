@@ -391,8 +391,6 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 	queryAndCompareTagKeys(t, "di", 1000000, nil)
 }
 
-<<<<<<< e1ab7742167853dc30acad63cbe72dee73034f36
-=======
 func TestTagSorting(t *testing.T) {
 	index := New()
 	index.Init()
@@ -454,8 +452,8 @@ func TestTagSorting(t *testing.T) {
 
 func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, expRes []string, expErr bool) {
 	t.Helper()
-	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from)
 
+	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
@@ -533,7 +531,87 @@ func TestAutoCompleteTag(t *testing.T) {
 	}
 }
 
->>>>>>> implement autocomplete for tag keys
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, expRes []string, expErr bool) {
+	t.Helper()
+
+	res, err := ix.AutoCompleteTagValues(1, tag, valPrefix, expr, from)
+	if (err != nil) != expErr {
+		if expErr {
+			t.Fatalf("Expected an error, but did not get one")
+		} else {
+			t.Fatalf("Expected no error, but got %s for %+v", err, expr)
+		}
+	}
+
+	if len(res) != len(expRes) {
+		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+	}
+
+	sort.Strings(expRes)
+	sort.Strings(res)
+	for i := range res {
+		if expRes[i] != res[i] {
+			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+		}
+	}
+}
+
+func TestAutoCompleteTagValues(t *testing.T) {
+	InitSmallIndex()
+
+	type testCase struct {
+		tag       string
+		valPrefix string
+		expr      []string
+		from      int64
+		expRes    []string
+		expErr    bool
+	}
+
+	testCases := []testCase{
+		{
+			tag:       "host",
+			valPrefix: "host9",
+			expr:      []string{"direction=write"},
+			from:      100,
+			expRes:    []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
+			expErr:    false,
+		}, {
+			tag:       "direction",
+			valPrefix: "w",
+			expr:      []string{"device=disk"},
+			from:      100,
+			expRes:    []string{"write"},
+			expErr:    false,
+		}, {
+			tag:       "direction",
+			valPrefix: "w",
+			expr:      []string{"device=cpu"},
+			from:      100,
+			expRes:    []string{},
+			expErr:    false,
+		}, {
+			tag:       "device",
+			valPrefix: "",
+			expr:      []string{},
+			from:      100,
+			expRes:    []string{"cpu", "disk"},
+			expErr:    false,
+		}, {
+			tag:       "device",
+			valPrefix: "",
+			expr:      []string{"disk=~disk[4-5]{1}"},
+			from:      100,
+			expRes:    []string{"disk"},
+			expErr:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.valPrefix, tc.expr, tc.from, tc.expRes, tc.expErr)
+	}
+}
+
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 
