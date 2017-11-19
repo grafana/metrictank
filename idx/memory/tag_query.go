@@ -300,53 +300,58 @@ func (q *TagQuery) filterByMatch(resultSet TagIDs, byId map[string]*idx.Archive,
 				delete(resultSet, id)
 				continue IDS
 			}
-
-		TAGS:
-			for _, tag := range def.Tags {
-				// length of key doesn't match
-				if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
-					continue
+			if e.key == "name" {
+				if e.value.MatchString(def.Name) == not {
+					delete(resultSet, id)
 				}
-
-				if e.key != tag[:len(e.key)] {
-					continue
-				}
-
-				value := tag[len(e.key)+1:]
-
-				// reduce regex matching by looking up cached non-matches
-				if _, ok := notMatchingTags[value]; ok {
-					// each key should only be present once per `def`, so if
-					// the key matches but the value doesn't we can skip the def
-					break TAGS
-				}
-
-				// reduce regex matching by looking up cached matches
-				if _, ok := matchingTags[value]; ok {
-					if not {
-						delete(resultSet, id)
+			} else {
+			TAGS:
+				for _, tag := range def.Tags {
+					// length of key doesn't match
+					if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
+						continue
 					}
-					continue IDS
-				}
 
-				// value == nil means that this expression can be short cut
-				// by not evaluating it
-				if e.value == nil || e.value.MatchString(value) {
-					if len(matchingTags) < matchCacheSize {
-						matchingTags[value] = struct{}{}
+					if e.key != tag[:len(e.key)] {
+						continue
 					}
-					if not {
-						delete(resultSet, id)
+
+					value := tag[len(e.key)+1:]
+
+					// reduce regex matching by looking up cached non-matches
+					if _, ok := notMatchingTags[value]; ok {
+						// each key should only be present once per `def`, so if
+						// the key matches but the value doesn't we can skip the def
+						break TAGS
 					}
-					continue IDS
-				} else {
-					if len(notMatchingTags) < matchCacheSize {
-						notMatchingTags[value] = struct{}{}
+
+					// reduce regex matching by looking up cached matches
+					if _, ok := matchingTags[value]; ok {
+						if not {
+							delete(resultSet, id)
+						}
+						continue IDS
+					}
+
+					// value == nil means that this expression can be short cut
+					// by not evaluating it
+					if e.value == nil || e.value.MatchString(value) {
+						if len(matchingTags) < matchCacheSize {
+							matchingTags[value] = struct{}{}
+						}
+						if not {
+							delete(resultSet, id)
+						}
+						continue IDS
+					} else {
+						if len(notMatchingTags) < matchCacheSize {
+							notMatchingTags[value] = struct{}{}
+						}
 					}
 				}
-			}
-			if !not {
-				delete(resultSet, id)
+				if !not {
+					delete(resultSet, id)
+				}
 			}
 		}
 	}
