@@ -91,18 +91,24 @@ func TestClusterStartup(t *testing.T) {
 		{
 			Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$",
 		},
+		{
+			Str: "grafana.*Initializing HTTP Server.*:3000",
+		},
 	}
 	ch := tracker.Match(matchers)
 	select {
 	case <-ch:
+		postAnnotation("TestClusterStartup:OK")
 		return
 	case <-time.After(time.Second * 40):
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
+		postAnnotation("TestClusterStartup:FAIL")
 	}
 }
 
 // 1 metric to each of 12 partitions, each partition replicated twice = expect total workload across cluster of 24Hz
 func TestClusterBaseIngestWorkload(t *testing.T) {
+	postAnnotation("TestClusterBaseIngestWorkload:begin")
 
 	//	tracker.LogStdout(true)
 	//	tracker.LogStderr(true)
@@ -161,15 +167,19 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 	})
 	if !suc6 {
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
+		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
 	}
 
 	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, validateCorrect(12))
 	if !suc6 {
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
+		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
 	}
+	postAnnotation("TestClusterBaseIngestWorkload:OK")
 }
 
 func TestQueryWorkload(t *testing.T) {
+	postAnnotation("TestQueryWorkload:begin")
 	pre := time.Now()
 	rand.Seed(pre.Unix())
 
@@ -182,8 +192,10 @@ func TestQueryWorkload(t *testing.T) {
 		other:   0,
 	}
 	if !reflect.DeepEqual(exp, results) {
+		postAnnotation("TestQueryWorkload:FAIL")
 		t.Fatalf("expected only correct results. got %s", spew.Sdump(results))
 	}
+	postAnnotation("TestQueryWorkload:OK")
 }
 
 // TestIsolateOneInstance tests what happens during the isolation of one instance, when min-available-shards is 12
@@ -194,6 +206,7 @@ func TestQueryWorkload(t *testing.T) {
 // but also before it does, but fails to get data via clustered requests from peers)
 //. TODO: in production do we stop querying isolated peers?
 func TestIsolateOneInstance(t *testing.T) {
+	postAnnotation("TestIsolateOneInstance:begin")
 	t.Log("Starting TestIsolateOneInstance)")
 	//	tracker.LogStdout(true)
 	//	tracker.LogStderr(true)
@@ -235,11 +248,14 @@ func TestIsolateOneInstance(t *testing.T) {
 		other:   0,
 	}
 	if !reflect.DeepEqual(exp, otherResults) {
+		postAnnotation("TestIsolateOneInstance:FAIL")
 		t.Fatalf("expected only correct results for all cluster nodes. got %s", spew.Sdump(otherResults))
 	}
+	postAnnotation("TestIsolateOneInstance:OK")
 }
 
 func TestHang(t *testing.T) {
+	postAnnotation("TestHang:begin")
 	t.Log("whatever happens, keep hanging for now, so that we can query grafana dashboards still")
 	var ch chan struct{}
 	<-ch
