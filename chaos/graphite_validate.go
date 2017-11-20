@@ -42,6 +42,8 @@ func validateTargets(targets []string) Validator {
 // (i.e. for the use case of 12 series (1 for each shard, and each series valued at 1)
 // all data from all shards is incorporated)
 // to allow 4 shards being down and unaccounted for, pass 8.
+// note: 5 points are ignored (see comments further down) so you should only call this
+// for sufficiently long series, e.g. 10 points or so.
 func validateCorrect(num float64) Validator {
 	return func(resp response) bool {
 		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {
@@ -51,10 +53,13 @@ func validateCorrect(num float64) Validator {
 			return false
 		}
 		points := resp.r[0].Datapoints
-		// first point may be null; not sure why
+		// first 3 points can sometimes be null.  We should at some point be more strict and clean that up,
+		// but that's not in scope for these tests which focus on cluster related problems
 		// last 2 points may be NaN or incomplete sums because some terms are NaN
-		// this is standard graphite behavior unlike the faulty behavior where terms are missing across the time range
-		for _, p := range points[1 : len(points)-2] {
+		// this is standard graphite behavior unlike the faulty cluster behavior.
+		// the faulty cluster behavior we're looking for is where terms are missing across the time range
+		// (because entire shards and their series are not taken into account)
+		for _, p := range points[3 : len(points)-3] {
 			if math.IsNaN(p.Val) {
 				return false
 			}
