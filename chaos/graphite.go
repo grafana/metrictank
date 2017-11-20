@@ -14,7 +14,9 @@ var renderClient *http.Client
 
 func init() {
 	renderClient = &http.Client{
-		Timeout: time.Second * 2, // definitely works as timeout in waiting for response, not sure re dial timeout
+		// definitely works as timeout in waiting for response, not sure re dial timeout
+		// note : MT's internal cross-cluster timeouts are 5s, so we have to wait at least as long to classify properly
+		Timeout: time.Second * 6,
 	}
 }
 
