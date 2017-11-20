@@ -63,6 +63,7 @@ func main() {
 		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
+		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 list")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'")
@@ -146,6 +147,8 @@ func main() {
 	}
 
 	defs := idx.Load(nil, cutoff)
+	// set this after doing the query, to assure age can't possibly be negative
+	out.QueryTime = time.Now().Unix()
 	total := len(defs)
 	shown := 0
 

@@ -12,6 +12,8 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+var QueryTime int64
+
 func Dump(d schema.MetricDefinition) {
 	spew.Dump(d)
 }
@@ -52,9 +54,14 @@ func pattern(in string) string {
 	return in
 }
 
+func age(in int64) int64 {
+	return QueryTime - in
+}
+
 func Template(format string) func(d schema.MetricDefinition) {
 	funcs := make(map[string]interface{})
 	funcs["pattern"] = pattern
+	funcs["age"] = age
 
 	// replace '\n' in the format string with actual newlines.
 	format = strings.Replace(format, "\\n", "\n", -1)
