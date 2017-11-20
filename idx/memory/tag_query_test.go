@@ -63,20 +63,14 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	for _, d := range data {
 		idStr := d.id.String()
 		byId[idStr] = &idx.Archive{}
+		byId[idStr].Name = "metric"
 		byId[idStr].Tags = d.tags
 		byId[idStr].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
-			if _, ok := tagIdx[tagSplits[0]]; !ok {
-				tagIdx[tagSplits[0]] = make(TagValue)
-			}
-
-			if _, ok := tagIdx[tagSplits[0]][tagSplits[1]]; !ok {
-				tagIdx[tagSplits[0]][tagSplits[1]] = make(TagIDs)
-			}
-
-			tagIdx[tagSplits[0]][tagSplits[1]][d.id] = struct{}{}
+			tagIdx.addTagId(tagSplits[0], tagSplits[1], d.id)
 		}
+		tagIdx.addTagId("name", byId[idStr].Name, d.id)
 	}
 
 	return tagIdx, byId
@@ -142,6 +136,23 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3!=", "key3!=~"}, 0)
+	expect := make(TagIDs)
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagNameEquals(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=metric"}, 0)
+	expect := make(TagIDs)
+	expect[ids[1]] = struct{}{}
+	expect[ids[3]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+func TestQueryByTagNameRegex(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=~metr"}, 0)
 	expect := make(TagIDs)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
