@@ -101,8 +101,8 @@ func TestClusterStartup(t *testing.T) {
 		postAnnotation("TestClusterStartup:OK")
 		return
 	case <-time.After(time.Second * 40):
-		t.Fatal("timed out while waiting for all metrictank instances to come up")
 		postAnnotation("TestClusterStartup:FAIL")
+		t.Fatal("timed out while waiting for all metrictank instances to come up")
 	}
 }
 
@@ -166,14 +166,14 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 		return true
 	})
 	if !suc6 {
-		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
+		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 	}
 
-	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-5s", 10, validateCorrect(12))
+	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-10s", 14, validateCorrect(12))
 	if !suc6 {
-		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
+		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
 	}
 	postAnnotation("TestClusterBaseIngestWorkload:OK")
 }
