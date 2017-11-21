@@ -801,11 +801,19 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "not tag specified"))
 		return
 	}
-
-	tagValues, err := s.clusterTagDetails(ctx.Req.Context(), ctx.OrgId, tag, request.Filter, request.From)
+	reqCtx := ctx.Req.Context()
+	tagValues, err := s.clusterTagDetails(reqCtx, ctx.OrgId, tag, request.Filter, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
 	}
 
 	resp := models.GraphiteTagDetailsResp{
@@ -831,11 +839,23 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	if result == nil {
 		result = make(map[string]uint64)
 	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
 	bufs, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 	resp := models.IndexTagDetailsResp{}
 	for _, buf := range bufs {
@@ -852,10 +872,19 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 }
 
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
-	series, err := s.clusterFindByTag(ctx.Req.Context(), ctx.OrgId, request.Expr, request.From)
+	reqCtx := ctx.Req.Context()
+	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, request.Expr, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
 	}
 
 	response.Write(ctx, response.NewJson(200, series, ""))
@@ -869,6 +898,13 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 		return nil, err
 	}
 
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
 	for _, series := range result {
 		seriesSet[series] = struct{}{}
 	}
@@ -877,6 +913,13 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 	bufs, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 
 	resp := models.IndexFindByTagResp{}
@@ -899,10 +942,19 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 }
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
-	tags, err := s.clusterTags(ctx.Req.Context(), ctx.OrgId, request.Filter, request.From)
+	reqCtx := ctx.Req.Context()
+	tags, err := s.clusterTags(reqCtx, ctx.OrgId, request.Filter, request.From)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
 	}
 
 	var resp models.GraphiteTagsResp
@@ -917,6 +969,12 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	if err != nil {
 		return nil, err
 	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
 
 	tagSet := make(map[string]struct{}, len(result))
 	for _, tag := range result {
@@ -927,6 +985,13 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 
 	resp := models.IndexTagsResp{}
