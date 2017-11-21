@@ -334,31 +334,36 @@ func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	var defs []schema.MetricDefinition
+	staleTs := uint32(time.Now().Add(maxStale * -1).Unix())
 	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = c.LoadPartition(partition, defs)
+		defs = c.LoadPartition(partition, defs, staleTs)
 	}
 	num := c.MemoryIdx.Load(defs)
 	log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
+func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
 	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
-	return c.load(defs, iter)
+	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) []schema.MetricDefinition {
+func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
 	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
-	return c.load(defs, iter)
+	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema.MetricDefinition {
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter, cutoff uint32) []schema.MetricDefinition {
 	mdef := schema.MetricDefinition{}
 	var id, name, metric, unit, mtype string
 	var orgId, interval int
 	var partition int32
 	var lastupdate int64
 	var tags []string
+	cutoff64 := int64(cutoff)
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+		if lastupdate < cutoff64 {
+			continue
+		}
 		mdef.Id = id
 		mdef.OrgId = orgId
 		mdef.Partition = partition
@@ -471,17 +476,6 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	pre := time.Now()
 	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
-	if updateCassIdx {
-		// if an error was encountered then pruned is probably a partial list of metricDefs
-		// deleted, so lets still try and delete these from Cassandra.
-		for _, def := range pruned {
-			log.Debug("cassandra-idx: metricDef %s pruned from the index.", def.Id)
-			err := c.deleteDef(&def)
-			if err != nil {
-				log.Error(3, "cassandra-idx: %s", err.Error())
-			}
-		}
-	}
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }

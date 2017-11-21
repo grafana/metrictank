@@ -138,40 +138,24 @@ func main() {
 		perror(err)
 	}
 
-	maxAgeInt := uint32(0)
+	var cutoff uint32
 	if maxAge != "0" {
-		maxAgeInt, err = dur.ParseNDuration(maxAge)
+		maxAgeInt, err := dur.ParseNDuration(maxAge)
 		perror(err)
+		cutoff = uint32(time.Now().Unix() - int64(maxAgeInt))
 	}
 
-	defs := idx.Load(nil)
+	defs := idx.Load(nil, cutoff)
 	total := len(defs)
 	shown := 0
 
-	if maxAgeInt == 0 {
-		for _, d := range defs {
-			if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-				if substr == "" || strings.Contains(d.Metric, substr) {
-					show(d)
-					shown += 1
-					if shown == limit {
-						break
-					}
-				}
-			}
-		}
-	} else {
-		cutoff := time.Now().Unix() - int64(maxAgeInt)
-		for _, d := range defs {
-			if d.LastUpdate > cutoff {
-				if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-					if substr == "" || strings.Contains(d.Metric, substr) {
-						show(d)
-						shown += 1
-						if shown == limit {
-							break
-						}
-					}
+	for _, d := range defs {
+		if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
+			if substr == "" || strings.Contains(d.Metric, substr) {
+				show(d)
+				shown += 1
+				if shown == limit {
+					break
 				}
 			}
 		}
