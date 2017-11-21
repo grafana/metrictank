@@ -33,6 +33,15 @@ var avg4a2b = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
+var sum4a2b = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.Inf(0), Ts: 20},
+	{Val: math.Inf(0), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 2469135780, Ts: 50}, // in accordance with graphite, sum(5,null) = 5
+	{Val: 4938271560, Ts: 60},
+}
+
 var c = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 0, Ts: 20},

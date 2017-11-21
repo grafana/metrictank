@@ -4,107 +4,218 @@ package batch
 
 // aggregation functions for batches of data
 import (
-	"gopkg.in/raintank/schema.v1"
 	"math"
+
+	"gopkg.in/raintank/schema.v1"
 )
 
 type AggFunc func(in []schema.Point) float64
+
+type AggBuilder interface {
+	AddPoint(in schema.Point)
+	Value() float64
+	Reset()
+}
+
+type AvgBuilder struct {
+	sum float64
+	cnt float64
+}
+
+func (b *AvgBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		b.sum += in.Val
+		b.cnt++
+	}
+}
+
+func (b *AvgBuilder) Value() float64 {
+	if b.cnt > 0 {
+		return b.sum / b.cnt
+	}
+	return math.NaN()
+}
+
+func (b *AvgBuilder) Reset() {
+	b.sum = 0
+	b.cnt = 0
+}
 
 func Avg(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("avg() called in aggregator with 0 terms")
 	}
-	valid := float64(0)
-	sum := float64(0)
+	b := AvgBuilder{sum: 0, cnt: 0}
 	for _, term := range in {
-		if !math.IsNaN(term.Val) {
-			valid += 1
-			sum += term.Val
-		}
+		b.AddPoint(term)
 	}
-	if valid == 0 {
+	return b.Value()
+}
+
+type CntBuilder struct {
+	cnt float64
+}
+
+func (b *CntBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		b.cnt++
+	}
+}
+
+func (b *CntBuilder) Value() float64 {
+	if b.cnt == 0 {
 		return math.NaN()
 	}
-	return sum / valid
+	return b.cnt
+}
+
+func (b *CntBuilder) Reset() {
+	b.cnt = 0
 }
 
 func Cnt(in []schema.Point) float64 {
-	valid := float64(0)
+	b := CntBuilder{cnt: 0}
 	for _, v := range in {
-		if !math.IsNaN(v.Val) {
-			valid += 1
-		}
+		b.AddPoint(v)
 	}
-	if valid == 0 {
-		return math.NaN()
+	return b.Value()
+}
+
+type LstBuilder struct {
+	lst float64
+}
+
+func (b *LstBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		b.lst = in.Val
 	}
-	return valid
+}
+
+func (b *LstBuilder) Value() float64 {
+	return b.lst
+}
+
+func (b *LstBuilder) Reset() {
+	b.lst = math.NaN()
 }
 
 func Lst(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("last() called in aggregator with 0 terms")
 	}
-	lst := math.NaN()
+	b := LstBuilder{lst: math.NaN()}
 	for _, v := range in {
-		if !math.IsNaN(v.Val) {
-			lst = v.Val
+		b.AddPoint(v)
+	}
+	return b.Value()
+}
+
+type MinBuilder struct {
+	min float64
+}
+
+func (b *MinBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		if math.IsNaN(b.min) || in.Val < b.min {
+			b.min = in.Val
 		}
 	}
-	return lst
+}
+
+func (b *MinBuilder) Value() float64 {
+	return b.min
+}
+
+func (b *MinBuilder) Reset() {
+	b.min = math.NaN()
 }
 
 func Min(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("min() called in aggregator with 0 terms")
 	}
-	valid := false
-	min := math.Inf(1)
+	b := MinBuilder{min: math.NaN()}
 	for _, v := range in {
-		if !math.IsNaN(v.Val) {
-			valid = true
-			if v.Val < min {
-				min = v.Val
-			}
+		b.AddPoint(v)
+	}
+	return b.Value()
+}
+
+type MaxBuilder struct {
+	max float64
+}
+
+func (b *MaxBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		if math.IsNaN(b.max) || in.Val > b.max {
+			b.max = in.Val
 		}
 	}
-	if !valid {
-		min = math.NaN()
-	}
-	return min
+}
+
+func (b *MaxBuilder) Value() float64 {
+	return b.max
+}
+
+func (b *MaxBuilder) Reset() {
+	b.max = math.NaN()
 }
 
 func Max(in []schema.Point) float64 {
 	if len(in) == 0 {
 		panic("max() called in aggregator with 0 terms")
 	}
-	valid := false
-	max := math.Inf(-1)
+	b := MaxBuilder{max: math.NaN()}
 	for _, v := range in {
-		if !math.IsNaN(v.Val) {
-			valid = true
-			if v.Val > max {
-				max = v.Val
-			}
+		b.AddPoint(v)
+	}
+	return b.Value()
+}
+
+type SumBuilder struct {
+	sum float64
+}
+
+func (b *SumBuilder) AddPoint(in schema.Point) {
+	if !math.IsNaN(in.Val) {
+		if math.IsNaN(b.sum) {
+			b.sum = 0
 		}
+		b.sum += in.Val
 	}
-	if !valid {
-		max = math.NaN()
-	}
-	return max
+}
+
+func (b *SumBuilder) Value() float64 {
+	return b.sum
+}
+
+func (b *SumBuilder) Reset() {
+	b.sum = math.NaN()
 }
 
 func Sum(in []schema.Point) float64 {
-	valid := false
-	sum := float64(0)
+	b := SumBuilder{sum: math.NaN()}
 	for _, term := range in {
-		if !math.IsNaN(term.Val) {
-			valid = true
-			sum += term.Val
-		}
+		b.AddPoint(term)
 	}
-	if !valid {
-		sum = math.NaN()
+	return b.Value()
+}
+
+// map the consolidation to the respective aggregation function, if applicable.
+func GetAggFunc(name string) AggBuilder {
+	switch name {
+	case "avg", "average":
+		return &AvgBuilder{sum: 0, cnt: 0}
+	case "cnt":
+		return &CntBuilder{cnt: 0}
+	case "lst", "last":
+		return &LstBuilder{lst: math.NaN()}
+	case "min":
+		return &MinBuilder{min: math.NaN()}
+	case "max":
+		return &MaxBuilder{max: math.NaN()}
+	case "sum":
+		return &SumBuilder{sum: math.NaN()}
 	}
-	return sum
+	return nil
 }
