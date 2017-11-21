@@ -2,32 +2,36 @@ package expr
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/batch"
 	"gopkg.in/raintank/schema.v1"
 )
 
-type FuncAvgSeries struct {
-	in []GraphiteFunc
+type FuncAggregate struct {
+	in  []GraphiteFunc
+	agg string
 }
 
-func NewAvgSeries() GraphiteFunc {
-	return &FuncAvgSeries{}
+// NewAggregateConstructor takes an agg string and returns a constructor function
+func NewAggregateConstructor(agg string) func() GraphiteFunc {
+	return func() GraphiteFunc {
+		return &FuncAggregate{agg: agg}
+	}
 }
 
-func (s *FuncAvgSeries) Signature() ([]Arg, []Arg) {
+func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
 	return []Arg{
 		ArgSeriesLists{val: &s.in},
 	}, []Arg{ArgSeries{}}
 }
 
-func (s *FuncAvgSeries) Context(context Context) Context {
+func (s *FuncAggregate) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	series, queryPatts, err := consumeFuncs(cache, s.in)
 	if err != nil {
 		return nil, err
@@ -38,35 +42,29 @@ func (s *FuncAvgSeries) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if len(series) == 1 {
-		name := fmt.Sprintf("averageSeries(%s)", series[0].QueryPatt)
+		name := fmt.Sprintf("%sSeries(%s)", s.agg, series[0].QueryPatt)
 		series[0].Target = name
 		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
+
+	agg := batch.GetAggFunc(s.agg)
+
 	for i := 0; i < len(series[0].Datapoints); i++ {
-		num := 0
-		sum := float64(0)
+		agg.Reset()
 		for j := 0; j < len(series); j++ {
-			p := series[j].Datapoints[i].Val
-			if !math.IsNaN(p) {
-				num++
-				sum += p
-			}
+			agg.AddPoint(series[j].Datapoints[i])
 		}
 		point := schema.Point{
-			Ts: series[0].Datapoints[i].Ts,
-		}
-		if num == 0 {
-			point.Val = math.NaN()
-		} else {
-			point.Val = sum / float64(num)
+			Ts:  series[0].Datapoints[i].Ts,
+			Val: agg.Value(),
 		}
 		out = append(out, point)
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := fmt.Sprintf("averageSeries(%s)", strings.Join(queryPatts, ","))
+	name := fmt.Sprintf("%sSeries(%s)", s.agg, strings.Join(queryPatts, ","))
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
