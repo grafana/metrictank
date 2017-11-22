@@ -21,20 +21,6 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-type limiter chan struct{}
-
-func (l limiter) enter() { l <- struct{}{} }
-func (l limiter) leave() { <-l }
-
-func newLimiter(l int) limiter {
-	return make(chan struct{}, l)
-}
-
-type getTargetsResp struct {
-	series []models.Series
-	err    error
-}
-
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
 func doRecover(errp *error) {
 	e := recover()
@@ -51,6 +37,20 @@ func doRecover(errp *error) {
 		}
 	}
 	return
+}
+
+type limiter chan struct{}
+
+func (l limiter) enter() { l <- struct{}{} }
+func (l limiter) leave() { <-l }
+
+func newLimiter(l int) limiter {
+	return make(chan struct{}, l)
+}
+
+type getTargetsResp struct {
+	series []models.Series
+	err    error
 }
 
 // Fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
@@ -301,7 +301,7 @@ LOOP:
 }
 
 func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema.Point, interval uint32, err error) {
-	defer doRecover(&err)
+	doRecover(&err)
 	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
 	normalize := req.AggNum > 1    // do we need to normalize points at runtime?
 	// normalize is runtime consolidation but only for the purpose of bringing high-res
@@ -316,28 +316,93 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 	}
 
 	if !readRollup && !normalize {
-		return s.getSeriesFixed(ctx, req, consolidation.None), req.OutInterval, nil
+		fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
+		if err != nil {
+			return nil, req.OutInterval, err
+		}
+		return fixed, req.OutInterval, err
 	} else if !readRollup && normalize {
-		return consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.None), req.AggNum, req.Consolidator), req.OutInterval, nil
+		fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
+		if err != nil {
+			return nil, req.OutInterval, err
+		}
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, req.OutInterval, nil
+		default:
+		}
+		return consolidation.Consolidate(fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readRollup && !normalize {
 		if req.Consolidator == consolidation.Avg {
+			sumFixed, err := s.getSeriesFixed(ctx, req, consolidation.Sum)
+			if err != nil {
+				return nil, req.OutInterval, err
+			}
+			// check to see if the request has been canceled, if so abort now.
+			select {
+			case <-ctx.Done():
+				//request canceled
+				return nil, req.OutInterval, nil
+			default:
+			}
+			cntFixed, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
+			if err != nil {
+				return nil, req.OutInterval, err
+			}
+			select {
+			case <-ctx.Done():
+				//request canceled
+				return nil, req.OutInterval, nil
+			default:
+			}
 			return divide(
-				s.getSeriesFixed(ctx, req, consolidation.Sum),
-				s.getSeriesFixed(ctx, req, consolidation.Cnt),
+				sumFixed,
+				cntFixed,
 			), req.OutInterval, nil
 		} else {
-			return s.getSeriesFixed(ctx, req, req.Consolidator), req.OutInterval, nil
+			fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
+			return fixed, req.OutInterval, err
 		}
 	} else {
 		// readRollup && normalize
 		if req.Consolidator == consolidation.Avg {
+			sumFixed, err := s.getSeriesFixed(ctx, req, consolidation.Sum)
+			if err != nil {
+				return nil, req.OutInterval, err
+			}
+			select {
+			case <-ctx.Done():
+				//request canceled
+				return nil, req.OutInterval, nil
+			default:
+			}
+			cntFixed, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
+			if err != nil {
+				return nil, req.OutInterval, err
+			}
+			select {
+			case <-ctx.Done():
+				//request canceled
+				return nil, req.OutInterval, nil
+			default:
+			}
 			return divide(
-				consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.Sum), req.AggNum, consolidation.Sum),
-				consolidation.Consolidate(s.getSeriesFixed(ctx, req, consolidation.Cnt), req.AggNum, consolidation.Sum),
+				consolidation.Consolidate(sumFixed, req.AggNum, consolidation.Sum),
+				consolidation.Consolidate(cntFixed, req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
 		} else {
-			return consolidation.Consolidate(
-				s.getSeriesFixed(ctx, req, req.Consolidator), req.AggNum, req.Consolidator), req.OutInterval, nil
+			fixed, err := s.getSeriesFixed(ctx, req, req.Consolidator)
+			if err != nil {
+				return nil, req.OutInterval, err
+			}
+			select {
+			case <-ctx.Done():
+				//request canceled
+				return nil, req.OutInterval, nil
+			default:
+			}
+			return consolidation.Consolidate(fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -352,38 +417,49 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
-func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) []schema.Point {
+func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
 	rctx := newRequestContext(ctx, &req, consolidator)
-	res := s.getSeries(rctx)
+	res, err := s.getSeries(rctx)
+	if err != nil {
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
 	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...)
-	return Fix(res.Points, req.From, req.To, req.ArchInterval)
+	return Fix(res.Points, req.From, req.To, req.ArchInterval), nil
 }
 
-func (s *Server) getSeries(ctx *requestContext) mdata.Result {
+func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 	res := s.getSeriesAggMetrics(ctx)
+	select {
+	case <-ctx.ctx.Done():
+		//request canceled
+		return res, nil
+	default:
+	}
+
 	log.Debug("oldest from aggmetrics is %d", res.Oldest)
 	span := opentracing.SpanFromContext(ctx.ctx)
 	span.SetTag("oldest_in_ring", res.Oldest)
 
 	if res.Oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
-		return res
-	}
-
-	// check to see if the request has been canceled, if so abort now.
-	select {
-	case <-ctx.ctx.Done():
-		//request canceled
-		return res
-	default:
+		return res, nil
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
 	until := util.Min(res.Oldest, ctx.To)
-
-	res.Iters = append(s.getSeriesCachedStore(ctx, until), res.Iters...)
-	return res
+	fromCache, err := s.getSeriesCachedStore(ctx, until)
+	if err != nil {
+		return res, err
+	}
+	res.Iters = append(fromCache, res.Iters...)
+	return res, nil
 }
 
 // getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
@@ -433,7 +509,7 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
 }
 
 // will only fetch until until, but uses ctx.To for debug logging
-func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk.Iter {
+func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chunk.Iter, error) {
 	var iters []chunk.Iter
 	var prevts uint32
 
@@ -459,7 +535,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 	select {
 	case <-ctx.ctx.Done():
 		//request canceled
-		return nil
+		return iters, nil
 	default:
 	}
 
@@ -470,9 +546,17 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 			// TODO(replay) figure out what to do if one piece is corrupt
 			tracing.Failure(span)
 			tracing.Errorf(span, "itergen: error getting iter from Start list %+v", err)
-			continue
+			return iters, err
 		}
 		iters = append(iters, *iter)
+	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-ctx.ctx.Done():
+		//request canceled
+		return iters, nil
+	default:
 	}
 
 	// the request cannot completely be served from cache, it will require cassandra involvement
@@ -480,7 +564,14 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 		if cacheRes.From != cacheRes.Until {
 			storeIterGens, err := s.BackendStore.Search(ctx.ctx, key, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				panic(err)
+				return iters, err
+			}
+			// check to see if the request has been canceled, if so abort now.
+			select {
+			case <-ctx.ctx.Done():
+				//request canceled
+				return iters, nil
+			default:
 			}
 
 			for _, itgen := range storeIterGens {
@@ -489,7 +580,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 					// TODO(replay) figure out what to do if one piece is corrupt
 					tracing.Failure(span)
 					tracing.Errorf(span, "itergen: error getting iter from cassandra slice %+v", err)
-					continue
+					return iters, err
 				}
 				// it's important that the itgens get added in chronological order,
 				// currently we rely on cassandra returning results in order
@@ -505,13 +596,13 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) []chunk
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt
 				log.Error(3, "itergen: error getting iter from cache result end slice %+v", err)
-				continue
+				return iters, err
 			}
 			iters = append(iters, *it)
 		}
 	}
 
-	return iters
+	return iters, nil
 }
 
 // check for duplicate series names for the same query. If found merge the results.

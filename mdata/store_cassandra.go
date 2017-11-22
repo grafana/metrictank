@@ -44,6 +44,7 @@ var (
 	errReadQueueFull  = errors.New("the read queue is full")
 	errReadTooOld     = errors.New("the read is too old")
 	errTableNotFound  = errors.New("table for given TTL not found")
+	errCxtCanceled    = errors.New("context canceled")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -406,7 +407,7 @@ type outcome struct {
 	month   uint32
 	sortKey uint32
 	i       *gocql.Iter
-	omitted bool
+	err     error
 }
 type asc []outcome
 
@@ -420,7 +421,7 @@ func (c *CassandraStore) processReadQueue() {
 		select {
 		case <-crr.ctx.Done():
 			//request canceled
-			crr.out <- outcome{omitted: true}
+			crr.out <- outcome{err: errCxtCanceled}
 			continue
 		default:
 		}
@@ -428,12 +429,17 @@ func (c *CassandraStore) processReadQueue() {
 		cassGetWaitDuration.Value(waitDuration)
 		if waitDuration > c.omitReadTimeout {
 			cassOmitOldRead.Inc()
-			crr.out <- outcome{omitted: true}
+			crr.out <- outcome{err: errReadTooOld}
 			continue
 		}
 
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter(), false}
+		iter := outcome{
+			month:   crr.month,
+			sortKey: crr.sortKey,
+			i:       c.Session.Query(crr.q, crr.p...).Iter(),
+			err:     nil,
+		}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -534,10 +540,14 @@ LOOP:
 			// request has been canceled, so no need to continue processing results
 			return nil, nil
 		case o := <-results:
-			if o.omitted {
+			if o.err != nil {
+				if o.err == errCxtCanceled {
+					// context was canceled, return immediately.
+					return nil, nil
+				}
 				tracing.Failure(span)
-				tracing.Error(span, errReadTooOld)
-				return nil, errReadTooOld
+				tracing.Error(span, o.err)
+				return nil, o.err
 			}
 			seen += 1
 			outcomes = append(outcomes, o)
