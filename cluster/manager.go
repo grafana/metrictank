@@ -67,10 +67,11 @@ type ClusterManager interface {
 
 type MemberlistManager struct {
 	sync.RWMutex
-	members  map[string]Node // all members in the cluster, including this node.
-	nodeName string
-	list     *memberlist.Memberlist
-	cfg      *memberlist.Config
+	members      map[string]Node // all members in the cluster, including this node.
+	nodeName     string
+	list         *memberlist.Memberlist
+	cfg          *memberlist.Config
+	suspectPeers map[string]time.Time
 }
 
 func NewMemberlistManager(thisNode Node, clusterName string, clusterHost net.IP, clusterPort int) *MemberlistManager {
@@ -78,7 +79,8 @@ func NewMemberlistManager(thisNode Node, clusterName string, clusterHost net.IP,
 		members: map[string]Node{
 			thisNode.Name: thisNode,
 		},
-		nodeName: thisNode.Name,
+		nodeName:     thisNode.Name,
+		suspectPeers: make(map[string]time.Time),
 	}
 	mgr.cfg = memberlist.DefaultLANConfig()
 	mgr.cfg.BindPort = clusterPort
@@ -109,6 +111,33 @@ func (c *MemberlistManager) Start() {
 		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
 	}
 	log.Info("CLU Start: joined to %d nodes in cluster", n)
+	go c.retrySuspectPeers()
+}
+
+func (c *MemberlistManager) retrySuspectPeers() {
+	ticker := time.NewTicker(suspectRetryInterval)
+	for range ticker.C {
+		peersToRetry := make([]string, 0)
+		c.Lock()
+		for peer, left := range c.suspectPeers {
+			if time.Since(left) > suspectRetryDuration {
+				delete(c.suspectPeers, peer)
+			} else {
+				peersToRetry = append(peersToRetry, peer)
+			}
+		}
+		c.Unlock()
+
+		for _, peer := range peersToRetry {
+			n, err := c.list.Join([]string{peer})
+			if err == nil && n == 1 {
+				log.Info("CLU manager: reconnected to peer %d", peer)
+				c.Lock()
+				delete(c.suspectPeers, peer)
+				c.Unlock()
+			}
+		}
+	}
 }
 
 func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
@@ -194,6 +223,9 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 		member.local = true
 	}
 	c.members[node.Name] = member
+	if _, ok := c.suspectPeers[node.Addr.String()]; ok {
+		delete(c.suspectPeers, node.Addr.String())
+	}
 	c.clusterStats()
 }
 
@@ -203,6 +235,7 @@ func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
 	defer c.Unlock()
 	log.Info("CLU manager: Node %s has left the cluster", node.Name)
 	delete(c.members, node.Name)
+	c.suspectPeers[node.Addr.String()] = time.Now()
 	c.clusterStats()
 }
 
