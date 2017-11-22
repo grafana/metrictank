@@ -42,8 +42,8 @@ func validateTargets(targets []string) Validator {
 // (i.e. for the use case of 12 series (1 for each shard, and each series valued at 1)
 // all data from all shards is incorporated)
 // to allow 4 shards being down and unaccounted for, pass 8.
-// note: 5 points are ignored (see comments further down) so you should only call this
-// for sufficiently long series, e.g. 10 points or so.
+// NOTE: 8 points are ignored (see comments further down) so you should only call this
+// for sufficiently long series, e.g. 15 points or so.
 func validateCorrect(num float64) Validator {
 	return func(resp response) bool {
 		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {

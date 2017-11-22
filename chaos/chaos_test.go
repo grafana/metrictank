@@ -70,7 +70,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 
 	go fakeMetrics(t)
 
-	suc6, resp := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp response) bool {
+	suc6, resp := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-8s", 18, func(resp response) bool {
 		exp := []string{
 			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metrics_received.counter32)",
@@ -87,7 +87,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 	}
 
-	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-10s", 14, validateCorrect(12))
+	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-15s", 20, validateCorrect(12))
 	if !suc6 {
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
@@ -98,7 +98,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 func TestQueryWorkload(t *testing.T) {
 	postAnnotation("TestQueryWorkload:begin")
 
-	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, 6000, validateCorrect(12))
+	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validateCorrect(12))
 
 	exp := checkResults{
 		valid:   []int{6000},
@@ -128,10 +128,10 @@ func TestIsolateOneInstance(t *testing.T) {
 	otherResultsChan := make(chan checkResults, 1)
 
 	go func() {
-		mt4ResultsChan <- checkMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, numReqMt4, validateCorrect(12), validateCode(503))
+		mt4ResultsChan <- checkMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, numReqMt4, validateCorrect(12), validateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, 6000, validateCorrect(12))
+		otherResultsChan <- checkMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validateCorrect(12))
 	}()
 
 	// now go ahead and isolate for 30s
