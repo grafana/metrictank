@@ -79,7 +79,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metrics_received.counter32)",
 		}
 		// avg rate must be 4 (metrics ingested per second by each instance)
-		return validateTargets(exp)(resp) && validatorAvg(5, 4)(resp)
+		return validateTargets(exp)(resp) && validatorAvgWindowed(8, 4)(resp)
 	})
 	if !suc6 {
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
