@@ -78,6 +78,16 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	return tagIdx, byId
 }
 
+func queryAndCompareTagResults(t *testing.T, q TagQuery, expectedData map[string]struct{}) {
+	t.Helper()
+	tagIdx, byId := getTestIndex(t)
+
+	res := q.RunGetTags(tagIdx, byId)
+	if !reflect.DeepEqual(expectedData, res) {
+		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
+	}
+}
+
 func queryAndCompareResults(t *testing.T, q TagQuery, expectedData TagIDs) {
 	t.Helper()
 	tagIdx, byId := getTestIndex(t)
@@ -200,6 +210,9 @@ func TestQueryByTagFilterByTagMatch(t *testing.T) {
 	expect[ids[5]] = struct{}{}
 	expect[ids[6]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
+
+	expectTags := make(map[string]struct{})
+	queryAndCompareTagResults(t, q, expectTags)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{2}"}, 0)
 	delete(expect, ids[3])

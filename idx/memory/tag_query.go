@@ -692,3 +692,38 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	q.filterByMatch(resultSet, byId, q.notMatch, true)
 	return resultSet
 }
+
+func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
+	ids := q.Run(index, byId)
+	res := make(map[string]struct{}, len(ids))
+
+	for id := range ids {
+		var def *idx.Archive
+		var ok bool
+		if def, ok = byId[id.String()]; !ok {
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			continue
+		}
+
+		for _, tag := range def.Tags {
+			equal := strings.Index(tag, "=")
+			if equal < 0 {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: tag is in index, but does not contain '=' sign: %s", tag)
+				continue
+			}
+
+			key := tag[:equal]
+			if _, ok := res[key]; !ok {
+				res[key] = struct{}{}
+			}
+		}
+	}
+
+	res["name"] = struct{}{}
+
+	return res
+}
