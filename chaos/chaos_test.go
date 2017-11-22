@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
-	"math/rand"
 	"os"
 	"os/exec"
 	"reflect"
@@ -13,34 +11,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/grafana/metrictank/chaos/out/kafkamdm"
-	"github.com/raintank/met/helper"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // TODO: cleanup when ctrl-C go test (teardown all containers)
 
-const numPartitions = 12
-
 var tracker *Tracker
-var metrics []*schema.MetricData
-
-func init() {
-	for i := 0; i < numPartitions; i++ {
-		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
-		m := &schema.MetricData{
-			OrgId:    1,
-			Name:     name,
-			Metric:   name,
-			Interval: 1,
-			Value:    1,
-			Unit:     "s",
-			Mtype:    "gauge",
-		}
-		m.SetId()
-		metrics = append(metrics, m)
-	}
-}
 
 func TestMain(m *testing.M) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -71,68 +46,29 @@ func TestMain(m *testing.M) {
 }
 
 func TestClusterStartup(t *testing.T) {
-	// wait until MT's are up and connected to kafka and cassandra
 	matchers := []Matcher{
-		{
-			Str: "metrictank0_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "metrictank1_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "metrictank2_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "metrictank3_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$",
-		},
-		{
-			Str: "grafana.*Initializing HTTP Server.*:3000",
-		},
+		{Str: "metrictank0_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank1_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank2_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank3_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "grafana.*Initializing HTTP Server.*:3000"},
 	}
 	ch := tracker.Match(matchers)
 	select {
 	case <-ch:
 		postAnnotation("TestClusterStartup:OK")
-		return
 	case <-time.After(time.Second * 40):
 		postAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
 	}
 }
 
-// 1 metric to each of 12 partitions, each partition replicated twice = expect total workload across cluster of 24Hz
 func TestClusterBaseIngestWorkload(t *testing.T) {
 	postAnnotation("TestClusterBaseIngestWorkload:begin")
 
-	//	tracker.LogStdout(true)
-	//	tracker.LogStderr(true)
-
-	go func() {
-		t.Log("Starting kafka publishing")
-		stats, _ := helper.New(false, "", "standard", "", "")
-		out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
-		if err != nil {
-			log.Fatal(4, "failed to create kafka-mdm output. %s", err)
-		}
-		ticker := time.NewTicker(time.Second)
-
-		for tick := range ticker.C {
-			unix := tick.Unix()
-			for i := range metrics {
-				metrics[i].Time = unix
-			}
-			err := out.Flush(metrics)
-			if err != nil {
-				t.Fatalf("failed to send data to kafka: %s", err)
-			}
-		}
-	}()
+	go fakeMetrics(t)
 
 	suc6, resp := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-5s", 15, func(resp response) bool {
 		exp := []string{
@@ -143,27 +79,8 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 			"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metrics_received.counter32)",
 		}
-		if !validateTargets(exp)(resp) {
-			return false
-		}
-		for _, series := range resp.r {
-			var sum float64
-			if len(series.Datapoints) != 5 {
-				return false
-			}
-			// skip the first point. it always seems to be null for some reason
-			for _, p := range series.Datapoints[1:] {
-				if math.IsNaN(p.Val) {
-					return false
-				}
-				sum += p.Val
-			}
-			// avg of all (4) datapoints must be 4 (metrics ingested per second by each instance)
-			if sum/4 != 4 {
-				return false
-			}
-		}
-		return true
+		// avg rate must be 4 (metrics ingested per second by each instance)
+		return validateTargets(exp)(resp) && validatorAvg(5, 4)(resp)
 	})
 	if !suc6 {
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
@@ -180,8 +97,6 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 
 func TestQueryWorkload(t *testing.T) {
 	postAnnotation("TestQueryWorkload:begin")
-	pre := time.Now()
-	rand.Seed(pre.Unix())
 
 	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-10s", time.Minute, 6000, validateCorrect(12))
 
@@ -207,11 +122,6 @@ func TestQueryWorkload(t *testing.T) {
 //. TODO: in production do we stop querying isolated peers?
 func TestIsolateOneInstance(t *testing.T) {
 	postAnnotation("TestIsolateOneInstance:begin")
-	t.Log("Starting TestIsolateOneInstance)")
-	//	tracker.LogStdout(true)
-	//	tracker.LogStderr(true)
-	pre := time.Now()
-	rand.Seed(pre.Unix())
 	numReqMt4 := 1200
 
 	mt4ResultsChan := make(chan checkResults, 1)

@@ -53,13 +53,14 @@ func validateCorrect(num float64) Validator {
 			return false
 		}
 		points := resp.r[0].Datapoints
-		// first 3 points can sometimes be null.  We should at some point be more strict and clean that up,
+		// first 4 points can sometimes be null (or some of them, so that sums don't add up)
+		// We should at some point be more strict and clean that up,
 		// but that's not in scope for these tests which focus on cluster related problems
 		// last 2 points may be NaN or incomplete sums because some terms are NaN
 		// this is standard graphite behavior unlike the faulty cluster behavior.
 		// the faulty cluster behavior we're looking for is where terms are missing across the time range
 		// (because entire shards and their series are not taken into account)
-		for _, p := range points[3 : len(points)-3] {
+		for _, p := range points[5 : len(points)-3] {
 			if math.IsNaN(p.Val) {
 				return false
 			}
@@ -71,12 +72,36 @@ func validateCorrect(num float64) Validator {
 	}
 }
 
-// validaterCode results a validator that validates whether the response has the given code
+// validaterCode returns a validator that validates whether the response has the given code
 func validateCode(code int) Validator {
 	return func(resp response) bool {
 		if resp.code == code {
 			return true
 		}
 		return false
+	}
+}
+
+// validaterAvg results a validator that validates the number of series and the avg value of each series
+func validatorAvg(num int, avg float64) Validator {
+	return func(resp response) bool {
+		for _, series := range resp.r {
+			var sum float64
+			if len(series.Datapoints) != num {
+				return false
+			}
+			// skip the first point. it always seems to be null for some reason
+			points := series.Datapoints[1:]
+			for _, p := range points {
+				if math.IsNaN(p.Val) {
+					return false
+				}
+				sum += p.Val
+			}
+			if sum/float64(len(points)) != avg {
+				return false
+			}
+		}
+		return true
 	}
 }
