@@ -87,7 +87,7 @@ func isolate(name, dur string, targets ...string) error {
 	}
 
 	// log all pumba's output
-	_, err = NewTracker(cmd, true, true, "pumba-stdout", "pumba-stderr")
+	_, err = NewTracker(cmd, false, false, "pumba-stdout", "pumba-stderr")
 	if err != nil {
 		return err
 	}
