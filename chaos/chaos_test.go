@@ -58,7 +58,6 @@ func TestClusterStartup(t *testing.T) {
 	ch := tracker.Match(matchers)
 	select {
 	case <-ch:
-		postAnnotation("TestClusterStartup:OK")
 	case <-time.After(time.Second * 40):
 		postAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
@@ -92,7 +91,6 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
 	}
-	postAnnotation("TestClusterBaseIngestWorkload:OK")
 }
 
 func TestQueryWorkload(t *testing.T) {
@@ -110,7 +108,6 @@ func TestQueryWorkload(t *testing.T) {
 		postAnnotation("TestQueryWorkload:FAIL")
 		t.Fatalf("expected only correct results. got %s", spew.Sdump(results))
 	}
-	postAnnotation("TestQueryWorkload:OK")
 }
 
 // TestIsolateOneInstance tests what happens during the isolation of one instance, when min-available-shards is 12
@@ -161,7 +158,6 @@ func TestIsolateOneInstance(t *testing.T) {
 		postAnnotation("TestIsolateOneInstance:FAIL")
 		t.Fatalf("expected only correct results for all cluster nodes. got %s", spew.Sdump(otherResults))
 	}
-	postAnnotation("TestIsolateOneInstance:OK")
 }
 
 func TestHang(t *testing.T) {
