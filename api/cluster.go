@@ -90,11 +90,6 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 
 // IndexFind returns a sequence of msgp encoded idx.Node's
 func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
-	// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
-	// filtering by our From timestamp.  This should be moved to a configuration option
-	if req.From != 0 {
-		req.From -= 86400
-	}
 	resp := models.NewIndexFindResp()
 
 	for _, pattern := range req.Patterns {
