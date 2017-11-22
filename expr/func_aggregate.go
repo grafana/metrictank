@@ -1,11 +1,9 @@
 package expr
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/batch"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -42,29 +40,19 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if len(series) == 1 {
-		name := fmt.Sprintf("%sSeries(%s)", s.agg, series[0].QueryPatt)
+		name := s.agg + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 
-	agg := batch.GetAggFunc(s.agg)
+	aggFunc := getCrossSeriesAggFunc(s.agg)
 
-	for i := 0; i < len(series[0].Datapoints); i++ {
-		agg.Reset()
-		for j := 0; j < len(series); j++ {
-			agg.AddPoint(series[j].Datapoints[i])
-		}
-		point := schema.Point{
-			Ts:  series[0].Datapoints[i].Ts,
-			Val: agg.Value(),
-		}
-		out = append(out, point)
-	}
+	aggFunc(series, &out)
 
 	cons, queryCons := summarizeCons(series)
-	name := fmt.Sprintf("%sSeries(%s)", s.agg, strings.Join(queryPatts, ","))
+	name := s.agg + "Series(" + strings.Join(queryPatts, ",") + ")"
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
