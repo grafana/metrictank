@@ -151,7 +151,8 @@ func parseExpression(expr string) (expression, error) {
 	// special key to match on tag
 	if res.key == "__tag" {
 		// currently ! queries on tags are not supported
-		if not {
+		// and values must be set
+		if not || len(res.value) == 0 {
 			return res, errInvalidQuery
 		}
 
