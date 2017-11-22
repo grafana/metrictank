@@ -192,6 +192,59 @@ func TestQueryByTagNameRegex(t *testing.T) {
 	queryAndCompareResults(t, q, expect)
 }
 
+func TestQueryByTagFilterByTagMatch(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag=~a{1}"}, 0)
+	expect := make(TagIDs)
+	expect[ids[3]] = struct{}{}
+	expect[ids[5]] = struct{}{}
+	expect[ids[6]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{2}"}, 0)
+	delete(expect, ids[3])
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{3}"}, 0)
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{4}"}, 0)
+	delete(expect, ids[5])
+	delete(expect, ids[6])
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag=~a{1}", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+
+	expect := make(TagIDs)
+	expect[ids[5]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{2}", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{3}", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag=~a{4}", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+	delete(expect, ids[5])
+	queryAndCompareResults(t, q, expect)
+}
+
 func TestQueryByTagFilterByTagPrefix(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag^=aa"}, 0)
@@ -204,11 +257,60 @@ func TestQueryByTagFilterByTagPrefix(t *testing.T) {
 func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag^=aa", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+
 	expect := make(TagIDs)
 	expect[ids[5]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaa", "key2=value2"}, 0)
 	if q.startWith != EQUAL {
 		t.Fatalf("Expected query to start with equal expression")
+	}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaaa", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+	delete(expect, ids[5])
+	delete(expect, ids[6])
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagPrefixWithFrom(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag^=aa"}, 7)
+	expect := make(TagIDs)
+	expect[ids[6]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagPrefixWithDifferentLengths(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag^=a"}, 0)
+	expect := make(TagIDs)
+	expect[ids[3]] = struct{}{}
+	expect[ids[5]] = struct{}{}
+	expect[ids[6]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaa"}, 0)
+	delete(expect, ids[3])
+	queryAndCompareResults(t, q, expect)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaaa"}, 0)
+	delete(expect, ids[5])
+	delete(expect, ids[6])
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagPrefixWithEmptyString(t *testing.T) {
+	_, err := NewTagQuery([]string{"__tag^="}, 0)
+	if err != errInvalidQuery {
+		t.Fatalf("Expected an error, but didn't get it")
 	}
 }
 
