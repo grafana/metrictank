@@ -82,23 +82,39 @@ func validateCode(code int) Validator {
 	}
 }
 
-// validaterAvg results a validator that validates the number of series and the avg value of each series
-func validatorAvg(num int, avg float64) Validator {
+// validatorAvgWindowed returns a validator that validates the number of series and the avg value of each series
+// it is windowed to allow the dataset to include one or two values that would be evened out by a value
+// just outside of the response. For example:
+// response: NaN 4 4 4 5 3 4 4 4 5
+// clearly here we can trust that if the avg value should be 4, that there would be a 3 coming after the response
+// but we don't want to wait for that.
+// NOTE: ignores up to 2 points from each series, adjust your input size accordingly for desired confidence
+func validatorAvgWindowed(numPoints int, avg float64) Validator {
+	try := func(datapoints []Point) bool {
+		for i := 0; i <= 1; i++ {
+		Try:
+			for j := len(datapoints); j >= len(datapoints)-1; j-- {
+				points := datapoints[i:j]
+				sum := float64(0)
+				for _, p := range points {
+					if math.IsNaN(p.Val) {
+						continue Try
+					}
+					sum += p.Val
+				}
+				if sum/float64(len(points)) == avg {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	return func(resp response) bool {
 		for _, series := range resp.r {
-			var sum float64
-			if len(series.Datapoints) != num {
+			if len(series.Datapoints) != numPoints {
 				return false
 			}
-			// skip the first point. it always seems to be null for some reason
-			points := series.Datapoints[1:]
-			for _, p := range points {
-				if math.IsNaN(p.Val) {
-					return false
-				}
-				sum += p.Val
-			}
-			if sum/float64(len(points)) != avg {
+			if !try(series.Datapoints) {
 				return false
 			}
 		}
