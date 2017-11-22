@@ -5,7 +5,7 @@ and perform various chaotic operations and confirm correct cluster behavior.
 
 ## dependencies
 
-before running, download these containers: gaiadocker/iproute2, gaiaadm/pumba (actually for now checkout https://github.com/gaia-adm/pumba/pull/58 and build that locally)
+before running, download these containers: gaiadocker/iproute2, gaiaadm/pumba
 (the go tests will automatically download them but it would mess up the timing results)
 
 ## how it works
