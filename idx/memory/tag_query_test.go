@@ -52,10 +52,10 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 		{ids[0], 1, []string{"key1=value1", "key2=value2"}},
 		{ids[1], 2, []string{"key1=value1", "key3=value3"}},
 		{ids[2], 3, []string{"key1=value1", "key4=value4"}},
-		{ids[3], 4, []string{"key1=value1", "key4=value3", "key3=value3"}},
+		{ids[3], 4, []string{"key1=value1", "abc=bbb", "key4=value3", "key3=value3"}},
 		{ids[4], 5, []string{"key2=value1", "key5=value4", "key3=value3"}},
-		{ids[5], 6, []string{"key2=value2", "key4=value5", "key3=vabc"}},
-		{ids[6], 7, []string{"key3=value1", "key4=value4"}},
+		{ids[5], 6, []string{"key2=value2", "aaa=bbb", "abc=bbb", "key4=value5", "key3=vabc"}},
+		{ids[6], 7, []string{"key3=value1", "aaa=bbb", "key4=value4"}},
 		{ids[7], 8, []string{"key3=valxxx"}},
 	}
 
@@ -190,6 +190,26 @@ func TestQueryByTagNameRegex(t *testing.T) {
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagPrefix(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag^=aa"}, 0)
+	expect := make(TagIDs)
+	expect[ids[5]] = struct{}{}
+	expect[ids[6]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag^=aa", "key2=value2"}, 0)
+	expect := make(TagIDs)
+	expect[ids[5]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {

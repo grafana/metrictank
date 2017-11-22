@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -17,8 +18,10 @@ const (
 	EQUAL = iota
 	NOT_EQUAL
 	MATCH
+	MATCH_TAG
 	NOT_MATCH
 	PREFIX
+	PREFIX_TAG
 )
 
 type expression struct {
@@ -58,6 +61,23 @@ type TagQuery struct {
 	notMatch  []kvRe
 	prefix    []kv
 	startWith int
+	filterTag int
+
+	// no need have more than one of tagMatch and tagPrefix
+	tagMatch  *regexp.Regexp
+	tagPrefix string
+}
+
+func compileRe(pattern string) (*regexp.Regexp, error) {
+	var re *regexp.Regexp
+	var err error
+	if pattern != "^.+" {
+		re, err = regexp.Compile(pattern)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return re, nil
 }
 
 // parseExpression returns an expression that's been generated from the given
@@ -128,6 +148,25 @@ func parseExpression(expr string) (expression, error) {
 	}
 	res.value = expr[valuePos:]
 
+	// special key to match on tag
+	if res.key == "__tag" {
+		// currently ! queries on tags are not supported
+		if not {
+			return res, errInvalidQuery
+		}
+
+		if regex {
+			res.operator = MATCH_TAG
+		} else if prefix {
+			res.operator = PREFIX_TAG
+		} else {
+			// currently only match & prefix operator are supported on tag
+			return res, errInvalidQuery
+		}
+
+		return res, nil
+	}
+
 	if not {
 		if regex {
 			res.operator = NOT_MATCH
@@ -174,7 +213,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			}
 		} else {
 			// always anchor all regular expressions at the beginning
-			if (e.operator == MATCH || e.operator == NOT_MATCH) && e.value[0] != byte('^') {
+			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != byte('^') {
 				e.value = "^(?:" + e.value + ")"
 			}
 
@@ -184,33 +223,52 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			case NOT_EQUAL:
 				q.notEqual = append(q.notEqual, e.kv)
 			case MATCH:
-				var re *regexp.Regexp
-				if e.value != "^.+" {
-					re, err = regexp.Compile(e.value)
-					if err != nil {
-						return q, errInvalidQuery
-					}
+				re, err := compileRe(e.value)
+				if err != nil {
+					return q, errInvalidQuery
 				}
 				q.match = append(q.match, kvRe{key: e.key, value: re})
 			case NOT_MATCH:
-				var re *regexp.Regexp
-				if e.value != "^.+" {
-					re, err = regexp.Compile(e.value)
-					if err != nil {
-						return q, errInvalidQuery
-					}
+				re, err := compileRe(e.value)
+				if err != nil {
+					return q, errInvalidQuery
 				}
 				q.notMatch = append(q.notMatch, kvRe{key: e.key, value: re})
 			case PREFIX:
 				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
+			case MATCH_TAG:
+				re, err := compileRe(e.value)
+				if err != nil {
+					return q, errInvalidQuery
+				}
+				q.tagMatch = re
+
+				// we only allow one query by tag
+				if q.filterTag != 0 {
+					return q, errInvalidQuery
+				}
+				q.filterTag = MATCH_TAG
+			case PREFIX_TAG:
+				q.tagPrefix = e.value
+
+				// we only allow one query by tag
+				if q.filterTag != 0 {
+					return q, errInvalidQuery
+				}
+				q.filterTag = PREFIX_TAG
 			}
 		}
 	}
 
+	// the cheapest operator to minimize the result set should have precedence
 	if len(q.equal) > 0 {
 		q.startWith = EQUAL
 	} else if len(q.prefix) > 0 {
 		q.startWith = PREFIX
+	} else if q.filterTag == PREFIX_TAG {
+		q.startWith = PREFIX_TAG
+	} else if q.filterTag == MATCH_TAG {
+		q.startWith = MATCH_TAG
 	} else if len(q.match) > 0 {
 		q.startWith = MATCH
 	} else {
@@ -265,6 +323,53 @@ func (q *TagQuery) getInitialByPrefix(index TagIndex, expr kv) TagIDs {
 	return resultSet
 }
 
+// getInitialByTagPrefix returns the initial resultset by creating a list of
+// metric IDs of which at least one tag starts with the defined prefix
+func (q *TagQuery) getInitialByTagPrefix(index TagIndex) TagIDs {
+	resultSet := make(TagIDs)
+
+	for tag, values := range index {
+		if len(tag) < len(q.tagPrefix) {
+			continue
+		}
+
+		if tag[:len(q.tagPrefix)] != q.tagPrefix {
+			continue
+		}
+
+		for _, ids := range values {
+			for id := range ids {
+				resultSet[id] = struct{}{}
+			}
+		}
+	}
+
+	return resultSet
+}
+
+// getInitialByTagMatch returns the initial resultset by creating a list of
+// metric IDs of which at least one tag matches the defined regex
+func (q *TagQuery) getInitialByTagMatch(index TagIndex) TagIDs {
+	resultSet := make(TagIDs)
+	matchCache := make(map[string]struct{})
+
+	for tag, values := range index {
+		if _, ok := matchCache[tag]; ok || q.tagMatch.MatchString(tag) {
+			if !ok {
+				matchCache[tag] = struct{}{}
+			}
+
+			for _, ids := range values {
+				for id := range ids {
+					resultSet[id] = struct{}{}
+				}
+			}
+		}
+	}
+
+	return resultSet
+}
+
 // getInitialByEqual returns the initial resultset by executing the given equal expression
 func (q *TagQuery) getInitialByEqual(index TagIndex, expr kv) TagIDs {
 	resultSet := make(TagIDs)
@@ -306,6 +411,34 @@ func (q *TagQuery) filterByEqual(resultSet TagIDs, index TagIndex, exprs []kv, n
 	}
 }
 
+func (q *TagQuery) filterByTagPrefix(resultSet TagIDs, byId map[string]*idx.Archive) {
+IDS:
+	for id := range resultSet {
+		var def *idx.Archive
+		var ok bool
+		if def, ok = byId[id.String()]; !ok {
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			delete(resultSet, id)
+			continue IDS
+		}
+
+		for _, tag := range def.Tags {
+			if len(tag) < len(q.tagPrefix) {
+				continue
+			}
+
+			if tag[:len(q.tagPrefix)] == q.tagPrefix {
+				continue IDS
+			}
+		}
+
+		delete(resultSet, id)
+	}
+}
+
 // filterByPrefix filters a list of metric ids by the given prefix. deletes all
 // ids from the result set where the given prefix does not match
 //
@@ -344,6 +477,53 @@ func (q *TagQuery) filterByPrefix(resultSet TagIDs, byId map[string]*idx.Archive
 			}
 			delete(resultSet, id)
 		}
+	}
+}
+
+func (q *TagQuery) filterByTagMatch(resultSet TagIDs, byId map[string]*idx.Archive) {
+	matchingTags := make(map[string]struct{})
+	notMatchingTags := make(map[string]struct{})
+
+IDS:
+	for id := range resultSet {
+		var def *idx.Archive
+		var ok bool
+		if def, ok = byId[id.String()]; !ok {
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			delete(resultSet, id)
+			continue IDS
+		}
+
+		for _, tag := range def.Tags {
+			equal := strings.Index(tag, "=")
+			if equal < 0 {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: tag is in index, but does not contain '=' sign: %s", tag)
+				delete(resultSet, id)
+				continue
+			}
+			key := tag[:equal]
+
+			if _, ok := notMatchingTags[key]; ok {
+				continue
+			}
+
+			if _, ok := matchingTags[key]; ok || q.tagMatch.MatchString(key) {
+				if !ok {
+					matchingTags[key] = struct{}{}
+				}
+				continue IDS
+			} else {
+				if _, ok := notMatchingTags[key]; !ok {
+					notMatchingTags[key] = struct{}{}
+				}
+			}
+		}
+
+		delete(resultSet, id)
 	}
 }
 
@@ -482,6 +662,12 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	case PREFIX:
 		resultSet = q.getInitialByPrefix(index, q.prefix[0])
 		q.prefix = q.prefix[1:]
+	case PREFIX_TAG:
+		resultSet = q.getInitialByTagPrefix(index)
+		q.filterTag = 0
+	case MATCH_TAG:
+		resultSet = q.getInitialByTagMatch(index)
+		q.filterTag = 0
 	case MATCH:
 		resultSet = q.getInitialByMatch(index, q.match[0])
 		q.match = q.match[1:]
@@ -493,8 +679,14 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	// possible resultSet.
 	q.filterByEqual(resultSet, index, q.equal, false)
 	q.filterByEqual(resultSet, index, q.notEqual, true)
+	if q.filterTag == PREFIX_TAG {
+		q.filterByTagPrefix(resultSet, byId)
+	}
 	q.filterByPrefix(resultSet, byId, q.prefix)
 	q.filterByFrom(resultSet, byId)
+	if q.filterTag == MATCH_TAG {
+		q.filterByTagMatch(resultSet, byId)
+	}
 	q.filterByMatch(resultSet, byId, q.match, false)
 	q.filterByMatch(resultSet, byId, q.notMatch, true)
 	return resultSet
