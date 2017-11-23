@@ -86,7 +86,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 	}
 
-	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-15s", 20, validateCorrect(12))
+	suc6, resp = retryMT("sum(some.id.of.a.metric.*)", "-16s", 20, validateCorrect(12))
 	if !suc6 {
 		postAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
@@ -96,7 +96,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 func TestQueryWorkload(t *testing.T) {
 	postAnnotation("TestQueryWorkload:begin")
 
-	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validateCorrect(12))
+	results := checkMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 6000, validateCorrect(12))
 
 	exp := checkResults{
 		valid:   []int{6000},
