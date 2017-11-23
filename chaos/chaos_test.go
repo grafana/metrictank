@@ -133,6 +133,11 @@ func TestIsolateOneInstance(t *testing.T) {
 
 	// now go ahead and isolate for 30s
 	isolate("metrictank4", "30s", "metrictank0", "metrictank1", "metrictank2", "metrictank3", "metrictank5")
+	isolate("metrictank0", "30s", "metrictank4")
+	isolate("metrictank1", "30s", "metrictank4")
+	isolate("metrictank2", "30s", "metrictank4")
+	isolate("metrictank3", "30s", "metrictank4")
+	isolate("metrictank5", "30s", "metrictank4")
 
 	// collect results of the minute long experiment
 	mt4Results := <-mt4ResultsChan
