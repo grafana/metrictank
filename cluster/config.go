@@ -17,13 +17,12 @@ var (
 	peersStr           string
 	mode               string
 	maxPrio            int
-	clusterPort        int
-	clusterHost        net.IP
-	clusterBindAddr    string
 	httpTimeout        time.Duration
 	minAvailableShards int
 
 	swimUseConfig               string
+	swimBindAddrStr             string
+	swimBindAddr                *net.TCPAddr
 	swimTCPTimeout              time.Duration
 	swimIndirectChecks          int
 	swimRetransmitMult          int
@@ -47,7 +46,6 @@ func ConfigSetup() {
 	clusterCfg := flag.NewFlagSet("cluster", flag.ExitOnError)
 	clusterCfg.StringVar(&ClusterName, "name", "metrictank", "Unique name of the cluster.")
 	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
-	clusterCfg.StringVar(&clusterBindAddr, "bind-addr", "0.0.0.0:7946", "TCP Address to listen on for cluster communication")
 	clusterCfg.StringVar(&peersStr, "peers", "", "TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
 	clusterCfg.StringVar(&mode, "mode", "single", "Operating mode of cluster. (single|multi)")
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
@@ -57,6 +55,7 @@ func ConfigSetup() {
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
 	swimCfg.StringVar(&swimUseConfig, "use-config", "default-lan", "config setting to use. If set, will override all other swim settings. Use none|default-lan|default-local|default-wan. see https://godoc.org/github.com/hashicorp/memberlist#Config . Note all our swim settings correspond to default-lan")
+	swimCfg.StringVar(&swimBindAddrStr, "bind-addr", "0.0.0.0:7946", "binding TCP Address for UDP and TCP gossip")
 	swimCfg.DurationVar(&swimTCPTimeout, "tcp-timeout", 10*time.Second, "timeout for establishing a stream connection with peers for a full state sync, and for stream reads and writes")
 	swimCfg.IntVar(&swimIndirectChecks, "indirect-checks", 3, "number of nodes that will be asked to perform an indirect probe of a node in the case a direct probe fails")
 	swimCfg.IntVar(&swimRetransmitMult, "retransmit-mult", 4, "multiplier for number of retransmissions for gossip messages. Retransmits = RetransmitMult * log(N+1)")
@@ -80,17 +79,15 @@ func ConfigProcess() {
 		log.Fatal(4, "CLU Config: invalid cluster operating mode")
 	}
 
-	addr, err := net.ResolveTCPAddr("tcp", clusterBindAddr)
+	var err error
+	swimBindAddr, err = net.ResolveTCPAddr("tcp", swimBindAddrStr)
 	if err != nil {
-		log.Fatal(4, "CLU Config: bind-addr is not a valid TCP address: %s", err.Error())
+		log.Fatal(4, "CLU Config: swim-bind-addr is not a valid TCP address: %s", err.Error())
 	}
 
 	if httpTimeout == 0 {
 		log.Fatal(4, "CLU Config: http-timeout must be a non-zero duration string like 60s")
 	}
-
-	clusterHost = addr.IP
-	clusterPort = addr.Port
 
 	Mode = ModeType(mode)
 

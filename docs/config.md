@@ -244,8 +244,6 @@ name = metrictank
 primary-node = true
 # maximum priority before a node should be considered not-ready.
 max-priority = 10
-# the TCP/UDP address to listen on for the gossip protocol.
-bind-addr = 0.0.0.0:7946
 # TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances.
 # If no port is specified, it is assumed the other nodes are using the same port this node is listening on.
 peers =
@@ -262,7 +260,7 @@ http-timeout = 60s
 ```
 # only relevant when using cluster mode 'multi'
 # for more details, see https://godoc.org/github.com/hashicorp/memberlist#Config
-# all values correspond literally to the memberlist.Config options
+# all values correspond literally to the memberlist.Config options except where noted
 [swim]
 # config setting to use. If set, will override all other swim settings. Use none|default-lan|default-local|default-wan. Note all our swim settings correspond to default-lan")
 # see:
@@ -270,6 +268,8 @@ http-timeout = 60s
 # * https://godoc.org/github.com/hashicorp/memberlist#DefaultLocalConfig
 # * https://godoc.org/github.com/hashicorp/memberlist#DefaultWANConfig
 use-config = default-lan
+# binding TCP Address for UDP and TCP gossip (full ip/dns:port combo unlike memberlist.Config)
+bind-addr = 0.0.0.0:7946
 # timeout for establishing a stream connection with peers for a full state sync, and for stream reads and writes
 tcp-timeout = 10s
 # number of nodes that will be asked to perform an indirect probe of a node in the case a direct probe fails
