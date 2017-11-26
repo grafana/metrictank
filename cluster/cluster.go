@@ -46,7 +46,7 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		local:         true,
 	}
 	if Mode == ModeMulti {
-		Manager = NewMemberlistManager(thisNode, ClusterName, clusterHost, clusterPort)
+		Manager = NewMemberlistManager(thisNode, clusterHost, clusterPort)
 	} else {
 		Manager = NewSingleNodeManager(thisNode)
 	}
