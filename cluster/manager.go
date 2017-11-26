@@ -3,7 +3,6 @@ package cluster
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +82,9 @@ func NewMemberlistManager(thisNode Node) *MemberlistManager {
 	switch swimUseConfig {
 	case "none":
 		mgr.cfg = memberlist.DefaultLANConfig() // use this as base so that the other settings have proper defaults
+		mgr.cfg.BindPort = swimBindAddr.Port
+		mgr.cfg.BindAddr = swimBindAddr.IP.String()
+		mgr.cfg.AdvertisePort = swimBindAddr.Port
 		mgr.cfg.TCPTimeout = swimTCPTimeout
 		mgr.cfg.IndirectChecks = swimIndirectChecks
 		mgr.cfg.RetransmitMult = swimRetransmitMult
@@ -107,9 +109,6 @@ func NewMemberlistManager(thisNode Node) *MemberlistManager {
 	default:
 		panic("invalid swimUseConfig. should already have been validated")
 	}
-	mgr.cfg.BindPort = clusterPort
-	mgr.cfg.BindAddr = clusterHost.String()
-	mgr.cfg.AdvertisePort = clusterPort
 	mgr.cfg.Events = mgr
 	mgr.cfg.Delegate = mgr
 	h := sha256.New()
