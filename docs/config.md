@@ -257,6 +257,51 @@ min-available-shards = 0
 http-timeout = 60s
 ```
 
+## SWIM clustering settings ##
+
+```
+# only relevant when using cluster mode 'multi'
+# for more details, see https://godoc.org/github.com/hashicorp/memberlist#Config
+# all values correspond literally to the memberlist.Config options
+[swim]
+# config setting to use. If set, will override all other swim settings. Use none|default-lan|default-local|default-wan. Note all our swim settings correspond to default-lan")
+# see:
+# * https://godoc.org/github.com/hashicorp/memberlist#DefaultLANConfig
+# * https://godoc.org/github.com/hashicorp/memberlist#DefaultLocalConfig
+# * https://godoc.org/github.com/hashicorp/memberlist#DefaultWANConfig
+use-config = default-lan
+# timeout for establishing a stream connection with peers for a full state sync, and for stream reads and writes
+tcp-timeout = 10s
+# number of nodes that will be asked to perform an indirect probe of a node in the case a direct probe fails
+indirect-checks = 3
+# multiplier for number of retransmissions for gossip messages. Retransmits = RetransmitMult * log(N+1)
+retransmit-mult = 4
+# multiplier for determining when inaccessible/suspect node is delared dead. SuspicionTimeout = SuspicionMult * log(N+1) * ProbeInterval
+suspicion-multi = 4
+# multiplier for upper bound on detection time.  SuspicionMaxTimeout = SuspicionMaxTimeoutMult * SuspicionTimeout
+suspicion-max-timeout-mult = 6
+# interval between complete state syncs. 0 will disable state push/pull syncs
+push-pull-interval = 30s
+# interval between random node probes
+probe-interval = 1s
+# timeout to wait for an ack from a probed node before assuming it is unhealthy. This should be set to 99-percentile of network RTT
+probe-timeout = 500ms
+# turn off the fallback TCP pings that are attempted if the direct UDP ping fails
+disable-tcp-pings = false
+# will increase the probe interval if the node becomes aware that it might be degraded and not meeting the soft real time requirements to reliably probe other nodes.
+awareness-max-multiplier = 8
+# number of random nodes to send gossip messages to per GossipInterval
+gossip-nodes = 3
+# interval between sending messages that need to be gossiped that haven't been able to piggyback on probing messages. 0 disables non-piggyback gossip
+gossip-interval = 200ms
+# interval after which a node has died that we will still try to gossip to it. This gives it a chance to refute
+gossip-to-the-dead-time = 30s
+# message compression
+enable-compression = true
+# system's DNS config file. Override allows for easier testing
+dns-config-path = /etc/resolv.conf
+```
+
 ## clustering transports for tracking chunk saves between replicated instances ##
 ### kafka as transport for clustering messages (recommended)
 
