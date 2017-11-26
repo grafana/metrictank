@@ -80,7 +80,33 @@ func NewMemberlistManager(thisNode Node) *MemberlistManager {
 		},
 		nodeName: thisNode.Name,
 	}
-	mgr.cfg = memberlist.DefaultLANConfig()
+	switch swimUseConfig {
+	case "none":
+		mgr.cfg = memberlist.DefaultLANConfig() // use this as base so that the other settings have proper defaults
+		mgr.cfg.TCPTimeout = swimTCPTimeout
+		mgr.cfg.IndirectChecks = swimIndirectChecks
+		mgr.cfg.RetransmitMult = swimRetransmitMult
+		mgr.cfg.SuspicionMult = swimSuspicionMult
+		mgr.cfg.SuspicionMaxTimeoutMult = swimSuspicionMaxTimeoutMult
+		mgr.cfg.PushPullInterval = swimPushPullInterval
+		mgr.cfg.ProbeInterval = swimProbeInterval
+		mgr.cfg.ProbeTimeout = swimProbeTimeout
+		mgr.cfg.DisableTcpPings = swimDisableTcpPings
+		mgr.cfg.AwarenessMaxMultiplier = swimAwarenessMaxMultiplier
+		mgr.cfg.GossipInterval = swimGossipInterval
+		mgr.cfg.GossipNodes = swimGossipNodes
+		mgr.cfg.GossipToTheDeadTime = swimGossipToTheDeadTime
+		mgr.cfg.EnableCompression = swimEnableCompression
+		mgr.cfg.DNSConfigPath = swimDNSConfigPath
+	case "default-lan":
+		mgr.cfg = memberlist.DefaultLANConfig()
+	case "default-local":
+		mgr.cfg = memberlist.DefaultLocalConfig()
+	case "default-wan":
+		mgr.cfg = memberlist.DefaultWANConfig()
+	default:
+		panic("invalid swimUseConfig. should already have been validated")
+	}
 	mgr.cfg.BindPort = clusterPort
 	mgr.cfg.BindAddr = clusterHost.String()
 	mgr.cfg.AdvertisePort = clusterPort
