@@ -8,6 +8,11 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+type seriesAggregator struct {
+	function crossSeriesAggFunc
+	name     string
+}
+
 type crossSeriesAggFunc func(in []models.Series, out *[]schema.Point)
 
 func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
