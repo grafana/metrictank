@@ -541,8 +541,8 @@ KEYS:
 // resolveIDs resolves a list of ids (TagIDs) into a list of complete
 // metric names, including tags. it assumes that at least a read lock
 // is already held by the caller
-func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
-	res := make([]string, len(ids))
+func (m *MemoryIdx) resolveIDs(ids TagIDs) []idx.Node {
+	res := make([]idx.Node, len(ids))
 	i := uint32(0)
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
@@ -552,13 +552,18 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			continue
 		}
 
-		res[i] = def.NameWithTags()
+		res[i] = idx.Node{
+			Path:        def.NameWithTags(),
+			Leaf:        true,
+			HasChildren: false,
+			Defs:        []idx.Archive{*def},
+		}
 		i++
 	}
 	return res
 }
 
-func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]string, error) {
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -572,7 +577,7 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]st
 	return m.idsByTagQuery(orgId, query), nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []idx.Node {
 	m.RLock()
 	defer m.RUnlock()
 

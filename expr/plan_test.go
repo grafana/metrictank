@@ -391,6 +391,15 @@ func TestNamingChains(t *testing.T) {
 			},
 		},
 		{
+			`aliasByNode(avg(perSecond(seriesByTag('name=~.*.bar'))), 0)`,
+			[]string{
+				"a.bar;key1=val1",
+			},
+			[]string{
+				"a",
+			},
+		},
+		{
 			`alias(perSecond(*.bar), 'a')`,
 			[]string{
 				"a.bar",

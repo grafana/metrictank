@@ -139,7 +139,7 @@ type MetricIndex interface {
 	// where the LastUpdate time is >= from will be returned as results.
 	// The returned results are not deduplicated and in certain cases it is possible
 	// that duplicate entries will be returned.
-	FindByTag(int, []string, int64) ([]string, error)
+	FindByTag(int, []string, int64) ([]Node, error)
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.

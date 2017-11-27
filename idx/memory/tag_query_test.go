@@ -281,9 +281,14 @@ func TestGetByTag(t *testing.T) {
 		if len(tc.expectation) != len(res) {
 			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, res)
 		}
+
+		resPaths := make([]string, 0, len(res))
+		for _, r := range res {
+			resPaths = append(resPaths, r.Path)
+		}
 		sort.Strings(tc.expectation)
-		sort.Strings(res)
-		if !reflect.DeepEqual(res, tc.expectation) {
+		sort.Strings(resPaths)
+		if !reflect.DeepEqual(resPaths, tc.expectation) {
 			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", res, tc.expectation)
 		}
 	}
