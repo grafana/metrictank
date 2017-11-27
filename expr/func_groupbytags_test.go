@@ -83,6 +83,21 @@ func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNames(t *testing.T) {
 	testGroupByTags("MultipleSeriesMultipleResultsMultipleNames", in, out, "sum", []string{"tag1"}, t)
 }
 
+func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNamesMoreTags(t *testing.T) {
+	in := []models.Series{
+		getModel("name1;tag1=val1;tag2=val2_0;tag3=3", a),
+		getModel("name1;tag1=val1;tag2=val2_1;tag3=3", b),
+		getModel("name2;tag1=val1_1;tag2=val2_0;tag3=3", c),
+		getModel("name2;tag1=val1_1;tag2=val2_1;tag3=3", d),
+	}
+	out := []models.Series{
+		getModel("sum;tag1=val1;tag3=3", sumab),
+		getModel("sum;tag1=val1_1;tag3=3", sumcd),
+	}
+
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"tag1", "tag3"}, t)
+}
+
 func TestGroupByTagsMultipleSeriesMultipleResultsGroupByName(t *testing.T) {
 	in := []models.Series{
 		getModel("name1;tag1=val1;tag2=val2_0", a),
@@ -177,6 +192,20 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 				continue
 			}
 			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, o.Datapoints[j], p)
+		}
+		if len(g.Tags) != len(o.Tags) {
+			t.Fatalf("case %q: len tags expected %d, got %d", name, len(o.Tags), len(g.Tags))
+		}
+		for k, v := range g.Tags {
+			expectedVal, ok := o.Tags[k]
+
+			if !ok {
+				t.Fatalf("case %q: Got unknown tag key '%s'", name, k)
+			}
+
+			if v != expectedVal {
+				t.Fatalf("case %q: Key '%s' had wrong value: expected '%s', got '%s'", name, k, expectedVal, v)
+			}
 		}
 	}
 }
