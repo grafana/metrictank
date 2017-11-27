@@ -122,3 +122,14 @@ type ArgBool struct {
 
 func (a ArgBool) Key() string    { return a.key }
 func (a ArgBool) Optional() bool { return a.opt }
+
+// Array of mixed strings or ints
+type ArgStringsOrInts struct {
+	key       string
+	opt       bool
+	validator []Validator
+	val       *[]expr
+}
+
+func (a ArgStringsOrInts) Key() string    { return a.key }
+func (a ArgStringsOrInts) Optional() bool { return a.opt }

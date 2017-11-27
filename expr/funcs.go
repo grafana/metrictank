@@ -47,6 +47,7 @@ func init() {
 	// keys must be sorted alphabetically. but functions with aliases can go together, in which case they are sorted by the first of their aliases
 	funcs = map[string]funcDef{
 		"alias":          {NewAlias, true},
+		"aliasByTags":    {NewAliasByNode, true},
 		"aliasByNode":    {NewAliasByNode, true},
 		"aliasSub":       {NewAliasSub, true},
 		"avg":            {NewAggregateConstructor("average", crossSeriesAvg), true},
