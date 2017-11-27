@@ -79,6 +79,15 @@ var sumabc = []schema.Point{
 	{Val: 1234567894, Ts: 60},
 }
 
+var sumcd = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 33, Ts: 20},
+	{Val: 200, Ts: 30},
+	{Val: 31, Ts: 40}, // overflowed
+	{Val: 83, Ts: 50},
+	{Val: 254, Ts: 60},
+}
+
 var avgab = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64 / 2, Ts: 20},

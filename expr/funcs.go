@@ -53,6 +53,7 @@ func init() {
 		"averageSeries":  {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"consolidateBy":  {NewConsolidateBy, true},
 		"divideSeries":   {NewDivideSeries, true},
+		"groupByTags":    {NewGroupByTags, false},
 		"max":            {NewAggregateConstructor("max", crossSeriesMax), true},
 		"maxSeries":      {NewAggregateConstructor("max", crossSeriesMax), true},
 		"min":            {NewAggregateConstructor("min", crossSeriesMin), true},
