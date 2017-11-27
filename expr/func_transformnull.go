@@ -50,6 +50,7 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 		transformed := models.Series{
 			Target:       target,
 			QueryPatt:    target,
+			Tags:         serie.Tags,
 			Datapoints:   pointSlicePool.Get().([]schema.Point),
 			Interval:     serie.Interval,
 			Consolidator: serie.Consolidator,

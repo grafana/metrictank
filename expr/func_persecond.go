@@ -61,6 +61,7 @@ func (s *FuncPerSecond) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		s := models.Series{
 			Target:     fmt.Sprintf("perSecond(%s)", serie.Target),
 			QueryPatt:  fmt.Sprintf("perSecond(%s)", serie.QueryPatt),
+			Tags:       serie.Tags,
 			Datapoints: out,
 			Interval:   serie.Interval,
 		}
