@@ -156,6 +156,16 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			return 0, ErrBadArgumentStr{"string", string(got.etype)}
 		}
 		*v.val = got.bool
+	case ArgStringsOrInts:
+		// special case! consume all subsequent args (if any) in args that will also yield a string
+		for ; len(e.args) > pos && (e.args[pos].etype == etString || e.args[pos].etype == etInt); pos++ {
+			for _, va := range v.validator {
+				if err := va(e.args[pos]); err != nil {
+					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				}
+			}
+			*v.val = append(*v.val, *e.args[pos])
+		}
 	default:
 		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
 	}
