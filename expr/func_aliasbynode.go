@@ -33,6 +33,9 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	}
 	for i, serie := range series {
 		metric := extractMetric(serie.Target)
+		if len(metric) == 0 {
+			metric = serie.Tags["name"]
+		}
 		parts := strings.Split(metric, ".")
 		var name []string
 		for _, n64 := range s.nodes {

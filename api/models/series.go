@@ -14,6 +14,7 @@ import (
 type Series struct {
 	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Datapoints   []schema.Point
+	Tags         map[string]string
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
 	QueryFrom    uint32                     // to tie series back to request it came from
@@ -34,6 +35,17 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 	for _, s := range series {
 		b = append(b, `{"target":`...)
 		b = strconv.AppendQuoteToASCII(b, s.Target)
+		if len(s.Tags) != 0 {
+			b = append(b, `,"tags":{`...)
+			for name, value := range s.Tags {
+				b = strconv.AppendQuoteToASCII(b, name)
+				b = append(b, ':')
+				b = strconv.AppendQuoteToASCII(b, value)
+				b = append(b, ',')
+			}
+			// Replace trailing comma with a closing bracket
+			b[len(b)-1] = '}'
+		}
 		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')
