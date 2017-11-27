@@ -127,6 +127,16 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			}
 		}
 		*v.val = got.str
+	case ArgStrings:
+		// special case! consume all subsequent args (if any) in args that will also yield a string
+		for ; len(e.args) > pos && e.args[pos].etype == etString; pos++ {
+			for _, va := range v.validator {
+				if err := va(e.args[pos]); err != nil {
+					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				}
+			}
+			*v.val = append(*v.val, e.args[pos].str)
+		}
 	case ArgRegex:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
