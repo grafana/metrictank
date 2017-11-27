@@ -241,7 +241,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 }
 
 func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T) {
-	f := NewAggregateConstructor(agg)()
+	f := NewAggregateConstructor(agg, getCrossSeriesAggFunc(agg))()
 	avg := f.(*FuncAggregate)
 	for _, i := range in {
 		avg.in = append(avg.in, NewMock(i))
@@ -324,7 +324,7 @@ func benchmarkAggregate(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	b.ResetTimer()
 	var err error
 	for i := 0; i < b.N; i++ {
-		f := NewAggregateConstructor("average")()
+		f := NewAggregateConstructor("average", crossSeriesAvg)()
 		avg := f.(*FuncAggregate)
 		avg.in = append(avg.in, NewMock(input))
 		results, err = f.Exec(make(map[Req][]models.Series))

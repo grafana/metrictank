@@ -9,13 +9,13 @@ import (
 
 type FuncAggregate struct {
 	in  []GraphiteFunc
-	agg string
+	agg seriesAggregator
 }
 
 // NewAggregateConstructor takes an agg string and returns a constructor function
-func NewAggregateConstructor(agg string) func() GraphiteFunc {
+func NewAggregateConstructor(aggDescription string, aggFunc crossSeriesAggFunc) func() GraphiteFunc {
 	return func() GraphiteFunc {
-		return &FuncAggregate{agg: agg}
+		return &FuncAggregate{agg: seriesAggregator{function: aggFunc, name: aggDescription}}
 	}
 }
 
@@ -40,19 +40,16 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if len(series) == 1 {
-		name := s.agg + "Series(" + series[0].QueryPatt + ")"
+		name := s.agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-
-	aggFunc := getCrossSeriesAggFunc(s.agg)
-
-	aggFunc(series, &out)
+	s.agg.function(series, &out)
 
 	cons, queryCons := summarizeCons(series)
-	name := s.agg + "Series(" + strings.Join(queryPatts, ",") + ")"
+	name := s.agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
