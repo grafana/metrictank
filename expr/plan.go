@@ -99,6 +99,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
+		// convert back to function syntax
 		expressionStr := "seriesByTag("
 		for i, ex := range e.args {
 			expressionStr += "'" + ex.str + "'"
@@ -108,7 +109,6 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		}
 		expressionStr += ")"
 		req := NewReq(expressionStr, context.from, context.to, context.consol)
-		// convert back to function syntax
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	}
