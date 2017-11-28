@@ -33,6 +33,15 @@ var avg4a2b = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
+var sum4a2b = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.Inf(0), Ts: 20},
+	{Val: math.Inf(0), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 2469135780, Ts: 50}, // in accordance with graphite, sum(5,null) = 5
+	{Val: 4938271560, Ts: 60},
+}
+
 var c = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 0, Ts: 20},
@@ -104,6 +113,24 @@ var maxabc = []schema.Point{
 	{Val: 2, Ts: 40},
 	{Val: 1234567890, Ts: 50},
 	{Val: 1234567890, Ts: 60},
+}
+
+var minab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 5.5, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1234567890, Ts: 50}, // in accordance with graphite, min(5,null) = 5
+	{Val: 1234567890, Ts: 60},
+}
+
+var minabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 1, Ts: 30},
+	{Val: 2, Ts: 40},
+	{Val: 3, Ts: 50},
+	{Val: 4, Ts: 60},
 }
 
 // make sure we test with the correct data, don't mask if processing accidentally modifies our input data
