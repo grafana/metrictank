@@ -100,12 +100,12 @@ func crossSeriesLst(in []models.Series, out *[]schema.Point) {
 func crossSeriesMin(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		nan := true
-		min := math.NaN()
+		min := math.Inf(1)
 		for j := 0; j < len(in); j++ {
 			p := in[j].Datapoints[i].Val
-			if !math.IsNaN(p) {
+			if !math.IsNaN(p) && p < min {
 				nan = false
-				min = math.Min(min, p)
+				min = p
 			}
 		}
 
@@ -121,15 +121,16 @@ func crossSeriesMin(in []models.Series, out *[]schema.Point) {
 		*out = append(*out, point)
 	}
 }
+
 func crossSeriesMax(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		nan := true
 		max := math.Inf(-1)
 		for j := 0; j < len(in); j++ {
 			p := in[j].Datapoints[i].Val
-			if !math.IsNaN(p) {
+			if !math.IsNaN(p) && p > max {
 				nan = false
-				max = math.Max(max, p)
+				max = p
 			}
 		}
 
