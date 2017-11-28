@@ -73,7 +73,7 @@ type MemberlistManager struct {
 	cfg      *memberlist.Config
 }
 
-func NewMemberlistManager(thisNode Node, clusterName string, clusterHost net.IP, clusterPort int) *MemberlistManager {
+func NewMemberlistManager(thisNode Node, clusterHost net.IP, clusterPort int) *MemberlistManager {
 	mgr := &MemberlistManager{
 		members: map[string]Node{
 			thisNode.Name: thisNode,
