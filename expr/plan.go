@@ -98,8 +98,20 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		req := NewReq(e.str, context.from, context.to, context.consol)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
+	} else if e.etype == etFunc && e.str == "seriesByTag" {
+		// convert back to function syntax
+		expressionStr := "seriesByTag("
+		for i, ex := range e.args {
+			expressionStr += "'" + ex.str + "'"
+			if i != len(e.args)-1 {
+				expressionStr += ","
+			}
+		}
+		expressionStr += ")"
+		req := NewReq(expressionStr, context.from, context.to, context.consol)
+		reqs = append(reqs, req)
+		return NewGet(req), reqs, nil
 	}
-
 	// here e.type is guaranteed to be etFunc
 	fdef, ok := funcs[e.str]
 	if !ok {

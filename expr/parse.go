@@ -337,21 +337,33 @@ func parseString(s string) (string, string, error) {
 	return s[:i], s[i+1:], nil
 }
 
-// exctractMetric searches for a metric name in `m'
+// extractMetric searches for a metric name in `m'
 // metric name is defined to be a series of name characters terminated by a comma
 func extractMetric(m string) string {
 	start := 0
 	end := 0
 	curlyBraces := 0
+	stringLiteral := false
+	allowEqual := false
 	for end < len(m) {
-		if m[end] == '{' {
-			curlyBraces++
-		} else if m[end] == '}' {
-			curlyBraces--
-		} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
-			return m[start:end]
-		} else if !(isNameChar(m[end]) || m[end] == ',') {
-			start = end + 1
+		if stringLiteral {
+			if m[end] == '\'' || m[end] == '"' {
+				stringLiteral = !stringLiteral
+				start = end + 1
+			}
+		} else {
+			if m[end] == '{' {
+				curlyBraces++
+			} else if m[end] == '}' {
+				curlyBraces--
+			} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
+				return m[start:end]
+			} else if !(isNameChar(m[end]) || m[end] == ',' || (allowEqual && m[end] == '=')) {
+				start = end + 1
+				allowEqual = false
+			} else if m[end] == ';' {
+				allowEqual = true
+			}
 		}
 
 		end++

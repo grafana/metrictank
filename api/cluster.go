@@ -228,3 +228,59 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 
 	return result, nil
 }
+
+type PeerResponse struct {
+	peer cluster.Node
+	buf  []byte
+}
+
+// peerQuery takes a request and the path to request it on, then fans it out
+// across the cluster, except to the local peer.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+func (s *Server) peerQueryWithPeer(ctx context.Context, data cluster.Traceable, name, path string) ([]PeerResponse, error) {
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+		return nil, err
+	}
+	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
+
+	result := make([]PeerResponse, 0, len(peers)-1)
+
+	var errors []error
+	var errLock sync.Mutex
+	var resLock sync.Mutex
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		if peer.IsLocal() {
+			continue
+		}
+		wg.Add(1)
+		go func(peer cluster.Node) {
+			defer wg.Done()
+			log.Debug("HTTP Render querying %s%s", peer.Name, path)
+			buf, err := peer.Post(ctx, name, path, data)
+			if err != nil {
+				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
+				errLock.Lock()
+				errors = append(errors, err)
+				errLock.Unlock()
+				return
+			}
+
+			resLock.Lock()
+			result = append(result, PeerResponse{peer, buf})
+			resLock.Unlock()
+		}(peer)
+	}
+	wg.Wait()
+
+	if len(errors) > 0 {
+		return nil, errors[0]
+	}
+
+	return result, nil
+}
