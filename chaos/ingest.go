@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/chaos/out/kafkamdm"
-	"github.com/graphite-ng/carbon-relay-ng/clock"
+	"github.com/grafana/metrictank/clock"
 	"github.com/raintank/met/helper"
 	"gopkg.in/raintank/schema.v1"
 )

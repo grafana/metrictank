@@ -1,9 +1,0 @@
-*.deb
-*.swp
-/carbon-relay-ng
-/carbon-relay-ng.ini
-/carbon-relay-ng.pid
-/carbon-relay-ng.test
-test_spool
-spool/*.dat
-*~

@@ -176,12 +176,6 @@
   revision = "4b53e1bddba0e2f734514aeb6c02db652f4c6fe8"
 
 [[projects]]
-  name = "github.com/graphite-ng/carbon-relay-ng"
-  packages = ["clock"]
-  revision = "5042de59dc34938f7f24e8f0c2452fa10ae30378"
-  version = "v0.9.3"
-
-[[projects]]
   branch = "master"
   name = "github.com/hailocab/go-hostpool"
   packages = ["."]
@@ -449,6 +443,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2fe2c355b530fd45d921c7f013797dc6f0006345642e7c89d4b640b7ed603d89"
+  inputs-digest = "1ed60c7bff342e382e10c70221c3a55c45e9b46194f8dff6325afe9fb9811f50"
   solver-name = "gps-cdcl"
   solver-version = 1
