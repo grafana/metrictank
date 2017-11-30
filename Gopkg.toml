@@ -1,0 +1,164 @@
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#  name = "github.com/x/y"
+#  version = "2.4.0"
+
+
+[[constraint]]
+  name = "github.com/Dieterbe/artisanalhistogram"
+
+[[constraint]]
+  name = "github.com/Dieterbe/profiletrigger"
+
+[[constraint]]
+  name = "github.com/Shopify/sarama"
+  version = "1.10.1"
+
+[[constraint]]
+  name = "github.com/Sirupsen/logrus"
+  version = "0.7.3"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/alyu/configparser"
+
+[[constraint]]
+  name = "github.com/bitly/go-hostpool"
+
+[[constraint]]
+  name = "github.com/bsm/sarama-cluster"
+
+[[constraint]]
+  name = "github.com/davecgh/go-spew"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/dgryski/go-linlog"
+
+[[constraint]]
+  name = "github.com/dgryski/go-tsz"
+
+[[constraint]]
+  name = "github.com/docker/docker"
+
+[[constraint]]
+  name = "github.com/go-macaron/binding"
+
+[[constraint]]
+  name = "github.com/gocql/gocql"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/golang/snappy"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/google/go-querystring"
+
+[[constraint]]
+  name = "github.com/graphite-ng/carbon-relay-ng"
+  version = "0.9.3"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hailocab/go-hostpool"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/memberlist"
+
+[[constraint]]
+  name = "github.com/jpillora/backoff"
+
+[[constraint]]
+  name = "github.com/kisielk/og-rek"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/kisielk/whisper-go"
+
+[[constraint]]
+  name = "github.com/mattbaird/elastigo"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/metrics20/go-metrics20"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mitchellh/go-homedir"
+
+[[constraint]]
+  name = "github.com/nsqio/go-nsq"
+
+[[constraint]]
+  name = "github.com/opentracing/opentracing-go"
+
+[[constraint]]
+  branch = "v2"
+  name = "github.com/raintank/dur"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/raintank/gziper"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/raintank/met"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/raintank/misc"
+
+[[constraint]]
+  name = "github.com/raintank/worldping-api"
+
+[[constraint]]
+  name = "github.com/rakyll/globalconf"
+
+[[constraint]]
+  name = "github.com/rs/cors"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/sergi/go-diff"
+
+[[constraint]]
+  name = "github.com/smartystreets/goconvey"
+
+[[constraint]]
+  name = "github.com/syndtr/goleveldb"
+
+[[constraint]]
+  name = "github.com/tinylib/msgp"
+  version = "1.0.0-beta"
+
+[[constraint]]
+  name = "github.com/uber/jaeger-client-go"
+
+[[constraint]]
+  name = "gopkg.in/macaron.v1"
+  version = "1.1.8"
+
+[[constraint]]
+  name = "gopkg.in/raintank/schema.v0"
+  version = "0.0.1"
+
+[[constraint]]
+  name = "gopkg.in/raintank/schema.v1"

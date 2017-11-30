@@ -1,20 +1,19 @@
 #!/bin/bash
 
-if ! which govendor >/dev/null; then
-	go get github.com/kardianos/govendor || exit 1
+if ! which dep >/dev/null; then
+	go get -u github.com/golang/dep/cmd/dep || exit 1
 fi
 
-ret=0
+dep version
 
-external=$(govendor list +external)
-missing=$(govendor list +missing)
-unused=$(govendor list +unused)
+# until we have https://docs.google.com/document/d/1j_Hka8eFKqWwGJWFSFedtBsNkFaRN3yvL4g8k30PLmg/edit#
+# this should do fine:
+# (note dep ensure -dry-run and dep ensure would add a whole bunch of packages to vendor, which dep prune deletes again, so we can't just check those)
+# we can expect this to change soon though: https://github.com/golang/dep/issues/944
 
-[ -n "$external" ] && ret=1 && echo -e "packages missing in vendor that are in gopath:\n$external\n"
-[ -n "$missing"  ] && ret=1 && echo -e "packages missing in vendor that are not found:\n$missing\n"
-[ -n "$unused"   ] && ret=1 && echo -e "unused vendored packages found:\n$unused\n"
+dep ensure -no-vendor -dry-run
+ret=$?
 
-echo govendor list: && govendor list
-echo -n "govendor version: " && govendor -version
+dep status
 
 exit $ret

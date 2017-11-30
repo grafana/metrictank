@@ -44,14 +44,22 @@ type HostPool interface {
 	markFailed(HostPoolResponse)
 
 	ResetAll()
+	// ReturnUnhealthy when called with true will prevent an unhealthy node from
+	// being returned and will instead return a nil HostPoolResponse. If using
+	// this feature then you should check the result of Get for nil
+	ReturnUnhealthy(v bool)
 	Hosts() []string
 	SetHosts([]string)
+
+	// Close the hostpool and release all resources.
+	Close()
 }
 
 type standardHostPool struct {
 	sync.RWMutex
 	hosts             map[string]*hostEntry
 	hostList          []*hostEntry
+	returnUnhealthy   bool
 	initialRetryDelay time.Duration
 	maxRetryInterval  time.Duration
 	nextHostIndex     int
@@ -68,6 +76,7 @@ const defaultDecayDuration = time.Duration(5) * time.Minute
 // Construct a basic HostPool using the hostnames provided
 func New(hosts []string) HostPool {
 	p := &standardHostPool{
+		returnUnhealthy:   true,
 		hosts:             make(map[string]*hostEntry, len(hosts)),
 		hostList:          make([]*hostEntry, len(hosts)),
 		initialRetryDelay: time.Duration(30) * time.Second,
@@ -113,6 +122,10 @@ func (p *standardHostPool) Get() HostPoolResponse {
 	p.Lock()
 	defer p.Unlock()
 	host := p.getRoundRobin()
+	if host == "" {
+		return nil
+	}
+
 	return &standardHostPoolResponse{host: host, pool: p}
 }
 
@@ -135,6 +148,11 @@ func (p *standardHostPool) getRoundRobin() string {
 		}
 	}
 
+	// all hosts are down and returnUnhealhy is false then return no host
+	if !p.returnUnhealthy {
+		return ""
+	}
+
 	// all hosts are down. re-add them
 	p.doResetAll()
 	p.nextHostIndex = 0
@@ -151,6 +169,12 @@ func (p *standardHostPool) SetHosts(hosts []string) {
 	p.Lock()
 	defer p.Unlock()
 	p.setHosts(hosts)
+}
+
+func (p *standardHostPool) ReturnUnhealthy(v bool) {
+	p.Lock()
+	defer p.Unlock()
+	p.returnUnhealthy = v
 }
 
 func (p *standardHostPool) setHosts(hosts []string) {
@@ -173,6 +197,12 @@ func (p *standardHostPool) setHosts(hosts []string) {
 func (p *standardHostPool) doResetAll() {
 	for _, h := range p.hosts {
 		h.dead = false
+	}
+}
+
+func (p *standardHostPool) Close() {
+	for _, h := range p.hosts {
+		h.dead = true
 	}
 }
 
@@ -205,7 +235,7 @@ func (p *standardHostPool) markFailed(hostR HostPoolResponse) {
 
 }
 func (p *standardHostPool) Hosts() []string {
-	hosts := make([]string, len(p.hosts))
+	hosts := make([]string, 0, len(p.hosts))
 	for host := range p.hosts {
 		hosts = append(hosts, host)
 	}

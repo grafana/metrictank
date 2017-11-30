@@ -1,0 +1,33 @@
+machine:
+  node:
+    version: 4.0
+  environment:
+    GOPATH: "/home/ubuntu/.go_workspace"
+    ORG_PATH: "github.com/raintank"
+    REPO_PATH: "${ORG_PATH}/worldping-api"
+
+dependencies:
+  pre:
+    - if [[ ! -e /usr/local/go-1.6 ]]; then sudo mv /usr/local/go /usr/local/go-1.5.1; wget https://storage.googleapis.com/golang/go1.6.1.linux-amd64.tar.gz && sudo tar -C /usr/local -zxf go1.6.1.linux-amd64.tar.gz && sudo mv /usr/local/go /usr/local/go-1.6 && sudo ln -s /usr/local/go-1.6 /usr/local/go; fi
+  override:
+    - rt-pkg/depends.sh
+    - rt-pkg/build.sh
+general:
+  artifacts:
+    - rt-pkg/artifacts
+
+test:
+  override:
+     # FMT
+     - test -z "$(gofmt -s -l . | grep -v Godeps/_workspace/src/ | tee /dev/stderr)"
+     # GO VET
+     - go vet ./pkg/...
+     # Go test
+     - go test -v ./pkg/...
+  post:
+     - cd rt-pkg && /bin/bash packaging.sh 
+deployment:
+  production:
+    branch: master
+    commands:
+      - rt-pkg/deploy.sh

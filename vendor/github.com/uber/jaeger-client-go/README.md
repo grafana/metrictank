@@ -6,6 +6,12 @@ This is a client side library that implements an
 [OpenTracing](http://opentracing.io) Tracer,
 with Zipkin-compatible data model.
 
+**IMPORTANT**: The library's import path is `github.com/uber/jaeger-client-go`, based on its original location. Do not try to import it as `github.com/jaegertracing/jaeger-client-go`, it will not compile. We might revisit this in the next major release.
+
+## How to Contribute
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Installation
 
 We recommended using a dependency manager like [glide](https://github.com/Masterminds/glide)
@@ -57,19 +63,28 @@ The tracer emits a number of different metrics, defined in
 tag-based metric names, e.g. instead of `statsd`-style string names
 like `counters.my-service.jaeger.spans.started.sampled`, the metrics
 are defined by a short name and a collection of key/value tags, for
-example: `name:traces, state:started, sampled:true`.
+example: `name:jaeger.traces, state:started, sampled:y`. See [metrics.go](./metrics.go)
+file for the full list and descriptions of emitted metrics.
 
-The monitoring backend is represented by the
-[StatsReporter](stats_reporter.go) interface. An implementation
-of that interface should be passed to the `New` method during
-tracer initialization:
+The monitoring backend is represented by the `metrics.Factory` interface from package
+[`"github.com/uber/jaeger-lib/metrics"`](github.com/uber/jaeger-lib/metrics).  An implementation
+of that interface can be passed as an option to either the Configuration object or the Tracer
+constructor, for example:
 
 ```go
-    stats := // create StatsReporter implementation
-    tracer := config.Tracing.New("your-service-name", stats)
+import (
+    "github.com/uber/jaeger-client-go/config"
+    "github.com/uber/jaeger-lib/metrics/prometheus"
+)
+
+    metricsFactory := prometheus.New()
+    tracer, closer, err := new(config.Configuration).New(
+        "your-service-name",
+        config.Metrics(metricsFactory),
+    )
 ```
 
-By default, a no-op `NullStatsReporter` is used.
+By default, a no-op `metrics.NullFactory` is used.
 
 ### Logging
 
@@ -80,12 +95,15 @@ by the [Logger](logger.go) interface. A logger instance implementing
 this interface can be set on the `Config` object before calling the
 `New` method.
 
+Besides the [zap](https://github.com/uber-go/zap) implementation
+bundled with this package there is also a [go-kit](https://github.com/go-kit/kit)
+one in the [jaeger-lib](https://github.com/uber/jaeger-lib) repository.
+
 ## Instrumentation for Tracing
 
 Since this tracer is fully compliant with OpenTracing API 1.0,
 all code instrumentation should only use the API itself, as described
-in the [opentracing-go]
-(https://github.com/opentracing/opentracing-go) documentation.
+in the [opentracing-go](https://github.com/opentracing/opentracing-go) documentation.
 
 ## Features
 
@@ -134,18 +152,15 @@ are available:
 
 ### Baggage Injection
 
-The OpenTracing spec allows for [baggage](https://github.com/opentracing/specification/blob/master/specification.md#set-a-baggage-item),
-which are key value pairs that are added to the span context and propagated
-throughout the trace.
-An external process can inject baggage by setting the special
-HTTP Header `jaeger-baggage` on a request
+The OpenTracing spec allows for [baggage][baggage], which are key value pairs that are added
+to the span context and propagated throughout the trace. An external process can inject baggage
+by setting the special HTTP Header `jaeger-baggage` on a request:
 
 ```sh
 curl -H "jaeger-baggage: key1=value1, key2=value2" http://myhost.com
 ```
 
-Baggage can also be programatically set inside your service by doing
-the following
+Baggage can also be programatically set inside your service:
 
 ```go
 if span := opentracing.SpanFromContext(ctx); span != nil {
@@ -209,14 +224,15 @@ However it is not the default propagation format, see [here](zipkin/README.md#Ne
 
 ## License
 
-  [The MIT License](LICENSE).
+[Apache 2.0 License](LICENSE).
 
 
 [doc-img]: https://godoc.org/github.com/uber/jaeger-client-go?status.svg
 [doc]: https://godoc.org/github.com/uber/jaeger-client-go
-[ci-img]: https://travis-ci.org/uber/jaeger-client-go.svg?branch=master
-[ci]: https://travis-ci.org/uber/jaeger-client-go
-[cov-img]: https://coveralls.io/repos/uber/jaeger-client-go/badge.svg?branch=master&service=github
-[cov]: https://coveralls.io/github/uber/jaeger-client-go?branch=master
+[ci-img]: https://travis-ci.org/jaegertracing/jaeger-client-go.svg?branch=master
+[ci]: https://travis-ci.org/jaegertracing/jaeger-client-go
+[cov-img]: https://codecov.io/gh/jaegertracing/jaeger-client-go/branch/master/graph/badge.svg
+[cov]: https://codecov.io/gh/jaegertracing/jaeger-client-go
 [ot-img]: https://img.shields.io/badge/OpenTracing--1.0-enabled-blue.svg
 [ot-url]: http://opentracing.io
+[baggage]: https://github.com/opentracing/specification/blob/master/specification.md#set-a-baggage-item
