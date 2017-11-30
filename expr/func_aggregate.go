@@ -48,7 +48,8 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	out := pointSlicePool.Get().([]schema.Point)
 	s.agg.function(series, &out)
 
-	// Build up the set of common tags to add to the tags map
+	// The tags for the aggregated series is only the tags that are
+	// common to all input series
 	var commonTags map[string]string
 	if len(series[0].Tags) == 0 {
 		commonTags = make(map[string]string, 0)
