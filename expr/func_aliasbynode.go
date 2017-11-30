@@ -32,6 +32,8 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		return nil, err
 	}
 	for i, serie := range series {
+		// Extract metric may not find a target if `seriesByTag` was used.
+		// If so, then we can try to grab the "name" tag.
 		metric := extractMetric(serie.Target)
 		if len(metric) == 0 {
 			metric = serie.Tags["name"]

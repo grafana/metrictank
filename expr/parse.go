@@ -337,8 +337,12 @@ func parseString(s string) (string, string, error) {
 	return s[:i], s[i+1:], nil
 }
 
-// extractMetric searches for a metric name in `m'
-// metric name is defined to be a series of name characters terminated by a comma
+// extractMetric searches for a metric name or path Expression in `m'
+// metric name / path expression is defined by the following criteria:
+// 1. Not a function name
+// 2. Consists only of name characters
+// 2.1 '=' is conditionally allowed if ';' is found (denoting tag format)
+// 3. Is not a string literal (i.e. contained within single/double quote pairs)
 func extractMetric(m string) string {
 	start := 0
 	end := 0

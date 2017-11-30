@@ -539,8 +539,8 @@ KEYS:
 }
 
 // resolveIDs resolves a list of ids (TagIDs) into a list of complete
-// metric names, including tags. it assumes that at least a read lock
-// is already held by the caller
+// Node structs. It assumes that at least a read lock is already
+// held by the caller
 func (m *MemoryIdx) resolveIDs(ids TagIDs) []idx.Node {
 	res := make([]idx.Node, len(ids))
 	i := uint32(0)

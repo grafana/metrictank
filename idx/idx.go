@@ -133,7 +133,7 @@ type MetricIndex interface {
 
 	// FindByTag takes a list of expressions in the format key<operator>value.
 	// The allowed operators are: =, !=, =~, !=~.
-	// It returns a slice of metric names that match the given conditions, the
+	// It returns a slice of Node structs that match the given conditions, the
 	// conditions are logically AND-ed.
 	// If the third argument is > 0 then the results will be filtered and only those
 	// where the LastUpdate time is >= from will be returned as results.
