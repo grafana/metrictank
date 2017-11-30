@@ -3,7 +3,6 @@ package middleware
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -53,9 +52,7 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		rw := macCtx.Resp.(*TracingResponseWriter)
 
 		headers := macCtx.Resp.Header()
-		spanStr := span.(*jaeger.Span).String()
-		pos := strings.Index(spanStr, ":")
-		traceID := spanStr[:pos]
+		traceID := span.Context().(jaeger.SpanContext).TraceID().String()
 		headers["Trace-Id"] = []string{traceID}
 
 		// call next handler. This will return after all handlers
