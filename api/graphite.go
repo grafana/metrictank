@@ -730,13 +730,13 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	}
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
+	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
 	}
 	resp := models.IndexTagDetailsResp{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
@@ -779,7 +779,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 	}
 
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	resps, err := s.peerQueryWithPeer(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
 	}
@@ -833,14 +833,14 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
+	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
 	}
 
 	resp := models.IndexTagsResp{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
