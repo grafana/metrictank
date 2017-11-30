@@ -541,9 +541,10 @@ KEYS:
 // resolveIDs resolves a list of ids (TagIDs) into a list of complete
 // Node structs. It assumes that at least a read lock is already
 // held by the caller
-func (m *MemoryIdx) resolveIDs(ids TagIDs) []idx.Node {
+func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
 	res := make([]idx.Node, len(ids))
 	i := uint32(0)
+	tree := m.Tree[orgId]
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
 		if !ok {
@@ -552,10 +553,18 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []idx.Node {
 			continue
 		}
 
+		name := def.NameWithTags()
+		node, ok := tree.Items[name]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", name)
+			continue
+		}
+
 		res[i] = idx.Node{
-			Path:        def.NameWithTags(),
-			Leaf:        true,
-			HasChildren: false,
+			Path:        name,
+			Leaf:        node.Leaf(),
+			HasChildren: node.HasChildren(),
 			Defs:        []idx.Archive{*def},
 		}
 		i++
@@ -586,7 +595,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []idx.Node {
 		return nil
 	}
 
-	return m.resolveIDs(query.Run(tags, m.DefById))
+	return m.resolveIDs(orgId, query.Run(tags, m.DefById))
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
