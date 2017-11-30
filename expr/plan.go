@@ -99,7 +99,11 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
-		// convert back to function syntax
+		// `seriesByTag` function requires resolving expressions to series
+		// (similar to path expressions handled above). Since we need the
+		// arguments of seriesByTag to do the resolution, we store the function
+		// string back into the Query member of a new request to be parsed later.
+		// TODO - find a way to prevent this parse/encode/parse/encode loop
 		expressionStr := "seriesByTag("
 		for i, ex := range e.args {
 			expressionStr += "'" + ex.str + "'"
