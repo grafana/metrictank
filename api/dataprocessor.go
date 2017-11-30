@@ -116,6 +116,17 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 	return out
 }
 
+// divideContext wraps a Consolidate() call with a context.Context condition
+func divideContext(ctx context.Context, pointsA, pointsB []schema.Point) []schema.Point {
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil
+	default:
+	}
+	return divide(pointsA, pointsB)
+}
+
 func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	if len(pointsA) != len(pointsB) {
 		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
@@ -317,46 +328,25 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 
 	if !readRollup && !normalize {
 		fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
-		if err != nil {
-			return nil, req.OutInterval, err
-		}
 		return fixed, req.OutInterval, err
 	} else if !readRollup && normalize {
 		fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
 		if err != nil {
 			return nil, req.OutInterval, err
 		}
-		select {
-		case <-ctx.Done():
-			//request canceled
-			return nil, req.OutInterval, nil
-		default:
-		}
-		return consolidation.Consolidate(fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
+		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readRollup && !normalize {
 		if req.Consolidator == consolidation.Avg {
 			sumFixed, err := s.getSeriesFixed(ctx, req, consolidation.Sum)
 			if err != nil {
 				return nil, req.OutInterval, err
 			}
-			// check to see if the request has been canceled, if so abort now.
-			select {
-			case <-ctx.Done():
-				//request canceled
-				return nil, req.OutInterval, nil
-			default:
-			}
 			cntFixed, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
 			if err != nil {
 				return nil, req.OutInterval, err
 			}
-			select {
-			case <-ctx.Done():
-				//request canceled
-				return nil, req.OutInterval, nil
-			default:
-			}
-			return divide(
+			return divideContext(
+				ctx,
 				sumFixed,
 				cntFixed,
 			), req.OutInterval, nil
@@ -371,23 +361,12 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 			if err != nil {
 				return nil, req.OutInterval, err
 			}
-			select {
-			case <-ctx.Done():
-				//request canceled
-				return nil, req.OutInterval, nil
-			default:
-			}
 			cntFixed, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
 			if err != nil {
 				return nil, req.OutInterval, err
 			}
-			select {
-			case <-ctx.Done():
-				//request canceled
-				return nil, req.OutInterval, nil
-			default:
-			}
-			return divide(
+			return divideContext(
+				ctx,
 				consolidation.Consolidate(sumFixed, req.AggNum, consolidation.Sum),
 				consolidation.Consolidate(cntFixed, req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
@@ -396,13 +375,7 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 			if err != nil {
 				return nil, req.OutInterval, err
 			}
-			select {
-			case <-ctx.Done():
-				//request canceled
-				return nil, req.OutInterval, nil
-			default:
-			}
-			return consolidation.Consolidate(fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
+			return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -418,6 +391,12 @@ func AggMetricKey(key, archive string, aggSpan uint32) string {
 }
 
 func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
 	rctx := newRequestContext(ctx, &req, consolidator)
 	res, err := s.getSeries(rctx)
 	if err != nil {
