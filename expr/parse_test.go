@@ -428,6 +428,30 @@ func TestExtractMetric(t *testing.T) {
 			"divideSeries(foo.bar,baz.quux)",
 			"foo.bar",
 		},
+		{
+			"sumSeries(seriesByTag('name=singleQuoted'))",
+			"",
+		},
+		{
+			`sumSeries(seriesByTag("name=doubleQuoted"))`,
+			"",
+		},
+		{
+			`sumSeries(seriesByTag('name=embeddedQuote"'))`,
+			"",
+		},
+		{
+			`sumSeries(seriesByTag('name=nonterminatedQuote"))`,
+			"",
+		},
+		{
+			`sumSeries(seriesByTag('name=\'escapedQuotes\''))`,
+			"",
+		},
+		{
+			"divideSeries(foo.bar;host=1;dc=test,baz.quux;host=1;dc=test)",
+			"foo.bar;host=1;dc=test",
+		},
 	}
 
 	for _, tt := range tests {
