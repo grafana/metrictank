@@ -28,10 +28,7 @@ func init() {
 }
 
 func initForTests(c *CasIdx) error {
-	if err := c.MemoryIdx.Init(); err != nil {
-		return err
-	}
-	return nil
+	return c.MemoryIdx.Init()
 }
 
 func getSeriesNames(depth, count int, prefix string) []string {
