@@ -23,7 +23,7 @@ dependencies:
 
 test:
   override:
-    - cd $IMPORTPATH && go test -v -race ./...
+    - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
     - cd $IMPORTPATH && go vet ./...
     - cd $IMPORTPATH && scripts/gofmt-check.sh
     - cd $IMPORTPATH && scripts/end2end_test.sh
