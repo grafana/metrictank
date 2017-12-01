@@ -165,40 +165,37 @@ func (c *CasIdx) InitBare() error {
 	var err error
 	tmpSession, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
-		return err
+		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
 	// create the keyspace or ensure it exists
 	if createKeyspace {
 		err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
 		if err != nil {
-			log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
-			return err
+			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
 		err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
 		if err != nil {
-			log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
-			return err
+			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
-				log.Warn("cassandra-idx cassandra keyspace not found. retry attempt: %v", attempt)
 				if attempt >= 5 {
-					return err
+					return fmt.Errorf("cassandra keyspace not found. %d attempts", attempt)
 				}
+				log.Warn("cassandra-idx cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
 				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
 					break
 				} else {
-					log.Warn("cassandra-idx cassandra table not found. retry attempt: %v", attempt)
 					if attempt >= 5 {
-						return err
+						return fmt.Errorf("cassandra table not found. %d attempts", attempt)
 					}
+					log.Warn("cassandra-idx cassandra table not found. retrying in 5s. attempt: %d", attempt)
 					time.Sleep(5 * time.Second)
 				}
 			}
@@ -210,8 +207,7 @@ func (c *CasIdx) InitBare() error {
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
-		return err
+		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
 	c.session = session
