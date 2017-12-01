@@ -64,7 +64,8 @@ func retry(query, from string, times int, validate Validator, base string) (bool
 	return false, resp
 }
 
-type checkResults struct {
+// temporary check results
+type checkResultsTemp struct {
 	sync.Mutex
 	valid []int // each position corresponds to a validator
 	// categories of invalid responses
@@ -74,13 +75,23 @@ type checkResults struct {
 	firstOther *response
 }
 
-func newCheckResults(validators []Validator) *checkResults {
-	return &checkResults{
+// final outcome of check results
+type checkResults struct {
+	valid []int // each position corresponds to a validator
+	// categories of invalid responses
+	empty      int
+	timeout    int
+	other      int
+	firstOther *response
+}
+
+func newCheckResultsTemp(validators []Validator) *checkResultsTemp {
+	return &checkResultsTemp{
 		valid: make([]int, len(validators)),
 	}
 }
 
-func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResults, validators []Validator) {
+func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResultsTemp, validators []Validator) {
 	r := renderQuery(base, query, from)
 	defer wg.Done()
 	for i, v := range validators {
@@ -124,7 +135,7 @@ func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResults,
 // we recommend for 60s duration to use 6000 requests, e.g. 100 per second
 func checkMT(endpoints []int, query, from string, dur time.Duration, reqs int, validators ...Validator) checkResults {
 	pre := time.Now()
-	ret := newCheckResults(validators)
+	ret := newCheckResultsTemp(validators)
 	period := dur / time.Duration(reqs)
 	tick := time.NewTicker(period)
 	issued := 0
@@ -143,5 +154,11 @@ func checkMT(endpoints []int, query, from string, dur time.Duration, reqs int, v
 	if time.Since(pre) > (110*dur/100)+2*time.Second {
 		panic(fmt.Sprintf("checkMT ran too long for some reason. expected %s. took actually %s. system overloaded?", dur, time.Since(pre)))
 	}
-	return *ret
+	return checkResults{
+		valid:      ret.valid,
+		empty:      ret.empty,
+		timeout:    ret.timeout,
+		other:      ret.other,
+		firstOther: ret.firstOther,
+	}
 }
