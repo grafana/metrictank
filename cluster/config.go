@@ -20,7 +20,7 @@ var (
 	httpTimeout        time.Duration
 	minAvailableShards int
 
-	swimUseConfig               string
+	swimUseConfig               = "default-lan"
 	swimBindAddrStr             string
 	swimBindAddr                *net.TCPAddr
 	swimTCPTimeout              time.Duration
