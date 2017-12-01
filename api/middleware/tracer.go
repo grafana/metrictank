@@ -51,9 +51,13 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 
 		rw := macCtx.Resp.(*TracingResponseWriter)
 
-		headers := macCtx.Resp.Header()
-		traceID := span.Context().(jaeger.SpanContext).TraceID().String()
-		headers["Trace-Id"] = []string{traceID}
+		// if tracing is enabled (context is not a opentracing.noopSpanContext)
+		// store traceID in output headers
+		if spanCtx, ok := span.Context().(jaeger.SpanContext); ok {
+			traceID := spanCtx.TraceID().String()
+			headers := macCtx.Resp.Header()
+			headers["Trace-Id"] = []string{traceID}
+		}
 
 		// call next handler. This will return after all handlers
 		// have completed and the request has been sent.
