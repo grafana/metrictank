@@ -12,16 +12,18 @@ import (
 )
 
 var (
-	ClusterName        string
-	primary            bool
-	peersStr           string
-	mode               string
-	maxPrio            int
-	clusterPort        int
-	clusterHost        net.IP
-	clusterBindAddr    string
-	httpTimeout        time.Duration
-	minAvailableShards int
+	ClusterName          string
+	primary              bool
+	peersStr             string
+	mode                 string
+	maxPrio              int
+	clusterPort          int
+	clusterHost          net.IP
+	clusterBindAddr      string
+	httpTimeout          time.Duration
+	minAvailableShards   int
+	suspectRetryDuration time.Duration
+	suspectRetryInterval time.Duration
 
 	client http.Client
 )
@@ -36,6 +38,8 @@ func ConfigSetup() {
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
+	clusterCfg.DurationVar(&suspectRetryDuration, "suspect-retry-duration", time.Minute*5, "Length of time to continually try and reconnect to a peer after it leaves.")
+	clusterCfg.DurationVar(&suspectRetryInterval, "suspect-retry-interval", time.Second*2, "Interval at which to try and reconnect to peers that have left the cluster.")
 	globalconf.Register("cluster", clusterCfg)
 }
 
