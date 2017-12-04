@@ -521,7 +521,7 @@ func TestAutoCompleteTag(t *testing.T) {
 			tagPrefix: "",
 			expr:      []string{},
 			from:      100,
-			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction", "cpu"},
+			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction", "cpu", "name"},
 			expErr:    false,
 		},
 	}
