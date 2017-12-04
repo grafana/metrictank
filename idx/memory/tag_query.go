@@ -665,10 +665,8 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 		q.prefix = q.prefix[1:]
 	case PREFIX_TAG:
 		resultSet = q.getInitialByTagPrefix(index)
-		q.filterTag = 0
 	case MATCH_TAG:
 		resultSet = q.getInitialByTagMatch(index)
-		q.filterTag = 0
 	case MATCH:
 		resultSet = q.getInitialByMatch(index, q.match[0])
 		q.match = q.match[1:]
@@ -723,7 +721,22 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 		}
 	}
 
-	res["name"] = struct{}{}
+	for tag := range res {
+		if q.filterTag == PREFIX_TAG {
+			if len(tag) < len(q.tagPrefix) {
+				delete(res, tag)
+				continue
+			}
+			if tag[:len(q.tagPrefix)] != q.tagPrefix {
+				delete(res, tag)
+				continue
+			}
+		} else {
+			if !q.tagMatch.MatchString(tag) {
+				delete(res, tag)
+			}
+		}
+	}
 
 	return res
 }

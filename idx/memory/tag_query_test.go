@@ -203,28 +203,41 @@ func TestQueryByTagNameRegex(t *testing.T) {
 }
 
 func TestQueryByTagFilterByTagMatch(t *testing.T) {
-	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag=~a{1}"}, 0)
-	expect := make(TagIDs)
-	expect[ids[3]] = struct{}{}
-	expect[ids[5]] = struct{}{}
-	expect[ids[6]] = struct{}{}
-	queryAndCompareResults(t, q, expect)
-
 	expectTags := make(map[string]struct{})
+	expectTags["abc"] = struct{}{}
+	expectTags["aaa"] = struct{}{}
 	queryAndCompareTagResults(t, q, expectTags)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{2}"}, 0)
-	delete(expect, ids[3])
-	queryAndCompareResults(t, q, expect)
+	delete(expectTags, "abc")
+	queryAndCompareTagResults(t, q, expectTags)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{3}"}, 0)
-	queryAndCompareResults(t, q, expect)
+	queryAndCompareTagResults(t, q, expectTags)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{4}"}, 0)
-	delete(expect, ids[5])
-	delete(expect, ids[6])
-	queryAndCompareResults(t, q, expect)
+	delete(expectTags, "aaa")
+	queryAndCompareTagResults(t, q, expectTags)
+}
+
+func TestQueryByTagFilterByTagPrefix(t *testing.T) {
+	q, _ := NewTagQuery([]string{"__tag^=a"}, 0)
+	expectTags := make(map[string]struct{})
+	expectTags["abc"] = struct{}{}
+	expectTags["aaa"] = struct{}{}
+	queryAndCompareTagResults(t, q, expectTags)
+
+	q, _ = NewTagQuery([]string{"__tag^=aa"}, 0)
+	delete(expectTags, "abc")
+	queryAndCompareTagResults(t, q, expectTags)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaa"}, 0)
+	queryAndCompareTagResults(t, q, expectTags)
+
+	q, _ = NewTagQuery([]string{"__tag^=aaaa"}, 0)
+	delete(expectTags, "aaa")
+	queryAndCompareTagResults(t, q, expectTags)
 }
 
 func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
@@ -255,15 +268,6 @@ func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
 		t.Fatalf("Expected query to start with equal expression")
 	}
 	delete(expect, ids[5])
-	queryAndCompareResults(t, q, expect)
-}
-
-func TestQueryByTagFilterByTagPrefix(t *testing.T) {
-	ids := getTestIDs(t)
-	q, _ := NewTagQuery([]string{"__tag^=aa"}, 0)
-	expect := make(TagIDs)
-	expect[ids[5]] = struct{}{}
-	expect[ids[6]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
