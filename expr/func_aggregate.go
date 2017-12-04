@@ -50,12 +50,11 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	// The tags for the aggregated series is only the tags that are
 	// common to all input series
-	var commonTags map[string]string
-	if len(series[0].Tags) == 0 {
-		commonTags = make(map[string]string, 0)
-	} else {
-		commonTags = series[0].Tags
+	commonTags := make(map[string]string, len(series[0].Tags))
+	for k, v := range series[0].Tags {
+		commonTags[k] = v
 	}
+
 	for _, serie := range series {
 		for k, v := range serie.Tags {
 			if commonTags[k] != v {
