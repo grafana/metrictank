@@ -57,10 +57,12 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			}
 			out = append(out, p)
 		}
-		name := fmt.Sprintf("divideSeries(%s,%s)", dividend.QueryPatt, divisor.QueryPatt)
+
+		name := fmt.Sprintf("divideSeries(%s,%s)", dividend.Target, divisor.Target)
 		output := models.Series{
 			Target:       name,
 			QueryPatt:    name,
+			Tags:         map[string]string{"name": name},
 			Datapoints:   out,
 			Interval:     divisor.Interval,
 			Consolidator: dividend.Consolidator,
