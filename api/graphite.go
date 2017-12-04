@@ -568,7 +568,21 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	for _, r := range plan.Reqs {
-		series, err := s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+		var err error
+		var series []Series
+		const SeriesByTagIdent = "seriesByTag("
+		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
+			startPos := len(SeriesByTagIdent)
+			endPos := strings.LastIndex(r.Query, ")")
+			exprs := strings.Split(r.Query[startPos:endPos], ",")
+			// Trim quotes
+			for i, e := range exprs {
+				exprs[i] = e[1 : len(e)-1]
+			}
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From))
+		} else {
+			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -716,13 +730,13 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	}
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
+	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
 	}
 	resp := models.IndexTagDetailsResp{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
@@ -741,11 +755,15 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		return
 	}
 
-	response.Write(ctx, response.NewJson(200, series, ""))
+	seriesNames := make([]string, 0, len(series))
+	for _, serie := range series {
+		seriesNames = append(seriesNames, serie.Pattern)
+	}
+	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
-func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]string, error) {
-	seriesSet := make(map[string]struct{})
+func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]Series, error) {
+	seriesSet := make(map[string]Series)
 
 	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
 	if err != nil {
@@ -753,28 +771,36 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 	}
 
 	for _, series := range result {
-		seriesSet[series] = struct{}{}
+		seriesSet[series.Path] = Series{
+			Pattern: series.Path,
+			Node:    cluster.Manager.ThisNode(),
+			Series:  []idx.Node{series},
+		}
 	}
 
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
 	}
 
-	resp := models.IndexFindByTagResp{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, r := range resps {
+		resp := models.IndexFindByTagResp{}
+		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
 		for _, series := range resp.Metrics {
-			seriesSet[series] = struct{}{}
+			seriesSet[series.Path] = Series{
+				Pattern: series.Path,
+				Node:    r.peer,
+				Series:  []idx.Node{series},
+			}
 		}
 	}
 
-	series := make([]string, 0, len(seriesSet))
-	for s := range seriesSet {
+	series := make([]Series, 0, len(seriesSet))
+	for _, s := range seriesSet {
 		series = append(series, s)
 	}
 
@@ -807,14 +833,14 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
-	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
+	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
 	}
 
 	resp := models.IndexTagsResp{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}

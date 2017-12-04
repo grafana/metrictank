@@ -1,6 +1,8 @@
 package expr
 
-import "github.com/grafana/metrictank/api/models"
+import (
+	"github.com/grafana/metrictank/api/models"
+)
 
 // internal function just for getting data
 type FuncGet struct {
@@ -20,5 +22,11 @@ func (s FuncGet) Context(context Context) Context {
 }
 
 func (s FuncGet) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	return cache[s.req], nil
+	series := cache[s.req]
+
+	for k := range series {
+		series[k].SetTags()
+	}
+
+	return series, nil
 }

@@ -539,11 +539,11 @@ KEYS:
 }
 
 // resolveIDs resolves a list of ids (TagIDs) into a list of complete
-// metric names, including tags. it assumes that at least a read lock
-// is already held by the caller
-func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
-	res := make([]string, len(ids))
-	i := uint32(0)
+// Node structs. It assumes that at least a read lock is already
+// held by the caller
+func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
+	res := make([]idx.Node, 0, len(ids))
+	tree := m.Tree[orgId]
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
 		if !ok {
@@ -552,13 +552,25 @@ func (m *MemoryIdx) resolveIDs(ids TagIDs) []string {
 			continue
 		}
 
-		res[i] = def.NameWithTags()
-		i++
+		name := def.NameWithTags()
+		node, ok := tree.Items[name]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", name)
+			continue
+		}
+
+		res = append(res, idx.Node{
+			Path:        name,
+			Leaf:        node.Leaf(),
+			HasChildren: node.HasChildren(),
+			Defs:        []idx.Archive{*def},
+		})
 	}
 	return res
 }
 
-func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]string, error) {
+func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -572,7 +584,7 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]st
 	return m.idsByTagQuery(orgId, query), nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []idx.Node {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -581,7 +593,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []string {
 		return nil
 	}
 
-	return m.resolveIDs(query.Run(tags, m.DefById))
+	return m.resolveIDs(orgId, query.Run(tags, m.DefById))
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {

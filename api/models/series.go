@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/grafana/metrictank/consolidation"
 	pickle "github.com/kisielk/og-rek"
@@ -14,12 +15,29 @@ import (
 type Series struct {
 	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Datapoints   []schema.Point
+	Tags         map[string]string // Must be set initially via call to `SetTags()`
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
 	QueryFrom    uint32                     // to tie series back to request it came from
 	QueryTo      uint32                     // to tie series back to request it came from
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
 	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
+}
+
+func (s *Series) SetTags() {
+	tagSplits := strings.Split(s.Target, ";")
+
+	s.Tags = make(map[string]string, len(tagSplits))
+
+	for _, tagPair := range tagSplits[1:] {
+		parts := strings.SplitN(tagPair, "=", 2)
+		if len(parts) != 2 {
+			// Shouldn't happen
+			continue
+		}
+		s.Tags[parts[0]] = parts[1]
+	}
+	s.Tags["name"] = tagSplits[0]
 }
 
 type SeriesByTarget []Series
@@ -34,6 +52,17 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 	for _, s := range series {
 		b = append(b, `{"target":`...)
 		b = strconv.AppendQuoteToASCII(b, s.Target)
+		if len(s.Tags) != 0 {
+			b = append(b, `,"tags":{`...)
+			for name, value := range s.Tags {
+				b = strconv.AppendQuoteToASCII(b, name)
+				b = append(b, ':')
+				b = strconv.AppendQuoteToASCII(b, value)
+				b = append(b, ',')
+			}
+			// Replace trailing comma with a closing bracket
+			b[len(b)-1] = '}'
+		}
 		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')

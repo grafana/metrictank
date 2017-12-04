@@ -283,18 +283,22 @@ func TestConsolidateBy(t *testing.T) {
 		input := map[Req][]models.Series{
 			NewReq("a", from, to, 0): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Avg, // emulate the fact that a by default will use avg
 			}},
 			NewReq("a", from, to, consolidation.Min): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Min,
 			}},
 			NewReq("a", from, to, consolidation.Sum): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Sum,
 			}},
 			NewReq("b", from, to, consolidation.Max): {{
 				QueryPatt:    "b",
+				Target:       "b",
 				Consolidator: consolidation.Max,
 			}},
 		}
@@ -388,6 +392,15 @@ func TestNamingChains(t *testing.T) {
 			},
 			[]string{
 				"*", // "a" could be more useful but see #648
+			},
+		},
+		{
+			`aliasByNode(avg(perSecond(seriesByTag('name=~.*.bar'))), 0)`,
+			[]string{
+				"a.bar;key1=val1",
+			},
+			[]string{
+				"a",
 			},
 		},
 		{

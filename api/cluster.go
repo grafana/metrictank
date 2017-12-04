@@ -178,13 +178,18 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 	response.Write(ctx, response.NewMsgp(200, &resp))
 }
 
+type PeerResponse struct {
+	peer cluster.Node
+	buf  []byte
+}
+
 // peerQuery takes a request and the path to request it on, then fans it out
 // across the cluster, except to the local peer.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([][]byte, error) {
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([]PeerResponse, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
 		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
@@ -192,7 +197,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	}
 	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
 
-	result := make([][]byte, 0, len(peers)-1)
+	result := make([]PeerResponse, 0, len(peers)-1)
 
 	var errors []error
 	var errLock sync.Mutex
@@ -216,7 +221,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 			}
 
 			resLock.Lock()
-			result = append(result, buf)
+			result = append(result, PeerResponse{peer, buf})
 			resLock.Unlock()
 		}(peer)
 	}

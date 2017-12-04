@@ -33,6 +33,12 @@ func TestAliasSub(t *testing.T) {
 			[]string{"metrictank.stats.env.instance.input.pluginname.metrics_received.counter32"},
 			[]string{"pluginname in"},
 		},
+		{
+			".*host=([^;]+)(;.*)?",
+			"\\1",
+			[]string{"foo.bar.baz;a=b;host=ab1"},
+			[]string{"ab1"},
+		},
 	}
 	for i, c := range cases {
 		f := NewAliasSub()

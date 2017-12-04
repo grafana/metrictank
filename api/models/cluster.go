@@ -37,5 +37,5 @@ type IndexTagDetailsResp struct {
 
 //go:generate msgp
 type IndexFindByTagResp struct {
-	Metrics []string `json:"metrics"`
+	Metrics []idx.Node `json:"metrics"`
 }

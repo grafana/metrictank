@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
@@ -337,24 +339,51 @@ func parseString(s string) (string, string, error) {
 	return s[:i], s[i+1:], nil
 }
 
-// exctractMetric searches for a metric name in `m'
-// metric name is defined to be a series of name characters terminated by a comma
+// extractMetric searches for a metric name or path Expression in `m'
+// metric name / path expression is defined by the following criteria:
+// 1. Not a function name
+// 2. Consists only of name characters
+// 	2.1 '=' is conditionally allowed if ';' is found (denoting tag format)
+// 	2.2 ',' is conditionally allowed within matching '{}'
+// 3. Is not a string literal (i.e. contained within single/double quote pairs)
 func extractMetric(m string) string {
 	start := 0
 	end := 0
 	curlyBraces := 0
+	quoteChar := byte(0)
+	allowEqual := false
 	for end < len(m) {
-		if m[end] == '{' {
-			curlyBraces++
-		} else if m[end] == '}' {
-			curlyBraces--
-		} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
-			return m[start:end]
-		} else if !(isNameChar(m[end]) || m[end] == ',') {
-			start = end + 1
+		c := m[end]
+		if (c == '\'' || c == '"') && (end == 0 || m[end-1] != '\\') {
+			// Found a non-escaped quote char
+			if quoteChar == 0 {
+				quoteChar = c
+				start = end + 1
+			} else if c == quoteChar {
+				quoteChar = byte(0)
+				start = end + 1
+			}
+		} else if quoteChar == 0 {
+			if c == '{' {
+				curlyBraces++
+			} else if c == '}' {
+				curlyBraces--
+			} else if c == ')' || (c == ',' && curlyBraces == 0) {
+				return m[start:end]
+			} else if !(isNameChar(c) || c == ',' || (allowEqual && c == '=')) {
+				start = end + 1
+				allowEqual = false
+			} else if c == ';' {
+				allowEqual = true
+			}
 		}
 
 		end++
+	}
+
+	if quoteChar != 0 {
+		log.Warn("extractMetric: encountered unterminated string literal in %s", m)
+		return ""
 	}
 
 	return m[start:end]
