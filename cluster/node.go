@@ -55,6 +55,8 @@ func (n *NodeState) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+/*
+To be enabled once all clusters are upgraded to code that can decode the new state
 func (n NodeState) MarshalJSON() ([]byte, error) {
 	switch n {
 	case NodeNotReady:
@@ -66,6 +68,7 @@ func (n NodeState) MarshalJSON() ([]byte, error) {
 	}
 	return nil, fmt.Errorf("impossible nodestate %v", n)
 }
+*/
 
 type Error struct {
 	code int
