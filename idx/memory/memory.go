@@ -542,8 +542,7 @@ KEYS:
 // Node structs. It assumes that at least a read lock is already
 // held by the caller
 func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
-	res := make([]idx.Node, len(ids))
-	i := uint32(0)
+	res := make([]idx.Node, 0, len(ids))
 	tree := m.Tree[orgId]
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
@@ -561,13 +560,12 @@ func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
 			continue
 		}
 
-		res[i] = idx.Node{
+		res = append(res, idx.Node{
 			Path:        name,
 			Leaf:        node.Leaf(),
 			HasChildren: node.HasChildren(),
 			Defs:        []idx.Archive{*def},
-		}
-		i++
+		})
 	}
 	return res
 }
