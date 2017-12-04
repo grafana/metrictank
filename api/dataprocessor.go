@@ -301,7 +301,7 @@ LOOP:
 }
 
 func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema.Point, interval uint32, err error) {
-	doRecover(&err)
+	defer doRecover(&err)
 	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
 	normalize := req.AggNum > 1    // do we need to normalize points at runtime?
 	// normalize is runtime consolidation but only for the purpose of bringing high-res
