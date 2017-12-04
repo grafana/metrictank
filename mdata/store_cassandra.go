@@ -44,7 +44,7 @@ var (
 	errReadQueueFull  = errors.New("the read queue is full")
 	errReadTooOld     = errors.New("the read is too old")
 	errTableNotFound  = errors.New("table for given TTL not found")
-	errCxtCanceled    = errors.New("context canceled")
+	errCtxCanceled    = errors.New("context canceled")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -421,7 +421,7 @@ func (c *CassandraStore) processReadQueue() {
 		select {
 		case <-crr.ctx.Done():
 			//request canceled
-			crr.out <- outcome{err: errCxtCanceled}
+			crr.out <- outcome{err: errCtxCanceled}
 			continue
 		default:
 		}
@@ -541,7 +541,7 @@ LOOP:
 			return nil, nil
 		case o := <-results:
 			if o.err != nil {
-				if o.err == errCxtCanceled {
+				if o.err == errCtxCanceled {
 					// context was canceled, return immediately.
 					return nil, nil
 				}
