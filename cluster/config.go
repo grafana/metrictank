@@ -23,7 +23,8 @@ var (
 	httpTimeout        time.Duration
 	minAvailableShards int
 
-	client http.Client
+	client    http.Client
+	transport *http.Transport
 )
 
 func ConfigSetup() {
@@ -57,17 +58,17 @@ func ConfigProcess() {
 	clusterPort = addr.Port
 
 	Mode = ModeType(mode)
-
+	transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Proxy:           http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   time.Second * 5,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: time.Second,
+	}
 	client = http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			Proxy:           http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   time.Second * 5,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: time.Second,
-		},
-		Timeout: httpTimeout,
+		Transport: transport,
+		Timeout:   httpTimeout,
 	}
 }

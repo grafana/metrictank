@@ -368,7 +368,10 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
 				req := models.NewReq(name, name, name, from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
-				points := srv.getSeriesFixed(test.NewContext(), req, consolidation.None)
+				points, err := srv.getSeriesFixed(test.NewContext(), req, consolidation.None)
+				if err != nil {
+					t.Errorf("case %q - error: %s", name, err)
+				}
 				if !reflect.DeepEqual(expected, points) {
 					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
 				}
@@ -637,7 +640,10 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				req := reqRaw(metric, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
 				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
-				iters := srv.getSeriesCachedStore(ctx, to)
+				iters, err := srv.getSeriesCachedStore(ctx, to)
+				if err != nil {
+					t.Fatalf("Pattern %s From %d To %d: error %s", pattern, from, to, err)
+				}
 
 				// expecting the first returned timestamp to be the T0 of the chunk containing "from"
 				expectResFrom := from - (from % span)

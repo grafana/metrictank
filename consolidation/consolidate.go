@@ -1,8 +1,21 @@
 package consolidation
 
 import (
+	"context"
+
 	"gopkg.in/raintank/schema.v1"
 )
+
+// ConsolidateContext wraps a Consolidate() call with a context.Context condition
+func ConsolidateContext(ctx context.Context, in []schema.Point, aggNum uint32, consolidator Consolidator) []schema.Point {
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil
+	default:
+	}
+	return Consolidate(in, aggNum, consolidator)
+}
 
 // Consolidate consolidates `in`, aggNum points at a time via the given function
 // note: the returned slice repurposes in's backing array.

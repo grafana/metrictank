@@ -1,6 +1,7 @@
 package mdata
 
 import (
+	"context"
 	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
@@ -13,6 +14,7 @@ type ChunkReadRequest struct {
 	p         []interface{}
 	timestamp time.Time
 	out       chan outcome
+	ctx       context.Context
 }
 
 type ChunkWriteRequest struct {

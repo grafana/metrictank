@@ -184,7 +184,8 @@ type PeerResponse struct {
 }
 
 // peerQuery takes a request and the path to request it on, then fans it out
-// across the cluster, except to the local peer.
+// across the cluster, except to the local peer. If any peer fails requests to
+// other peers are aborted.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
@@ -197,11 +198,13 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	}
 	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
 
-	result := make([]PeerResponse, 0, len(peers)-1)
+	reqCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	var errors []error
-	var errLock sync.Mutex
-	var resLock sync.Mutex
+	responses := make(chan struct {
+		data PeerResponse
+		err  error
+	}, 1)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		if peer.IsLocal() {
@@ -211,24 +214,29 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 		go func(peer cluster.Node) {
 			defer wg.Done()
 			log.Debug("HTTP Render querying %s%s", peer.Name, path)
-			buf, err := peer.Post(ctx, name, path, data)
+			buf, err := peer.Post(reqCtx, name, path, data)
 			if err != nil {
+				cancel()
 				log.Error(4, "HTTP Render error querying %s%s: %q", peer.Name, path, err)
-				errLock.Lock()
-				errors = append(errors, err)
-				errLock.Unlock()
-				return
 			}
-
-			resLock.Lock()
-			result = append(result, PeerResponse{peer, buf})
-			resLock.Unlock()
+			responses <- struct {
+				data PeerResponse
+				err  error
+			}{PeerResponse{peer, buf}, err}
 		}(peer)
 	}
-	wg.Wait()
+	// wait for all list goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
 
-	if len(errors) > 0 {
-		return nil, errors[0]
+	result := make([]PeerResponse, 0, len(peers)-1)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, err
+		}
+		result = append(result, resp.data)
 	}
 
 	return result, nil
