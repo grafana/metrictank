@@ -19,10 +19,19 @@ var tracker *Tracker
 
 func TestMain(m *testing.M) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, path("docker/launch.sh"), "docker-chaos")
+
+	fmt.Println("stopping docker-chaos stack should it be running...")
+	cmd := exec.CommandContext(ctx, "docker-compose", "down")
+	cmd.Dir = path("docker/docker-chaos")
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("launching docker-chaos stack...")
+	cmd = exec.CommandContext(ctx, path("docker/launch.sh"), "docker-chaos")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
-	var err error
 	tracker, err = NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err)
@@ -35,7 +44,7 @@ func TestMain(m *testing.M) {
 
 	retcode := m.Run()
 
-	fmt.Println("stopping the docker-compose stack...")
+	fmt.Println("stopping docker-compose stack...")
 	cancelFunc()
 	if err := cmd.Wait(); err != nil {
 		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)
