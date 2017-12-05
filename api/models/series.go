@@ -69,7 +69,7 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 			if math.IsNaN(p.Val) {
 				b = append(b, `null,`...)
 			} else {
-				b = strconv.AppendFloat(b, p.Val, 'f', 3, 64)
+				b = strconv.AppendFloat(b, p.Val, 'f', -1, 64)
 				b = append(b, ',')
 			}
 			b = strconv.AppendUint(b, uint64(p.Ts), 10)

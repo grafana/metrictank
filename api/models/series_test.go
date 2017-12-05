@@ -2,8 +2,9 @@ package models
 
 import (
 	"encoding/json"
-	"gopkg.in/raintank/schema.v1"
 	"testing"
+
+	"gopkg.in/raintank/schema.v1"
 )
 
 func TestJsonMarshal(t *testing.T) {
@@ -48,7 +49,7 @@ func TestJsonMarshal(t *testing.T) {
 					Interval: 60,
 				},
 			},
-			out: `[{"target":"a","datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]]}]`,
+			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]}]`,
 		},
 		{
 			in: []Series{
@@ -67,14 +68,14 @@ func TestJsonMarshal(t *testing.T) {
 					Datapoints: []schema.Point{
 						{Val: 123.456, Ts: 10},
 						{Val: 123.7, Ts: 20},
-						{Val: 124.10, Ts: 30},
+						{Val: 124.1001, Ts: 30},
 						{Val: 125.0, Ts: 40},
 						{Val: 126.0, Ts: 50},
 					},
 					Interval: 10,
 				},
 			},
-			out: `[{"target":"a","datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]]}]`,
+			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[123.7,20],[124.1001,30],[125,40],[126,50]]}]`,
 		},
 	}
 
