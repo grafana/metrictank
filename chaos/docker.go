@@ -100,9 +100,9 @@ func isolateOut(name, dur string, targets ...string) error {
 	var cmd *exec.Cmd
 	if len(ips) > 0 {
 		t := strings.Join(ips, ",")
-		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "gaiaadm/pumba", "--", "pumba", "--debug", "netem", "--target", t, "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
+		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "gaiaadm/pumba", "--", "pumba", "netem", "--target", t, "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
 	} else {
-		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "--debug", "netem", "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
+		cmd = exec.Command("docker", "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "pumba", "--", "pumba", "netem", "--tc-image", "gaiadocker/iproute2", "--duration", dur, "loss", "--percent", "100", name)
 	}
 
 	// log all pumba's output

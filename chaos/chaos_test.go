@@ -64,9 +64,8 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "grafana.*Initializing HTTP Server.*:3000"},
 	}
-	ch := tracker.Match(matchers)
 	select {
-	case <-ch:
+	case <-tracker.Match(matchers):
 	case <-time.After(time.Second * 40):
 		postAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
@@ -125,7 +124,6 @@ func TestQueryWorkload(t *testing.T) {
 // since they have at least 1 instance running for each shard.
 // the isolated shard should either return correct replies, or errors (in two cases: when it marks any shards as down,
 // but also before it does, but fails to get data via clustered requests from peers)
-//. TODO: in production do we stop querying isolated peers?
 func TestIsolateOneInstance(t *testing.T) {
 	postAnnotation("TestIsolateOneInstance:begin")
 	numReqMt4 := 1200
@@ -149,11 +147,11 @@ func TestIsolateOneInstance(t *testing.T) {
 
 	// validate results of isolated node
 	if mt4Results.valid[0]+mt4Results.valid[1] != numReqMt4 {
-		t.Fatalf("expected mt4 to return either correct or erroring responses. got %s", spew.Sdump(mt4Results))
+		t.Fatalf("expected mt4 to return either correct or erroring responses (total %d). got %s", numReqMt4, spew.Sdump(mt4Results))
 	}
 	if mt4Results.valid[1] < numReqMt4*30/100 {
 		// the instance is completely down for 30s of the 60s experiment run, but we allow some slack
-		t.Fatalf("expected at least 30%% of all mt4 results to succeed. got %s", spew.Sdump(mt4Results))
+		t.Fatalf("expected at least 30%% of all mt4 results to succeed. did %d queries. got %s", numReqMt4, spew.Sdump(mt4Results))
 	}
 
 	// validate results of other cluster nodes
