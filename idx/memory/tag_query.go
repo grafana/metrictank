@@ -66,7 +66,7 @@ type TagQuery struct {
 	filterTag int
 
 	// no need have more than one of tagMatch and tagPrefix
-	tagMatch  *regexp.Regexp
+	tagMatch  kvRe
 	tagPrefix string
 
 	index TagIndex
@@ -247,7 +247,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 				if err != nil {
 					return q, errInvalidQuery
 				}
-				q.tagMatch = re
+				q.tagMatch = kvRe{value: re}
 
 				// we only allow one query by tag
 				if q.filterTag != 0 {
@@ -360,7 +360,7 @@ func (q *TagQuery) getInitialByTagMatch() TagIDs {
 	matchCache := make(map[string]struct{})
 
 	for tag, values := range q.index {
-		if _, ok := matchCache[tag]; ok || q.tagMatch.MatchString(tag) {
+		if _, ok := matchCache[tag]; ok || q.tagMatch.value.MatchString(tag) {
 			if !ok {
 				matchCache[tag] = struct{}{}
 			}
@@ -517,7 +517,7 @@ IDS:
 				continue
 			}
 
-			if _, ok := matchingTags[key]; ok || q.tagMatch.MatchString(key) {
+			if _, ok := matchingTags[key]; ok || q.tagMatch.value.MatchString(key) {
 				if !ok {
 					matchingTags[key] = struct{}{}
 				}
@@ -838,20 +838,26 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 		}
 		key := tag[:equal]
 
-		/*if _, ok := notMatchingTags[key]; ok {
-			return false
-		}*/
+		if _, ok := q.tagMatch.missCache[key]; ok {
+			continue
+		}
 
-		//if _, ok := matchingTags[key]; ok || q.tagMatch.MatchString(key) {
-		if q.tagMatch.MatchString(key) {
-			/*if !ok {
-				matchingTags[key] = struct{}{}
-			}*/
+		if _, ok := q.tagMatch.matchCache[key]; ok || q.tagMatch.value.MatchString(key) {
+			if !ok {
+				if q.tagMatch.matchCache == nil {
+					q.tagMatch.matchCache = make(map[string]struct{})
+				}
+				q.tagMatch.matchCache[key] = struct{}{}
+			}
 			return true
-			/*} else {
-			if _, ok := notMatchingTags[key]; !ok {
-				notMatchingTags[key] = struct{}{}
-			}*/
+		} else {
+			if _, ok := q.tagMatch.missCache[key]; !ok {
+				if q.tagMatch.missCache == nil {
+					q.tagMatch.missCache = make(map[string]struct{})
+				}
+				q.tagMatch.missCache[key] = struct{}{}
+			}
+			continue
 		}
 	}
 
@@ -962,7 +968,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 				continue
 			}
 		} else {
-			if !q.tagMatch.MatchString(tag) {
+			if !q.tagMatch.value.MatchString(tag) {
 				delete(res, tag)
 			}
 		}
