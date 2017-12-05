@@ -36,9 +36,11 @@ type kv struct {
 }
 
 type kvRe struct {
-	cost  uint // cost of evaluating expression, compared to other kvRe objects
-	key   string
-	value *regexp.Regexp
+	cost       uint // cost of evaluating expression, compared to other kvRe objects
+	key        string
+	value      *regexp.Regexp
+	matchCache map[string]struct{}
+	missCache  map[string]struct{}
 }
 
 type KvByCost []kv
@@ -66,6 +68,9 @@ type TagQuery struct {
 	// no need have more than one of tagMatch and tagPrefix
 	tagMatch  *regexp.Regexp
 	tagPrefix string
+
+	index TagIndex
+	byId  map[string]*idx.Archive
 }
 
 func compileRe(pattern string) (*regexp.Regexp, error) {
@@ -266,12 +271,12 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		q.startWith = EQUAL
 	} else if len(q.prefix) > 0 {
 		q.startWith = PREFIX
+	} else if len(q.match) > 0 {
+		q.startWith = MATCH
 	} else if q.filterTag == PREFIX_TAG {
 		q.startWith = PREFIX_TAG
 	} else if q.filterTag == MATCH_TAG {
 		q.startWith = MATCH_TAG
-	} else if len(q.match) > 0 {
-		q.startWith = MATCH
 	} else {
 		return q, errInvalidQuery
 	}
@@ -280,14 +285,14 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 }
 
 // getInitialByMatch returns the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(index TagIndex, expr kvRe) TagIDs {
+func (q *TagQuery) getInitialByMatch(expr kvRe) TagIDs {
 	resultSet := make(TagIDs)
 
 	// shortcut if value == nil.
 	// this will simply match any value, like ^.+. since we know that every value
 	// in the index must not be empty, we can skip the matching.
 	if expr.value == nil {
-		for _, ids := range index[expr.key] {
+		for _, ids := range q.index[expr.key] {
 			for id := range ids {
 				resultSet[id] = struct{}{}
 			}
@@ -295,7 +300,7 @@ func (q *TagQuery) getInitialByMatch(index TagIndex, expr kvRe) TagIDs {
 		return resultSet
 	}
 
-	for v, ids := range index[expr.key] {
+	for v, ids := range q.index[expr.key] {
 		if !expr.value.MatchString(v) {
 			continue
 		}
@@ -308,10 +313,10 @@ func (q *TagQuery) getInitialByMatch(index TagIndex, expr kvRe) TagIDs {
 }
 
 // getInitialByPrefix returns the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(index TagIndex, expr kv) TagIDs {
+func (q *TagQuery) getInitialByPrefix(expr kv) TagIDs {
 	resultSet := make(TagIDs)
 
-	for v, ids := range index[expr.key] {
+	for v, ids := range q.index[expr.key] {
 		if len(v) < len(expr.value) || v[:len(expr.value)] != expr.value {
 			continue
 		}
@@ -326,10 +331,10 @@ func (q *TagQuery) getInitialByPrefix(index TagIndex, expr kv) TagIDs {
 
 // getInitialByTagPrefix returns the initial resultset by creating a list of
 // metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix(index TagIndex) TagIDs {
+func (q *TagQuery) getInitialByTagPrefix() TagIDs {
 	resultSet := make(TagIDs)
 
-	for tag, values := range index {
+	for tag, values := range q.index {
 		if len(tag) < len(q.tagPrefix) {
 			continue
 		}
@@ -350,11 +355,11 @@ func (q *TagQuery) getInitialByTagPrefix(index TagIndex) TagIDs {
 
 // getInitialByTagMatch returns the initial resultset by creating a list of
 // metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch(index TagIndex) TagIDs {
+func (q *TagQuery) getInitialByTagMatch() TagIDs {
 	resultSet := make(TagIDs)
 	matchCache := make(map[string]struct{})
 
-	for tag, values := range index {
+	for tag, values := range q.index {
 		if _, ok := matchCache[tag]; ok || q.tagMatch.MatchString(tag) {
 			if !ok {
 				matchCache[tag] = struct{}{}
@@ -372,11 +377,11 @@ func (q *TagQuery) getInitialByTagMatch(index TagIndex) TagIDs {
 }
 
 // getInitialByEqual returns the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(index TagIndex, expr kv) TagIDs {
+func (q *TagQuery) getInitialByEqual(expr kv) TagIDs {
 	resultSet := make(TagIDs)
 
 	// copy the map, because we'll later delete items from it
-	for k, v := range index[expr.key][expr.value] {
+	for k, v := range q.index[expr.key][expr.value] {
 		resultSet[k] = v
 	}
 
@@ -636,18 +641,21 @@ func (q *TagQuery) filterByFrom(resultSet TagIDs, byId map[string]*idx.Archive) 
 }
 
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
+	q.index = index
+	q.byId = byId
+
 	var resultSet TagIDs
 
 	for i := range q.equal {
-		q.equal[i].cost = uint(len(index[q.equal[i].key][q.equal[i].value]))
+		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
 	}
 
 	for i := range q.prefix {
-		q.prefix[i].cost = uint(len(index[q.prefix[i].key][q.prefix[i].value]))
+		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
 	}
 
 	for i := range q.match {
-		q.match[i].cost = uint(len(index[q.match[i].key]))
+		q.match[i].cost = uint(len(q.index[q.match[i].key]))
 	}
 
 	sort.Sort(KvByCost(q.equal))
@@ -658,17 +666,17 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	switch q.startWith {
 	case EQUAL:
-		resultSet = q.getInitialByEqual(index, q.equal[0])
+		resultSet = q.getInitialByEqual(q.equal[0])
 		q.equal = q.equal[1:]
 	case PREFIX:
-		resultSet = q.getInitialByPrefix(index, q.prefix[0])
+		resultSet = q.getInitialByPrefix(q.prefix[0])
 		q.prefix = q.prefix[1:]
 	case PREFIX_TAG:
-		resultSet = q.getInitialByTagPrefix(index)
+		resultSet = q.getInitialByTagPrefix()
 	case MATCH_TAG:
-		resultSet = q.getInitialByTagMatch(index)
+		resultSet = q.getInitialByTagMatch()
 	case MATCH:
-		resultSet = q.getInitialByMatch(index, q.match[0])
+		resultSet = q.getInitialByMatch(q.match[0])
 		q.match = q.match[1:]
 	}
 
@@ -676,7 +684,13 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	// filters should be in ascending order by the cpu required to process them,
 	// that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	q.filterByEqual(resultSet, index, q.equal, false)
+	for id := range resultSet {
+		if !q.testByAllExpressions(id) {
+			delete(resultSet, id)
+		}
+	}
+
+	/*q.filterByEqual(resultSet, index, q.equal, false)
 	q.filterByEqual(resultSet, index, q.notEqual, true)
 	if q.filterTag == PREFIX_TAG {
 		q.filterByTagPrefix(resultSet, byId)
@@ -687,8 +701,224 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 		q.filterByTagMatch(resultSet, byId)
 	}
 	q.filterByMatch(resultSet, byId, q.match, false)
-	q.filterByMatch(resultSet, byId, q.notMatch, true)
+	q.filterByMatch(resultSet, byId, q.notMatch, true)*/
 	return resultSet
+}
+
+func (q *TagQuery) testByAllExpressions(id idx.MetricID) bool {
+	var def *idx.Archive
+	var ok bool
+
+	if def, ok = q.byId[id.String()]; !ok {
+		// should never happen because every ID in the tag index
+		// must be present in the byId lookup table
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+		return false
+	}
+
+	if !q.testByFrom(def) {
+		return false
+	}
+
+	if len(q.equal) > 0 && !q.testByEqual(id, q.equal, false) {
+		return false
+	}
+
+	if len(q.notEqual) > 0 && !q.testByEqual(id, q.notEqual, true) {
+		return false
+	}
+
+	if q.filterTag == PREFIX_TAG {
+		if !q.testByTagPrefix(def) {
+			return false
+		}
+	}
+
+	if !q.testByPrefix(def, q.prefix) {
+		return false
+	}
+
+	if q.filterTag == MATCH_TAG {
+		if !q.testByTagMatch(def) {
+			return false
+		}
+	}
+
+	if len(q.match) > 0 && !q.testByMatch(def, q.match, false) {
+		return false
+	}
+
+	if len(q.notMatch) > 0 && !q.testByMatch(def, q.notMatch, true) {
+		return false
+	}
+
+	return true
+}
+
+func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
+EXPRS:
+	for _, e := range exprs {
+		if e.key == "name" {
+			if e.value.MatchString(def.Name) {
+				if not {
+					return false
+				} else {
+					continue EXPRS
+				}
+			} else {
+				if !not {
+					return false
+				} else {
+					continue EXPRS
+				}
+			}
+		}
+		for _, tag := range def.Tags {
+			// length of key doesn't match
+			if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
+				continue
+			}
+
+			if e.key != tag[:len(e.key)] {
+				continue
+			}
+
+			value := tag[len(e.key)+1:]
+
+			// reduce regex matching by looking up cached non-matches
+			if _, ok := e.missCache[value]; ok {
+				continue
+			}
+
+			// reduce regex matching by looking up cached matches
+			if _, ok := e.matchCache[value]; ok {
+				if not {
+					return false
+				}
+				continue EXPRS
+			}
+
+			// value == nil means that this expression can be short cut
+			// by not evaluating it
+			if e.value == nil || e.value.MatchString(value) {
+				if len(e.matchCache) < matchCacheSize {
+					if e.matchCache == nil {
+						e.matchCache = make(map[string]struct{})
+					}
+					e.matchCache[value] = struct{}{}
+				}
+				if not {
+					return false
+				}
+				continue EXPRS
+			} else {
+				if len(e.missCache) < matchCacheSize {
+					if e.missCache == nil {
+						e.missCache = make(map[string]struct{})
+					}
+					e.missCache[value] = struct{}{}
+				}
+			}
+		}
+		if !not {
+			return false
+		}
+	}
+	return true
+}
+
+func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
+	for _, tag := range def.Tags {
+		equal := strings.Index(tag, "=")
+		if equal < 0 {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: tag is in index, but does not contain '=' sign: %s", tag)
+			continue
+		}
+		key := tag[:equal]
+
+		/*if _, ok := notMatchingTags[key]; ok {
+			return false
+		}*/
+
+		//if _, ok := matchingTags[key]; ok || q.tagMatch.MatchString(key) {
+		if q.tagMatch.MatchString(key) {
+			/*if !ok {
+				matchingTags[key] = struct{}{}
+			}*/
+			return true
+			/*} else {
+			if _, ok := notMatchingTags[key]; !ok {
+				notMatchingTags[key] = struct{}{}
+			}*/
+		}
+	}
+
+	return false
+}
+
+func (q *TagQuery) testByFrom(def *idx.Archive) bool {
+	return q.from <= def.LastUpdate
+}
+
+func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
+EXPRS:
+	for _, e := range exprs {
+		for _, tag := range def.Tags {
+			// continue if any of these match:
+			// - length of tag is too short, so this can't be a match
+			// - the position where we expect the = is not a =
+			// - the key does not match
+			// - the prefix value does not match
+			if len(tag) < len(e.key)+len(e.value)+1 ||
+				tag[len(e.key)] != 61 ||
+				tag[:len(e.key)] != e.key ||
+				tag[len(e.key)+1:len(e.key)+len(e.value)+1] != e.value {
+				continue
+			}
+			continue EXPRS
+		}
+		return false
+	}
+	return true
+}
+
+func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
+	for _, tag := range def.Tags {
+		if len(tag) < len(q.tagPrefix) {
+			continue
+		}
+
+		if tag[:len(q.tagPrefix)] == q.tagPrefix {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
+	for _, e := range exprs {
+		indexIds := q.index[e.key][e.value]
+
+		// shortcut if key=value combo does not exist at all
+		if len(indexIds) == 0 {
+			return not
+		}
+
+		if _, ok := indexIds[id]; ok {
+			if not {
+				return false
+			}
+		} else {
+			if !not {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
