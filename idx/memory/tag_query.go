@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -619,7 +620,7 @@ func (q *TagQuery) sortByCost() {
 	sort.Sort(KvReByCost(q.notMatch))
 }
 
-func (q *TagQuery) getInitialResultSet() TagIDs {
+func (q *TagQuery) getInitialIds() TagIDs {
 	var resultSet TagIDs
 
 	switch q.startWith {
@@ -647,7 +648,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	q.sortByCost()
 
-	resultSet := q.getInitialResultSet()
+	resultSet := q.getInitialIds()
 
 	// filter the resultSet by the from condition and all other expressions given.
 	// filters should be in ascending order by the cpu required to process them,
@@ -673,16 +674,41 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	return resultSet
 }
 
+func (q *TagQuery) getMaxTagCount() int {
+	var maxTagCount int
+
+	if q.filterTag == PREFIX_TAG {
+		for tag := range q.index {
+			if len(tag) < len(q.tagPrefix) {
+				continue
+			}
+			if tag[:len(q.tagPrefix)] != q.tagPrefix {
+				continue
+			}
+			maxTagCount++
+		}
+	} else if q.filterTag == MATCH_TAG {
+		for tag := range q.index {
+			if q.tagMatch.value.MatchString(tag) {
+				maxTagCount++
+			}
+		}
+	}
+	return maxTagCount
+}
+
 func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 
-	q.sortByCost()
+	maxTagCount := int32(-1)
+	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
-	ids := q.getInitialResultSet()
+	q.sortByCost()
+	ids := q.getInitialIds()
+
 	resultSet := make(map[string]struct{}, 0)
 	missCache := make(map[string]struct{}, 0)
-
 	for id := range ids {
 		var def *idx.Archive
 		var ok bool
@@ -730,6 +756,9 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 			if q.testByAllExpressions(id, def) {
 				for key := range metricTags {
 					resultSet[key] = struct{}{}
+					if atomic.LoadInt32(&maxTagCount) <= int32(len(resultSet)) {
+						return resultSet
+					}
 				}
 			}
 		}
