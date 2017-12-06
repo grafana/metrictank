@@ -458,7 +458,7 @@ func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, f
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
 		} else {
-			t.Fatalf("Expected no error, but got %s", err)
+			t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, tagPrefix)
 		}
 	}
 

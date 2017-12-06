@@ -705,6 +705,9 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 			}
 
 			key := tag[:equal]
+			if _, ok := resultSet[key]; ok {
+				continue
+			}
 			if q.filterTag == PREFIX_TAG {
 				if len(key) < len(q.tagPrefix) {
 					continue
@@ -712,16 +715,13 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 				if key[:len(q.tagPrefix)] != q.tagPrefix {
 					continue
 				}
-			} else {
+			} else if q.filterTag == MATCH_TAG {
 				if _, ok := missCache[key]; ok || !q.tagMatch.value.MatchString(tag) {
 					if !ok {
 						missCache[key] = struct{}{}
 					}
 					continue
 				}
-			}
-			if _, ok := resultSet[key]; ok {
-				continue
 			}
 			metricTags[key] = struct{}{}
 		}
