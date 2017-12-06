@@ -388,71 +388,7 @@ func (q *TagQuery) getInitialByEqual(expr kv) TagIDs {
 	return resultSet
 }
 
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
-	q.index = index
-	q.byId = byId
-
-	var resultSet TagIDs
-
-	for i := range q.equal {
-		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
-	}
-
-	for i := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
-	}
-
-	for i := range q.match {
-		q.match[i].cost = uint(len(q.index[q.match[i].key]))
-	}
-
-	sort.Sort(KvByCost(q.equal))
-	sort.Sort(KvByCost(q.notEqual))
-	sort.Sort(KvByCost(q.prefix))
-	sort.Sort(KvReByCost(q.match))
-	sort.Sort(KvReByCost(q.notMatch))
-
-	switch q.startWith {
-	case EQUAL:
-		resultSet = q.getInitialByEqual(q.equal[0])
-		q.equal = q.equal[1:]
-	case PREFIX:
-		resultSet = q.getInitialByPrefix(q.prefix[0])
-		q.prefix = q.prefix[1:]
-	case PREFIX_TAG:
-		resultSet = q.getInitialByTagPrefix()
-	case MATCH_TAG:
-		resultSet = q.getInitialByTagMatch()
-	case MATCH:
-		resultSet = q.getInitialByMatch(q.match[0])
-		q.match = q.match[1:]
-	}
-
-	// filter the resultSet by the from condition and all other expressions given.
-	// filters should be in ascending order by the cpu required to process them,
-	// that way the most cpu intensive filters only get applied to the smallest
-	// possible resultSet.
-	for id := range resultSet {
-		if !q.testByAllExpressions(id) {
-			delete(resultSet, id)
-		}
-	}
-
-	return resultSet
-}
-
-func (q *TagQuery) testByAllExpressions(id idx.MetricID) bool {
-	var def *idx.Archive
-	var ok bool
-
-	if def, ok = q.byId[id.String()]; !ok {
-		// should never happen because every ID in the tag index
-		// must be present in the byId lookup table
-		corruptIndex.Inc()
-		log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
-		return false
-	}
-
+func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -663,14 +599,65 @@ func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
 	return true
 }
 
-func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
-	ids := q.Run(index, byId)
-	res := make(map[string]struct{}, len(ids))
+func (q *TagQuery) sortByCost() {
+	for i := range q.equal {
+		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
+	}
 
-	for id := range ids {
+	for i := range q.prefix {
+		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
+	}
+
+	for i := range q.match {
+		q.match[i].cost = uint(len(q.index[q.match[i].key]))
+	}
+
+	sort.Sort(KvByCost(q.equal))
+	sort.Sort(KvByCost(q.notEqual))
+	sort.Sort(KvByCost(q.prefix))
+	sort.Sort(KvReByCost(q.match))
+	sort.Sort(KvReByCost(q.notMatch))
+}
+
+func (q *TagQuery) getInitialResultSet() TagIDs {
+	var resultSet TagIDs
+
+	switch q.startWith {
+	case EQUAL:
+		resultSet = q.getInitialByEqual(q.equal[0])
+		q.equal = q.equal[1:]
+	case PREFIX:
+		resultSet = q.getInitialByPrefix(q.prefix[0])
+		q.prefix = q.prefix[1:]
+	case PREFIX_TAG:
+		resultSet = q.getInitialByTagPrefix()
+	case MATCH_TAG:
+		resultSet = q.getInitialByTagMatch()
+	case MATCH:
+		resultSet = q.getInitialByMatch(q.match[0])
+		q.match = q.match[1:]
+	}
+
+	return resultSet
+}
+
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
+	q.index = index
+	q.byId = byId
+
+	q.sortByCost()
+
+	resultSet := q.getInitialResultSet()
+
+	// filter the resultSet by the from condition and all other expressions given.
+	// filters should be in ascending order by the cpu required to process them,
+	// that way the most cpu intensive filters only get applied to the smallest
+	// possible resultSet.
+	for id := range resultSet {
 		var def *idx.Archive
 		var ok bool
-		if def, ok = byId[id.String()]; !ok {
+
+		if def, ok = q.byId[id.String()]; !ok {
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			corruptIndex.Inc()
@@ -678,6 +665,37 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 			continue
 		}
 
+		if !q.testByAllExpressions(id, def) {
+			delete(resultSet, id)
+		}
+	}
+
+	return resultSet
+}
+
+func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
+	q.index = index
+	q.byId = byId
+
+	q.sortByCost()
+
+	ids := q.getInitialResultSet()
+	resultSet := make(map[string]struct{}, 0)
+	missCache := make(map[string]struct{}, 0)
+
+	for id := range ids {
+		var def *idx.Archive
+		var ok bool
+
+		if def, ok = q.byId[id.String()]; !ok {
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			continue
+		}
+
+		metricTags := make(map[string]struct{}, 0)
 		for _, tag := range def.Tags {
 			equal := strings.Index(tag, "=")
 			if equal < 0 {
@@ -687,28 +705,35 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 			}
 
 			key := tag[:equal]
-			if _, ok := res[key]; !ok {
-				res[key] = struct{}{}
+			if q.filterTag == PREFIX_TAG {
+				if len(key) < len(q.tagPrefix) {
+					continue
+				}
+				if key[:len(q.tagPrefix)] != q.tagPrefix {
+					continue
+				}
+			} else {
+				if _, ok := missCache[key]; ok || !q.tagMatch.value.MatchString(tag) {
+					if !ok {
+						missCache[key] = struct{}{}
+					}
+					continue
+				}
+			}
+			if _, ok := resultSet[key]; ok {
+				continue
+			}
+			metricTags[key] = struct{}{}
+		}
+
+		if len(metricTags) > 0 {
+			if q.testByAllExpressions(id, def) {
+				for key := range metricTags {
+					resultSet[key] = struct{}{}
+				}
 			}
 		}
 	}
 
-	for tag := range res {
-		if q.filterTag == PREFIX_TAG {
-			if len(tag) < len(q.tagPrefix) {
-				delete(res, tag)
-				continue
-			}
-			if tag[:len(q.tagPrefix)] != q.tagPrefix {
-				delete(res, tag)
-				continue
-			}
-		} else {
-			if !q.tagMatch.value.MatchString(tag) {
-				delete(res, tag)
-			}
-		}
-	}
-
-	return res
+	return resultSet
 }
