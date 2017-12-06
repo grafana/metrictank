@@ -886,3 +886,53 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
+	InitLargeIndex()
+
+	type testCase struct {
+		tagPrefix string
+		expr      []string
+		from      int64
+		expRes    []string
+	}
+
+	tc := testCase{
+		tagPrefix: "di",
+		expr:      []string{},
+		from:      100,
+		expRes:    []string{"disk", "direction"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, tc.expRes, false)
+	}
+}
+
+func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
+	InitLargeIndex()
+
+	type testCase struct {
+		tagPrefix string
+		expr      []string
+		from      int64
+		expRes    []string
+	}
+
+	tc := testCase{
+		tagPrefix: "di",
+		expr:      []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
+		from:      12345,
+		expRes:    []string{"disk", "direction"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, tc.expRes, false)
+	}
+}
