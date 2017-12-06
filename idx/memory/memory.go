@@ -482,41 +482,14 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 			return nil, nil
 		}
 
+		if len(tagPrefix) > 0 {
+			expressions = append(expressions, fmt.Sprintf("__tag^=%s", tagPrefix))
+		}
 		query, err := NewTagQuery(expressions, from)
 		if err != nil {
 			return nil, err
 		}
-		ids := query.Run(tags, m.DefById)
-		for id := range ids {
-			def, ok := m.DefById[id.String()]
-			if !ok {
-				corruptIndex.Inc()
-				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-				continue
-			}
-
-			for _, tag := range def.Tags {
-				i := strings.Index(tag, "=")
-				if i == -1 {
-					corruptIndex.Inc()
-					log.Error(3, "memory-idx: corrupt. Tag in index has no '=' sign: %s", tag)
-					continue
-				}
-
-				key := tag[:i]
-				if _, ok := res[key]; ok {
-					continue
-				}
-
-				if len(tagPrefix) > 0 {
-					if len(tagPrefix) <= len(key) && key[:len(tagPrefix)] == tagPrefix {
-						res[key] = struct{}{}
-					}
-				} else {
-					res[key] = struct{}{}
-				}
-			}
-		}
+		res = query.RunGetTags(tags, m.DefById)
 	} else {
 	TAGS:
 		for tag, values := range tags {
