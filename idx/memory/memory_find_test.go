@@ -149,6 +149,7 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 func TestMain(m *testing.M) {
 	defer func(t bool) { tagSupport = t }(tagSupport)
 	tagSupport = true
+	tagQueryWorkers = 5
 	matchCacheSize = 1000
 	os.Exit(m.Run())
 }
