@@ -533,7 +533,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 	return res, nil
 }
 
-func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64) ([]string, error) {
+func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	expressions = append(expressions, tag+"^="+valPrefix)
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
@@ -574,6 +574,11 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 	res := make([]string, 0, len(valueMap))
 	for v := range valueMap {
 		res = append(res, v)
+	}
+
+	sort.Strings(res)
+	if uint16(len(res)) > limit {
+		res = res[:limit]
 	}
 
 	return res, nil
