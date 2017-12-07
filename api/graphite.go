@@ -1095,7 +1095,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 }
 
 func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
-	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.ValPrefix, request.Tag, request.Expr, request.From)
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.ValPrefix, request.Tag, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1104,8 +1104,8 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, valPrefix, tag string, expressions []string, from int64) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, valPrefix, tag, expressions, from)
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, valPrefix, tag string, expressions []string, from int64, limit uint16) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, valPrefix, tag, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1115,7 +1115,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, va
 		valSet[val] = struct{}{}
 	}
 
-	data := models.IndexAutoCompleteTagValues{OrgId: orgId, ValPrefix: valPrefix, Tag: tag, Expr: expressions, From: from}
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, ValPrefix: valPrefix, Tag: tag, Expr: expressions, From: from, Limit: limit}
 	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err
@@ -1135,6 +1135,11 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, va
 	vals := make([]string, 0, len(valSet))
 	for t := range valSet {
 		vals = append(vals, t)
+	}
+
+	sort.Strings(vals)
+	if uint16(len(vals)) > limit {
+		vals = vals[:limit]
 	}
 
 	return vals, nil

@@ -135,7 +135,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
 	var tags models.StringList
 	var err error
-	tags, err = s.MetricIndex.AutoCompleteTagValues(req.OrgId, req.ValPrefix, req.Tag, req.Expr, req.From)
+	tags, err = s.MetricIndex.AutoCompleteTagValues(req.OrgId, req.ValPrefix, req.Tag, req.Expr, req.From, req.Limit)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

@@ -545,10 +545,10 @@ func TestAutoCompleteTag(t *testing.T) {
 	}
 }
 
-func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, expRes []string, expErr bool) {
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, limit uint16, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTagValues(1, tag, valPrefix, expr, from)
+	res, err := ix.AutoCompleteTagValues(1, tag, valPrefix, expr, from, limit)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
@@ -578,6 +578,7 @@ func TestAutoCompleteTagValues(t *testing.T) {
 		valPrefix string
 		expr      []string
 		from      int64
+		limit     uint16
 		expRes    []string
 		expErr    bool
 	}
@@ -588,13 +589,23 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			valPrefix: "host9",
 			expr:      []string{"direction=write"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
+			expErr:    false,
+		}, {
+			tag:       "host",
+			valPrefix: "host9",
+			expr:      []string{"direction=write"},
+			from:      100,
+			limit:     5,
+			expRes:    []string{"host9", "host90", "host91", "host92", "host93"},
 			expErr:    false,
 		}, {
 			tag:       "direction",
 			valPrefix: "w",
 			expr:      []string{"device=disk"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"write"},
 			expErr:    false,
 		}, {
@@ -602,6 +613,7 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			valPrefix: "w",
 			expr:      []string{"device=cpu"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{},
 			expErr:    false,
 		}, {
@@ -609,6 +621,7 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			valPrefix: "",
 			expr:      []string{},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"cpu", "disk"},
 			expErr:    false,
 		}, {
@@ -616,13 +629,14 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			valPrefix: "",
 			expr:      []string{"disk=~disk[4-5]{1}"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"disk"},
 			expErr:    false,
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagValuesAndCompare(t, tc.tag, tc.valPrefix, tc.expr, tc.from, tc.expRes, tc.expErr)
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.valPrefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
 	}
 }
 
