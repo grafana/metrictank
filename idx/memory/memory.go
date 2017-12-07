@@ -536,7 +536,11 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 }
 
 func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
-	expressions = append(expressions, tag+"^="+valPrefix)
+	if len(valPrefix) > 0 {
+		expressions = append(expressions, tag+"^="+valPrefix)
+	} else {
+		expressions = append(expressions, tag+"!=")
+	}
 	query, err := NewTagQuery(expressions, from)
 	if err != nil {
 		return nil, err
@@ -562,14 +566,18 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
 			continue
 		}
-		for _, t := range def.Tags {
-			if len(tag) > len(t)+2 {
-				continue
+		if tag == "name" {
+			valueMap[def.Name] = struct{}{}
+		} else {
+			for _, t := range def.Tags {
+				if len(tag) > len(t)+2 {
+					continue
+				}
+				if t[:len(tag)] != tag {
+					continue
+				}
+				valueMap[t[len(tag)+1:]] = struct{}{}
 			}
-			if t[:len(tag)] != tag {
-				continue
-			}
-			valueMap[t[len(tag)+1:]] = struct{}{}
 		}
 	}
 
