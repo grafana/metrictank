@@ -193,6 +193,7 @@ func TestQueryByTagNameEquals(t *testing.T) {
 	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
+
 func TestQueryByTagNameRegex(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=~metr"}, 0)
