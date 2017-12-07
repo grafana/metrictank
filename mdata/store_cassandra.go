@@ -101,6 +101,7 @@ type CassandraStore struct {
 	ttlTables        TTLTables
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
+	timeout          time.Duration
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -290,6 +291,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
+		timeout:          cluster.Timeout,
 	}
 
 	for i := 0; i < writers; i++ {
@@ -398,7 +400,9 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
-	ret := c.Session.Query(query, row_key, t0, data).Exec()
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	ret := c.Session.Query(query, row_key, t0, data).WithContext(ctx).Exec()
+	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
 }
