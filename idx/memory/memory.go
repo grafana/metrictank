@@ -540,54 +540,77 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 }
 
 func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
-	if len(valPrefix) > 0 {
-		expressions = append(expressions, tag+"^="+valPrefix)
-	} else {
-		expressions = append(expressions, tag+"!=")
-	}
-	query, err := NewTagQuery(expressions, from)
-	if err != nil {
-		return nil, err
-	}
+	var res []string
 
-	m.RLock()
-	defer m.RUnlock()
-
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil, nil
-	}
-
-	ids := query.Run(tags, m.DefById)
-	valueMap := make(map[string]struct{})
-	for id := range ids {
-		var ok bool
-		var def *idx.Archive
-		if def, ok = m.DefById[id.String()]; !ok {
-			// should never happen because every ID in the tag index
-			// must be present in the byId lookup table
-			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
-			continue
-		}
-		if tag == "name" {
-			valueMap[def.Name] = struct{}{}
+	if len(expressions) > 0 {
+		if len(valPrefix) > 0 {
+			expressions = append(expressions, tag+"^="+valPrefix)
 		} else {
-			for _, t := range def.Tags {
-				if len(tag) > len(t)+2 {
-					continue
+			expressions = append(expressions, tag+"!=")
+		}
+		query, err := NewTagQuery(expressions, from)
+		if err != nil {
+			return nil, err
+		}
+
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		ids := query.Run(tags, m.DefById)
+		valueMap := make(map[string]struct{})
+		for id := range ids {
+			var ok bool
+			var def *idx.Archive
+			if def, ok = m.DefById[id.String()]; !ok {
+				// should never happen because every ID in the tag index
+				// must be present in the byId lookup table
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+				continue
+			}
+			if tag == "name" {
+				valueMap[def.Name] = struct{}{}
+			} else {
+				for _, t := range def.Tags {
+					if len(tag) > len(t)+2 {
+						continue
+					}
+					if t[:len(tag)] != tag {
+						continue
+					}
+					valueMap[t[len(tag)+1:]] = struct{}{}
 				}
-				if t[:len(tag)] != tag {
-					continue
-				}
-				valueMap[t[len(tag)+1:]] = struct{}{}
 			}
 		}
-	}
 
-	res := make([]string, 0, len(valueMap))
-	for v := range valueMap {
-		res = append(res, v)
+		res = make([]string, 0, len(valueMap))
+		for v := range valueMap {
+			res = append(res, v)
+		}
+	} else {
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		vals := tags[tag]
+		res = make([]string, 0, len(vals))
+
+		for val := range vals {
+			if len(valPrefix) > 0 && (len(valPrefix) > len(val) || val[:len(valPrefix)] != valPrefix) {
+				continue
+			}
+
+			res = append(res, val)
+		}
 	}
 
 	sort.Strings(res)
