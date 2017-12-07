@@ -890,14 +890,14 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	}
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, TagPrefix: tagPrefix, Expr: expressions, From: from, Limit: limit}
-	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/tags")
+	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
 	}
 
 	resp := models.StringList{}
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
 		if err != nil {
 			return nil, err
 		}
@@ -941,14 +941,14 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 	}
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, ValPrefix: valPrefix, Expr: expressions, From: from, Limit: limit}
-	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/values")
+	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err
 	}
 
 	var resp models.StringList
-	for _, buf := range bufs {
-		_, err = resp.UnmarshalMsg(buf)
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
 		if err != nil {
 			return nil, err
 		}
