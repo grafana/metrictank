@@ -450,10 +450,10 @@ func TestTagSorting(t *testing.T) {
 	}
 }
 
-func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, expRes []string, expErr bool) {
+func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, limit uint16, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from)
+	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from, limit)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
@@ -482,6 +482,7 @@ func TestAutoCompleteTag(t *testing.T) {
 		tagPrefix string
 		expr      []string
 		from      int64
+		limit     uint16
 		expRes    []string
 		expErr    bool
 	}
@@ -491,43 +492,56 @@ func TestAutoCompleteTag(t *testing.T) {
 			tagPrefix: "di",
 			expr:      []string{"direction=write", "host=host90"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"disk", "direction"},
 			expErr:    false,
 		}, {
 			tagPrefix: "di",
 			expr:      []string{"direction=write", "host=host90", "device=cpu"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{},
 			expErr:    false,
 		}, {
 			tagPrefix: "",
 			expr:      []string{"direction=write", "host=host90"},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction"},
+			expErr:    false,
+		}, {
+			tagPrefix: "",
+			expr:      []string{"direction=write", "host=host90"},
+			from:      100,
+			limit:     3,
+			expRes:    []string{"dc", "device", "direction"},
 			expErr:    false,
 		}, {
 			tagPrefix: "ho",
 			expr:      []string{},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"host"},
 			expErr:    false,
 		}, {
 			tagPrefix: "host",
 			expr:      []string{},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"host"},
 			expErr:    false,
 		}, {
 			tagPrefix: "",
 			expr:      []string{},
 			from:      100,
+			limit:     100,
 			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction", "cpu", "name"},
 			expErr:    false,
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagsAndCompare(t, tc.tagPrefix, tc.expr, tc.from, tc.expRes, tc.expErr)
+		autoCompleteTagsAndCompare(t, tc.tagPrefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
 	}
 }
 
@@ -908,7 +922,7 @@ func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, tc.expRes, false)
+		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, 2, tc.expRes, false)
 	}
 }
 
@@ -933,6 +947,6 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, tc.expRes, false)
+		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, 2, tc.expRes, false)
 	}
 }

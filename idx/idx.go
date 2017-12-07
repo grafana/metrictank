@@ -147,7 +147,7 @@ type MetricIndex interface {
 	// LastUpdate time is >= the given value.
 	Tags(int, string, int64) ([]string, error)
 
-	AutoCompleteTags(int, string, []string, int64) ([]string, error)
+	AutoCompleteTags(int, string, []string, int64, uint16) ([]string, error)
 	AutoCompleteTagValues(int, string, string, []string, int64) ([]string, error)
 
 	// TagDetails returns a list of all values associated with a given tag key in the

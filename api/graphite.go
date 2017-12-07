@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1039,7 +1040,7 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 }
 
 func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request models.GraphiteAutoCompleteTags) {
-	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.TagPrefix, request.Expr, request.From)
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.TagPrefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1052,8 +1053,8 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTags(orgId, tagPrefix, expressions, from)
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTags(orgId, tagPrefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1063,7 +1064,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 		tagSet[tag] = struct{}{}
 	}
 
-	data := models.IndexAutoCompleteTags{OrgId: orgId, TagPrefix: tagPrefix, Expr: expressions, From: from}
+	data := models.IndexAutoCompleteTags{OrgId: orgId, TagPrefix: tagPrefix, Expr: expressions, From: from, Limit: limit}
 	bufs, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
@@ -1083,6 +1084,11 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	tags := make([]string, 0, len(tagSet))
 	for t := range tagSet {
 		tags = append(tags, t)
+	}
+
+	sort.Strings(tags)
+	if uint16(len(tags)) > limit {
+		tags = tags[:limit]
 	}
 
 	return tags, nil

@@ -465,7 +465,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
-func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64) ([]string, error) {
+func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	m.RLock()
 	defer m.RUnlock()
 
@@ -474,7 +474,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		return nil, nil
 	}
 
-	res := make(map[string]struct{})
+	res := make([]string, 0)
 
 	if len(expressions) > 0 {
 		tags, ok := m.tags[orgId]
@@ -489,15 +489,28 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		if err != nil {
 			return nil, err
 		}
-		res = query.RunGetTags(tags, m.DefById)
+		resMap := query.RunGetTags(tags, m.DefById)
+		for tag := range resMap {
+			res = append(res, tag)
+		}
+		sort.Strings(res)
+		if uint16(len(res)) > limit {
+			res = res[:limit]
+		}
 	} else {
-	TAGS:
-		for tag, values := range tags {
+		tagsSorted := make([]string, 0, len(tags))
+		for tag := range tags {
 			if len(tagPrefix) > 0 && (len(tagPrefix) > len(tag) || tag[:len(tagPrefix)] != tagPrefix) {
 				continue
 			}
 
-			for _, ids := range values {
+			tagsSorted = append(tagsSorted, tag)
+		}
+		sort.Strings(tagsSorted)
+
+	TAGS:
+		for _, tag := range tagsSorted {
+			for _, ids := range tags[tag] {
 				for id := range ids {
 					def, ok := m.DefById[id.String()]
 					if !ok {
@@ -506,7 +519,10 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 						continue
 					}
 					if def.LastUpdate >= from {
-						res[tag] = struct{}{}
+						res = append(res, tag)
+						if uint16(len(res)) >= limit {
+							break TAGS
+						}
 						continue TAGS
 					}
 				}
@@ -514,11 +530,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		}
 	}
 
-	resStrings := make([]string, 0, len(res))
-	for tag := range res {
-		resStrings = append(resStrings, tag)
-	}
-	return resStrings, nil
+	return res, nil
 }
 
 func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64) ([]string, error) {
