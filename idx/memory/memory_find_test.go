@@ -418,8 +418,8 @@ func TestTagSorting(t *testing.T) {
 		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
 	}
 	expected := "name1;a=a;b=a;c=a;d=a;e=a"
-	if res[0] != expected {
-		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
+	if res[0].Path != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 
 	md2 := []schema.MetricDefinition{
@@ -446,8 +446,8 @@ func TestTagSorting(t *testing.T) {
 		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
 	}
 	expected = "name2;1=a;2=a;3=a;4=a;5=a"
-	if res[0] != expected {
-		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0])
+	if res[0].Path != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 }
 
