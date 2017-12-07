@@ -2,9 +2,11 @@ package memory
 
 import (
 	"errors"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/grafana/metrictank/idx"
@@ -37,11 +39,13 @@ type kv struct {
 }
 
 type kvRe struct {
-	cost       uint // cost of evaluating expression, compared to other kvRe objects
-	key        string
-	value      *regexp.Regexp
-	matchCache map[string]struct{}
-	missCache  map[string]struct{}
+	cost           uint // cost of evaluating expression, compared to other kvRe objects
+	key            string
+	value          *regexp.Regexp
+	matchCache     sync.Map
+	matchCacheSize int32
+	missCache      sync.Map
+	missCacheSize  int32
 }
 
 type KvByCost []kv
@@ -286,19 +290,18 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 }
 
 // getInitialByMatch returns the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(expr kvRe) TagIDs {
-	resultSet := make(TagIDs)
-
+func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan idx.MetricID) {
 	// shortcut if value == nil.
 	// this will simply match any value, like ^.+. since we know that every value
 	// in the index must not be empty, we can skip the matching.
 	if expr.value == nil {
 		for _, ids := range q.index[expr.key] {
 			for id := range ids {
-				resultSet[id] = struct{}{}
+				idCh <- id
 			}
 		}
-		return resultSet
+		close(idCh)
+		return
 	}
 
 	for v, ids := range q.index[expr.key] {
@@ -307,34 +310,29 @@ func (q *TagQuery) getInitialByMatch(expr kvRe) TagIDs {
 		}
 
 		for id := range ids {
-			resultSet[id] = struct{}{}
+			idCh <- id
 		}
 	}
-	return resultSet
+	close(idCh)
 }
 
 // getInitialByPrefix returns the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(expr kv) TagIDs {
-	resultSet := make(TagIDs)
-
+func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan idx.MetricID) {
 	for v, ids := range q.index[expr.key] {
 		if len(v) < len(expr.value) || v[:len(expr.value)] != expr.value {
 			continue
 		}
 
 		for id := range ids {
-			resultSet[id] = struct{}{}
+			idCh <- id
 		}
 	}
-
-	return resultSet
+	close(idCh)
 }
 
 // getInitialByTagPrefix returns the initial resultset by creating a list of
 // metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix() TagIDs {
-	resultSet := make(TagIDs)
-
+func (q *TagQuery) getInitialByTagPrefix(idCh chan idx.MetricID) {
 	for tag, values := range q.index {
 		if len(tag) < len(q.tagPrefix) {
 			continue
@@ -346,47 +344,35 @@ func (q *TagQuery) getInitialByTagPrefix() TagIDs {
 
 		for _, ids := range values {
 			for id := range ids {
-				resultSet[id] = struct{}{}
+				idCh <- id
 			}
 		}
 	}
-
-	return resultSet
+	close(idCh)
 }
 
 // getInitialByTagMatch returns the initial resultset by creating a list of
 // metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch() TagIDs {
-	resultSet := make(TagIDs)
-	matchCache := make(map[string]struct{})
-
+func (q *TagQuery) getInitialByTagMatch(idCh chan idx.MetricID) {
 	for tag, values := range q.index {
-		if _, ok := matchCache[tag]; ok || q.tagMatch.value.MatchString(tag) {
-			if !ok {
-				matchCache[tag] = struct{}{}
-			}
-
+		if q.tagMatch.value.MatchString(tag) {
 			for _, ids := range values {
 				for id := range ids {
-					resultSet[id] = struct{}{}
+					idCh <- id
 				}
 			}
 		}
 	}
-
-	return resultSet
+	close(idCh)
 }
 
 // getInitialByEqual returns the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(expr kv) TagIDs {
-	resultSet := make(TagIDs)
-
+func (q *TagQuery) getInitialByEqual(expr kv, idCh chan idx.MetricID) {
 	// copy the map, because we'll later delete items from it
-	for k, v := range q.index[expr.key][expr.value] {
-		resultSet[k] = v
+	for k := range q.index[expr.key][expr.value] {
+		idCh <- k
 	}
-
-	return resultSet
+	close(idCh)
 }
 
 func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool {
@@ -460,12 +446,12 @@ EXPRS:
 			value := tag[len(e.key)+1:]
 
 			// reduce regex matching by looking up cached non-matches
-			if _, ok := e.missCache[value]; ok {
+			if _, ok := e.missCache.Load(value); ok {
 				continue
 			}
 
 			// reduce regex matching by looking up cached matches
-			if _, ok := e.matchCache[value]; ok {
+			if _, ok := e.matchCache.Load(value); ok {
 				if not {
 					return false
 				}
@@ -475,22 +461,18 @@ EXPRS:
 			// value == nil means that this expression can be short cut
 			// by not evaluating it
 			if e.value == nil || e.value.MatchString(value) {
-				if len(e.matchCache) < matchCacheSize {
-					if e.matchCache == nil {
-						e.matchCache = make(map[string]struct{})
-					}
-					e.matchCache[value] = struct{}{}
+				if atomic.LoadInt32(&e.matchCacheSize) < int32(matchCacheSize) {
+					e.matchCache.Store(value, struct{}{})
+					atomic.AddInt32(&e.matchCacheSize, 1)
 				}
 				if not {
 					return false
 				}
 				continue EXPRS
 			} else {
-				if len(e.missCache) < matchCacheSize {
-					if e.missCache == nil {
-						e.missCache = make(map[string]struct{})
-					}
-					e.missCache[value] = struct{}{}
+				if atomic.LoadInt32(&e.missCacheSize) < int32(matchCacheSize) {
+					e.missCache.Store(value, struct{}{})
+					atomic.AddInt32(&e.missCacheSize, 1)
 				}
 			}
 		}
@@ -511,24 +493,24 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 		}
 		key := tag[:equal]
 
-		if _, ok := q.tagMatch.missCache[key]; ok {
+		if _, ok := q.tagMatch.missCache.Load(key); ok {
 			continue
 		}
 
-		if _, ok := q.tagMatch.matchCache[key]; ok || q.tagMatch.value.MatchString(key) {
+		if _, ok := q.tagMatch.matchCache.Load(key); ok || q.tagMatch.value.MatchString(key) {
 			if !ok {
-				if q.tagMatch.matchCache == nil {
-					q.tagMatch.matchCache = make(map[string]struct{})
+				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
+					q.tagMatch.matchCache.Store(key, struct{}{})
+					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
 				}
-				q.tagMatch.matchCache[key] = struct{}{}
 			}
 			return true
 		} else {
-			if _, ok := q.tagMatch.missCache[key]; !ok {
-				if q.tagMatch.missCache == nil {
-					q.tagMatch.missCache = make(map[string]struct{})
+			if _, ok := q.tagMatch.missCache.Load(key); !ok {
+				if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
+					q.tagMatch.missCache.Store(key, struct{}{})
+					atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
 				}
-				q.tagMatch.missCache[key] = struct{}{}
 			}
 			continue
 		}
@@ -620,26 +602,29 @@ func (q *TagQuery) sortByCost() {
 	sort.Sort(KvReByCost(q.notMatch))
 }
 
-func (q *TagQuery) getInitialIds() TagIDs {
-	var resultSet TagIDs
+func (q *TagQuery) getInitialIds() chan idx.MetricID {
+	idCh := make(chan idx.MetricID)
 
 	switch q.startWith {
 	case EQUAL:
-		resultSet = q.getInitialByEqual(q.equal[0])
+		query := q.equal[0]
 		q.equal = q.equal[1:]
+		go q.getInitialByEqual(query, idCh)
 	case PREFIX:
-		resultSet = q.getInitialByPrefix(q.prefix[0])
+		query := q.prefix[0]
 		q.prefix = q.prefix[1:]
+		go q.getInitialByPrefix(query, idCh)
 	case PREFIX_TAG:
-		resultSet = q.getInitialByTagPrefix()
+		go q.getInitialByTagPrefix(idCh)
 	case MATCH_TAG:
-		resultSet = q.getInitialByTagMatch()
+		go q.getInitialByTagMatch(idCh)
 	case MATCH:
-		resultSet = q.getInitialByMatch(q.match[0])
+		query := q.match[0]
 		q.match = q.match[1:]
+		go q.getInitialByMatch(query, idCh)
 	}
 
-	return resultSet
+	return idCh
 }
 
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
@@ -648,13 +633,40 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	q.sortByCost()
 
-	resultSet := q.getInitialIds()
+	workers := 50
+	idCh := q.getInitialIds()
+	resCh := make(chan idx.MetricID)
+	completeCh := make(chan struct{})
 
+	for i := 0; i < workers; i++ {
+		go q.filterIdsFromChan(idCh, resCh, completeCh)
+	}
+
+	completedWorkers := 0
+	result := make(TagIDs)
+
+IDS:
+	for {
+		select {
+		case id := <-resCh:
+			result[id] = struct{}{}
+		case <-completeCh:
+			completedWorkers++
+			if completedWorkers >= workers {
+				break IDS
+			}
+		}
+	}
+
+	return result
+}
+
+func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh chan struct{}) {
 	// filter the resultSet by the from condition and all other expressions given.
-	// filters should be in ascending order by the cpu required to process them,
-	// that way the most cpu intensive filters only get applied to the smallest
+	// filters should get applied in ascending order by the cpu required to process
+	// them, that way the most cpu intensive filters only get applied to the smallest
 	// possible resultSet.
-	for id := range resultSet {
+	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
 
@@ -666,26 +678,28 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 			continue
 		}
 
-		if !q.testByAllExpressions(id, def) {
-			delete(resultSet, id)
+		if q.testByAllExpressions(id, def) {
+			resCh <- id
 		}
 	}
 
-	return resultSet
+	completeCh <- struct{}{}
 }
 
 func (q *TagQuery) getMaxTagCount() int {
 	var maxTagCount int
 
 	if q.filterTag == PREFIX_TAG {
-		for tag := range q.index {
-			if len(tag) < len(q.tagPrefix) {
-				continue
+		if len(q.tagPrefix) > 0 {
+			for tag := range q.index {
+				if len(tag) < len(q.tagPrefix) {
+					continue
+				}
+				if tag[:len(q.tagPrefix)] != q.tagPrefix {
+					continue
+				}
+				maxTagCount++
 			}
-			if tag[:len(q.tagPrefix)] != q.tagPrefix {
-				continue
-			}
-			maxTagCount++
 		}
 	} else if q.filterTag == MATCH_TAG {
 		for tag := range q.index {
@@ -693,6 +707,8 @@ func (q *TagQuery) getMaxTagCount() int {
 				maxTagCount++
 			}
 		}
+	} else {
+		maxTagCount = len(q.index)
 	}
 	return maxTagCount
 }
@@ -701,15 +717,47 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	q.index = index
 	q.byId = byId
 
-	maxTagCount := int32(-1)
+	maxTagCount := int32(math.MaxInt32)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
 	q.sortByCost()
-	ids := q.getInitialIds()
+	idCh := q.getInitialIds()
 
-	resultSet := make(map[string]struct{}, 0)
-	missCache := make(map[string]struct{}, 0)
-	for id := range ids {
+	workers := 50
+	stopCh := make(chan struct{})
+	completeCh := make(chan struct{})
+	tagCh := make(chan string)
+
+	for i := 0; i < workers; i++ {
+		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
+	}
+
+	completedWorkers := 0
+	result := make(map[string]struct{})
+TAGS:
+	for {
+		select {
+		case tag := <-tagCh:
+			result[tag] = struct{}{}
+			if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
+				break TAGS
+			}
+		case <-completeCh:
+			completedWorkers++
+			if completedWorkers >= workers {
+				break TAGS
+			}
+		}
+	}
+	close(stopCh)
+	return result
+}
+
+func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
+	results := make(map[string]struct{})
+
+IDS:
+	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
 
@@ -731,7 +779,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 			}
 
 			key := tag[:equal]
-			if _, ok := resultSet[key]; ok {
+			if _, ok := results[key]; ok {
 				continue
 			}
 			if q.filterTag == PREFIX_TAG {
@@ -742,9 +790,9 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 					continue
 				}
 			} else if q.filterTag == MATCH_TAG {
-				if _, ok := missCache[key]; ok || !q.tagMatch.value.MatchString(tag) {
+				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.value.MatchString(tag) {
 					if !ok {
-						missCache[key] = struct{}{}
+						q.tagMatch.missCache.Store(key, struct{}{})
 					}
 					continue
 				}
@@ -755,14 +803,17 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 		if len(metricTags) > 0 {
 			if q.testByAllExpressions(id, def) {
 				for key := range metricTags {
-					resultSet[key] = struct{}{}
-					if atomic.LoadInt32(&maxTagCount) <= int32(len(resultSet)) {
-						return resultSet
-					}
+					tagCh <- key
+					results[key] = struct{}{}
 				}
 			}
 		}
+		select {
+		case <-stopCh:
+			break IDS
+		default:
+		}
 	}
 
-	return resultSet
+	completeCh <- struct{}{}
 }
