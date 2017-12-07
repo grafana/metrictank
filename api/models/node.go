@@ -116,6 +116,7 @@ func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
 	span.SetTag("tag", t.Tag)
 	span.SetTag("expressions", t.Expr)
 	span.SetTag("from", t.From)
+	span.SetTag("limit", t.Limit)
 }
 
 func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
