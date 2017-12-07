@@ -43,15 +43,17 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled        bool
-	matchCacheSize int
-	tagSupport     bool
+	Enabled         bool
+	matchCacheSize  int
+	tagSupport      bool
+	tagQueryWorkers int
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&tagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }

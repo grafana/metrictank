@@ -633,12 +633,11 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	q.sortByCost()
 
-	workers := 50
 	idCh := q.getInitialIds()
 	resCh := make(chan idx.MetricID)
 	completeCh := make(chan struct{})
 
-	for i := 0; i < workers; i++ {
+	for i := 0; i < tagQueryWorkers; i++ {
 		go q.filterIdsFromChan(idCh, resCh, completeCh)
 	}
 
@@ -652,7 +651,7 @@ IDS:
 			result[id] = struct{}{}
 		case <-completeCh:
 			completedWorkers++
-			if completedWorkers >= workers {
+			if completedWorkers >= tagQueryWorkers {
 				break IDS
 			}
 		}
@@ -723,12 +722,11 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	q.sortByCost()
 	idCh := q.getInitialIds()
 
-	workers := 50
 	stopCh := make(chan struct{})
 	completeCh := make(chan struct{})
 	tagCh := make(chan string)
 
-	for i := 0; i < workers; i++ {
+	for i := 0; i < tagQueryWorkers; i++ {
 		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
 	}
 
@@ -744,7 +742,7 @@ TAGS:
 			}
 		case <-completeCh:
 			completedWorkers++
-			if completedWorkers >= workers {
+			if completedWorkers >= tagQueryWorkers {
 				break TAGS
 			}
 		}
