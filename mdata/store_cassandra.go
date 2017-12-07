@@ -441,7 +441,7 @@ func (c *CassandraStore) processReadQueue() {
 		iter := outcome{
 			month:   crr.month,
 			sortKey: crr.sortKey,
-			i:       c.Session.Query(crr.q, crr.p...).Iter(),
+			i:       c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
 			err:     nil,
 		}
 		cassGetExecDuration.Value(time.Since(pre))
@@ -588,9 +588,14 @@ LOOP:
 		}
 		err := outcome.i.Close()
 		if err != nil {
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				// query was aborted.
+				return nil, nil
+			}
 			tracing.Failure(span)
 			tracing.Error(span, err)
 			errmetrics.Inc(err)
+			return nil, err
 		} else {
 			cassChunksPerRow.Value(int(chunks))
 		}
