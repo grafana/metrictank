@@ -468,22 +468,9 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 }
 
 func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
-	m.RLock()
-	defer m.RUnlock()
-
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil, nil
-	}
-
 	res := make([]string, 0)
 
 	if len(expressions) > 0 {
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
 		if len(tagPrefix) > 0 {
 			expressions = append(expressions, fmt.Sprintf("__tag^=%s", tagPrefix))
 		}
@@ -491,6 +478,15 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		if err != nil {
 			return nil, err
 		}
+
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
 		resMap := query.RunGetTags(tags, m.DefById)
 		for tag := range resMap {
 			res = append(res, tag)
@@ -500,6 +496,14 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 			res = res[:limit]
 		}
 	} else {
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
 		tagsSorted := make([]string, 0, len(tags))
 		for tag := range tags {
 			if len(tagPrefix) > 0 && (len(tagPrefix) > len(tag) || tag[:len(tagPrefix)] != tagPrefix) {
