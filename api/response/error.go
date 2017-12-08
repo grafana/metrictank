@@ -1,5 +1,9 @@
 package response
 
+import (
+	"encoding/json"
+)
+
 type Error interface {
 	Code() int
 	Error() string
@@ -21,6 +25,32 @@ func WrapError(e error) *ErrorResp {
 	if _, ok := e.(Error); ok {
 		resp.code = e.(Error).Code()
 	}
+	return resp
+}
+
+type TagDBError struct {
+	Error string `json:"error"`
+}
+
+// graphite's http tagdb client requires a specific error format
+func WrapErrorForTagDB(e error) *ErrorResp {
+	b, err := json.Marshal(TagDBError{Error: e.Error()})
+	if err != nil {
+		return &ErrorResp{
+			err:  "{\"error\": \"failed to encode error message\"}",
+			code: 500,
+		}
+	}
+
+	resp := &ErrorResp{
+		err:  string(b),
+		code: 500,
+	}
+
+	if _, ok := e.(Error); ok {
+		resp.code = e.(Error).Code()
+	}
+
 	return resp
 }
 
