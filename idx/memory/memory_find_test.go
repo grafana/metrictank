@@ -530,6 +530,13 @@ func TestAutoCompleteTag(t *testing.T) {
 			expRes:    []string{"host"},
 			expErr:    false,
 		}, {
+			tagPrefix: "host",
+			expr:      []string{"direction=write"},
+			from:      100,
+			limit:     0,
+			expRes:    []string{"host"},
+			expErr:    false,
+		}, {
 			tagPrefix: "n",
 			expr:      []string{},
 			from:      100,
@@ -629,6 +636,14 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			from:      100,
 			limit:     100,
 			expRes:    []string{"cpu", "disk"},
+			expErr:    false,
+		}, {
+			tag:       "device",
+			valPrefix: "c",
+			expr:      []string{},
+			from:      100,
+			limit:     0,
+			expRes:    []string{"cpu"},
 			expErr:    false,
 		}, {
 			tag:       "device",

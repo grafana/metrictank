@@ -513,7 +513,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		}
 
 		sort.Strings(res)
-		if uint16(len(res)) > limit {
+		if uint16(len(res)) > limit && limit > 0 {
 			res = res[:limit]
 		}
 	} else {
@@ -668,7 +668,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 	}
 
 	sort.Strings(res)
-	if uint16(len(res)) > limit {
+	if uint16(len(res)) > limit && limit > 0 {
 		res = res[:limit]
 	}
 

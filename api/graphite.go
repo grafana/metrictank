@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -871,11 +872,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 		return
 	}
 
-	var resp models.GraphiteTagsResp
-	for _, tag := range tags {
-		resp = append(resp, models.GraphiteTagResp{Tag: tag})
-	}
-	response.Write(ctx, response.NewJson(200, resp, ""))
+	response.Write(ctx, response.NewJson(200, tags, ""))
 }
 
 func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
@@ -912,7 +909,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	}
 
 	sort.Strings(tags)
-	if uint16(len(tags)) > limit {
+	if uint16(len(tags)) > limit && limit > 0 {
 		tags = tags[:limit]
 	}
 
@@ -931,6 +928,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 
 func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, valPrefix, expressions, from, limit)
+	fmt.Println(fmt.Sprintf("got result %+v", result))
 	if err != nil {
 		return nil, err
 	}
@@ -963,7 +961,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 	}
 
 	sort.Strings(vals)
-	if uint16(len(vals)) > limit {
+	if uint16(len(vals)) > limit && limit > 0 {
 		vals = vals[:limit]
 	}
 
