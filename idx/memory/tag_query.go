@@ -521,7 +521,7 @@ func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.key == "name" {
-			if e.value.MatchString(def.Name) {
+			if e.value == nil || e.value.MatchString(def.Name) {
 				if not {
 					return false
 				} else {
