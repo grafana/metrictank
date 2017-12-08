@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -917,7 +916,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 }
 
 func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
-	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.ValPrefix, request.Expr, request.From, request.Limit)
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.ValuePrefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -928,7 +927,6 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 
 func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, valPrefix, expressions, from, limit)
-	fmt.Println(fmt.Sprintf("got result %+v", result))
 	if err != nil {
 		return nil, err
 	}
