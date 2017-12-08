@@ -80,7 +80,7 @@ func NewMemberlistManager(thisNode Node) *MemberlistManager {
 		nodeName: thisNode.Name,
 	}
 	switch swimUseConfig {
-	case "none":
+	case "manual":
 		mgr.cfg = memberlist.DefaultLANConfig() // use this as base so that the other settings have proper defaults
 		mgr.cfg.BindPort = swimBindAddr.Port
 		mgr.cfg.BindAddr = swimBindAddr.IP.String()
