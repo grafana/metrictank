@@ -889,14 +889,14 @@ IDS:
 					}
 					results[key] = struct{}{}
 				}
+			} else {
+				// check if we need to stop
+				select {
+				case <-stopCh:
+					break IDS
+				default:
+				}
 			}
-		}
-
-		// check if we need to stop after each id evaluation
-		select {
-		case <-stopCh:
-			break IDS
-		default:
 		}
 	}
 
