@@ -467,8 +467,6 @@ func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, f
 		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
 	}
 
-	sort.Strings(expRes)
-	sort.Strings(res)
 	for i := range res {
 		if expRes[i] != res[i] {
 			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
@@ -494,7 +492,7 @@ func TestAutoCompleteTag(t *testing.T) {
 			expr:      []string{"direction=write", "host=host90"},
 			from:      100,
 			limit:     100,
-			expRes:    []string{"disk", "direction"},
+			expRes:    []string{"direction", "disk"},
 			expErr:    false,
 		}, {
 			tagPrefix: "di",
@@ -508,7 +506,7 @@ func TestAutoCompleteTag(t *testing.T) {
 			expr:      []string{"direction=write", "host=host90"},
 			from:      100,
 			limit:     100,
-			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction"},
+			expRes:    []string{"dc", "device", "direction", "disk", "host", "metric", "name"},
 			expErr:    false,
 		}, {
 			tagPrefix: "",
@@ -532,11 +530,18 @@ func TestAutoCompleteTag(t *testing.T) {
 			expRes:    []string{"host"},
 			expErr:    false,
 		}, {
+			tagPrefix: "n",
+			expr:      []string{},
+			from:      100,
+			limit:     100,
+			expRes:    []string{"name"},
+			expErr:    false,
+		}, {
 			tagPrefix: "",
 			expr:      []string{},
 			from:      100,
 			limit:     100,
-			expRes:    []string{"dc", "host", "device", "disk", "metric", "direction", "cpu", "name"},
+			expRes:    []string{"cpu", "dc", "device", "direction", "disk", "host", "metric", "name"},
 			expErr:    false,
 		},
 	}
