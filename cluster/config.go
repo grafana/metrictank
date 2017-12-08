@@ -54,7 +54,7 @@ func ConfigSetup() {
 	globalconf.Register("cluster", clusterCfg)
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
-	swimCfg.StringVar(&swimUseConfig, "use-config", "default-lan", "config setting to use. If set, will override all other swim settings. Use none|default-lan|default-local|default-wan. see https://godoc.org/github.com/hashicorp/memberlist#Config . Note all our swim settings correspond to default-lan")
+	swimCfg.StringVar(&swimUseConfig, "use-config", "manual", "config setting to use. If set to anything but manual, will override all other swim settings. Use manual|default-lan|default-local|default-wan. see https://godoc.org/github.com/hashicorp/memberlist#Config . Note all our swim settings correspond to default-lan")
 	swimCfg.StringVar(&swimBindAddrStr, "bind-addr", "0.0.0.0:7946", "binding TCP Address for UDP and TCP gossip")
 	swimCfg.DurationVar(&swimTCPTimeout, "tcp-timeout", 10*time.Second, "timeout for establishing a stream connection with peers for a full state sync, and for stream reads and writes")
 	swimCfg.IntVar(&swimIndirectChecks, "indirect-checks", 3, "number of nodes that will be asked to perform an indirect probe of a node in the case a direct probe fails")
@@ -105,7 +105,7 @@ func ConfigProcess() {
 	}
 
 	if mode == "multi" {
-		if swimUseConfig != "none" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
+		if swimUseConfig != "manual" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
 			log.Fatal(4, "CLU Config: invalid swim-use-config setting")
 		}
 	}
