@@ -471,6 +471,10 @@ func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
 	return idCh, stopCh
 }
 
+// testByAllExpressions takes and id and a MetricDefinition and runs it through
+// all required tests in order to decide whether this metric should be part
+// of the final result set or not
+// in map/reduce terms this is the reduce function
 func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool {
 	if !q.testByFrom(def) {
 		return false
@@ -511,6 +515,8 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool 
 	return true
 }
 
+// testByMatch filters a given metric by matching a regular expression against
+// the values of specific associated tags
 func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
 EXPRS:
 	for _, e := range exprs {
@@ -579,6 +585,8 @@ EXPRS:
 	return true
 }
 
+// testByTagMatch filters a given metric by matching a regular expression against
+// the associated tags
 func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 	for _, tag := range def.Tags {
 		equal := strings.Index(tag, "=")
@@ -615,10 +623,13 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 	return false
 }
 
+// testByFrom filters a given metric by its LastUpdate time
 func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 	return q.from <= def.LastUpdate
 }
 
+// testByPrefix filters a given metric by matching prefixes against the values
+// of a specific tag
 func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
@@ -641,6 +652,7 @@ EXPRS:
 	return true
 }
 
+// testByTagPrefix filters a given metric by matching prefixes against its tags
 func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
 	for _, tag := range def.Tags {
 		if len(tag) < len(q.tagPrefix) {
@@ -655,6 +667,7 @@ func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
 	return false
 }
 
+// testByEqual filters a given metric by the defined "=" expressions
 func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
 	for _, e := range exprs {
 		indexIds := q.index[e.key][e.value]
@@ -678,11 +691,11 @@ func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
 	return true
 }
 
+// filterIdsFromChan takes a channel of metric ids and runs them through the
+// required tests to decide whether a metric should be part of the final
+// result set or not
+// it returns the final result set via the given resCh parameter
 func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh chan struct{}) {
-	// filter the resultSet by the from condition and all other expressions given.
-	// filters should get applied in ascending order by the cpu required to process
-	// them, that way the most cpu intensive filters only get applied to the smallest
-	// possible resultSet.
 	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
@@ -704,6 +717,10 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh c
 	completeCh <- struct{}{}
 }
 
+// sortByCost tries to estimate the cost of different expressions and sort them
+// in increasing order
+// this is to reduce the result set cheaply and only apply expensive tests to an
+// already reduced set of results
 func (q *TagQuery) sortByCost() {
 	for i := range q.equal {
 		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
@@ -724,6 +741,7 @@ func (q *TagQuery) sortByCost() {
 	sort.Sort(KvReByCost(q.notMatch))
 }
 
+// Run executes the tag query on the given index and returns a list of ids
 func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	q.index = index
 	q.byId = byId
@@ -759,6 +777,10 @@ IDS:
 	return result
 }
 
+// getMaxTagCount calculates the maximum number of results a tag query could
+// possibly return
+// this is useful because when running a tag query we can abort it as soon as
+// we know that there can't be more tags discovered and added to the result set
 func (q *TagQuery) getMaxTagCount() int {
 	var maxTagCount int
 
@@ -786,6 +808,9 @@ func (q *TagQuery) getMaxTagCount() int {
 	return maxTagCount
 }
 
+// filterTagsFromChan takes a channel of metric IDs and evaluates each of them
+// according to the criteria associated with this query
+// those that pass all the tests will be returned via the given tag channel
 func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
 	results := make(map[string]struct{})
 
@@ -851,11 +876,19 @@ IDS:
 	completeCh <- struct{}{}
 }
 
+// RunGetTags executes the tag query and returns all the tags of the
+// resulting metrics
 func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 
 	maxTagCount := int32(math.MaxInt32)
+
+	// start a thread to calculate the maximum possible number of tags.
+	// this might not always complete before the query execution, but in most
+	// cases it likely will. when it does end before the execution of the query,
+	// the value of maxTagCount will be used to abort the query execution once
+	// the max number of possible tags has been reached
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
 	q.sortByCost()
