@@ -79,6 +79,15 @@ var sumabc = []schema.Point{
 	{Val: 1234567894, Ts: 60},
 }
 
+var sumcd = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 33, Ts: 20},
+	{Val: 200, Ts: 30},
+	{Val: 31, Ts: 40}, // overflowed
+	{Val: 83, Ts: 50},
+	{Val: 254, Ts: 60},
+}
+
 var avgab = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64 / 2, Ts: 20},
@@ -131,6 +140,96 @@ var minabc = []schema.Point{
 	{Val: 2, Ts: 40},
 	{Val: 3, Ts: 50},
 	{Val: 4, Ts: 60},
+}
+
+var multab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: math.Inf(1), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50}, // in accordance with graphite, mult(5,null) = 5
+	{Val: math.NaN(), Ts: 60},
+}
+
+var multabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: math.Inf(1), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: math.NaN(), Ts: 60},
+}
+
+var medianab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64 / 2, Ts: 20},
+	{Val: (math.MaxFloat64 - 14.5) / 2, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1234567890, Ts: 50},
+	{Val: 1234567890, Ts: 60},
+}
+
+var medianabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 5.5, Ts: 30},
+	{Val: 2, Ts: 40},
+	{Val: float64(1234567893) / 2, Ts: 50},
+	{Val: float64(1234567894) / 2, Ts: 60},
+}
+
+var diffab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: -math.MaxFloat64, Ts: 20},
+	{Val: 25.5 - math.MaxFloat64, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1234567890, Ts: 50},
+	{Val: 1234567890, Ts: 60},
+}
+
+var diffabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: -math.MaxFloat64, Ts: 20},
+	{Val: 24.5 - math.MaxFloat64, Ts: 30},
+	{Val: 2, Ts: 40},
+	{Val: 1234567887, Ts: 50},
+	{Val: 1234567886, Ts: 60},
+}
+
+var stddevab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.Inf(1), Ts: 20},
+	{Val: math.Inf(1), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 0, Ts: 50},
+	{Val: 0, Ts: 60},
+}
+
+var stddevabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.Inf(1), Ts: 20},
+	{Val: math.Inf(1), Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 617283943.5, Ts: 50},
+	{Val: 617283943, Ts: 60},
+}
+
+var rangeab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64, Ts: 20},
+	{Val: math.MaxFloat64 - 14.5, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 0, Ts: 50},
+	{Val: 0, Ts: 60},
+}
+
+var rangeabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64, Ts: 20},
+	{Val: math.MaxFloat64 - 19, Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 1234567887, Ts: 50},
+	{Val: 1234567886, Ts: 60},
 }
 
 // make sure we test with the correct data, don't mask if processing accidentally modifies our input data
