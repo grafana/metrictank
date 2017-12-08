@@ -77,7 +77,7 @@ type TagQuery struct {
 	index TagIndex
 	byId  map[string]*idx.Archive
 
-	wg sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func compileRe(pattern string) (*regexp.Regexp, error) {
@@ -199,7 +199,7 @@ func parseExpression(expr string) (expression, error) {
 }
 
 func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
-	q := TagQuery{from: from}
+	q := TagQuery{from: from, wg: &sync.WaitGroup{}}
 
 	if len(expressions) == 0 {
 		return q, errInvalidQuery
@@ -700,6 +700,7 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh c
 		}
 	}
 
+	q.wg.Done()
 	completeCh <- struct{}{}
 }
 
@@ -731,8 +732,9 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	idCh, _ := q.getInitialIds()
 	resCh := make(chan idx.MetricID)
-	completeCh := make(chan struct{})
+	completeCh := make(chan struct{}, tagQueryWorkers)
 
+	q.wg.Add(tagQueryWorkers)
 	for i := 0; i < tagQueryWorkers; i++ {
 		go q.filterIdsFromChan(idCh, resCh, completeCh)
 	}
@@ -834,18 +836,18 @@ IDS:
 		if len(metricTags) > 0 {
 			if q.testByAllExpressions(id, def) {
 				for key := range metricTags {
-					tagCh <- key
+					select {
+					case tagCh <- key:
+					case <-stopCh:
+						break IDS
+					}
 					results[key] = struct{}{}
 				}
 			}
 		}
-		select {
-		case <-stopCh:
-			break IDS
-		default:
-		}
 	}
 
+	q.wg.Done()
 	completeCh <- struct{}{}
 }
 
@@ -859,9 +861,10 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	q.sortByCost()
 	idCh, stopCh := q.getInitialIds()
 
-	completeCh := make(chan struct{})
+	completeCh := make(chan struct{}, tagQueryWorkers)
 	tagCh := make(chan string)
 
+	q.wg.Add(tagQueryWorkers)
 	for i := 0; i < tagQueryWorkers; i++ {
 		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
 	}
