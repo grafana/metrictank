@@ -768,7 +768,17 @@ IDS:
 		case <-completeCh:
 			completedWorkers++
 			if completedWorkers >= tagQueryWorkers {
-				break IDS
+				// once all workers have completed the query execution is done.
+				// we need to consume the result channel until it's empty before
+				// returning the results
+				for {
+					select {
+					case id := <-resCh:
+						result[id] = struct{}{}
+					default:
+						break IDS
+					}
+				}
 			}
 		}
 	}
@@ -782,19 +792,18 @@ IDS:
 // this is useful because when running a tag query we can abort it as soon as
 // we know that there can't be more tags discovered and added to the result set
 func (q *TagQuery) getMaxTagCount() int {
+	defer q.wg.Done()
 	var maxTagCount int
 
-	if q.filterTag == PREFIX_TAG {
-		if len(q.tagPrefix) > 0 {
-			for tag := range q.index {
-				if len(tag) < len(q.tagPrefix) {
-					continue
-				}
-				if tag[:len(q.tagPrefix)] != q.tagPrefix {
-					continue
-				}
-				maxTagCount++
+	if q.filterTag == PREFIX_TAG && len(q.tagPrefix) > 0 {
+		for tag := range q.index {
+			if len(tag) < len(q.tagPrefix) {
+				continue
 			}
+			if tag[:len(q.tagPrefix)] != q.tagPrefix {
+				continue
+			}
+			maxTagCount++
 		}
 	} else if q.filterTag == MATCH_TAG {
 		for tag := range q.index {
@@ -805,6 +814,7 @@ func (q *TagQuery) getMaxTagCount() int {
 	} else {
 		maxTagCount = len(q.index)
 	}
+
 	return maxTagCount
 }
 
@@ -827,6 +837,8 @@ IDS:
 			continue
 		}
 
+		// generate a set of all tags of the current metric that satisfy the
+		// tag filter condition
 		metricTags := make(map[string]struct{}, 0)
 		for _, tag := range def.Tags {
 			equal := strings.Index(tag, "=")
@@ -840,6 +852,7 @@ IDS:
 			if _, ok := results[key]; ok {
 				continue
 			}
+
 			if q.filterTag == PREFIX_TAG {
 				if len(key) < len(q.tagPrefix) {
 					continue
@@ -858,17 +871,32 @@ IDS:
 			metricTags[key] = struct{}{}
 		}
 
+		// if some tags satisfy the current tag filter condition then we run
+		// the metric through all tag expression tests in order to decide
+		// whether those tags should be part of the final result set
 		if len(metricTags) > 0 {
 			if q.testByAllExpressions(id, def) {
 				for key := range metricTags {
 					select {
 					case tagCh <- key:
 					case <-stopCh:
+						// if execution of query has stopped because the max tag
+						// count has been reached then tagCh <- might block
+						// because that channel will not be consumed anymore. in
+						// that case the stop channel will have been closed so
+						// we so we exit here
 						break IDS
 					}
 					results[key] = struct{}{}
 				}
 			}
+		}
+
+		// check if we need to stop after each id evaluation
+		select {
+		case <-stopCh:
+			break IDS
+		default:
 		}
 	}
 
@@ -889,6 +917,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	// cases it likely will. when it does end before the execution of the query,
 	// the value of maxTagCount will be used to abort the query execution once
 	// the max number of possible tags has been reached
+	q.wg.Add(1)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
 	q.sortByCost()
@@ -904,6 +933,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 
 	completedWorkers := 0
 	result := make(map[string]struct{})
+
 TAGS:
 	for {
 		select {
@@ -915,12 +945,23 @@ TAGS:
 		case <-completeCh:
 			completedWorkers++
 			if completedWorkers >= tagQueryWorkers {
-				break TAGS
+				// one all workers have completed the query execution is done.
+				// we need to consume the result channel until it's empty before
+				// returning the results
+				for {
+					select {
+					case tag := <-tagCh:
+						result[tag] = struct{}{}
+					default:
+						break TAGS
+					}
+				}
 			}
 		}
 	}
-	close(stopCh)
 
+	// abort query execution and wait for all workers to end
+	close(stopCh)
 	q.wg.Wait()
 	return result
 }
