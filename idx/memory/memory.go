@@ -506,6 +506,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		for tag := range resMap {
 			res = append(res, tag)
 		}
+
 		sort.Strings(res)
 		if uint16(len(res)) > limit {
 			res = res[:limit]

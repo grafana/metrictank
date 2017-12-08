@@ -748,6 +748,14 @@ TAGS:
 		}
 	}
 	close(stopCh)
+
+	// special case for "name"
+	// if there is at least one metric that satisfies the given conditions,
+	// then "name" must be a valid result because every metric has a name.
+	if len(result) > 0 {
+		result["name"] = struct{}{}
+	}
+
 	return result
 }
 
