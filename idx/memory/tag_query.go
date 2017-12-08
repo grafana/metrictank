@@ -42,9 +42,9 @@ type kvRe struct {
 	cost           uint // cost of evaluating expression, compared to other kvRe objects
 	key            string
 	value          *regexp.Regexp
-	matchCache     sync.Map
+	matchCache     *sync.Map
 	matchCacheSize int32
-	missCache      sync.Map
+	missCache      *sync.Map
 	missCacheSize  int32
 }
 
@@ -213,13 +213,17 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		if len(e.value) == 0 {
 			if e.operator == EQUAL || e.operator == MATCH {
 				q.notMatch = append(q.notMatch, kvRe{
-					key:   e.key,
-					value: nil,
+					key:        e.key,
+					value:      nil,
+					matchCache: &sync.Map{},
+					missCache:  &sync.Map{},
 				})
 			} else {
 				q.match = append(q.match, kvRe{
-					key:   e.key,
-					value: nil,
+					key:        e.key,
+					value:      nil,
+					matchCache: &sync.Map{},
+					missCache:  &sync.Map{},
 				})
 			}
 		} else {
@@ -238,13 +242,23 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 				if err != nil {
 					return q, errInvalidQuery
 				}
-				q.match = append(q.match, kvRe{key: e.key, value: re})
+				q.match = append(q.match, kvRe{
+					key:        e.key,
+					value:      re,
+					matchCache: &sync.Map{},
+					missCache:  &sync.Map{},
+				})
 			case NOT_MATCH:
 				re, err := compileRe(e.value)
 				if err != nil {
 					return q, errInvalidQuery
 				}
-				q.notMatch = append(q.notMatch, kvRe{key: e.key, value: re})
+				q.notMatch = append(q.notMatch, kvRe{
+					key:        e.key,
+					value:      re,
+					matchCache: &sync.Map{},
+					missCache:  &sync.Map{},
+				})
 			case PREFIX:
 				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
 			case MATCH_TAG:
@@ -252,7 +266,11 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 				if err != nil {
 					return q, errInvalidQuery
 				}
-				q.tagMatch = kvRe{value: re}
+				q.tagMatch = kvRe{
+					value:      re,
+					matchCache: &sync.Map{},
+					missCache:  &sync.Map{},
+				}
 
 				// we only allow one query by tag
 				if q.filterTag != 0 {
@@ -748,13 +766,6 @@ TAGS:
 		}
 	}
 	close(stopCh)
-
-	// special case for "name"
-	// if there is at least one metric that satisfies the given conditions,
-	// then "name" must be a valid result because every metric has a name.
-	if len(result) > 0 {
-		result["name"] = struct{}{}
-	}
 
 	return result
 }

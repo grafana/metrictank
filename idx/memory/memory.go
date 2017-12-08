@@ -507,6 +507,11 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 			res = append(res, tag)
 		}
 
+		// special case for the tag "name", we need to fake it
+		if len(res) > 0 && (len(tagPrefix) >= 4 && tagPrefix[:4] == "name") || len(tagPrefix) == 0 {
+			res = append(res, "name")
+		}
+
 		sort.Strings(res)
 		if uint16(len(res)) > limit {
 			res = res[:limit]
@@ -528,6 +533,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 
 			tagsSorted = append(tagsSorted, tag)
 		}
+
 		sort.Strings(tagsSorted)
 
 	TAGS:
