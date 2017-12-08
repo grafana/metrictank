@@ -46,7 +46,7 @@ var (
 	Enabled         bool
 	matchCacheSize  int
 	tagSupport      bool
-	tagQueryWorkers int
+	tagQueryWorkers int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
@@ -467,9 +467,23 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
+// AutoCompleteTags is used to generate a list of possible values that could
+// complete a given prefix. It also accepts additional conditions to further
+// narrow down the result set.
+//
+// tagPrefix:  the string to be completed
+// expressions: tagdb expressions in the same format as graphite uses
+// from:        only tags will be returned that have at least one metric
+//              with a LastUpdateTime above from
+// limit:       the maximum number of results to return, the results will
+//              always be sorted alphabetically for consistency between
+//              consecutive queries
+//
 func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	res := make([]string, 0)
 
+	// only if expressions are specified we need to build a tag query.
+	// otherwise, the generation of the result set is much simpler
 	if len(expressions) > 0 {
 		if len(tagPrefix) > 0 {
 			expressions = append(expressions, fmt.Sprintf("__tag^=%s", tagPrefix))
@@ -479,6 +493,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 			return nil, err
 		}
 
+		// only acquire lock after we're sure the query is valid
 		m.RLock()
 		defer m.RUnlock()
 
@@ -518,19 +533,24 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		for _, tag := range tagsSorted {
 			for _, ids := range tags[tag] {
 				for id := range ids {
-					def, ok := m.DefById[id.String()]
-					if !ok {
-						corruptIndex.Inc()
-						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-						continue
-					}
-					if def.LastUpdate >= from {
-						res = append(res, tag)
-						if uint16(len(res)) >= limit {
-							break TAGS
+					// only if from is specified we need to find at least one
+					// metric with LastUpdateTime >= from
+					if from > 0 {
+						def, ok := m.DefById[id.String()]
+						if !ok {
+							corruptIndex.Inc()
+							log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+							continue
 						}
-						continue TAGS
+						if def.LastUpdate < from {
+							continue
+						}
 					}
+					res = append(res, tag)
+					if uint16(len(res)) >= limit {
+						break TAGS
+					}
+					continue TAGS
 				}
 			}
 		}
@@ -539,13 +559,31 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 	return res, nil
 }
 
+// AutoCompleteTagValues is used to generate a list of possible values that could
+// complete a given value prefix. It requires a tag to be specified and only values
+// of the given tag will be returned. It also accepts additional conditions to
+// further narrow down the result set.
+//
+// tag:         values of which tag should be returned
+// valPrefix:   the string to be completed
+// expressions: tagdb expressions in the same format as graphite uses
+// from:        only tags will be returned that have at least one metric
+//              with a LastUpdateTime above from
+// limit:       the maximum number of results to return, the results will
+//              always be sorted alphabetically for consistency between
+//              consecutive queries
+//
 func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
 	var res []string
 
+	// only if expressions are specified we need to build a tag query.
+	// otherwise, the generation of the result set is much simpler
 	if len(expressions) > 0 {
 		if len(valPrefix) > 0 {
 			expressions = append(expressions, tag+"^="+valPrefix)
 		} else {
+			// if no value prefix has been specified we just query for all
+			// metrics that have the given tag
 			expressions = append(expressions, tag+"!=")
 		}
 		query, err := NewTagQuery(expressions, from)
@@ -553,6 +591,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 			return nil, err
 		}
 
+		// only acquire lock after we're sure the query is valid
 		m.RLock()
 		defer m.RUnlock()
 
@@ -573,16 +612,21 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
 				continue
 			}
+
+			// special case if the tag to complete values for is "name"
 			if tag == "name" {
 				valueMap[def.Name] = struct{}{}
 			} else {
 				for _, t := range def.Tags {
-					if len(tag) > len(t)+2 {
+					// tag + "=" + at least one character as value so "+ 2"
+					if len(tag) >= len(t)+2 {
 						continue
 					}
 					if t[:len(tag)] != tag {
 						continue
 					}
+
+					// keep the value after "=", that's why "+1"
 					valueMap[t[len(tag)+1:]] = struct{}{}
 				}
 			}
@@ -601,9 +645,12 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 			return nil, nil
 		}
 
-		vals := tags[tag]
-		res = make([]string, 0, len(vals))
+		vals, ok := tags[tag]
+		if !ok {
+			return nil, nil
+		}
 
+		res = make([]string, 0, len(vals))
 		for val := range vals {
 			if len(valPrefix) > 0 && (len(valPrefix) > len(val) || val[:len(valPrefix)] != valPrefix) {
 				continue
