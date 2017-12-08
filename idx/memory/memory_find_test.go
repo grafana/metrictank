@@ -960,7 +960,7 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 		tagPrefix: "di",
 		expr:      []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
 		from:      12345,
-		expRes:    []string{"disk", "direction"},
+		expRes:    []string{"direction", "disk"},
 	}
 
 	b.ReportAllocs()

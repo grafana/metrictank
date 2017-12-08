@@ -18,13 +18,13 @@ var (
 )
 
 const (
-	EQUAL = iota
-	NOT_EQUAL
-	MATCH
-	MATCH_TAG
-	NOT_MATCH
-	PREFIX
-	PREFIX_TAG
+	EQUAL      = iota // =
+	NOT_EQUAL         // !=
+	MATCH             // =~        regular expression
+	MATCH_TAG         // __tag=~   relies on special key __tag
+	NOT_MATCH         // !=~
+	PREFIX            // ^=        exact prefix, not regex
+	PREFIX_TAG        // __tag^=   exact prefix with tag
 )
 
 type expression struct {
@@ -42,10 +42,10 @@ type kvRe struct {
 	cost           uint // cost of evaluating expression, compared to other kvRe objects
 	key            string
 	value          *regexp.Regexp
-	matchCache     *sync.Map
-	matchCacheSize int32
-	missCache      *sync.Map
-	missCacheSize  int32
+	matchCache     *sync.Map // needs to be reference so kvRe can be copied
+	matchCacheSize int32     // sync.Map does not have a way to get the length
+	missCache      *sync.Map // needs to be reference so kvRe can be copied
+	missCacheSize  int32     // sync.Map does not have a way to get the length
 }
 
 type KvByCost []kv
@@ -67,15 +67,17 @@ type TagQuery struct {
 	notEqual  []kv
 	notMatch  []kvRe
 	prefix    []kv
-	startWith int
-	filterTag int
+	startWith int // expression type to generate the initial result set from
+	filterTag int // if tags should be filtered by prefix or regex match (max one)
 
 	// no need have more than one of tagMatch and tagPrefix
-	tagMatch  kvRe
-	tagPrefix string
+	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
+	tagPrefix string // only used for auto complete of tags
 
 	index TagIndex
 	byId  map[string]*idx.Archive
+
+	wg sync.WaitGroup
 }
 
 func compileRe(pattern string) (*regexp.Regexp, error) {
@@ -104,13 +106,13 @@ func parseExpression(expr string) (expression, error) {
 			break
 		}
 
-		// !
+		// ! (not)
 		if expr[pos] == 33 {
 			not = true
 			break
 		}
 
-		// ^
+		// ^ (prefix)
 		if expr[pos] == 94 {
 			prefix = true
 			break
@@ -140,7 +142,7 @@ func parseExpression(expr string) (expression, error) {
 	}
 	pos++
 
-	// if ~
+	// if ~ (regex)
 	if len(expr) > pos && expr[pos] == 126 {
 		if prefix {
 			return res, errInvalidQuery
@@ -158,10 +160,10 @@ func parseExpression(expr string) (expression, error) {
 	}
 	res.value = expr[valuePos:]
 
-	// special key to match on tag
+	// special key to match on tag instead of a value
 	if res.key == "__tag" {
-		// currently ! queries on tags are not supported
-		// and values must be set
+		// currently ! (not) queries on tags are not supported
+		// and unlike normal queries a value must be set
 		if not || len(res.value) == 0 {
 			return res, errInvalidQuery
 		}
@@ -262,28 +264,30 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			case PREFIX:
 				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
 			case MATCH_TAG:
+				// we only allow one query by tag
+				if q.filterTag != 0 {
+					return q, errInvalidQuery
+				}
+
 				re, err := compileRe(e.value)
 				if err != nil {
 					return q, errInvalidQuery
 				}
+
 				q.tagMatch = kvRe{
 					value:      re,
 					matchCache: &sync.Map{},
 					missCache:  &sync.Map{},
 				}
 
-				// we only allow one query by tag
-				if q.filterTag != 0 {
-					return q, errInvalidQuery
-				}
 				q.filterTag = MATCH_TAG
 			case PREFIX_TAG:
-				q.tagPrefix = e.value
-
 				// we only allow one query by tag
 				if q.filterTag != 0 {
 					return q, errInvalidQuery
 				}
+
+				q.tagPrefix = e.value
 				q.filterTag = PREFIX_TAG
 			}
 		}
@@ -297,6 +301,8 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	} else if len(q.match) > 0 {
 		q.startWith = MATCH
 	} else if q.filterTag == PREFIX_TAG {
+		// starting with a tag based query can be very expensive because they
+		// have the potential to result in a huge initial result set
 		q.startWith = PREFIX_TAG
 	} else if q.filterTag == MATCH_TAG {
 		q.startWith = MATCH_TAG
@@ -307,50 +313,89 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 	return q, nil
 }
 
-// getInitialByMatch returns the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan idx.MetricID) {
-	// shortcut if value == nil.
-	// this will simply match any value, like ^.+. since we know that every value
-	// in the index must not be empty, we can skip the matching.
-	if expr.value == nil {
-		for _, ids := range q.index[expr.key] {
-			for id := range ids {
-				idCh <- id
-			}
+// getInitialByEqual generates the initial resultset by executing the given equal expression
+func (q *TagQuery) getInitialByEqual(expr kv, idCh chan idx.MetricID, stopCh chan struct{}) {
+	defer q.wg.Done()
+
+	for k := range q.index[expr.key][expr.value] {
+		select {
+		case <-stopCh:
+			break
+		case idCh <- k:
 		}
-		close(idCh)
-		return
 	}
 
-	for v, ids := range q.index[expr.key] {
-		if !expr.value.MatchString(v) {
-			continue
-		}
-
-		for id := range ids {
-			idCh <- id
-		}
-	}
 	close(idCh)
 }
 
-// getInitialByPrefix returns the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan idx.MetricID) {
+// getInitialByPrefix generates the initial resultset by executing the given prefix match expression
+func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan idx.MetricID, stopCh chan struct{}) {
+	defer q.wg.Done()
+
+VALUES:
 	for v, ids := range q.index[expr.key] {
 		if len(v) < len(expr.value) || v[:len(expr.value)] != expr.value {
 			continue
 		}
 
 		for id := range ids {
-			idCh <- id
+			select {
+			case <-stopCh:
+				break VALUES
+			case idCh <- id:
+			}
 		}
 	}
+
 	close(idCh)
 }
 
-// getInitialByTagPrefix returns the initial resultset by creating a list of
+// getInitialByMatch generates the initial resultset by executing the given match expression
+func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan idx.MetricID, stopCh chan struct{}) {
+	defer q.wg.Done()
+
+	// shortcut if value == nil.
+	// this will simply match any value, like ^.+. since we know that every value
+	// in the index must not be empty, we can skip the matching.
+	if expr.value == nil {
+	VALUES1:
+		for _, ids := range q.index[expr.key] {
+			for id := range ids {
+				select {
+				case <-stopCh:
+					break VALUES1
+				case idCh <- id:
+				}
+			}
+		}
+		close(idCh)
+		return
+	}
+
+VALUES2:
+	for v, ids := range q.index[expr.key] {
+		if !expr.value.MatchString(v) {
+			continue
+		}
+
+		for id := range ids {
+			select {
+			case <-stopCh:
+				break VALUES2
+			case idCh <- id:
+			}
+		}
+	}
+
+	close(idCh)
+}
+
+// getInitialByTagPrefix generates the initial resultset by creating a list of
 // metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix(idCh chan idx.MetricID) {
+func (q *TagQuery) getInitialByTagPrefix(idCh chan idx.MetricID, stopCh chan struct{}) {
+	defer q.wg.Done()
+
+TAGS:
 	for tag, values := range q.index {
 		if len(tag) < len(q.tagPrefix) {
 			continue
@@ -362,35 +407,68 @@ func (q *TagQuery) getInitialByTagPrefix(idCh chan idx.MetricID) {
 
 		for _, ids := range values {
 			for id := range ids {
-				idCh <- id
-			}
-		}
-	}
-	close(idCh)
-}
-
-// getInitialByTagMatch returns the initial resultset by creating a list of
-// metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch(idCh chan idx.MetricID) {
-	for tag, values := range q.index {
-		if q.tagMatch.value.MatchString(tag) {
-			for _, ids := range values {
-				for id := range ids {
-					idCh <- id
+				select {
+				case <-stopCh:
+					break TAGS
+				case idCh <- id:
 				}
 			}
 		}
 	}
+
 	close(idCh)
 }
 
-// getInitialByEqual returns the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(expr kv, idCh chan idx.MetricID) {
-	// copy the map, because we'll later delete items from it
-	for k := range q.index[expr.key][expr.value] {
-		idCh <- k
+// getInitialByTagMatch generates the initial resultset by creating a list of
+// metric IDs of which at least one tag matches the defined regex
+func (q *TagQuery) getInitialByTagMatch(idCh chan idx.MetricID, stopCh chan struct{}) {
+	defer q.wg.Done()
+
+TAGS:
+	for tag, values := range q.index {
+		if q.tagMatch.value.MatchString(tag) {
+			for _, ids := range values {
+				for id := range ids {
+					select {
+					case <-stopCh:
+						break TAGS
+					case idCh <- id:
+					}
+				}
+			}
+		}
 	}
+
 	close(idCh)
+}
+
+// getInitialIds returns a channel through which the IDs of the initial result
+// set will be sent
+func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
+	idCh := make(chan idx.MetricID)
+	stopCh := make(chan struct{})
+	q.wg.Add(1)
+
+	switch q.startWith {
+	case EQUAL:
+		query := q.equal[0]
+		q.equal = q.equal[1:]
+		go q.getInitialByEqual(query, idCh, stopCh)
+	case PREFIX:
+		query := q.prefix[0]
+		q.prefix = q.prefix[1:]
+		go q.getInitialByPrefix(query, idCh, stopCh)
+	case MATCH:
+		query := q.match[0]
+		q.match = q.match[1:]
+		go q.getInitialByMatch(query, idCh, stopCh)
+	case PREFIX_TAG:
+		go q.getInitialByTagPrefix(idCh, stopCh)
+	case MATCH_TAG:
+		go q.getInitialByTagMatch(idCh, stopCh)
+	}
+
+	return idCh, stopCh
 }
 
 func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool {
@@ -600,84 +678,6 @@ func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
 	return true
 }
 
-func (q *TagQuery) sortByCost() {
-	for i := range q.equal {
-		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
-	}
-
-	for i := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
-	}
-
-	for i := range q.match {
-		q.match[i].cost = uint(len(q.index[q.match[i].key]))
-	}
-
-	sort.Sort(KvByCost(q.equal))
-	sort.Sort(KvByCost(q.notEqual))
-	sort.Sort(KvByCost(q.prefix))
-	sort.Sort(KvReByCost(q.match))
-	sort.Sort(KvReByCost(q.notMatch))
-}
-
-func (q *TagQuery) getInitialIds() chan idx.MetricID {
-	idCh := make(chan idx.MetricID)
-
-	switch q.startWith {
-	case EQUAL:
-		query := q.equal[0]
-		q.equal = q.equal[1:]
-		go q.getInitialByEqual(query, idCh)
-	case PREFIX:
-		query := q.prefix[0]
-		q.prefix = q.prefix[1:]
-		go q.getInitialByPrefix(query, idCh)
-	case PREFIX_TAG:
-		go q.getInitialByTagPrefix(idCh)
-	case MATCH_TAG:
-		go q.getInitialByTagMatch(idCh)
-	case MATCH:
-		query := q.match[0]
-		q.match = q.match[1:]
-		go q.getInitialByMatch(query, idCh)
-	}
-
-	return idCh
-}
-
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
-	q.index = index
-	q.byId = byId
-
-	q.sortByCost()
-
-	idCh := q.getInitialIds()
-	resCh := make(chan idx.MetricID)
-	completeCh := make(chan struct{})
-
-	for i := 0; i < tagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh, completeCh)
-	}
-
-	completedWorkers := 0
-	result := make(TagIDs)
-
-IDS:
-	for {
-		select {
-		case id := <-resCh:
-			result[id] = struct{}{}
-		case <-completeCh:
-			completedWorkers++
-			if completedWorkers >= tagQueryWorkers {
-				break IDS
-			}
-		}
-	}
-
-	return result
-}
-
 func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh chan struct{}) {
 	// filter the resultSet by the from condition and all other expressions given.
 	// filters should get applied in ascending order by the cpu required to process
@@ -701,6 +701,60 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh c
 	}
 
 	completeCh <- struct{}{}
+}
+
+func (q *TagQuery) sortByCost() {
+	for i := range q.equal {
+		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
+	}
+
+	for i := range q.prefix {
+		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
+	}
+
+	for i := range q.match {
+		q.match[i].cost = uint(len(q.index[q.match[i].key]))
+	}
+
+	sort.Sort(KvByCost(q.equal))
+	sort.Sort(KvByCost(q.notEqual))
+	sort.Sort(KvByCost(q.prefix))
+	sort.Sort(KvReByCost(q.match))
+	sort.Sort(KvReByCost(q.notMatch))
+}
+
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
+	q.index = index
+	q.byId = byId
+
+	q.sortByCost()
+
+	idCh, _ := q.getInitialIds()
+	resCh := make(chan idx.MetricID)
+	completeCh := make(chan struct{})
+
+	for i := 0; i < tagQueryWorkers; i++ {
+		go q.filterIdsFromChan(idCh, resCh, completeCh)
+	}
+
+	completedWorkers := 0
+	result := make(TagIDs)
+
+IDS:
+	for {
+		select {
+		case id := <-resCh:
+			result[id] = struct{}{}
+		case <-completeCh:
+			completedWorkers++
+			if completedWorkers >= tagQueryWorkers {
+				break IDS
+			}
+		}
+	}
+
+	q.wg.Wait()
+	return result
 }
 
 func (q *TagQuery) getMaxTagCount() int {
@@ -728,46 +782,6 @@ func (q *TagQuery) getMaxTagCount() int {
 		maxTagCount = len(q.index)
 	}
 	return maxTagCount
-}
-
-func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
-	q.index = index
-	q.byId = byId
-
-	maxTagCount := int32(math.MaxInt32)
-	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
-
-	q.sortByCost()
-	idCh := q.getInitialIds()
-
-	stopCh := make(chan struct{})
-	completeCh := make(chan struct{})
-	tagCh := make(chan string)
-
-	for i := 0; i < tagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
-	}
-
-	completedWorkers := 0
-	result := make(map[string]struct{})
-TAGS:
-	for {
-		select {
-		case tag := <-tagCh:
-			result[tag] = struct{}{}
-			if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
-				break TAGS
-			}
-		case <-completeCh:
-			completedWorkers++
-			if completedWorkers >= tagQueryWorkers {
-				break TAGS
-			}
-		}
-	}
-	close(stopCh)
-
-	return result
 }
 
 func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
@@ -833,4 +847,44 @@ IDS:
 	}
 
 	completeCh <- struct{}{}
+}
+
+func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
+	q.index = index
+	q.byId = byId
+
+	maxTagCount := int32(math.MaxInt32)
+	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
+
+	q.sortByCost()
+	idCh, stopCh := q.getInitialIds()
+
+	completeCh := make(chan struct{})
+	tagCh := make(chan string)
+
+	for i := 0; i < tagQueryWorkers; i++ {
+		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
+	}
+
+	completedWorkers := 0
+	result := make(map[string]struct{})
+TAGS:
+	for {
+		select {
+		case tag := <-tagCh:
+			result[tag] = struct{}{}
+			if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
+				break TAGS
+			}
+		case <-completeCh:
+			completedWorkers++
+			if completedWorkers >= tagQueryWorkers {
+				break TAGS
+			}
+		}
+	}
+	close(stopCh)
+
+	q.wg.Wait()
+	return result
 }
