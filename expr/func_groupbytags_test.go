@@ -172,6 +172,11 @@ func TestGroupByTagsAllAggregators(t *testing.T) {
 		{name: "avg", result1: avgab, result2: avgabc},
 		{name: "average", result1: avgab, result2: avgabc},
 		{name: "max", result1: maxab, result2: maxabc},
+		{name: "median", result1: medianab, result2: medianabc},
+		{name: "multiply", result1: multab, result2: multabc},
+		{name: "stddev", result1: stddevab, result2: stddevabc},
+		{name: "diff", result1: diffab, result2: diffabc},
+		{name: "range", result1: rangeab, result2: rangeabc},
 	}
 
 	for _, agg := range aggregators {
