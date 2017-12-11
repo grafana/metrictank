@@ -87,7 +87,7 @@ type IndexAutoCompleteTags struct {
 	TagPrefix string   `json:"tagPrefix"`
 	Expr      []string `json:"expressions"`
 	From      int64    `json:"from"`
-	Limit     uint16   `json:"limit"`
+	Limit     uint     `json:"limit"`
 }
 
 func (t IndexAutoCompleteTags) Trace(span opentracing.Span) {
@@ -107,7 +107,7 @@ type IndexAutoCompleteTagValues struct {
 	Tag       string   `json:"tag"`
 	Expr      []string `json:"expressions"`
 	From      int64    `json:"from"`
-	Limit     uint16   `json:"limit"`
+	Limit     uint     `json:"limit"`
 }
 
 func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {

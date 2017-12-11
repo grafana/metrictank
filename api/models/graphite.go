@@ -63,7 +63,7 @@ type GraphiteAutoCompleteTags struct {
 	Expr      []string `json:"expr" form:"expr"`
 	TagPrefix string   `json:"tagPrefix" form:"tagPrefix"`
 	From      int64    `json:"from" form:"from"`
-	Limit     uint16   `json:"limit" form:"limit"`
+	Limit     uint     `json:"limit" form:"limit"`
 }
 
 type GraphiteAutoCompleteTagValues struct {
@@ -71,7 +71,7 @@ type GraphiteAutoCompleteTagValues struct {
 	Tag         string   `json:"tag", form:"tag"`
 	ValuePrefix string   `json:"valuePrefix" form:"valuePrefix"`
 	From        int64    `json:"from" form:"from"`
-	Limit       uint16   `json:"limit" form:"limit"`
+	Limit       uint     `json:"limit" form:"limit"`
 }
 
 type GraphiteTagResp struct {

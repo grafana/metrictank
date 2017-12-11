@@ -451,7 +451,7 @@ func TestTagSorting(t *testing.T) {
 	}
 }
 
-func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, limit uint16, expRes []string, expErr bool) {
+func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
 	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from, limit)
@@ -481,7 +481,7 @@ func TestAutoCompleteTag(t *testing.T) {
 		tagPrefix string
 		expr      []string
 		from      int64
-		limit     uint16
+		limit     uint
 		expRes    []string
 		expErr    bool
 	}
@@ -530,13 +530,6 @@ func TestAutoCompleteTag(t *testing.T) {
 			expRes:    []string{"host"},
 			expErr:    false,
 		}, {
-			tagPrefix: "host",
-			expr:      []string{"direction=write"},
-			from:      100,
-			limit:     0,
-			expRes:    []string{"host"},
-			expErr:    false,
-		}, {
 			tagPrefix: "n",
 			expr:      []string{},
 			from:      100,
@@ -558,7 +551,7 @@ func TestAutoCompleteTag(t *testing.T) {
 	}
 }
 
-func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, limit uint16, expRes []string, expErr bool) {
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
 	res, err := ix.AutoCompleteTagValues(1, tag, valPrefix, expr, from, limit)
@@ -591,7 +584,7 @@ func TestAutoCompleteTagValues(t *testing.T) {
 		valPrefix string
 		expr      []string
 		from      int64
-		limit     uint16
+		limit     uint
 		expRes    []string
 		expErr    bool
 	}
@@ -636,14 +629,6 @@ func TestAutoCompleteTagValues(t *testing.T) {
 			from:      100,
 			limit:     100,
 			expRes:    []string{"cpu", "disk"},
-			expErr:    false,
-		}, {
-			tag:       "device",
-			valPrefix: "c",
-			expr:      []string{},
-			from:      100,
-			limit:     0,
-			expRes:    []string{"cpu"},
 			expErr:    false,
 		}, {
 			tag:       "device",

@@ -147,8 +147,8 @@ type MetricIndex interface {
 	// LastUpdate time is >= the given value.
 	Tags(int, string, int64) ([]string, error)
 
-	AutoCompleteTags(int, string, []string, int64, uint16) ([]string, error)
-	AutoCompleteTagValues(int, string, string, []string, int64, uint16) ([]string, error)
+	AutoCompleteTags(int, string, []string, int64, uint) ([]string, error)
+	AutoCompleteTagValues(int, string, string, []string, int64, uint) ([]string, error)
 
 	// TagDetails returns a list of all values associated with a given tag key in the
 	// given org. The occurences of each value is counted and the count is referred to by

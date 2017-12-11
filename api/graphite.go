@@ -1040,6 +1040,10 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 }
 
 func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request models.GraphiteAutoCompleteTags) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
 	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.TagPrefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
@@ -1049,7 +1053,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 	response.Write(ctx, response.NewJson(200, tags, ""))
 }
 
-func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	result, err := s.MetricIndex.AutoCompleteTags(orgId, tagPrefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
@@ -1083,7 +1087,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	}
 
 	sort.Strings(tags)
-	if uint16(len(tags)) > limit && limit > 0 {
+	if uint(len(tags)) > limit {
 		tags = tags[:limit]
 	}
 
@@ -1091,6 +1095,10 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 }
 
 func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
 	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.ValuePrefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
@@ -1100,7 +1108,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, valPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, valPrefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
@@ -1134,7 +1142,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 	}
 
 	sort.Strings(vals)
-	if uint16(len(vals)) > limit && limit > 0 {
+	if uint(len(vals)) > limit {
 		vals = vals[:limit]
 	}
 

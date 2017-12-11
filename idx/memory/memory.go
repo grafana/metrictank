@@ -479,7 +479,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 //              always be sorted alphabetically for consistency between
 //              consecutive queries
 //
-func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
+func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	res := make([]string, 0)
 
 	// only if expressions are specified we need to build a tag query.
@@ -513,7 +513,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 		}
 
 		sort.Strings(res)
-		if uint16(len(res)) > limit && limit > 0 {
+		if uint(len(res)) > limit {
 			res = res[:limit]
 		}
 	} else {
@@ -554,7 +554,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 						}
 					}
 					res = append(res, tag)
-					if uint16(len(res)) >= limit {
+					if uint(len(res)) >= limit {
 						break TAGS
 					}
 					continue TAGS
@@ -580,7 +580,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 //              always be sorted alphabetically for consistency between
 //              consecutive queries
 //
-func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint16) ([]string, error) {
+func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
@@ -668,7 +668,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 	}
 
 	sort.Strings(res)
-	if uint16(len(res)) > limit && limit > 0 {
+	if uint(len(res)) > limit {
 		res = res[:limit]
 	}
 
