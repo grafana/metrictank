@@ -354,7 +354,7 @@ func main() {
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	/***********************************
-		Initialize MetricPerrist notifiers
+		Initialize MetricPersist notifiers
 	***********************************/
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {

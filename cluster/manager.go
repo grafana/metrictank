@@ -3,7 +3,6 @@ package cluster
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -73,17 +72,43 @@ type MemberlistManager struct {
 	cfg      *memberlist.Config
 }
 
-func NewMemberlistManager(thisNode Node, clusterHost net.IP, clusterPort int) *MemberlistManager {
+func NewMemberlistManager(thisNode Node) *MemberlistManager {
 	mgr := &MemberlistManager{
 		members: map[string]Node{
 			thisNode.Name: thisNode,
 		},
 		nodeName: thisNode.Name,
 	}
-	mgr.cfg = memberlist.DefaultLANConfig()
-	mgr.cfg.BindPort = clusterPort
-	mgr.cfg.BindAddr = clusterHost.String()
-	mgr.cfg.AdvertisePort = clusterPort
+	switch swimUseConfig {
+	case "manual":
+		mgr.cfg = memberlist.DefaultLANConfig() // use this as base so that the other settings have proper defaults
+		mgr.cfg.BindPort = swimBindAddr.Port
+		mgr.cfg.BindAddr = swimBindAddr.IP.String()
+		mgr.cfg.AdvertisePort = swimBindAddr.Port
+		mgr.cfg.TCPTimeout = swimTCPTimeout
+		mgr.cfg.IndirectChecks = swimIndirectChecks
+		mgr.cfg.RetransmitMult = swimRetransmitMult
+		mgr.cfg.SuspicionMult = swimSuspicionMult
+		mgr.cfg.SuspicionMaxTimeoutMult = swimSuspicionMaxTimeoutMult
+		mgr.cfg.PushPullInterval = swimPushPullInterval
+		mgr.cfg.ProbeInterval = swimProbeInterval
+		mgr.cfg.ProbeTimeout = swimProbeTimeout
+		mgr.cfg.DisableTcpPings = swimDisableTcpPings
+		mgr.cfg.AwarenessMaxMultiplier = swimAwarenessMaxMultiplier
+		mgr.cfg.GossipInterval = swimGossipInterval
+		mgr.cfg.GossipNodes = swimGossipNodes
+		mgr.cfg.GossipToTheDeadTime = swimGossipToTheDeadTime
+		mgr.cfg.EnableCompression = swimEnableCompression
+		mgr.cfg.DNSConfigPath = swimDNSConfigPath
+	case "default-lan":
+		mgr.cfg = memberlist.DefaultLANConfig()
+	case "default-local":
+		mgr.cfg = memberlist.DefaultLocalConfig()
+	case "default-wan":
+		mgr.cfg = memberlist.DefaultWANConfig()
+	default:
+		panic("invalid swimUseConfig. should already have been validated")
+	}
 	mgr.cfg.Events = mgr
 	mgr.cfg.Delegate = mgr
 	h := sha256.New()

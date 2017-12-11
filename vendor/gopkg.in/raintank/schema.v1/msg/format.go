@@ -9,8 +9,3 @@ const (
 	FormatMetricDataArrayJson Format = iota
 	FormatMetricDataArrayMsgp
 )
-
-const (
-	FormatProbeEventJson Format = iota
-	FormatProbeEventMsgp
-)

@@ -1,0 +1,21 @@
+sudo: required
+
+services:
+  - docker
+
+language: go
+go_import_path: github.com/uber/jaeger-lib
+
+go:
+  - 1.7
+
+env:
+  global:
+    - GO15VENDOREXPERIMENT=1
+
+install:
+  - make install-ci
+
+script:
+  - make test-ci
+  - travis_retry goveralls -coverprofile=cover.out -service=travis-ci || true
