@@ -39,12 +39,17 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		return nil, err
 	}
 
-	if len(series) == 0 {
-		return series, nil
-	}
-
 	if len(s.tags) == 0 {
 		return nil, errors.New("No tags specified")
+	}
+
+	aggFunc := getCrossSeriesAggFunc(s.aggregator)
+	if aggFunc == nil {
+		return nil, errors.New("Invalid aggregation func: " + s.aggregator)
+	}
+
+	if len(series) <= 1 {
+		return series, nil
 	}
 
 	groups := make(map[string][]models.Series)
@@ -106,7 +111,6 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		groups[key] = append(groups[key], serie)
 	}
 
-	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 	output := make([]models.Series, 0, len(groups))
 
 	// Now, for each key perform the requested aggregation
