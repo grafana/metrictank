@@ -33,6 +33,41 @@ func getModel(name string, data []schema.Point) models.Series {
 		Datapoints: getCopy(data),
 	}
 }
+
+// Test error cases
+func TestNoTags(t *testing.T) {
+	in := []models.Series{
+		getModel("name1;tag1=val1", a),
+	}
+	f := NewGroupByTags()
+	gby := f.(*FuncGroupByTags)
+	gby.in = NewMock(in)
+	gby.aggregator = "sum"
+	gby.tags = []string{}
+
+	_, err := f.Exec(make(map[Req][]models.Series))
+	if err == nil {
+		t.Fatalf("case %q: err should not be nil but was", "TestnoTags")
+	}
+}
+
+func TestInvalidAggregator(t *testing.T) {
+	in := []models.Series{
+		getModel("name1;tag1=val1", a),
+	}
+	f := NewGroupByTags()
+	gby := f.(*FuncGroupByTags)
+	gby.in = NewMock(in)
+	gby.aggregator = "inv"
+	gby.tags = []string{}
+
+	_, err := f.Exec(make(map[Req][]models.Series))
+	if err == nil {
+		t.Fatalf("case %q: err should not be nil but was", "TestnoTags")
+	}
+}
+
+// Test normal cases
 func TestGroupByTagsSingleSeries(t *testing.T) {
 	in := []models.Series{
 		getModel("name1;tag1=val1", a),
