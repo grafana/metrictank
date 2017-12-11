@@ -79,6 +79,12 @@ func ConfigProcess() {
 		log.Fatal(4, "CLU Config: invalid cluster operating mode")
 	}
 
+	Mode = ModeType(mode)
+
+	if mode != ModeMulti {
+		return
+	}
+
 	var err error
 	swimBindAddr, err = net.ResolveTCPAddr("tcp", swimBindAddrStr)
 	if err != nil {
@@ -88,8 +94,6 @@ func ConfigProcess() {
 	if httpTimeout == 0 {
 		log.Fatal(4, "CLU Config: http-timeout must be a non-zero duration string like 60s")
 	}
-
-	Mode = ModeType(mode)
 
 	client = http.Client{
 		Transport: &http.Transport{
@@ -104,9 +108,7 @@ func ConfigProcess() {
 		Timeout: httpTimeout,
 	}
 
-	if mode == "multi" {
-		if swimUseConfig != "manual" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
-			log.Fatal(4, "CLU Config: invalid swim-use-config setting")
-		}
+	if swimUseConfig != "manual" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
+		log.Fatal(4, "CLU Config: invalid swim-use-config setting")
 	}
 }
