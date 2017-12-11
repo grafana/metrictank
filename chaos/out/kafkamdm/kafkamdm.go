@@ -60,6 +60,13 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
 	config.Producer.Compression = out.GetCompression(codec)
 	config.Producer.Partitioner = sarama.NewManualPartitioner
+
+	// set all timeouts a bit more aggressive so we can bail out quicker.
+	// useful for our unit tests, which operate in the orders of seconds anyway
+	// the defaults of 30s is too long for many of our tests.
+	config.Net.DialTimeout = 5 * time.Second
+	config.Net.ReadTimeout = 5 * time.Second
+	config.Net.WriteTimeout = 5 * time.Second
 	err := config.Validate()
 	if err != nil {
 		return nil, err
