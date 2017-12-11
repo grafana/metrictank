@@ -66,6 +66,8 @@ func TestClusterStartup(t *testing.T) {
 	}
 	select {
 	case <-tracker.Match(matchers):
+		fmt.Println("stack now running.")
+		fmt.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 40):
 		postAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
