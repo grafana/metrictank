@@ -3,7 +3,6 @@ package chaos
 import (
 	"fmt"
 	"log"
-	"testing"
 	"time"
 
 	"github.com/grafana/metrictank/chaos/out/kafkamdm"
@@ -33,7 +32,7 @@ func init() {
 	}
 }
 
-func fakeMetrics(t *testing.T) {
+func fakeMetrics() {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
 	if err != nil {
@@ -52,7 +51,7 @@ func fakeMetrics(t *testing.T) {
 		}
 		err := out.Flush(metrics)
 		if err != nil {
-			t.Fatalf("failed to send data to kafka: %s", err)
+			panic(fmt.Sprintf("failed to send data to kafka: %s", err))
 		}
 	}
 }

@@ -75,7 +75,7 @@ func TestClusterStartup(t *testing.T) {
 func TestClusterBaseIngestWorkload(t *testing.T) {
 	postAnnotation("TestClusterBaseIngestWorkload:begin")
 
-	go fakeMetrics(t)
+	go fakeMetrics()
 
 	suc6, resp := retryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-8s", 18, func(resp response) bool {
 		exp := []string{
