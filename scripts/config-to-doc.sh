@@ -4,6 +4,10 @@
 # headers like h3 and h2 are printed as-is, and the lines between them (config items and their comments)
 # are wrapped in ``` blocks. t=code means we're in such a block.
 
+# Find the directory we exist within and cd into the root level dir
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd ${DIR}/..
+
 function process() {
 	local filename="$1"
 t=
