@@ -28,6 +28,7 @@ test:
     - cd $IMPORTPATH && scripts/gofmt-check.sh
     - cd $IMPORTPATH && scripts/end2end_test.sh
     - cd $IMPORTPATH && scripts/tools_gitignore.sh
+    - cd $IMPORTPATH && scripts/check_docs_uptodate.sh
   post:
     - scripts/package.sh
 
