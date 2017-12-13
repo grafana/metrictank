@@ -157,60 +157,6 @@ Flags:
 ```
 
 
-## mt-index-migrate-050-to-054
-
-```
-mt-index-migrate-050-to-054
-
-Converts a metrictank index to the new 0.5.4 (and beyond) format, using cassandra instead of elasticsearch
-differences:
- * schema 0 to schema 1 - proper metrics2.0 - (for 0.5.1, 576d8fcb47888b8a334e9a125d6aadf8e0e4d4d7)
- * store data in cassandra in the metric_def_ix table, as a messagepack encoded blob (cassandra idx new in 0.5.3 - 26be821bd8bead43db120e96d14d0ee88d6b6880)
- * use lastUpdate field (for 0.5.4, a07007ab8d4a22b122bbc5f9fadb51480e1c5b0c)
-
-Flags:
-
-  -cass-addr string
-    	Address of cassandra host. (default "localhost")
-  -dry-run
-    	run in dry-run mode. No changes will be made. (default true)
-  -es-addr string
-    	address of elasticsearch host. (default "localhost")
-  -index string
-    	elasticsearch index that contains current metric index values. (default "metric")
-  -keyspace string
-    	Cassandra keyspace to use. (default "raintank")
-```
-
-
-## mt-index-migrate-06-to-07
-
-```
-mt-index-migrate-06-to-07
-
-Converts a metrictank v0.6 index to the v0.7 format
-differences:
- * cassandra table: metric_def_idx -> metric_idx
- * data is stored as individual fields, not as messagepack encoded blob
- * support for partitioning. the partition field in cassandra will be set based on num-partitions and partition-schema
-
-Flags:
-
-  -cass-addr string
-    	Address of cassandra host. (default "localhost")
-  -dry-run
-    	run in dry-run mode. No changes will be made. (default true)
-  -keyspace string
-    	Cassandra keyspace to use. (default "raintank")
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -num-partitions int
-    	number of partitions in cluster (default 1)
-  -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
-```
-
-
 ## mt-kafka-mdm-sniff
 
 ```

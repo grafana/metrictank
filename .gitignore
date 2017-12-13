@@ -6,8 +6,6 @@ build/
 /cmd/mt-explain/mt-explain
 /cmd/mt-index-cat/mt-index-cat
 /cmd/mt-index-migrate/mt-index-migrate
-/cmd/mt-index-migrate-050-to-054/mt-index-migrate-050-to-054
-/cmd/mt-index-migrate-06-to-07/mt-index-migrate-06-to-07
 /cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
 /cmd/mt-kafka-mdm-sniff-out-of-order/mt-kafka-mdm-sniff-out-of-order
 /cmd/mt-replicator/mt-replicator
