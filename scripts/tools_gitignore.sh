@@ -3,6 +3,8 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
+# NOTE: known limitation: does not clean up stale gitignore rules
+
 SOURCEDIR=${DIR}/..
 file=$SOURCEDIR/.gitignore
 

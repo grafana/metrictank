@@ -55,11 +55,6 @@
   version = "0.10.0"
 
 [[projects]]
-  name = "github.com/araddon/gou"
-  packages = ["."]
-  revision = "cf9cf25f52be174c5878920a8021bd224cbe32c7"
-
-[[projects]]
   name = "github.com/armon/go-metrics"
   packages = ["."]
   revision = "06b60999766278efd6d2b5d8418a58c3d5b99e87"
@@ -249,11 +244,6 @@
   revision = "6834731faf32e62a2dd809d99fb24d1e4ae5a92d"
 
 [[projects]]
-  name = "github.com/mattbaird/elastigo"
-  packages = ["lib"]
-  revision = "34c4c4d8425cbdcbc8e257943a2044d5e9f7dab5"
-
-[[projects]]
   branch = "master"
   name = "github.com/metrics20/go-metrics20"
   packages = ["carbon20"]
@@ -429,12 +419,6 @@
   version = "v1.1.8"
 
 [[projects]]
-  name = "gopkg.in/raintank/schema.v0"
-  packages = ["."]
-  revision = "b5eb018b887ddff47b9152f28f6f1513be9b2141"
-  version = "v0.0.1"
-
-[[projects]]
   name = "gopkg.in/raintank/schema.v1"
   packages = [".","msg"]
   revision = "c068e0c9c054af19c858b2d947741180c09ea6b1"
@@ -443,6 +427,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1ed60c7bff342e382e10c70221c3a55c45e9b46194f8dff6325afe9fb9811f50"
+  inputs-digest = "251b221fc1c90596997d9c0c3570ce1ee0d87b504913eb5d4c3c5a248b6b724b"
   solver-name = "gps-cdcl"
   solver-version = 1
