@@ -76,20 +76,17 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
+
+	// check settings in cluster section
 	if !validMode(mode) {
 		log.Fatal(4, "CLU Config: invalid cluster operating mode")
 	}
 
 	Mode = ModeType(mode)
 
+	// all further stuff is only relevant in multi mode
 	if mode != ModeMulti {
 		return
-	}
-
-	var err error
-	swimBindAddr, err = net.ResolveTCPAddr("tcp", swimBindAddrStr)
-	if err != nil {
-		log.Fatal(4, "CLU Config: swim-bind-addr is not a valid TCP address: %s", err.Error())
 	}
 
 	if httpTimeout == 0 {
@@ -110,7 +107,16 @@ func ConfigProcess() {
 		Timeout:   httpTimeout,
 	}
 
+	// check settings in swim section
 	if swimUseConfig != "manual" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
 		log.Fatal(4, "CLU Config: invalid swim-use-config setting")
+	}
+
+	if swimUseConfig == "manual" {
+		var err error
+		swimBindAddr, err = net.ResolveTCPAddr("tcp", swimBindAddrStr)
+		if err != nil {
+			log.Fatal(4, "CLU Config: swim-bind-addr is not a valid TCP address: %s", err.Error())
+		}
 	}
 }
