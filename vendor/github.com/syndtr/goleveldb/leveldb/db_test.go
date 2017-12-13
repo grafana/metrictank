@@ -767,7 +767,7 @@ func TestDB_GetEncountersEmptyLevel(t *testing.T) {
 		//   * sstable B in level 2
 		// Then do enough Get() calls to arrange for an automatic compaction
 		// of sstable A.  A bug would cause the compaction to be marked as
-		// occuring at level 1 (instead of the correct level 0).
+		// occurring at level 1 (instead of the correct level 0).
 
 		// Step 1: First place sstables in levels 0 and 2
 		for i := 0; ; i++ {
@@ -1877,7 +1877,7 @@ func TestDB_ConcurrentIterator(t *testing.T) {
 }
 
 func TestDB_ConcurrentWrite(t *testing.T) {
-	const n, niter = 10, 10000
+	const n, bk, niter = 10, 3, 10000
 	h := newDbHarness(t)
 	defer h.close()
 
@@ -1889,11 +1889,29 @@ func TestDB_ConcurrentWrite(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			for k := 0; k < niter; k++ {
-				kstr := fmt.Sprintf("%d.%d", i, k)
+				kstr := fmt.Sprintf("put-%d.%d", i, k)
 				vstr := fmt.Sprintf("v%d", k)
 				h.put(kstr, vstr)
 				// Key should immediately available after put returns.
 				h.getVal(kstr, vstr)
+			}
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		batch := &Batch{}
+		go func(i int) {
+			defer wg.Done()
+			for k := 0; k < niter; k++ {
+				batch.Reset()
+				for j := 0; j < bk; j++ {
+					batch.Put([]byte(fmt.Sprintf("batch-%d.%d.%d", i, k, j)), []byte(fmt.Sprintf("v%d", k)))
+				}
+				h.write(batch)
+				// Key should immediately available after put returns.
+				for j := 0; j < bk; j++ {
+					h.getVal(fmt.Sprintf("batch-%d.%d.%d", i, k, j), fmt.Sprintf("v%d", k))
+				}
 			}
 		}(i)
 	}
@@ -2229,12 +2247,12 @@ func TestDB_GoleveldbIssue72and83(t *testing.T) {
 				k1checksum0 := binary.LittleEndian.Uint32(k1[len(k1)-4:])
 				k1checksum1 := util.NewCRC(k1[:len(k1)-4]).Value()
 				if k1checksum0 != k1checksum1 {
-					t.Fatalf("READER0 #%d.%d W#%d invalid K1 checksum: %#x != %#x", i, k, k1checksum0, k1checksum0)
+					t.Fatalf("READER0 #%d.%d W#%d invalid K1 checksum: %#x != %#x", i, k, writei, k1checksum0, k1checksum0)
 				}
 				k2checksum0 := binary.LittleEndian.Uint32(k2[len(k2)-4:])
 				k2checksum1 := util.NewCRC(k2[:len(k2)-4]).Value()
 				if k2checksum0 != k2checksum1 {
-					t.Fatalf("READER0 #%d.%d W#%d invalid K2 checksum: %#x != %#x", i, k, k2checksum0, k2checksum1)
+					t.Fatalf("READER0 #%d.%d W#%d invalid K2 checksum: %#x != %#x", i, k, writei, k2checksum0, k2checksum1)
 				}
 				kwritei := int(binary.LittleEndian.Uint32(k2[len(k2)-8:]))
 				if writei != kwritei {
@@ -2718,7 +2736,7 @@ func testDB_IterTriggeredCompaction(t *testing.T, limitDiv int) {
 		initialSize1 = h.sizeOf(limitKey, maxKey)
 	)
 
-	t.Logf("inital size %s [rest %s]", shortenb(int(initialSize0)), shortenb(int(initialSize1)))
+	t.Logf("initial size %s [rest %s]", shortenb(int(initialSize0)), shortenb(int(initialSize1)))
 
 	for r := 0; true; r++ {
 		if r >= mIter {
@@ -2822,6 +2840,7 @@ func TestDB_BulkInsertDelete(t *testing.T) {
 		}
 	}
 
+	h.waitCompaction()
 	if tot := h.totalTables(); tot > 10 {
 		t.Fatalf("too many uncompacted tables: %d (%s)", tot, h.getTablesPerLevel())
 	}
