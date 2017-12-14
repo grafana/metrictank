@@ -6,9 +6,9 @@ build/
 /cmd/mt-explain/mt-explain
 /cmd/mt-index-cat/mt-index-cat
 /cmd/mt-index-migrate/mt-index-migrate
-/cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
 /cmd/mt-kafka-mdm-sniff-out-of-order/mt-kafka-mdm-sniff-out-of-order
-/cmd/mt-replicator/mt-replicator
+/cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
+/cmd/mt-replicator-via-tsdb/mt-replicator-via-tsdb
 /cmd/mt-schemas-explain/mt-schemas-explain
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat
@@ -16,4 +16,3 @@ build/
 /cmd/mt-view-boundaries/mt-view-boundaries
 /cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
 /cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
-/cmd/mt-replicator-via-tsdb/mt-replicator-via-tsdb
