@@ -24,13 +24,13 @@ func NewReorderBuffer(reorderWindow uint32, interval int) *ReorderBuffer {
 	return buf
 }
 
-func (rob *ReorderBuffer) Add(ts uint32, val float64) []schema.Point {
+func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 	ts = AggBoundary(ts, rob.interval)
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(rob.len*rob.interval) {
 		metricsTooOld.Inc()
-		return nil
+		return nil, false
 	}
 
 	var res []schema.Point
@@ -59,7 +59,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) []schema.Point {
 		rob.buf[index].Val = val
 	}
 
-	return res
+	return res, true
 }
 
 // returns all the data in the buffer as a raw list of points
@@ -78,4 +78,23 @@ func (rob *ReorderBuffer) Get() []schema.Point {
 	}
 
 	return res
+}
+
+func (rob *ReorderBuffer) Reset() {
+	for i := range rob.buf {
+		rob.buf[i].Ts = 0
+		rob.buf[i].Val = 0
+	}
+	rob.newest = 0
+}
+
+func (rob *ReorderBuffer) Flush() []schema.Point {
+	res := rob.Get()
+	rob.Reset()
+
+	return res
+}
+
+func (rob *ReorderBuffer) IsEmpty() bool {
+	return rob.buf[rob.newest].Ts == 0
 }
