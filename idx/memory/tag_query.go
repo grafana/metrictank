@@ -205,7 +205,13 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		return q, errInvalidQuery
 	}
 
-	for _, expr := range expressions {
+	sort.Strings(expressions)
+	for i, expr := range expressions {
+		// skip duplicate expression
+		if i > 0 && expr == expressions[i-1] {
+			continue
+		}
+
 		e, err := parseExpression(expr)
 		if err != nil {
 			return q, err
