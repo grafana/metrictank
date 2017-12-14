@@ -560,7 +560,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	}
 
 	// this aggMetric has never had metrics written to it.
-	if len(a.Chunks) == 0 && (a.rob == nil || !a.rob.HasData()) {
+	if len(a.Chunks) == 0 && (a.rob == nil || a.rob.IsEmpty()) {
 		return true
 	}
 

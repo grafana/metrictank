@@ -291,21 +291,21 @@ func TestReorderBufferFlushUnsortedData2(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushAndHasData(t *testing.T) {
+func TestReorderBufferFlushAndIsEmpty(t *testing.T) {
 	buf := NewReorderBuffer(10, 1)
 
-	if buf.HasData() != false {
-		t.Fatalf("Expected HasData() to be false")
+	if !buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be true")
 	}
 
 	buf.Add(123, 123)
-	if buf.HasData() != true {
-		t.Fatalf("Expected HasData() to be true")
+	if buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be false")
 	}
 
 	buf.Reset()
-	if buf.HasData() != false {
-		t.Fatalf("Expected HasData() to be false")
+	if !buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be true")
 	}
 }
 
