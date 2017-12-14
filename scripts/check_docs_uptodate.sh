@@ -13,6 +13,7 @@ fi
 ./tools-to-doc.sh > $tmp
 diff ../docs/tools.md $tmp
 ret=$?
+rm $tmp
 [ $ret -gt 0 ] && exit $ret
 
 echo "checking configs"
@@ -22,5 +23,8 @@ if [ ! -r ../docs/config.md ]; then
 fi
 ./config-to-doc.sh > $tmp
 diff ../docs/config.md $tmp
+ret=$?
+rm $tmp
+exit $ret
 
 # metrics2docs .> docs/metrics.md this doesn't work very well yet
