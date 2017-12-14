@@ -217,46 +217,6 @@ Flags:
 ```
 
 
-## mt-replicator
-
-```
-mt-replicator
-
-Replicates a kafka mdm topic on a given cluster to a topic on another
-
-Flags:
-
-  -compression string
-    	compression: none|gzip|snappy (default "snappy")
-  -dst-brokers string
-    	tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -group string
-    	Kafka consumer group (default "mt-replicator")
-  -initial-offset int
-    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -metric-dst-topic string
-    	metrics topic name on destination cluster (default "mdm")
-  -metric-src-topic string
-    	metrics topic name on source cluster (default "mdm")
-  -metrics
-    	replicate metrics
-  -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "bySeries")
-  -persist
-    	replicate persistMetrics
-  -persist-dst-topic string
-    	metricPersist topic name on destination cluster (default "metricpersist")
-  -persist-src-topic string
-    	metricPersist topic name on source cluster (default "metricpersist")
-  -src-brokers string
-    	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -version
-    	print version string
-```
-
-
 ## mt-replicator-via-tsdb
 
 ```
