@@ -255,6 +255,18 @@ func TestQueryByTagFilterByTagPrefixSpecialCaseName(t *testing.T) {
 	queryAndCompareTagResults(t, q, expectTags)
 }
 
+func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"__tag=~na", "key2=value2"}, 0)
+	if q.startWith != EQUAL {
+		t.Fatalf("Expected query to start with equal expression")
+	}
+	expect := make(TagIDs)
+	expect[ids[0]] = struct{}{}
+	expect[ids[5]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
 func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag=~a{1}", "key2=value2"}, 0)
