@@ -22,7 +22,5 @@ if [ ! -r ../docs/config.md ]; then
 fi
 ./config-to-doc.sh > $tmp
 diff ../docs/config.md $tmp
-ret=$?
-[ $ret -gt 0 ] && exit $ret
 
 # metrics2docs .> docs/metrics.md this doesn't work very well yet
