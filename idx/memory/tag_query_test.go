@@ -62,10 +62,10 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	tagIdx := make(TagIndex)
 	byId := make(map[string]*idx.Archive)
 
-	for _, d := range data {
+	for i, d := range data {
 		idStr := d.id.String()
 		byId[idStr] = &idx.Archive{}
-		byId[idStr].Name = "metric"
+		byId[idStr].Name = fmt.Sprintf("metric%d", i)
 		byId[idStr].Tags = d.tags
 		byId[idStr].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
@@ -130,6 +130,14 @@ func TestQueryByTagSimplePrefix(t *testing.T) {
 	queryAndCompareResults(t, q, expect)
 }
 
+func TestQueryByTagPrefixSpecialCaseName(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"key1=value1", "name^=metric2"}, 0)
+	expect := make(TagIDs)
+	expect[ids[2]] = struct{}{}
+	queryAndCompareResults(t, q, expect)
+}
+
 func TestQueryByTagFilterByPrefix(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"key1=value1", "key3^=val"}, 0)
@@ -187,10 +195,9 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 
 func TestQueryByTagNameEquals(t *testing.T) {
 	ids := getTestIDs(t)
-	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=metric"}, 0)
+	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=metric1"}, 0)
 	expect := make(TagIDs)
 	expect[ids[1]] = struct{}{}
-	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -238,6 +245,13 @@ func TestQueryByTagFilterByTagPrefix(t *testing.T) {
 
 	q, _ = NewTagQuery([]string{"__tag^=aaaa"}, 0)
 	delete(expectTags, "aaa")
+	queryAndCompareTagResults(t, q, expectTags)
+}
+
+func TestQueryByTagFilterByTagPrefixSpecialCaseName(t *testing.T) {
+	q, _ := NewTagQuery([]string{"key1=value1", "__tag^=na"}, 0)
+	expectTags := make(map[string]struct{})
+	expectTags["name"] = struct{}{}
 	queryAndCompareTagResults(t, q, expectTags)
 }
 
