@@ -633,6 +633,16 @@ func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
+		// pass test if all these match:
+		// - key is "name"
+		// - def.Name is long enough so it might match the prefix
+		// - the prefix matches with def.Name
+		if e.key == "name" &&
+			len(def.Name) >= len(e.value) &&
+			def.Name[:len(e.value)] == e.value {
+			continue EXPRS
+		}
+
 		for _, tag := range def.Tags {
 			// continue if any of these match:
 			// - length of tag is too short, so this can't be a match
@@ -654,6 +664,10 @@ EXPRS:
 
 // testByTagPrefix filters a given metric by matching prefixes against its tags
 func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
+	if len(q.tagPrefix) <= 4 && q.tagPrefix == "name"[:len(q.tagPrefix)] {
+		return true
+	}
+
 	for _, tag := range def.Tags {
 		if len(tag) < len(q.tagPrefix) {
 			continue
@@ -824,6 +838,19 @@ func (q *TagQuery) getMaxTagCount() int {
 func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
 	results := make(map[string]struct{})
 
+	matchesName := false
+	if q.filterTag == PREFIX_TAG || q.startWith == PREFIX_TAG {
+		if len(q.tagPrefix) <= 4 && "name"[:len(q.tagPrefix)] == q.tagPrefix {
+			matchesName = true
+		}
+	} else if q.filterTag == MATCH_TAG || q.startWith == MATCH_TAG {
+		if q.tagMatch.value.MatchString("name") {
+			matchesName = true
+		}
+	} else {
+		matchesName = true
+	}
+
 IDS:
 	for id := range idCh {
 		var def *idx.Archive
@@ -869,6 +896,10 @@ IDS:
 				}
 			}
 			metricTags[key] = struct{}{}
+		}
+
+		if matchesName {
+			metricTags["name"] = struct{}{}
 		}
 
 		// if some tags satisfy the current tag filter condition then we run
