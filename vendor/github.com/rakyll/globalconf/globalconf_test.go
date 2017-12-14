@@ -96,6 +96,22 @@ func TestParse_GlobalWithDottedFlagname(t *testing.T) {
 	}
 }
 
+// Given the need to test overwriting a flag with an environmental variable set to an empty string
+// Reset the flags and clear the env.
+// Set the env var for the c flag to an empty string.
+// Expect flagC to an empty string and not be the value Hello World from the INI file.
+func TestParse_GlobalWithEmptyValue(t *testing.T) {
+	resetForTesting("")
+
+	os.Setenv(envTestPrefix+"C", "")
+	flagC := flag.String("c", "", "")
+
+	parse(t, "./testdata/global.ini", envTestPrefix)
+	if got, want := *flagC, ""; got != want {
+		t.Errorf("got flag = %q, want empty string", got)
+	}
+}
+
 func TestParse_GlobalOverwrite(t *testing.T) {
 	resetForTesting("-b=7.6")
 	flagB := flag.Float64("b", 0.0, "")

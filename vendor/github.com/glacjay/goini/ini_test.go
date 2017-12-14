@@ -1,22 +1,11 @@
 package ini
 
 import (
+	"bufio"
 	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
-)
-
-const (
-	exampleStr = `key1 = true
-
-[section1]
-key1 = value2
-key2 = 5
-key3 = 1.3
-
-[section2]
-key1 = 5
-
-`
 )
 
 var (
@@ -31,6 +20,17 @@ func init() {
 func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Error("Example: load error:", err)
+	}
+}
+
+func TestLoadFileWithSpaces(t *testing.T) {
+	if err := ioutil.WriteFile("testLoadFileWithSpaces.ini", []byte(" "), 0777); err != nil {
+		t.Error("Unable to write test file")
+	}
+	defer os.Remove("testLoadFileWithSpaces.ini")
+
+	if _, err := Load("testLoadFileWithSpaces.ini"); err != nil {
+		t.Error("Load: Couldn't load ini file with line consisting only of spaces.")
 	}
 }
 
@@ -163,7 +163,29 @@ func TestString(t *testing.T) {
 	d.SetInt("section1", "key2", 5)
 	d.SetDouble("section1", "key3", 1.3)
 	d.SetDouble("section2", "key1", 5.0)
-	if d.String() != exampleStr {
-		t.Errorf("Dict cannot be stringified as expected.")
+	reader := strings.NewReader(d.String())
+	d2, err := LoadReader(bufio.NewReader(reader))
+	if err != nil {
+		t.Error("Example: load error:", err)
+	}
+	b, found := d2.GetBool("", "key1")
+	if !found || !b {
+		t.Errorf("Stringify failed for key1")
+	}
+	s, found := d2.GetString("section1", "key1")
+	if !found || s != "value2" {
+		t.Error("Stringify failed for section1, key1")
+	}
+	i, found := d2.GetInt("section1", "key2")
+	if !found || i != 5 {
+		t.Error("Stringify failed for section1, key2")
+	}
+	db, found := d2.GetDouble("section1", "key3")
+	if !found || db != 1.3 {
+		t.Error("Stringify failed for section1, key3")
+	}
+	db, found = d2.GetDouble("section2", "key1")
+	if !found || db != 5.0 {
+		t.Error("Stringify failed for section2, key1")
 	}
 }
