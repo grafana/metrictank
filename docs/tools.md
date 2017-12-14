@@ -83,6 +83,8 @@ cass config flags:
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -create-keyspace
+    	enable the creation of the index keyspace and tables, only one node needs this (default true)
   -enabled
     	 (default true)
   -host-verification
@@ -120,10 +122,13 @@ output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.In
 
 You may also use processing functions in templates:
 pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
+age: subtracts the passed integer (typically .LastUpdate) from the query time
+roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 EXAMPLES:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
 mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
 mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\nX-Org-Id: 1\n\n'
+mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\n' | sort | uniq -c
 ```
 
 
@@ -157,60 +162,6 @@ Flags:
 ```
 
 
-## mt-index-migrate-050-to-054
-
-```
-mt-index-migrate-050-to-054
-
-Converts a metrictank index to the new 0.5.4 (and beyond) format, using cassandra instead of elasticsearch
-differences:
- * schema 0 to schema 1 - proper metrics2.0 - (for 0.5.1, 576d8fcb47888b8a334e9a125d6aadf8e0e4d4d7)
- * store data in cassandra in the metric_def_ix table, as a messagepack encoded blob (cassandra idx new in 0.5.3 - 26be821bd8bead43db120e96d14d0ee88d6b6880)
- * use lastUpdate field (for 0.5.4, a07007ab8d4a22b122bbc5f9fadb51480e1c5b0c)
-
-Flags:
-
-  -cass-addr string
-    	Address of cassandra host. (default "localhost")
-  -dry-run
-    	run in dry-run mode. No changes will be made. (default true)
-  -es-addr string
-    	address of elasticsearch host. (default "localhost")
-  -index string
-    	elasticsearch index that contains current metric index values. (default "metric")
-  -keyspace string
-    	Cassandra keyspace to use. (default "raintank")
-```
-
-
-## mt-index-migrate-06-to-07
-
-```
-mt-index-migrate-06-to-07
-
-Converts a metrictank v0.6 index to the v0.7 format
-differences:
- * cassandra table: metric_def_idx -> metric_idx
- * data is stored as individual fields, not as messagepack encoded blob
- * support for partitioning. the partition field in cassandra will be set based on num-partitions and partition-schema
-
-Flags:
-
-  -cass-addr string
-    	Address of cassandra host. (default "localhost")
-  -dry-run
-    	run in dry-run mode. No changes will be made. (default true)
-  -keyspace string
-    	Cassandra keyspace to use. (default "raintank")
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -num-partitions int
-    	number of partitions in cluster (default 1)
-  -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
-```
-
-
 ## mt-kafka-mdm-sniff
 
 ```
@@ -236,58 +187,33 @@ Flags:
 ```
 mt-kafka-mdm-sniff-out-of-order
 
-Inspects what's flowing through kafka (in mdm format) and reports it to you
+Inspects what's flowing through kafka (in mdm format) and reports out of order data (does not take into account reorder buffer)
+
+# Mechanism
+* it sniffs points being added on a per-series (metric Id) level
+* for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp
+* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
+every event is printed using the specified format
+
+# Event formatting
+Uses standard golang templating. E.g. {{field}} with these available fields:
+.Head.subfield - head is last successfully added message
+.Bad.subfield - Bad is the current point that could not be added (assuming no re-order buffer)
+(subfield is any property of the out-of-order MetricData: Time OrgId Id Name Metric Interval Value Unit Mtype Tags and also these 2 extra fileds: Part (partition) and Seen (when the msg was consumed from kafka)
+NumBad - number of failed points since last successfull add
+DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)
+DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)
 
 Flags:
 
   -config string
     	configuration file path (default "/etc/metrictank/metrictank.ini")
   -format string
-    	template to render the data with (default "{{.First.Seen}} {{.First.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+    	template to render event with (default "{{.Bad.Id}} {{.Bad.Name}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}")
   -prefix string
-    	only show metrics that have this prefix
+    	only show metrics with a name that has this prefix
   -substr string
-    	only show metrics that have this substring
-```
-
-
-## mt-replicator
-
-```
-mt-replicator
-
-Replicates a kafka mdm topic on a given cluster to a topic on another
-
-Flags:
-
-  -compression string
-    	compression: none|gzip|snappy (default "snappy")
-  -dst-brokers string
-    	tcp address for kafka cluster to consume from (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -group string
-    	Kafka consumer group (default "mt-replicator")
-  -initial-offset int
-    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -metric-dst-topic string
-    	metrics topic name on destination cluster (default "mdm")
-  -metric-src-topic string
-    	metrics topic name on source cluster (default "mdm")
-  -metrics
-    	replicate metrics
-  -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "bySeries")
-  -persist
-    	replicate persistMetrics
-  -persist-dst-topic string
-    	metricPersist topic name on destination cluster (default "metricpersist")
-  -persist-src-topic string
-    	metricPersist topic name on source cluster (default "metricpersist")
-  -src-brokers string
-    	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -version
-    	print version string
+    	only show metrics with a name that has this substring
 ```
 
 
@@ -302,24 +228,16 @@ Flags:
 
   -batch-size int
     	number of metrics to send in each batch. (default 10000)
-  -client-id string
-    	Kafka consumer group client id (default "$HOSTNAME")
-  -consumer-fetch-default int
-    	number of bytes to try and fetch from consumer (default 32768)
+  -config string
+    	configuration file path
   -destination-key string
     	admin-key of destination tsdb-gw server (default "admin-key")
   -destination-url string
     	tsdb-gw address to send metrics to (default "http://localhost/metrics")
-  -group string
-    	Kafka consumer group (default "mt-replicator")
-  -initial-offset int
-    	initial offset to consume from. (-2=oldest, -1=newest) (default -2)
+  -instance string
+    	instance identifier. must be unique. Used for naming queue consumers and emitted metrics (default "default")
   -log-level int
     	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -src-brokers string
-    	tcp address of source kafka cluster (may be be given multiple times as a comma-separated list) (default "localhost:9092")
-  -src-topic string
-    	metrics topic name on source cluster (default "mdm")
   -version
     	print version string
 ```
@@ -363,6 +281,8 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-create-keyspace
+    	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
@@ -371,10 +291,6 @@ Flags:
     	cassandra keyspace to use for storing the metric data table (default "metrictank")
   -cassandra-password string
     	password for authentication (default "cassandra")
-  -cassandra-read-concurrency int
-    	max number of concurrent reads to cassandra. (default 20)
-  -cassandra-read-queue-size int
-    	max number of outstanding reads before blocking. value doesn't matter much (default 100)
   -cassandra-retries int
     	how many times to retry a query before failing it
   -cassandra-ssl
@@ -385,8 +301,6 @@ Flags:
     	username for authentication (default "cassandra")
   -cql-protocol-version int
     	cql protocol version to use (default 4)
-  -window-factor int
-    	the window factor be used when creating the metric table schema (default 20)
 ```
 
 
@@ -423,18 +337,22 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-create-keyspace
+    	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
     	cassandra keyspace to use for storing the metric data table (default "raintank")
+  -cassandra-omit-read-timeout int
+    	if a read is older than this, it will directly be omitted without executing (default 60)
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
     	max number of concurrent reads to cassandra. (default 20)
   -cassandra-read-queue-size int
-    	max number of outstanding reads before blocking. value doesn't matter much (default 100)
+    	max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel. (default 200000)
   -cassandra-retries int
     	how many times to retry a query before failing it
   -cassandra-ssl
@@ -535,22 +453,26 @@ to see UTC times, just prefix command with TZ=UTC
 
 ```
 Usage of ./mt-whisper-importer-reader:
-  -chunkspans string
-    	List of chunk spans separated by ':'. The 1st whisper archive gets the 1st span, 2nd the 2nd, etc (default "10min")
-  -exit-on-error
-    	Exit with a message when there's an error (default true)
+  -dst-schemas string
+    	The filename of the output schemas definition file
+  -http-auth string
+    	The credentials used to authenticate in the format "user:password"
   -http-endpoint string
     	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
+  -import-up-to uint
+    	Only import up to the specified timestamp (default 4294967295)
+  -insecure-ssl
+    	Disables ssl certificate verification
+  -name-filter string
+    	A regex pattern to be applied to all metric names, only matching ones will be imported
   -name-prefix string
     	Prefix to prepend before every metric name, should include the '.' if necessary
   -orgid int
     	Organization ID the data belongs to  (default 1)
-  -read-archives string
-    	Comma separated list of positive integers or '*' for all archives (default "*")
   -threads int
-    	Number of workers threads to process .wsp files (default 10)
+    	Number of workers threads to process and convert .wsp files (default 10)
   -verbose
-    	Write logs to terminal
+    	More detailed logging
   -whisper-directory string
     	The directory that contains the whisper file structure (default "/opt/graphite/storage/whisper")
   -write-unfinished-chunks
@@ -561,19 +483,56 @@ Usage of ./mt-whisper-importer-reader:
 ## mt-whisper-importer-writer
 
 ```
-Usage of ./mt-whisper-importer-writer:
+mt-whisper-importer-writer
+
+Opens an endpoint to send data to, which then gets stored in the MT internal DB(s)
+
+Usage:
+
+  mt-whisper-importer-writer [global config flags] <idxtype> [idx config flags] 
+
+global config flags:
+
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -cassandra-auth
+    	enable cassandra authentication
+  -cassandra-ca-path string
+    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
+  -cassandra-consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-create-keyspace
+    	enable the creation of the metrictank keyspace (default true)
+  -cassandra-host-selection-policy string
+    	 (default "tokenaware,hostpool-epsilon-greedy")
+  -cassandra-host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
-    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+    	cassandra keyspace to use for storing the metric data table (default "raintank")
+  -cassandra-password string
+    	password for authentication (default "cassandra")
+  -cassandra-read-concurrency int
+    	max number of concurrent reads to cassandra. (default 20)
+  -cassandra-read-queue-size int
+    	max number of outstanding reads before blocking. value doesn't matter much (default 100)
+  -cassandra-retries int
+    	how many times to retry a query before failing it
+  -cassandra-ssl
+    	enable SSL connection to cassandra
+  -cassandra-timeout int
+    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-username string
+    	username for authentication (default "cassandra")
+  -cql-protocol-version int
+    	cql protocol version to use (default 4)
   -exit-on-error
     	Exit with a message when there's an error (default true)
-  -fake-avg-aggregates
-    	Generate sum/cnt series out of avg series to accommodate metrictank (default true)
   -http-endpoint string
     	The http endpoint to listen on (default "127.0.0.1:8080")
   -num-partitions int
     	Number of Partitions (default 1)
+  -overwrite-chunks
+    	If true existing chunks may be overwritten (default true)
   -partition-scheme string
     	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries) (default "bySeries")
   -ttls string
@@ -581,8 +540,54 @@ Usage of ./mt-whisper-importer-writer:
   -uri-path string
     	the URI on which we expect chunks to get posted (default "/chunks")
   -verbose
-    	Write logs to terminal
+    	More detailed logging
   -window-factor int
     	the window factor be used when creating the metric table schema (default 20)
+
+idxtype: only 'cass' supported for now
+
+cass config flags:
+
+  -auth
+    	enable cassandra user authentication
+  -ca-path string
+    	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -create-keyspace
+    	enable the creation of the index keyspace and tables, only one node needs this (default true)
+  -enabled
+    	 (default true)
+  -host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
+  -hosts string
+    	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+  -keyspace string
+    	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -max-stale duration
+    	clear series from the index if they have not been seen for this much time.
+  -num-conns int
+    	number of concurrent connections to cassandra (default 10)
+  -password string
+    	password for authentication (default "cassandra")
+  -protocol-version int
+    	cql protocol version to use (default 4)
+  -prune-interval duration
+    	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -ssl
+    	enable SSL connection to cassandra
+  -timeout duration
+    	cassandra request timeout (default 1s)
+  -update-cassandra-index
+    	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
+  -update-interval duration
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+  -username string
+    	username for authentication (default "cassandra")
+  -write-queue-size int
+    	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
+
+EXAMPLES:
+mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata
 ```
 

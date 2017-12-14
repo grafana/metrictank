@@ -4,8 +4,7 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
 GITVERSION=`git describe --always`
-SOURCEDIR=${DIR}/..
-BUILDDIR=$SOURCEDIR/build
+BUILDDIR=$(dirname $DIR)/build
 
 # Make dir
 mkdir -p $BUILDDIR

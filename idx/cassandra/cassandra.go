@@ -274,7 +274,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 
 	now := uint32(time.Now().Unix())
 
-	// Cassandra uses partition id asthe partitionin key, so an "update" that changes the partition for
+	// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
 	// an existing metricDef will just create a new row in the table and wont remove the old row.
 	// So we need to explicitly delete the old entry.
 	if inMemory && existing.Partition != partition {
