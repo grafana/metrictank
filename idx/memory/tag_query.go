@@ -594,6 +594,24 @@ EXPRS:
 // testByTagMatch filters a given metric by matching a regular expression against
 // the associated tags
 func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
+	// special case for tag "name"
+	if _, ok := q.tagMatch.missCache.Load("name"); !ok {
+		if _, ok := q.tagMatch.matchCache.Load("name"); ok || q.tagMatch.value.MatchString("name") {
+			if !ok {
+				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
+					q.tagMatch.matchCache.Store("name", struct{}{})
+					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
+				}
+			}
+			return true
+		} else {
+			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
+				q.tagMatch.missCache.Store("name", struct{}{})
+				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
+			}
+		}
+	}
+
 	for _, tag := range def.Tags {
 		equal := strings.Index(tag, "=")
 		if equal < 0 {
@@ -616,11 +634,9 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 			}
 			return true
 		} else {
-			if _, ok := q.tagMatch.missCache.Load(key); !ok {
-				if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.missCache.Store(key, struct{}{})
-					atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
-				}
+			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
+				q.tagMatch.missCache.Store(key, struct{}{})
+				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
 			}
 			continue
 		}
