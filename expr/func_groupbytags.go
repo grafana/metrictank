@@ -29,7 +29,6 @@ func (s *FuncGroupByTags) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncGroupByTags) Context(context Context) Context {
-	// set this? context.consol = consolidation.FromConsolidateBy(s.aggregator)
 	return context
 }
 
@@ -123,11 +122,7 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 		tags["name"] = tagSplits[0]
 
-		if len(tagSplits) > 1 {
-			tagSplits = tagSplits[1:]
-		}
-
-		for _, split := range tagSplits {
+		for _, split := range tagSplits[1:] {
 			pair := strings.SplitN(split, "=", 2)
 			tags[pair[0]] = pair[1]
 		}

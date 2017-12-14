@@ -18,11 +18,7 @@ func getModel(name string, data []schema.Point) models.Series {
 
 	tags["name"] = tagSplits[0]
 
-	if len(tagSplits) > 1 {
-		tagSplits = tagSplits[1:]
-	}
-
-	for _, split := range tagSplits {
+	for _, split := range tagSplits[1:] {
 		pair := strings.SplitN(split, "=", 2)
 		tags[pair[0]] = pair[1]
 	}
@@ -146,6 +142,34 @@ func TestGroupByTagsMultipleSeriesMultipleResultsGroupByName(t *testing.T) {
 	}
 
 	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name"}, t)
+}
+
+func TestGroupByTagsSingleGroupByName(t *testing.T) {
+	in := []models.Series{
+		getModel("name1;tag1=val1;tag2=val2_0;tag3=3", a),
+		getModel("name1;tag1=val1;tag2=val2_1;tag3=3", b),
+		getModel("name1;tag1=val1_1;tag2=val2_0;tag3=3", c),
+	}
+	out := []models.Series{
+		getModel("name1", sumabc),
+	}
+
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, t)
+}
+
+func TestGroupByTagsMultipleGroupByName(t *testing.T) {
+	in := []models.Series{
+		getModel("name1;tag1=val1;tag2=val2_0;tag3=3", a),
+		getModel("name1;tag1=val1;tag2=val2_1;tag3=3", b),
+		getModel("name2;tag1=val1_1;tag2=val2_0;tag3=3", c),
+		getModel("name2;tag1=val1_1;tag2=val2_1;tag3=3", d),
+	}
+	out := []models.Series{
+		getModel("name1", sumab),
+		getModel("name2", sumcd),
+	}
+
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, t)
 }
 
 func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
