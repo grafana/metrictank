@@ -9,8 +9,7 @@ cd ${DIR}
 [ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
 GITVERSION=`git describe --always`
-SOURCEDIR=${DIR}/..
-BUILDDIR=$SOURCEDIR/build
+BUILDDIR=$(dirname $DIR)/build
 
 # Make dir
 mkdir -p $BUILDDIR
