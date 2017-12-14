@@ -95,6 +95,6 @@ func (rob *ReorderBuffer) Flush() []schema.Point {
 	return res
 }
 
-func (rob *ReorderBuffer) HasData() bool {
-	return rob.buf[rob.newest].Ts != 0
+func (rob *ReorderBuffer) IsEmpty() bool {
+	return rob.buf[rob.newest].Ts == 0
 }
