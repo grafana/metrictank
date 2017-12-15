@@ -83,6 +83,11 @@ var (
 		math.MaxUint32,
 		"Only import up to the specified timestamp",
 	)
+	importAfter = flag.Uint(
+		"import-after",
+		0,
+		"Only import after the specified timestamp",
+	)
 	verbose = flag.Bool(
 		"verbose",
 		false,
