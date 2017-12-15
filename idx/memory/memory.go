@@ -596,7 +596,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 			expressions = append(expressions, tag+"^="+valPrefix)
 		} else {
 			// if no value prefix has been specified we still require that at
-			// the given tag must be present
+			// least the given tag must be present
 			expressions = append(expressions, tag+"!=")
 		}
 
