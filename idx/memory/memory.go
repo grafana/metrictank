@@ -179,12 +179,11 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 
 func (m *MemoryIdx) Update(entry idx.Archive) {
 	m.Lock()
+	defer m.Unlock()
 	if _, ok := m.DefById[entry.Id]; !ok {
-		m.Unlock()
 		return
 	}
 	*(m.DefById[entry.Id]) = entry
-	m.Unlock()
 }
 
 // indexTags reads the tags of a given metric definition and creates the
@@ -263,6 +262,7 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 // Used to rebuild the index from an existing set of metricDefinitions.
 func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	m.Lock()
+	defer m.Unlock()
 	var pre time.Time
 	var num int
 	for i := range defs {
@@ -288,7 +288,6 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
 	}
-	m.Unlock()
 	return num
 }
 
@@ -1105,25 +1104,27 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
 	var pruned []idx.Archive
 	pre := time.Now()
-	m.RLock()
 	orgs := []int{orgId}
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs across all orgs")
+		m.RLock()
 		orgs = make([]int, len(m.Tree))
 		i := 0
 		for org := range m.Tree {
 			orgs[i] = org
 			i++
 		}
+		m.RUnlock()
 	}
-	m.RUnlock()
 	for _, org := range orgs {
-		m.Lock()
+		m.RLock()
 		tree, ok := m.Tree[org]
 		if !ok {
-			m.Unlock()
+			m.RUnlock()
 			continue
 		}
+
+		var toPrune []string
 
 		for _, n := range tree.Items {
 			if !n.Leaf() {
@@ -1136,15 +1137,29 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 				}
 			}
 			if staleCount == len(n.Defs) {
-				log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 				//we need to delete this node.
-				defs := m.delete(org, n, true)
-				statMetricsActive.Dec()
-				pruned = append(pruned, defs...)
+				toPrune = append(toPrune, n.Path)
 			}
 		}
-		m.Unlock()
+		m.RUnlock()
+
+		for _, path := range toPrune {
+			m.Lock()
+			n, ok := tree.Items[path]
+			if !ok {
+				m.Unlock()
+				log.Debug("memory-idx: series %s for orgId:%d was identified for pruning but cannot be found.", path, org)
+				continue
+			}
+
+			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
+			defs := m.delete(org, n, true)
+			statMetricsActive.Dec()
+			pruned = append(pruned, defs...)
+			m.Unlock()
+		}
 	}
+
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 	}
