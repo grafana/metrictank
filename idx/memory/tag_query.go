@@ -17,14 +17,20 @@ var (
 	errInvalidQuery = errors.New("invalid query")
 )
 
+// the supported operators are documented together with the graphite
+// reference implementation:
+// http://graphite.readthedocs.io/en/latest/tags.html
+//
+// some of the following operators are non-standard and are only used
+// internally to implement certain functionalities requiring them
 const (
 	EQUAL      = iota // =
 	NOT_EQUAL         // !=
 	MATCH             // =~        regular expression
-	MATCH_TAG         // __tag=~   relies on special key __tag
+	MATCH_TAG         // __tag=~   relies on special key __tag. non-standard, required for `/metrics/tags` requests with "filter"
 	NOT_MATCH         // !=~
-	PREFIX            // ^=        exact prefix, not regex
-	PREFIX_TAG        // __tag^=   exact prefix with tag
+	PREFIX            // ^=        exact prefix, not regex. non-standard, required for auto complete of tag values
+	PREFIX_TAG        // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
 )
 
 type expression struct {
