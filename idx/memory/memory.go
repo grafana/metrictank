@@ -474,20 +474,20 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 // tagPrefix:   the string to be completed
 // expressions: tagdb expressions in the same format as graphite uses
 // from:        only tags will be returned that have at least one metric
-//              with a LastUpdate above from
+//              with a LastUpdate >= from
 // limit:       the maximum number of results to return, the results will
 //              always be sorted alphabetically for consistency between
 //              consecutive queries and the limit is applied after sorting
 //
 func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	res := make([]string, 0)
+	var res []string
 
 	// only if expressions are specified we need to build a tag query.
 	// otherwise, the generation of the result set is much simpler
 	if len(expressions) > 0 {
 		// incorporate the tag prefix into the tag query expressions
 		if len(tagPrefix) > 0 {
-			expressions = append(expressions, fmt.Sprintf("__tag^=%s", tagPrefix))
+			expressions = append(expressions, "__tag^="+tagPrefix)
 		}
 
 		query, err := NewTagQuery(expressions, from)
@@ -524,7 +524,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 
 		tagsSorted := make([]string, 0, len(tags))
 		for tag := range tags {
-			if len(tagPrefix) > 0 && (len(tagPrefix) > len(tag) || tag[:len(tagPrefix)] != tagPrefix) {
+			if !strings.HasPrefix(tag, tagPrefix) {
 				continue
 			}
 
@@ -616,6 +616,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 
 		ids := query.Run(tags, m.DefById)
 		valueMap := make(map[string]struct{})
+		prefix := tag + "="
 		for id := range ids {
 			var ok bool
 			var def *idx.Archive
@@ -632,18 +633,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 				valueMap[def.Name] = struct{}{}
 			} else {
 				for _, t := range def.Tags {
-					// tag + "=" + at least one character as value so "+ 2"
-					if len(tag)+2 >= len(t) {
-						continue
-					}
-
-					// after the tag there must be a "=" sign
-					if t[len(tag)] != 61 {
-						continue
-					}
-
-					// check if tag matches
-					if t[:len(tag)] != tag {
+					if !strings.HasPrefix(t, prefix) {
 						continue
 					}
 
@@ -673,7 +663,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 
 		res = make([]string, 0, len(vals))
 		for val := range vals {
-			if len(valPrefix) > 0 && (len(valPrefix) > len(val) || val[:len(valPrefix)] != valPrefix) {
+			if !strings.HasPrefix(val, valPrefix) {
 				continue
 			}
 

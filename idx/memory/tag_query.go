@@ -343,7 +343,7 @@ func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan idx.MetricID, stopCh ch
 
 VALUES:
 	for v, ids := range q.index[expr.key] {
-		if len(v) < len(expr.value) || v[:len(expr.value)] != expr.value {
+		if !strings.HasPrefix(v, expr.value) {
 			continue
 		}
 
@@ -406,11 +406,7 @@ func (q *TagQuery) getInitialByTagPrefix(idCh chan idx.MetricID, stopCh chan str
 
 TAGS:
 	for tag, values := range q.index {
-		if len(tag) < len(q.tagPrefix) {
-			continue
-		}
-
-		if tag[:len(q.tagPrefix)] != q.tagPrefix {
+		if !strings.HasPrefix(tag, q.tagPrefix) {
 			continue
 		}
 
@@ -544,13 +540,10 @@ EXPRS:
 				}
 			}
 		}
-		for _, tag := range def.Tags {
-			// length of key doesn't match
-			if len(tag) <= len(e.key)+1 || tag[len(e.key)] != 61 {
-				continue
-			}
 
-			if e.key != tag[:len(e.key)] {
+		prefix := e.key + "="
+		for _, tag := range def.Tags {
+			if !strings.HasPrefix(tag, prefix) {
 				continue
 			}
 
@@ -662,22 +655,18 @@ EXPRS:
 		// - key is "name"
 		// - def.Name is long enough so it might match the prefix
 		// - the prefix matches with def.Name
-		if e.key == "name" &&
-			len(def.Name) >= len(e.value) &&
-			def.Name[:len(e.value)] == e.value {
+		if e.key == "name" && strings.HasPrefix(def.Name, e.value) {
 			continue EXPRS
 		}
 
+		prefix := e.key + "=" + e.value
 		for _, tag := range def.Tags {
 			// continue if any of these match:
 			// - length of tag is too short, so this can't be a match
 			// - the position where we expect the = is not a =
 			// - the key does not match
 			// - the prefix value does not match
-			if len(tag) < len(e.key)+len(e.value)+1 ||
-				tag[len(e.key)] != 61 ||
-				tag[:len(e.key)] != e.key ||
-				tag[len(e.key)+1:len(e.key)+len(e.value)+1] != e.value {
+			if !strings.HasPrefix(tag, prefix) {
 				continue
 			}
 			continue EXPRS
@@ -689,16 +678,12 @@ EXPRS:
 
 // testByTagPrefix filters a given metric by matching prefixes against its tags
 func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
-	if len(q.tagPrefix) <= 4 && q.tagPrefix == "name"[:len(q.tagPrefix)] {
+	if strings.HasPrefix("name", q.tagPrefix) {
 		return true
 	}
 
 	for _, tag := range def.Tags {
-		if len(tag) < len(q.tagPrefix) {
-			continue
-		}
-
-		if tag[:len(q.tagPrefix)] == q.tagPrefix {
+		if strings.HasPrefix(tag, q.tagPrefix) {
 			return true
 		}
 	}
@@ -822,10 +807,7 @@ func (q *TagQuery) getMaxTagCount() int {
 
 	if q.filterTagBy == PREFIX_TAG && len(q.tagPrefix) > 0 {
 		for tag := range q.index {
-			if len(tag) < len(q.tagPrefix) {
-				continue
-			}
-			if tag[:len(q.tagPrefix)] != q.tagPrefix {
+			if !strings.HasPrefix(tag, q.tagPrefix) {
 				continue
 			}
 			maxTagCount++
@@ -883,10 +865,7 @@ IDS:
 			}
 
 			if q.filterTagBy == PREFIX_TAG {
-				if len(key) < len(q.tagPrefix) {
-					continue
-				}
-				if key[:len(q.tagPrefix)] != q.tagPrefix {
+				if !strings.HasPrefix(key, q.tagPrefix) {
 					continue
 				}
 			} else if q.filterTagBy == MATCH_TAG {
@@ -945,7 +924,7 @@ func (q *TagQuery) tagFilterMatchesName() bool {
 	matchName := false
 
 	if q.filterTagBy == PREFIX_TAG || q.startWith == PREFIX_TAG {
-		if len(q.tagPrefix) <= 4 && "name"[:len(q.tagPrefix)] == q.tagPrefix {
+		if strings.HasPrefix("name", q.tagPrefix) {
 			matchName = true
 		}
 	} else if q.filterTagBy == MATCH_TAG || q.startWith == MATCH_TAG {
