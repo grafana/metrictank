@@ -475,7 +475,7 @@ func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
 // all required tests in order to decide whether this metric should be part
 // of the final result set or not
 // in map/reduce terms this is the reduce function
-func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool {
+func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, matchName bool) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -488,7 +488,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool 
 		return false
 	}
 
-	if q.filterTagBy == PREFIX_TAG {
+	if q.filterTagBy == PREFIX_TAG && !matchName {
 		if !q.testByTagPrefix(def) {
 			return false
 		}
@@ -498,7 +498,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive) bool 
 		return false
 	}
 
-	if q.filterTagBy == MATCH_TAG {
+	if q.filterTagBy == MATCH_TAG && !matchName {
 		if !q.testByTagMatch(def) {
 			return false
 		}
@@ -738,7 +738,7 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh c
 			continue
 		}
 
-		if q.testByAllExpressions(id, def) {
+		if q.testByAllExpressions(id, def, false) {
 			resCh <- id
 		}
 	}
@@ -858,24 +858,10 @@ func (q *TagQuery) getMaxTagCount() int {
 // according to the criteria associated with this query
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
-func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
+func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}, matchName bool) {
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
-
-	// matchesName defines whether the given tag condition matches the special tag "name" or not
-	matchesName := false
-	if q.filterTagBy == PREFIX_TAG || q.startWith == PREFIX_TAG {
-		if len(q.tagPrefix) <= 4 && "name"[:len(q.tagPrefix)] == q.tagPrefix {
-			matchesName = true
-		}
-	} else if q.filterTagBy == MATCH_TAG || q.startWith == MATCH_TAG {
-		if q.tagMatch.value.MatchString("name") {
-			matchesName = true
-		}
-	} else {
-		matchesName = true
-	}
 
 IDS:
 	for id := range idCh {
@@ -925,7 +911,7 @@ IDS:
 			metricTags[key] = struct{}{}
 		}
 
-		if matchesName {
+		if matchName {
 			if _, ok := resultsCache["name"]; !ok {
 				metricTags["name"] = struct{}{}
 			}
@@ -935,7 +921,7 @@ IDS:
 		// the metric through all tag expression tests in order to decide
 		// whether those tags should be part of the final result set
 		if len(metricTags) > 0 {
-			if q.testByAllExpressions(id, def) {
+			if q.testByAllExpressions(id, def, matchName) {
 				for key := range metricTags {
 					select {
 					case tagCh <- key:
@@ -964,6 +950,29 @@ IDS:
 	completeCh <- struct{}{}
 }
 
+// determines whether the given tag prefix/tag match will match the special
+// tag "name". if it does, then we can omit some filtering because we know
+// that every metric has a name
+func (q *TagQuery) tagFilterMatchesName() bool {
+	matchName := false
+
+	if q.filterTagBy == PREFIX_TAG || q.startWith == PREFIX_TAG {
+		if len(q.tagPrefix) <= 4 && "name"[:len(q.tagPrefix)] == q.tagPrefix {
+			matchName = true
+		}
+	} else if q.filterTagBy == MATCH_TAG || q.startWith == MATCH_TAG {
+		if q.tagMatch.value.MatchString("name") {
+			matchName = true
+		}
+	} else {
+		// some tag queries might have no prefix specified yet, in this case
+		// we do not need to filter by the name
+		matchName = true
+	}
+
+	return matchName
+}
+
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
 func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
@@ -985,6 +994,12 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	completeCh := make(chan struct{}, tagQueryWorkers)
 	tagCh := make(chan string)
 
+	// matchName defines whether the given tag condition matches the special
+	// tag "name" or not
+	// if we know it matches "name", and we assume every metric has a name, then
+	// we can omit a lot of matching
+	matchName := q.tagFilterMatchesName()
+
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. then they will extract the tags of
@@ -993,7 +1008,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	// signal its completion
 	q.wg.Add(tagQueryWorkers)
 	for i := 0; i < tagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh)
+		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh, matchName)
 	}
 
 	completedWorkers := 0
