@@ -728,7 +728,7 @@ func (q *TagQuery) testByEqual(id idx.MetricID, exprs []kv, not bool) bool {
 // required tests to decide whether a metric should be part of the final
 // result set or not
 // it returns the final result set via the given resCh parameter
-func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh chan struct{}) {
+func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID) {
 	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
@@ -747,7 +747,6 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID, completeCh c
 	}
 
 	q.wg.Done()
-	completeCh <- struct{}{}
 }
 
 // sortByCost tries to estimate the cost of different expressions and sort them
@@ -783,46 +782,27 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 
 	idCh, _ := q.getInitialIds()
 	resCh := make(chan idx.MetricID)
-	completeCh := make(chan struct{}, tagQueryWorkers)
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. those that satisfy all conditions
 	// will be pushed into the resCh
-	// when a worker completes it pushes an empty item into the completeCh to
-	// signal its completion
 	q.wg.Add(tagQueryWorkers)
 	for i := 0; i < tagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh, completeCh)
+		go q.filterIdsFromChan(idCh, resCh)
 	}
 
-	completedWorkers := 0
+	go func() {
+		q.wg.Wait()
+		close(resCh)
+	}()
+
 	result := make(TagIDs)
 
-IDS:
-	for {
-		select {
-		case id := <-resCh:
-			result[id] = struct{}{}
-		case <-completeCh:
-			completedWorkers++
-			if completedWorkers >= tagQueryWorkers {
-				// once all workers have completed the query execution is done.
-				// we need to consume the result channel until it's empty before
-				// returning the results
-				for {
-					select {
-					case id := <-resCh:
-						result[id] = struct{}{}
-					default:
-						break IDS
-					}
-				}
-			}
-		}
+	for id := range resCh {
+		result[id] = struct{}{}
 	}
 
-	q.wg.Wait()
 	return result
 }
 
@@ -861,7 +841,7 @@ func (q *TagQuery) getMaxTagCount() int {
 // according to the criteria associated with this query
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
-func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}, matchName bool) {
+func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, stopCh chan struct{}, matchName bool) {
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
@@ -950,7 +930,6 @@ IDS:
 	}
 
 	q.wg.Done()
-	completeCh <- struct{}{}
 }
 
 // determines whether the given tag prefix/tag match will match the special
@@ -994,7 +973,6 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 
 	q.sortByCost()
 	idCh, stopCh := q.getInitialIds()
-	completeCh := make(chan struct{}, tagQueryWorkers)
 	tagCh := make(chan string)
 
 	// matchName defines whether the given tag condition matches the special
@@ -1007,47 +985,29 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. then they will extract the tags of
 	// those that satisfy all conditions and push them into tagCh.
-	// when a worker completes it pushes an empty item into the completeCh to
-	// signal its completion
 	q.wg.Add(tagQueryWorkers)
 	for i := 0; i < tagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, completeCh, stopCh, matchName)
+		go q.filterTagsFromChan(idCh, tagCh, stopCh, matchName)
 	}
 
-	completedWorkers := 0
+	go func() {
+		q.wg.Wait()
+		close(tagCh)
+	}()
+
 	result := make(map[string]struct{})
 
-TAGS:
-	for {
-		select {
-		case tag := <-tagCh:
-			result[tag] = struct{}{}
+	for tag := range tagCh {
+		result[tag] = struct{}{}
 
-			// if we know that there can't be more results than what we have
-			// abort the query execution
-			if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
-				break TAGS
-			}
-		case <-completeCh:
-			completedWorkers++
-			if completedWorkers >= tagQueryWorkers {
-				// once all workers have completed the query execution is done.
-				// we need to consume the result channel until it's empty before
-				// returning the results
-				for {
-					select {
-					case tag := <-tagCh:
-						result[tag] = struct{}{}
-					default:
-						break TAGS
-					}
-				}
-			}
+		// if we know that there can't be more results than what we have
+		// abort the query execution
+		if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
+			break
 		}
 	}
 
 	// abort query execution and wait for all workers to end
 	close(stopCh)
-	q.wg.Wait()
 	return result
 }
