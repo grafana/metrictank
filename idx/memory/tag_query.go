@@ -112,15 +112,15 @@ func parseExpression(expr string) (expression, error) {
 FIND_OPERATOR:
 	for ; pos < len(expr); pos++ {
 		switch expr[pos] {
-		case 61: // =
+		case '=':
 			break FIND_OPERATOR
-		case 33: // ! (not)
+		case '!':
 			not = true
 			break FIND_OPERATOR
-		case 94: // ^ (prefix)
+		case '^':
 			prefix = true
 			break FIND_OPERATOR
-		case 59: // disallow ; in key
+		case ';':
 			return res, errInvalidQuery
 		}
 	}
@@ -137,14 +137,12 @@ FIND_OPERATOR:
 		pos++
 	}
 
-	// expecting a =
-	if len(expr) <= pos || expr[pos] != 61 {
+	if len(expr) <= pos || expr[pos] != '=' {
 		return res, errInvalidQuery
 	}
 	pos++
 
-	// if ~ (regex)
-	if len(expr) > pos && expr[pos] == 126 {
+	if len(expr) > pos && expr[pos] == '~' {
 		// ^=~ is not a valid operator
 		if prefix {
 			return res, errInvalidQuery
@@ -234,7 +232,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			}
 		} else {
 			// always anchor all regular expressions at the beginning if they do not start with ^
-			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != 94 {
+			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != '^' {
 				e.value = "^(?:" + e.value + ")"
 			}
 
