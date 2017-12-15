@@ -82,14 +82,17 @@ type TagQuery struct {
 }
 
 func compileRe(pattern string) (*regexp.Regexp, error) {
-	var re *regexp.Regexp
-	var err error
-	if pattern != "^.+" {
-		re, err = regexp.Compile(pattern)
-		if err != nil {
-			return nil, err
-		}
+	// shortcut, we don't need to compile that pattern, if re == nil we'll
+	// simply check if there is any value and save a regex match
+	if pattern == "^.+" {
+		return nil, nil
 	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
 	return re, nil
 }
 
