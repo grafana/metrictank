@@ -859,8 +859,11 @@ func (q *TagQuery) getMaxTagCount() int {
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
 func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, completeCh, stopCh chan struct{}) {
-	results := make(map[string]struct{})
+	// used to prevent that this worker thread will push the same result into
+	// the chan twice
+	resultsCache := make(map[string]struct{})
 
+	// matchesName defines whether the given tag condition matches the special tag "name" or not
 	matchesName := false
 	if q.filterTagBy == PREFIX_TAG || q.startWith == PREFIX_TAG {
 		if len(q.tagPrefix) <= 4 && "name"[:len(q.tagPrefix)] == q.tagPrefix {
@@ -899,7 +902,8 @@ IDS:
 			}
 
 			key := tag[:equal]
-			if _, ok := results[key]; ok {
+			// this tag has already been pushed into tagCh, so we can stop evaluating
+			if _, ok := resultsCache[key]; ok {
 				continue
 			}
 
@@ -922,7 +926,9 @@ IDS:
 		}
 
 		if matchesName {
-			metricTags["name"] = struct{}{}
+			if _, ok := resultsCache["name"]; !ok {
+				metricTags["name"] = struct{}{}
+			}
 		}
 
 		// if some tags satisfy the current tag filter condition then we run
@@ -941,7 +947,7 @@ IDS:
 						// we so we exit here
 						break IDS
 					}
-					results[key] = struct{}{}
+					resultsCache[key] = struct{}{}
 				}
 			} else {
 				// check if we need to stop
