@@ -579,7 +579,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 // valPrefix:   the string to be completed
 // expressions: tagdb expressions in the same format as graphite uses
 // from:        only tags will be returned that have at least one metric
-//              with a LastUpdate above from
+//              with a LastUpdate >= from
 // limit:       the maximum number of results to return, the results will
 //              always be sorted alphabetically for consistency between
 //              consecutive queries and the limit is applied after sorting
