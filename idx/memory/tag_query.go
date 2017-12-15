@@ -316,10 +316,11 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 func (q *TagQuery) getInitialByEqual(expr kv, idCh chan idx.MetricID, stopCh chan struct{}) {
 	defer q.wg.Done()
 
+KEYS:
 	for k := range q.index[expr.key][expr.value] {
 		select {
 		case <-stopCh:
-			break
+			break KEYS
 		case idCh <- k:
 		}
 	}
