@@ -140,6 +140,7 @@ FIND_OPERATOR:
 
 	// if ~ (regex)
 	if len(expr) > pos && expr[pos] == 126 {
+		// ^=~ is not a valid operator
 		if prefix {
 			return res, errInvalidQuery
 		}
@@ -215,24 +216,20 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 
 		// special case of empty value
 		if len(e.value) == 0 {
+			expression := kvRe{
+				key:        e.key,
+				value:      nil,
+				matchCache: &sync.Map{},
+				missCache:  &sync.Map{},
+			}
 			if e.operator == EQUAL || e.operator == MATCH {
-				q.notMatch = append(q.notMatch, kvRe{
-					key:        e.key,
-					value:      nil,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
+				q.notMatch = append(q.notMatch, expression)
 			} else {
-				q.match = append(q.match, kvRe{
-					key:        e.key,
-					value:      nil,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
+				q.match = append(q.match, expression)
 			}
 		} else {
-			// always anchor all regular expressions at the beginning
-			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != byte('^') {
+			// always anchor all regular expressions at the beginning if they do not start with ^
+			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != 94 {
 				e.value = "^(?:" + e.value + ")"
 			}
 
