@@ -104,26 +104,18 @@ func parseExpression(expr string) (expression, error) {
 	res := expression{}
 
 	// scan up to operator to get key
+FIND_OPERATOR:
 	for ; pos < len(expr); pos++ {
-		// =
-		if expr[pos] == 61 {
-			break
-		}
-
-		// ! (not)
-		if expr[pos] == 33 {
+		switch expr[pos] {
+		case 61: // =
+			break FIND_OPERATOR
+		case 33: // ! (not)
 			not = true
-			break
-		}
-
-		// ^ (prefix)
-		if expr[pos] == 94 {
+			break FIND_OPERATOR
+		case 94: // ^ (prefix)
 			prefix = true
-			break
-		}
-
-		// disallow ; in key
-		if expr[pos] == 59 {
+			break FIND_OPERATOR
+		case 59: // disallow ; in key
 			return res, errInvalidQuery
 		}
 	}
