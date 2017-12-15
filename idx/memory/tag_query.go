@@ -806,8 +806,8 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 	return result
 }
 
-// getMaxTagCount calculates the maximum number of results a tag query could
-// possibly return
+// getMaxTagCount calculates the maximum number of results (cardinality) a
+// tag query could possibly return
 // this is useful because when running a tag query we can abort it as soon as
 // we know that there can't be more tags discovered and added to the result set
 func (q *TagQuery) getMaxTagCount() int {
