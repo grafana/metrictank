@@ -886,7 +886,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 	}
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, TagPrefix: tagPrefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/tags")
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
 	}
@@ -937,7 +937,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 	}
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, ValPrefix: valPrefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags/autoComplete/values")
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err
 	}
