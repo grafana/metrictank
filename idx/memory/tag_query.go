@@ -32,20 +32,25 @@ type expression struct {
 	operator int
 }
 
+// a key / value combo used to represent a tag expression like "key=value"
+// the cost is an estimate how expensive this query is compared to others
+// with the same operator
 type kv struct {
 	cost  uint // cost of evaluating expression, compared to other kv objects
 	key   string
 	value string
 }
 
+// kv expressions that rely on regular expressions will get converted to kvRe in
+// NewTagQuery() to accomodate the additional requirements of regex based queries.
 type kvRe struct {
 	cost           uint // cost of evaluating expression, compared to other kvRe objects
 	key            string
-	value          *regexp.Regexp
-	matchCache     *sync.Map // needs to be reference so kvRe can be copied
-	matchCacheSize int32     // sync.Map does not have a way to get the length
-	missCache      *sync.Map // needs to be reference so kvRe can be copied
-	missCacheSize  int32     // sync.Map does not have a way to get the length
+	value          *regexp.Regexp // the regexp pattern to evaluate, nil means everything should match
+	matchCache     *sync.Map      // needs to be reference so kvRe can be copied, caches regex matches
+	matchCacheSize int32          // sync.Map does not have a way to get the length
+	missCache      *sync.Map      // needs to be reference so kvRe can be copied, caches regex misses
+	missCacheSize  int32          // sync.Map does not have a way to get the length
 }
 
 type KvByCost []kv
