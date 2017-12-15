@@ -485,9 +485,11 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 	// only if expressions are specified we need to build a tag query.
 	// otherwise, the generation of the result set is much simpler
 	if len(expressions) > 0 {
+		// incorporate the tag prefix into the tag query expressions
 		if len(tagPrefix) > 0 {
 			expressions = append(expressions, fmt.Sprintf("__tag^=%s", tagPrefix))
 		}
+
 		query, err := NewTagQuery(expressions, from)
 		if err != nil {
 			return nil, err
@@ -533,11 +535,16 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 
 	TAGS:
 		for _, tag := range tagsSorted {
-			for _, ids := range tags[tag] {
-				for id := range ids {
-					// only if from is specified we need to find at least one
-					// metric with LastUpdateTime >= from
-					if from > 0 {
+			// the tags are processed in sorted order, so once we have have "limit" results we can break
+			if uint(len(res)) >= limit {
+				break TAGS
+			}
+
+			// only if from is specified we need to find at least one
+			// metric with LastUpdateTime >= from
+			if from > 0 {
+				for _, ids := range tags[tag] {
+					for id := range ids {
 						def, ok := m.DefById[id.String()]
 						if !ok {
 							corruptIndex.Inc()
@@ -547,13 +554,15 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 						if def.LastUpdate < from {
 							continue
 						}
+
+						// we found one metric that satisfies the from, add the tag and continue to the next one
+						res = append(res, tag)
+
+						continue TAGS
 					}
-					res = append(res, tag)
-					if uint(len(res)) >= limit {
-						break TAGS
-					}
-					continue TAGS
 				}
+			} else {
+				res = append(res, tag)
 			}
 		}
 	}
