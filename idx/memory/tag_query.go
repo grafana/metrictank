@@ -23,19 +23,22 @@ var (
 //
 // some of the following operators are non-standard and are only used
 // internally to implement certain functionalities requiring them
+
+type match uint16
+
 const (
-	EQUAL      = iota // =
-	NOT_EQUAL         // !=
-	MATCH             // =~        regular expression
-	MATCH_TAG         // __tag=~   relies on special key __tag. non-standard, required for `/metrics/tags` requests with "filter"
-	NOT_MATCH         // !=~
-	PREFIX            // ^=        exact prefix, not regex. non-standard, required for auto complete of tag values
-	PREFIX_TAG        // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
+	EQUAL      match = iota // =
+	NOT_EQUAL               // !=
+	MATCH                   // =~        regular expression
+	MATCH_TAG               // __tag=~   relies on special key __tag. non-standard, required for `/metrics/tags` requests with "filter"
+	NOT_MATCH               // !=~
+	PREFIX                  // ^=        exact prefix, not regex. non-standard, required for auto complete of tag values
+	PREFIX_TAG              // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
 )
 
 type expression struct {
 	kv
-	operator int
+	operator match
 }
 
 // a key / value combo used to represent a tag expression like "key=value"
@@ -71,7 +74,7 @@ func (a KvReByCost) Len() int           { return len(a) }
 func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
-//TagQuery runs a set of pattern or string matches on tag keys and values against
+// TagQuery runs a set of pattern or string matches on tag keys and values against
 // the index. It is executed via:
 // Run() which returns a set of matching MetricIDs
 // RunGetTags() which returns the set of tag values found amongst the matching MetricIDs
@@ -82,8 +85,8 @@ type TagQuery struct {
 	notEqual    []kv
 	notMatch    []kvRe
 	prefix      []kv
-	startWith   int // expression type to generate the initial result set from
-	filterTagBy int // if tags should be filtered by prefix or regex match (max one)
+	startWith   match // to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	filterTagBy match // can only be PREFIX_TAG or MATCH_TAG (only one. why?)
 
 	// no need have more than one of tagMatch and tagPrefix, tags can only be
 	// filtered by max one condition
