@@ -249,11 +249,7 @@ func crossSeriesRange(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		point := schema.Point{
 			Ts:  in[0].Datapoints[i].Ts,
-			Val: math.NaN(),
-		}
-
-		if !math.IsNaN(maxes[i].Val) {
-			point.Val = maxes[i].Val - mins[i].Val
+			Val: maxes[i].Val - mins[i].Val,
 		}
 
 		*out = append(*out, point)
