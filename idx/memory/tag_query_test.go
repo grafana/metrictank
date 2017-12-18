@@ -537,7 +537,7 @@ func TestExpressionParsing(t *testing.T) {
 		expression string
 		key        string
 		value      string
-		operator   int
+		operator   match
 		err        error
 	}
 
