@@ -407,6 +407,7 @@ func TestTagSorting(t *testing.T) {
 	md1.SetId()
 
 	// set out of order tags after SetId (because that would sort it)
+	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
 	index.AddOrUpdate(md1, 1)
 
@@ -435,6 +436,7 @@ func TestTagSorting(t *testing.T) {
 	md2[0].SetId()
 
 	// set out of order tags after SetId (because that would sort it)
+	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
 	index.Load(md2)
 
