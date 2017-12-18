@@ -467,7 +467,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
-// AutoCompleteTags returns tag values matching the specified conditions
+// AutoCompleteTags returns tags matching the specified conditions
 // prefix:      prefix match
 // expressions: tagdb expressions in the same format as graphite
 // from:        tags must have at least one metric with LastUpdate >= from
