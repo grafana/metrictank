@@ -63,8 +63,21 @@ type Tree struct {
 }
 
 type IdSet map[idx.MetricID]struct{} // set of ids
-type TagValue map[string]IdSet       // value -> set of ids
-type TagIndex map[string]TagValue    // key -> list of values
+
+func (ids IdSet) String() string {
+	var res string
+	for id := range ids {
+		if len(res) > 0 {
+			res += " "
+		}
+		res += id.String()
+	}
+	return res
+
+}
+
+type TagValue map[string]IdSet    // value -> set of ids
+type TagIndex map[string]TagValue // key -> list of values
 
 func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 	ti := *t
