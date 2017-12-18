@@ -95,17 +95,7 @@ func queryAndCompareResults(t *testing.T, q TagQuery, expectedData IdSet) {
 	res := q.Run(tagIdx, byId)
 
 	if !reflect.DeepEqual(expectedData, res) {
-		toStr := func(ids IdSet) string {
-			var res string
-			for id := range ids {
-				if len(res) > 0 {
-					res += " "
-				}
-				res += id.String()
-			}
-			return res
-		}
-		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", toStr(expectedData), toStr(res))
+		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expectedData, res)
 	}
 }
 
