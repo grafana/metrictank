@@ -1,10 +1,10 @@
 package expr
 
 import (
+	"errors"
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
@@ -13,21 +13,13 @@ import (
 )
 
 func getModel(name string, data []schema.Point) models.Series {
-	tags := make(map[string]string, 3)
-	tagSplits := strings.Split(name, ";")
-
-	tags["name"] = tagSplits[0]
-
-	for _, split := range tagSplits[1:] {
-		pair := strings.SplitN(split, "=", 2)
-		tags[pair[0]] = pair[1]
-	}
-	return models.Series{
+	series := models.Series{
 		Target:     name,
 		QueryPatt:  name,
-		Tags:       tags,
 		Datapoints: getCopy(data),
 	}
+	series.SetTags()
+	return series
 }
 
 // Test error cases
@@ -35,32 +27,9 @@ func TestNoTags(t *testing.T) {
 	in := []models.Series{
 		getModel("name1;tag1=val1", a),
 	}
-	f := NewGroupByTags()
-	gby := f.(*FuncGroupByTags)
-	gby.in = NewMock(in)
-	gby.aggregator = "sum"
-	gby.tags = []string{}
+	expected := errors.New("No tags specified")
 
-	_, err := f.Exec(make(map[Req][]models.Series))
-	if err == nil {
-		t.Fatalf("case %q: err should not be nil but was", "TestnoTags")
-	}
-}
-
-func TestInvalidAggregator(t *testing.T) {
-	in := []models.Series{
-		getModel("name1;tag1=val1", a),
-	}
-	f := NewGroupByTags()
-	gby := f.(*FuncGroupByTags)
-	gby.in = NewMock(in)
-	gby.aggregator = "inv"
-	gby.tags = []string{}
-
-	_, err := f.Exec(make(map[Req][]models.Series))
-	if err == nil {
-		t.Fatalf("case %q: err should not be nil but was", "TestnoTags")
-	}
+	testGroupByTags("ErrNoTags", in, nil, "sum", []string{}, expected, t)
 }
 
 // Test normal cases
@@ -70,7 +39,7 @@ func TestGroupByTagsSingleSeries(t *testing.T) {
 	}
 	out := in
 
-	testGroupByTags("SingleSeries", in, out, "sum", []string{"tag1"}, t)
+	testGroupByTags("SingleSeries", in, out, "sum", []string{"tag1"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesSingleResult(t *testing.T) {
@@ -82,7 +51,7 @@ func TestGroupByTagsMultipleSeriesSingleResult(t *testing.T) {
 		getModel("name1;tag1=val1", sumab),
 	}
 
-	testGroupByTags("MultipleSeriesSingleResult", in, out, "sum", []string{"tag1"}, t)
+	testGroupByTags("MultipleSeriesSingleResult", in, out, "sum", []string{"tag1"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesMultipleResults(t *testing.T) {
@@ -97,7 +66,7 @@ func TestGroupByTagsMultipleSeriesMultipleResults(t *testing.T) {
 		getModel("name1;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResult", in, out, "sum", []string{"tag1"}, t)
+	testGroupByTags("MultipleSeriesMultipleResult", in, out, "sum", []string{"tag1"}, nil, t)
 }
 func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNames(t *testing.T) {
 	in := []models.Series{
@@ -111,7 +80,7 @@ func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNames(t *testing.T) {
 		getModel("sum;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNames", in, out, "sum", []string{"tag1"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNames", in, out, "sum", []string{"tag1"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNamesMoreTags(t *testing.T) {
@@ -126,7 +95,7 @@ func TestGroupByTagsMultipleSeriesMultipleResultsMultipleNamesMoreTags(t *testin
 		getModel("sum;tag1=val1_1;tag3=3", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"tag1", "tag3"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"tag1", "tag3"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesMultipleResultsGroupByName(t *testing.T) {
@@ -141,7 +110,7 @@ func TestGroupByTagsMultipleSeriesMultipleResultsGroupByName(t *testing.T) {
 		getModel("name2;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name"}, nil, t)
 }
 
 func TestGroupByTagsSingleGroupByName(t *testing.T) {
@@ -154,7 +123,7 @@ func TestGroupByTagsSingleGroupByName(t *testing.T) {
 		getModel("name1", sumabc),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, nil, t)
 }
 
 func TestGroupByTagsMultipleGroupByName(t *testing.T) {
@@ -169,7 +138,7 @@ func TestGroupByTagsMultipleGroupByName(t *testing.T) {
 		getModel("name2", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
@@ -184,7 +153,7 @@ func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
 		getModel("name2;missingTag=;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name", "missingTag"}, t)
+	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name", "missingTag"}, nil, t)
 }
 
 func TestGroupByTagsAllAggregators(t *testing.T) {
@@ -216,11 +185,11 @@ func TestGroupByTagsAllAggregators(t *testing.T) {
 			getModel("name2;tag1=val1_1", agg.result2),
 		}
 
-		testGroupByTags("AllAggregators:"+agg.name, in, out, agg.name, []string{"tag1", "name"}, t)
+		testGroupByTags("AllAggregators:"+agg.name, in, out, agg.name, []string{"tag1", "name"}, nil, t)
 	}
 }
 
-func testGroupByTags(name string, in []models.Series, out []models.Series, agg string, tags []string, t *testing.T) {
+func testGroupByTags(name string, in []models.Series, out []models.Series, agg string, tags []string, expectedErr error, t *testing.T) {
 	f := NewGroupByTags()
 	gby := f.(*FuncGroupByTags)
 	gby.in = NewMock(in)
@@ -228,8 +197,12 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 	gby.tags = tags
 
 	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+	if err != expectedErr {
+		if expectedErr == nil {
+			t.Fatalf("case %q: expected no error but got %q", name, err)
+		} else if err == nil || err.Error() != expectedErr.Error() {
+			t.Fatalf("case %q: err %q but expected %q", name, err, expectedErr)
+		}
 	}
 	if len(got) != len(out) {
 		t.Fatalf("case %q: GroupByTags output expected to be %d but actually %d", name, len(out), len(got))
