@@ -95,12 +95,9 @@ func testSeriesAggregate(name, agg string, in []models.Series, out []schema.Poin
 		t.Fatalf("case %q (%q): len output expected %d, got %d", name, agg, len(out), len(got))
 	}
 
-	// Use EPSILON to avoid floating-point precision errors
-	EPSILON := math.Nextafter(1, 2) - 1
-
 	for j, p := range got {
 		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out[j].Val)
-		if (bothNaN || p.Val == out[j].Val || math.Abs(p.Val-out[j].Val) < EPSILON) && p.Ts == out[j].Ts {
+		if (bothNaN || p.Val == out[j].Val) && p.Ts == out[j].Ts {
 			continue
 		}
 		t.Fatalf("case %q (%q): output point %d - expected %v got %v", name, agg, j, out[j], p)
