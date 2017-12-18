@@ -71,6 +71,10 @@ func (a KvReByCost) Len() int           { return len(a) }
 func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
+//TagQuery runs a set of pattern or string matches on tag keys and values against
+// the index. It is executed via:
+// Run() which returns a set of matching MetricIDs
+// RunGetTags() which returns the set of tag values found amongst the matching MetricIDs
 type TagQuery struct {
 	from        int64
 	equal       []kv
