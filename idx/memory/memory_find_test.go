@@ -451,27 +451,6 @@ func TestTagSorting(t *testing.T) {
 	}
 }
 
-func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
-	t.Helper()
-
-	res, err := ix.AutoCompleteTags(1, prefix, expr, from, limit)
-	if expErr && err == nil {
-		t.Fatalf("Expected an error, but did not get one")
-	} else if !expErr && err != nil {
-		t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
-	}
-
-	if len(res) != len(expRes) {
-		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
-	}
-
-	for i := range res {
-		if expRes[i] != res[i] {
-			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
-		}
-	}
-}
-
 func TestAutoCompleteTag(t *testing.T) {
 	InitSmallIndex()
 
@@ -966,5 +945,26 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		autoCompleteTagsAndCompare(b, tc.prefix, tc.expr, tc.from, 2, tc.expRes, false)
+	}
+}
+
+func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
+	t.Helper()
+
+	res, err := ix.AutoCompleteTags(1, prefix, expr, from, limit)
+	if expErr && err == nil {
+		t.Fatalf("Expected an error, but did not get one")
+	} else if !expErr && err != nil {
+		t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
+	}
+
+	if len(res) != len(expRes) {
+		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+	}
+
+	for i := range res {
+		if expRes[i] != res[i] {
+			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+		}
 	}
 }
