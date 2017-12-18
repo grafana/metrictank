@@ -455,12 +455,10 @@ func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from
 	t.Helper()
 
 	res, err := ix.AutoCompleteTags(1, prefix, expr, from, limit)
-	if (err != nil) != expErr {
-		if expErr {
-			t.Fatalf("Expected an error, but did not get one")
-		} else {
-			t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
-		}
+	if expErr && err == nil {
+		t.Fatalf("Expected an error, but did not get one")
+	} else if !expErr && err != nil {
+		t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
 	}
 
 	if len(res) != len(expRes) {
