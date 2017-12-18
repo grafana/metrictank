@@ -23,7 +23,7 @@ func NewGroupByTags() GraphiteFunc {
 func (s *FuncGroupByTags) Signature() ([]Arg, []Arg) {
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgString{val: &s.aggregator},
+		ArgString{val: &s.aggregator, validator: []Validator{IsAggFunc}},
 		ArgStrings{val: &s.tags},
 	}, []Arg{ArgSeries{}}
 }
@@ -40,11 +40,6 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 	if len(s.tags) == 0 {
 		return nil, errors.New("No tags specified")
-	}
-
-	aggFunc := getCrossSeriesAggFunc(s.aggregator)
-	if aggFunc == nil {
-		return nil, errors.New("Invalid aggregation func: " + s.aggregator)
 	}
 
 	if len(series) <= 1 {
@@ -111,17 +106,10 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	}
 
 	output := make([]models.Series, 0, len(groups))
+	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
 	// Now, for each key perform the requested aggregation
 	for name, groupSeries := range groups {
-		var out []schema.Point
-		if len(groupSeries) == 1 {
-			out = groupSeries[0].Datapoints
-		} else {
-			out = pointSlicePool.Get().([]schema.Point)
-			aggFunc(groupSeries, &out)
-		}
-
 		tags := make(map[string]string, len(groupTags)+1)
 		tagSplits := strings.Split(name, ";")
 
@@ -137,10 +125,17 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			Target:       name,
 			QueryPatt:    name,
 			Tags:         tags,
-			Datapoints:   out,
 			Interval:     series[0].Interval,
 			Consolidator: cons,
 			QueryCons:    queryCons,
+		}
+
+		if len(groupSeries) == 1 {
+			newSeries.Datapoints = groupSeries[0].Datapoints
+		} else {
+			newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
+			aggFunc(groupSeries, &newSeries.Datapoints)
+			cache[Req{}] = append(cache[Req{}], newSeries)
 		}
 
 		output = append(output, newSeries)

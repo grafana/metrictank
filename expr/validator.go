@@ -13,3 +13,10 @@ func IntPositive(e *expr) error {
 	}
 	return nil
 }
+
+func IsAggFunc(e *expr) error {
+	if getCrossSeriesAggFunc(e.str) == nil {
+		return errors.New("Invalid aggregation func: " + e.str)
+	}
+	return nil
+}
