@@ -450,7 +450,7 @@ TAGS:
 // getInitialIds returns a channel through which the IDs of the initial result
 // set will be sent
 func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
-	idCh := make(chan idx.MetricID)
+	idCh := make(chan idx.MetricID, 1000)
 	stopCh := make(chan struct{})
 	q.wg.Add(1)
 
