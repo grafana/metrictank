@@ -528,36 +528,16 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, prefix string, expressions []str
 
 		sort.Strings(tagsSorted)
 
-	TAGS:
 		for _, tag := range tagsSorted {
-			// the tags are processed in sorted order, so once we have have "limit" results we can break
-			if uint(len(res)) >= limit {
-				break TAGS
-			}
-
 			// only if from is specified we need to find at least one
 			// metric with LastUpdate >= from
-			if from > 0 {
-				for _, ids := range tags[tag] {
-					for id := range ids {
-						def, ok := m.DefById[id.String()]
-						if !ok {
-							corruptIndex.Inc()
-							log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-							continue
-						}
-						if def.LastUpdate < from {
-							continue
-						}
-
-						// we found one metric that satisfies the from, add the tag and continue to the next one
-						res = append(res, tag)
-
-						continue TAGS
-					}
-				}
-			} else {
+			if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
 				res = append(res, tag)
+			}
+
+			// the tags are processed in sorted order, so once we have have "limit" results we can break
+			if uint(len(res)) >= limit {
+				break
 			}
 		}
 	}
@@ -702,43 +682,40 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 		res = make([]string, 0, len(tags))
 	}
 
-KEYS:
-	for key := range tags {
+	for tag := range tags {
 		// filter by pattern if one was given
-		if re != nil && !re.MatchString(key) {
+		if re != nil && !re.MatchString(tag) {
 			continue
 		}
 
 		// if from is > 0 we need to find at least one metric definition where
-		// LastUpdate >= from before we add the key to the result set
-		if from > 0 {
-			for _, ids := range tags[key] {
-				for id := range ids {
-					def, ok := m.DefById[id.String()]
-					if !ok {
-						corruptIndex.Inc()
-						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-						continue
-					}
-
-					// as soon as we found one metric definition with LastUpdate >= from
-					// we can add the current key to the result set and move on to the next
-					if def.LastUpdate >= from {
-						res = append(res, key)
-						continue KEYS
-					}
-				}
-			}
-
-			// no metric definition with LastUpdate >= from has been found,
-			// continue with the next key
-			continue KEYS
+		// LastUpdate >= from before we add the tag to the result set
+		if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
+			res = append(res, tag)
 		}
-
-		res = append(res, key)
 	}
 
 	return res, nil
+}
+
+func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
+	for _, ids := range tags[tag] {
+		for id := range ids {
+			def, ok := m.DefById[id.String()]
+			if !ok {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+				continue
+			}
+
+			// as soon as we found one metric definition with LastUpdate >= from
+			// we can return true
+			if def.LastUpdate >= from {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // resolveIDs resolves a list of ids (IdSet) into a list of complete
