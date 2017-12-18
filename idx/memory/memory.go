@@ -467,27 +467,22 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
-// AutoCompleteTags is used to generate a list of possible values that could
-// complete a given prefix. It also accepts additional conditions to further
-// narrow down the result set.
+// AutoCompleteTags returns tag values matching the specified conditions
+// prefix:      prefix match
+// expressions: tagdb expressions in the same format as graphite
+// from:        tags must have at least one metric with LastUpdate >= from
+// limit:       the maximum number of results to return
 //
-// tagPrefix:   the string to be completed
-// expressions: tagdb expressions in the same format as graphite uses
-// from:        only tags will be returned that have at least one metric
-//              with a LastUpdate >= from
-// limit:       the maximum number of results to return, the results will
-//              always be sorted alphabetically for consistency between
-//              consecutive queries and the limit is applied after sorting
-//
-func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
+// the results will always be sorted alphabetically for consistency
+func (m *MemoryIdx) AutoCompleteTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
 	// otherwise, the generation of the result set is much simpler
 	if len(expressions) > 0 {
 		// incorporate the tag prefix into the tag query expressions
-		if len(tagPrefix) > 0 {
-			expressions = append(expressions, "__tag^="+tagPrefix)
+		if len(prefix) > 0 {
+			expressions = append(expressions, "__tag^="+prefix)
 		}
 
 		query, err := NewTagQuery(expressions, from)
@@ -524,7 +519,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 
 		tagsSorted := make([]string, 0, len(tags))
 		for tag := range tags {
-			if !strings.HasPrefix(tag, tagPrefix) {
+			if !strings.HasPrefix(tag, prefix) {
 				continue
 			}
 
@@ -570,21 +565,15 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, tagPrefix string, expressions []
 	return res, nil
 }
 
-// AutoCompleteTagValues is used to generate a list of possible values that could
-// complete a given value prefix. It requires a tag to be specified and only values
-// of the given tag will be returned. It also accepts additional conditions to
-// further narrow down the result set.
+// AutoCompleteTagValues returns tag values matching the specified conditions
+// tag:         tag key match
+// prefix:      value prefix match
+// expressions: tagdb expressions in the same format as graphite
+// from:        tags must have at least one metric with LastUpdate >= from
+// limit:       the maximum number of results to return
 //
-// tag:         values of which tag should be returned
-// valPrefix:   the string to be completed
-// expressions: tagdb expressions in the same format as graphite uses
-// from:        only tags will be returned that have at least one metric
-//              with a LastUpdate >= from
-// limit:       the maximum number of results to return, the results will
-//              always be sorted alphabetically for consistency between
-//              consecutive queries and the limit is applied after sorting
-//
-func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
+// the results will always be sorted alphabetically for consistency
+func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
@@ -592,8 +581,8 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 	if len(expressions) > 0 {
 
 		// add the value prefix into the expressions as an additional condition
-		if len(valPrefix) > 0 {
-			expressions = append(expressions, tag+"^="+valPrefix)
+		if len(prefix) > 0 {
+			expressions = append(expressions, tag+"^="+prefix)
 		} else {
 			// if no value prefix has been specified we still require that at
 			// least the given tag must be present
@@ -663,7 +652,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 
 		res = make([]string, 0, len(vals))
 		for val := range vals {
-			if !strings.HasPrefix(val, valPrefix) {
+			if !strings.HasPrefix(val, prefix) {
 				continue
 			}
 

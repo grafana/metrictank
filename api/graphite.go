@@ -1044,7 +1044,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 		request.Limit = tagdbDefaultLimit
 	}
 
-	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.TagPrefix, request.Expr, request.From, request.Limit)
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.Prefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -1053,8 +1053,8 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 	response.Write(ctx, response.NewJson(200, tags, ""))
 }
 
-func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTags(orgId, tagPrefix, expressions, from, limit)
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTags(orgId, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1064,7 +1064,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, tagPref
 		tagSet[tag] = struct{}{}
 	}
 
-	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: tagPrefix, Expr: expressions, From: from, Limit: limit}
+	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
 	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
@@ -1099,7 +1099,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 		request.Limit = tagdbDefaultLimit
 	}
 
-	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.ValuePrefix, request.Expr, request.From, request.Limit)
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.Prefix, request.Expr, request.From, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -1108,8 +1108,8 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, valPrefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, valPrefix, expressions, from, limit)
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1119,7 +1119,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 		valSet[val] = struct{}{}
 	}
 
-	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: valPrefix, Expr: expressions, From: from, Limit: limit}
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
 	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err

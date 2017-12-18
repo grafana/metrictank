@@ -451,15 +451,15 @@ func TestTagSorting(t *testing.T) {
 	}
 }
 
-func autoCompleteTagsAndCompare(t testing.TB, tagPrefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
+func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTags(1, tagPrefix, expr, from, limit)
+	res, err := ix.AutoCompleteTags(1, prefix, expr, from, limit)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
 		} else {
-			t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, tagPrefix)
+			t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
 		}
 	}
 
@@ -478,83 +478,83 @@ func TestAutoCompleteTag(t *testing.T) {
 	InitSmallIndex()
 
 	type testCase struct {
-		tagPrefix string
-		expr      []string
-		from      int64
-		limit     uint
-		expRes    []string
-		expErr    bool
+		prefix string
+		expr   []string
+		from   int64
+		limit  uint
+		expRes []string
+		expErr bool
 	}
 
 	testCases := []testCase{
 		{
-			tagPrefix: "di",
-			expr:      []string{"direction=write", "host=host90"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"direction", "disk"},
-			expErr:    false,
+			prefix: "di",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"direction", "disk"},
+			expErr: false,
 		}, {
-			tagPrefix: "di",
-			expr:      []string{"direction=write", "host=host90", "device=cpu"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{},
-			expErr:    false,
+			prefix: "di",
+			expr:   []string{"direction=write", "host=host90", "device=cpu"},
+			from:   100,
+			limit:  100,
+			expRes: []string{},
+			expErr: false,
 		}, {
-			tagPrefix: "",
-			expr:      []string{"direction=write", "host=host90"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"dc", "device", "direction", "disk", "host", "metric", "name"},
-			expErr:    false,
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"dc", "device", "direction", "disk", "host", "metric", "name"},
+			expErr: false,
 		}, {
-			tagPrefix: "",
-			expr:      []string{"direction=write", "host=host90"},
-			from:      100,
-			limit:     3,
-			expRes:    []string{"dc", "device", "direction"},
-			expErr:    false,
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  3,
+			expRes: []string{"dc", "device", "direction"},
+			expErr: false,
 		}, {
-			tagPrefix: "ho",
-			expr:      []string{},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"host"},
-			expErr:    false,
+			prefix: "ho",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host"},
+			expErr: false,
 		}, {
-			tagPrefix: "host",
-			expr:      []string{},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"host"},
-			expErr:    false,
+			prefix: "host",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host"},
+			expErr: false,
 		}, {
-			tagPrefix: "n",
-			expr:      []string{},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"name"},
-			expErr:    false,
+			prefix: "n",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"name"},
+			expErr: false,
 		}, {
-			tagPrefix: "",
-			expr:      []string{},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"cpu", "dc", "device", "direction", "disk", "host", "metric", "name"},
-			expErr:    false,
+			prefix: "",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"cpu", "dc", "device", "direction", "disk", "host", "metric", "name"},
+			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagsAndCompare(t, tc.tagPrefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
+		autoCompleteTagsAndCompare(t, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
 	}
 }
 
-func autoCompleteTagValuesAndCompare(t testing.TB, tag, valPrefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTagValues(1, tag, valPrefix, expr, from, limit)
+	res, err := ix.AutoCompleteTagValues(1, tag, prefix, expr, from, limit)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
@@ -580,69 +580,69 @@ func TestAutoCompleteTagValues(t *testing.T) {
 	InitSmallIndex()
 
 	type testCase struct {
-		tag       string
-		valPrefix string
-		expr      []string
-		from      int64
-		limit     uint
-		expRes    []string
-		expErr    bool
+		tag    string
+		prefix string
+		expr   []string
+		from   int64
+		limit  uint
+		expRes []string
+		expErr bool
 	}
 
 	testCases := []testCase{
 		{
-			tag:       "host",
-			valPrefix: "host9",
-			expr:      []string{"direction=write"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
-			expErr:    false,
+			tag:    "host",
+			prefix: "host9",
+			expr:   []string{"direction=write"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
+			expErr: false,
 		}, {
-			tag:       "host",
-			valPrefix: "host9",
-			expr:      []string{"direction=write"},
-			from:      100,
-			limit:     5,
-			expRes:    []string{"host9", "host90", "host91", "host92", "host93"},
-			expErr:    false,
+			tag:    "host",
+			prefix: "host9",
+			expr:   []string{"direction=write"},
+			from:   100,
+			limit:  5,
+			expRes: []string{"host9", "host90", "host91", "host92", "host93"},
+			expErr: false,
 		}, {
-			tag:       "direction",
-			valPrefix: "w",
-			expr:      []string{"device=disk"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"write"},
-			expErr:    false,
+			tag:    "direction",
+			prefix: "w",
+			expr:   []string{"device=disk"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"write"},
+			expErr: false,
 		}, {
-			tag:       "direction",
-			valPrefix: "w",
-			expr:      []string{"device=cpu"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{},
-			expErr:    false,
+			tag:    "direction",
+			prefix: "w",
+			expr:   []string{"device=cpu"},
+			from:   100,
+			limit:  100,
+			expRes: []string{},
+			expErr: false,
 		}, {
-			tag:       "device",
-			valPrefix: "",
-			expr:      []string{},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"cpu", "disk"},
-			expErr:    false,
+			tag:    "device",
+			prefix: "",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"cpu", "disk"},
+			expErr: false,
 		}, {
-			tag:       "device",
-			valPrefix: "",
-			expr:      []string{"disk=~disk[4-5]{1}"},
-			from:      100,
-			limit:     100,
-			expRes:    []string{"disk"},
-			expErr:    false,
+			tag:    "device",
+			prefix: "",
+			expr:   []string{"disk=~disk[4-5]{1}"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"disk"},
+			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagValuesAndCompare(t, tc.tag, tc.valPrefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
 	}
 }
 
@@ -925,24 +925,24 @@ func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	InitLargeIndex()
 
 	type testCase struct {
-		tagPrefix string
-		expr      []string
-		from      int64
-		expRes    []string
+		prefix string
+		expr   []string
+		from   int64
+		expRes []string
 	}
 
 	tc := testCase{
-		tagPrefix: "di",
-		expr:      []string{},
-		from:      100,
-		expRes:    []string{"disk", "direction"},
+		prefix: "di",
+		expr:   []string{},
+		from:   100,
+		expRes: []string{"disk", "direction"},
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, 2, tc.expRes, false)
+		autoCompleteTagsAndCompare(b, tc.prefix, tc.expr, tc.from, 2, tc.expRes, false)
 	}
 }
 
@@ -950,23 +950,23 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	InitLargeIndex()
 
 	type testCase struct {
-		tagPrefix string
-		expr      []string
-		from      int64
-		expRes    []string
+		prefix string
+		expr   []string
+		from   int64
+		expRes []string
 	}
 
 	tc := testCase{
-		tagPrefix: "di",
-		expr:      []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
-		from:      12345,
-		expRes:    []string{"direction", "disk"},
+		prefix: "di",
+		expr:   []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
+		from:   12345,
+		expRes: []string{"direction", "disk"},
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, tc.tagPrefix, tc.expr, tc.from, 2, tc.expRes, false)
+		autoCompleteTagsAndCompare(b, tc.prefix, tc.expr, tc.from, 2, tc.expRes, false)
 	}
 }
