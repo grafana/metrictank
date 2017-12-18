@@ -103,8 +103,8 @@ func (i IndexAutoCompleteTags) TraceDebug(span opentracing.Span) {
 
 type IndexAutoCompleteTagValues struct {
 	OrgId  int      `json:"orgId" binding:"Required"`
-	Prefix string   `json:"prefix"`
 	Tag    string   `json:"tag"`
+	Prefix string   `json:"prefix"`
 	Expr   []string `json:"expressions"`
 	From   int64    `json:"from"`
 	Limit  uint     `json:"limit"`
