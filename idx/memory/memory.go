@@ -62,9 +62,9 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type TagIDs map[idx.MetricID]struct{} // set of ids
-type TagValue map[string]TagIDs       // value -> set of ids
-type TagIndex map[string]TagValue     // key -> list of values
+type IdSet map[idx.MetricID]struct{} // set of ids
+type TagValue map[string]IdSet       // value -> set of ids
+type TagIndex map[string]TagValue    // key -> list of values
 
 func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 	ti := *t
@@ -72,7 +72,7 @@ func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 		ti[name] = make(TagValue)
 	}
 	if _, ok := ti[name][value]; !ok {
-		ti[name][value] = make(TagIDs)
+		ti[name][value] = make(IdSet)
 	}
 	ti[name][value][id] = struct{}{}
 }
@@ -752,10 +752,10 @@ KEYS:
 	return res, nil
 }
 
-// resolveIDs resolves a list of ids (TagIDs) into a list of complete
+// resolveIDs resolves a list of ids (IdSet) into a list of complete
 // Node structs. It assumes that at least a read lock is already
 // held by the caller
-func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
+func (m *MemoryIdx) resolveIDs(orgId int, ids IdSet) []idx.Node {
 	res := make([]idx.Node, 0, len(ids))
 	tree := m.Tree[orgId]
 	for id := range ids {

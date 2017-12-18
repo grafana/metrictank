@@ -86,8 +86,8 @@ type TagQuery struct {
 	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
 	tagPrefix string // only used for auto complete of tags to match exact prefix
 
-	index TagIndex
-	byId  map[string]*idx.Archive
+	index TagIndex                // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId  map[string]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
 
 	wg *sync.WaitGroup
 }
@@ -765,7 +765,7 @@ func (q *TagQuery) sortByCost() {
 }
 
 // Run executes the tag query on the given index and returns a list of ids
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
+func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) IdSet {
 	q.index = index
 	q.byId = byId
 
@@ -788,7 +788,7 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) TagIDs {
 		close(resCh)
 	}()
 
-	result := make(TagIDs)
+	result := make(IdSet)
 
 	for id := range resCh {
 		result[id] = struct{}{}
