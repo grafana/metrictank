@@ -104,14 +104,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		// arguments of seriesByTag to do the resolution, we store the function
 		// string back into the Query member of a new request to be parsed later.
 		// TODO - find a way to prevent this parse/encode/parse/encode loop
-		expressionStr := "seriesByTag("
-		for i, ex := range e.args {
-			expressionStr += "'" + ex.str + "'"
-			if i != len(e.args)-1 {
-				expressionStr += ","
-			}
-		}
-		expressionStr += ")"
+		expressionStr := "seriesByTag(" + e.argsStr + ")"
 		req := NewReq(expressionStr, context.from, context.to, context.consol)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
