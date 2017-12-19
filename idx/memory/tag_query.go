@@ -90,10 +90,10 @@ type TagQuery struct {
 	prefix   []kv   // PREFIX
 
 	// clause that operate on tags (keys)
-	// we only need to support 1 condition for now: a filter or match
-	filterTagBy match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	tagMatch    kvRe   // only used for /metrics/tags with regex in filter param
-	tagPrefix   string // only used for auto complete of tags to match exact prefix
+	// we only need to support 1 condition for now: a prefix or match
+	tagClause match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
+	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
+	tagPrefix string // only used for auto complete of tags to match exact prefix
 
 	startWith match // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 
@@ -284,7 +284,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
 			case MATCH_TAG:
 				// we only allow one query by tag
-				if q.filterTagBy != 0 {
+				if q.tagClause != 0 {
 					return q, errInvalidQuery
 				}
 
@@ -299,15 +299,15 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 					missCache:  &sync.Map{},
 				}
 
-				q.filterTagBy = MATCH_TAG
+				q.tagClause = MATCH_TAG
 			case PREFIX_TAG:
 				// we only allow one query by tag
-				if q.filterTagBy != 0 {
+				if q.tagClause != 0 {
 					return q, errInvalidQuery
 				}
 
 				q.tagPrefix = e.value
-				q.filterTagBy = PREFIX_TAG
+				q.tagClause = PREFIX_TAG
 			}
 		}
 	}
@@ -319,11 +319,11 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 		q.startWith = PREFIX
 	} else if len(q.match) > 0 {
 		q.startWith = MATCH
-	} else if q.filterTagBy == PREFIX_TAG {
+	} else if q.tagClause == PREFIX_TAG {
 		// starting with a tag based query can be very expensive because they
 		// have the potential to result in a huge initial result set
 		q.startWith = PREFIX_TAG
-	} else if q.filterTagBy == MATCH_TAG {
+	} else if q.tagClause == MATCH_TAG {
 		q.startWith = MATCH_TAG
 	} else {
 		return q, errInvalidQuery
@@ -504,7 +504,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, omitT
 		return false
 	}
 
-	if q.filterTagBy == PREFIX_TAG && !omitTagFilters {
+	if q.tagClause == PREFIX_TAG && !omitTagFilters {
 		if !q.testByTagPrefix(def) {
 			return false
 		}
@@ -514,7 +514,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, omitT
 		return false
 	}
 
-	if q.filterTagBy == MATCH_TAG && !omitTagFilters {
+	if q.tagClause == MATCH_TAG && !omitTagFilters {
 		if !q.testByTagMatch(def) {
 			return false
 		}
@@ -817,14 +817,14 @@ func (q *TagQuery) getMaxTagCount() int {
 	defer q.wg.Done()
 	var maxTagCount int
 
-	if q.filterTagBy == PREFIX_TAG && len(q.tagPrefix) > 0 {
+	if q.tagClause == PREFIX_TAG && len(q.tagPrefix) > 0 {
 		for tag := range q.index {
 			if !strings.HasPrefix(tag, q.tagPrefix) {
 				continue
 			}
 			maxTagCount++
 		}
-	} else if q.filterTagBy == MATCH_TAG {
+	} else if q.tagClause == MATCH_TAG {
 		for tag := range q.index {
 			if q.tagMatch.value.MatchString(tag) {
 				maxTagCount++
@@ -876,11 +876,11 @@ IDS:
 				continue
 			}
 
-			if q.filterTagBy == PREFIX_TAG {
+			if q.tagClause == PREFIX_TAG {
 				if !strings.HasPrefix(key, q.tagPrefix) {
 					continue
 				}
-			} else if q.filterTagBy == MATCH_TAG {
+			} else if q.tagClause == MATCH_TAG {
 				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.value.MatchString(tag) {
 					if !ok {
 						q.tagMatch.missCache.Store(key, struct{}{})
@@ -936,11 +936,11 @@ IDS:
 func (q *TagQuery) tagFilterMatchesName() bool {
 	matchName := false
 
-	if q.filterTagBy == PREFIX_TAG || q.startWith == PREFIX_TAG {
+	if q.tagClause == PREFIX_TAG || q.startWith == PREFIX_TAG {
 		if strings.HasPrefix("name", q.tagPrefix) {
 			matchName = true
 		}
-	} else if q.filterTagBy == MATCH_TAG || q.startWith == MATCH_TAG {
+	} else if q.tagClause == MATCH_TAG || q.startWith == MATCH_TAG {
 		if q.tagMatch.value.MatchString("name") {
 			matchName = true
 		}
