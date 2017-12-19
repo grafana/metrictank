@@ -620,7 +620,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, prefix string, express
 					}
 
 					// keep the value after "=", that's why "+1"
-					valueMap[t[len(tag)+1:]] = struct{}{}
+					valueMap[t[len(prefix):]] = struct{}{}
 				}
 			}
 		}
