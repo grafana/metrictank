@@ -776,8 +776,11 @@ func (q *TagQuery) sortByCost() {
 		q.equal[i].cost = uint(len(q.index[kv.key][kv.value]))
 	}
 
+	// for prefix and match clauses we can't determine the actual cost
+	// without actually evaluating them, so we estimate based on
+	// cardinality of the key
 	for i, kv := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[kv.key][kv.value]))
+		q.prefix[i].cost = uint(len(q.index[kv.key]))
 	}
 
 	for i, kvRe := range q.match {
