@@ -378,7 +378,7 @@ func TestTagKeysWithFilter(t *testing.T) {
 	expected := []string{"dc", "device", "disk", "direction"}
 	queryAndCompareTagKeys(t, "d", 0, expected)
 
-	expected = []string{"disk", "direction"}
+	expected = []string{"direction", "disk"}
 	queryAndCompareTagKeys(t, "di", 0, expected)
 }
 
@@ -914,7 +914,7 @@ func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 		prefix: "di",
 		expr:   []string{},
 		from:   100,
-		expRes: []string{"disk", "direction"},
+		expRes: []string{"direction", "disk"},
 	}
 
 	b.ReportAllocs()
