@@ -997,8 +997,8 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 
 	// matchName defines whether the given tag condition matches the special
 	// tag "name" or not
-	// if we know it matches "name", and we assume every metric has a name, then
-	// we can omit a lot of matching
+	// if we know it matches "name", we know there can only be 1 tag filter,
+	// and we assume every metric has a name, then we can omit a lot of matching
 	matchName := q.tagFilterMatchesName()
 
 	// start the tag query workers. they'll consume the ids on the idCh and
