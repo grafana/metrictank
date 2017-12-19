@@ -88,7 +88,9 @@ type TagQuery struct {
 	startWith   match // to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 	filterTagBy match // can only be PREFIX_TAG or MATCH_TAG (only one. why?)
 
-	// no need have more than one of tagMatch and tagPrefix, tags can only be
+	// the following two conditions are evaluated against the tag, not against the tag value, so they
+	// must be treated as special cases that are separated from the others.
+	// there is no need have a list of tagMatch and tagPrefix conditions, tags can only be
 	// filtered by max one condition
 	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
 	tagPrefix string // only used for auto complete of tags to match exact prefix
