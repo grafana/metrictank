@@ -505,7 +505,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, omitT
 		return false
 	}
 
-	if q.tagClause == PREFIX_TAG && !omitTagFilters {
+	if q.tagClause == PREFIX_TAG && !omitTagFilters && q.startWith != PREFIX_TAG {
 		if !q.testByTagPrefix(def) {
 			return false
 		}
@@ -515,7 +515,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, omitT
 		return false
 	}
 
-	if q.tagClause == MATCH_TAG && !omitTagFilters {
+	if q.tagClause == MATCH_TAG && !omitTagFilters && q.startWith != MATCH_TAG {
 		if !q.testByTagMatch(def) {
 			return false
 		}
