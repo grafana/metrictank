@@ -642,7 +642,7 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 					}
 
 					// keep the value after "=", that's why "+1"
-					valueMap[t[len(tag)+1:]] = struct{}{}
+					valueMap[t[len(prefix):]] = struct{}{}
 				}
 			}
 		}
