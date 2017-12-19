@@ -533,7 +533,7 @@ func TestAutoCompleteTag(t *testing.T) {
 func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTagValues(1, tag, prefix, expr, from, limit)
+	res, err := ix.FindTagValues(1, tag, prefix, expr, from, limit)
 	if (err != nil) != expErr {
 		if expErr {
 			t.Fatalf("Expected an error, but did not get one")
@@ -953,7 +953,7 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
 	t.Helper()
 
-	res, err := ix.AutoCompleteTags(1, prefix, expr, from, limit)
+	res, err := ix.FindTags(1, prefix, expr, from, limit)
 	if expErr && err == nil {
 		t.Fatalf("Expected an error, but did not get one")
 	} else if !expErr && err != nil {

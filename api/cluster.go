@@ -122,7 +122,7 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 }
 
 func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.IndexAutoCompleteTags) {
-	tags, err := s.MetricIndex.AutoCompleteTags(req.OrgId, req.Prefix, req.Expr, req.From, req.Limit)
+	tags, err := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.Expr, req.From, req.Limit)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -131,7 +131,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 }
 
 func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
-	tags, err := s.MetricIndex.AutoCompleteTagValues(req.OrgId, req.Tag, req.Prefix, req.Expr, req.From, req.Limit)
+	tags, err := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.Expr, req.From, req.Limit)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

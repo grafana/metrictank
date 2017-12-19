@@ -147,16 +147,16 @@ type MetricIndex interface {
 	// LastUpdate time is >= the given value.
 	Tags(int, string, int64) ([]string, error)
 
-	// AutoCompleteTags generates a list of possible tags that could complete a
+	// FindTags generates a list of possible tags that could complete a
 	// given prefix. It also accepts additional tag conditions to further narrow
 	// down the result set in the format of graphite's tag queries
-	AutoCompleteTags(int, string, []string, int64, uint) ([]string, error)
+	FindTags(int, string, []string, int64, uint) ([]string, error)
 
-	// AutoCompleteTagValues generates a list of possible values that could
+	// FindTagValues generates a list of possible values that could
 	// complete a given value prefix. It requires a tag to be specified and only values
 	// of the given tag will be returned. It also accepts additional conditions to
 	// further narrow down the result set in the format of graphite's tag queries
-	AutoCompleteTagValues(int, string, string, []string, int64, uint) ([]string, error)
+	FindTagValues(int, string, string, []string, int64, uint) ([]string, error)
 
 	// TagDetails returns a list of all values associated with a given tag key in the
 	// given org. The occurences of each value is counted and the count is referred to by

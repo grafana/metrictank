@@ -480,14 +480,14 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 	return res, nil
 }
 
-// AutoCompleteTags returns tags matching the specified conditions
+// FindTags returns tags matching the specified conditions
 // prefix:      prefix match
 // expressions: tagdb expressions in the same format as graphite
 // from:        tags must have at least one metric with LastUpdate >= from
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) AutoCompleteTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
@@ -558,7 +558,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, prefix string, expressions []str
 	return res, nil
 }
 
-// AutoCompleteTagValues returns tag values matching the specified conditions
+// FindTagValues returns tag values matching the specified conditions
 // tag:         tag key match
 // prefix:      value prefix match
 // expressions: tagdb expressions in the same format as graphite
@@ -566,7 +566,7 @@ func (m *MemoryIdx) AutoCompleteTags(orgId int, prefix string, expressions []str
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.

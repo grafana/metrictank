@@ -1054,7 +1054,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 }
 
 func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTags(orgId, prefix, expressions, from, limit)
+	result, err := s.MetricIndex.FindTags(orgId, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1109,7 +1109,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 }
 
 func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.AutoCompleteTagValues(orgId, tag, prefix, expressions, from, limit)
+	result, err := s.MetricIndex.FindTagValues(orgId, tag, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
 	}
