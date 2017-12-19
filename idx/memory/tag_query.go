@@ -493,7 +493,7 @@ func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
 // all required tests in order to decide whether this metric should be part
 // of the final result set or not
 // in map/reduce terms this is the reduce function
-func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, matchName bool) bool {
+func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, omitTagFilters bool) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -506,7 +506,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, match
 		return false
 	}
 
-	if q.filterTagBy == PREFIX_TAG && !matchName {
+	if q.filterTagBy == PREFIX_TAG && !omitTagFilters {
 		if !q.testByTagPrefix(def) {
 			return false
 		}
@@ -516,7 +516,7 @@ func (q *TagQuery) testByAllExpressions(id idx.MetricID, def *idx.Archive, match
 		return false
 	}
 
-	if q.filterTagBy == MATCH_TAG && !matchName {
+	if q.filterTagBy == MATCH_TAG && !omitTagFilters {
 		if !q.testByTagMatch(def) {
 			return false
 		}
@@ -756,6 +756,7 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID) {
 			continue
 		}
 
+		// we always omit tag filters because Run() does not support filtering by tags
 		if q.testByAllExpressions(id, def, false) {
 			resCh <- id
 		}
@@ -856,7 +857,7 @@ func (q *TagQuery) getMaxTagCount() int {
 // according to the criteria associated with this query
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
-func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, stopCh chan struct{}, matchName bool) {
+func (q *TagQuery) filterTagsFromChan(idCh chan idx.MetricID, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
@@ -909,7 +910,8 @@ IDS:
 			metricTags[key] = struct{}{}
 		}
 
-		if matchName {
+		// if we don't filter tags, then we can assume that "name" should always be part of the result set
+		if omitTagFilters {
 			if _, ok := resultsCache["name"]; !ok {
 				metricTags["name"] = struct{}{}
 			}
@@ -919,7 +921,7 @@ IDS:
 		// the metric through all tag expression tests in order to decide
 		// whether those tags should be part of the final result set
 		if len(metricTags) > 0 {
-			if q.testByAllExpressions(id, def, matchName) {
+			if q.testByAllExpressions(id, def, omitTagFilters) {
 				for key := range metricTags {
 					select {
 					case tagCh <- key:
