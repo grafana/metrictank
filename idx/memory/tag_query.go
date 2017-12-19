@@ -772,16 +772,16 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID) {
 // this is to reduce the result set cheaply and only apply expensive tests to an
 // already reduced set of results
 func (q *TagQuery) sortByCost() {
-	for i := range q.equal {
-		q.equal[i].cost = uint(len(q.index[q.equal[i].key][q.equal[i].value]))
+	for i, kv := range q.equal {
+		q.equal[i].cost = uint(len(q.index[kv.key][kv.value]))
 	}
 
-	for i := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[q.prefix[i].key][q.prefix[i].value]))
+	for i, kv := range q.prefix {
+		q.prefix[i].cost = uint(len(q.index[kv.key][kv.value]))
 	}
 
-	for i := range q.match {
-		q.match[i].cost = uint(len(q.index[q.match[i].key]))
+	for i, kvRe := range q.match {
+		q.match[i].cost = uint(len(q.index[kvRe.key]))
 	}
 
 	sort.Sort(KvByCost(q.equal))
