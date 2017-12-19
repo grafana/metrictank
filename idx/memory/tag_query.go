@@ -77,23 +77,25 @@ func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 // TagQuery runs a set of pattern or string matches on tag keys and values against
 // the index. It is executed via:
 // Run() which returns a set of matching MetricIDs
-// RunGetTags() the returned list of strings are the tags of the metrics that match the given conditions
+// RunGetTags() which returns a list of tags of the matching metrics
 type TagQuery struct {
-	from      int64
-	equal     []kv
-	match     []kvRe
-	notEqual  []kv
-	notMatch  []kvRe
-	prefix    []kv
-	startWith match // to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	// clause that operates on LastUpdate field
+	from int64
 
-	// the following two conditions are evaluated against the tag, not against the tag value, so they
-	// must be treated as special cases that are separated from the others.
-	// there is no need have a list of tagMatch and tagPrefix conditions, tags can only be
-	// filtered by max one condition
+	// clauses that operate on values. from expressions like tag<operator>value
+	equal    []kv   // EQUAL
+	match    []kvRe // MATCH
+	notEqual []kv   // NOT_EQUAL
+	notMatch []kvRe // NOT_MATCH
+	prefix   []kv   // PREFIX
+
+	// clause that operate on tags (keys)
+	// we only need to support 1 condition for now: a filter or match
+	filterTagBy match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
 	tagMatch    kvRe   // only used for /metrics/tags with regex in filter param
 	tagPrefix   string // only used for auto complete of tags to match exact prefix
-	filterTagBy match  // can only be PREFIX_TAG or MATCH_TAG (or 0 if unset), the api only supports one tag expression at a time
+
+	startWith match // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 
 	index TagIndex                // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId  map[string]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
@@ -974,10 +976,9 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	idCh, stopCh := q.getInitialIds()
 	tagCh := make(chan string)
 
-	// matchName defines whether the given tag condition matches the special
-	// tag "name" or not
-	// if we know it matches "name", we know there can only be 1 tag filter,
-	// and we assume every metric has a name, then we can omit a lot of matching
+	// we know there can only be 1 tag filter, so if we detect that the given
+	// tag condition matches the special tag "name", we can omit the filtering
+	// because every metric has a name.
 	matchName := q.tagFilterMatchesName()
 
 	// start the tag query workers. they'll consume the ids on the idCh and
