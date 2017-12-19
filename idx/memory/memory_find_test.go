@@ -34,26 +34,26 @@ type metric struct {
 
 var queries = []query{
 	//LEAF queries
-	{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.read", ExpectedResults: 1},
+	{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.read;dc=dc1;device=disk;direction=read;disk=disk1;host=host960;metric=disk_ops", ExpectedResults: 1},
 	{Pattern: "collectd.dc1.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
-	{Pattern: "collectd.*.host960.disk.disk1.disk_ops.read", ExpectedResults: 5},
+	{Pattern: "collectd.*.host960.disk.disk1.disk_ops.read;*", ExpectedResults: 5},
 	{Pattern: "collectd.*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
 	{Pattern: "collectd.d*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
 	{Pattern: "collectd.[abcd]*.host960.disk.disk1.disk_ops.*", ExpectedResults: 10},
 	{Pattern: "collectd.{dc1,dc50}.host960.disk.disk1.disk_ops.*", ExpectedResults: 2},
 
-	{Pattern: "collectd.dc3.host960.cpu.1.idle", ExpectedResults: 1},
-	{Pattern: "collectd.dc30.host960.cpu.1.idle", ExpectedResults: 0},
-	{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
-	{Pattern: "collectd.dc3.host960.*.*.idle", ExpectedResults: 32},
+	{Pattern: "collectd.dc3.host960.cpu.1.idle;cpu=cpu1;dc=dc3;device=cpu;host=host960;metric=idle", ExpectedResults: 1},
+	{Pattern: "collectd.dc30.host960.cpu.1.idle;cpu=cpu1;dc=dc30;device=cpu;host=host960;metric=idle", ExpectedResults: 0},
+	{Pattern: "collectd.dc3.host960.*.*.idle;*", ExpectedResults: 32},
+	{Pattern: "collectd.dc3.host960.*.*.idle;*", ExpectedResults: 32},
 
-	{Pattern: "collectd.dc3.host96[0-9].cpu.1.idle", ExpectedResults: 10},
-	{Pattern: "collectd.dc30.host96[0-9].cpu.1.idle", ExpectedResults: 0},
-	{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
-	{Pattern: "collectd.dc3.host96[0-9].*.*.idle", ExpectedResults: 320},
+	{Pattern: "collectd.dc3.host96[0-9].cpu.1.idle;*", ExpectedResults: 10},
+	{Pattern: "collectd.dc30.host96[0-9].cpu.1.idle;*", ExpectedResults: 0},
+	{Pattern: "collectd.dc3.host96[0-9].*.*.idle;*", ExpectedResults: 320},
+	{Pattern: "collectd.dc3.host96[0-9].*.*.idle;*", ExpectedResults: 320},
 
-	{Pattern: "collectd.{dc1,dc2,dc3}.host960.cpu.1.idle", ExpectedResults: 3},
-	{Pattern: "collectd.{dc*, a*}.host960.cpu.1.idle", ExpectedResults: 5},
+	{Pattern: "collectd.{dc1,dc2,dc3}.host960.cpu.1.idle;*", ExpectedResults: 3},
+	{Pattern: "collectd.{dc*, a*}.host960.cpu.1.idle;*", ExpectedResults: 5},
 
 	//Branch queries
 	{Pattern: "collectd.dc1.host960.*", ExpectedResults: 2},
@@ -96,10 +96,10 @@ func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []m
 					series = append(series, metric{
 						Name: p + "." + m,
 						Tags: []string{
-							"dc=dc" + strconv.Itoa(dc),
-							"host=host" + strconv.Itoa(host),
-							"device=cpu",
 							"cpu=cpu" + strconv.Itoa(cpu),
+							"dc=dc" + strconv.Itoa(dc),
+							"device=cpu",
+							"host=host" + strconv.Itoa(host),
 							"metric=" + m,
 						},
 					})
@@ -121,22 +121,22 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 						Name: p + "." + m + ".read",
 						Tags: []string{
 							"dc=dc" + strconv.Itoa(dc),
-							"host=host" + strconv.Itoa(host),
 							"device=disk",
-							"disk=disk" + strconv.Itoa(disk),
-							"metric=" + m,
 							"direction=read",
+							"disk=disk" + strconv.Itoa(disk),
+							"host=host" + strconv.Itoa(host),
+							"metric=" + m,
 						},
 					})
 					series = append(series, metric{
 						Name: p + "." + m + ".write",
 						Tags: []string{
 							"dc=dc" + strconv.Itoa(dc),
-							"host=host" + strconv.Itoa(host),
 							"device=disk",
-							"disk=disk" + strconv.Itoa(disk),
-							"metric=" + m,
 							"direction=write",
+							"disk=disk" + strconv.Itoa(disk),
+							"host=host" + strconv.Itoa(host),
+							"metric=" + m,
 						},
 					})
 				}
@@ -444,7 +444,7 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 
 func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
-	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "host"}
+	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "name", "host"}
 	b.ReportAllocs()
 	b.ResetTimer()
 
@@ -454,6 +454,7 @@ func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 }
 
 func ixFind(b *testing.B, org, q int) {
+	b.Helper()
 	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
 		panic(err)
