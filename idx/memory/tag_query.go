@@ -79,21 +79,21 @@ func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 // Run() which returns a set of matching MetricIDs
 // RunGetTags() the returned list of strings are the tags of the metrics that match the given conditions
 type TagQuery struct {
-	from        int64
-	equal       []kv
-	match       []kvRe
-	notEqual    []kv
-	notMatch    []kvRe
-	prefix      []kv
-	startWith   match // to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
-	filterTagBy match // can only be PREFIX_TAG or MATCH_TAG (only one. why?)
+	from      int64
+	equal     []kv
+	match     []kvRe
+	notEqual  []kv
+	notMatch  []kvRe
+	prefix    []kv
+	startWith match // to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 
 	// the following two conditions are evaluated against the tag, not against the tag value, so they
 	// must be treated as special cases that are separated from the others.
 	// there is no need have a list of tagMatch and tagPrefix conditions, tags can only be
 	// filtered by max one condition
-	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
-	tagPrefix string // only used for auto complete of tags to match exact prefix
+	tagMatch    kvRe   // only used for /metrics/tags with regex in filter param
+	tagPrefix   string // only used for auto complete of tags to match exact prefix
+	filterTagBy match  // can only be PREFIX_TAG or MATCH_TAG (or 0 if unset), the api only supports one tag expression at a time
 
 	index TagIndex                // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId  map[string]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
