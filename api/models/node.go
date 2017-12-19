@@ -82,6 +82,46 @@ func (t IndexTags) Trace(span opentracing.Span) {
 func (i IndexTags) TraceDebug(span opentracing.Span) {
 }
 
+type IndexAutoCompleteTags struct {
+	OrgId  int      `json:"orgId" binding:"Required"`
+	Prefix string   `json:"Prefix"`
+	Expr   []string `json:"expressions"`
+	From   int64    `json:"from"`
+	Limit  uint     `json:"limit"`
+}
+
+func (t IndexAutoCompleteTags) Trace(span opentracing.Span) {
+	span.SetTag("org", t.OrgId)
+	span.SetTag("Prefix", t.Prefix)
+	span.SetTag("expressions", t.Expr)
+	span.SetTag("from", t.From)
+	span.SetTag("limit", t.Limit)
+}
+
+func (i IndexAutoCompleteTags) TraceDebug(span opentracing.Span) {
+}
+
+type IndexAutoCompleteTagValues struct {
+	OrgId  int      `json:"orgId" binding:"Required"`
+	Tag    string   `json:"tag"`
+	Prefix string   `json:"prefix"`
+	Expr   []string `json:"expressions"`
+	From   int64    `json:"from"`
+	Limit  uint     `json:"limit"`
+}
+
+func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
+	span.SetTag("org", t.OrgId)
+	span.SetTag("Prefix", t.Prefix)
+	span.SetTag("tag", t.Tag)
+	span.SetTag("expressions", t.Expr)
+	span.SetTag("from", t.From)
+	span.SetTag("limit", t.Limit)
+}
+
+func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	Id string `json:"id" form:"id" binding:"Required"`
 }

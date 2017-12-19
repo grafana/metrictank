@@ -28,6 +28,7 @@ var (
 	timeZoneStr      string
 
 	getTargetsConcurrency int
+	tagdbDefaultLimit     uint
 
 	graphiteProxy *httputil.ReverseProxy
 	timeZone      *time.Location
@@ -48,6 +49,7 @@ func ConfigSetup() {
 	apiCfg.StringVar(&fallbackGraphite, "fallback-graphite-addr", "http://localhost:8080", "in case our /render endpoint does not support the requested processing, proxy the request to this graphite")
 	apiCfg.StringVar(&timeZoneStr, "time-zone", "local", "timezone for interpreting from/until values when needed, specified using [zoneinfo name](https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones) e.g. 'America/New_York', 'UTC' or 'local' to use local server timezone")
 	apiCfg.IntVar(&getTargetsConcurrency, "get-targets-concurrency", 20, "maximum number of concurrent threads for fetching data on the local node. Each thread handles a single series.")
+	apiCfg.UintVar(&tagdbDefaultLimit, "tagdb-default-limit", 100, "default limit for tagdb query results, can be overridden with query parameter \"limit\"")
 	globalconf.Register("http", apiCfg)
 }
 

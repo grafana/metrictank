@@ -189,6 +189,8 @@ log-min-dur = 5min
 time-zone = local
 # maximum number of concurrent threads for fetching data on the local node. Each thread handles a single series.
 get-targets-concurrency = 20
+# default limit for tagdb query results, can be overridden with query parameter "limit"
+tagdb-default-limit = 100
 ```
 
 ## metric data inputs ##
@@ -400,6 +402,8 @@ create-keyspace = true
 enabled = false
 # enables/disables querying based on tags
 tag-support = false
+# number of workers to spin up to evaluate tag queries
+tag-query-workers = 50
 # size of regular expression cache in tag query evaluation
 match-cache-size = 1000
 ```

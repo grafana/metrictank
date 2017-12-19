@@ -43,15 +43,17 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled        bool
-	matchCacheSize int
-	tagSupport     bool
+	Enabled         bool
+	matchCacheSize  int
+	tagSupport      bool
+	tagQueryWorkers int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&tagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }
@@ -60,9 +62,22 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type TagIDs map[idx.MetricID]struct{} // set of ids
-type TagValue map[string]TagIDs       // value -> set of ids
-type TagIndex map[string]TagValue     // key -> list of values
+type IdSet map[idx.MetricID]struct{} // set of ids
+
+func (ids IdSet) String() string {
+	var res string
+	for id := range ids {
+		if len(res) > 0 {
+			res += " "
+		}
+		res += id.String()
+	}
+	return res
+
+}
+
+type TagValue map[string]IdSet    // value -> set of ids
+type TagIndex map[string]TagValue // key -> list of values
 
 func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 	ti := *t
@@ -70,7 +85,7 @@ func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 		ti[name] = make(TagValue)
 	}
 	if _, ok := ti[name][value]; !ok {
-		ti[name][value] = make(TagIDs)
+		ti[name][value] = make(IdSet)
 	}
 	ti[name][value][id] = struct{}{}
 }
@@ -443,7 +458,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 				def, ok := m.DefById[id.String()]
 				if !ok {
 					corruptIndex.Inc()
-					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
 					continue
 				}
 
@@ -460,6 +475,195 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 		if count > 0 {
 			res[value] = count
 		}
+	}
+
+	return res, nil
+}
+
+// FindTags returns tags matching the specified conditions
+// prefix:      prefix match
+// expressions: tagdb expressions in the same format as graphite
+// from:        tags must have at least one metric with LastUpdate >= from
+// limit:       the maximum number of results to return
+//
+// the results will always be sorted alphabetically for consistency
+func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+	var res []string
+
+	// only if expressions are specified we need to build a tag query.
+	// otherwise, the generation of the result set is much simpler
+	if len(expressions) > 0 {
+		// incorporate the tag prefix into the tag query expressions
+		if len(prefix) > 0 {
+			expressions = append(expressions, "__tag^="+prefix)
+		}
+
+		query, err := NewTagQuery(expressions, from)
+		if err != nil {
+			return nil, err
+		}
+
+		// only acquire lock after we're sure the query is valid
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		resMap := query.RunGetTags(tags, m.DefById)
+		for tag := range resMap {
+			res = append(res, tag)
+		}
+
+		sort.Strings(res)
+		if uint(len(res)) > limit {
+			res = res[:limit]
+		}
+	} else {
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		tagsSorted := make([]string, 0, len(tags))
+		for tag := range tags {
+			if !strings.HasPrefix(tag, prefix) {
+				continue
+			}
+
+			tagsSorted = append(tagsSorted, tag)
+		}
+
+		sort.Strings(tagsSorted)
+
+		for _, tag := range tagsSorted {
+			// only if from is specified we need to find at least one
+			// metric with LastUpdate >= from
+			if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
+				res = append(res, tag)
+			}
+
+			// the tags are processed in sorted order, so once we have have "limit" results we can break
+			if uint(len(res)) >= limit {
+				break
+			}
+		}
+	}
+
+	return res, nil
+}
+
+// FindTagValues returns tag values matching the specified conditions
+// tag:         tag key match
+// prefix:      value prefix match
+// expressions: tagdb expressions in the same format as graphite
+// from:        tags must have at least one metric with LastUpdate >= from
+// limit:       the maximum number of results to return
+//
+// the results will always be sorted alphabetically for consistency
+func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+	var res []string
+
+	// only if expressions are specified we need to build a tag query.
+	// otherwise, the generation of the result set is much simpler
+	if len(expressions) > 0 {
+
+		// add the value prefix into the expressions as an additional condition
+		if len(prefix) > 0 {
+			expressions = append(expressions, tag+"^="+prefix)
+		} else {
+			// if no value prefix has been specified we still require that at
+			// least the given tag must be present
+			expressions = append(expressions, tag+"!=")
+		}
+
+		query, err := NewTagQuery(expressions, from)
+		if err != nil {
+			return nil, err
+		}
+
+		// only acquire lock after we're sure the query is valid
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		ids := query.Run(tags, m.DefById)
+		valueMap := make(map[string]struct{})
+		prefix := tag + "="
+		for id := range ids {
+			var ok bool
+			var def *idx.Archive
+			if def, ok = m.DefById[id.String()]; !ok {
+				// should never happen because every ID in the tag index
+				// must be present in the byId lookup table
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
+				continue
+			}
+
+			// special case if the tag to complete values for is "name"
+			if tag == "name" {
+				valueMap[def.Name] = struct{}{}
+			} else {
+				for _, t := range def.Tags {
+					if !strings.HasPrefix(t, prefix) {
+						continue
+					}
+
+					// keep the value after "=", that's why "+1"
+					valueMap[t[len(prefix):]] = struct{}{}
+				}
+			}
+		}
+
+		res = make([]string, 0, len(valueMap))
+		for v := range valueMap {
+			res = append(res, v)
+		}
+	} else {
+		m.RLock()
+		defer m.RUnlock()
+
+		tags, ok := m.tags[orgId]
+		if !ok {
+			return nil, nil
+		}
+
+		vals, ok := tags[tag]
+		if !ok {
+			return nil, nil
+		}
+
+		res = make([]string, 0, len(vals))
+		for val := range vals {
+			if !strings.HasPrefix(val, prefix) {
+				continue
+			}
+
+			res = append(res, val)
+		}
+	}
+
+	sort.Strings(res)
+	if uint(len(res)) > limit {
+		res = res[:limit]
 	}
 
 	return res, nil
@@ -499,56 +703,53 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 		res = make([]string, 0, len(tags))
 	}
 
-KEYS:
-	for key := range tags {
+	for tag := range tags {
 		// filter by pattern if one was given
-		if re != nil && !re.MatchString(key) {
+		if re != nil && !re.MatchString(tag) {
 			continue
 		}
 
 		// if from is > 0 we need to find at least one metric definition where
-		// LastUpdate >= from before we add the key to the result set
-		if from > 0 {
-			for _, ids := range tags[key] {
-				for id := range ids {
-					def, ok := m.DefById[id.String()]
-					if !ok {
-						corruptIndex.Inc()
-						log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
-						continue
-					}
-
-					// as soon as we found one metric definition with LastUpdate >= from
-					// we can add the current key to the result set and move on to the next
-					if def.LastUpdate >= from {
-						res = append(res, key)
-						continue KEYS
-					}
-				}
-			}
-
-			// no metric definition with LastUpdate >= from has been found,
-			// continue with the next key
-			continue KEYS
+		// LastUpdate >= from before we add the tag to the result set
+		if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
+			res = append(res, tag)
 		}
-
-		res = append(res, key)
 	}
 
 	return res, nil
 }
 
-// resolveIDs resolves a list of ids (TagIDs) into a list of complete
+func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
+	for _, ids := range tags[tag] {
+		for id := range ids {
+			def, ok := m.DefById[id.String()]
+			if !ok {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
+				continue
+			}
+
+			// as soon as we found one metric definition with LastUpdate >= from
+			// we can return true
+			if def.LastUpdate >= from {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resolveIDs resolves a list of ids (IdSet) into a list of complete
 // Node structs. It assumes that at least a read lock is already
 // held by the caller
-func (m *MemoryIdx) resolveIDs(orgId int, ids TagIDs) []idx.Node {
+func (m *MemoryIdx) resolveIDs(orgId int, ids IdSet) []idx.Node {
 	res := make([]idx.Node, 0, len(ids))
 	tree := m.Tree[orgId]
 	for id := range ids {
 		def, ok := m.DefById[id.String()]
 		if !ok {
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id.String())
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
 			continue
 		}
 
@@ -799,7 +1000,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 			node, ok := tree.Items[n.Path+"."+child]
 			if !ok {
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: node %s missing. Index is corrupt.", n.Path+"."+child)
+				log.Error(3, "memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
 				continue
 			}
 			log.Debug("memory-idx: deleting child %s from branch %s", node.Path, n.Path)

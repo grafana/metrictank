@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1036,4 +1037,114 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	return tags, nil
+}
+
+func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request models.GraphiteAutoCompleteTags) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.Prefix, request.Expr, request.From, request.Limit)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, tags, ""))
+}
+
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.FindTags(orgId, prefix, expressions, from, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	tagSet := make(map[string]struct{}, len(result))
+	for _, tag := range result {
+		tagSet[tag] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.StringList{}
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tags = append(tags, t)
+	}
+
+	sort.Strings(tags)
+	if uint(len(tags)) > limit {
+		tags = tags[:limit]
+	}
+
+	return tags, nil
+}
+
+func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.Prefix, request.Expr, request.From, request.Limit)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.FindTagValues(orgId, tag, prefix, expressions, from, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	valSet := make(map[string]struct{}, len(result))
+	for _, val := range result {
+		valSet[val] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.StringList
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, val := range resp {
+			valSet[val] = struct{}{}
+		}
+	}
+
+	vals := make([]string, 0, len(valSet))
+	for t := range valSet {
+		vals = append(vals, t)
+	}
+
+	sort.Strings(vals)
+	if uint(len(vals)) > limit {
+		vals = vals[:limit]
+	}
+
+	return vals, nil
 }

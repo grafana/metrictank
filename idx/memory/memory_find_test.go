@@ -149,6 +149,7 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 func TestMain(m *testing.M) {
 	defer func(t bool) { tagSupport = t }(tagSupport)
 	tagSupport = true
+	tagQueryWorkers = 5
 	matchCacheSize = 1000
 	os.Exit(m.Run())
 }
@@ -377,7 +378,7 @@ func TestTagKeysWithFilter(t *testing.T) {
 	expected := []string{"dc", "device", "disk", "direction"}
 	queryAndCompareTagKeys(t, "d", 0, expected)
 
-	expected = []string{"disk", "direction"}
+	expected = []string{"direction", "disk"}
 	queryAndCompareTagKeys(t, "di", 0, expected)
 }
 
@@ -389,6 +390,239 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 
 	// reflect.DeepEqual treats nil & []string{} as not equal
 	queryAndCompareTagKeys(t, "di", 1000000, nil)
+}
+
+func TestTagSorting(t *testing.T) {
+	index := New()
+	index.Init()
+
+	md1 := &schema.MetricData{
+		Name:     "name1",
+		Metric:   "name1",
+		Tags:     []string{},
+		Interval: 10,
+		OrgId:    1,
+		Time:     int64(123),
+	}
+	md1.SetId()
+
+	// set out of order tags after SetId (because that would sort it)
+	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
+	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
+	index.AddOrUpdate(md1, 1)
+
+	res, err := index.FindByTag(1, []string{"b=a"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
+	}
+	expected := "name1;a=a;b=a;c=a;d=a;e=a"
+	if res[0].Path != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
+	}
+
+	md2 := []schema.MetricDefinition{
+		{
+			Name:       "name2",
+			Metric:     "name2",
+			Tags:       []string{},
+			Interval:   10,
+			OrgId:      1,
+			LastUpdate: int64(123),
+		},
+	}
+	md2[0].SetId()
+
+	// set out of order tags after SetId (because that would sort it)
+	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
+	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
+	index.Load(md2)
+
+	res, err = index.FindByTag(1, []string{"3=a"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %s", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("Expected exactly 1 result, got %d: %+v", len(res), res)
+	}
+	expected = "name2;1=a;2=a;3=a;4=a;5=a"
+	if res[0].Path != expected {
+		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
+	}
+}
+
+func TestAutoCompleteTag(t *testing.T) {
+	InitSmallIndex()
+
+	type testCase struct {
+		prefix string
+		expr   []string
+		from   int64
+		limit  uint
+		expRes []string
+		expErr bool
+	}
+
+	testCases := []testCase{
+		{
+			prefix: "di",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"direction", "disk"},
+			expErr: false,
+		}, {
+			prefix: "di",
+			expr:   []string{"direction=write", "host=host90", "device=cpu"},
+			from:   100,
+			limit:  100,
+			expRes: []string{},
+			expErr: false,
+		}, {
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"dc", "device", "direction", "disk", "host", "metric", "name"},
+			expErr: false,
+		}, {
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			from:   100,
+			limit:  3,
+			expRes: []string{"dc", "device", "direction"},
+			expErr: false,
+		}, {
+			prefix: "ho",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host"},
+			expErr: false,
+		}, {
+			prefix: "host",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host"},
+			expErr: false,
+		}, {
+			prefix: "n",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"name"},
+			expErr: false,
+		}, {
+			prefix: "",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"cpu", "dc", "device", "direction", "disk", "host", "metric", "name"},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagsAndCompare(t, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
+	}
+}
+
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
+	t.Helper()
+
+	res, err := ix.FindTagValues(1, tag, prefix, expr, from, limit)
+	if (err != nil) != expErr {
+		if expErr {
+			t.Fatalf("Expected an error, but did not get one")
+		} else {
+			t.Fatalf("Expected no error, but got %s for %+v", err, expr)
+		}
+	}
+
+	if len(res) != len(expRes) {
+		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+	}
+
+	sort.Strings(expRes)
+	sort.Strings(res)
+	for i := range res {
+		if expRes[i] != res[i] {
+			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+		}
+	}
+}
+
+func TestAutoCompleteTagValues(t *testing.T) {
+	InitSmallIndex()
+
+	type testCase struct {
+		tag    string
+		prefix string
+		expr   []string
+		from   int64
+		limit  uint
+		expRes []string
+		expErr bool
+	}
+
+	testCases := []testCase{
+		{
+			tag:    "host",
+			prefix: "host9",
+			expr:   []string{"direction=write"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
+			expErr: false,
+		}, {
+			tag:    "host",
+			prefix: "host9",
+			expr:   []string{"direction=write"},
+			from:   100,
+			limit:  5,
+			expRes: []string{"host9", "host90", "host91", "host92", "host93"},
+			expErr: false,
+		}, {
+			tag:    "direction",
+			prefix: "w",
+			expr:   []string{"device=disk"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"write"},
+			expErr: false,
+		}, {
+			tag:    "direction",
+			prefix: "w",
+			expr:   []string{"device=cpu"},
+			from:   100,
+			limit:  100,
+			expRes: []string{},
+			expErr: false,
+		}, {
+			tag:    "device",
+			prefix: "",
+			expr:   []string{},
+			from:   100,
+			limit:  100,
+			expRes: []string{"cpu", "disk"},
+			expErr: false,
+		}, {
+			tag:    "device",
+			prefix: "",
+			expr:   []string{"disk=~disk[4-5]{1}"},
+			from:   100,
+			limit:  100,
+			expRes: []string{"disk"},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes, tc.expErr)
+	}
 }
 
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
@@ -662,6 +896,77 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 		}
 		if len(series) != q.ExpectedResults {
 			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
+		}
+	}
+}
+
+func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
+	InitLargeIndex()
+
+	type testCase struct {
+		prefix string
+		expr   []string
+		from   int64
+		expRes []string
+	}
+
+	tc := testCase{
+		prefix: "di",
+		expr:   []string{},
+		from:   100,
+		expRes: []string{"direction", "disk"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		autoCompleteTagsAndCompare(b, tc.prefix, tc.expr, tc.from, 2, tc.expRes, false)
+	}
+}
+
+func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
+	InitLargeIndex()
+
+	type testCase struct {
+		prefix string
+		expr   []string
+		from   int64
+		expRes []string
+	}
+
+	tc := testCase{
+		prefix: "di",
+		expr:   []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
+		from:   12345,
+		expRes: []string{"direction", "disk"},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		autoCompleteTagsAndCompare(b, tc.prefix, tc.expr, tc.from, 2, tc.expRes, false)
+	}
+}
+
+func autoCompleteTagsAndCompare(t testing.TB, prefix string, expr []string, from int64, limit uint, expRes []string, expErr bool) {
+	t.Helper()
+
+	res, err := ix.FindTags(1, prefix, expr, from, limit)
+	if expErr && err == nil {
+		t.Fatalf("Expected an error, but did not get one")
+	} else if !expErr && err != nil {
+		t.Fatalf("Expected no error, but got %s for %+v and prefix %s", err, expr, prefix)
+	}
+
+	if len(res) != len(expRes) {
+		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+	}
+
+	for i := range res {
+		if expRes[i] != res[i] {
+			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
 		}
 	}
 }

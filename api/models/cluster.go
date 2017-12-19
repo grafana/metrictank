@@ -5,6 +5,9 @@ import (
 )
 
 //go:generate msgp
+type StringList []string
+
+//go:generate msgp
 type IndexFindResp struct {
 	Nodes map[string][]idx.Node
 }

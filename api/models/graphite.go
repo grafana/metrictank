@@ -53,20 +53,35 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 }
 
 type GraphiteTags struct {
-	Filter string `json:"filter"`
-	From   int64  `json:"from"`
+	Filter string `json:"filter" form:"filter"`
+	From   int64  `json:"from" form:"from"`
 }
 
 type GraphiteTagsResp []GraphiteTagResp
+
+type GraphiteAutoCompleteTags struct {
+	Prefix string   `json:"prefix" form:"prefix"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Limit  uint     `json:"limit" form:"limit"`
+}
+
+type GraphiteAutoCompleteTagValues struct {
+	Tag    string   `json:"tag" form:"tag"`
+	Prefix string   `json:"prefix" form:"prefix"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Limit  uint     `json:"limit" form:"limit"`
+}
 
 type GraphiteTagResp struct {
 	Tag string `json:"tag"`
 }
 
 type GraphiteTagDetails struct {
-	Tag    string `json:"tag"`
-	Filter string `json:"filter"`
-	From   int64  `json:"from"`
+	Tag    string `json:"tag" form:"tag"`
+	Filter string `json:"filter" form:"filter"`
+	From   int64  `json:"from" form:"from"`
 }
 
 type GraphiteTagDetailsResp struct {
@@ -80,8 +95,8 @@ type GraphiteTagDetailsValueResp struct {
 }
 
 type GraphiteTagFindSeries struct {
-	Expr []string `json:"expr"`
-	From int64    `json:"from"`
+	Expr []string `json:"expr" form:"expr"`
+	From int64    `json:"from" form:"from"`
 }
 
 type GraphiteTagFindSeriesResp struct {
