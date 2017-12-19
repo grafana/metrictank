@@ -542,6 +542,9 @@ func (a *AggMetric) add(ts uint32, val float64) {
 	a.addAggregators(ts, val)
 }
 
+// GC returns whether or not this AggMetric is stale and can be removed
+// chunkMinTs -> min timestamp of a chunk before to be considered stale and to be persisted to Cassandra
+// metricMinTs -> min timestamp for a metric before to be considered stale and to be purged from the tank
 func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
@@ -560,8 +563,9 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	}
 
 	// this aggMetric has never had metrics written to it.
-	if len(a.Chunks) == 0 && (a.rob == nil || a.rob.IsEmpty()) {
-		return true
+	// if the rob is empty or disabled, this AggMetric can be deleted
+	if len(a.Chunks) == 0 {
+		return a.rob == nil || a.rob.IsEmpty()
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
