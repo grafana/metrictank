@@ -962,6 +962,9 @@ func (q *TagQuery) tagFilterMatchesName() bool {
 	} else {
 		// some tag queries might have no prefix specified yet, in this case
 		// we do not need to filter by the name
+		// f.e. we know that every metric has a name, and we know that the
+		// prefix "" matches the string "name", so we know that every metric
+		// will pass the tag prefix test. hence we can omit the entire test.
 		matchName = true
 	}
 
