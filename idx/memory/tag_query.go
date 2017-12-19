@@ -458,8 +458,9 @@ TAGS:
 	close(idCh)
 }
 
-// getInitialIds returns a channel through which the IDs of the initial result
-// set will be sent
+// getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
+// a channel through which the IDs of the initial result set will be sent
+// a stop channel, which when closed, will cause it to abort the background worker.
 func (q *TagQuery) getInitialIds() (chan idx.MetricID, chan struct{}) {
 	idCh := make(chan idx.MetricID, 1000)
 	stopCh := make(chan struct{})
