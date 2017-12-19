@@ -624,7 +624,7 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 		equal := strings.Index(tag, "=")
 		if equal < 0 {
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: tag is in index, but does not contain '=' sign: %s", tag)
+			log.Error(3, "memory-idx: ID %q has tag %q in index without '=' sign", def.Id, tag)
 			continue
 		}
 		key := tag[:equal]
@@ -740,7 +740,7 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan idx.MetricID) {
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
 			continue
 		}
 
@@ -859,7 +859,7 @@ IDS:
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
 			continue
 		}
 
@@ -870,7 +870,7 @@ IDS:
 			equal := strings.Index(tag, "=")
 			if equal < 0 {
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: tag is in index, but does not contain '=' sign: %s", tag)
+				log.Error(3, "memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
 				continue
 			}
 

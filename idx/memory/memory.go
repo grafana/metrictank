@@ -458,7 +458,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 				def, ok := m.DefById[id.String()]
 				if !ok {
 					corruptIndex.Inc()
-					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
 					continue
 				}
 
@@ -614,7 +614,7 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id.String())
+				log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
 				continue
 			}
 
@@ -725,7 +725,7 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 			def, ok := m.DefById[id.String()]
 			if !ok {
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id.String())
+				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
 				continue
 			}
 
@@ -749,7 +749,7 @@ func (m *MemoryIdx) resolveIDs(orgId int, ids IdSet) []idx.Node {
 		def, ok := m.DefById[id.String()]
 		if !ok {
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id.String())
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
 			continue
 		}
 
@@ -1000,7 +1000,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 			node, ok := tree.Items[n.Path+"."+child]
 			if !ok {
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: node %s missing. Index is corrupt.", n.Path+"."+child)
+				log.Error(3, "memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
 				continue
 			}
 			log.Debug("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
