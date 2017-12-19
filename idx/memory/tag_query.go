@@ -663,21 +663,12 @@ func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
-		// pass test if all these match:
-		// - key is "name"
-		// - def.Name is long enough so it might match the prefix
-		// - the prefix matches with def.Name
 		if e.key == "name" && strings.HasPrefix(def.Name, e.value) {
 			continue EXPRS
 		}
 
 		prefix := e.key + "=" + e.value
 		for _, tag := range def.Tags {
-			// continue if any of these match:
-			// - length of tag is too short, so this can't be a match
-			// - the position where we expect the = is not a =
-			// - the key does not match
-			// - the prefix value does not match
 			if !strings.HasPrefix(tag, prefix) {
 				continue
 			}
