@@ -488,6 +488,10 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
@@ -567,6 +571,10 @@ func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, fro
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
 	var res []string
 
 	// only if expressions are specified we need to build a tag query.
