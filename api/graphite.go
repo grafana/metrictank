@@ -269,6 +269,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	switch request.Format {
 	case "msgp":
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
+	case "msgpack":
+		response.Write(ctx, response.NewMsgpack(200, models.SeriesByTarget(out).ForGraphite("msgpack")))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, models.SeriesByTarget(out)))
 	default:
@@ -311,6 +313,8 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewJson(200, findTreejson(request.Query, nodes), request.Jsonp))
 	case "completer":
 		response.Write(ctx, response.NewJson(200, findCompleter(nodes), request.Jsonp))
+	case "msgpack":
+		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
 	}

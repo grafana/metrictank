@@ -12,6 +12,7 @@ import (
 )
 
 //go:generate msgp
+
 type Series struct {
 	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Datapoints   []schema.Point
@@ -91,18 +92,22 @@ func (series SeriesByTarget) MarshalJSON() ([]byte, error) {
 	return series.MarshalJSONFast(nil)
 }
 
-func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
-	data := make([]seriesForPickle, len(series))
+func (series SeriesByTarget) ForGraphite(format string) SeriesListForPickle {
+	var none interface{}
+	if format == "pickle" {
+		none = pickle.None{}
+	}
+	data := make(SeriesListForPickle, len(series))
 	for i, s := range series {
 		datapoints := make([]interface{}, len(s.Datapoints))
 		for j, p := range s.Datapoints {
 			if math.IsNaN(p.Val) {
-				datapoints[j] = pickle.None{}
+				datapoints[j] = none
 			} else {
 				datapoints[j] = p.Val
 			}
 		}
-		data[i] = seriesForPickle{
+		data[i] = SeriesForPickle{
 			Name:           s.Target,
 			Step:           s.Interval,
 			Values:         datapoints,
@@ -116,17 +121,23 @@ func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
 			data[i].End = s.QueryTo
 		}
 	}
+	return data
+}
+
+func (series SeriesByTarget) Pickle(buf []byte) ([]byte, error) {
 	buffer := bytes.NewBuffer(buf)
 	encoder := pickle.NewEncoder(buffer)
-	err := encoder.Encode(data)
+	err := encoder.Encode(series.ForGraphite("pickle"))
 	return buffer.Bytes(), err
 }
 
-type seriesForPickle struct {
-	Name           string        `pickle:"name"`
-	Start          uint32        `pickle:"start"`
-	End            uint32        `pickle:"end"`
-	Step           uint32        `pickle:"step"`
-	Values         []interface{} `pickle:"values"`
-	PathExpression string        `pickle:"pathExpression"`
+type SeriesListForPickle []SeriesForPickle
+
+type SeriesForPickle struct {
+	Name           string        `pickle:"name" msg:"name"`
+	Start          uint32        `pickle:"start" msg:"start"`
+	End            uint32        `pickle:"end" msg:"end"`
+	Step           uint32        `pickle:"step" msg:"step"`
+	Values         []interface{} `pickle:"values" msg:"values"`
+	PathExpression string        `pickle:"pathExpression" msg:"pathExpression"`
 }

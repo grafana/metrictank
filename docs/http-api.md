@@ -54,7 +54,7 @@ POST /metrics/find
 
 * header `X-Org-Id` required
 * query (required): can be an id, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
-* format: json, treejson, completer. (defaults to json)
+* format: json, treejson, completer, pickle, or msgpack. (defaults to json)
 * jsonp
 
 Returns metrics which match the query and are stored under the given org or are public data under org -1 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
@@ -98,14 +98,14 @@ POST /render
 
 * header `X-Org-Id` required
 * maxDataPoints: int (default: 800)
-* target: mandatory. one or more metric names or patterns, like graphite.  
+* target: mandatory. one or more metric names or patterns, like graphite.
   note: **no graphite functions are currently supported** except that
   you can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
   [Consolidation](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
-* format: json or msgp (default: json)
-* process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions 
+* format: json, msgp, pickle, or msgpack (default: json)
+* process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxing to the fallback graphite).
   - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
   - stable: process request without fallback if we have all the needed functions and they are marked as stable.
@@ -169,7 +169,7 @@ The time specification is used throughout the http api and it can be any of thes
 
 * now: current time on server
 * any integer: unix timestamp
-* `-offset` or `offset` gets interpreted as current time minus offset.  
+* `-offset` or `offset` gets interpreted as current time minus offset.
   Where `offset` is a sequence of one or more `<num><unit>` where unit is one of:
 
 	- ``, `s`, `sec`, `secs`, `second`, `seconds`
