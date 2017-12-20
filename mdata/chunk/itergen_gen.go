@@ -12,13 +12,13 @@ import (
 func (z *IterGen) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
-	var zxvk uint32
-	zxvk, err = dc.ReadMapHeader()
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
 		return
 	}
-	for zxvk > 0 {
-		zxvk--
+	for zb0001 > 0 {
+		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
 			return
@@ -55,7 +55,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "B"
 	err = en.Append(0x83, 0xa1, 0x42)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteBytes(z.B)
 	if err != nil {
@@ -64,7 +64,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Ts"
 	err = en.Append(0xa2, 0x54, 0x73)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.Ts)
 	if err != nil {
@@ -73,7 +73,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Span"
 	err = en.Append(0xa4, 0x53, 0x70, 0x61, 0x6e)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.Span)
 	if err != nil {
@@ -102,13 +102,13 @@ func (z *IterGen) MarshalMsg(b []byte) (o []byte, err error) {
 func (z *IterGen) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
-	var zbzg uint32
-	zbzg, bts, err = msgp.ReadMapHeaderBytes(bts)
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	for zbzg > 0 {
-		zbzg--
+	for zb0001 > 0 {
+		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
 			return

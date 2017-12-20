@@ -73,7 +73,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "RowKey"
 	err = en.Append(0x84, 0xa6, 0x52, 0x6f, 0x77, 0x4b, 0x65, 0x79)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteString(z.RowKey)
 	if err != nil {
@@ -82,7 +82,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "SecondsPerPoint"
 	err = en.Append(0xaf, 0x53, 0x65, 0x63, 0x6f, 0x6e, 0x64, 0x73, 0x50, 0x65, 0x72, 0x50, 0x6f, 0x69, 0x6e, 0x74)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.SecondsPerPoint)
 	if err != nil {
@@ -91,7 +91,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Points"
 	err = en.Append(0xa6, 0x50, 0x6f, 0x69, 0x6e, 0x74, 0x73)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.Points)
 	if err != nil {
@@ -100,7 +100,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Chunks"
 	err = en.Append(0xa6, 0x43, 0x68, 0x75, 0x6e, 0x6b, 0x73)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Chunks)))
 	if err != nil {
@@ -267,7 +267,7 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "MetricData"
 	err = en.Append(0x83, 0xaa, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x61, 0x74, 0x61)
 	if err != nil {
-		return err
+		return
 	}
 	err = z.MetricData.EncodeMsg(en)
 	if err != nil {
@@ -276,7 +276,7 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "AggregationMethod"
 	err = en.Append(0xb1, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4d, 0x65, 0x74, 0x68, 0x6f, 0x64)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.AggregationMethod)
 	if err != nil {
@@ -285,7 +285,7 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Archives"
 	err = en.Append(0xa8, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x73)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Archives)))
 	if err != nil {
