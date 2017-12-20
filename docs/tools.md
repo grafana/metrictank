@@ -459,6 +459,8 @@ Usage of ./mt-whisper-importer-reader:
     	The credentials used to authenticate in the format "user:password"
   -http-endpoint string
     	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
+  -import-after uint
+    	Only import after the specified timestamp
   -import-up-to uint
     	Only import up to the specified timestamp (default 4294967295)
   -insecure-ssl
