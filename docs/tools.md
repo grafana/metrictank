@@ -461,6 +461,8 @@ Usage of ./mt-whisper-importer-reader:
     	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
   -import-up-to uint
     	Only import up to the specified timestamp (default 4294967295)
+  -import-after uint
+    	Only import after the specified timestamp (default 0)
   -insecure-ssl
     	Disables ssl certificate verification
   -name-filter string
