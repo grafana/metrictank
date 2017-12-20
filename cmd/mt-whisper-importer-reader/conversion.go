@@ -239,6 +239,9 @@ func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 		if boundary > uint32(*importUpTo) {
 			break
 		}
+		if boundary < uint32(*importAfter) {
+			continue
+		}
 
 		if boundary == currentBoundary {
 			agg.Add(inPoint.Value)
