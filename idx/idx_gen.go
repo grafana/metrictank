@@ -60,7 +60,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "MetricDefinition"
 	err = en.Append(0x84, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	if err != nil {
-		return err
+		return
 	}
 	err = z.MetricDefinition.EncodeMsg(en)
 	if err != nil {
@@ -69,7 +69,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "SchemaId"
 	err = en.Append(0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x64)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint16(z.SchemaId)
 	if err != nil {
@@ -78,7 +78,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "AggId"
 	err = en.Append(0xa5, 0x41, 0x67, 0x67, 0x49, 0x64)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint16(z.AggId)
 	if err != nil {
@@ -87,7 +87,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "LastSave"
 	err = en.Append(0xa8, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x61, 0x76, 0x65)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteUint32(z.LastSave)
 	if err != nil {
@@ -202,7 +202,7 @@ func (z MetricID) EncodeMsg(en *msgp.Writer) (err error) {
 	// map header, size 0
 	err = en.Append(0x80)
 	if err != nil {
-		return err
+		return
 	}
 	return
 }
@@ -312,7 +312,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Path"
 	err = en.Append(0x84, 0xa4, 0x50, 0x61, 0x74, 0x68)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteString(z.Path)
 	if err != nil {
@@ -321,7 +321,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Leaf"
 	err = en.Append(0xa4, 0x4c, 0x65, 0x61, 0x66)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteBool(z.Leaf)
 	if err != nil {
@@ -330,7 +330,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "Defs"
 	err = en.Append(0xa4, 0x44, 0x65, 0x66, 0x73)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Defs)))
 	if err != nil {
@@ -345,7 +345,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	// write "HasChildren"
 	err = en.Append(0xab, 0x48, 0x61, 0x73, 0x43, 0x68, 0x69, 0x6c, 0x64, 0x72, 0x65, 0x6e)
 	if err != nil {
-		return err
+		return
 	}
 	err = en.WriteBool(z.HasChildren)
 	if err != nil {
