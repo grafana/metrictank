@@ -582,9 +582,8 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 			startPos := len(SeriesByTagIdent)
 			endPos := strings.LastIndex(r.Query, ")")
 			exprs := strings.Split(r.Query[startPos:endPos], ",")
-			// Trim quotes
 			for i, e := range exprs {
-				exprs[i] = e[1 : len(e)-1]
+				exprs[i] = strings.Trim(e, " '\"")
 			}
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From))
 		} else {
