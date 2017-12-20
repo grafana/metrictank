@@ -356,9 +356,10 @@
   revision = "995f5b2e021c69b8b028ba6d0b05c1dd500783db"
 
 [[projects]]
+  branch = "master"
   name = "github.com/syndtr/goleveldb"
   packages = ["leveldb","leveldb/cache","leveldb/comparer","leveldb/errors","leveldb/filter","leveldb/iterator","leveldb/journal","leveldb/memdb","leveldb/opt","leveldb/storage","leveldb/table","leveldb/util"]
-  revision = "6ae1797c0b42b9323fc27ff7dcf568df88f2f33d"
+  revision = "3d8f4155ffd9029d32e5cf03853b58759b6e3710"
 
 [[projects]]
   name = "github.com/tinylib/msgp"
