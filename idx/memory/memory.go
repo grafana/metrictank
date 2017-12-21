@@ -980,7 +980,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	}
 
 	for _, f := range found {
-		deleted := m.delete(orgId, f, true)
+		deleted := m.delete(orgId, f, true, true)
 		statMetricsActive.DecUint32(uint32(len(deleted)))
 		deletedDefs = append(deletedDefs, deleted...)
 	}
@@ -989,10 +989,10 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Archive {
+func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
 	tree := m.Tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
-	if n.HasChildren() {
+	if deleteChildren && n.HasChildren() {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
 		for _, child := range n.Children {
@@ -1003,9 +1003,10 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 				continue
 			}
 			log.Debug("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
-			deleted := m.delete(orgId, node, false)
+			deleted := m.delete(orgId, node, false, true)
 			deletedDefs = append(deletedDefs, deleted...)
 		}
+		n.Children = nil
 	}
 
 	// delete the metricDefs
@@ -1013,6 +1014,17 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 		log.Debug("memory-idx: deleting %s from index", id)
 		deletedDefs = append(deletedDefs, *m.DefById[id])
 		delete(m.DefById, id)
+	}
+	n.Defs = nil
+
+	if tagSupport {
+		for _, def := range deletedDefs {
+			m.deindexTags(&(def.MetricDefinition))
+		}
+	}
+
+	if n.HasChildren() {
+		return deletedDefs
 	}
 
 	// delete the node.
@@ -1064,19 +1076,13 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents bool) []idx.Ar
 			log.Error(3, "memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
-		bNode.Children = make([]string, 0)
+		bNode.Children = nil
 		if bNode.Leaf() {
 			log.Debug("memory-idx: branch %s is also a leaf node, keeping it.", branch)
 			break
 		}
 		log.Debug("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
 		delete(tree.Items, branch)
-	}
-
-	if tagSupport {
-		for _, def := range deletedDefs {
-			m.deindexTags(&(def.MetricDefinition))
-		}
 	}
 
 	return deletedDefs
@@ -1136,8 +1142,8 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 			}
 
 			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
-			defs := m.delete(org, n, true)
-			statMetricsActive.Dec()
+			defs := m.delete(org, n, true, false)
+			statMetricsActive.Add(-1 * len(defs))
 			pruned = append(pruned, defs...)
 			m.Unlock()
 		}
