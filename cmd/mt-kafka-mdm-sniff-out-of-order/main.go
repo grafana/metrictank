@@ -30,7 +30,7 @@ var (
 type Tracker struct {
 	Head      Msg   // last successfully added message
 	Bad       Msg   // current point that could not be added (assuming no re-order buffer)
-	NumBad    int   // number of failed points since last successfull add
+	NumBad    int   // number of failed points since last successful add
 	DeltaTime int64 // delta between Head and Bad time properties in seconds (point timestamps)
 	DeltaSeen int64 // delta between Head and Bad seen time in seconds (consumed from kafka)
 }
@@ -113,7 +113,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, ".Head.subfield - head is last successfully added message")
 		fmt.Fprintln(os.Stderr, ".Bad.subfield - Bad is the current point that could not be added (assuming no re-order buffer)")
 		fmt.Fprintln(os.Stderr, "(subfield is any property of the out-of-order MetricData: Time OrgId Id Name Metric Interval Value Unit Mtype Tags and also these 2 extra fileds: Part (partition) and Seen (when the msg was consumed from kafka)")
-		fmt.Fprintln(os.Stderr, "NumBad - number of failed points since last successfull add")
+		fmt.Fprintln(os.Stderr, "NumBad - number of failed points since last successful add")
 		fmt.Fprintln(os.Stderr, "DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)")
 		fmt.Fprintln(os.Stderr, "DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")

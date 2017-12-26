@@ -151,7 +151,7 @@ type MetricIndex interface {
 	AutoCompleteTagValues(int, string, string, []string, int64, uint16) ([]string, error)
 
 	// TagDetails returns a list of all values associated with a given tag key in the
-	// given org. The occurences of each value is counted and the count is referred to by
+	// given org. The occurrences of each value is counted and the count is referred to by
 	// the metric names in the returned map.
 	// If the third parameter is not "" it will be used as a regular expression to filter
 	// the values before accounting for them.
