@@ -26,6 +26,7 @@ test:
     - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
     - cd $IMPORTPATH && go vet ./...
     - cd $IMPORTPATH && scripts/qa/gofmt.sh
+    - cd $IMPORTPATH && scripts/qa/ineffassign.sh
     - cd $IMPORTPATH && scripts/qa/end2end.sh
     - cd $IMPORTPATH && scripts/qa/tools_gitignore.sh
     - cd $IMPORTPATH && scripts/qa/docs.sh
