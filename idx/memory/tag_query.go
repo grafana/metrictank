@@ -51,7 +51,7 @@ type kv struct {
 }
 
 // kv expressions that rely on regular expressions will get converted to kvRe in
-// NewTagQuery() to accomodate the additional requirements of regex based queries.
+// NewTagQuery() to accommodate the additional requirements of regex based queries.
 type kvRe struct {
 	cost           uint // cost of evaluating expression, compared to other kvRe objects
 	key            string
