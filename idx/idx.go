@@ -60,6 +60,9 @@ func (id *MetricID) FromString(s string) error {
 
 	dst := make([]byte, 16)
 	n, err := hex.Decode(dst, []byte(splits[1]))
+	if err != nil {
+		return err
+	}
 	if n != 16 {
 		return errInvalidIdString
 	}
