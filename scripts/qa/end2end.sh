@@ -17,16 +17,16 @@ $DOCKER_COMPOSE_EXEC -f $DOCKER_COMPOSE_FILE up -d
 export WAIT_HOSTS="127.0.0.1:2003"
 export WAIT_TIMEOUT=120
 export METRICS_PER_SECOND=1000
-scripts/wait_for_endpoint.sh scripts/generate_test_data.sh start
+scripts/util/wait_for_endpoint.sh scripts/qa/generate_test_data.sh start
 
 # give fakemetrics some warmup time
 sleep 30
 
 # verify the metrics have arrived in graphite and keep exit status
-scripts/verify_metrics_received.py 127.0.0.1 8080 10 $METRICS_PER_SECOND
+scripts/qa/verify_metrics_received.py 127.0.0.1 8080 10 $METRICS_PER_SECOND
 RESULT=$?
 
-scripts/generate_test_data.sh stop
+scripts/qa/generate_test_data.sh stop
 $DOCKER_COMPOSE_EXEC -f $DOCKER_COMPOSE_FILE down
 
 exit $RESULT

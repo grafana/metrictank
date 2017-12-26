@@ -10,7 +10,7 @@ COPY config/storage-aggregation.conf /etc/metrictank/storage-aggregation.conf
 
 COPY build/* /usr/bin/
 
-COPY wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
+COPY util/wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
 
 EXPOSE 6060
 

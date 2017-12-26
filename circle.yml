@@ -16,7 +16,7 @@ machine:
 dependencies:
   override:
     - scripts/depends.sh
-    - cd $IMPORTPATH && scripts/vendor_health.sh
+    - cd $IMPORTPATH && scripts/qa/vendor.sh
     - scripts/build.sh
     - scripts/build_tools.sh
     - scripts/build_docker.sh
@@ -25,12 +25,12 @@ test:
   override:
     - cd $IMPORTPATH && go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
     - cd $IMPORTPATH && go vet ./...
-    - cd $IMPORTPATH && scripts/gofmt-check.sh
-    - cd $IMPORTPATH && scripts/end2end_test.sh
-    - cd $IMPORTPATH && scripts/tools_gitignore.sh
-    - cd $IMPORTPATH && scripts/check_docs_uptodate.sh
+    - cd $IMPORTPATH && scripts/qa/gofmt.sh
+    - cd $IMPORTPATH && scripts/qa/end2end.sh
+    - cd $IMPORTPATH && scripts/qa/tools_gitignore.sh
+    - cd $IMPORTPATH && scripts/qa/docs.sh
   post:
-    - scripts/package.sh
+    - scripts/build_packages.sh
 
 general:
   artifacts:
@@ -40,6 +40,6 @@ deployment:
   production:
     branch: master
     commands:
-      - scripts/deploy.sh
+      - scripts/push/packagecloud.sh
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - scripts/deploy_docker.sh
+      - scripts/push/docker.sh
