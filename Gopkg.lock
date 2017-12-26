@@ -133,6 +133,12 @@
   version = "v1.0.2"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/glacjay/goini"
+  packages = ["."]
+  revision = "fd3024d87ee21a36d3ccc4367f509fec89cd90ee"
+
+[[projects]]
   name = "github.com/go-macaron/binding"
   packages = ["."]
   revision = "a453235199f8898e01647db8820f937a184fbd09"
@@ -312,15 +318,10 @@
   revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
 
 [[projects]]
+  branch = "master"
   name = "github.com/rakyll/globalconf"
   packages = ["."]
-  revision = "415abc325023f1a00cd2d9fa512e0e71745791a2"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/rakyll/goini"
-  packages = ["."]
-  revision = "907cca0f578a5316fb864ec6992dc3d9730ec58c"
+  revision = "f3ec558991f8d5e7b1efcc291fa36edef6c47123"
 
 [[projects]]
   name = "github.com/rs/cors"
