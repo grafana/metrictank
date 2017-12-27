@@ -237,7 +237,7 @@ points that go back in time.
 E.g. for any given series, when a point has a timestamp
 that is not higher than the timestamp of the last written timestamp for that series.
 * `tank.persist`:  
-how long it takes to persist a chunk (and chunks preceeding it)
+how long it takes to persist a chunk (and chunks preceding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer

@@ -39,7 +39,7 @@ Note that metrictank simply logs to stdout, and not to a file.
 
 This will be needed to query metrictank.
 
-Install Graphite via your prefered method as detailed at http://graphite.readthedocs.io/en/latest/install.html
+Install Graphite via your preferred method as detailed at http://graphite.readthedocs.io/en/latest/install.html
 (We hope to provide Debian and Ubuntu packages in the near future.)
 
 Configure graphite with the following settings in local_settings.py

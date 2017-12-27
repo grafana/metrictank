@@ -65,7 +65,7 @@ apt-get install metrictank
 
 ### Install Graphite
 
-Install Graphite via your prefered method as detailed at http://graphite.readthedocs.io/en/latest/install.html
+Install Graphite via your preferred method as detailed at http://graphite.readthedocs.io/en/latest/install.html
 (We hope to provide Debian and Ubuntu packages in the near future.)
 
 Configure graphite with the following settings in local_settings.py
@@ -100,7 +100,7 @@ yum localinstall jre-8u60-linux-x64.rpm
 
 ## Set up cassandra
 
-* Add the DataStax respository:
+* Add the DataStax repository:
 
 ```
 cat << EOF > /etc/yum.repos.d/datastax.repo
