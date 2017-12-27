@@ -330,7 +330,10 @@ func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	var defs []schema.MetricDefinition
-	staleTs := uint32(time.Now().Add(maxStale * -1).Unix())
+	var staleTs uint32
+	if maxStale != 0 {
+		staleTs = uint32(time.Now().Add(maxStale * -1).Unix())
+	}
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = c.LoadPartition(partition, defs, staleTs)
 	}
