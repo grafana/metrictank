@@ -62,8 +62,6 @@ a counter of messages published to the nsq cluster notifier
 a counter of messages received from cluster notifiers
 * `cluster.decode_err.join`:  
 a counter of json unmarshal errors
-* `cluster.decode_err.merge_remote_state`:  
-a counter of json unmarshal errors
 * `cluster.decode_err.update`:  
 a counter of json unmarshal errors
 * `cluster.events.join`:  

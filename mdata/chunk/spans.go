@@ -2,9 +2,6 @@ package chunk
 
 type SpanCode uint8
 
-const min = 60
-const hour = 60 * min
-
 var ChunkSpans = [32]uint32{
 	1,
 	5,
