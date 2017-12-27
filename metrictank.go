@@ -32,7 +32,6 @@ import (
 	"github.com/grafana/metrictank/mdata/notifierNsq"
 	"github.com/grafana/metrictank/stats"
 	statsConfig "github.com/grafana/metrictank/stats/config"
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -43,7 +42,6 @@ var (
 	warmupPeriod time.Duration
 	startupTime  time.Time
 	gitHash      = "(none)"
-	tracer       opentracing.Tracer
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex

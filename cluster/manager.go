@@ -44,8 +44,6 @@ var (
 	unmarshalErrJoin = stats.NewCounter32("cluster.decode_err.join")
 	// metric cluster.decode_err.update is a counter of json unmarshal errors
 	unmarshalErrUpdate = stats.NewCounter32("cluster.decode_err.update")
-	// metric cluster.decode_err.merge_remote_state is a counter of json unmarshal errors
-	unmarshalErrMergeRemoteState = stats.NewCounter32("cluster.decode_err.merge_remote_state")
 )
 
 type ClusterManager interface {

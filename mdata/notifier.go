@@ -12,8 +12,7 @@ import (
 )
 
 var (
-	notifierHandlers    []NotifierHandler
-	persistMessageBatch *PersistMessageBatch
+	notifierHandlers []NotifierHandler
 
 	// metric cluster.notifier.all.messages-received is a counter of messages received from cluster notifiers
 	messagesReceived = stats.NewCounter32("cluster.notifier.all.messages-received")

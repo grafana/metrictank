@@ -16,7 +16,6 @@ import (
 var (
 	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
 	BranchUnderLeaf    = errors.New("can't add branch under leaf")
-	errInvalidQuery    = errors.New("invalid query")
 	errInvalidIdString = errors.New("invalid ID string")
 )
 
