@@ -20,7 +20,7 @@ and bugs to fix.  It should be considered an *alpha* project.
 * no performance/availability isolation between tenants per instance. (only data isolation)
 * clustering is basic: statically defined peers, master promotions are manual, etc. See [clustering](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for more.
 * minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
-* the datastructures can use performance engineering.   [A Go GC issue may occassionally inflate response times](https://github.com/golang/go/issues/14812).
+* the datastructures can use performance engineering.   [A Go GC issue may occasionally inflate response times](https://github.com/golang/go/issues/14812).
 * the native input protocol is inefficient.  Should not send all metadata with each point.
 * we use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/grafana/metrictank/blob/master/docs/tags.md).
 * for any series you can't write points that are earlier than previously written points. (unless you restart MT)

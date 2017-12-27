@@ -126,5 +126,5 @@ LONGER CHUNK (vs SHORTER CHUNK):
 * max chunkspan should have an explicit cap, to ease deploys and promotions
 * less overhead in memory (less bookeeping variables surrounding tsz series)
 * more decoding overhead
-* to accomodate newest chunk, cost of keeping 1 extra old chunk in RAM increases (or hitting cassandra more)
+* to accommodate newest chunk, cost of keeping 1 extra old chunk in RAM increases (or hitting cassandra more)
 * for aggbands, generally means storing more data in RAM that we don't really need in ram
