@@ -309,8 +309,19 @@ func TestROBFlushAndIsEmpty(t *testing.T) {
 	}
 }
 
+func NewInputData(num int) []schema.Point {
+	ret := make([]schema.Point, num)
+	for i := 1; i <= num; i++ {
+		ret[i] = schema.Point{
+			Val: float64(i),
+			Ts:  uint32(i),
+		}
+	}
+	return ret
+}
+
 func BenchmarkROBAddInOrder(b *testing.B) {
-	data := make([]schema.Point, b.N)
+	data := NewInputData(b.N)
 	buf := NewReorderBuffer(uint32(b.N), 1)
 	b.ResetTimer()
 
@@ -320,13 +331,12 @@ func BenchmarkROBAddInOrder(b *testing.B) {
 }
 
 func BenchmarkROBAddOutOfOrder(b *testing.B) {
-	data := make([]schema.Point, b.N)
-	unsortedData := unsort(data, 10)
+	data := unsort(NewInputData(b.N), 10)
 	buf := NewReorderBuffer(uint32(b.N), 1)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
+		buf.Add(data[i].Ts, data[i].Val)
 	}
 }
 
