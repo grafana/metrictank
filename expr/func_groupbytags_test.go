@@ -37,9 +37,19 @@ func TestGroupByTagsSingleSeries(t *testing.T) {
 	in := []models.Series{
 		getModel("name1;tag1=val1", a),
 	}
-	out := in
+	out := []models.Series{
+		getModel("name1;tag1=val1", a),
+	}
 
-	testGroupByTags("SingleSeries", in, out, "sum", []string{"tag1"}, nil, t)
+	aggs := []string{"average", "median", "sum", "min", "max", "stddev", "diff", "range", "multiply"}
+
+	for _, agg := range aggs {
+		out[0].Datapoints = out[0].Datapoints[:0]
+		aggFunc := getCrossSeriesAggFunc(agg)
+		aggFunc(in, &out[0].Datapoints)
+
+		testGroupByTags("SingleSeries"+agg, in, out, agg, []string{"tag1"}, nil, t)
+	}
 }
 
 func TestGroupByTagsMultipleSeriesSingleResult(t *testing.T) {
