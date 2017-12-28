@@ -83,25 +83,21 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				return 0, generateValidatorError(v.key, err)
 			}
 		}
 		*v.val = got.int
 	case ArgInts:
-		if got.etype != etInt {
-			return 0, ErrBadArgumentStr{"int", string(got.etype)}
-		}
-		*v.val = append(*v.val, got.int)
-		// special case! consume all subsequent args (if any) in args that will also yield an integer
-		for len(e.args) > pos+1 && e.args[pos+1].etype == etInt {
-			pos += 1
+		// consume all args (if any) in args that will yield an integer
+		for ; pos < len(e.args) && e.args[pos].etype == etInt; pos++ {
 			for _, va := range v.validator {
 				if err := va(e.args[pos]); err != nil {
-					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+					return 0, generateValidatorError(v.key, err)
 				}
 			}
 			*v.val = append(*v.val, e.args[pos].int)
 		}
+		return pos, nil
 	case ArgFloat:
 		// integer is also a valid float, just happened to have no decimals
 		if got.etype != etFloat && got.etype != etInt {
@@ -109,7 +105,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				return 0, generateValidatorError(v.key, err)
 			}
 		}
 		if got.etype == etInt {
@@ -123,27 +119,28 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				return 0, generateValidatorError(v.key, err)
 			}
 		}
 		*v.val = got.str
 	case ArgStrings:
-		// special case! consume all subsequent args (if any) in args that will also yield a string
-		for ; len(e.args) > pos && e.args[pos].etype == etString; pos++ {
+		// consume all args (if any) in args that will yield a string
+		for ; pos < len(e.args) && e.args[pos].etype == etString; pos++ {
 			for _, va := range v.validator {
 				if err := va(e.args[pos]); err != nil {
-					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+					return 0, generateValidatorError(v.key, err)
 				}
 			}
 			*v.val = append(*v.val, e.args[pos].str)
 		}
+		return pos, nil
 	case ArgRegex:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
-				return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+				return 0, generateValidatorError(v.key, err)
 			}
 		}
 		re, err := regexp.Compile(got.str)
@@ -157,20 +154,28 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		*v.val = got.bool
 	case ArgStringsOrInts:
-		// special case! consume all subsequent args (if any) in args that will also yield a string
+		// consume all args (if any) in args that will yield a string or int
 		for ; len(e.args) > pos && (e.args[pos].etype == etString || e.args[pos].etype == etInt); pos++ {
 			for _, va := range v.validator {
 				if err := va(e.args[pos]); err != nil {
-					return 0, fmt.Errorf("%s: %s", v.key, err.Error())
+					return 0, generateValidatorError(v.key, err)
 				}
 			}
 			*v.val = append(*v.val, *e.args[pos])
 		}
+		return pos, nil
 	default:
 		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
 	}
-	pos += 1
+	pos++
 	return pos, nil
+}
+
+func generateValidatorError(key string, err error) error {
+	if len(key) == 0 {
+		return err
+	}
+	return fmt.Errorf("%s: %s", key, err.Error())
 }
 
 // consumeSeriesArg verifies that the argument at given pos matches the expected arg
