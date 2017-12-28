@@ -91,6 +91,17 @@ type ArgString struct {
 func (a ArgString) Key() string    { return a.key }
 func (a ArgString) Optional() bool { return a.opt }
 
+// ArgStrings represents one or more strings
+type ArgStrings struct {
+	key       string
+	opt       bool
+	validator []Validator
+	val       *[]string
+}
+
+func (a ArgStrings) Key() string    { return a.key }
+func (a ArgStrings) Optional() bool { return a.opt }
+
 // like string, but should result in a regex
 type ArgRegex struct {
 	key       string
@@ -111,3 +122,14 @@ type ArgBool struct {
 
 func (a ArgBool) Key() string    { return a.key }
 func (a ArgBool) Optional() bool { return a.opt }
+
+// Array of mixed strings or ints
+type ArgStringsOrInts struct {
+	key       string
+	opt       bool
+	validator []Validator
+	val       *[]expr
+}
+
+func (a ArgStringsOrInts) Key() string    { return a.key }
+func (a ArgStringsOrInts) Optional() bool { return a.opt }
