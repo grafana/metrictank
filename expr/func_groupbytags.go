@@ -42,10 +42,6 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		return nil, errors.New("No tags specified")
 	}
 
-	if len(series) <= 1 {
-		return series, nil
-	}
-
 	groups := make(map[string][]models.Series)
 	useName := false
 
@@ -130,13 +126,9 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			QueryCons:    queryCons,
 		}
 
-		if len(groupSeries) == 1 {
-			newSeries.Datapoints = groupSeries[0].Datapoints
-		} else {
-			newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
-			aggFunc(groupSeries, &newSeries.Datapoints)
-			cache[Req{}] = append(cache[Req{}], newSeries)
-		}
+		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
+		aggFunc(groupSeries, &newSeries.Datapoints)
+		cache[Req{}] = append(cache[Req{}], newSeries)
 
 		output = append(output, newSeries)
 	}
