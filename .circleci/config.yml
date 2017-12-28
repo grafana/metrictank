@@ -18,6 +18,7 @@ jobs:
       - run: go vet ./...
       - run: scripts/qa/gofmt.sh
       - run: scripts/qa/ineffassign.sh
+      - run: scripts/qa/go-generate.sh
       - run: scripts/qa/end2end.sh
       - run: scripts/qa/misspell.sh
       - run: scripts/qa/unused.sh
