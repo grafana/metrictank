@@ -1,8 +1,11 @@
 package expr
 
-import "errors"
+import (
+	"errors"
+)
 
 var ErrIntPositive = errors.New("integer must be positive")
+var ErrInvalidAggFunc = errors.New("Invalid aggregation func")
 
 // Validator is a function to validate an input
 type Validator func(e *expr) error
@@ -16,7 +19,7 @@ func IntPositive(e *expr) error {
 
 func IsAggFunc(e *expr) error {
 	if getCrossSeriesAggFunc(e.str) == nil {
-		return errors.New("Invalid aggregation func: " + e.str)
+		return ErrInvalidAggFunc
 	}
 	return nil
 }
