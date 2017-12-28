@@ -211,7 +211,7 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 		if expectedErr == nil {
 			t.Fatalf("case %q: expected no error but got %q", name, err)
 		} else if err == nil || err.Error() != expectedErr.Error() {
-			t.Fatalf("case %q: err %q but expected %q", name, err, expectedErr)
+			t.Fatalf("case %q: expected error %q but got %q", name, err, expectedErr)
 		}
 	}
 	if len(got) != len(out) {
