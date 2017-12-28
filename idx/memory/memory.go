@@ -682,6 +682,10 @@ func (m *MemoryIdx) AutoCompleteTagValues(orgId int, tag, valPrefix string, expr
 	return res, nil
 }
 
+// Tags returns a list of all tag keys associated with the metrics of a given
+// organization. The return values are filtered by the regex in the second parameter.
+// If the third parameter is >0 then only metrics will be accounted of which the
+// LastUpdate time is >= the given value.
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
