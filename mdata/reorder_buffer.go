@@ -9,7 +9,6 @@ import (
 // The reorder buffer itself is not thread safe because it is only used by AggMetric,
 // which is thread safe, so there is no locking in the buffer.
 type ReorderBuffer struct {
-	len      uint32         // length of buffer in number of datapoints
 	newest   uint32         // index of newest buffer entry
 	interval uint32         // metric interval
 	buf      []schema.Point // the actual buffer holding the data
@@ -17,7 +16,6 @@ type ReorderBuffer struct {
 
 func NewReorderBuffer(reorderWindow uint32, interval int) *ReorderBuffer {
 	buf := &ReorderBuffer{
-		len:      reorderWindow,
 		interval: uint32(interval),
 		buf:      make([]schema.Point, reorderWindow),
 	}
@@ -28,18 +26,18 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 	ts = AggBoundary(ts, rob.interval)
 
 	// out of order and too old
-	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(rob.len*rob.interval) {
+	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
 		metricsTooOld.Inc()
 		return nil, false
 	}
 
 	var res []schema.Point
-	oldest := (rob.newest + 1) % rob.len
-	index := (ts / rob.interval) % rob.len
+	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
+	index := (ts / rob.interval) % uint32(cap(rob.buf))
 	if ts > rob.buf[rob.newest].Ts {
 		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
-		if flushCount > rob.len {
-			flushCount = rob.len
+		if flushCount > uint32(cap(rob.buf)) {
+			flushCount = uint32(cap(rob.buf))
 		}
 
 		for i := uint32(0); i < flushCount; i++ {
@@ -48,7 +46,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 			}
 			rob.buf[oldest].Ts = 0
 			rob.buf[oldest].Val = 0
-			oldest = (oldest + 1) % rob.len
+			oldest = (oldest + 1) % uint32(cap(rob.buf))
 		}
 		rob.buf[index].Ts = ts
 		rob.buf[index].Val = val
@@ -64,8 +62,8 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 
 // returns all the data in the buffer as a raw list of points
 func (rob *ReorderBuffer) Get() []schema.Point {
-	res := make([]schema.Point, 0, rob.len)
-	oldest := (rob.newest + 1) % rob.len
+	res := make([]schema.Point, 0, cap(rob.buf))
+	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
 
 	for {
 		if rob.buf[oldest].Ts != 0 {
@@ -74,7 +72,7 @@ func (rob *ReorderBuffer) Get() []schema.Point {
 		if oldest == rob.newest {
 			break
 		}
-		oldest = (oldest + 1) % rob.len
+		oldest = (oldest + 1) % uint32(cap(rob.buf))
 	}
 
 	return res
