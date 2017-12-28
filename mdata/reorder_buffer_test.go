@@ -309,65 +309,79 @@ func TestROBFlushAndIsEmpty(t *testing.T) {
 	}
 }
 
+func BenchmarkROB10Add(b *testing.B) {
+	benchmarkROBAdd(b, 10, 0)
+}
+
+func BenchmarkROB120Add(b *testing.B) {
+	benchmarkROBAdd(b, 120, 0)
+}
+
+func BenchmarkROB600Add(b *testing.B) {
+	benchmarkROBAdd(b, 600, 0)
+}
+
+func BenchmarkROB10AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 10, 5)
+}
+
+func BenchmarkROB120AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 120, 5)
+}
+
+func BenchmarkROB600AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 600, 5)
+}
+
+func BenchmarkROB10AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 10, 50)
+}
+
+func BenchmarkROB120AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 120, 50)
+}
+
+func BenchmarkROB600AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 600, 50)
+}
+
+func BenchmarkROB10AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 10, 500)
+}
+
+func BenchmarkROB120AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 120, 500)
+}
+
+func BenchmarkROB600AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 600, 500)
+}
+
+func benchmarkROBAdd(b *testing.B, window, shufgroup int) {
+	data := NewInputData(b.N)
+	if shufgroup > 1 {
+		data = unsort(data, shufgroup)
+	}
+
+	rob := NewReorderBuffer(uint32(window), 1)
+	var out []schema.Point
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		out, _ = rob.Add(data[i].Ts, data[i].Val)
+	}
+	if len(out) > 1000 {
+		panic("this clause should never fire. only exists for compiler not to optimize away the results")
+	}
+}
+
 func NewInputData(num int) []schema.Point {
 	ret := make([]schema.Point, num)
-	for i := 1; i <= num; i++ {
+	for i := 0; i < num; i++ {
 		ret[i] = schema.Point{
-			Val: float64(i),
-			Ts:  uint32(i),
+			Val: float64(i + 1),
+			Ts:  uint32(i + 1),
 		}
 	}
 	return ret
-}
-
-func BenchmarkROBAddInOrder(b *testing.B) {
-	data := NewInputData(b.N)
-	buf := NewReorderBuffer(uint32(b.N), 1)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		buf.Add(data[i].Ts, data[i].Val)
-	}
-}
-
-func BenchmarkROBAddOutOfOrder(b *testing.B) {
-	data := unsort(NewInputData(b.N), 10)
-	buf := NewReorderBuffer(uint32(b.N), 1)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		buf.Add(data[i].Ts, data[i].Val)
-	}
-}
-
-func benchmarkAddAndFlushX(b *testing.B, datapoints, reorderWindow uint32) {
-	buf := NewReorderBuffer(
-		reorderWindow,
-		1,
-	)
-	ts := uint32(1)
-	for ; ts <= datapoints; ts++ {
-		buf.Add(ts, float64(ts*100))
-	}
-
-	b.ResetTimer()
-
-	for run := 0; run < b.N; run++ {
-		ts := uint32(1)
-		for ; ts <= datapoints; ts++ {
-			buf.Add(ts, float64(ts*100))
-		}
-	}
-}
-
-func BenchmarkROBAddAndFlush10000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 10000, 1000)
-}
-
-func BenchmarkROBAddAndFlush1000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 1000, 100)
-}
-
-func BenchmarkROBAddAndFlush100(b *testing.B) {
-	benchmarkAddAndFlushX(b, 100, 10)
 }
