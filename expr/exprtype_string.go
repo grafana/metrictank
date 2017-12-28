@@ -2,7 +2,7 @@
 
 package expr
 
-import "fmt"
+import "strconv"
 
 const _exprType_name = "etNameetBooletFuncetIntetFloatetString"
 
@@ -10,7 +10,7 @@ var _exprType_index = [...]uint8{0, 6, 12, 18, 23, 30, 38}
 
 func (i exprType) String() string {
 	if i < 0 || i >= exprType(len(_exprType_index)-1) {
-		return fmt.Sprintf("exprType(%d)", i)
+		return "exprType(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _exprType_name[_exprType_index[i]:_exprType_index[i+1]]
 }
