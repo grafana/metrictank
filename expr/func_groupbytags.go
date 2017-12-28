@@ -106,25 +106,15 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 	// Now, for each key perform the requested aggregation
 	for name, groupSeries := range groups {
-		tags := make(map[string]string, len(groupTags)+1)
-		tagSplits := strings.Split(name, ";")
-
-		tags["name"] = tagSplits[0]
-
-		for _, split := range tagSplits[1:] {
-			pair := strings.SplitN(split, "=", 2)
-			tags[pair[0]] = pair[1]
-		}
-
 		cons, queryCons := summarizeCons(series)
 		newSeries := models.Series{
 			Target:       name,
 			QueryPatt:    name,
-			Tags:         tags,
 			Interval:     series[0].Interval,
 			Consolidator: cons,
 			QueryCons:    queryCons,
 		}
+		newSeries.SetTags()
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
 		aggFunc(groupSeries, &newSeries.Datapoints)
