@@ -2,7 +2,7 @@
 
 package chunk
 
-import "fmt"
+import "strconv"
 
 const _Format_name = "FormatStandardGoTszFormatStandardGoTszWithSpan"
 
@@ -10,7 +10,7 @@ var _Format_index = [...]uint8{0, 19, 46}
 
 func (i Format) String() string {
 	if i >= Format(len(_Format_index)-1) {
-		return fmt.Sprintf("Format(%d)", i)
+		return "Format(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _Format_name[_Format_index[i]:_Format_index[i+1]]
 }
