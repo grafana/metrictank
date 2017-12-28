@@ -59,7 +59,7 @@ func unsort(data []schema.Point, unsortBy int) []schema.Point {
 	return out
 }
 
-func TestReorderBufferUnsort(t *testing.T) {
+func TestROBUnsort(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 0, Val: 0},
 		{Ts: 1, Val: 100},
@@ -93,7 +93,7 @@ func TestReorderBufferUnsort(t *testing.T) {
 	}
 }
 
-func TestReorderBufferAddAndGetInOrder(t *testing.T) {
+func TestROBAddAndGetInOrder(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1002, Val: 200},
@@ -107,7 +107,7 @@ func TestReorderBufferAddAndGetInOrder(t *testing.T) {
 	testAddAndGet(t, 600, testData, expectedData, 3, 0, 0)
 }
 
-func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
+func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1003, Val: 300},
 		{Ts: 1002, Val: 200},
@@ -119,7 +119,7 @@ func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	testAddAndGet(t, 1, testData, expectedData, 1, 2, 0)
 }
 
-func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
+func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1002, Val: 200},
@@ -145,7 +145,7 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 	testAddAndGet(t, 600, testData, expectedData, 9, 0, 2)
 }
 
-func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
+func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1002, Val: 200},
 		{Ts: 1004, Val: 400},
@@ -171,7 +171,7 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) 
 	testAddAndGet(t, 600, testData, expectedData, 9, 0, 3)
 }
 
-func TestReorderBufferOmitFlushIfNotEnoughData(t *testing.T) {
+func TestROBOmitFlushIfNotEnoughData(t *testing.T) {
 	b := NewReorderBuffer(9, 1)
 	for i := uint32(1); i < 10; i++ {
 		flushed, _ := b.Add(i, float64(i*100))
@@ -181,7 +181,7 @@ func TestReorderBufferOmitFlushIfNotEnoughData(t *testing.T) {
 	}
 }
 
-func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
+func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1004, Val: 400},
@@ -212,7 +212,7 @@ func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushSortedData(t *testing.T) {
+func TestROBFlushSortedData(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1)
 	metricsTooOld.SetUint32(0)
@@ -231,7 +231,7 @@ func TestReorderBufferFlushSortedData(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushUnsortedData1(t *testing.T) {
+func TestROBFlushUnsortedData1(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(3, 1)
 	data := []schema.Point{
@@ -272,7 +272,7 @@ func TestReorderBufferFlushUnsortedData1(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushUnsortedData2(t *testing.T) {
+func TestROBFlushUnsortedData2(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1)
 	data := make([]schema.Point, 1000)
@@ -291,7 +291,7 @@ func TestReorderBufferFlushUnsortedData2(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushAndIsEmpty(t *testing.T) {
+func TestROBFlushAndIsEmpty(t *testing.T) {
 	buf := NewReorderBuffer(10, 1)
 
 	if !buf.IsEmpty() {
@@ -309,7 +309,7 @@ func TestReorderBufferFlushAndIsEmpty(t *testing.T) {
 	}
 }
 
-func BenchmarkAddInOrder(b *testing.B) {
+func BenchmarkROBAddInOrder(b *testing.B) {
 	data := make([]schema.Point, b.N)
 	buf := NewReorderBuffer(uint32(b.N), 1)
 	b.ResetTimer()
@@ -319,7 +319,7 @@ func BenchmarkAddInOrder(b *testing.B) {
 	}
 }
 
-func BenchmarkAddOutOfOrder(b *testing.B) {
+func BenchmarkROBAddOutOfOrder(b *testing.B) {
 	data := make([]schema.Point, b.N)
 	unsortedData := unsort(data, 10)
 	buf := NewReorderBuffer(uint32(b.N), 1)
@@ -350,14 +350,14 @@ func benchmarkAddAndFlushX(b *testing.B, datapoints, reorderWindow uint32) {
 	}
 }
 
-func BenchmarkAddAndFlush10000(b *testing.B) {
+func BenchmarkROBAddAndFlush10000(b *testing.B) {
 	benchmarkAddAndFlushX(b, 10000, 1000)
 }
 
-func BenchmarkAddAndFlush1000(b *testing.B) {
+func BenchmarkROBAddAndFlush1000(b *testing.B) {
 	benchmarkAddAndFlushX(b, 1000, 100)
 }
 
-func BenchmarkAddAndFlush100(b *testing.B) {
+func BenchmarkROBAddAndFlush100(b *testing.B) {
 	benchmarkAddAndFlushX(b, 100, 10)
 }
