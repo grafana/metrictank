@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	GitHash     = "(none)"
+	gitHash     = "(none)"
 	showVersion = flag.Bool("version", false, "print version string")
 	metric      = flag.String("metric", "", "specify a metric name to see which aggregation rule it matches")
 )
@@ -32,7 +32,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-aggs-explain (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-aggs-explain (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 	if flag.NArg() > 1 {

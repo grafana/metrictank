@@ -42,7 +42,7 @@ var (
 	logLevel     int
 	warmupPeriod time.Duration
 	startupTime  time.Time
-	GitHash      = "(none)"
+	gitHash      = "(none)"
 	tracer       opentracing.Tracer
 
 	metrics     *mdata.AggMetrics
@@ -111,7 +111,7 @@ func main() {
 
 	// if the user just wants the version, give it and exit
 	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 
@@ -185,7 +185,7 @@ func main() {
 		log.Fatal(4, "instance can't be empty")
 	}
 
-	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
 
 	/***********************************
 		Initialize our Cluster
@@ -201,7 +201,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
 	}
-	cluster.Init(*instance, GitHash, startupTime, scheme, int(port))
+	cluster.Init(*instance, gitHash, startupTime, scheme, int(port))
 
 	/***********************************
 		Validate remaining settings

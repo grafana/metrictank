@@ -21,7 +21,7 @@ import (
 const tsFormat = "2006-01-02 15:04:05"
 
 var (
-	GitHash = "(none)"
+	gitHash = "(none)"
 
 	// flags from metrictank.go, globals
 	showVersion = flag.Bool("version", false, "print version string")
@@ -96,7 +96,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 	if flag.NArg() < 1 {
@@ -144,7 +144,7 @@ func main() {
 	}
 
 	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 
