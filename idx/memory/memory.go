@@ -745,38 +745,6 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 	return false
 }
 
-// resolveIDs resolves a list of ids (IdSet) into a list of complete
-// Node structs. It assumes that at least a read lock is already
-// held by the caller
-func (m *MemoryIdx) resolveIDs(orgId int, ids IdSet) []idx.Node {
-	res := make([]idx.Node, 0, len(ids))
-	tree := m.Tree[orgId]
-	for id := range ids {
-		def, ok := m.DefById[id.String()]
-		if !ok {
-			corruptIndex.Inc()
-			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
-			continue
-		}
-
-		name := def.NameWithTags()
-		node, ok := tree.Items[name]
-		if !ok {
-			corruptIndex.Inc()
-			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", name)
-			continue
-		}
-
-		res = append(res, idx.Node{
-			Path:        name,
-			Leaf:        node.Leaf(),
-			HasChildren: node.HasChildren(),
-			Defs:        []idx.Archive{*def},
-		})
-	}
-	return res
-}
-
 func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
 	if !tagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
@@ -792,7 +760,23 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]id
 	defer m.RUnlock()
 
 	ids := m.idsByTagQuery(orgId, query)
-	return m.resolveIDs(orgId, ids), nil
+	res := make([]idx.Node, 0, len(ids))
+	for id := range ids {
+		def, ok := m.DefById[id.String()]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
+			continue
+		}
+
+		res = append(res, idx.Node{
+			Path:        def.NameWithTags(),
+			Leaf:        true,
+			HasChildren: false,
+			Defs:        []idx.Archive{*def},
+		})
+	}
+	return res, nil
 }
 
 func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) IdSet {
