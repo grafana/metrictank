@@ -224,21 +224,14 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 // deindexTags takes a given metric definition and removes all references
 // to it from the tag index. It assumes a lock is already held.
-func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
-	tags, ok := m.tags[def.OrgId]
-	if !ok {
-		corruptIndex.Inc()
-		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
-		return
-	}
-
+func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
 	id, err := idx.NewMetricIDFromString(def.Id)
 	if err != nil {
 		// should never happen because all IDs in the index must have
 		// a valid format
 		invalidId.Inc()
 		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-		return
+		return false
 	}
 
 	for _, tag := range def.Tags {
@@ -257,6 +250,8 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	}
 
 	tags.delTagId("name", def.Name, id)
+
+	return true
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -995,10 +990,38 @@ func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, erro
 	}
 
 	m.Lock()
-	defs := m.deleteTagged(orgId, ids)
-	m.Unlock()
+	defer m.Unlock()
+	return m.deleteTaggedByIdSet(orgId, ids), nil
+}
 
-	return defs, nil
+// deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
+// it is important that only IDs of series with tags get passed in here, because
+// otherwise the result might be inconsistencies between DefByIDs and the tree index.
+func (m *MemoryIdx) deleteTaggedByIdSet(orgId int, ids IdSet) []idx.Archive {
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	deletedDefs := make([]idx.Archive, 0, len(ids))
+	for id := range ids {
+		idStr := id.String()
+		def, ok := m.DefById[idStr]
+		if !ok {
+			// not necessarily a corruption, the id could have been deleted
+			// while we switched from read to write lock
+			continue
+		}
+		if !m.deindexTags(tags, &def.MetricDefinition) {
+			continue
+		}
+		deletedDefs = append(deletedDefs, *def)
+		delete(m.DefById, idStr)
+	}
+
+	statMetricsActive.Add(-1 * len(ids))
+
+	return deletedDefs
 }
 
 func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
@@ -1117,49 +1140,96 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 // delete series from the index if they have not been seen since "oldest"
 func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
-	var pruned []idx.Archive
-	pre := time.Now()
-	orgs := []int{orgId}
+	orgs := make(map[int]struct{})
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs across all orgs")
 		m.RLock()
-		orgs = make([]int, len(m.Tree))
-		i := 0
 		for org := range m.Tree {
-			orgs[i] = org
-			i++
+			orgs[org] = struct{}{}
+		}
+		if tagSupport {
+			for org := range m.tags {
+				orgs[org] = struct{}{}
+			}
 		}
 		m.RUnlock()
+	} else {
+		orgs[orgId] = struct{}{}
 	}
-	for _, org := range orgs {
-		m.RLock()
-		tree, ok := m.Tree[org]
-		if !ok {
-			m.RUnlock()
+
+	var pruned []idx.Archive
+	toPruneUntagged := make(map[int]map[string]struct{}, len(orgs))
+	toPruneTagged := make(map[int]IdSet, len(orgs))
+	for org := range orgs {
+		toPruneTagged[org] = make(IdSet)
+		toPruneUntagged[org] = make(map[string]struct{})
+	}
+	pre := time.Now()
+
+	m.RLock()
+DEFS:
+	for _, def := range m.DefById {
+		if _, ok := orgs[def.OrgId]; !ok {
+			continue DEFS
+		}
+
+		if def.LastUpdate >= oldestUnix {
+			continue DEFS
+		}
+
+		if len(def.Tags) == 0 {
+			tree, ok := m.Tree[def.OrgId]
+			if !ok {
+				continue DEFS
+			}
+
+			n, ok := tree.Items[def.Name]
+			if !ok || !n.Leaf() {
+				continue DEFS
+			}
+
+			for _, id := range n.Defs {
+				if m.DefById[id].LastUpdate >= oldestUnix {
+					continue DEFS
+				}
+			}
+
+			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
+		} else {
+			id, err := idx.NewMetricIDFromString(def.Id)
+			if err != nil {
+				log.Error(3, "memory-idx: corrupt index. ID format %s seems to be invalid", def.Id)
+				continue DEFS
+			}
+
+			toPruneTagged[def.OrgId][id] = struct{}{}
+		}
+	}
+	m.RUnlock()
+
+	for org, ids := range toPruneTagged {
+		if len(ids) == 0 {
+			continue
+		}
+		m.Lock()
+		defs := m.deleteTaggedByIdSet(org, ids)
+		m.Unlock()
+		pruned = append(pruned, defs...)
+	}
+
+	for org, paths := range toPruneUntagged {
+		if len(paths) == 0 {
 			continue
 		}
 
-		var toPrune []string
-
-		for _, n := range tree.Items {
-			if !n.Leaf() {
-				continue
-			}
-			staleCount := 0
-			for _, id := range n.Defs {
-				if m.DefById[id].LastUpdate < oldestUnix {
-					staleCount++
-				}
-			}
-			if staleCount == len(n.Defs) {
-				//we need to delete this node.
-				toPrune = append(toPrune, n.Path)
-			}
+		m.Lock()
+		tree, ok := m.Tree[org]
+		if !ok {
+			m.Unlock()
+			continue
 		}
-		m.RUnlock()
 
-		for _, path := range toPrune {
-			m.Lock()
+		for path := range paths {
 			n, ok := tree.Items[path]
 			if !ok {
 				m.Unlock()
@@ -1169,15 +1239,17 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 
 			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 			defs := m.delete(org, n, true, false)
-			statMetricsActive.Add(-1 * len(defs))
 			pruned = append(pruned, defs...)
-			m.Unlock()
 		}
+		m.Unlock()
 	}
+
+	statMetricsActive.Add(-1 * len(pruned))
 
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 	}
+
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil
 }
