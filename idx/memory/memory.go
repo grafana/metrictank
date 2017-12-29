@@ -298,7 +298,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		AggId:            aggId,
 	}
 
-	if tagSupport && len(def.Tags) > 0 {
+	if TagSupport && len(def.Tags) > 0 {
 		if _, ok := m.DefById[def.Id]; !ok {
 			m.DefById[def.Id] = archive
 			statAdd.Inc()
@@ -926,31 +926,28 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
-	orgs := []int{-1, orgId}
+
+	orgs := make(map[int]struct{})
+	orgs[-1] = struct{}{}
+	orgs[orgId] = struct{}{}
 	if orgId == -1 {
 		log.Info("memory-idx: returning all metricDefs for all orgs")
-		orgs = make([]int, len(m.Tree))
-		i := 0
 		for org := range m.Tree {
-			orgs[i] = org
-			i++
+			orgs[org] = struct{}{}
+		}
+		for org := range m.tags {
+			orgs[org] = struct{}{}
 		}
 	}
+
 	defs := make([]idx.Archive, 0)
-	for _, org := range orgs {
-		tree, ok := m.Tree[org]
-		if !ok {
+	for _, def := range m.DefById {
+		if _, ok := orgs[def.OrgId]; !ok {
 			continue
 		}
-		for _, n := range tree.Items {
-			if !n.Leaf() {
-				continue
-			}
-			for _, id := range n.Defs {
-				defs = append(defs, *m.DefById[id])
-			}
-		}
+		defs = append(defs, *def)
 	}
+
 	statListDuration.Value(time.Since(pre))
 
 	return defs
