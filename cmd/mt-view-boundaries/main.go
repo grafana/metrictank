@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	GitHash     string
+	gitHash     string
 	showVersion = flag.Bool("version", false, "print version string")
 	spanStr     = flag.String("span", "", "see boundaries for chunks of this span")
 	now         = time.Now()
@@ -50,7 +50,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-view-boundaries (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-view-boundaries (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 

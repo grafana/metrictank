@@ -24,10 +24,10 @@ for tool in *; do
   if [ "$1" == "-race" ]
   then
     set -x
-    CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   else
     set -x
-    go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    go build -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   fi
   set +x
   cd ..

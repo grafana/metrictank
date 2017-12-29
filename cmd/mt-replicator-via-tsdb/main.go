@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	GitHash           = "(none)"
+	gitHash           = "(none)"
 	showVersion       = flag.Bool("version", false, "print version string")
 	logLevel          = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	confFile          = flag.String("config", "", "configuration file path")
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	if *showVersion {
-		fmt.Printf("mt-replicator-via-tsdb (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-replicator-via-tsdb (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 
@@ -91,7 +91,7 @@ func main() {
 
 	// initialize the clusterManager so that we can query it for our partitions.
 	cluster.Mode = cluster.ModeSingle
-	cluster.Init(*instance, GitHash, time.Now(), "", 0)
+	cluster.Init(*instance, gitHash, time.Now(), "", 0)
 
 	inKafkaMdm.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
