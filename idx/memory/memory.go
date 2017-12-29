@@ -292,7 +292,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	path := def.NameWithTags()
+	path := def.Name
 
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
@@ -301,6 +301,15 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
 		AggId:            aggId,
+	}
+
+	if tagSupport && len(def.Tags) > 0 {
+		if _, ok := m.DefById[def.Id]; !ok {
+			m.DefById[def.Id] = archive
+			statAdd.Inc()
+			log.Debug("memory-idx: adding %s to DefById", path)
+		}
+		return *archive
 	}
 
 	//first check to see if a tree has been created for this OrgId
@@ -329,13 +338,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		}
 	}
 
-	pos := strings.Index(path, ";")
-	if pos == -1 {
-		pos = strings.LastIndex(path, ".")
-	} else {
-		// find the last '.' that is not part of a tag
-		pos = strings.LastIndex(path[:pos], ".")
-	}
+	pos := strings.LastIndex(path, ".")
 
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
@@ -1020,12 +1023,6 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 		delete(m.DefById, id)
 	}
 	n.Defs = nil
-
-	if tagSupport {
-		for _, def := range deletedDefs {
-			m.deindexTags(&(def.MetricDefinition))
-		}
-	}
 
 	if n.HasChildren() {
 		return deletedDefs
