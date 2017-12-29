@@ -1,7 +1,7 @@
 #!/bin/bash
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
+cd ${DIR}/..
 
 # make sure CircleCI gets all tags properly.
 # see https://discuss.circleci.com/t/where-are-my-git-tags/2371
@@ -9,7 +9,7 @@ cd ${DIR}
 [ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
 GITVERSION=`git describe --always`
-BUILDDIR=$(dirname $DIR)/build
+BUILDDIR=$(pwd)/build
 
 # Make dir
 mkdir -p $BUILDDIR
@@ -19,9 +19,6 @@ rm -rf $BUILDDIR/*
 
 # disable cgo
 export CGO_ENABLED=0
-
-# Build binary
-cd $GOPATH/src/github.com/grafana/metrictank
 
 OUTPUT=$BUILDDIR/metrictank
 
