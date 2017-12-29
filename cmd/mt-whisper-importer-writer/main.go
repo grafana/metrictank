@@ -90,7 +90,7 @@ var (
 	cassandraUsername = globalFlags.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = globalFlags.String("cassandra-password", "cassandra", "password for authentication")
 
-	GitHash = "(none)"
+	gitHash = "(none)"
 )
 
 type Server struct {
@@ -166,7 +166,7 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
-	cluster.Init("mt-whisper-importer-writer", GitHash, time.Now(), "http", int(80))
+	cluster.Init("mt-whisper-importer-writer", gitHash, time.Now(), "http", int(80))
 
 	server := &Server{
 		Session:     store.Session,

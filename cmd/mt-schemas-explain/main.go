@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	GitHash      = "(none)"
+	gitHash      = "(none)"
 	showVersion  = flag.Bool("version", false, "print version string")
 	windowFactor = flag.Int("window-factor", 20, "size of compaction window relative to TTL")
 	metric       = flag.String("metric", "", "specify a metric name to see which schema it matches")
@@ -35,7 +35,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-schemas-explain (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-schemas-explain (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 	if flag.NArg() > 1 {
