@@ -3,6 +3,7 @@ set -x
 BASE=$(dirname $0)
 CODE_DIR=$(readlink -e "$BASE/../")
 
+sudo apt-get update # otherwise the below install command doesn't work
 sudo apt-get install rpm # to be able to make rpms
 
 BUILD_ROOT=$CODE_DIR/build
