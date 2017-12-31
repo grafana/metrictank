@@ -7,39 +7,6 @@ gopath=${GOPATH/:*/} # get the first dir
 
 go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp
 
-# stringer needs all packages to be installed to work
-# see https://github.com/golang/go/issues/10249
-#go install ./...
-function install () {
-	local path=$1
-	echo installing vendor/$path
-	cd vendor/$path
-	if ! go install .; then
-		echo "installation of $path failed" >&2
-		exit 2
-	fi
-	cd - >/dev/null
-
-	desired=$gopath/pkg/linux_amd64/$path
-	echo "let's see if the desired path '$desired' exists:"
-	ls -alh $desired
-
-	got=$gopath/pkg/linux_amd64/github.com/grafana/metrictank/vendor/$path
-	echo "let see if the path we probably got '$got' exists:"
-	ls -alh $got
-
-	echo "assuming go put them in 'got', not 'desired', symlinking..."
-	parent=$(dirname $desired)
-	echo mkdir -p $parent
-	mkdir -p $parent
-	ln -s $got $desired
-}
-
-install github.com/opentracing/opentracing-go
-install github.com/dgryski/go-tsz
-install gopkg.in/raintank/schema.v1
-
-
 go generate $(go list ./... | grep -v /vendor/)
 out=$(git status --short)
 [ -z "$out" ] && echo "all good" && exit 0
