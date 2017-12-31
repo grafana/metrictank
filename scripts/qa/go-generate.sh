@@ -15,10 +15,8 @@ echo "??????????????????????? Did you forget to run go generate ????????????????
 echo "## git status after running go generate:"
 git status
 echo "## git diff after running go generate:"
-# if we don't pipe into cat, this will just hang and timeout in circleCI
-# I think because git tries to be smart and use an interactive pager,
-# for which I could not find a nicer way to disable.
-git diff | cat -
+# disable pager, otherwise this will just hang and timeout in circleCI
+git --no-pager diff 
 
 echo "You should probably run:"
 echo "go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp"
