@@ -16,11 +16,11 @@ jobs:
       - run: scripts/qa/tools_gitignore.sh
       - run: scripts/qa/unused.sh
       - run: scripts/qa/vendor.sh
+      - run: go vet ./...
       - run: scripts/build.sh
       - run: scripts/build_tools.sh
       - run: scripts/build_docker.sh
       - run: scripts/qa/docs.sh
-      - run: go vet ./...
       - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
       - run: scripts/qa/end2end.sh
       - run: scripts/depends.sh
