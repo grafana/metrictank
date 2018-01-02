@@ -69,6 +69,8 @@ func TestAddingEvicting(t *testing.T) {
 	if peek := cacheChunkEvict.Peek(); peek != 4 {
 		t.Fatalf("Expected evict counter to be at 4, got %d", peek)
 	}
+
+	a.Stop()
 }
 
 func TestLRUOrdering(t *testing.T) {
@@ -103,4 +105,55 @@ func TestLRUOrdering(t *testing.T) {
 	if peek := cacheChunkEvict.Peek(); peek != 1 {
 		t.Fatalf("Expected evict counter to be at 1, got %d", peek)
 	}
+
+	a.Stop()
+}
+
+func TestMetricDeleting(t *testing.T) {
+	a := NewFlatAccnt(12)
+	cacheChunkAdd.SetUint32(0)
+
+	var metric1 string = "metric1"
+	var metric2 string = "metric2"
+
+	a.AddChunk(metric1, 1, 2)
+	a.AddChunk(metric2, 1, 2)
+	a.AddChunk(metric1, 2, 2)
+	a.AddChunk(metric2, 2, 2)
+	a.AddChunk(metric1, 3, 2)
+	a.AddChunk(metric2, 3, 2)
+
+	a.DelMetric(metric1)
+
+	total := a.GetTotal()
+	expect_total := uint64(6)
+	if total != expect_total {
+		t.Fatalf("Expected total to be %d, got %d", expect_total, total)
+	}
+
+	if cacheSizeUsed.Peek() != expect_total {
+		t.Fatalf("Expected total to be %d, got %d", expect_total, total)
+	}
+
+	if _, ok := a.metrics[metric1]; ok {
+		t.Fatalf("Expected %s to not exist, but it's still present", metric1)
+	}
+
+	a.AddChunk(metric1, 4, 12)
+	evictQ := a.GetEvictQ()
+
+	et := <-evictQ
+	if et.Metric != metric2 || et.Ts != 1 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != 2 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != 3 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+
+	a.Stop()
 }
