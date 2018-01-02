@@ -24,7 +24,7 @@ cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
-PACKAGE_NAME="${BUILD_PKG}/metrictank-${VERSION}_${ARCH}.deb"
+PACKAGE_NAME="${BUILD_PKG}/sysvinit/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --deb-init ${BASE}/config/sysvinit/init.d/metrictank \
@@ -46,7 +46,7 @@ cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
-PACKAGE_NAME="${BUILD_PKG}/metrictank-${VERSION}_${ARCH}.deb"
+PACKAGE_NAME="${BUILD_PKG}/upstart/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --deb-upstart ${BASE}/config/upstart/metrictank \
@@ -69,7 +69,7 @@ cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
-PACKAGE_NAME="${BUILD_PKG}/metrictank-${VERSION}_${ARCH}.deb"
+PACKAGE_NAME="${BUILD_PKG}/systemd/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --config-files /etc/metrictank/ \
@@ -89,7 +89,7 @@ cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
-PACKAGE_NAME="${BUILD_PKG}/metrictank-${VERSION}.el7.${ARCH}.rpm"
+PACKAGE_NAME="${BUILD_PKG}/systemd-centos7/metrictank-${VERSION}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --config-files /etc/metrictank/ \
@@ -109,7 +109,7 @@ cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
 
-PACKAGE_NAME="${BUILD_PKG}/metrictank-${VERSION}.el6.${ARCH}.rpm"
+PACKAGE_NAME="${BUILD_PKG}/upstart-0.6.5/metrictank-${VERSION}.el6.${ARCH}.rpm"
 fpm -s dir -t rpm \
   -v ${VERSION} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
   --replaces metric-tank --provides metric-tank \
