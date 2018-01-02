@@ -24,6 +24,10 @@ func (l *LRU) touch(key interface{}) {
 	}
 }
 
+func (l *LRU) del(key interface{}) {
+	delete(l.items, key)
+}
+
 func (l *LRU) pop() interface{} {
 	ent := l.list.Back()
 	if ent == nil {
