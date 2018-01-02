@@ -8,6 +8,7 @@ type Accnt interface {
 	GetEvictQ() chan *EvictTarget
 	AddChunk(string, uint32, uint64)
 	HitChunk(string, uint32)
+	DelMetric(string)
 	Stop()
 	Reset()
 }
