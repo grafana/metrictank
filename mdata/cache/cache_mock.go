@@ -1,6 +1,9 @@
 package cache
 
 import (
+	"context"
+	"sync"
+
 	"github.com/grafana/metrictank/mdata/chunk"
 	"sync"
 )
@@ -14,7 +17,7 @@ type MockCache struct {
 	SearchCount     int
 }
 
-func (mc *MockCache) Add(m string, t uint32, i chunk.IterGen) {
+func (mc *MockCache) Add(m, r string, t uint32, i chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.AddCount++

@@ -33,6 +33,9 @@ type CCache struct {
 	// one CCacheMetric struct per metric key, indexed by the key
 	metricCache map[string]*CCacheMetric
 
+	// sets of metric keys, indexed by their raw metric keys
+	metricRawKeys map[string]map[string]struct{}
+
 	// accounting for the cache. keeps track of when data needs to be evicted
 	// and what should be evicted
 	accnt accnt.Accnt
@@ -45,10 +48,11 @@ type CCache struct {
 
 func NewCCache() *CCache {
 	cc := &CCache{
-		metricCache: make(map[string]*CCacheMetric),
-		accnt:       accnt.NewFlatAccnt(maxSize),
-		stop:        make(chan interface{}),
-		tracer:      opentracing.NoopTracer{},
+		metricCache:   make(map[string]*CCacheMetric),
+		metricRawKeys: make(map[string]map[string]struct{}),
+		accnt:         accnt.NewFlatAccnt(maxSize),
+		stop:          make(chan interface{}),
+		tracer:        opentracing.NoopTracer{},
 	}
 	go cc.evictLoop()
 	return cc
@@ -68,6 +72,30 @@ func (c *CCache) evictLoop() {
 			return
 		}
 	}
+}
+
+// takes a raw key and deletes all archives associated with it from cache
+func (c *CCache) DelMetric(rawMetric string) *CCDelMetricResult {
+	res := &CCDelMetricResult{}
+
+	c.Lock()
+	defer c.Unlock()
+
+	mets, ok := c.metricRawKeys[rawMetric]
+	if !ok {
+		return res
+	}
+
+	for met := range mets {
+		delete(c.metricCache, met)
+		c.accnt.DelMetric(met)
+		res.Archives++
+	}
+
+	delete(c.metricRawKeys, rawMetric)
+	res.Series++
+
+	return res
 }
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
@@ -94,17 +122,30 @@ func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	accnt.CacheChunkPushHot.Inc()
 
 	c.RUnlock()
-	c.Add(metric, prev, itergen)
+	met.Add(prev, itergen)
 }
 
-func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen) {
 	c.Lock()
 	defer c.Unlock()
 
-	if ccm, ok := c.metricCache[metric]; !ok {
+	ccm, ok := c.metricCache[metric]
+	if !ok {
 		ccm = NewCCacheMetric()
-		ccm.Init(prev, itergen)
+		ccm.Init(rawMetric, prev, itergen)
 		c.metricCache[metric] = ccm
+
+		// if we do not have this raw key yet, create an entry for it
+		ccms, ok := c.metricRawKeys[rawMetric]
+		if !ok {
+			ccms = make(map[string]struct{})
+			c.metricRawKeys[rawMetric] = ccms
+		}
+
+		// if we don't have it yet, associate the metric with this raw key
+		if _, ok = ccms[metric]; !ok {
+			ccms[metric] = struct{}{}
+		}
 	} else {
 		ccm.Add(prev, itergen)
 	}
@@ -112,11 +153,16 @@ func (c *CCache) Add(metric string, prev uint32, itergen chunk.IterGen) {
 	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
 }
 
-func (cc *CCache) Reset() {
-	cc.accnt.Reset()
+func (cc *CCache) Reset() *CCDelMetricResult {
+	res := &CCDelMetricResult{}
 	cc.Lock()
+	cc.accnt.Reset()
+	res.Series = len(cc.metricRawKeys)
+	res.Archives = len(cc.metricCache)
 	cc.metricCache = make(map[string]*CCacheMetric)
+	cc.metricRawKeys = make(map[string]map[string]struct{})
 	cc.Unlock()
+	return res
 }
 
 func (c *CCache) Stop() {
@@ -132,11 +178,20 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	defer runtime.Gosched()
 	defer c.Unlock()
 
-	if _, ok := c.metricCache[target.Metric]; ok {
-		log.Debug("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
-		length := c.metricCache[target.Metric].Del(target.Ts)
-		if length == 0 {
-			delete(c.metricCache, target.Metric)
+	ccm, ok := c.metricCache[target.Metric]
+	if !ok {
+		return
+	}
+
+	log.Debug("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
+	length := c.metricCache[target.Metric].Del(target.Ts)
+	if length == 0 {
+		delete(c.metricCache, target.Metric)
+
+		// this key should alway be present, if not there there is a corruption of the state
+		delete(c.metricRawKeys[ccm.RawMetric], target.Metric)
+		if len(c.metricRawKeys[ccm.RawMetric]) == 0 {
+			delete(c.metricRawKeys, ccm.RawMetric)
 		}
 	}
 }
