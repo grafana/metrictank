@@ -25,15 +25,12 @@ jobs:
       - run: scripts/qa/tools_gitignore.sh
       - run: scripts/qa/docs.sh
       - run: scripts/build_packages.sh
-
-general:
-  artifacts:
-    - build
-
-deployment:
-  production:
-    branch: master
-    commands:
-      - scripts/push/packagecloud.sh
-      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - scripts/push/docker.sh
+      - store_artifacts:
+          path: /home/circleci/.go_workspace/src/github.com/grafana/metrictank/build
+      - deploy:
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              scripts/push/packagecloud.sh
+              docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+              scripts/push/docker.sh
+            fi
