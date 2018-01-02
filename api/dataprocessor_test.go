@@ -419,7 +419,7 @@ func compareReqEqual(a, b models.Req) bool {
 	if a.Consolidator != b.Consolidator {
 		return false
 	}
-	if a.Node.Name != b.Node.Name {
+	if a.Node.GetName() != b.Node.GetName() {
 		return false
 	}
 	if a.Archive != b.Archive {

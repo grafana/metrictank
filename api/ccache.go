@@ -75,7 +75,7 @@ func (s *Server) ccacheDeletePropagate(ctx context.Context, req *models.CCacheDe
 		go func(peer cluster.Node) {
 			mu.Lock()
 			defer mu.Unlock()
-			peerResults[peer.Name] = s.ccacheDeleteRemote(ctx, req, peer)
+			peerResults[peer.GetName()] = s.ccacheDeleteRemote(ctx, req, peer)
 			wg.Done()
 		}(peer)
 	}
@@ -87,10 +87,10 @@ func (s *Server) ccacheDeletePropagate(ctx context.Context, req *models.CCacheDe
 func (s *Server) ccacheDeleteRemote(ctx context.Context, req *models.CCacheDelete, peer cluster.Node) models.CCacheDeleteResp {
 	var res models.CCacheDeleteResp
 
-	log.Debug("HTTP metricDelete calling %s/ccache/delete", peer.Name)
+	log.Debug("HTTP metricDelete calling %s/ccache/delete", peer.GetName())
 	buf, err := peer.Post(ctx, "ccacheDeleteRemote", "/ccache/delete", *req)
 	if err != nil {
-		log.Error(4, "HTTP ccacheDelete error querying %s/ccache/delete: %q", peer.Name, err)
+		log.Error(4, "HTTP ccacheDelete error querying %s/ccache/delete: %q", peer.GetName(), err)
 		if res.Errors == 0 {
 			res.FirstError = err.Error()
 		}
@@ -100,7 +100,7 @@ func (s *Server) ccacheDeleteRemote(ctx context.Context, req *models.CCacheDelet
 
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
-		log.Error(4, "HTTP ccacheDelete error unmarshaling body from %s/ccache/delete: %q", peer.Name, err)
+		log.Error(4, "HTTP ccacheDelete error unmarshaling body from %s/ccache/delete: %q", peer.GetName(), err)
 		res.Errors++
 		return res
 	}

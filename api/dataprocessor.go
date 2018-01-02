@@ -145,7 +145,7 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		if req.Node.IsLocal() {
 			localReqs = append(localReqs, req)
 		} else {
-			remoteReqs[req.Node.Name] = append(remoteReqs[req.Node.Name], req)
+			remoteReqs[req.Node.GetName()] = append(remoteReqs[req.Node.GetName()], req)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for _, nodeReqs := range remoteReqs {
-		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.Name)
+		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.GetName())
 		go func(reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
@@ -218,11 +218,11 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				cancel()
-				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.Name, err)
+				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err)
 				responses <- getTargetsResp{nil, err}
 				return
 			}
-			log.Debug("DP getTargetsRemote: %s returned %d series", node.Name, len(resp.Series))
+			log.Debug("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
 			responses <- getTargetsResp{resp.Series, nil}
 		}(nodeReqs)
 	}
