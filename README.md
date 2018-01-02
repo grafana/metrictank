@@ -95,6 +95,6 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 License
 =======
 
-Copyright 2016 Dieter Plaetinck, Anthony Woods, Jeremy Bingham, Damian Gryski, raintank inc
+Copyright 2016-2018 Dieter Plaetinck, Anthony Woods, Jeremy Bingham, Damian Gryski, raintank inc
 
 This software is distributed under the terms of the GNU Affero General Public License.
