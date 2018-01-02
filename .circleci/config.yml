@@ -1,0 +1,38 @@
+version: 2
+jobs:
+  build:
+    working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
+    machine: true
+    steps:
+      - run: go version
+      - run: echo $GOPATH
+      - run: docker version
+      - run: docker-compose version
+      - checkout
+      - run: scripts/qa/gofmt.sh
+      - run: scripts/qa/go-generate.sh
+      - run: scripts/qa/ineffassign.sh
+      - run: scripts/qa/misspell.sh
+      - run: scripts/qa/tools_gitignore.sh
+      - run: scripts/qa/unused.sh
+      - run: scripts/qa/vendor.sh
+      - run: scripts/build.sh
+      - run: scripts/build_tools.sh
+      - run: scripts/build_docker.sh
+      - run: scripts/qa/docs.sh
+      - run: go vet ./...
+      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
+      - run: scripts/qa/end2end.sh
+      - run: scripts/depends.sh
+      - run: scripts/build_packages.sh
+      - store_artifacts:
+          path: build
+      - store_artifacts:
+          path: build_pkg
+      - deploy:
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              scripts/push/packagecloud.sh
+              docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+              scripts/push/docker.sh
+            fi

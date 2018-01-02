@@ -16,7 +16,6 @@ import (
 var (
 	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
 	BranchUnderLeaf    = errors.New("can't add branch under leaf")
-	errInvalidQuery    = errors.New("invalid query")
 	errInvalidIdString = errors.New("invalid ID string")
 )
 
@@ -60,6 +59,9 @@ func (id *MetricID) FromString(s string) error {
 
 	dst := make([]byte, 16)
 	n, err := hex.Decode(dst, []byte(splits[1]))
+	if err != nil {
+		return err
+	}
 	if n != 16 {
 		return errInvalidIdString
 	}

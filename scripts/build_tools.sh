@@ -1,10 +1,10 @@
 #!/bin/bash
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
+cd ${DIR}/..
 
 GITVERSION=`git describe --always`
-BUILDDIR=$(dirname $DIR)/build
+BUILDDIR=$(pwd)/build
 
 # Make dir
 mkdir -p $BUILDDIR
@@ -18,7 +18,7 @@ function fail () {
 }
 
 # Build binary
-cd $GOPATH/src/github.com/grafana/metrictank/cmd
+cd cmd
 for tool in *; do
   cd $tool
   if [ "$1" == "-race" ]

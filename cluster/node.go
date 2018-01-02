@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/go-querystring/query"
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
@@ -194,13 +193,4 @@ func handleResp(rsp *http.Response) ([]byte, error) {
 		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
 	}
 	return ioutil.ReadAll(rsp.Body)
-}
-
-// Convert an interface{} to a urlencoded querystring
-func toQueryString(q interface{}) (string, error) {
-	v, err := query.Values(q)
-	if err != nil {
-		return "", err
-	}
-	return v.Encode(), nil
 }

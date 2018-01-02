@@ -2,7 +2,6 @@ package chaos
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -19,6 +18,8 @@ func init() {
 		panic(err)
 	}
 }
+
+/* not currently used, but useful later
 
 func assertRunning(cli *client.Client, expected []string) error {
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
@@ -58,6 +59,7 @@ func stop(name string) error {
 	cmd.Dir = path("docker/docker-chaos")
 	return cmd.Run()
 }
+*/
 
 // isolate isolates traffic between containers in setA and containers in setB
 func isolate(setA, setB []string, dur string) error {

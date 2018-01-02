@@ -1,14 +1,11 @@
 #!/bin/bash
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
+cd $DIR/../../cmd
+file=../.gitignore
 
 # NOTE: known limitation: does not clean up stale gitignore rules
 
-SOURCEDIR=${DIR}/..
-file=$SOURCEDIR/.gitignore
-
-cd $GOPATH/src/github.com/grafana/metrictank/cmd
 declare -a missing
 for tool in *; do
 	rule="/cmd/$tool/$tool"
