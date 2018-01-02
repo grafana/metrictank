@@ -9,13 +9,13 @@ if [ -z ${PACKAGECLOUD_REPO} ] ; then
 fi
 
 # Ubuntu 14.04, 16.04, debian 7 (wheezy) & debian 8 (jessie)
-package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty build/upstart/*.deb
-package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/xenial build/systemd/*.deb
-package_cloud push ${PACKAGECLOUD_REPO}/debian/wheezy build/sysvinit/*.deb
-package_cloud push ${PACKAGECLOUD_REPO}/debian/jessie build/systemd/*.deb
+package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/trusty build_pkg/upstart/*.deb
+package_cloud push ${PACKAGECLOUD_REPO}/ubuntu/xenial build_pkg/systemd/*.deb
+package_cloud push ${PACKAGECLOUD_REPO}/debian/wheezy build_pkg/sysvinit/*.deb
+package_cloud push ${PACKAGECLOUD_REPO}/debian/jessie build_pkg/systemd/*.deb
 
 # CentOS 6
-package_cloud push ${PACKAGECLOUD_REPO}/el/6 build/upstart-0.6.5/*rpm
+package_cloud push ${PACKAGECLOUD_REPO}/el/6 build_pkg/upstart-0.6.5/*rpm
 
 # CentOS 7
-package_cloud push ${PACKAGECLOUD_REPO}/el/7 build/systemd-centos7/*rpm
+package_cloud push ${PACKAGECLOUD_REPO}/el/7 build_pkg/systemd-centos7/*rpm

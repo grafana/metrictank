@@ -26,7 +26,9 @@ jobs:
       - run: scripts/qa/docs.sh
       - run: scripts/build_packages.sh
       - store_artifacts:
-          path: /home/circleci/.go_workspace/src/github.com/grafana/metrictank/build
+          path: build
+      - store_artifacts:
+          path: build_pkg
       - deploy:
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
