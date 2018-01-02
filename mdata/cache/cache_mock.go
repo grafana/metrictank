@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/grafana/metrictank/mdata/chunk"
-	"sync"
 )
 
 type MockCache struct {
@@ -15,6 +14,14 @@ type MockCache struct {
 	CacheIfHotCb    func()
 	StopCount       int
 	SearchCount     int
+	DelMetricRes    CCDelMetricResult
+	DelMetricKeys   []string
+}
+
+func NewMockCache() *MockCache {
+	return &MockCache{
+		DelMetricKeys: make([]string, 0),
+	}
 }
 
 func (mc *MockCache) Add(m, r string, t uint32, i chunk.IterGen) {
@@ -38,9 +45,18 @@ func (mc *MockCache) Stop() {
 	mc.StopCount++
 }
 
-func (mc *MockCache) Search(m string, f uint32, u uint32) *CCSearchResult {
+func (mc *MockCache) Search(ctx context.Context, m string, f uint32, u uint32) *CCSearchResult {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.SearchCount++
 	return nil
+}
+
+func (mc *MockCache) DelMetric(key string) *CCDelMetricResult {
+	mc.DelMetricKeys = append(mc.DelMetricKeys, key)
+	return &mc.DelMetricRes
+}
+
+func (mc *MockCache) Reset() *CCDelMetricResult {
+	return &CCDelMetricResult{}
 }
