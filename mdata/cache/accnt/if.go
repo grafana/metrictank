@@ -6,9 +6,9 @@ package accnt
 // in the future if they just implement this interface.
 type Accnt interface {
 	GetEvictQ() chan *EvictTarget
-	AddChunk(string, uint32, uint64)
-	HitChunk(string, uint32)
-	DelMetric(string)
+	AddChunk(metric string, ts uint32, size uint64)
+	HitChunk(metric string, ts uint32)
+	DelMetric(metric string)
 	Stop()
 	Reset()
 }
