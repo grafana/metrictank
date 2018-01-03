@@ -135,15 +135,14 @@ func (c *CCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGe
 		ccm.Init(rawMetric, prev, itergen)
 		c.metricCache[metric] = ccm
 
-		// if we do not have this raw key yet, create an entry for it
+		// if we do not have this raw key yet, create the entry with the association
 		ccms, ok := c.metricRawKeys[rawMetric]
 		if !ok {
-			ccms = make(map[string]struct{})
-			c.metricRawKeys[rawMetric] = ccms
-		}
-
-		// if we don't have it yet, associate the metric with this raw key
-		if _, ok = ccms[metric]; !ok {
+			c.metricRawKeys[rawMetric] = map[string]struct{}{
+				metric: {},
+			}
+		} else {
+			// otherwise, make sure the association exists
 			ccms[metric] = struct{}{}
 		}
 	} else {
