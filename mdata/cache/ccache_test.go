@@ -611,4 +611,23 @@ func testMetricDelete(t *testing.T, cc *CCache) {
 	if delRes.Archives != expectDelArchives {
 		t.Fatalf("Expected exactly %d archives to get deleted, but got %d", expectDelArchives, delRes.Archives)
 	}
+
+	// check if metric1_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// check if metric1_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// check if metric2_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
 }
