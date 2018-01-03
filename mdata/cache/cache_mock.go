@@ -19,9 +19,7 @@ type MockCache struct {
 }
 
 func NewMockCache() *MockCache {
-	return &MockCache{
-		DelMetricKeys: make([]string, 0),
-	}
+	return &MockCache{}
 }
 
 func (mc *MockCache) Add(m, r string, t uint32, i chunk.IterGen) {
