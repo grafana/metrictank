@@ -23,13 +23,13 @@ func NewMockCache() *MockCache {
 	return &MockCache{}
 }
 
-func (mc *MockCache) Add(m, r string, t uint32, i chunk.IterGen) {
+func (mc *MockCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.AddCount++
 }
 
-func (mc *MockCache) CacheIfHot(m string, t uint32, i chunk.IterGen) {
+func (mc *MockCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.CacheIfHotCount++
@@ -44,15 +44,15 @@ func (mc *MockCache) Stop() {
 	mc.StopCount++
 }
 
-func (mc *MockCache) Search(ctx context.Context, m string, f uint32, u uint32) *CCSearchResult {
+func (mc *MockCache) Search(ctx context.Context, metric string, from uint32, until uint32) *CCSearchResult {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.SearchCount++
 	return nil
 }
 
-func (mc *MockCache) DelMetric(key string) (int, int) {
-	mc.DelMetricKeys = append(mc.DelMetricKeys, key)
+func (mc *MockCache) DelMetric(rawMetric string) (int, int) {
+	mc.DelMetricKeys = append(mc.DelMetricKeys, rawMetric)
 	return mc.DelMetricSeries, mc.DelMetricArchives
 }
 
