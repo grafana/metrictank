@@ -503,7 +503,21 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 	}
 }
 
+func TestReset(t *testing.T) {
+	cc := NewCCache()
+
+	// .Reset() is being called at the end of testMetricDelete()
+	testMetricDelete(t, cc)
+	testMetricDelete(t, cc)
+	testMetricDelete(t, cc)
+}
+
 func TestMetricDelete(t *testing.T) {
+	cc := NewCCache()
+	testMetricDelete(t, cc)
+}
+
+func testMetricDelete(t *testing.T, cc *CCache) {
 	var res *CCSearchResult
 
 	rawMetric1 := "some.tree.metric1"
@@ -511,7 +525,6 @@ func TestMetricDelete(t *testing.T) {
 	metric1_2 := "some.tree.metric1_600_sum"
 	rawMetric2 := "some.tree.metric2"
 	metric2_1 := "some.tree.metric2_6000_cnt"
-	cc := NewCCache()
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	itgenCount := 10
 	itgens := make([]chunk.IterGen, 0, itgenCount)
