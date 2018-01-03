@@ -4,10 +4,15 @@ import (
 	"testing"
 )
 
-func TestAddingEvicting(t *testing.T) {
-	a := NewFlatAccnt(10)
+func resetCounters() {
 	cacheChunkAdd.SetUint32(0)
 	cacheChunkEvict.SetUint32(0)
+	cacheSizeUsed.SetUint64(0)
+}
+
+func TestAddingEvicting(t *testing.T) {
+	resetCounters()
+	a := NewFlatAccnt(10)
 	evictQ := a.GetEvictQ()
 
 	// some test data
@@ -74,9 +79,8 @@ func TestAddingEvicting(t *testing.T) {
 }
 
 func TestLRUOrdering(t *testing.T) {
+	resetCounters()
 	a := NewFlatAccnt(6)
-	cacheChunkAdd.SetUint32(0)
-	cacheChunkEvict.SetUint32(0)
 	evictQ := a.GetEvictQ()
 
 	// some test data
@@ -110,8 +114,8 @@ func TestLRUOrdering(t *testing.T) {
 }
 
 func TestMetricDeleting(t *testing.T) {
+	resetCounters()
 	a := NewFlatAccnt(12)
-	cacheChunkAdd.SetUint32(0)
 
 	var metric1 string = "metric1"
 	var metric2 string = "metric2"
