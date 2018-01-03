@@ -105,12 +105,13 @@ func MembersForQuery() ([]Node, error) {
 				}
 				continue
 			}
-			if membersMap[part].priority == member.GetPriority() {
+			priority := member.GetPriority()
+			if membersMap[part].priority == priority {
 				membersMap[part].nodes = append(membersMap[part].nodes, member)
-			} else if membersMap[part].priority > member.GetPriority() {
+			} else if membersMap[part].priority > priority {
 				// this node has higher priority (lower number) then previously seen candidates
 				membersMap[part] = &partitionCandidates{
-					priority: member.GetPriority(),
+					priority: priority,
 					nodes:    []Node{member},
 				}
 			}
