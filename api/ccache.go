@@ -91,9 +91,7 @@ func (s *Server) ccacheDeleteRemote(ctx context.Context, req *models.CCacheDelet
 	buf, err := peer.Post(ctx, "ccacheDeleteRemote", "/ccache/delete", *req)
 	if err != nil {
 		log.Error(4, "HTTP ccacheDelete error querying %s/ccache/delete: %q", peer.GetName(), err)
-		if res.Errors == 0 {
-			res.FirstError = err.Error()
-		}
+		res.FirstError = err.Error()
 		res.Errors++
 		return res
 	}
@@ -101,8 +99,8 @@ func (s *Server) ccacheDeleteRemote(ctx context.Context, req *models.CCacheDelet
 	err = json.Unmarshal(buf, &res)
 	if err != nil {
 		log.Error(4, "HTTP ccacheDelete error unmarshaling body from %s/ccache/delete: %q", peer.GetName(), err)
+		res.FirstError = err.Error()
 		res.Errors++
-		return res
 	}
 
 	return res
