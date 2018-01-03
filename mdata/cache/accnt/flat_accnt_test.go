@@ -117,8 +117,8 @@ func TestMetricDeleting(t *testing.T) {
 	resetCounters()
 	a := NewFlatAccnt(12)
 
-	var metric1 string = "metric1"
-	var metric2 string = "metric2"
+	metric1 := "metric1"
+	metric2 := "metric2"
 
 	a.AddChunk(metric1, 1, 2)
 	a.AddChunk(metric2, 1, 2)
@@ -132,11 +132,11 @@ func TestMetricDeleting(t *testing.T) {
 	total := a.GetTotal()
 	expect_total := uint64(6)
 	if total != expect_total {
-		t.Fatalf("Expected total to be %d, got %d", expect_total, total)
+		t.Fatalf("Expected total %d, got %d", expect_total, total)
 	}
 
 	if cacheSizeUsed.Peek() != expect_total {
-		t.Fatalf("Expected total to be %d, got %d", expect_total, total)
+		t.Fatalf("Expected total %d, got %d", expect_total, total)
 	}
 
 	if _, ok := a.metrics[metric1]; ok {
