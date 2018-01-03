@@ -73,17 +73,17 @@ func TestPeersForQueryMulti(t *testing.T) {
 		So(nodeNames, ShouldContain, manager.thisNode().GetName())
 		Convey("members should be selected randomly with even distribution", func() {
 			peerCount := make(map[string]int)
-			for i := 0; i < 10000; i++ {
+			for i := 0; i < 100; i++ {
 				selected, err = MembersForQuery()
 				So(err, ShouldBeNil)
 				for _, p := range selected {
 					peerCount[p.GetName()]++
 				}
 			}
-			So(peerCount["node1"], ShouldEqual, 10000)
+			So(peerCount["node1"], ShouldEqual, 100)
 			So(peerCount["node2"], ShouldEqual, 0)
-			So(peerCount["node3"], ShouldAlmostEqual, 5000)
-			So(peerCount["node4"], ShouldAlmostEqual, 5000)
+			So(peerCount["node3"], ShouldEqual, 50)
+			So(peerCount["node4"], ShouldEqual, 50)
 			for p, count := range peerCount {
 				t.Logf("%s: %d", p, count)
 			}
