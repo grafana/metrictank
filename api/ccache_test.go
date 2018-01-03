@@ -89,8 +89,6 @@ func TestMetricDelete(t *testing.T) {
 func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	manager := cluster.InitMock()
 
-	expectedDeletedSeries, expectedDeletedArchives := 0, 0
-
 	// define how many series/archives are getting deleted by peer 0
 	resp := models.CCacheDeleteResp{
 		Peers:           map[string]models.CCacheDeleteResp{"2": {Errors: 1}},
@@ -108,16 +106,15 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	delArchives := 10
 	testKey := "12345"
 
-	// add up how many series/archives are expected to be deleted
-	expectedDeletedSeries += delSeries
-	expectedDeletedArchives += delArchives
-
 	srv, _ := newSrv(delSeries, delArchives, testKey)
 	req, err := json.Marshal(models.CCacheDelete{
 		Patterns:  []string{"test.*"},
 		OrgId:     1,
 		Propagate: true,
 	})
+	if err != nil {
+		t.Fatalf("Unexpected error when marshaling json: %s", err)
+	}
 
 	ts := httptest.NewServer(srv.Macaron)
 	defer ts.Close()
@@ -192,6 +189,9 @@ func TestMetricDeletePropagation(t *testing.T) {
 		OrgId:     1,
 		Propagate: true,
 	})
+	if err != nil {
+		t.Fatalf("Unexpected error when marshaling json: %s", err)
+	}
 
 	ts := httptest.NewServer(srv.Macaron)
 	defer ts.Close()
