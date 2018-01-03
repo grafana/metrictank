@@ -9,13 +9,14 @@ import (
 
 type MockCache struct {
 	sync.Mutex
-	AddCount        int
-	CacheIfHotCount int
-	CacheIfHotCb    func()
-	StopCount       int
-	SearchCount     int
-	DelMetricRes    CCDelMetricResult
-	DelMetricKeys   []string
+	AddCount          int
+	CacheIfHotCount   int
+	CacheIfHotCb      func()
+	StopCount         int
+	SearchCount       int
+	DelMetricArchives int
+	DelMetricSeries   int
+	DelMetricKeys     []string
 }
 
 func NewMockCache() *MockCache {
@@ -52,11 +53,11 @@ func (mc *MockCache) Search(ctx context.Context, m string, f uint32, u uint32) *
 	return nil
 }
 
-func (mc *MockCache) DelMetric(key string) *CCDelMetricResult {
+func (mc *MockCache) DelMetric(key string) (int, int) {
 	mc.DelMetricKeys = append(mc.DelMetricKeys, key)
-	return &mc.DelMetricRes
+	return mc.DelMetricSeries, mc.DelMetricArchives
 }
 
-func (mc *MockCache) Reset() *CCDelMetricResult {
-	return &CCDelMetricResult{}
+func (mc *MockCache) Reset() (int, int) {
+	return mc.DelMetricSeries, mc.DelMetricArchives
 }

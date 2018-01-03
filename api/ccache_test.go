@@ -29,7 +29,8 @@ func newSrv(delSeries, delArchives int, key string) (*Server, *cache.MockCache) 
 	srv.BindBackendStore(store)
 
 	mockCache := cache.NewMockCache()
-	mockCache.DelMetricRes = cache.CCDelMetricResult{Series: delSeries, Archives: delArchives}
+	mockCache.DelMetricSeries = delSeries
+	mockCache.DelMetricArchives = delArchives
 	metrics := mdata.NewAggMetrics(store, mockCache, false, 0, 0, 0)
 	srv.BindMemoryStore(metrics)
 	srv.BindCache(mockCache)

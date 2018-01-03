@@ -75,27 +75,27 @@ func (c *CCache) evictLoop() {
 }
 
 // takes a raw key and deletes all archives associated with it from cache
-func (c *CCache) DelMetric(rawMetric string) *CCDelMetricResult {
-	res := &CCDelMetricResult{}
+func (c *CCache) DelMetric(rawMetric string) (int, int) {
+	archives, series := 0, 0
 
 	c.Lock()
 	defer c.Unlock()
 
 	mets, ok := c.metricRawKeys[rawMetric]
 	if !ok {
-		return res
+		return archives, series
 	}
 
 	for met := range mets {
 		delete(c.metricCache, met)
 		c.accnt.DelMetric(met)
-		res.Archives++
+		archives++
 	}
 
 	delete(c.metricRawKeys, rawMetric)
-	res.Series++
+	series++
 
-	return res
+	return series, archives
 }
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
@@ -153,16 +153,15 @@ func (c *CCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGe
 	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
 }
 
-func (cc *CCache) Reset() *CCDelMetricResult {
-	res := &CCDelMetricResult{}
+func (cc *CCache) Reset() (int, int) {
 	cc.Lock()
 	cc.accnt.Reset()
-	res.Series = len(cc.metricRawKeys)
-	res.Archives = len(cc.metricCache)
+	series := len(cc.metricRawKeys)
+	archives := len(cc.metricCache)
 	cc.metricCache = make(map[string]*CCacheMetric)
 	cc.metricRawKeys = make(map[string]map[string]struct{})
 	cc.Unlock()
-	return res
+	return series, archives
 }
 
 func (c *CCache) Stop() {

@@ -33,9 +33,9 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 	}
 
 	if fullFlush {
-		delResult := s.Cache.Reset()
-		res.DeletedSeries += delResult.Series
-		res.DeletedArchives += delResult.Archives
+		delSeries, delArchives := s.Cache.Reset()
+		res.DeletedSeries += delSeries
+		res.DeletedArchives += delArchives
 	} else {
 		for _, pattern := range req.Patterns {
 			nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
@@ -48,9 +48,9 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 			} else {
 				for _, node := range nodes {
 					for _, def := range node.Defs {
-						delResult := s.Cache.DelMetric(def.Id)
-						res.DeletedSeries += delResult.Series
-						res.DeletedArchives += delResult.Archives
+						delSeries, delArchives := s.Cache.DelMetric(def.Id)
+						res.DeletedSeries += delSeries
+						res.DeletedArchives += delArchives
 					}
 				}
 			}

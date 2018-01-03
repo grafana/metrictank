@@ -11,17 +11,12 @@ type Cache interface {
 	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
 	Stop()
 	Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult
-	DelMetric(rawMetric string) *CCDelMetricResult
-	Reset() *CCDelMetricResult
+	DelMetric(rawMetric string) (int, int)
+	Reset() (int, int)
 }
 
 type CachePusher interface {
 	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
-}
-
-type CCDelMetricResult struct {
-	Series   int
-	Archives int
 }
 
 type CCSearchResult struct {

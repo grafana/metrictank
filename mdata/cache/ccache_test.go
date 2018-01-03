@@ -545,15 +545,15 @@ func TestMetricDelete(t *testing.T) {
 	}
 
 	// now delete metric1_1, but leave metric2_1
-	delRes := cc.DelMetric(rawMetric1)
+	delSeries, delArchives := cc.DelMetric(rawMetric1)
 	expectDelSeries := 1
-	if delRes.Series != expectDelSeries {
-		t.Fatalf("Expected exactly %d series to get deleted, but got %d", expectDelSeries, delRes.Series)
+	if delSeries != expectDelSeries {
+		t.Fatalf("Expected exactly %d series to get deleted, but got %d", expectDelSeries, delSeries)
 	}
 
 	expectDelArchives := 2
-	if delRes.Archives != expectDelArchives {
-		t.Fatalf("Expected exactly %d archives to get deleted, but got %d", expectDelArchives, delRes.Archives)
+	if delArchives != expectDelArchives {
+		t.Fatalf("Expected exactly %d archives to get deleted, but got %d", expectDelArchives, delArchives)
 	}
 
 	// check if metric1_1 returns no results anymore
@@ -587,14 +587,14 @@ func TestMetricDelete(t *testing.T) {
 	}
 
 	// now reset the whole metric cache
-	delRes = cc.Reset()
+	delSeries, delArchives = cc.Reset()
 	expectDelSeries = 2
-	if delRes.Series != expectDelSeries {
-		t.Fatalf("Expected exactly %d series to get deleted, but got %d", expectDelSeries, delRes.Series)
+	if delSeries != expectDelSeries {
+		t.Fatalf("Expected exactly %d series to get deleted, but got %d", expectDelSeries, delSeries)
 	}
 
 	expectDelArchives = 3
-	if delRes.Archives != expectDelArchives {
-		t.Fatalf("Expected exactly %d archives to get deleted, but got %d", expectDelArchives, delRes.Archives)
+	if delArchives != expectDelArchives {
+		t.Fatalf("Expected exactly %d archives to get deleted, but got %d", expectDelArchives, delArchives)
 	}
 }
