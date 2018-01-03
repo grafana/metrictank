@@ -92,7 +92,6 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 
 	// define how many series/archives are getting deleted by peer 0
 	resp := models.CCacheDeleteResp{
-		Peers:           map[string]models.CCacheDeleteResp{"2": {Errors: 1}},
 		DeletedSeries:   1,
 		DeletedArchives: 1,
 		Errors:          1,
@@ -139,41 +138,18 @@ func TestMetricDeletePropagation(t *testing.T) {
 	manager := cluster.InitMock()
 
 	expectedDeletedSeries, expectedDeletedArchives := 0, 0
-
-	// define how many series/archives are getting deleted by peer 0
-	resp := models.CCacheDeleteResp{
-		DeletedSeries:   2,
-		DeletedArchives: 5,
+	for _, peer := range []string{"Peer1", "Peer2", "Peer3"} {
+		// define how many series/archives are getting deleted by this peer
+		resp := models.CCacheDeleteResp{
+			DeletedSeries:   2,
+			DeletedArchives: 5,
+		}
+		expectedDeletedSeries += resp.DeletedSeries
+		expectedDeletedArchives += resp.DeletedArchives
+		respEncoded := response.NewJson(200, resp, "")
+		buf, _ := respEncoded.Body()
+		manager.Peers = append(manager.Peers, cluster.NewMockNode(false, peer, buf))
 	}
-	expectedDeletedSeries += resp.DeletedSeries
-	expectedDeletedArchives += resp.DeletedArchives
-	respEncoded := response.NewJson(200, resp, "")
-	buf, _ := respEncoded.Body()
-	manager.Peers = append(manager.Peers, cluster.NewMockNode(false, "1", buf))
-
-	// define how many series/archives are getting deleted by peer 1
-	resp = models.CCacheDeleteResp{
-		Peers:           map[string]models.CCacheDeleteResp{"2": {Errors: 1}},
-		DeletedSeries:   1,
-		DeletedArchives: 1,
-	}
-
-	respEncoded = response.NewJson(200, resp, "")
-	buf, _ = respEncoded.Body()
-	// should be ignored because peer.IsLocal() is true
-	manager.Peers = append(manager.Peers, cluster.NewMockNode(true, "2", buf))
-
-	// define how many series/archives are getting deleted by peer 2
-	resp = models.CCacheDeleteResp{
-		Peers:           map[string]models.CCacheDeleteResp{"3": {Errors: 1}},
-		DeletedSeries:   1,
-		DeletedArchives: 3,
-	}
-	expectedDeletedSeries += resp.DeletedSeries
-	expectedDeletedArchives += resp.DeletedArchives
-	respEncoded = response.NewJson(200, resp, "")
-	buf, _ = respEncoded.Body()
-	manager.Peers = append(manager.Peers, cluster.NewMockNode(false, "3", buf))
 
 	// define how many series/archives are going to get deleted by this server
 	delSeries := 3
