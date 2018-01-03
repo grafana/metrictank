@@ -82,8 +82,8 @@ func TestPeersForQueryMulti(t *testing.T) {
 			}
 			So(peerCount["node1"], ShouldEqual, 1000)
 			So(peerCount["node2"], ShouldEqual, 0)
-			So(peerCount["node3"], ShouldNotAlmostEqual, 500)
-			So(peerCount["node4"], ShouldNotAlmostEqual, 500)
+			So(peerCount["node3"], ShouldAlmostEqual, 500)
+			So(peerCount["node4"], ShouldAlmostEqual, 500)
 			for p, count := range peerCount {
 				t.Logf("%s: %d", p, count)
 			}
