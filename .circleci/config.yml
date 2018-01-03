@@ -48,9 +48,8 @@ jobs:
       - run: scripts/qa/end2end.sh
 
   deploy:
-    working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.9.2
+      - image: circleci/ruby:2.3
     steps:
       - checkout
       - attach_workspace:
