@@ -27,8 +27,8 @@ func (l *LRU) touch(key interface{}) {
 func (l *LRU) del(key interface{}) {
 	if ent, ok := l.items[key]; ok {
 		l.list.Remove(ent)
+		delete(l.items, key)
 	}
-	delete(l.items, key)
 }
 
 func (l *LRU) pop() interface{} {
