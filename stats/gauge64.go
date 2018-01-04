@@ -54,3 +54,7 @@ func (g *Gauge64) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	buf = WriteUint64(buf, prefix, []byte("gauge64"), val, now)
 	return buf
 }
+
+func (c *Gauge64) Peek() uint64 {
+	return atomic.LoadUint64(&c.val)
+}

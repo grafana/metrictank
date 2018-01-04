@@ -25,16 +25,16 @@ func TestPeersForQuerySingle(t *testing.T) {
 func TestPeersForQueryMulti(t *testing.T) {
 	Mode = ModeMulti
 	Init("node1", "test", time.Now(), "http", 6060)
-	Manager.SetPrimary(true)
-	Manager.SetPartitions([]int32{1, 2})
+	manager := Manager.(*MemberlistManager)
+	manager.SetPrimary(true)
+	manager.SetPartitions([]int32{1, 2})
 	maxPrio = 10
-	Manager.SetPriority(10)
-	Manager.SetReady()
-	thisNode := Manager.ThisNode()
-	Manager.(*MemberlistManager).Lock()
-
-	Manager.(*MemberlistManager).members = map[string]Node{
-		thisNode.Name: thisNode,
+	manager.SetPriority(10)
+	manager.SetReady()
+	thisNode := manager.thisNode()
+	manager.Lock()
+	manager.members = map[string]HTTPNode{
+		thisNode.GetName(): thisNode,
 		"node2": {
 			Name:       "node2",
 			Primary:    true,
@@ -57,27 +57,27 @@ func TestPeersForQueryMulti(t *testing.T) {
 			Priority:   10,
 		},
 	}
-	Manager.(*MemberlistManager).Unlock()
+	manager.Unlock()
 	Convey("when cluster in multi mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 2)
 		nodeNames := []string{}
 		for _, n := range selected {
-			nodeNames = append(nodeNames, n.Name)
-			if n.Name == Manager.ThisNode().Name {
-				So(n, ShouldResemble, Manager.ThisNode())
+			nodeNames = append(nodeNames, n.GetName())
+			if n.GetName() == manager.thisNode().GetName() {
+				So(n, ShouldResemble, manager.thisNode())
 			}
 		}
 
-		So(nodeNames, ShouldContain, Manager.ThisNode().Name)
+		So(nodeNames, ShouldContain, manager.thisNode().GetName())
 		Convey("members should be selected randomly with even distribution", func() {
 			peerCount := make(map[string]int)
 			for i := 0; i < 1000; i++ {
 				selected, err = MembersForQuery()
 				So(err, ShouldBeNil)
 				for _, p := range selected {
-					peerCount[p.Name]++
+					peerCount[p.GetName()]++
 				}
 			}
 			So(peerCount["node1"], ShouldEqual, 1000)

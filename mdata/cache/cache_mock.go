@@ -1,26 +1,35 @@
 package cache
 
 import (
-	"github.com/grafana/metrictank/mdata/chunk"
+	"context"
 	"sync"
+
+	"github.com/grafana/metrictank/mdata/chunk"
 )
 
 type MockCache struct {
 	sync.Mutex
-	AddCount        int
-	CacheIfHotCount int
-	CacheIfHotCb    func()
-	StopCount       int
-	SearchCount     int
+	AddCount          int
+	CacheIfHotCount   int
+	CacheIfHotCb      func()
+	StopCount         int
+	SearchCount       int
+	DelMetricArchives int
+	DelMetricSeries   int
+	DelMetricKeys     []string
 }
 
-func (mc *MockCache) Add(m string, t uint32, i chunk.IterGen) {
+func NewMockCache() *MockCache {
+	return &MockCache{}
+}
+
+func (mc *MockCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.AddCount++
 }
 
-func (mc *MockCache) CacheIfHot(m string, t uint32, i chunk.IterGen) {
+func (mc *MockCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.CacheIfHotCount++
@@ -35,9 +44,18 @@ func (mc *MockCache) Stop() {
 	mc.StopCount++
 }
 
-func (mc *MockCache) Search(m string, f uint32, u uint32) *CCSearchResult {
+func (mc *MockCache) Search(ctx context.Context, metric string, from uint32, until uint32) *CCSearchResult {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.SearchCount++
 	return nil
+}
+
+func (mc *MockCache) DelMetric(rawMetric string) (int, int) {
+	mc.DelMetricKeys = append(mc.DelMetricKeys, rawMetric)
+	return mc.DelMetricSeries, mc.DelMetricArchives
+}
+
+func (mc *MockCache) Reset() (int, int) {
+	return mc.DelMetricSeries, mc.DelMetricArchives
 }

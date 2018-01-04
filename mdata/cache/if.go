@@ -7,14 +7,16 @@ import (
 )
 
 type Cache interface {
-	Add(string, uint32, chunk.IterGen)
-	CacheIfHot(string, uint32, chunk.IterGen)
+	Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen)
+	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
 	Stop()
-	Search(context.Context, string, uint32, uint32) *CCSearchResult
+	Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult
+	DelMetric(rawMetric string) (int, int)
+	Reset() (int, int)
 }
 
 type CachePusher interface {
-	CacheIfHot(string, uint32, chunk.IterGen)
+	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
 }
 
 type CCSearchResult struct {

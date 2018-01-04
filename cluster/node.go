@@ -88,7 +88,7 @@ func (r *Error) Code() int {
 	return r.code
 }
 
-type Node struct {
+type HTTPNode struct {
 	Name          string    `json:"name"`
 	Version       string    `json:"version"`
 	Primary       bool      `json:"primary"`
@@ -105,19 +105,27 @@ type Node struct {
 	local         bool
 }
 
-func (n Node) RemoteURL() string {
+func (n HTTPNode) RemoteURL() string {
 	return fmt.Sprintf("%s://%s:%d", n.ApiScheme, n.RemoteAddr, n.ApiPort)
 }
 
-func (n Node) IsReady() bool {
+func (n HTTPNode) IsReady() bool {
 	return n.State == NodeReady && n.Priority <= maxPrio
 }
 
-func (n Node) IsLocal() bool {
+func (n HTTPNode) GetPriority() int {
+	return n.Priority
+}
+
+func (n HTTPNode) GetPartitions() []int32 {
+	return n.Partitions
+}
+
+func (n HTTPNode) IsLocal() bool {
 	return n.local
 }
 
-func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
+func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "metrictank")
@@ -169,7 +177,7 @@ func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret 
 	// then abort the http request.
 	select {
 	case <-ctx.Done():
-		log.Debug("CLU Node: context canceled. terminating request to peer %s", n.Name)
+		log.Debug("CLU HTTPNode: context canceled. terminating request to peer %s", n.Name)
 		transport.CancelRequest(req)
 		<-c // Wait for client.Do but ignore result
 	case resp := <-c:
@@ -177,13 +185,17 @@ func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret 
 		rsp := resp.r
 		if err != nil {
 			tags.Error.Set(span, true)
-			log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
+			log.Error(3, "CLU HTTPNode: %s unreachable. %s", n.Name, err.Error())
 			return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
 		}
 		return handleResp(rsp)
 	}
 
 	return nil, nil
+}
+
+func (n HTTPNode) GetName() string {
+	return n.Name
 }
 
 func handleResp(rsp *http.Response) ([]byte, error) {

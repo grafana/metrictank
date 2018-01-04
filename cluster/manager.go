@@ -64,15 +64,15 @@ type ClusterManager interface {
 
 type MemberlistManager struct {
 	sync.RWMutex
-	members  map[string]Node // all members in the cluster, including this node.
+	members  map[string]HTTPNode // all members in the cluster, including this node.
 	nodeName string
 	list     *memberlist.Memberlist
 	cfg      *memberlist.Config
 }
 
-func NewMemberlistManager(thisNode Node) *MemberlistManager {
+func NewMemberlistManager(thisNode HTTPNode) *MemberlistManager {
 	mgr := &MemberlistManager{
-		members: map[string]Node{
+		members: map[string]HTTPNode{
 			thisNode.Name: thisNode,
 		},
 		nodeName: thisNode.Name,
@@ -141,14 +141,22 @@ func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
 }
 
 func (c *MemberlistManager) ThisNode() Node {
+	return c.thisNode()
+}
+
+func (c *MemberlistManager) thisNode() HTTPNode {
 	c.RLock()
 	defer c.RUnlock()
 	return c.members[c.nodeName]
 }
 
 func (c *MemberlistManager) MemberList() []Node {
+	return toIf(c.memberList())
+}
+
+func (c *MemberlistManager) memberList() []HTTPNode {
 	c.RLock()
-	list := make([]Node, len(c.members), len(c.members))
+	list := make([]HTTPNode, len(c.members), len(c.members))
 	i := 0
 	for _, p := range c.members {
 		list[i] = p
@@ -204,8 +212,8 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 	if len(node.Meta) == 0 {
 		return
 	}
-	log.Info("CLU manager: Node %s with address %s has joined the cluster", node.Name, node.Addr.String())
-	member := Node{}
+	log.Info("CLU manager: HTTPNode %s with address %s has joined the cluster", node.Name, node.Addr.String())
+	member := HTTPNode{}
 	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
@@ -224,7 +232,7 @@ func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
 	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
-	log.Info("CLU manager: Node %s has left the cluster", node.Name)
+	log.Info("CLU manager: HTTPNode %s has left the cluster", node.Name)
 	delete(c.members, node.Name)
 	c.clusterStats()
 }
@@ -236,7 +244,7 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	if len(node.Meta) == 0 {
 		return
 	}
-	member := Node{}
+	member := HTTPNode{}
 	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
 		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
@@ -256,7 +264,7 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 		member.local = true
 	}
 	c.members[node.Name] = member
-	log.Info("CLU manager: Node %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
+	log.Info("CLU manager: HTTPNode %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
 	c.clusterStats()
 }
 
@@ -270,7 +278,7 @@ func (c *MemberlistManager) BroadcastUpdate() {
 
 // NodeMeta is used to retrieve meta-data about the current node
 // when broadcasting an alive message. It's length is limited to
-// the given byte size. This metadata is available in the Node structure.
+// the given byte size. This metadata is available in the HTTPNode structure.
 func (c *MemberlistManager) NodeMeta(limit int) []byte {
 	c.RLock()
 	meta, err := json.Marshal(c.members[c.nodeName])
@@ -410,10 +418,10 @@ func (c *MemberlistManager) Stop() {
 
 type SingleNodeManager struct {
 	sync.RWMutex
-	node Node
+	node HTTPNode
 }
 
-func NewSingleNodeManager(thisNode Node) *SingleNodeManager {
+func NewSingleNodeManager(thisNode HTTPNode) *SingleNodeManager {
 	return &SingleNodeManager{
 		node: thisNode,
 	}
@@ -469,9 +477,13 @@ func (m *SingleNodeManager) ThisNode() Node {
 }
 
 func (m *SingleNodeManager) MemberList() []Node {
+	return toIf(m.memberList())
+}
+
+func (m *SingleNodeManager) memberList() []HTTPNode {
 	m.RLock()
 	defer m.RUnlock()
-	return []Node{m.node}
+	return []HTTPNode{m.node}
 }
 
 func (m *SingleNodeManager) Join(peers []string) (int, error) {
@@ -510,4 +522,12 @@ func (m *SingleNodeManager) SetPriority(prio int) {
 
 func (m *SingleNodeManager) Stop() {
 	return
+}
+
+func toIf(in []HTTPNode) []Node {
+	out := make([]Node, len(in))
+	for i, m := range in {
+		out[i] = m
+	}
+	return out
 }
