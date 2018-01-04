@@ -10,9 +10,12 @@ jobs:
       - run: scripts/build_tools.sh
       - setup_remote_docker
       - run: scripts/build_docker.sh
+      - run: mkdir build_docker && docker save -o build_docker/metrictank.tar grafana/metrictank
       - persist_to_workspace:
           root: .
-          paths: build
+          paths:
+            - build
+            - build_docker
 
   test:
     working_directory: /go/src/github.com/grafana/metrictank
@@ -45,6 +48,7 @@ jobs:
       - attach_workspace:
           at: .
       - run: scripts/qa/docs.sh
+      - run: docker load -i build_docker/metrictank.tar
       - run: scripts/qa/end2end.sh
 
   deploy:
@@ -65,6 +69,7 @@ jobs:
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               scripts/push/packagecloud.sh
               docker login -u $DOCKER_USER -p $DOCKER_PASS
+              docker load -i build_docker/metrictank.tar
               scripts/push/docker.sh
             fi
 
