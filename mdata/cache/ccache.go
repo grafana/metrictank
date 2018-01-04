@@ -132,7 +132,7 @@ func (c *CCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGe
 	ccm, ok := c.metricCache[metric]
 	if !ok {
 		ccm = NewCCacheMetric()
-		ccm.Init(rawMetric, prev, itergen)
+		ccm.Init(uint8(len(metric)-len(rawMetric)), prev, itergen)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association
@@ -187,9 +187,10 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 		delete(c.metricCache, target.Metric)
 
 		// this key should alway be present, if not there there is a corruption of the state
-		delete(c.metricRawKeys[ccm.RawMetric], target.Metric)
-		if len(c.metricRawKeys[ccm.RawMetric]) == 0 {
-			delete(c.metricRawKeys, ccm.RawMetric)
+		rawMetric := target.Metric[:len(target.Metric)-int(ccm.SuffixLen)]
+		delete(c.metricRawKeys[rawMetric], target.Metric)
+		if len(c.metricRawKeys[rawMetric]) == 0 {
+			delete(c.metricRawKeys, rawMetric)
 		}
 	}
 }
