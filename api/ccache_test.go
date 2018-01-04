@@ -38,10 +38,10 @@ func newSrv(delSeries, delArchives int, key string) (*Server, *cache.MockCache) 
 	metricIndex := memory.New()
 	metricIndex.AddOrUpdate(
 		&schema.MetricData{
-			Id:       key,
+			Id:       "123",
 			OrgId:    1,
-			Name:     "test.key",
-			Metric:   "test.key",
+			Name:     key,
+			Metric:   key,
 			Interval: 10,
 			Value:    1,
 		},
@@ -54,9 +54,9 @@ func newSrv(delSeries, delArchives int, key string) (*Server, *cache.MockCache) 
 func TestMetricDelete(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	delSeries := 3
-	delArchives := 10
-	testKey := "12345"
+	delSeries := 1
+	delArchives := 3
+	testKey := "test.key"
 
 	srv, cache := newSrv(delSeries, delArchives, testKey)
 	req, _ := json.Marshal(models.CCacheDelete{
@@ -102,9 +102,9 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	manager.Peers = append(manager.Peers, cluster.NewMockNode(false, "0", buf))
 
 	// define how many series/archives are going to get deleted by this server
-	delSeries := 3
-	delArchives := 10
-	testKey := "12345"
+	delSeries := 1
+	delArchives := 3
+	testKey := "test.key"
 
 	srv, _ := newSrv(delSeries, delArchives, testKey)
 	req, err := json.Marshal(models.CCacheDelete{
@@ -152,9 +152,9 @@ func TestMetricDeletePropagation(t *testing.T) {
 	}
 
 	// define how many series/archives are going to get deleted by this server
-	delSeries := 3
-	delArchives := 10
-	testKey := "12345"
+	delSeries := 1
+	delArchives := 3
+	testKey := "test.key"
 
 	// add up how many series/archives are expected to be deleted
 	expectedDeletedSeries += delSeries
