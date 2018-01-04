@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -37,8 +38,24 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		res.DeletedSeries += delSeries
 		res.DeletedArchives += delArchives
 	} else {
-		for _, pattern := range req.Patterns {
-			nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
+		var toClear []idx.Node
+		if len(req.Patterns) > 0 {
+			for _, pattern := range req.Patterns {
+				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
+				if err != nil {
+					if res.Errors == 0 {
+						res.FirstError = err.Error()
+					}
+					res.Errors += 1
+					code = 500
+				} else {
+					toClear = append(toClear, nodes...)
+				}
+			}
+		}
+
+		if len(req.Expr) > 0 {
+			nodes, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, 0)
 			if err != nil {
 				if res.Errors == 0 {
 					res.FirstError = err.Error()
@@ -46,12 +63,16 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 				res.Errors += 1
 				code = 500
 			} else {
-				for _, node := range nodes {
-					for _, def := range node.Defs {
-						delSeries, delArchives := s.Cache.DelMetric(def.NameWithTags())
-						res.DeletedSeries += delSeries
-						res.DeletedArchives += delArchives
-					}
+				toClear = append(toClear, nodes...)
+			}
+		}
+
+		if len(toClear) > 0 {
+			for _, node := range toClear {
+				for _, def := range node.Defs {
+					delSeries, delArchives := s.Cache.DelMetric(def.Id)
+					res.DeletedSeries += delSeries
+					res.DeletedArchives += delArchives
 				}
 			}
 		}

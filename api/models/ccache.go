@@ -5,7 +5,10 @@ import (
 )
 
 type CCacheDelete struct {
-	Patterns  []string `json:"patterns" form:"patterns" binding:"Required"`
+	// patterns with name globbing
+	Patterns []string `json:"patterns" form:"patterns" `
+	// tag expressions to select series
+	Expr      []string `json:"expr" form:"expr"`
 	OrgId     int      `json:"orgId" form:"orgId" binding:"Required"`
 	Propagate bool     `json:"propagate" form:"propagate"`
 }
