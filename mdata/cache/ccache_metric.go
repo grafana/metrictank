@@ -20,7 +20,7 @@ type CCacheMetric struct {
 	// the list of chunk time stamps in ascending order
 	keys []uint32
 
-	RawMetric string
+	SuffixLen uint8
 }
 
 func NewCCacheMetric() *CCacheMetric {
@@ -29,8 +29,8 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(rawMetric string, prev uint32, itergen chunk.IterGen) {
-	mc.RawMetric = rawMetric
+func (mc *CCacheMetric) Init(suffixLen uint8, prev uint32, itergen chunk.IterGen) {
+	mc.SuffixLen = suffixLen
 	mc.Add(prev, itergen)
 }
 
