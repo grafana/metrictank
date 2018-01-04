@@ -471,10 +471,6 @@ func (m *SingleNodeManager) SetState(state NodeState) {
 }
 
 func (m *SingleNodeManager) ThisNode() Node {
-	return m.thisNode()
-}
-
-func (m *SingleNodeManager) thisNode() HTTPNode {
 	m.RLock()
 	defer m.RUnlock()
 	return m.node
