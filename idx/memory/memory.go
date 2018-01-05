@@ -45,15 +45,15 @@ var (
 
 	Enabled         bool
 	matchCacheSize  int
-	tagSupport      bool
-	tagQueryWorkers int // number of workers to spin up when evaluation tag expressions
+	TagSupport      bool
+	TagQueryWorkers int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
-	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
-	memoryIdx.IntVar(&tagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
+	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }
@@ -170,7 +170,7 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 
-	if tagSupport {
+	if TagSupport {
 		m.indexTags(def)
 	}
 
@@ -269,7 +269,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 
 		m.add(def)
 
-		if tagSupport {
+		if TagSupport {
 			m.indexTags(def)
 		}
 
@@ -298,7 +298,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		AggId:            aggId,
 	}
 
-	if tagSupport && len(def.Tags) > 0 {
+	if TagSupport && len(def.Tags) > 0 {
 		if _, ok := m.DefById[def.Id]; !ok {
 			m.DefById[def.Id] = archive
 			statAdd.Inc()
@@ -413,7 +413,7 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 }
 
 func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[string]uint64, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -485,7 +485,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -568,7 +568,7 @@ func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, fro
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -671,7 +671,7 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 // If the third parameter is >0 then only metrics will be accounted of which the
 // LastUpdate time is >= the given value.
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -741,7 +741,7 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 }
 
 func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -955,7 +955,7 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 }
 
 func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -1146,7 +1146,7 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 		for org := range m.Tree {
 			orgs[org] = struct{}{}
 		}
-		if tagSupport {
+		if TagSupport {
 			for org := range m.tags {
 				orgs[org] = struct{}{}
 			}

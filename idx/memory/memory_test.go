@@ -61,16 +61,16 @@ func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool
 }
 
 // testWithAndWithoutTagSupport calls a test with all combinations of
-// the settings tagSupport and tagsInTree. In some cases those settings can
+// the settings TagSupport and tagsInTree. In some cases those settings can
 // affect the logic quite a lot, so we need to test all combinations
 func testWithAndWithoutTagSupport(t *testing.T, f func(*testing.T)) {
 	t.Helper()
-	_tagSupport := tagSupport
-	defer func() { tagSupport = _tagSupport }()
+	_tagSupport := TagSupport
+	defer func() { TagSupport = _tagSupport }()
 
-	tagSupport = true
+	TagSupport = true
 	f(t)
-	tagSupport = false
+	TagSupport = false
 	f(t)
 }
 

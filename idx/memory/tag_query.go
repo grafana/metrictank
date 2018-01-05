@@ -785,8 +785,8 @@ func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) IdSet {
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. those that satisfy all conditions
 	// will be pushed into the resCh
-	q.wg.Add(tagQueryWorkers)
-	for i := 0; i < tagQueryWorkers; i++ {
+	q.wg.Add(TagQueryWorkers)
+	for i := 0; i < TagQueryWorkers; i++ {
 		go q.filterIdsFromChan(idCh, resCh)
 	}
 
@@ -980,8 +980,8 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. then they will extract the tags of
 	// those that satisfy all conditions and push them into tagCh.
-	q.wg.Add(tagQueryWorkers)
-	for i := 0; i < tagQueryWorkers; i++ {
+	q.wg.Add(TagQueryWorkers)
+	for i := 0; i < TagQueryWorkers; i++ {
 		go q.filterTagsFromChan(idCh, tagCh, stopCh, matchName)
 	}
 
