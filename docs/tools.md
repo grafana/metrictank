@@ -471,6 +471,8 @@ Usage of ./mt-whisper-importer-reader:
     	Prefix to prepend before every metric name, should include the '.' if necessary
   -orgid int
     	Organization ID the data belongs to  (default 1)
+  -position-file string
+    	file to store position and load position from
   -threads int
     	Number of workers threads to process and convert .wsp files (default 10)
   -verbose
