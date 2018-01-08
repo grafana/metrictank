@@ -853,11 +853,10 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 }
 
 func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
-	var results []*Node
 	tree, ok := m.Tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return results, nil
+		return nil, nil
 	}
 
 	var nodes []string
@@ -894,14 +893,14 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		startNode, ok = tree.Items[branch]
 		if !ok {
 			log.Debug("memory-idx: branch %s does not exist in the index for orgId %d", branch, orgId)
-			return results, nil
+			return nil, nil
 		}
 	}
 
 	if startNode == nil {
 		corruptIndex.Inc()
 		log.Error(3, "memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
-		return results, nil
+		return nil, nil
 	}
 
 	children := []*Node{startNode}
@@ -914,12 +913,12 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			return nil, err
 		}
 
-		grandChildren := make([]*Node, 0)
+		var grandChildren []*Node
 		for _, c := range children {
 			if c == nil {
 				corruptIndex.Inc()
 				log.Error(3, "memory-idx: child is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q", orgId, pattern, i, pos, p)
-				return results, nil
+				return nil, nil
 			}
 			if !c.HasChildren() {
 				log.Debug("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
@@ -944,11 +943,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	}
 
 	log.Debug("memory-idx: reached pattern length. %d nodes matched", len(children))
-	for _, c := range children {
-		results = append(results, c)
-	}
-
-	return results, nil
+	return children, nil
 }
 
 func (m *MemoryIdx) List(orgId int) []idx.Archive {
