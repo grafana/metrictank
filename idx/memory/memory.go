@@ -788,19 +788,20 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]id
 		return nil, err
 	}
 
-	return m.idsByTagQuery(orgId, query), nil
-}
-
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []idx.Node {
 	m.RLock()
 	defer m.RUnlock()
 
+	ids := m.idsByTagQuery(orgId, query)
+	return m.resolveIDs(orgId, ids), nil
+}
+
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) IdSet {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
 	}
 
-	return m.resolveIDs(orgId, query.Run(tags, m.DefById))
+	return query.Run(tags, m.DefById)
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
@@ -974,6 +975,46 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	statListDuration.Value(time.Since(pre))
 
 	return defs
+}
+
+func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, error) {
+	if !tagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	queries := make([]TagQuery, 0, len(paths))
+	for _, path := range paths {
+		elements := strings.Split(path, ";")
+		if len(elements) < 2 {
+			continue
+		}
+		expressions := elements[1:]
+		expressions = append(expressions, "name="+elements[0])
+
+		q, err := NewTagQuery(expressions, 0)
+		if err != nil {
+			return nil, err
+		}
+		queries = append(queries, q)
+	}
+
+	ids := make(IdSet)
+	for _, query := range queries {
+		m.RLock()
+		queryIds := m.idsByTagQuery(orgId, query)
+		m.RUnlock()
+
+		for id := range queryIds {
+			ids[id] = struct{}{}
+		}
+	}
+
+	m.Lock()
+	defs := m.deleteTagged(orgId, ids)
+	m.Unlock()
+
+	return defs, nil
 }
 
 func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {

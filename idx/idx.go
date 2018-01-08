@@ -168,4 +168,8 @@ type MetricIndex interface {
 	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
 	// time is >= the from timestamp will be included.
 	TagDetails(int, string, string, int64) (map[string]uint64, error)
+
+	// DeleteTagged deletes the specified series from the tag index and also the
+	// DefById index.
+	DeleteTagged(int, []string) ([]Archive, error)
 }
