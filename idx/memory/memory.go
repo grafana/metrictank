@@ -287,7 +287,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 }
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	path := def.Name
+	path := def.NameWithTags()
 
 	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
 	aggId, _ := mdata.MatchAgg(def.Name)
@@ -298,7 +298,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		AggId:            aggId,
 	}
 
-	if TagSupport && len(def.Tags) > 0 {
+	if tagSupport && len(def.Tags) > 0 {
 		if _, ok := m.DefById[def.Id]; !ok {
 			m.DefById[def.Id] = archive
 			statAdd.Inc()
@@ -928,8 +928,6 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	defer m.RUnlock()
 
 	orgs := make(map[int]struct{})
-	orgs[-1] = struct{}{}
-	orgs[orgId] = struct{}{}
 	if orgId == -1 {
 		log.Info("memory-idx: returning all metricDefs for all orgs")
 		for org := range m.Tree {
@@ -938,6 +936,9 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 		for org := range m.tags {
 			orgs[org] = struct{}{}
 		}
+	} else {
+		orgs[-1] = struct{}{}
+		orgs[orgId] = struct{}{}
 	}
 
 	defs := make([]idx.Archive, 0)
@@ -1067,6 +1068,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 		deletedDefs = append(deletedDefs, *m.DefById[id])
 		delete(m.DefById, id)
 	}
+
 	n.Defs = nil
 
 	if n.HasChildren() {

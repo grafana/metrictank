@@ -139,6 +139,19 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 	response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
 }
 
+func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.IndexTagDelSeries) {
+	deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, request.Paths)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	res := models.IndexTagDelSeriesResp{}
+	res.Count = len(deleted)
+
+	response.Write(ctx, response.NewMsgp(200, res))
+}
+
 func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
 	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
 	if err != nil {
@@ -208,11 +221,18 @@ type PeerResponse struct {
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([]PeerResponse, error) {
-	peers, err := cluster.MembersForQuery()
-	if err != nil {
-		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
-		return nil, err
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string, allPeers bool) (map[string]PeerResponse, error) {
+	var peers []cluster.Node
+	var err error
+
+	if allPeers {
+		peers = cluster.Manager.MemberList()
+	} else {
+		peers, err = cluster.MembersForQuery()
+		if err != nil {
+			log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+			return nil, err
+		}
 	}
 	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
 
@@ -249,12 +269,12 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 		close(responses)
 	}()
 
-	result := make([]PeerResponse, 0, len(peers)-1)
+	result := make(map[string]PeerResponse)
 	for resp := range responses {
 		if resp.err != nil {
 			return nil, err
 		}
-		result = append(result, resp.data)
+		result[resp.data.peer.GetName()] = resp.data
 	}
 
 	return result, nil

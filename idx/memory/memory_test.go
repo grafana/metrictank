@@ -40,29 +40,51 @@ func getRandomString(n int, alphabets ...byte) string {
 	return string(bytes)
 }
 
-func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.MetricData {
+func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool) []*schema.MetricData {
 	data := make([]*schema.MetricData, count)
 	series := getSeriesNames(depth, count, prefix)
-	for i, s := range series {
 
+	for i, s := range series {
 		data[i] = &schema.MetricData{
 			Name:     s,
 			Metric:   s,
 			OrgId:    orgId,
 			Interval: interval,
 		}
+		if tagged {
+			data[i].Tags = []string{fmt.Sprintf("series_id=%d", i)}
+		}
 		data[i].SetId()
 	}
+
 	return data
 }
 
+// testWithAndWithoutTagSupport calls a test with all combinations of
+// the settings tagSupport and tagsInTree. In some cases those settings can
+// affect the logic quite a lot, so we need to test all combinations
+func testWithAndWithoutTagSupport(t *testing.T, f func(*testing.T)) {
+	t.Helper()
+	_tagSupport := tagSupport
+	defer func() { tagSupport = _tagSupport }()
+
+	tagSupport = true
+	f(t)
+	tagSupport = false
+	f(t)
+}
+
 func TestGetAddKey(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testGetAddKey)
+}
+
+func testGetAddKey(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
-	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
-	org2Series := getMetricData(2, 2, 5, 10, "metric.org2")
+	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
+	org2Series := getMetricData(2, 2, 5, 10, "metric.org2", false)
 
 	for _, series := range [][]*schema.MetricData{publicSeries, org1Series, org2Series} {
 		orgId := series[0].OrgId
@@ -96,17 +118,21 @@ func TestGetAddKey(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testFind)
+}
+
+func testFind(t *testing.T) {
 	ix := New()
 	ix.Init()
-	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
+	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
-	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
+	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
-	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
+	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo", false) {
 		s.Time = 1 * 86400
 		ix.AddOrUpdate(s, 1)
 		s.Time = 2 * 86400
@@ -114,7 +140,7 @@ func TestFind(t *testing.T) {
 		s.SetId()
 		ix.AddOrUpdate(s, 1)
 	}
-	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
+	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo", false) {
 		s.Time = 1 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
@@ -219,11 +245,15 @@ func TestFind(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testDelete)
+}
+
+func testDelete(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
-	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
+	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 
 	for _, s := range publicSeries {
 		ix.AddOrUpdate(s, 1)
@@ -231,55 +261,46 @@ func TestDelete(t *testing.T) {
 	for _, s := range org1Series {
 		ix.AddOrUpdate(s, 1)
 	}
-	Convey("when deleting exact path", t, func() {
-		defs, err := ix.Delete(1, org1Series[0].Name)
-		So(err, ShouldBeNil)
-		So(defs, ShouldHaveLength, 1)
-		So(defs[0].Id, ShouldEqual, org1Series[0].Id)
-		Convey("series should not be present in the metricDef index", func() {
-			_, ok := ix.Get(org1Series[0].Id)
-			So(ok, ShouldEqual, false)
-			Convey("series should not be present in searches", func() {
-				nodes := strings.Split(org1Series[0].Name, ".")
-				branch := strings.Join(nodes[0:len(nodes)-2], ".")
-				found, err := ix.Find(1, branch+".*.*", 0)
-				So(err, ShouldBeNil)
-				So(found, ShouldHaveLength, 4)
-				for _, n := range found {
-					So(n.Path, ShouldNotEqual, org1Series[0].Name)
-				}
-			})
-		})
-	})
+}
 
-	Convey("when deleting by wildcard", t, func() {
-		defs, err := ix.Delete(1, "metric.org1.*")
+func TestDeleteTagged(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", true)
+	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", true)
+
+	for _, s := range publicSeries {
+		ix.AddOrUpdate(s, 1)
+	}
+	for _, s := range org1Series {
+		ix.AddOrUpdate(s, 1)
+	}
+
+	Convey("when deleting by tag", t, func() {
+		testName := schema.MetricDefinitionFromMetricData(org1Series[3]).NameWithTags()
+		ids, err := ix.DeleteTagged(1, []string{testName})
 		So(err, ShouldBeNil)
-		t.Log(len(defs))
-		So(defs, ShouldHaveLength, 4)
+		So(ids, ShouldHaveLength, 1)
+		So(ids[0].Id, ShouldEqual, org1Series[3].Id)
 		Convey("series should not be present in the metricDef index", func() {
-			for _, def := range org1Series {
-				_, ok := ix.Get(def.Id)
-				So(ok, ShouldEqual, false)
-			}
-			Convey("series should not be present in searches", func() {
-				for _, def := range org1Series {
-					nodes := strings.Split(def.Name, ".")
-					branch := strings.Join(nodes[0:len(nodes)-1], ".")
-					found, err := ix.Find(1, branch+".*", 0)
-					So(err, ShouldBeNil)
-					So(found, ShouldHaveLength, 0)
-				}
-				found, err := ix.Find(1, "metric.*", 0)
+			nodes, err := ix.FindByTag(1, []string{"series_id=3"}, 0)
+			So(err, ShouldBeNil)
+			So(nodes, ShouldHaveLength, 0)
+			Convey("but others should still be present", func() {
+				nodes, err := ix.FindByTag(1, []string{"series_id=~[0-9]"}, 0)
 				So(err, ShouldBeNil)
-				So(found, ShouldHaveLength, 1)
-				So(found[0].Path, ShouldEqual, "metric.public")
+				So(nodes, ShouldHaveLength, 4)
 			})
 		})
 	})
 }
 
 func TestDeleteNodeWith100kChildren(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testDeleteNodeWith100kChildren)
+}
+
+func testDeleteNodeWith100kChildren(t *testing.T) {
 	ix := New()
 	ix.Init()
 
@@ -322,6 +343,10 @@ func TestDeleteNodeWith100kChildren(t *testing.T) {
 }
 
 func TestMixedBranchLeaf(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testMixedBranchLeaf)
+}
+
+func testMixedBranchLeaf(t *testing.T) {
 	ix := New()
 	ix.Init()
 
@@ -370,6 +395,10 @@ func TestMixedBranchLeaf(t *testing.T) {
 }
 
 func TestMixedBranchLeafDelete(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testMixedBranchLeafDelete)
+}
+
+func testMixedBranchLeafDelete(t *testing.T) {
 	ix := New()
 	ix.Init()
 	series := []*schema.MetricData{
@@ -452,7 +481,75 @@ func TestMixedBranchLeafDelete(t *testing.T) {
 	})
 }
 
+func TestPruneTaggedSeries(t *testing.T) {
+	ix := New()
+	ix.Init()
+
+	// add old series
+	series := getMetricData(1, 2, 5, 10, "metric.bah", true)
+	for _, s := range series {
+		s.Time = 1
+		s.SetId()
+		ix.AddOrUpdate(s, 1)
+	}
+
+	// add new series
+	series = getMetricData(1, 2, 5, 10, "metric.foo", true)
+	for _, s := range series {
+		s.Time = 10
+		s.SetId()
+		ix.AddOrUpdate(s, 1)
+	}
+
+	Convey("after populating index", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 10)
+	})
+
+	Convey("When purging old series", t, func() {
+		purged, err := ix.Prune(1, time.Unix(2, 0))
+		So(err, ShouldBeNil)
+		So(purged, ShouldHaveLength, 5)
+		nodes, err := ix.FindByTag(1, []string{"name=~metric\\.bah.*", "series_id=~[0-4]"}, 0)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 0)
+		nodes, err = ix.FindByTag(1, []string{"name=~metric\\.foo.*", "series_id=~[0-4]"}, 0)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+	})
+
+	Convey("after purge", t, func() {
+		defs := ix.List(-1)
+		So(defs, ShouldHaveLength, 5)
+		data := &schema.MetricData{
+			Name:     defs[0].Name,
+			Metric:   defs[0].Metric,
+			Id:       defs[0].Id,
+			Tags:     defs[0].Tags,
+			Mtype:    defs[0].Mtype,
+			OrgId:    1,
+			Interval: 10,
+			Time:     100,
+		}
+		data.SetId()
+		ix.AddOrUpdate(data, 1)
+		Convey("When purging old series", func() {
+			purged, err := ix.Prune(1, time.Unix(12, 0))
+			So(err, ShouldBeNil)
+			So(purged, ShouldHaveLength, 4)
+			nodes, err := ix.FindByTag(1, []string{"name=~metric\\.foo.*", "series_id=~[0-4]"}, 0)
+			So(err, ShouldBeNil)
+			So(nodes, ShouldHaveLength, 1)
+		})
+	})
+
+}
+
 func TestPrune(t *testing.T) {
+	testWithAndWithoutTagSupport(t, testPrune)
+}
+
+func testPrune(t *testing.T) {
 	ix := New()
 	ix.Init()
 

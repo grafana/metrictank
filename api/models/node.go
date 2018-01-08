@@ -122,6 +122,19 @@ func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
 func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
 }
 
+type IndexTagDelSeries struct {
+	OrgId int      `json:"orgId" binding:"Required"`
+	Paths []string `json:"path" form:"path"`
+}
+
+func (t IndexTagDelSeries) Trace(span opentracing.Span) {
+	span.SetTag("org", t.OrgId)
+	span.SetTag("paths", t.Paths)
+}
+
+func (i IndexTagDelSeries) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	Id string `json:"id" form:"id" binding:"Required"`
 }
