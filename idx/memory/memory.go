@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -900,7 +901,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	if startNode == nil {
 		corruptIndex.Inc()
 		log.Error(3, "memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
-		return nil, nil
+		return nil, response.NewInternalError("hit an empty path in the index")
 	}
 
 	children := []*Node{startNode}
@@ -931,7 +932,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				if grandChild == nil {
 					corruptIndex.Inc()
 					log.Error(3, "memory-idx: grandChild is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q,path=%q", orgId, pattern, i, pos, p, newBranch)
-					return nil, nil
+					return nil, response.NewInternalError("hit an empty path in the index")
 				}
 
 				grandChildren = append(grandChildren, grandChild)
@@ -1192,7 +1193,7 @@ func getMatcher(path string) (func([]string) []string, error) {
 			r, err := regexp.Compile(toRegexp(p))
 			if err != nil {
 				log.Debug("memory-idx: regexp failed to compile. %s - %s", p, err)
-				return nil, err
+				return nil, response.NewBadRequest(err.Error())
 			}
 			regexes = append(regexes, r)
 		}
