@@ -883,18 +883,25 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 		}
 	}
 	var startNode *Node
+	var branch string
 	if pos == 0 {
 		//we need to start at the root.
 		log.Debug("memory-idx: starting search at the root node")
 		startNode = tree.Items[""]
 	} else {
-		branch := strings.Join(nodes[0:pos], ".")
+		branch = strings.Join(nodes[0:pos], ".")
 		log.Debug("memory-idx: starting search at branch %s", branch)
 		startNode, ok = tree.Items[branch]
 		if !ok {
 			log.Debug("memory-idx: branch %s does not exist in the index for orgId %d", branch, orgId)
 			return results, nil
 		}
+	}
+
+	if startNode == nil {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
+		return results, nil
 	}
 
 	children := []*Node{startNode}
@@ -909,6 +916,11 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 
 		grandChildren := make([]*Node, 0)
 		for _, c := range children {
+			if c == nil {
+				corruptIndex.Inc()
+				log.Error(3, "memory-idx: child is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q", orgId, pattern, i, pos, p)
+				return results, nil
+			}
 			if !c.HasChildren() {
 				log.Debug("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
 				// expecting a branch
