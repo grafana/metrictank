@@ -88,6 +88,11 @@ var (
 		0,
 		"Only import after the specified timestamp",
 	)
+	positionFile = flag.String(
+		"position-file",
+		"",
+		"file to store position and load position from",
+	)
 	verbose = flag.Bool(
 		"verbose",
 		false,
@@ -114,19 +119,28 @@ func main() {
 		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
 	}
 
+	var pos *posTracker
+	if len(*positionFile) > 0 {
+		pos, err = NewPositionKeeper(*positionFile)
+		if err != nil {
+			log.Fatalf("Error instantiating position keeper: %s", err)
+		}
+		defer pos.Close()
+	}
+
 	fileChan := make(chan string)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(*threads)
 	for i := 0; i < *threads; i++ {
-		go processFromChan(fileChan, wg)
+		go processFromChan(pos, fileChan, wg)
 	}
 
-	getFileListIntoChan(fileChan)
+	getFileListIntoChan(pos, fileChan)
 	wg.Wait()
 }
 
-func processFromChan(files chan string, wg *sync.WaitGroup) {
+func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
 	}
@@ -194,6 +208,9 @@ func processFromChan(files chan string, wg *sync.WaitGroup) {
 			resp.Body.Close()
 		}
 
+		if pos != nil {
+			pos.Done(file)
+		}
 		processed := atomic.AddUint32(&processedCount, 1)
 		if processed%100 == 0 {
 			skipped := atomic.LoadUint32(&skippedCount)
@@ -362,7 +379,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 }
 
 // scan a directory and feed the list of whisper files relative to base into the given channel
-func getFileListIntoChan(fileChan chan string) {
+func getFileListIntoChan(pos *posTracker, fileChan chan string) {
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
@@ -375,9 +392,15 @@ func getFileListIntoChan(fileChan chan string) {
 				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}
-			if len(path) >= 4 && path[len(path)-4:] == ".wsp" {
-				fileChan <- path
+			if len(path) < 4 || path[len(path)-4:] != ".wsp" {
+				return nil
 			}
+			if pos != nil && pos.IsDone(path) {
+				log.Debugf("Skipping file %s because it was listed as already done", path)
+				return nil
+			}
+
+			fileChan <- path
 			return nil
 		},
 	)
