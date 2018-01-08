@@ -915,11 +915,6 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 
 		var grandChildren []*Node
 		for _, c := range children {
-			if c == nil {
-				corruptIndex.Inc()
-				log.Error(3, "memory-idx: child is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q", orgId, pattern, i, pos, p)
-				return nil, nil
-			}
 			if !c.HasChildren() {
 				log.Debug("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
 				// expecting a branch
@@ -932,7 +927,14 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				if c.Path == "" {
 					newBranch = m
 				}
-				grandChildren = append(grandChildren, tree.Items[newBranch])
+				grandChild := tree.Items[newBranch]
+				if grandChild == nil {
+					corruptIndex.Inc()
+					log.Error(3, "memory-idx: grandChild is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q,path=%q", orgId, pattern, i, pos, p, newBranch)
+					return nil, nil
+				}
+
+				grandChildren = append(grandChildren, grandChild)
 			}
 		}
 		children = grandChildren
