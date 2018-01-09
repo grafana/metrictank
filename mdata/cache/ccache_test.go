@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
+// getItgen returns an IterGen which holds a chunk which has directly encoded all values
 func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
@@ -42,11 +43,11 @@ func getConnectedChunks(t *testing.T, metric string) *CCache {
 	itgen4 := getItgen(t, values, 1015, false)
 	itgen5 := getItgen(t, values, 1020, false)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 1000, itgen2)
-	cc.Add(metric, 1005, itgen3)
-	cc.Add(metric, 1010, itgen4)
-	cc.Add(metric, 1015, itgen5)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 1000, itgen2)
+	cc.Add(metric, metric, 1005, itgen3)
+	cc.Add(metric, metric, 1010, itgen4)
+	cc.Add(metric, metric, 1015, itgen5)
 
 	return cc
 }
@@ -61,8 +62,8 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 1000, itgen2)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 1000, itgen2)
 
 	cc.CacheIfHot(metric, 0, itgen3)
 
@@ -95,7 +96,7 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, metric, 0, itgen1)
 
 	cc.CacheIfHot(metric, 0, itgen3)
 
@@ -121,8 +122,8 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 1000, itgen2)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 1000, itgen2)
 
 	cc.CacheIfHot(metric, 1005, itgen3)
 
@@ -155,7 +156,7 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, itgen1)
+	cc.Add(metric, metric, 0, itgen1)
 
 	cc.CacheIfHot(metric, 1005, itgen3)
 
@@ -179,8 +180,8 @@ func TestConsecutiveAdding(t *testing.T) {
 	itgen1 := getItgen(t, values, 1000, false)
 	itgen2 := getItgen(t, values, 1005, false)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 1000, itgen2)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 1000, itgen2)
 
 	mc := cc.metricCache[metric]
 	chunk1, ok := mc.chunks[1000]
@@ -216,9 +217,9 @@ func TestDisconnectedAdding(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, true)
 	itgen3 := getItgen(t, values, 1010, true)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 0, itgen2)
-	cc.Add(metric, 0, itgen3)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 0, itgen2)
+	cc.Add(metric, metric, 0, itgen3)
 
 	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
@@ -250,9 +251,9 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	itgen2 := getItgen(t, values, 1005, false)
 	itgen3 := getItgen(t, values, 1010, false)
 
-	cc.Add(metric, 0, itgen1)
-	cc.Add(metric, 1000, itgen2)
-	cc.Add(metric, 0, itgen3)
+	cc.Add(metric, metric, 0, itgen1)
+	cc.Add(metric, metric, 1000, itgen2)
+	cc.Add(metric, metric, 0, itgen3)
 
 	res := cc.Search(test.NewContext(), metric, 900, 1015)
 
@@ -380,19 +381,19 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 			cc.Reset()
 
 			if ascending {
-				cc.Add(metric, 0, itgen1)
-				cc.Add(metric, 1000, itgen2)
-				cc.Add(metric, 1010, itgen3)
-				cc.Add(metric, 0, itgen4)
-				cc.Add(metric, 1030, itgen5)
-				cc.Add(metric, 1040, itgen6)
+				cc.Add(metric, metric, 0, itgen1)
+				cc.Add(metric, metric, 1000, itgen2)
+				cc.Add(metric, metric, 1010, itgen3)
+				cc.Add(metric, metric, 0, itgen4)
+				cc.Add(metric, metric, 1030, itgen5)
+				cc.Add(metric, metric, 1040, itgen6)
 			} else {
-				cc.Add(metric, 0, itgen6)
-				cc.Add(metric, 0, itgen5)
-				cc.Add(metric, 0, itgen4)
-				cc.Add(metric, 0, itgen3)
-				cc.Add(metric, 0, itgen2)
-				cc.Add(metric, 0, itgen1)
+				cc.Add(metric, metric, 0, itgen6)
+				cc.Add(metric, metric, 0, itgen5)
+				cc.Add(metric, metric, 0, itgen4)
+				cc.Add(metric, metric, 0, itgen3)
+				cc.Add(metric, metric, 0, itgen2)
+				cc.Add(metric, metric, 0, itgen1)
 			}
 
 			res = cc.Search(test.NewContext(), metric, from, until)
@@ -456,19 +457,19 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 			cc.Reset()
 
 			if ascending {
-				cc.Add(metric, 0, itgen1)
-				cc.Add(metric, 1000, itgen2)
-				cc.Add(metric, 1010, itgen3)
-				cc.Add(metric, 0, itgen4)
-				cc.Add(metric, 1040, itgen5)
-				cc.Add(metric, 1050, itgen6)
+				cc.Add(metric, metric, 0, itgen1)
+				cc.Add(metric, metric, 1000, itgen2)
+				cc.Add(metric, metric, 1010, itgen3)
+				cc.Add(metric, metric, 0, itgen4)
+				cc.Add(metric, metric, 1040, itgen5)
+				cc.Add(metric, metric, 1050, itgen6)
 			} else {
-				cc.Add(metric, 0, itgen6)
-				cc.Add(metric, 0, itgen5)
-				cc.Add(metric, 0, itgen4)
-				cc.Add(metric, 0, itgen3)
-				cc.Add(metric, 0, itgen2)
-				cc.Add(metric, 0, itgen1)
+				cc.Add(metric, metric, 0, itgen6)
+				cc.Add(metric, metric, 0, itgen5)
+				cc.Add(metric, metric, 0, itgen4)
+				cc.Add(metric, metric, 0, itgen3)
+				cc.Add(metric, metric, 0, itgen2)
+				cc.Add(metric, metric, 0, itgen1)
 			}
 
 			res = cc.Search(test.NewContext(), metric, from, until)
@@ -501,4 +502,132 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 			}
 		}
 	}
+}
+
+func TestReset(t *testing.T) {
+	cc := NewCCache()
+
+	// .Reset() is being called at the end of testMetricDelete()
+	testMetricDelete(t, cc)
+	testMetricDelete(t, cc)
+	testMetricDelete(t, cc)
+}
+
+func TestMetricDelete(t *testing.T) {
+	cc := NewCCache()
+	testMetricDelete(t, cc)
+}
+
+func testMetricDelete(t *testing.T, cc *CCache) {
+	var res *CCSearchResult
+
+	rawMetric1 := "some.tree.metric1"
+	metric1_1 := "some.tree.metric1_600_cnt"
+	metric1_2 := "some.tree.metric1_600_sum"
+	rawMetric2 := "some.tree.metric2"
+	metric2_1 := "some.tree.metric2_6000_cnt"
+	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	itgenCount := 10
+	itgens := make([]chunk.IterGen, 0, itgenCount)
+	for i := 1000; i < 1000+itgenCount*len(values); i = i + len(values) {
+		itgens = append(itgens, getItgen(t, values, uint32(i), true))
+	}
+
+	// add two metrics with itgenCount chunks each
+	for _, itgen := range itgens {
+		cc.Add(metric1_1, rawMetric1, 0, itgen)
+		cc.Add(metric1_2, rawMetric1, 0, itgen)
+		cc.Add(metric2_1, rawMetric2, 0, itgen)
+	}
+
+	// check if Search returns them all for metric1_1
+	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != itgenCount {
+		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
+	}
+
+	// check if Search returns them all for metric1_2
+	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != itgenCount {
+		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
+	}
+
+	// check if Search returns them all for metric2_1
+	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != itgenCount {
+		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
+	}
+
+	// now delete metric1_1, but leave metric2_1
+	delSeries, delArchives := cc.DelMetric(rawMetric1)
+	expectDelSeries := 1
+	if delSeries != expectDelSeries {
+		t.Fatalf("Expected exactly %d deleted series, but got %d", expectDelSeries, delSeries)
+	}
+
+	expectDelArchives := 2
+	if delArchives != expectDelArchives {
+		t.Fatalf("Expected exactly %d deleted archives, but got %d", expectDelArchives, delArchives)
+	}
+
+	// check if metric1_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// check if metric1_2 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// but metric2_1 should still be there
+	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != itgenCount {
+		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
+	}
+
+	// now add metric1_1 and metric1_2 again
+	for _, itgen := range itgens {
+		cc.Add(metric1_1, rawMetric1, 0, itgen)
+		cc.Add(metric1_2, rawMetric1, 0, itgen)
+	}
+
+	// and check if it gets returned by Search again
+	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != itgenCount {
+		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
+	}
+
+	// now reset the whole metric cache
+	delSeries, delArchives = cc.Reset()
+	expectDelSeries = 2
+	if delSeries != expectDelSeries {
+		t.Fatalf("Expected exactly deleted %d series, but got %d", expectDelSeries, delSeries)
+	}
+
+	expectDelArchives = 3
+	if delArchives != expectDelArchives {
+		t.Fatalf("Expected exactly deleted %d archives, but got %d", expectDelArchives, delArchives)
+	}
+
+	// check if metric1_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// check if metric1_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
+	// check if metric2_1 returns no results anymore
+	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	if len(res.Start) != 0 {
+		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
+	}
+
 }

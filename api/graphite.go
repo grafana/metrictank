@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -59,49 +60,72 @@ func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, s
 		return nil, err
 	}
 	log.Debug("HTTP findSeries for %v across %d instances", patterns, len(peers))
-	errors := make([]error, 0)
-	series := make([]Series, 0)
-
-	var mu sync.Mutex
 	var wg sync.WaitGroup
+
+	responses := make(chan struct {
+		series []Series
+		err    error
+	}, 1)
+	findCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	for _, peer := range peers {
-		log.Debug("HTTP findSeries getting results from %s", peer.Name)
+		log.Debug("HTTP findSeries getting results from %s", peer.GetName())
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
-				result, err := s.findSeriesLocal(ctx, orgId, patterns, seenAfter)
-				mu.Lock()
+				result, err := s.findSeriesLocal(findCtx, orgId, patterns, seenAfter)
 				if err != nil {
-					errors = append(errors, err)
+					// cancel requests on all other peers.
+					cancel()
 				}
-				series = append(series, result...)
-				mu.Unlock()
+				responses <- struct {
+					series []Series
+					err    error
+				}{result, err}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.findSeriesRemote(ctx, orgId, patterns, seenAfter, peer)
-				mu.Lock()
+				result, err := s.findSeriesRemote(findCtx, orgId, patterns, seenAfter, peer)
 				if err != nil {
-					errors = append(errors, err)
+					// cancel requests on all other peers.
+					cancel()
 				}
-				series = append(series, result...)
-				mu.Unlock()
+				responses <- struct {
+					series []Series
+					err    error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	if len(errors) > 0 {
-		err = errors[0]
+
+	// wait for all findSeries goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	series := make([]Series, 0)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, err
+		}
+		series = append(series, resp.series...)
 	}
 
-	return series, err
+	return series, nil
 }
 
 func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, nil
+		default:
+		}
 		_, span := tracing.NewSpan(ctx, s.Tracer, "findSeriesLocal")
 		span.SetTag("org", orgId)
 		span.SetTag("pattern", pattern)
@@ -122,7 +146,7 @@ func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []stri
 }
 
 func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
-	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.Name, orgId, patterns)
+	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.GetName(), orgId, patterns)
 	data := models.IndexFind{
 		Patterns: patterns,
 		OrgId:    orgId,
@@ -130,13 +154,19 @@ func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []str
 	}
 	buf, err := peer.Post(ctx, "findSeriesRemote", "/index/find", data)
 	if err != nil {
-		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.Name, err)
+		log.Error(4, "HTTP Render error querying %s/index/find: %q", peer.GetName(), err)
 		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 	resp := models.NewIndexFindResp()
 	_, err = resp.UnmarshalMsg(buf)
 	if err != nil {
-		log.Error(4, "HTTP Find() error unmarshaling body from %s/index/find: %q", peer.Name, err)
+		log.Error(4, "HTTP Find() error unmarshaling body from %s/index/find: %q", peer.GetName(), err)
 		return nil, err
 	}
 	result := make([]Series, 0)
@@ -146,7 +176,7 @@ func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []str
 			Node:    peer,
 			Series:  nodes,
 		})
-		log.Debug("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, peer.Name)
+		log.Debug("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, peer.GetName())
 	}
 	return result, nil
 }
@@ -249,6 +279,15 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-newctx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
 	noDataPoints := true
 	for _, o := range out {
 		if len(o.Datapoints) != 0 {
@@ -262,6 +301,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	switch request.Format {
 	case "msgp":
 		response.Write(ctx, response.NewMsgp(200, models.SeriesByTarget(out)))
+	case "msgpack":
+		response.Write(ctx, response.NewMsgpack(200, models.SeriesByTarget(out).ForGraphite("msgpack")))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, models.SeriesByTarget(out)))
 	default:
@@ -279,11 +320,22 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		return
 	}
 	nodes := make([]idx.Node, 0)
-	series, err := s.findSeries(ctx.Req.Context(), ctx.OrgId, []string{request.Query}, int64(fromUnix))
+	reqCtx := ctx.Req.Context()
+	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix))
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
 	seenPaths := make(map[string]struct{})
 	// different nodes may have overlapping data in their index.
 	// maybe because they used to receive a certain shard but now dont. or because they host metrics under branches
@@ -304,6 +356,8 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewJson(200, findTreejson(request.Query, nodes), request.Jsonp))
 	case "completer":
 		response.Write(ctx, response.NewJson(200, findCompleter(nodes), request.Jsonp))
+	case "msgpack":
+		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
 	}
@@ -314,18 +368,24 @@ func (s *Server) listLocal(orgId int) []idx.Archive {
 }
 
 func (s *Server) listRemote(ctx context.Context, orgId int, peer cluster.Node) ([]idx.Archive, error) {
-	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.Name, orgId)
+	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.GetName(), orgId)
 	buf, err := peer.Post(ctx, "listRemote", "/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
-		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.Name, err)
+		log.Error(4, "HTTP IndexJson() error querying %s/index/list: %q", peer.GetName(), err)
 		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 	result := make([]idx.Archive, 0)
 	for len(buf) != 0 {
 		var def idx.Archive
 		buf, err = def.UnmarshalMsg(buf)
 		if err != nil {
-			log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/index/list: %q", peer.Name, err)
+			log.Error(3, "HTTP IndexJson() error unmarshaling body from %s/index/list: %q", peer.GetName(), err)
 			return nil, err
 		}
 		result = append(result, def)
@@ -339,53 +399,67 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
-	errors := make([]error, 0)
-	series := make([]idx.Archive, 0)
-	seenDefs := make(map[string]struct{})
-	var mu sync.Mutex
+	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
+	defer cancel()
+	responses := make(chan struct {
+		series []idx.Archive
+		err    error
+	}, 1)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
 				result := s.listLocal(ctx.OrgId)
-				mu.Lock()
-				for _, def := range result {
-					if _, ok := seenDefs[def.Id]; !ok {
-						series = append(series, def)
-						seenDefs[def.Id] = struct{}{}
-					}
-				}
-				mu.Unlock()
+				responses <- struct {
+					series []idx.Archive
+					err    error
+				}{result, nil}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.listRemote(ctx.Req.Context(), ctx.OrgId, peer)
-				mu.Lock()
+				result, err := s.listRemote(reqCtx, ctx.OrgId, peer)
 				if err != nil {
-					errors = append(errors, err)
+					cancel()
 				}
-				for _, def := range result {
-					if _, ok := seenDefs[def.Id]; !ok {
-						series = append(series, def)
-						seenDefs[def.Id] = struct{}{}
-					}
-				}
-				mu.Unlock()
+				responses <- struct {
+					series []idx.Archive
+					err    error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	if len(errors) > 0 {
-		err = errors[0]
+
+	// wait for all list goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	series := make([]idx.Archive, 0)
+	seenDefs := make(map[string]struct{})
+	for resp := range responses {
+		if resp.err != nil {
+			response.Write(ctx, response.WrapError(err))
+			return
+		}
+		for _, def := range resp.series {
+			if _, ok := seenDefs[def.Id]; !ok {
+				series = append(series, def)
+				seenDefs[def.Id] = struct{}{}
+			}
+		}
 	}
 
-	if err != nil {
-		log.Error(3, "HTTP IndexJson() %s", err.Error())
-		response.Write(ctx, response.WrapError(err))
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
 		return
+	default:
 	}
 
 	response.Write(ctx, response.NewFastJson(200, models.MetricNames(series)))
@@ -404,7 +478,11 @@ func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 			c.IsLeaf = "0"
 		}
 
-		i := strings.LastIndex(c.Path, ".")
+		i := strings.Index(c.Path, ";")
+		if i == -1 {
+			i = len(c.Path)
+		}
+		i = strings.LastIndex(c.Path[:i], ".")
 
 		if i != -1 {
 			c.Name = c.Path[i+1:]
@@ -433,14 +511,13 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	tree := models.NewSeriesTree()
 	seen := make(map[string]struct{})
 
-	basepath := ""
-	if i := strings.LastIndex(query, "."); i != -1 {
-		basepath = query[:i+1]
-	}
-
 	for _, g := range nodes {
 		name := string(g.Path)
-		if i := strings.LastIndex(name, "."); i != -1 {
+		i := strings.Index(name, ";")
+		if i == -1 {
+			i = len(name)
+		}
+		if i = strings.LastIndex(name[:i], "."); i != -1 {
 			name = name[i+1:]
 		}
 
@@ -460,7 +537,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 		}
 
 		t := models.SeriesTreeItem{
-			ID:            basepath + name,
+			ID:            g.Path,
 			Context:       treejsonContext,
 			Text:          name,
 			AllowChildren: allowChildren,
@@ -476,46 +553,72 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	peers := cluster.Manager.MemberList()
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debug("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
-	errors := make([]error, 0)
+
+	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
+	defer cancel()
 	deleted := 0
-	var mu sync.Mutex
+	responses := make(chan struct {
+		deleted int
+		err     error
+	}, len(peers))
 	var wg sync.WaitGroup
 	for _, peer := range peers {
-		log.Debug("HTTP metricsDelete getting results from %s", peer.Name)
+		log.Debug("HTTP metricsDelete getting results from %s", peer.GetName())
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
 				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
-				mu.Lock()
+				var e error
 				if err != nil {
-					// errors can be due to bad user input or corrupt index.
+					cancel()
 					if strings.Contains(err.Error(), "Index is corrupt") {
-						errors = append(errors, response.NewError(http.StatusInternalServerError, err.Error()))
+						e = response.NewError(http.StatusInternalServerError, err.Error())
 					} else {
-						errors = append(errors, response.NewError(http.StatusBadRequest, err.Error()))
+						e = response.NewError(http.StatusBadRequest, err.Error())
 					}
 				}
-				deleted += result
-				mu.Unlock()
+				responses <- struct {
+					deleted int
+					err     error
+				}{result, e}
 				wg.Done()
 			}()
 		} else {
 			go func(peer cluster.Node) {
-				result, err := s.metricsDeleteRemote(ctx.Req.Context(), ctx.OrgId, req.Query, peer)
-				mu.Lock()
+				result, err := s.metricsDeleteRemote(reqCtx, ctx.OrgId, req.Query, peer)
 				if err != nil {
-					errors = append(errors, err)
+					cancel()
 				}
-				deleted += result
-				mu.Unlock()
+				responses <- struct {
+					deleted int
+					err     error
+				}{result, err}
 				wg.Done()
 			}(peer)
 		}
 	}
-	wg.Wait()
-	var err error
-	if len(errors) > 0 {
-		response.Write(ctx, response.WrapError(err))
+
+	// wait for all metricsDelete goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	for resp := range responses {
+		if resp.err != nil {
+			response.Write(ctx, response.WrapError(resp.err))
+			return
+		}
+		deleted += resp.deleted
+	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
 	}
 
 	resp := models.MetricsDeleteResp{
@@ -531,7 +634,7 @@ func (s *Server) metricsDeleteLocal(orgId int, query string) (int, error) {
 }
 
 func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query string, peer cluster.Node) (int, error) {
-	log.Debug("HTTP metricDelete calling %s/index/delete for %d:%q", peer.Name, orgId, query)
+	log.Debug("HTTP metricDelete calling %s/index/delete for %d:%q", peer.GetName(), orgId, query)
 
 	body := models.IndexDelete{
 		Query: query,
@@ -539,13 +642,21 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query strin
 	}
 	buf, err := peer.Post(ctx, "metricsDeleteRemote", "/index/delete", body)
 	if err != nil {
-		log.Error(4, "HTTP metricDelete error querying %s/index/delete: %q", peer.Name, err)
+		log.Error(4, "HTTP metricDelete error querying %s/index/delete: %q", peer.GetName(), err)
 		return 0, err
 	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return 0, nil
+	default:
+	}
+
 	resp := models.MetricsDeleteResp{}
 	_, err = resp.UnmarshalMsg(buf)
 	if err != nil {
-		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/index/delete: %q", peer.Name, err)
+		log.Error(4, "HTTP metricDelete error unmarshaling body from %s/index/delete: %q", peer.GetName(), err)
 		return 0, err
 	}
 
@@ -565,7 +676,26 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	for _, r := range plan.Reqs {
-		series, err := s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, nil
+		default:
+		}
+		var err error
+		var series []Series
+		const SeriesByTagIdent = "seriesByTag("
+		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
+			startPos := len(SeriesByTagIdent)
+			endPos := strings.LastIndex(r.Query, ")")
+			exprs := strings.Split(r.Query[startPos:endPos], ",")
+			for i, e := range exprs {
+				exprs[i] = strings.Trim(e, " '\"")
+			}
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From))
+		} else {
+			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -588,12 +718,20 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 					}
+
 					newReq := models.NewReq(
-						archive.Id, archive.Name, r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
 				}
 			}
 		}
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 
 	reqRenderSeriesCount.Value(len(reqs))
@@ -613,7 +751,7 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 
 	if LogLevel < 2 {
 		for _, req := range reqs {
-			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.Name)
+			log.Debug("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 		}
 	}
 
@@ -622,6 +760,7 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 		log.Error(3, "HTTP Render %s", err.Error())
 		return nil, err
 	}
+
 	out = mergeSeries(out)
 
 	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
@@ -672,4 +811,343 @@ func getLocation(desc string) (*time.Location, error) {
 		return time.Local, nil
 	}
 	return time.LoadLocation(desc)
+}
+
+func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.GraphiteTagDetails) {
+	tag := ctx.Params(":tag")
+	if len(tag) <= 0 {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, "not tag specified"))
+		return
+	}
+	reqCtx := ctx.Req.Context()
+	tagValues, err := s.clusterTagDetails(reqCtx, ctx.OrgId, tag, request.Filter, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
+	resp := models.GraphiteTagDetailsResp{
+		Tag:    tag,
+		Values: make([]models.GraphiteTagDetailsValueResp, 0, len(tagValues)),
+	}
+
+	for k, v := range tagValues {
+		resp.Values = append(resp.Values, models.GraphiteTagDetailsValueResp{
+			Value: k,
+			Count: v,
+		})
+	}
+
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter string, from int64) (map[string]uint64, error) {
+	result, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = make(map[string]uint64)
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
+	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
+	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
+	if err != nil {
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+	resp := models.IndexTagDetailsResp{}
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range resp.Values {
+			result[k] = result[k] + v
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
+	reqCtx := ctx.Req.Context()
+	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, request.Expr, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+	seriesNames := make([]string, 0, len(series))
+	for _, serie := range series {
+		seriesNames = append(seriesNames, serie.Pattern)
+	}
+	response.Write(ctx, response.NewJson(200, seriesNames, ""))
+}
+
+func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]Series, error) {
+	seriesSet := make(map[string]Series)
+
+	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
+	for _, series := range result {
+		seriesSet[series.Path] = Series{
+			Pattern: series.Path,
+			Node:    cluster.Manager.ThisNode(),
+			Series:  []idx.Node{series},
+		}
+	}
+
+	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
+	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
+	for _, r := range resps {
+		resp := models.IndexFindByTagResp{}
+		_, err = resp.UnmarshalMsg(r.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, series := range resp.Metrics {
+			seriesSet[series.Path] = Series{
+				Pattern: series.Path,
+				Node:    r.peer,
+				Series:  []idx.Node{series},
+			}
+		}
+	}
+
+	series := make([]Series, 0, len(seriesSet))
+	for _, s := range seriesSet {
+		series = append(series, s)
+	}
+
+	return series, nil
+}
+
+func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
+	reqCtx := ctx.Req.Context()
+	tags, err := s.clusterTags(reqCtx, ctx.OrgId, request.Filter, request.From)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
+	var resp models.GraphiteTagsResp
+	for _, tag := range tags {
+		resp = append(resp, models.GraphiteTagResp{Tag: tag})
+	}
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from int64) ([]string, error) {
+	result, err := s.MetricIndex.Tags(orgId, filter, from)
+	if err != nil {
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
+	tagSet := make(map[string]struct{}, len(result))
+	for _, tag := range result {
+		tagSet[tag] = struct{}{}
+	}
+
+	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
+	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
+	}
+
+	resp := models.IndexTagsResp{}
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp.Tags {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tags = append(tags, t)
+	}
+
+	return tags, nil
+}
+
+func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request models.GraphiteAutoCompleteTags) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.Prefix, request.Expr, request.From, request.Limit)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, tags, ""))
+}
+
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.FindTags(orgId, prefix, expressions, from, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	tagSet := make(map[string]struct{}, len(result))
+	for _, tag := range result {
+		tagSet[tag] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	resp := models.StringList{}
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range resp {
+			tagSet[tag] = struct{}{}
+		}
+	}
+
+	tags := make([]string, 0, len(tagSet))
+	for t := range tagSet {
+		tags = append(tags, t)
+	}
+
+	sort.Strings(tags)
+	if uint(len(tags)) > limit {
+		tags = tags[:limit]
+	}
+
+	return tags, nil
+}
+
+func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request models.GraphiteAutoCompleteTagValues) {
+	if request.Limit == 0 {
+		request.Limit = tagdbDefaultLimit
+	}
+
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.Prefix, request.Expr, request.From, request.Limit)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, resp, ""))
+}
+
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+	result, err := s.MetricIndex.FindTagValues(orgId, tag, prefix, expressions, from, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	valSet := make(map[string]struct{}, len(result))
+	for _, val := range result {
+		valSet[val] = struct{}{}
+	}
+
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.StringList
+	for _, response := range responses {
+		_, err = resp.UnmarshalMsg(response.buf)
+		if err != nil {
+			return nil, err
+		}
+		for _, val := range resp {
+			valSet[val] = struct{}{}
+		}
+	}
+
+	vals := make([]string, 0, len(valSet))
+	for t := range valSet {
+		vals = append(vals, t)
+	}
+
+	sort.Strings(vals)
+	if uint(len(vals)) > limit {
+		vals = vals[:limit]
+	}
+
+	return vals, nil
 }

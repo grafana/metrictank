@@ -11,6 +11,28 @@ import (
 	"gopkg.in/macaron.v1"
 )
 
+//go:generate msgp
+//msgp:ignore FromTo
+//msgp:ignore GraphiteAutoCompleteTags
+//msgp:ignore GraphiteAutoCompleteTagValues
+//msgp:ignore GraphiteFind
+//msgp:ignore GraphiteRender
+//msgp:ignore GraphiteTag
+//msgp:ignore GraphiteTagDetails
+//msgp:ignore GraphiteTagDetailsResp
+//msgp:ignore GraphiteTagDetailsValueResp
+//msgp:ignore GraphiteTagFindSeries
+//msgp:ignore GraphiteTagFindSeriesResp
+//msgp:ignore GraphiteTagResp
+//msgp:ignore GraphiteTags
+//msgp:ignore GraphiteTagsResp
+//msgp:ignore MetricNames
+//msgp:ignore MetricsDelete
+//msgp:ignore SeriesCompleter
+//msgp:ignore SeriesCompleterItem
+//msgp:ignore SeriesTree
+//msgp:ignore SeriesTreeItem
+
 type FromTo struct {
 	From  string `json:"from" form:"from"`
 	Until string `json:"until" form:"until"`
@@ -23,7 +45,7 @@ type GraphiteRender struct {
 	MaxDataPoints uint32   `json:"maxDataPoints" form:"maxDataPoints" binding:"Default(800)"`
 	Targets       []string `json:"target" form:"target"`
 	TargetsRails  []string `form:"target[]"` // # Rails/PHP/jQuery common practice format: ?target[]=path.1&target[]=path.2 -> like graphite, we allow this.
-	Format        string   `json:"format" form:"format" binding:"In(,json,msgp,pickle)"`
+	Format        string   `json:"format" form:"format" binding:"In(,json,msgp,msgpack,pickle)"`
 	NoProxy       bool     `json:"local" form:"local"` //this is set to true by graphite-web when it passes request to cluster servers
 	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
 }
@@ -52,10 +74,61 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 	return errs
 }
 
+type GraphiteTags struct {
+	Filter string `json:"filter" form:"filter"`
+	From   int64  `json:"from" form:"from"`
+}
+
+type GraphiteTagsResp []GraphiteTagResp
+
+type GraphiteAutoCompleteTags struct {
+	Prefix string   `json:"tagPrefix" form:"tagPrefix"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Limit  uint     `json:"limit" form:"limit"`
+}
+
+type GraphiteAutoCompleteTagValues struct {
+	Tag    string   `json:"tag" form:"tag"`
+	Prefix string   `json:"valuePrefix" form:"valuePrefix"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Limit  uint     `json:"limit" form:"limit"`
+}
+
+type GraphiteTagResp struct {
+	Tag string `json:"tag"`
+}
+
+type GraphiteTagDetails struct {
+	Tag    string `json:"tag" form:"tag"`
+	Filter string `json:"filter" form:"filter"`
+	From   int64  `json:"from" form:"from"`
+}
+
+type GraphiteTagDetailsResp struct {
+	Tag    string                        `json:"tag"`
+	Values []GraphiteTagDetailsValueResp `json:"values"`
+}
+
+type GraphiteTagDetailsValueResp struct {
+	Count uint64 `json:"count"`
+	Value string `json:"value"`
+}
+
+type GraphiteTagFindSeries struct {
+	Expr []string `json:"expr" form:"expr"`
+	From int64    `json:"from" form:"from"`
+}
+
+type GraphiteTagFindSeriesResp struct {
+	Series []string `json:"series"`
+}
+
 type GraphiteFind struct {
 	FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`
-	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,pickle)"`
+	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
 }
 
@@ -120,9 +193,9 @@ func (s SeriesPickle) Pickle(buf []byte) ([]byte, error) {
 }
 
 type SeriesPickleItem struct {
-	Path      string    `pickle:"path"`
-	IsLeaf    bool      `pickle:"isLeaf"`
-	Intervals [][]int64 `pickle:"intervals"` // list of (start,end) tuples
+	Path      string    `pickle:"path" msg:"path"`
+	IsLeaf    bool      `pickle:"isLeaf" msg:"isLeaf"`
+	Intervals [][]int64 `pickle:"intervals" msg:"intervals"` // list of (start,end) tuples
 }
 
 func NewSeriesPickleItem(path string, isLeaf bool, intervals [][]int64) SeriesPickleItem {

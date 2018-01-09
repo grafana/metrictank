@@ -13,15 +13,16 @@ services:
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
     environment:
-     WAIT_HOSTS: cassandra:9042
-     WAIT_TIMEOUT: 60
-     MT_HTTP_MULTI_TENANT: "false"
+      WAIT_HOSTS: cassandra:9042
+      WAIT_TIMEOUT: 60
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_MEMORY_IDX_TAG_SUPPORT: "true"
     links:
      - cassandra
 
   cassandra:
     hostname: cassandra
-    image: cassandra:3.0.8
+    image: cassandra:3.9
     environment:
       MAX_HEAP_SIZE: 1G
       HEAP_NEWSIZE: 256M

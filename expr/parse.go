@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 var (
@@ -177,6 +179,8 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		}
 
 		// we now know we're parsing a key-value pair
+		// in the future we should probably add validation here that the key
+		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
 			argCont, eCont, errCont := Parse(e)
@@ -261,14 +265,28 @@ func parseConst(s string) (*expr, string, error) {
 	return &expr{int: v, str: s[:i], etype: etInt}, s[i:], err
 }
 
+// parseName parses a "name" which is either:
+// 1) a metric expression
+// 2) the key of a keyword argument
+// 3) a function name
+// It's up to the caller to determine which, based on context. E.g.:
+// * if leftover data starts with '(' then assume 3 and validate function name
+// * if leftover data starts with '=' assume 2
+// * fallback to assuming 1.
+// it returns the parsed name and any leftover data
 func parseName(s string) (string, string) {
 
 	var i int
+	allowEqual := false
 
 FOR:
 	for braces := 0; i < len(s); i++ {
-
-		if isNameChar(s[i]) {
+		// if the current expression is a metric name with ";" (59) we should
+		// allow the "=" (61) character to be part of the metric name
+		if isNameChar(s[i]) || (allowEqual && s[i] == 61) {
+			if s[i] == 59 {
+				allowEqual = true
+			}
 			continue
 		}
 
@@ -288,7 +306,6 @@ FOR:
 		default:
 			break FOR
 		}
-
 	}
 
 	if i == len(s) {
@@ -322,24 +339,51 @@ func parseString(s string) (string, string, error) {
 	return s[:i], s[i+1:], nil
 }
 
-// exctractMetric searches for a metric name in `m'
-// metric name is defined to be a series of name characters terminated by a comma
+// extractMetric searches for a metric name or path Expression in `m'
+// metric name / path expression is defined by the following criteria:
+// 1. Not a function name
+// 2. Consists only of name characters
+// 	2.1 '=' is conditionally allowed if ';' is found (denoting tag format)
+// 	2.2 ',' is conditionally allowed within matching '{}'
+// 3. Is not a string literal (i.e. contained within single/double quote pairs)
 func extractMetric(m string) string {
 	start := 0
 	end := 0
 	curlyBraces := 0
+	quoteChar := byte(0)
+	allowEqual := false
 	for end < len(m) {
-		if m[end] == '{' {
-			curlyBraces++
-		} else if m[end] == '}' {
-			curlyBraces--
-		} else if m[end] == ')' || (m[end] == ',' && curlyBraces == 0) {
-			return m[start:end]
-		} else if !(isNameChar(m[end]) || m[end] == ',') {
-			start = end + 1
+		c := m[end]
+		if (c == '\'' || c == '"') && (end == 0 || m[end-1] != '\\') {
+			// Found a non-escaped quote char
+			if quoteChar == 0 {
+				quoteChar = c
+				start = end + 1
+			} else if c == quoteChar {
+				quoteChar = byte(0)
+				start = end + 1
+			}
+		} else if quoteChar == 0 {
+			if c == '{' {
+				curlyBraces++
+			} else if c == '}' {
+				curlyBraces--
+			} else if c == ')' || (c == ',' && curlyBraces == 0) {
+				return m[start:end]
+			} else if !(isNameChar(c) || c == ',' || (allowEqual && c == '=')) {
+				start = end + 1
+				allowEqual = false
+			} else if c == ';' {
+				allowEqual = true
+			}
 		}
 
 		end++
+	}
+
+	if quoteChar != 0 {
+		log.Warn("extractMetric: encountered unterminated string literal in %s", m)
+		return ""
 	}
 
 	return m[start:end]

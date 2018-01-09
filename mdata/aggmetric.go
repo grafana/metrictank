@@ -435,7 +435,12 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.add(ts, val)
 	} else {
 		// write through reorder buffer
-		res := a.rob.Add(ts, val)
+		res, accepted := a.rob.Add(ts, val)
+
+		if len(res) == 0 && accepted {
+			a.lastWrite = uint32(time.Now().Unix())
+		}
+
 		for _, p := range res {
 			a.add(p.Ts, p.Val)
 		}
@@ -537,13 +542,30 @@ func (a *AggMetric) add(ts uint32, val float64) {
 	a.addAggregators(ts, val)
 }
 
+// GC returns whether or not this AggMetric is stale and can be removed
+// chunkMinTs -> min timestamp of a chunk before to be considered stale and to be persisted to Cassandra
+// metricMinTs -> min timestamp for a metric before to be considered stale and to be purged from the tank
 func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
 
+	// if the reorderBuffer is enabled and we have not received a datapoint in a while,
+	// then flush the reorder buffer.
+	if a.rob != nil && a.lastWrite < chunkMinTs {
+		tmpLastWrite := a.lastWrite
+		pts := a.rob.Flush()
+		for _, p := range pts {
+			a.add(p.Ts, p.Val)
+		}
+
+		// adding points will cause our lastWrite to be updated, but we want to keep the old value
+		a.lastWrite = tmpLastWrite
+	}
+
 	// this aggMetric has never had metrics written to it.
+	// if the rob is empty or disabled, this AggMetric can be deleted
 	if len(a.Chunks) == 0 {
-		return true
+		return a.rob == nil || a.rob.IsEmpty()
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)

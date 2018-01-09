@@ -165,40 +165,37 @@ func (c *CasIdx) InitBare() error {
 	var err error
 	tmpSession, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
-		return err
+		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
 	// create the keyspace or ensure it exists
 	if createKeyspace {
 		err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
 		if err != nil {
-			log.Error(3, "cassandra-idx failed to initialize cassandra keyspace. %s", err)
-			return err
+			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
 		err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
 		if err != nil {
-			log.Error(3, "cassandra-idx failed to initialize cassandra table. %s", err)
-			return err
+			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
 			if err != nil {
-				log.Warn("cassandra-idx cassandra keyspace not found. retry attempt: %v", attempt)
 				if attempt >= 5 {
-					return err
+					return fmt.Errorf("cassandra keyspace not found. %d attempts", attempt)
 				}
+				log.Warn("cassandra-idx cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
 				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
 					break
 				} else {
-					log.Warn("cassandra-idx cassandra table not found. retry attempt: %v", attempt)
 					if attempt >= 5 {
-						return err
+						return fmt.Errorf("cassandra table not found. %d attempts", attempt)
 					}
+					log.Warn("cassandra-idx cassandra table not found. retrying in 5s. attempt: %d", attempt)
 					time.Sleep(5 * time.Second)
 				}
 			}
@@ -210,8 +207,7 @@ func (c *CasIdx) InitBare() error {
 	c.cluster.Keyspace = keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "cassandra-idx failed to create cassandra session. %s", err)
-		return err
+		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
 	c.session = session
@@ -278,7 +274,7 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 
 	now := uint32(time.Now().Unix())
 
-	// Cassandra uses partition id asthe partitionin key, so an "update" that changes the partition for
+	// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
 	// an existing metricDef will just create a new row in the table and wont remove the old row.
 	// So we need to explicitly delete the old entry.
 	if inMemory && existing.Partition != partition {
@@ -334,31 +330,39 @@ func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
 	var defs []schema.MetricDefinition
+	var staleTs uint32
+	if maxStale != 0 {
+		staleTs = uint32(time.Now().Add(maxStale * -1).Unix())
+	}
 	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = c.LoadPartition(partition, defs)
+		defs = c.LoadPartition(partition, defs, staleTs)
 	}
 	num := c.MemoryIdx.Load(defs)
 	log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (c *CasIdx) Load(defs []schema.MetricDefinition) []schema.MetricDefinition {
+func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
 	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
-	return c.load(defs, iter)
+	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) []schema.MetricDefinition {
+func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
 	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
-	return c.load(defs, iter)
+	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter) []schema.MetricDefinition {
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter, cutoff uint32) []schema.MetricDefinition {
 	mdef := schema.MetricDefinition{}
 	var id, name, metric, unit, mtype string
 	var orgId, interval int
 	var partition int32
 	var lastupdate int64
 	var tags []string
+	cutoff64 := int64(cutoff)
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+		if lastupdate < cutoff64 {
+			continue
+		}
 		mdef.Id = id
 		mdef.OrgId = orgId
 		mdef.Partition = partition
@@ -471,17 +475,6 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	pre := time.Now()
 	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
-	if updateCassIdx {
-		// if an error was encountered then pruned is probably a partial list of metricDefs
-		// deleted, so lets still try and delete these from Cassandra.
-		for _, def := range pruned {
-			log.Debug("cassandra-idx: metricDef %s pruned from the index.", def.Id)
-			err := c.deleteDef(&def)
-			if err != nil {
-				log.Error(3, "cassandra-idx: %s", err.Error())
-			}
-		}
-	}
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }

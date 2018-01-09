@@ -13,16 +13,16 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func points(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func points(ctx context.Context, store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
 			fmt.Println("### Table", table)
 			if fix != 0 {
-				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				points := getSeries(ctx, store, table, metric.id, fromUnix, toUnix, fix)
 				printPointsNormal(points, fromUnix, toUnix)
 			} else {
-				igens, err := store.SearchTable(context.Background(), metric.id, table, fromUnix, toUnix)
+				igens, err := store.SearchTable(ctx, metric.id, table, fromUnix, toUnix)
 				if err != nil {
 					panic(err)
 				}
@@ -32,16 +32,16 @@ func points(store *mdata.CassandraStore, tables []string, metrics []Metric, from
 	}
 }
 
-func pointSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func pointSummary(ctx context.Context, store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
 			fmt.Println("### Table", table)
 			if fix != 0 {
-				points := getSeries(store, table, metric.id, fromUnix, toUnix, fix)
+				points := getSeries(ctx, store, table, metric.id, fromUnix, toUnix, fix)
 				printPointsSummary(points, fromUnix, toUnix)
 			} else {
-				igens, err := store.SearchTable(context.Background(), metric.id, table, fromUnix, toUnix)
+				igens, err := store.SearchTable(ctx, metric.id, table, fromUnix, toUnix)
 				if err != nil {
 					panic(err)
 				}
@@ -51,9 +51,9 @@ func pointSummary(store *mdata.CassandraStore, tables []string, metrics []Metric
 	}
 }
 
-func getSeries(store *mdata.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
+func getSeries(ctx context.Context, store *mdata.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
-	itgens, err := store.SearchTable(context.Background(), id, table, fromUnix, toUnix)
+	itgens, err := store.SearchTable(ctx, id, table, fromUnix, toUnix)
 	if err != nil {
 		panic(err)
 	}

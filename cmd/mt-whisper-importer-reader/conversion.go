@@ -75,7 +75,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 			rawFactor := float64(spp) / float64(rawRes)
 			if retIdx == 0 || c.method != "avg" {
 				for _, p := range in {
-					if p.Timestamp > uint32(*importUpTo) {
+					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
 					adjustedPoints[c.method][p.Timestamp] = p.Value
@@ -85,7 +85,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 				}
 			} else {
 				for _, p := range in {
-					if p.Timestamp > uint32(*importUpTo) {
+					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
 					adjustedPoints["sum"][p.Timestamp] = p.Value * rawFactor
@@ -111,7 +111,7 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 	// merge the results that are keyed by timestamp into a slice of points
 	for m, p := range adjustedPoints {
 		for t, v := range p {
-			if t <= uint32(*importUpTo) {
+			if t <= uint32(*importUpTo) && t >= uint32(*importAfter) {
 				res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
 			}
 		}
@@ -148,7 +148,7 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 		// generate datapoints based on inPoint in reverse order
 		var outPoints []whisper.Point
 		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
-			if ts > uint32(*importUpTo) {
+			if ts > uint32(*importUpTo) || ts < uint32(*importAfter) {
 				continue
 			}
 			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
@@ -238,6 +238,9 @@ func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
 		if boundary > uint32(*importUpTo) {
 			break
+		}
+		if boundary < uint32(*importAfter) {
+			continue
 		}
 
 		if boundary == currentBoundary {

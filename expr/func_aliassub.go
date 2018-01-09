@@ -38,7 +38,13 @@ func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, err
 		return nil, err
 	}
 	for i := range series {
+		// TODO - graphite doesn't attempt to extract the
+		// metric/expression from the series. MT probably shouldn't either.
+		// This will almost certainly break some dashboards
 		metric := extractMetric(series[i].Target)
+		if metric == "" {
+			metric = series[i].Target
+		}
 		name := s.search.ReplaceAllString(metric, replace)
 		series[i].Target = name
 		series[i].QueryPatt = name

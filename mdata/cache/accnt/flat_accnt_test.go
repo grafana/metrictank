@@ -4,10 +4,15 @@ import (
 	"testing"
 )
 
-func TestAddingEvicting(t *testing.T) {
-	a := NewFlatAccnt(10)
+func resetCounters() {
 	cacheChunkAdd.SetUint32(0)
 	cacheChunkEvict.SetUint32(0)
+	cacheSizeUsed.SetUint64(0)
+}
+
+func TestAddingEvicting(t *testing.T) {
+	resetCounters()
+	a := NewFlatAccnt(10)
 	evictQ := a.GetEvictQ()
 
 	// some test data
@@ -69,12 +74,13 @@ func TestAddingEvicting(t *testing.T) {
 	if peek := cacheChunkEvict.Peek(); peek != 4 {
 		t.Fatalf("Expected evict counter to be at 4, got %d", peek)
 	}
+
+	a.Stop()
 }
 
 func TestLRUOrdering(t *testing.T) {
+	resetCounters()
 	a := NewFlatAccnt(6)
-	cacheChunkAdd.SetUint32(0)
-	cacheChunkEvict.SetUint32(0)
 	evictQ := a.GetEvictQ()
 
 	// some test data
@@ -103,4 +109,55 @@ func TestLRUOrdering(t *testing.T) {
 	if peek := cacheChunkEvict.Peek(); peek != 1 {
 		t.Fatalf("Expected evict counter to be at 1, got %d", peek)
 	}
+
+	a.Stop()
+}
+
+func TestMetricDeleting(t *testing.T) {
+	resetCounters()
+	a := NewFlatAccnt(12)
+
+	metric1 := "metric1"
+	metric2 := "metric2"
+
+	a.AddChunk(metric1, 1, 2)
+	a.AddChunk(metric2, 1, 2)
+	a.AddChunk(metric1, 2, 2)
+	a.AddChunk(metric2, 2, 2)
+	a.AddChunk(metric1, 3, 2)
+	a.AddChunk(metric2, 3, 2)
+
+	a.DelMetric(metric1)
+
+	total := a.GetTotal()
+	expect_total := uint64(6)
+	if total != expect_total {
+		t.Fatalf("Expected total %d, got %d", expect_total, total)
+	}
+
+	if cacheSizeUsed.Peek() != expect_total {
+		t.Fatalf("Expected total %d, got %d", expect_total, total)
+	}
+
+	if _, ok := a.metrics[metric1]; ok {
+		t.Fatalf("Expected %s to not exist, but it's still present", metric1)
+	}
+
+	a.AddChunk(metric1, 4, 12)
+	evictQ := a.GetEvictQ()
+
+	et := <-evictQ
+	if et.Metric != metric2 || et.Ts != 1 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != 2 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+	et = <-evictQ
+	if et.Metric != metric2 || et.Ts != 3 {
+		t.Fatalf("Returned evict target is not as expected, got %+v", et)
+	}
+
+	a.Stop()
 }

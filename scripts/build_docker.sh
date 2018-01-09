@@ -7,6 +7,7 @@ cd ${DIR}
 
 VERSION=`git describe --always`
 
+rm -rf build/*
 mkdir -p build
 cp ../build/* build/
 

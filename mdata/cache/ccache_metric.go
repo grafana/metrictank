@@ -19,6 +19,8 @@ type CCacheMetric struct {
 
 	// the list of chunk time stamps in ascending order
 	keys []uint32
+
+	SuffixLen uint8
 }
 
 func NewCCacheMetric() *CCacheMetric {
@@ -27,7 +29,8 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(prev uint32, itergen chunk.IterGen) {
+func (mc *CCacheMetric) Init(suffixLen uint8, prev uint32, itergen chunk.IterGen) {
+	mc.SuffixLen = suffixLen
 	mc.Add(prev, itergen)
 }
 
@@ -42,11 +45,16 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	prev := mc.chunks[ts].Prev
 	next := mc.chunks[ts].Next
 
-	if _, ok := mc.chunks[prev]; prev != 0 && ok {
-		mc.chunks[prev].Next = 0
+	if prev != 0 {
+		if _, ok := mc.chunks[prev]; ok {
+			mc.chunks[prev].Next = 0
+		}
 	}
-	if _, ok := mc.chunks[next]; next != 0 && ok {
-		mc.chunks[next].Prev = 0
+
+	if next != 0 {
+		if _, ok := mc.chunks[next]; ok {
+			mc.chunks[next].Prev = 0
+		}
 	}
 
 	delete(mc.chunks, ts)
@@ -208,7 +216,7 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric string, from, 
 			log.Warn("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
 			span := opentracing.SpanFromContext(ctx)
 			span.SetTag("searchForwardBug", true)
-			cacheMetricBug.Inc()
+			searchFwdBug.Inc()
 			break
 		}
 	}

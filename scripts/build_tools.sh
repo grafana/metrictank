@@ -1,11 +1,10 @@
 #!/bin/bash
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
+cd ${DIR}/..
 
 GITVERSION=`git describe --always`
-SOURCEDIR=${DIR}/..
-BUILDDIR=$SOURCEDIR/build
+BUILDDIR=$(pwd)/build
 
 # Make dir
 mkdir -p $BUILDDIR
@@ -19,16 +18,16 @@ function fail () {
 }
 
 # Build binary
-cd $GOPATH/src/github.com/grafana/metrictank/cmd
+cd cmd
 for tool in *; do
   cd $tool
   if [ "$1" == "-race" ]
   then
     set -x
-    CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   else
     set -x
-    go build -ldflags "-X main.GitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    go build -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   fi
   set +x
   cd ..

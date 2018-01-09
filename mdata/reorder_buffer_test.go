@@ -7,18 +7,27 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAddFail, expectReordered uint32) []schema.Point {
+func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded, expectAddFail, expectReordered uint32) []schema.Point {
 	var flushed []schema.Point
 	b := NewReorderBuffer(reorderWindow, 1)
 	metricsTooOld.SetUint32(0)
 	metricsReordered.SetUint32(0)
+	addedCount := uint32(0)
 	for _, point := range testData {
-		addRes := b.Add(point.Ts, point.Val)
+		addRes, accepted := b.Add(point.Ts, point.Val)
 		flushed = append(flushed, addRes...)
+		if accepted {
+			addedCount++
+		}
 	}
 	if expectAddFail != metricsTooOld.Peek() {
 		t.Fatalf("Expected %d failures, but had %d", expectAddFail, metricsTooOld.Peek())
 	}
+
+	if expectAdded != addedCount {
+		t.Fatalf("Expected %d accepted datapoints, but had %d", expectAdded, addedCount)
+	}
+
 	if metricsReordered.Peek() != expectReordered {
 		t.Fatalf("Expected %d metrics to get reordered, but had %d", expectReordered, metricsReordered.Peek())
 	}
@@ -50,7 +59,7 @@ func unsort(data []schema.Point, unsortBy int) []schema.Point {
 	return out
 }
 
-func TestReorderBufferUnsort(t *testing.T) {
+func TestROBUnsort(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 0, Val: 0},
 		{Ts: 1, Val: 100},
@@ -84,7 +93,7 @@ func TestReorderBufferUnsort(t *testing.T) {
 	}
 }
 
-func TestReorderBufferAddAndGetInOrder(t *testing.T) {
+func TestROBAddAndGetInOrder(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1002, Val: 200},
@@ -95,10 +104,10 @@ func TestReorderBufferAddAndGetInOrder(t *testing.T) {
 		{Ts: 1002, Val: 200},
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0, 0)
+	testAddAndGet(t, 600, testData, expectedData, 3, 0, 0)
 }
 
-func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
+func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1003, Val: 300},
 		{Ts: 1002, Val: 200},
@@ -107,10 +116,10 @@ func TestReorderBufferAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	expectedData := []schema.Point{
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 1, testData, expectedData, 2, 0)
+	testAddAndGet(t, 1, testData, expectedData, 1, 2, 0)
 }
 
-func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
+func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1002, Val: 200},
@@ -133,10 +142,10 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0, 2)
+	testAddAndGet(t, 600, testData, expectedData, 9, 0, 2)
 }
 
-func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
+func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1002, Val: 200},
 		{Ts: 1004, Val: 400},
@@ -159,20 +168,20 @@ func TestReorderBufferAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) 
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 0, 3)
+	testAddAndGet(t, 600, testData, expectedData, 9, 0, 3)
 }
 
-func TestReorderBufferOmitFlushIfNotEnoughData(t *testing.T) {
+func TestROBOmitFlushIfNotEnoughData(t *testing.T) {
 	b := NewReorderBuffer(9, 1)
 	for i := uint32(1); i < 10; i++ {
-		flushed := b.Add(i, float64(i*100))
+		flushed, _ := b.Add(i, float64(i*100))
 		if len(flushed) > 0 {
 			t.Fatalf("Expected no data to get flushed out")
 		}
 	}
 }
 
-func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
+func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1004, Val: 400},
@@ -197,19 +206,19 @@ func TestReorderBufferAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 		{Ts: 1003, Val: 300},
 		{Ts: 1004, Val: 400},
 	}
-	flushedData := testAddAndGet(t, 5, testData, expectedData, 1, 2)
+	flushedData := testAddAndGet(t, 5, testData, expectedData, 8, 1, 2)
 	if !reflect.DeepEqual(flushedData, expectedFlushedData) {
 		t.Fatalf("Flushed data does not match expected flushed data:\n%+v\n%+v", flushedData, expectedFlushedData)
 	}
 }
 
-func TestReorderBufferFlushSortedData(t *testing.T) {
+func TestROBFlushSortedData(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1)
 	metricsTooOld.SetUint32(0)
 	for i := 1100; i < 2100; i++ {
-		flushed := buf.Add(uint32(i), float64(i))
-		if metricsTooOld.Peek() != 0 {
+		flushed, accepted := buf.Add(uint32(i), float64(i))
+		if metricsTooOld.Peek() != 0 || !accepted {
 			t.Fatalf("Adding failed")
 		}
 		results = append(results, flushed...)
@@ -222,7 +231,7 @@ func TestReorderBufferFlushSortedData(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushUnsortedData1(t *testing.T) {
+func TestROBFlushUnsortedData1(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(3, 1)
 	data := []schema.Point{
@@ -238,8 +247,8 @@ func TestReorderBufferFlushUnsortedData1(t *testing.T) {
 	failedCount := 0
 	metricsTooOld.SetUint32(0)
 	for _, p := range data {
-		flushed := buf.Add(p.Ts, p.Val)
-		if metricsTooOld.Peek() != 0 {
+		flushed, accepted := buf.Add(p.Ts, p.Val)
+		if metricsTooOld.Peek() != 0 || !accepted {
 			failedCount++
 			metricsTooOld.SetUint32(0)
 		} else {
@@ -263,7 +272,7 @@ func TestReorderBufferFlushUnsortedData1(t *testing.T) {
 	}
 }
 
-func TestReorderBufferFlushUnsortedData2(t *testing.T) {
+func TestROBFlushUnsortedData2(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1)
 	data := make([]schema.Point, 1000)
@@ -272,7 +281,7 @@ func TestReorderBufferFlushUnsortedData2(t *testing.T) {
 	}
 	unsortedData := unsort(data, 10)
 	for i := 0; i < len(data); i++ {
-		flushed := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
+		flushed, _ := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
 		results = append(results, flushed...)
 	}
 	for i := 0; i < 400; i++ {
@@ -282,55 +291,97 @@ func TestReorderBufferFlushUnsortedData2(t *testing.T) {
 	}
 }
 
-func BenchmarkAddInOrder(b *testing.B) {
-	data := make([]schema.Point, b.N)
-	buf := NewReorderBuffer(uint32(b.N), 1)
-	b.ResetTimer()
+func TestROBFlushAndIsEmpty(t *testing.T) {
+	buf := NewReorderBuffer(10, 1)
 
-	for i := 0; i < b.N; i++ {
-		buf.Add(data[i].Ts, data[i].Val)
+	if !buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be true")
+	}
+
+	buf.Add(123, 123)
+	if buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be false")
+	}
+
+	buf.Reset()
+	if !buf.IsEmpty() {
+		t.Fatalf("Expected IsEmpty() to be true")
 	}
 }
 
-func BenchmarkAddOutOfOrder(b *testing.B) {
-	data := make([]schema.Point, b.N)
-	unsortedData := unsort(data, 10)
-	buf := NewReorderBuffer(uint32(b.N), 1)
+func BenchmarkROB10Add(b *testing.B) {
+	benchmarkROBAdd(b, 10, 0)
+}
+
+func BenchmarkROB120Add(b *testing.B) {
+	benchmarkROBAdd(b, 120, 0)
+}
+
+func BenchmarkROB600Add(b *testing.B) {
+	benchmarkROBAdd(b, 600, 0)
+}
+
+func BenchmarkROB10AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 10, 5)
+}
+
+func BenchmarkROB120AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 120, 5)
+}
+
+func BenchmarkROB600AddShuffled5(b *testing.B) {
+	benchmarkROBAdd(b, 600, 5)
+}
+
+func BenchmarkROB10AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 10, 50)
+}
+
+func BenchmarkROB120AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 120, 50)
+}
+
+func BenchmarkROB600AddShuffled50(b *testing.B) {
+	benchmarkROBAdd(b, 600, 50)
+}
+
+func BenchmarkROB10AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 10, 500)
+}
+
+func BenchmarkROB120AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 120, 500)
+}
+
+func BenchmarkROB600AddShuffled500(b *testing.B) {
+	benchmarkROBAdd(b, 600, 500)
+}
+
+func benchmarkROBAdd(b *testing.B, window, shufgroup int) {
+	data := NewInputData(b.N)
+	if shufgroup > 1 {
+		data = unsort(data, shufgroup)
+	}
+
+	rob := NewReorderBuffer(uint32(window), 1)
+	var out []schema.Point
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
+		out, _ = rob.Add(data[i].Ts, data[i].Val)
+	}
+	if len(out) > 1000 {
+		panic("this clause should never fire. only exists for compiler not to optimize away the results")
 	}
 }
 
-func benchmarkAddAndFlushX(b *testing.B, datapoints, reorderWindow uint32) {
-	buf := NewReorderBuffer(
-		reorderWindow,
-		1,
-	)
-	ts := uint32(1)
-	for ; ts <= datapoints; ts++ {
-		buf.Add(ts, float64(ts*100))
-	}
-
-	b.ResetTimer()
-
-	for run := 0; run < b.N; run++ {
-		ts := uint32(1)
-		for ; ts <= datapoints; ts++ {
-			buf.Add(ts, float64(ts*100))
+func NewInputData(num int) []schema.Point {
+	ret := make([]schema.Point, num)
+	for i := 0; i < num; i++ {
+		ret[i] = schema.Point{
+			Val: float64(i + 1),
+			Ts:  uint32(i + 1),
 		}
 	}
-}
-
-func BenchmarkAddAndFlush10000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 10000, 1000)
-}
-
-func BenchmarkAddAndFlush1000(b *testing.B) {
-	benchmarkAddAndFlushX(b, 1000, 100)
-}
-
-func BenchmarkAddAndFlush100(b *testing.B) {
-	benchmarkAddAndFlushX(b, 100, 10)
+	return ret
 }

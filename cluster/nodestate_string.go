@@ -2,7 +2,7 @@
 
 package cluster
 
-import "fmt"
+import "strconv"
 
 const _NodeState_name = "NodeNotReadyNodeReadyNodeUnreachable"
 
@@ -10,7 +10,7 @@ var _NodeState_index = [...]uint8{0, 12, 21, 36}
 
 func (i NodeState) String() string {
 	if i < 0 || i >= NodeState(len(_NodeState_index)-1) {
-		return fmt.Sprintf("NodeState(%d)", i)
+		return "NodeState(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _NodeState_name[_NodeState_index[i]:_NodeState_index[i+1]]
 }

@@ -63,3 +63,29 @@ func TestLRUNumeric(t *testing.T) {
 		t.Fatalf("expected nil, got %d", val)
 	}
 }
+
+func TestLRUDelete(t *testing.T) {
+	key1 := 1000
+	key2 := 1001
+
+	lru := NewLRU()
+	lru.touch(key1)
+	lru.touch(key2)
+
+	expectedSize := 2
+	if len(lru.items) != expectedSize || lru.list.Len() != expectedSize {
+		t.Fatalf("Expected lru to contain %d items, but have %d / %d", expectedSize, len(lru.items), lru.list.Len())
+	}
+
+	lru.del(key1)
+	expectedSize = 1
+	if len(lru.items) != expectedSize || lru.list.Len() != expectedSize {
+		t.Fatalf("Expected lru to contain %d items, but have %d / %d", expectedSize, len(lru.items), lru.list.Len())
+	}
+
+	lru.del(key2)
+	expectedSize = 0
+	if len(lru.items) != expectedSize || lru.list.Len() != expectedSize {
+		t.Fatalf("Expected lru to contain %d items, but have %d / %d", expectedSize, len(lru.items), lru.list.Len())
+	}
+}

@@ -39,7 +39,7 @@ func testSeries() []series {
 					Interval: 60,
 				},
 			},
-			out: `[{"target":"a","datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]]}]`,
+			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]}]`,
 		},
 		{
 			in: []models.Series{
@@ -65,7 +65,7 @@ func testSeries() []series {
 					Interval: 10,
 				},
 			},
-			out: `[{"target":"a","datapoints":[[123.000,60],[10000.000,120],[0.000,180],[1.000,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[123.700,20],[124.100,30],[125.000,40],[126.000,50]]}]`,
+			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[123.7,20],[124.1,30],[125,40],[126,50]]}]`,
 		},
 	}
 	return cases

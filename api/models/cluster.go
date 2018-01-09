@@ -5,6 +5,9 @@ import (
 )
 
 //go:generate msgp
+type StringList []string
+
+//go:generate msgp
 type IndexFindResp struct {
 	Nodes map[string][]idx.Node
 }
@@ -23,4 +26,19 @@ type GetDataResp struct {
 
 type MetricsDeleteResp struct {
 	DeletedDefs int `json:"deletedDefs"`
+}
+
+//go:generate msgp
+type IndexTagsResp struct {
+	Tags []string `json:"tags"`
+}
+
+//go:generate msgp
+type IndexTagDetailsResp struct {
+	Values map[string]uint64 `json:"values"`
+}
+
+//go:generate msgp
+type IndexFindByTagResp struct {
+	Metrics []idx.Node `json:"metrics"`
 }

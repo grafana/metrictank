@@ -8,7 +8,7 @@ import (
 
 const maxVal = uint32(29999999) // used to report max number as 29s even if it's higher
 
-// Hist15s is optimized for measurements between 500ms and 12h
+// Hist15s is optimized for measurements between 1ms and 15s
 type Hist15s struct {
 	limits [32]uint32 // in micros
 	counts [32]uint32

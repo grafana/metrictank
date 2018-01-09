@@ -43,6 +43,7 @@ func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 		s := models.Series{
 			Target:       fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
 			QueryPatt:    fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor),
+			Tags:         serie.Tags,
 			Datapoints:   out,
 			Interval:     serie.Interval,
 			Consolidator: serie.Consolidator,

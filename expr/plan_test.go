@@ -283,18 +283,22 @@ func TestConsolidateBy(t *testing.T) {
 		input := map[Req][]models.Series{
 			NewReq("a", from, to, 0): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Avg, // emulate the fact that a by default will use avg
 			}},
 			NewReq("a", from, to, consolidation.Min): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Min,
 			}},
 			NewReq("a", from, to, consolidation.Sum): {{
 				QueryPatt:    "a",
+				Target:       "a",
 				Consolidator: consolidation.Sum,
 			}},
 			NewReq("b", from, to, consolidation.Max): {{
 				QueryPatt:    "b",
+				Target:       "b",
 				Consolidator: consolidation.Max,
 			}},
 		}
@@ -391,6 +395,15 @@ func TestNamingChains(t *testing.T) {
 			},
 		},
 		{
+			`aliasByNode(avg(perSecond(seriesByTag('name=~.*.bar'))), 0)`,
+			[]string{
+				"a.bar;key1=val1",
+			},
+			[]string{
+				"a",
+			},
+		},
+		{
 			`alias(perSecond(*.bar), 'a')`,
 			[]string{
 				"a.bar",
@@ -455,6 +468,86 @@ func TestNamingChains(t *testing.T) {
 					t.Errorf("case %d:\n%q with %d inputs:\noutput series mismatch at pos %d:\nexp: %v\ngot: %v", i, c.target, len(c.keys), j, exp, out[j].Target)
 				}
 			}
+		}
+	}
+}
+
+// TestParseErrors tests that the proper error is returned for various parse failures
+func TestTargetErrors(t *testing.T) {
+	from := uint32(1000)
+	to := uint32(2000)
+	stable := true
+
+	cases := []struct {
+		testDescription    string
+		target             string // target request "from user"
+		expectedParseError error
+		expectedPlanError  error
+	}{
+		{
+			"No error (sanity test)",
+			`groupByTags(seriesByTag('name=val'),"sum", "tag1", "tag2", "tag3")`,
+			nil,
+			nil,
+		},
+		{
+			"ArgStrings - Missing args",
+			`groupByTags(seriesByTag('name=val'),"sum")`,
+			nil,
+			ErrMissingArg,
+		},
+		{
+			"ArgStrings - Leftover args",
+			`groupByTags(seriesByTag('name=val'),"sum", "tag1", 1)`,
+			nil,
+			ErrTooManyArg,
+		},
+		{
+			"ArgStrings - Wrong type",
+			`groupByTags(seriesByTag('name=val'),"sum", 1)`,
+			nil,
+			ErrTooManyArg,
+		},
+		{
+			"groupByTags - invalid agg function",
+			`groupByTags(seriesByTag('name=val'),"bogus", "tag1")`,
+			nil,
+			ErrInvalidAggFunc,
+		},
+		{
+			"aliasByTags - all strings",
+			`aliasByTags(seriesByTag('name=val'), "name", "tag1")`,
+			nil,
+			nil,
+		},
+		{
+			"aliasByTags - all ints",
+			`aliasByTags(seriesByTag('name=val'), 0, 1)`,
+			nil,
+			nil,
+		},
+		{
+			"aliasByTags - mixed",
+			`aliasByTags(seriesByTag('name=val'), "name", 1)`,
+			nil,
+			nil,
+		},
+		{
+			"aliasByTags - some unsupported types",
+			`aliasByTags(seriesByTag('name=val'), "name", 1.23)`,
+			nil,
+			ErrTooManyArg,
+		},
+	}
+
+	for _, c := range cases {
+		exprs, err := ParseMany([]string{c.target})
+		if err != c.expectedParseError {
+			t.Fatalf("case %q: expected parse error %q but got %q", c.testDescription, c.expectedParseError, err)
+		}
+		_, err = NewPlan(exprs, from, to, 800, stable, nil)
+		if err != c.expectedPlanError {
+			t.Fatalf("case %q: expected plan error %q but got %q", c.testDescription, c.expectedPlanError, err)
 		}
 	}
 }

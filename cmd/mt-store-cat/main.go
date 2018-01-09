@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/grafana/metrictank/conf"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	"github.com/grafana/metrictank/mdata"
 	"github.com/raintank/dur"
@@ -18,7 +21,7 @@ import (
 const tsFormat = "2006-01-02 15:04:05"
 
 var (
-	GitHash = "(none)"
+	gitHash = "(none)"
 
 	// flags from metrictank.go, globals
 	showVersion = flag.Bool("version", false, "print version string")
@@ -93,7 +96,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 	if flag.NArg() < 1 {
@@ -141,7 +144,7 @@ func main() {
 	}
 
 	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 
@@ -161,6 +164,12 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
+	tracer, traceCloser, err := conf.GetTracer(false, "")
+	if err != nil {
+		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+	}
+	defer traceCloser.Close()
+	store.SetTracer(tracer)
 
 	if tableSelector == "tables" {
 		tables, err := getTables(store, *cassandraKeyspace, "")
@@ -247,12 +256,15 @@ func main() {
 
 	fmt.Printf("# Keyspace %q:\n", *cassandraKeyspace)
 
+	span := tracer.StartSpan("mt-store-cat " + format)
+	ctx := opentracing.ContextWithSpan(context.Background(), span)
+
 	switch format {
 	case "points":
-		points(store, tables, metrics, fromUnix, toUnix, uint32(*fix))
+		points(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "point-summary":
-		pointSummary(store, tables, metrics, fromUnix, toUnix, uint32(*fix))
+		pointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
-		chunkSummary(store, tables, metrics, *cassandraKeyspace, *groupTTL)
+		chunkSummary(ctx, store, tables, metrics, *cassandraKeyspace, *groupTTL)
 	}
 }

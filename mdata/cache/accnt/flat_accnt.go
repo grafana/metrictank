@@ -18,9 +18,6 @@ const eventQSize = 100000
 // cache chunks into the evict queue, which will get consumed by the
 // evict loop.
 type FlatAccnt struct {
-	// total size of cache we're accounting for
-	total uint64
-
 	// metric accounting per metric key
 	metrics map[string]*FlatAccntMet
 
@@ -51,6 +48,8 @@ type FlatAccntMet struct {
 // event types to be used in FlatAccntEvent
 const evnt_hit_chnk uint8 = 4
 const evnt_add_chnk uint8 = 5
+const evnt_del_met uint8 = 6
+const evnt_get_total uint8 = 7
 const evnt_stop uint8 = 100
 const evnt_reset uint8 = 101
 
@@ -72,6 +71,16 @@ type HitPayload struct {
 	ts     uint32
 }
 
+// payload to be sent with del metric event
+type DelMetPayload struct {
+	metric string
+}
+
+// payload to be sent with a get total request event
+type GetTotalPayload struct {
+	res_chan chan uint64
+}
+
 func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 	accnt := FlatAccnt{
 		metrics: make(map[string]*FlatAccntMet),
@@ -84,6 +93,16 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 
 	go accnt.eventLoop()
 	return &accnt
+}
+
+func (a *FlatAccnt) DelMetric(metric string) {
+	a.act(evnt_del_met, &DelMetPayload{metric})
+}
+
+func (a *FlatAccnt) GetTotal() uint64 {
+	res_chan := make(chan uint64)
+	a.act(evnt_get_total, &GetTotalPayload{res_chan})
+	return <-res_chan
 }
 
 func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
@@ -139,20 +158,49 @@ func (a *FlatAccnt) eventLoop() {
 						Ts:     payload.ts,
 					},
 				)
+			case evnt_del_met:
+				payload := event.pl.(*DelMetPayload)
+				a.delMet(payload.metric)
+			case evnt_get_total:
+				payload := event.pl.(*GetTotalPayload)
+				a.getTotal(payload.res_chan)
 			case evnt_stop:
 				return
 			case evnt_reset:
 				a.metrics = make(map[string]*FlatAccntMet)
-				a.total = 0
 				a.lru.reset()
+				cacheSizeUsed.SetUint64(0)
 			}
 
 			// evict until we're below the max
-			for a.total > a.maxSize {
+			for cacheSizeUsed.Peek() > a.maxSize {
 				a.evict()
 			}
 		}
 	}
+}
+
+func (a *FlatAccnt) getTotal(res_chan chan uint64) {
+	res_chan <- cacheSizeUsed.Peek()
+}
+
+func (a *FlatAccnt) delMet(metric string) {
+	met, ok := a.metrics[metric]
+	if !ok {
+		return
+	}
+
+	for ts := range met.chunks {
+		a.lru.del(
+			EvictTarget{
+				Metric: metric,
+				Ts:     ts,
+			},
+		)
+	}
+
+	cacheSizeUsed.DecUint64(met.total)
+	delete(a.metrics, metric)
 }
 
 func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
@@ -175,8 +223,7 @@ func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
 
 	met.chunks[ts] = size
 	met.total = met.total + size
-	a.total = a.total + size
-	cacheSizeUsed.SetUint64(a.total)
+	cacheSizeUsed.AddUint64(size)
 }
 
 func (a *FlatAccnt) evict() {
@@ -215,8 +262,7 @@ func (a *FlatAccnt) evict() {
 	for _, ts = range targets {
 		size = met.chunks[ts]
 		met.total = met.total - size
-		a.total = a.total - size
-		cacheSizeUsed.SetUint64(a.total)
+		cacheSizeUsed.DecUint64(size)
 		cacheChunkEvict.Inc()
 		a.evictQ <- &EvictTarget{
 			Metric: target.Metric,

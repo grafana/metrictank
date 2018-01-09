@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"github.com/grafana/metrictank/mdata"
 )
 
-func chunkSummary(store *mdata.CassandraStore, tables []string, metrics []Metric, keyspace, groupTTL string) error {
+func chunkSummary(ctx context.Context, store *mdata.CassandraStore, tables []string, metrics []Metric, keyspace, groupTTL string) error {
 	now := uint32(time.Now().Unix())
 	end_month := now - (now % mdata.Month_sec)
 

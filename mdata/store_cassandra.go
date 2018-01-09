@@ -44,6 +44,7 @@ var (
 	errReadQueueFull  = errors.New("the read queue is full")
 	errReadTooOld     = errors.New("the read is too old")
 	errTableNotFound  = errors.New("table for given TTL not found")
+	errCtxCanceled    = errors.New("context canceled")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -100,6 +101,7 @@ type CassandraStore struct {
 	ttlTables        TTLTables
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
+	timeout          time.Duration
 }
 
 func ttlUnits(ttl uint32) float64 {
@@ -289,6 +291,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
+		timeout:          cluster.Timeout,
 	}
 
 	for i := 0; i < writers; i++ {
@@ -397,7 +400,9 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
-	ret := c.Session.Query(query, row_key, t0, data).Exec()
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	ret := c.Session.Query(query, row_key, t0, data).WithContext(ctx).Exec()
+	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
 }
@@ -406,7 +411,7 @@ type outcome struct {
 	month   uint32
 	sortKey uint32
 	i       *gocql.Iter
-	omitted bool
+	err     error
 }
 type asc []outcome
 
@@ -416,15 +421,29 @@ func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
+		// check to see if the request has been canceled, if so abort now.
+		select {
+		case <-crr.ctx.Done():
+			//request canceled
+			crr.out <- outcome{err: errCtxCanceled}
+			continue
+		default:
+		}
 		waitDuration := time.Since(crr.timestamp)
 		cassGetWaitDuration.Value(waitDuration)
 		if waitDuration > c.omitReadTimeout {
 			cassOmitOldRead.Inc()
-			crr.out <- outcome{omitted: true}
+			crr.out <- outcome{err: errReadTooOld}
 			continue
 		}
+
 		pre := time.Now()
-		iter := outcome{crr.month, crr.sortKey, c.Session.Query(crr.q, crr.p...).Iter(), false}
+		iter := outcome{
+			month:   crr.month,
+			sortKey: crr.sortKey,
+			i:       c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
+			err:     nil,
+		}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
 	}
@@ -460,7 +479,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 	crrs := make([]*ChunkReadRequest, 0)
 
 	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil})
+		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil, ctx})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -503,6 +522,10 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 	for i := range crrs {
 		crrs[i].out = results
 		select {
+		case <-ctx.Done():
+			// request has been canceled, so no need to continue queuing reads.
+			// reads already queued will be aborted when read from the queue.
+			return nil, nil
 		case c.readQueue <- crrs[i]:
 		default:
 			cassReadQueueFull.Inc()
@@ -514,17 +537,28 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 	outcomes := make([]outcome, 0, numQueries)
 
 	seen := 0
-	for o := range results {
-		if o.omitted {
-			tracing.Failure(span)
-			tracing.Error(span, errReadTooOld)
-			return nil, errReadTooOld
-		}
-		seen += 1
-		outcomes = append(outcomes, o)
-		if seen == numQueries {
-			close(results)
-			break
+LOOP:
+	for {
+		select {
+		case <-ctx.Done():
+			// request has been canceled, so no need to continue processing results
+			return nil, nil
+		case o := <-results:
+			if o.err != nil {
+				if o.err == errCtxCanceled {
+					// context was canceled, return immediately.
+					return nil, nil
+				}
+				tracing.Failure(span)
+				tracing.Error(span, o.err)
+				return nil, o.err
+			}
+			seen += 1
+			outcomes = append(outcomes, o)
+			if seen == numQueries {
+				close(results)
+				break LOOP
+			}
 		}
 	}
 	cassGetChunksDuration.Value(time.Since(pre))
@@ -554,9 +588,14 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, sta
 		}
 		err := outcome.i.Close()
 		if err != nil {
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				// query was aborted.
+				return nil, nil
+			}
 			tracing.Failure(span)
 			tracing.Error(span, err)
 			errmetrics.Inc(err)
+			return nil, err
 		} else {
 			cassChunksPerRow.Value(int(chunks))
 		}

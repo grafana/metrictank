@@ -1,10 +1,20 @@
 Changes by Version
 ==================
 
-2.9.1 (unreleased)
-------------------
+2.11.0 (2017-11-27)
+-------------------
 
-- nothing yet
+- Normalize metric names and tags to be compatible with Prometheus (#222)
+
+
+2.10.0 (2017-11-14)
+-------------------
+
+- Support custom tracing headers (#176)
+- Add BaggageRestrictionManager (#178) and RemoteBaggageRestrictionManager (#182)
+- Do not coerce baggage keys to lower case (#196)
+- Log span name when span cannot be reported (#198)
+- Add option to enable gen128Bit for tracer (#193) and allow custom generator for high bits of trace ID (#219)
 
 
 2.9.0 (2017-07-29)

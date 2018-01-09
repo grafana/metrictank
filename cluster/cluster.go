@@ -32,7 +32,7 @@ var (
 )
 
 func Init(name, version string, started time.Time, apiScheme string, apiPort int) {
-	thisNode := Node{
+	thisNode := HTTPNode{
 		Name:          name,
 		ApiPort:       apiPort,
 		ApiScheme:     apiScheme,
@@ -46,7 +46,7 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		local:         true,
 	}
 	if Mode == ModeMulti {
-		Manager = NewMemberlistManager(thisNode, ClusterName, clusterHost, clusterPort)
+		Manager = NewMemberlistManager(thisNode)
 	} else {
 		Manager = NewSingleNodeManager(thisNode)
 	}
@@ -85,32 +85,32 @@ func MembersForQuery() ([]Node, error) {
 	// priority
 	membersMap := make(map[int32]*partitionCandidates)
 	if thisNode.IsReady() {
-		for _, part := range thisNode.Partitions {
+		for _, part := range thisNode.GetPartitions() {
 			membersMap[part] = &partitionCandidates{
-				priority: thisNode.Priority,
+				priority: thisNode.GetPriority(),
 				nodes:    []Node{thisNode},
 			}
 		}
 	}
 
 	for _, member := range Manager.MemberList() {
-		if !member.IsReady() || member.Name == thisNode.Name {
+		if !member.IsReady() || member.GetName() == thisNode.GetName() {
 			continue
 		}
-		for _, part := range member.Partitions {
+		for _, part := range member.GetPartitions() {
 			if _, ok := membersMap[part]; !ok {
 				membersMap[part] = &partitionCandidates{
-					priority: member.Priority,
+					priority: member.GetPriority(),
 					nodes:    []Node{member},
 				}
 				continue
 			}
-			if membersMap[part].priority == member.Priority {
+			if membersMap[part].priority == member.GetPriority() {
 				membersMap[part].nodes = append(membersMap[part].nodes, member)
-			} else if membersMap[part].priority > member.Priority {
+			} else if membersMap[part].priority > member.GetPriority() {
 				// this node has higher priority (lower number) then previously seen candidates
 				membersMap[part] = &partitionCandidates{
-					priority: member.Priority,
+					priority: member.GetPriority(),
 					nodes:    []Node{member},
 				}
 			}
@@ -127,23 +127,23 @@ func MembersForQuery() ([]Node, error) {
 
 LOOP:
 	for _, candidates := range membersMap {
-		if candidates.nodes[0].Name == thisNode.Name {
-			if _, ok := selectedMembers[thisNode.Name]; !ok {
-				selectedMembers[thisNode.Name] = struct{}{}
+		if candidates.nodes[0].GetName() == thisNode.GetName() {
+			if _, ok := selectedMembers[thisNode.GetName()]; !ok {
+				selectedMembers[thisNode.GetName()] = struct{}{}
 				answer = append(answer, thisNode)
 			}
 			continue LOOP
 		}
 
 		for _, n := range candidates.nodes {
-			if _, ok := selectedMembers[n.Name]; ok {
+			if _, ok := selectedMembers[n.GetName()]; ok {
 				continue LOOP
 			}
 		}
 		// if no nodes have been selected yet then grab a
 		// random node from the set of available nodes
 		selected := candidates.nodes[rand.Intn(len(candidates.nodes))]
-		selectedMembers[selected.Name] = struct{}{}
+		selectedMembers[selected.GetName()] = struct{}{}
 		answer = append(answer, selected)
 	}
 

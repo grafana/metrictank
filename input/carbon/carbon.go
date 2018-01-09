@@ -7,6 +7,7 @@ import (
 	"flag"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/grafana/metrictank/cluster"
@@ -181,16 +182,16 @@ func (c *Carbon) handle(conn net.Conn) {
 			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
 			continue
 		}
-		name := string(key)
+		nameSplits := strings.Split(string(key), ";")
 		md := &schema.MetricData{
-			Name:     name,
-			Metric:   name,
-			Interval: c.intervalGetter.GetInterval(name),
+			Name:     nameSplits[0],
+			Metric:   nameSplits[0],
+			Interval: c.intervalGetter.GetInterval(nameSplits[0]),
 			Value:    val,
 			Unit:     "unknown",
 			Time:     int64(ts),
 			Mtype:    "gauge",
-			Tags:     []string{},
+			Tags:     nameSplits[1:],
 			OrgId:    1, // admin org
 		}
 		md.SetId()

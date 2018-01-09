@@ -29,6 +29,7 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 * `metrictank.stats.$environment.$instance.store.cassandra.chunk_operations.save_ok.counter32`: number of saved chunks (based on your chunkspan settings)
 * `metrictank.stats.$environment.$instance.api.request_handle.values.rate32` : rate per second of render requests
+* `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
 
 
 
@@ -48,7 +49,7 @@ Metrictank crashed. What to do?
    the amount of memory consumed by the process.
    * Use [rollups](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
 2) Check the metrictank log.
-   If it exited due to a panic, you should probably open a [ticket](https://github.com/grafana/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceeding log data.
+   If it exited due to a panic, you should probably open a [ticket](https://github.com/grafana/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceding log data.
    If it exited due to an error, it could be a problem in your infrastructure or a problem in the metrictank code (in the latter case, please open a ticket as described above)
 
 ### Recovery
@@ -61,7 +62,7 @@ Metrictank crashed. What to do?
 
 #### If you only run once instance
 
-If you use the kafka-mdm input (at grafana we do), before restarting check your [offset option](https://github.com/grafana/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immidiately getting realtime insights back, at the cost of missing older data.
+If you use the kafka-mdm input (at grafana we do), before restarting check your [offset option](https://github.com/grafana/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immediately getting realtime insights back, at the cost of missing older data.
 
 
 ## Metrictank hangs
@@ -113,7 +114,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 3) golang GC runs may cause ingest drops.  Look at 'golang GC' in the Grafana dashboard and see if you can get the dashboard zoom right to look at individual GC runs, and see if they correspond to the ingest drops. (shared cursor is really handy here)
 
 4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads
-from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparant with large ingest rates where metrictank gets closer to saturation
+from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparent with large ingest rates where metrictank gets closer to saturation
 
 ## Metrictank uses too much memory
 

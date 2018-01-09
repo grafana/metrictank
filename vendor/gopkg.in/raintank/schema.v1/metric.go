@@ -15,6 +15,7 @@ var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var errInvalidEmptyName = errors.New("name cannot be empty")
 var errInvalidEmptyMetric = errors.New("metric cannot be empty")
 var errInvalidMtype = errors.New("invalid mtype")
+var errInvalidTagFormat = errors.New("invalid tag format")
 
 type PartitionedMetric interface {
 	Validate() error
@@ -60,6 +61,9 @@ func (m *MetricData) Validate() error {
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
+	}
+	if !validateTags(m.Tags) {
+		return errInvalidTagFormat
 	}
 	return nil
 }
@@ -109,16 +113,60 @@ type MetricDataArray []*MetricData
 
 // for ES
 type MetricDefinition struct {
-	Id         string   `json:"id"`
-	OrgId      int      `json:"org_id"`
-	Name       string   `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
-	Metric     string   `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
-	Interval   int      `json:"interval"`                                      // minimum 10
-	Unit       string   `json:"unit"`
-	Mtype      string   `json:"mtype"`
+	Id       string `json:"id"`
+	OrgId    int    `json:"org_id"`
+	Name     string `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
+	Metric   string `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
+	Interval int    `json:"interval"`                                      // minimum 10
+	Unit     string `json:"unit"`
+	Mtype    string `json:"mtype"`
+
+	// some users of MetricDefinition (f.e. MetricTank) might add a "name" tag
+	// to this slice which allows querying by name as a tag. this special tag
+	// should not be stored or transmitted over the network, otherwise it may
+	// just get overwritten by the receiver.
 	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
 	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
 	Partition  int32    `json:"partition"`
+
+	// this is a special attribute that does not need to be set, it is only used
+	// to keep the state of NameWithTags()
+	nameWithTags string `json:"-"`
+}
+
+// NameWithTags deduplicates the name and tags strings by storing their content
+// as a single string in .nameWithTags and then makes .Name and the .Tags slices
+// of it. Once this has been done it won't do it a second time, but just reuse
+// the already generated .nameWithTags.
+// It returns the deduplicated name with tags.
+func (m *MetricDefinition) NameWithTags() string {
+	if len(m.nameWithTags) > 0 {
+		return m.nameWithTags
+	}
+
+	sort.Strings(m.Tags)
+
+	nameWithTagsBuffer := bytes.NewBufferString(m.Name)
+	tagPositions := make([]int, 0, len(m.Tags)*2)
+	for _, t := range m.Tags {
+		if len(t) >= 5 && t[:5] == "name=" {
+			continue
+		}
+
+		nameWithTagsBuffer.WriteString(";")
+		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
+		nameWithTagsBuffer.WriteString(t)
+		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
+	}
+
+	m.nameWithTags = nameWithTagsBuffer.String()
+	m.Tags = make([]string, len(tagPositions)/2)
+	for i := 0; i < len(m.Tags); i++ {
+		m.Tags[i] = m.nameWithTags[tagPositions[i*2]:tagPositions[i*2+1]]
+	}
+	m.Name = m.nameWithTags[:len(m.Name)]
+
+	return m.nameWithTags
 }
 
 func (m *MetricDefinition) SetId() {
@@ -132,10 +180,15 @@ func (m *MetricDefinition) SetId() {
 	buffer.WriteByte(0)
 	fmt.Fprintf(buffer, "%d", m.Interval)
 
-	for _, k := range m.Tags {
+	for _, t := range m.Tags {
+		if len(t) >= 5 && t[:5] == "name=" {
+			continue
+		}
+
 		buffer.WriteByte(0)
-		buffer.WriteString(k)
+		buffer.WriteString(t)
 	}
+
 	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
 }
 
@@ -154,6 +207,9 @@ func (m *MetricDefinition) Validate() error {
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
+	}
+	if !validateTags(m.Tags) {
+		return errInvalidTagFormat
 	}
 	return nil
 }
@@ -182,6 +238,7 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 	if err := json.Unmarshal(b, &def); err != nil {
 		return nil, err
 	}
+
 	return def, nil
 }
 
@@ -190,7 +247,8 @@ func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	tags := make([]string, len(d.Tags))
 	copy(tags, d.Tags)
-	return &MetricDefinition{
+
+	md := &MetricDefinition{
 		Id:         d.Id,
 		Name:       d.Name,
 		OrgId:      d.OrgId,
@@ -201,4 +259,54 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 		Unit:       d.Unit,
 		Tags:       tags,
 	}
+
+	return md
+}
+
+// validateTags verifies that all the tags are of a valid format. If one or more
+// are invalid it returns false, otherwise true.
+// a valid format is anything that looks like key=value, the length of key and
+// value must be >0 and both must not contain the ; character.
+func validateTags(tags []string) bool {
+	for _, t := range tags {
+		if len(t) == 0 {
+			return false
+		}
+
+		// any = must not be the first character
+		if t[0] == 61 {
+			return false
+		}
+
+		foundEqual := false
+		for pos := 0; pos < len(t); pos++ {
+			// no ; allowed
+			if t[pos] == 59 {
+				return false
+			}
+
+			if !foundEqual {
+				// no ! allowed in key
+				if t[pos] == 33 {
+					return false
+				}
+
+				// found the first =, so this will be the separator between key & value
+				if t[pos] == 61 {
+					// first equal sign must not be the last character
+					if pos == len(t)-1 {
+						return false
+					}
+
+					foundEqual = true
+				}
+			}
+		}
+
+		if !foundEqual {
+			return false
+		}
+	}
+
+	return true
 }

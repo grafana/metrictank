@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	jaeger "github.com/uber/jaeger-client-go"
 	"gopkg.in/macaron.v1"
 )
 
@@ -49,6 +50,15 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		macCtx.MapTo(macCtx.Resp, (*http.ResponseWriter)(nil))
 
 		rw := macCtx.Resp.(*TracingResponseWriter)
+
+		// if tracing is enabled (context is not a opentracing.noopSpanContext)
+		// store traceID in output headers
+		if spanCtx, ok := span.Context().(jaeger.SpanContext); ok {
+			traceID := spanCtx.TraceID().String()
+			headers := macCtx.Resp.Header()
+			headers["Trace-Id"] = []string{traceID}
+		}
+
 		// call next handler. This will return after all handlers
 		// have completed and the request has been sent.
 		macCtx.Next()

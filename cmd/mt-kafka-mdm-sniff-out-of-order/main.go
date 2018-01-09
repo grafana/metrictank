@@ -22,26 +22,29 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	format   = flag.String("format", "{{.First.Seen}} {{.First.Time}} | {{.Seen}} {{.Time}} {{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
-	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
-	substr   = flag.String("substr", "", "only show metrics that have this substring")
+	format   = flag.String("format", "{{.Bad.Id}} {{.Bad.Name}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}", "template to render event with")
+	prefix   = flag.String("prefix", "", "only show metrics with a name that has this prefix")
+	substr   = flag.String("substr", "", "only show metrics with a name that has this substring")
 )
 
-type Data struct {
+type Tracker struct {
+	Head      Msg   // last successfully added message
+	Bad       Msg   // current point that could not be added (assuming no re-order buffer)
+	NumBad    int   // number of failed points since last successful add
+	DeltaTime int64 // delta between Head and Bad time properties in seconds (point timestamps)
+	DeltaSeen int64 // delta between Head and Bad seen time in seconds (consumed from kafka)
+}
+
+type Msg struct {
 	Part int32
 	Seen time.Time
 	schema.MetricData
 }
 
-type TplData struct {
-	Data       // currently seen
-	First Data // seen the first time
-}
-
 // find out of order metrics
 type inputOOOFinder struct {
 	template.Template
-	data map[string]Data // by metric name
+	data map[string]Tracker // by metric id
 	lock sync.Mutex
 }
 
@@ -49,7 +52,7 @@ func newInputOOOFinder(format string) *inputOOOFinder {
 	tpl := template.Must(template.New("format").Parse(format + "\n"))
 	return &inputOOOFinder{
 		*tpl,
-		make(map[string]Data),
+		make(map[string]Tracker),
 		sync.Mutex{},
 	}
 }
@@ -61,24 +64,33 @@ func (ip *inputOOOFinder) Process(metric *schema.MetricData, partition int32) {
 	if *substr != "" && !strings.Contains(metric.Metric, *substr) {
 		return
 	}
-	now := Data{
+	now := Msg{
 		Part:       partition,
 		Seen:       time.Now(),
 		MetricData: *metric,
 	}
 	ip.lock.Lock()
-	first, ok := ip.data[metric.Name]
+	tracker, ok := ip.data[metric.Id]
 	if !ok {
-		ip.data[metric.Name] = now
+		ip.data[metric.Id] = Tracker{
+			Head: now,
+		}
 	} else {
-		if metric.Time > first.Time {
-			ip.data[metric.Name] = now
+		if metric.Time > tracker.Head.Time {
+			tracker.Head = now
+			tracker.NumBad = 0
+			ip.data[metric.Id] = tracker
 		} else {
-			t := TplData{now, first}
-			err := ip.Execute(os.Stdout, t)
+			// if metric time <= head point time, generate event and print
+			tracker.Bad = now
+			tracker.NumBad += 1
+			tracker.DeltaTime = tracker.Head.Time - metric.Time
+			tracker.DeltaSeen = now.Seen.Unix() - tracker.Head.Seen.Unix()
+			err := ip.Execute(os.Stdout, tracker)
 			if err != nil {
 				log.Error(0, "executing template: %s", err)
 			}
+			ip.data[metric.Id] = tracker
 		}
 	}
 	ip.lock.Unlock()
@@ -88,7 +100,22 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-kafka-mdm-sniff-out-of-order")
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Inspects what's flowing through kafka (in mdm format) and reports it to you")
+		fmt.Fprintln(os.Stderr, "Inspects what's flowing through kafka (in mdm format) and reports out of order data (does not take into account reorder buffer)")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "# Mechanism")
+		fmt.Fprintln(os.Stderr, "* it sniffs points being added on a per-series (metric Id) level")
+		fmt.Fprintln(os.Stderr, "* for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp")
+		fmt.Fprintln(os.Stderr, "* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point")
+		fmt.Fprintln(os.Stderr, "every event is printed using the specified format")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "# Event formatting")
+		fmt.Fprintln(os.Stderr, "Uses standard golang templating. E.g. {{field}} with these available fields:")
+		fmt.Fprintln(os.Stderr, ".Head.subfield - head is last successfully added message")
+		fmt.Fprintln(os.Stderr, ".Bad.subfield - Bad is the current point that could not be added (assuming no re-order buffer)")
+		fmt.Fprintln(os.Stderr, "(subfield is any property of the out-of-order MetricData: Time OrgId Id Name Metric Interval Value Unit Mtype Tags and also these 2 extra fileds: Part (partition) and Seen (when the msg was consumed from kafka)")
+		fmt.Fprintln(os.Stderr, "NumBad - number of failed points since last successful add")
+		fmt.Fprintln(os.Stderr, "DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)")
+		fmt.Fprintln(os.Stderr, "DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
 	}

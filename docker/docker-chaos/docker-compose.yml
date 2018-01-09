@@ -1,0 +1,217 @@
+version: '2'
+
+services:
+  metrictank0:
+    hostname: metrictank0
+    image: grafana/metrictank
+    ports:
+     - "6060:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042
+      WAIT_TIMEOUT: 30
+      MT_CASSANDRA_CREATE_KEYSPACE: "true"
+      MT_CASSANDRA_IDX_CREATE_KEYSPACE: "true"
+      MT_CLUSTER_BIND_ADDR: "metrictank0:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank0
+      MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
+      MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+
+  metrictank1:
+    hostname: metrictank1
+    image: grafana/metrictank
+    ports:
+      - "6061:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_CLUSTER_BIND_ADDR: "metrictank1:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0
+      MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank1
+      MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
+      MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+     - metrictank0
+
+  metrictank2:
+    hostname: metrictank2
+    image: grafana/metrictank
+    ports:
+      - "6062:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_CLUSTER_BIND_ADDR: "metrictank2:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0
+      MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank2
+      MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
+      MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+     - metrictank0
+
+  metrictank3:
+    hostname: metrictank3
+    image: grafana/metrictank
+    ports:
+      - "6063:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_CLUSTER_BIND_ADDR: "metrictank3:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0
+      MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank3
+      MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
+      MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+     - metrictank0
+
+  metrictank4:
+    hostname: metrictank4
+    image: grafana/metrictank
+    ports:
+      - "6064:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_CLUSTER_BIND_ADDR: "metrictank4:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0
+      MT_CLUSTER_PRIMARY_NODE: "true"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank4
+      MT_KAFKA_CLUSTER_PARTITIONS: 8,9,10,11
+      MT_KAFKA_MDM_IN_PARTITIONS: 8,9,10,11
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+     - metrictank0
+
+  metrictank5:
+    hostname: metrictank5
+    image: grafana/metrictank
+    ports:
+      - "6065:6060"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+    environment:
+      WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
+      WAIT_TIMEOUT: 30
+      MT_CLUSTER_BIND_ADDR: "metrictank5:7946"
+      MT_CLUSTER_MODE: multi
+      MT_CLUSTER_PEERS: metrictank0
+      MT_CLUSTER_PRIMARY_NODE: "false"
+      MT_CLUSTER_MIN_AVAILABLE_SHARDS:
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_INSTANCE: metrictank5
+      MT_KAFKA_CLUSTER_PARTITIONS: 8,9,10,11
+      MT_KAFKA_MDM_IN_PARTITIONS: 8,9,10,11
+      MT_LOG_LEVEL: 2
+    links:
+     - cassandra
+     - metrictank0
+
+  cassandra:
+    hostname: cassandra
+    image: cassandra:3.9
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    ports:
+     - "9042:9042"
+
+  graphite:
+    hostname: graphite
+    image: raintank/graphite-mt
+    ports:
+     - "8080:80"
+    environment:
+      GRAPHITE_CLUSTER_SERVERS: metrictank0:6060
+      GRAPHITE_STATSD_HOST: statsdaemon
+      WSGI_PROCESSES: 4
+      WSGI_THREADS: 25
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
+  kafka:
+    hostname: kafka
+    image: raintank/kafka
+    environment:
+      ADVERTISED_HOST: kafka
+      NUM_PARTITIONS: 12
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "9999:9999"
+    volumes:
+      - /tmp/kafka-logs
+
+  statsdaemon:
+    hostname: statsdaemon
+    image: raintank/statsdaemon
+    ports:
+     - "8125:8125/udp"
+    volumes:
+     - "./statsdaemon.ini:/etc/statsdaemon.ini"
+
+  # easiest to just use a separate graphite server for monitoring
+  graphitemon:
+    hostname: graphitemon
+    image:  graphiteapp/graphite-statsd
+    ports:
+      - "2003:2003"
+      - "80:80"
+    volumes:
+     - "./carbon.conf:/opt/graphite/conf/carbon.conf"
+     - "./storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf"
+
+  jaeger:
+    hostname: jaeger
+    image:  jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"

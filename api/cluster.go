@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
@@ -45,7 +47,7 @@ func (s *Server) appStatus(ctx *middleware.Context) {
 func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
 		ClusterName: cluster.ClusterName,
-		NodeName:    cluster.Manager.ThisNode().Name,
+		NodeName:    cluster.Manager.ThisNode().GetName(),
 		Members:     cluster.Manager.MemberList(),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
@@ -56,7 +58,7 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 	var toJoin []string
 
 	for _, memberNode := range cluster.Manager.MemberList() {
-		memberNames[memberNode.Name] = struct{}{}
+		memberNames[memberNode.GetName()] = struct{}{}
 	}
 
 	for _, peerName := range req.Members {
@@ -88,11 +90,6 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 
 // IndexFind returns a sequence of msgp encoded idx.Node's
 func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
-	// metricDefs only get updated periodically (when using CassandraIdx), so we add a 1day (86400seconds) buffer when
-	// filtering by our From timestamp.  This should be moved to a configuration option
-	if req.From != 0 {
-		req.From -= 86400
-	}
 	resp := models.NewIndexFindResp()
 
 	for _, pattern := range req.Patterns {
@@ -104,6 +101,51 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 		resp.Nodes[pattern] = nodes
 	}
 	response.Write(ctx, response.NewMsgp(200, resp))
+}
+
+func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDetails) {
+	values, err := s.MetricIndex.TagDetails(req.OrgId, req.Tag, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{Values: values}))
+}
+
+func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
+	tags, err := s.MetricIndex.Tags(req.OrgId, req.Filter, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
+}
+
+func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.IndexAutoCompleteTags) {
+	tags, err := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.Expr, req.From, req.Limit)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
+}
+
+func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
+	tags, err := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.Expr, req.From, req.Limit)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
+}
+
+func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
+	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewMsgp(200, &models.IndexFindByTagResp{Metrics: metrics}))
 }
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
@@ -152,4 +194,68 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 		DeletedDefs: len(defs),
 	}
 	response.Write(ctx, response.NewMsgp(200, &resp))
+}
+
+type PeerResponse struct {
+	peer cluster.Node
+	buf  []byte
+}
+
+// peerQuery takes a request and the path to request it on, then fans it out
+// across the cluster, except to the local peer. If any peer fails requests to
+// other peers are aborted.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) ([]PeerResponse, error) {
+	peers, err := cluster.MembersForQuery()
+	if err != nil {
+		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+		return nil, err
+	}
+	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
+
+	reqCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	responses := make(chan struct {
+		data PeerResponse
+		err  error
+	}, 1)
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		if peer.IsLocal() {
+			continue
+		}
+		wg.Add(1)
+		go func(peer cluster.Node) {
+			defer wg.Done()
+			log.Debug("HTTP Render querying %s%s", peer.GetName(), path)
+			buf, err := peer.Post(reqCtx, name, path, data)
+			if err != nil {
+				cancel()
+				log.Error(4, "HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
+			}
+			responses <- struct {
+				data PeerResponse
+				err  error
+			}{PeerResponse{peer, buf}, err}
+		}(peer)
+	}
+	// wait for all list goroutines to end, then close our responses channel
+	go func() {
+		wg.Wait()
+		close(responses)
+	}()
+
+	result := make([]PeerResponse, 0, len(peers)-1)
+	for resp := range responses {
+		if resp.err != nil {
+			return nil, err
+		}
+		result = append(result, resp.data)
+	}
+
+	return result, nil
 }

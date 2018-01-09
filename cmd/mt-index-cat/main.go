@@ -63,10 +63,13 @@ func main() {
 		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
+		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
+		fmt.Println("roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 list")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\\nX-Org-Id: 1\\n\\n'")
+		fmt.Println("mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\\n' | sort | uniq -c")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
@@ -138,40 +141,26 @@ func main() {
 		perror(err)
 	}
 
-	maxAgeInt := uint32(0)
+	var cutoff uint32
 	if maxAge != "0" {
-		maxAgeInt, err = dur.ParseNDuration(maxAge)
+		maxAgeInt, err := dur.ParseNDuration(maxAge)
 		perror(err)
+		cutoff = uint32(time.Now().Unix() - int64(maxAgeInt))
 	}
 
-	defs := idx.Load(nil)
+	defs := idx.Load(nil, cutoff)
+	// set this after doing the query, to assure age can't possibly be negative
+	out.QueryTime = time.Now().Unix()
 	total := len(defs)
 	shown := 0
 
-	if maxAgeInt == 0 {
-		for _, d := range defs {
-			if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-				if substr == "" || strings.Contains(d.Metric, substr) {
-					show(d)
-					shown += 1
-					if shown == limit {
-						break
-					}
-				}
-			}
-		}
-	} else {
-		cutoff := time.Now().Unix() - int64(maxAgeInt)
-		for _, d := range defs {
-			if d.LastUpdate > cutoff {
-				if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-					if substr == "" || strings.Contains(d.Metric, substr) {
-						show(d)
-						shown += 1
-						if shown == limit {
-							break
-						}
-					}
+	for _, d := range defs {
+		if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
+			if substr == "" || strings.Contains(d.Metric, substr) {
+				show(d)
+				shown += 1
+				if shown == limit {
+					break
 				}
 			}
 		}

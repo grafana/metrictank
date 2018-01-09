@@ -32,7 +32,6 @@ import (
 	"github.com/grafana/metrictank/mdata/notifierNsq"
 	"github.com/grafana/metrictank/stats"
 	statsConfig "github.com/grafana/metrictank/stats/config"
-	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -42,8 +41,7 @@ var (
 	logLevel     int
 	warmupPeriod time.Duration
 	startupTime  time.Time
-	GitHash      = "(none)"
-	tracer       opentracing.Tracer
+	gitHash      = "(none)"
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
@@ -111,7 +109,7 @@ func main() {
 
 	// if the user just wants the version, give it and exit
 	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), GitHash)
+		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
 	}
 
@@ -185,7 +183,7 @@ func main() {
 		log.Fatal(4, "instance can't be empty")
 	}
 
-	log.Info("Metrictank starting. Built from %s - Go version %s", GitHash, runtime.Version())
+	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
 
 	/***********************************
 		Initialize our Cluster
@@ -201,7 +199,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
 	}
-	cluster.Init(*instance, GitHash, startupTime, scheme, int(port))
+	cluster.Init(*instance, gitHash, startupTime, scheme, int(port))
 
 	/***********************************
 		Validate remaining settings
@@ -354,7 +352,7 @@ func main() {
 	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	/***********************************
-		Initialize MetricPerrist notifiers
+		Initialize MetricPersist notifiers
 	***********************************/
 	handlers := make([]mdata.NotifierHandler, 0)
 	if notifierKafka.Enabled {
@@ -400,7 +398,8 @@ func main() {
 	/***********************************
 		Wait for Shutdown
 	***********************************/
-	<-sigChan
+	sig := <-sigChan
+	log.Info("Received signal %q. Shutting down", sig)
 
 	// Leave the cluster. All other nodes will be notified we have left
 	// and so will stop sending us requests.

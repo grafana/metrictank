@@ -1,15 +1,15 @@
 #!/bin/bash
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
+cd ${DIR}/..
 
 # make sure CircleCI gets all tags properly.
 # see https://discuss.circleci.com/t/where-are-my-git-tags/2371
-git fetch --unshallow
+# and https://stackoverflow.com/questions/37531605/how-to-test-if-git-repository-is-shallow
+[ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
 GITVERSION=`git describe --always`
-SOURCEDIR=${DIR}/..
-BUILDDIR=$SOURCEDIR/build
+BUILDDIR=$(pwd)/build
 
 # Make dir
 mkdir -p $BUILDDIR
@@ -20,16 +20,13 @@ rm -rf $BUILDDIR/*
 # disable cgo
 export CGO_ENABLED=0
 
-# Build binary
-cd $GOPATH/src/github.com/grafana/metrictank
-
 OUTPUT=$BUILDDIR/metrictank
 
 if [ "$1" == "-race" ]
 then
   set -x
-  CGO_ENABLED=1 go build -race -ldflags "-X main.GitHash=$GITVERSION" -o $OUTPUT
+  CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
 else
   set -x
-  go build -ldflags "-X main.GitHash=$GITVERSION" -o $OUTPUT
+  go build -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
 fi

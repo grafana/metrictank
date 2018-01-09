@@ -1,6 +1,6 @@
 Regarding type expr, much of parse.go, parse_test.go:
 
-Copyright (c) 2017 Grafana Labs
+Copyright (c) 2017-2018 Grafana Labs
 Copyright (c) 2014,2015 Damian Gryski <damian@gryski.com>
 All rights reserved.
 

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/go-querystring/query"
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
@@ -89,7 +88,7 @@ func (r *Error) Code() int {
 	return r.code
 }
 
-type Node struct {
+type HTTPNode struct {
 	Name          string    `json:"name"`
 	Version       string    `json:"version"`
 	Primary       bool      `json:"primary"`
@@ -106,19 +105,27 @@ type Node struct {
 	local         bool
 }
 
-func (n Node) RemoteURL() string {
+func (n HTTPNode) RemoteURL() string {
 	return fmt.Sprintf("%s://%s:%d", n.ApiScheme, n.RemoteAddr, n.ApiPort)
 }
 
-func (n Node) IsReady() bool {
+func (n HTTPNode) IsReady() bool {
 	return n.State == NodeReady && n.Priority <= maxPrio
 }
 
-func (n Node) IsLocal() bool {
+func (n HTTPNode) GetPriority() int {
+	return n.Priority
+}
+
+func (n HTTPNode) GetPartitions() []int32 {
+	return n.Partitions
+}
+
+func (n HTTPNode) IsLocal() bool {
 	return n.local
 }
 
-func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
+func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "metrictank")
@@ -152,27 +159,50 @@ func (n Node) Post(ctx context.Context, name, path string, body Traceable) (ret 
 		log.Error(3, "CLU failed to inject span into headers: %s", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
-	rsp, err := client.Do(req)
-	if err != nil {
-		log.Error(3, "CLU Node: %s unreachable. %s", n.Name, err.Error())
-		return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
+
+	c := make(chan struct {
+		r   *http.Response
+		err error
+	}, 1)
+
+	go func() {
+		rsp, err := client.Do(req)
+		c <- struct {
+			r   *http.Response
+			err error
+		}{rsp, err}
+	}()
+
+	// wait for either our results from the http request or if out context has been canceled
+	// then abort the http request.
+	select {
+	case <-ctx.Done():
+		log.Debug("CLU HTTPNode: context canceled. terminating request to peer %s", n.Name)
+		transport.CancelRequest(req)
+		<-c // Wait for client.Do but ignore result
+	case resp := <-c:
+		err := resp.err
+		rsp := resp.r
+		if err != nil {
+			tags.Error.Set(span, true)
+			log.Error(3, "CLU HTTPNode: %s unreachable. %s", n.Name, err.Error())
+			return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
+		}
+		return handleResp(rsp)
 	}
-	return handleResp(rsp)
+
+	return nil, nil
+}
+
+func (n HTTPNode) GetName() string {
+	return n.Name
 }
 
 func handleResp(rsp *http.Response) ([]byte, error) {
 	defer rsp.Body.Close()
 	if rsp.StatusCode != 200 {
+		ioutil.ReadAll(rsp.Body)
 		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
 	}
 	return ioutil.ReadAll(rsp.Body)
-}
-
-// Convert an interface{} to a urlencoded querystring
-func toQueryString(q interface{}) (string, error) {
-	v, err := query.Values(q)
-	if err != nil {
-		return "", err
-	}
-	return v.Encode(), nil
 }
