@@ -61,4 +61,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
 	r.Combo("/tags/autoComplete/tags", withOrg, ready, bind(models.GraphiteAutoCompleteTags{})).Get(s.graphiteAutoCompleteTags).Post(s.graphiteAutoCompleteTags)
 	r.Combo("/tags/autoComplete/values", withOrg, ready, bind(models.GraphiteAutoCompleteTagValues{})).Get(s.graphiteAutoCompleteTagValues).Post(s.graphiteAutoCompleteTagValues)
+
+	r.Combo("/functions", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
+	r.Combo("/functions/:func(.+)", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 }
