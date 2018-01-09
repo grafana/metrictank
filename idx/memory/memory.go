@@ -103,6 +103,29 @@ func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
 	}
 }
 
+// <name>;<key>=<name> -> Set of references to schema.MetricDefinition
+type defByTagSet map[string]map[*schema.MetricDefinition]struct{}
+
+func (defs defByTagSet) add(def *schema.MetricDefinition) {
+	fullName := def.NameWithTags()
+	if _, ok := defs[fullName]; !ok {
+		defs[fullName] = make(map[*schema.MetricDefinition]struct{}, 1)
+	}
+	defs[fullName][def] = struct{}{}
+}
+
+func (defs defByTagSet) del(def *schema.MetricDefinition) {
+	fullName := def.NameWithTags()
+	delete(defs[fullName], def)
+	if len(defs[fullName]) == 0 {
+		delete(defs, fullName)
+	}
+}
+
+func (defs defByTagSet) defs(fullName string) map[*schema.MetricDefinition]struct{} {
+	return defs[fullName]
+}
+
 type Node struct {
 	Path     string
 	Children []string
@@ -132,13 +155,16 @@ type MemoryIdx struct {
 
 	// org id -> key name -> key value -> id
 	tags map[int]TagIndex
+
+	DefByTagSet defByTagSet
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]*idx.Archive),
-		Tree:    make(map[int]*Tree),
-		tags:    make(map[int]TagIndex),
+		DefById:     make(map[string]*idx.Archive),
+		DefByTagSet: make(defByTagSet),
+		Tree:        make(map[int]*Tree),
+		tags:        make(map[int]TagIndex),
 	}
 }
 
@@ -220,6 +246,8 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tags.addTagId(tagName, tagValue, id)
 	}
 	tags.addTagId("name", def.Name, id)
+
+	m.DefByTagSet.add(def)
 }
 
 // deindexTags takes a given metric definition and removes all references
@@ -250,6 +278,8 @@ func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) boo
 	}
 
 	tags.delTagId("name", def.Name, id)
+
+	m.DefByTagSet.del(def)
 
 	return true
 }
@@ -1195,13 +1225,24 @@ DEFS:
 
 			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
 		} else {
-			id, err := idx.NewMetricIDFromString(def.Id)
-			if err != nil {
-				log.Error(3, "memory-idx: corrupt index. ID format %s seems to be invalid", def.Id)
-				continue DEFS
+			defs := m.DefByTagSet.defs(def.NameWithTags())
+			// if any other MetricDef with the same tag set is not expired yet,
+			// then we do not want to prune any of them
+			for def := range defs {
+				if def.LastUpdate >= oldestUnix {
+					continue DEFS
+				}
 			}
 
-			toPruneTagged[def.OrgId][id] = struct{}{}
+			for def := range defs {
+				id, err := idx.NewMetricIDFromString(def.Id)
+				if err != nil {
+					log.Error(3, "memory-idx: corrupt index. ID format %s seems to be invalid", def.Id)
+					continue
+				}
+
+				toPruneTagged[def.OrgId][id] = struct{}{}
+			}
 		}
 	}
 	m.RUnlock()

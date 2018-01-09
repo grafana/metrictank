@@ -542,7 +542,63 @@ func TestPruneTaggedSeries(t *testing.T) {
 			So(nodes, ShouldHaveLength, 1)
 		})
 	})
+}
 
+func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
+	_tagSupport := TagSupport
+	defer func() { TagSupport = _tagSupport }()
+	TagSupport = true
+
+	ix := New()
+	ix.Init()
+
+	series := getMetricData(1, 2, 1, 10, "metric.bah", true)
+	serie2 := *series[0]
+	series = append(series, &serie2)
+	series[0].Interval = 1
+	series[1].Interval = 2
+	series[0].Time = 1
+	series[1].Time = 10
+	series[0].SetId()
+	series[1].SetId()
+
+	for _, s := range series {
+		ix.AddOrUpdate(s, 1)
+	}
+
+	Convey("after populating index", t, func() {
+		defs := ix.List(1)
+		So(defs, ShouldHaveLength, 2)
+	})
+
+	findExpressions := []string{"name=" + series[1].Name}
+	for _, tag := range series[1].Tags {
+		findExpressions = append(findExpressions, tag)
+	}
+
+	Convey("When purging old series", t, func() {
+		purged, err := ix.Prune(1, time.Unix(2, 0))
+		So(err, ShouldBeNil)
+		So(purged, ShouldHaveLength, 0)
+	})
+
+	Convey("After purge", t, func() {
+		nodes, err := ix.FindByTag(1, findExpressions, 0)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 2)
+	})
+
+	Convey("When purging newer series", t, func() {
+		purged, err := ix.Prune(1, time.Unix(20, 0))
+		So(err, ShouldBeNil)
+		So(purged, ShouldHaveLength, 2)
+	})
+
+	Convey("After purge", t, func() {
+		nodes, err := ix.FindByTag(1, findExpressions, 0)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 0)
+	})
 }
 
 func TestPrune(t *testing.T) {
