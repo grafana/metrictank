@@ -121,9 +121,9 @@ func main() {
 
 	var pos *posTracker
 	if len(*positionFile) > 0 {
-		pos, err = NewPositionKeeper(*positionFile)
+		pos, err = NewPositionTracker(*positionFile)
 		if err != nil {
-			log.Fatalf("Error instantiating position keeper: %s", err)
+			log.Fatalf("Error instantiating position tracker: %s", err)
 		}
 		defer pos.Close()
 	}
