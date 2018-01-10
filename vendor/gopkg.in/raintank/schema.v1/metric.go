@@ -62,7 +62,7 @@ func (m *MetricData) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
 	}
-	if !validateTags(m.Tags) {
+	if !ValidateTags(m.Tags) {
 		return errInvalidTagFormat
 	}
 	return nil
@@ -208,7 +208,7 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
 	}
-	if !validateTags(m.Tags) {
+	if !ValidateTags(m.Tags) {
 		return errInvalidTagFormat
 	}
 	return nil
@@ -263,11 +263,10 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	return md
 }
 
-// validateTags verifies that all the tags are of a valid format. If one or more
-// are invalid it returns false, otherwise true.
-// a valid format is anything that looks like key=value, the length of key and
-// value must be >0 and both must not contain the ; character.
-func validateTags(tags []string) bool {
+// ValidateTags returns whether all tags are in a valid format.
+// a valid format is anything that looks like key=value,
+// the length of key and value must be >0 and both must not contain the ; character.
+func ValidateTags(tags []string) bool {
 	for _, t := range tags {
 		if len(t) == 0 {
 			return false
