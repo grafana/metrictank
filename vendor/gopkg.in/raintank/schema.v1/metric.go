@@ -272,26 +272,24 @@ func ValidateTags(tags []string) bool {
 			return false
 		}
 
-		// any = must not be the first character
-		if t[0] == 61 {
+		if t[0] == '=' {
 			return false
 		}
 
 		foundEqual := false
 		for pos := 0; pos < len(t); pos++ {
-			// no ; allowed
-			if t[pos] == 59 {
+			if t[pos] == ';' {
 				return false
 			}
 
 			if !foundEqual {
 				// no ! allowed in key
-				if t[pos] == 33 {
+				if t[pos] == '!' {
 					return false
 				}
 
 				// found the first =, so this will be the separator between key & value
-				if t[pos] == 61 {
+				if t[pos] == '=' {
 					// first equal sign must not be the last character
 					if pos == len(t)-1 {
 						return false
