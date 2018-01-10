@@ -70,6 +70,8 @@ global config flags:
     	only show metrics that have this prefix
   -substr string
     	only show metrics that have this substring
+  -tags string
+    	tag filter. empty (default), or 'valid', or 'invalid'
   -verbose
     	print stats to stderr
 

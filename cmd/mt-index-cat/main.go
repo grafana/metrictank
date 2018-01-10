@@ -26,6 +26,7 @@ func main() {
 	var addr string
 	var prefix string
 	var substr string
+	var tags string
 	var from string
 	var maxAge string
 	var verbose bool
@@ -35,6 +36,7 @@ func main() {
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
+	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), or 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
@@ -111,6 +113,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if tags != "" && tags != "valid" && tags != "invalid" {
+		log.Println("invalid tags filter")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
 	cassandra.Enabled = true
@@ -157,6 +165,13 @@ func main() {
 	for _, d := range defs {
 		if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
 			if substr == "" || strings.Contains(d.Metric, substr) {
+				if tags != "" {
+					valid := schema.ValidateTags(d.Tags)
+					// skip the metric if the validation result is not what we want
+					if valid != (tags == "valid") {
+						continue
+					}
+				}
 				show(d)
 				shown += 1
 				if shown == limit {
