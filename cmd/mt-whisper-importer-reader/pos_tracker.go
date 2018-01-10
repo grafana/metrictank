@@ -16,7 +16,7 @@ type posTracker struct {
 	wg           sync.WaitGroup
 }
 
-func NewPositionKeeper(file string) (*posTracker, error) {
+func NewPositionTracker(file string) (*posTracker, error) {
 	p := &posTracker{file: file}
 
 	fd, err := os.Open(file)
