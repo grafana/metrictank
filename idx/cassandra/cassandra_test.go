@@ -14,6 +14,53 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+type testIterator struct {
+	rows []cassRow
+}
+
+type cassRow struct {
+	id         string
+	orgId      int
+	partition  int32
+	name       string
+	metric     string
+	interval   int
+	unit       string
+	mtype      string
+	tags       []string
+	lastUpdate int64
+}
+
+func (i *testIterator) Scan(dest ...interface{}) bool {
+	if len(i.rows) == 0 {
+		return false
+	}
+
+	if len(dest) < 10 {
+		return false
+	}
+
+	row := i.rows[0]
+	*(dest[0].(*string)) = row.id
+	*(dest[1].(*int)) = row.orgId
+	*(dest[2].(*int32)) = row.partition
+	*(dest[3].(*string)) = row.name
+	*(dest[4].(*string)) = row.metric
+	*(dest[5].(*int)) = row.interval
+	*(dest[6].(*string)) = row.unit
+	*(dest[7].(*string)) = row.mtype
+	*(dest[8].(*[]string)) = row.tags
+	*(dest[9].(*int64)) = row.lastUpdate
+
+	i.rows = i.rows[1:]
+
+	return true
+}
+
+func (i *testIterator) Close() error {
+	return nil
+}
+
 func init() {
 	keyspace = "metrictank"
 	hosts = ""
@@ -430,4 +477,114 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 		ix.AddOrUpdate(updates[n], 1)
 	}
 	ix.Stop()
+}
+
+func TestPruneStaleOnLoad(t *testing.T) {
+	iter := testIterator{}
+	iter.rows = append(iter.rows, cassRow{
+		id:         "1",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   1,
+		lastUpdate: 1,
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "2",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   3,
+		lastUpdate: 2,
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "3",
+		orgId:      1,
+		partition:  1,
+		name:       "met2",
+		metric:     "met2",
+		interval:   1,
+		lastUpdate: 1,
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "4",
+		orgId:      1,
+		partition:  1,
+		name:       "met2",
+		metric:     "met2",
+		interval:   3,
+		lastUpdate: 1,
+	})
+
+	idx := &CasIdx{}
+	var defs []schema.MetricDefinition
+	defs = idx.load(defs, &iter, uint32(2))
+
+	expectedLen := 2
+	if len(defs) != expectedLen {
+		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	}
+
+	if defs[0].Id != "1" || defs[1].Id != "2" {
+		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
+	}
+}
+
+func TestPruneStaleOnLoadWithTags(t *testing.T) {
+	iter := testIterator{}
+	iter.rows = append(iter.rows, cassRow{
+		id:         "1",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   1,
+		lastUpdate: 1,
+		tags:       []string{"tag1=val1"},
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "2",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   2,
+		lastUpdate: 2,
+		tags:       []string{"tag1=val1"},
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "3",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   3,
+		lastUpdate: 1,
+		tags:       []string{"tag1=val1;tag2=val2"},
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         "4",
+		orgId:      1,
+		partition:  1,
+		name:       "met1",
+		metric:     "met1",
+		interval:   4,
+		lastUpdate: 1,
+		tags:       []string{"tag1=val1;tag2=val2"},
+	})
+
+	idx := &CasIdx{}
+	var defs []schema.MetricDefinition
+	defs = idx.load(defs, &iter, uint32(2))
+
+	expectedLen := 2
+	if len(defs) != expectedLen {
+		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	}
+
+	if defs[0].Id != "1" || defs[1].Id != "2" {
+		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
+	}
 }
