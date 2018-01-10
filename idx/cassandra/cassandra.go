@@ -129,6 +129,11 @@ type CasIdx struct {
 	wg         sync.WaitGroup
 }
 
+type cqlIterator interface {
+	Scan(dest ...interface{}) bool
+	Close() error
+}
+
 func New() *CasIdx {
 	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
@@ -351,7 +356,7 @@ func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, 
 	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter, cutoff uint32) []schema.MetricDefinition {
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff uint32) []schema.MetricDefinition {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
 	var id, name, metric, unit, mtype string
 	var orgId, interval int
