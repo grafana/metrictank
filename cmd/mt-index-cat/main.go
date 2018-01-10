@@ -36,7 +36,7 @@ func main() {
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
-	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), or 'valid', or 'invalid'")
+	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
@@ -56,6 +56,13 @@ func main() {
 		fmt.Printf("  mt-index-cat [global config flags] <idxtype> [idx config flags] output \n\n")
 		fmt.Printf("global config flags:\n\n")
 		globalFlags.PrintDefaults()
+		fmt.Println()
+		fmt.Println("tags filter:")
+		fmt.Println("     ''        no filtering based on tags")
+		fmt.Println("     'none'    only show metrics that have no tags")
+		fmt.Println("     'some'    only show metrics that have one or more tags")
+		fmt.Println("     'valid'   only show metrics whose tags (if any) are valid")
+		fmt.Println("     'invalid' only show metrics that have one or more invalid tags")
 		fmt.Println()
 		fmt.Printf("idxtype: only 'cass' supported for now\n\n")
 		fmt.Printf("cass config flags:\n\n")
@@ -113,7 +120,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if tags != "" && tags != "valid" && tags != "invalid" {
+	if tags != "" && tags != "valid" && tags != "invalid" && tags != "some" && tags != "none" {
 		log.Println("invalid tags filter")
 		flag.Usage()
 		os.Exit(1)
@@ -166,10 +173,19 @@ func main() {
 		if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
 			if substr == "" || strings.Contains(d.Metric, substr) {
 				if tags != "" {
-					valid := schema.ValidateTags(d.Tags)
-					// skip the metric if the validation result is not what we want
-					if valid != (tags == "valid") {
+					if tags == "none" && len(d.Tags) != 0 {
 						continue
+					}
+					if tags == "some" && len(d.Tags) == 0 {
+						continue
+					}
+					if tags == "valid" || tags == "invalid" {
+						valid := schema.ValidateTags(d.Tags)
+
+						// skip the metric if the validation result is not what we want
+						if valid != (tags == "valid") {
+							continue
+						}
 					}
 				}
 				show(d)
