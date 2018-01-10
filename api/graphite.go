@@ -1151,3 +1151,8 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 
 	return vals, nil
 }
+
+func (s *Server) graphiteFunctions(ctx *middleware.Context) {
+	ctx.Req.Request.Body = ctx.Body
+	graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+}
