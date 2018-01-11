@@ -103,6 +103,28 @@ func main() {
 	startupTime = time.Now()
 
 	/***********************************
+		Initialize Logger
+	***********************************/
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+	// workaround for https://github.com/grafana/grafana/issues/4055
+	switch logLevel {
+	case 0:
+		log.Level(log.TRACE)
+	case 1:
+		log.Level(log.DEBUG)
+	case 2:
+		log.Level(log.INFO)
+	case 3:
+		log.Level(log.WARN)
+	case 4:
+		log.Level(log.ERROR)
+	case 5:
+		log.Level(log.CRITICAL)
+	case 6:
+		log.Level(log.FATAL)
+	}
+	
+	/***********************************
 		Initialize Configuration
 	***********************************/
 	flag.Parse()
@@ -152,29 +174,11 @@ func main() {
 	config.ParseAll()
 
 	/***********************************
-		Initialize Logging
+		Set Log Levels
 	***********************************/
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
-	// workaround for https://github.com/grafana/grafana/issues/4055
-	switch logLevel {
-	case 0:
-		log.Level(log.TRACE)
-	case 1:
-		log.Level(log.DEBUG)
-	case 2:
-		log.Level(log.INFO)
-	case 3:
-		log.Level(log.WARN)
-	case 4:
-		log.Level(log.ERROR)
-	case 5:
-		log.Level(log.CRITICAL)
-	case 6:
-		log.Level(log.FATAL)
-	}
 
 	/***********************************
 		Validate  settings needed for clustering
