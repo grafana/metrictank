@@ -113,6 +113,9 @@ func main() {
 		return
 	}
 
+	// Initialize logger
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+
 	// Only try and parse the conf file if it exists
 	path := ""
 	if _, err := os.Stat(*confFile); err == nil {
@@ -152,9 +155,8 @@ func main() {
 	config.ParseAll()
 
 	/***********************************
-		Initialize Logging
+		Set Log Levels
 	***********************************/
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
