@@ -170,30 +170,32 @@ func main() {
 	shown := 0
 
 	for _, d := range defs {
-		if prefix == "" || strings.HasPrefix(d.Metric, prefix) {
-			if substr == "" || strings.Contains(d.Metric, substr) {
-				if tags != "" {
-					if tags == "none" && len(d.Tags) != 0 {
-						continue
-					}
-					if tags == "some" && len(d.Tags) == 0 {
-						continue
-					}
-					if tags == "valid" || tags == "invalid" {
-						valid := schema.ValidateTags(d.Tags)
+		// note that prefix and substr can be "", meaning filter disabled.
+		// the conditions handle this fine as well.
+		if !strings.HasPrefix(d.Metric, prefix) {
+			continue
+		}
+		if !strings.Contains(d.Metric, substr) {
+			continue
+		}
+		if tags == "none" && len(d.Tags) != 0 {
+			continue
+		}
+		if tags == "some" && len(d.Tags) == 0 {
+			continue
+		}
+		if tags == "valid" || tags == "invalid" {
+			valid := schema.ValidateTags(d.Tags)
 
-						// skip the metric if the validation result is not what we want
-						if valid != (tags == "valid") {
-							continue
-						}
-					}
-				}
-				show(d)
-				shown += 1
-				if shown == limit {
-					break
-				}
+			// skip the metric if the validation result is not what we want
+			if valid != (tags == "valid") {
+				continue
 			}
+		}
+		show(d)
+		shown += 1
+		if shown == limit {
+			break
 		}
 	}
 
