@@ -70,8 +70,17 @@ global config flags:
     	only show metrics that have this prefix
   -substr string
     	only show metrics that have this substring
+  -tags string
+    	tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'
   -verbose
     	print stats to stderr
+
+tags filter:
+     ''        no filtering based on tags
+     'none'    only show metrics that have no tags
+     'some'    only show metrics that have one or more tags
+     'valid'   only show metrics whose tags (if any) are valid
+     'invalid' only show metrics that have one or more invalid tags
 
 idxtype: only 'cass' supported for now
 
