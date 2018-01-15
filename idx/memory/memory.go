@@ -1051,7 +1051,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 	// branch ""        -> node "foo"
 	nodes := strings.Split(n.Path, ".")
 	for i := len(nodes) - 1; i >= 0; i-- {
-		branch := strings.Join(nodes[0:i], ".")
+		branch := strings.Join(nodes[:i], ".")
 		log.Debug("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {

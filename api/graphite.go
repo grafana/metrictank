@@ -134,7 +134,7 @@ func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []stri
 		if err != nil {
 			err := response.WrapError(err)
 			if err.Code() != http.StatusBadRequest {
-				tags.Error.Set(span, true)
+				tracing.Failure(span)
 			}
 			return nil, err
 		}
