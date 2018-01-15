@@ -882,20 +882,16 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			break
 		}
 	}
-	var startNode *Node
 	var branch string
-	if pos == 0 {
-		//we need to start at the root.
-		log.Debug("memory-idx: starting search at the root node")
-		startNode = tree.Items[""]
-	} else {
-		branch = strings.Join(nodes[0:pos], ".")
-		log.Debug("memory-idx: starting search at branch %s", branch)
-		startNode, ok = tree.Items[branch]
-		if !ok {
-			log.Debug("memory-idx: branch %s does not exist in the index for orgId %d", branch, orgId)
-			return nil, nil
-		}
+	if pos != 0 {
+		branch = strings.Join(nodes[:pos], ".")
+	}
+	log.Debug("memory-idx: starting search at orgId %d, node %q", orgId, branch)
+	startNode, ok := tree.Items[branch]
+
+	if !ok {
+		log.Debug("memory-idx: branch %q does not exist in the index for orgId %d", branch, orgId)
+		return nil, nil
 	}
 
 	if startNode == nil {
