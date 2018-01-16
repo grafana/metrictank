@@ -313,7 +313,7 @@ func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
 
 func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
 	sum := 0
-	for _, char := range cwr.key {
+	for _, char := range cwr.Key {
 		sum += int(char)
 	}
 	which := sum % len(c.writeQueues)
@@ -331,26 +331,26 @@ func (c *CassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
-			log.Debug("CS: starting to save %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
+			log.Debug("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
-			cassPutWaitDuration.Value(time.Now().Sub(cwr.timestamp))
+			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
-			buf := PrepareChunkData(cwr.span, cwr.chunk.Series.Bytes())
+			buf := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
 			success := false
 			attempts := 0
 			for !success {
-				err := c.insertChunk(cwr.key, cwr.chunk.T0, cwr.ttl, buf)
+				err := c.insertChunk(cwr.Key, cwr.Chunk.T0, cwr.TTL, buf)
 
 				if err == nil {
 					success = true
-					cwr.metric.SyncChunkSaveState(cwr.chunk.T0)
-					SendPersistMessage(cwr.key, cwr.chunk.T0)
-					log.Debug("CS: save complete. %s:%d %v", cwr.key, cwr.chunk.T0, cwr.chunk)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
+					SendPersistMessage(cwr.Key, cwr.Chunk.T0)
+					log.Debug("CS: save complete. %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
 					if (attempts % 20) == 0 {
-						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.chunk, err)
+						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Chunk, err)
 					}
 					chunkSaveFail.Inc()
 					sleepTime := 100 * attempts
