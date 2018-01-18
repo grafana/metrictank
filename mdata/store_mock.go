@@ -23,8 +23,8 @@ func (c *MockStore) ResetMock() {
 
 // Add adds a chunk to the store
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
-	itgen := chunk.NewBareIterGen(cwr.chunk.Series.Bytes(), cwr.chunk.Series.T0, cwr.span)
-	c.results[cwr.key] = append(c.results[cwr.key], *itgen)
+	itgen := chunk.NewBareIterGen(cwr.Chunk.Series.Bytes(), cwr.Chunk.Series.T0, cwr.Span)
+	c.results[cwr.Key] = append(c.results[cwr.Key], *itgen)
 }
 
 // searches through the mock results and returns the right ones according to start / end

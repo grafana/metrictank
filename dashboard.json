@@ -71,7 +71,7 @@
             "current": false,
             "max": false,
             "min": false,
-            "show": true,
+            "show": false,
             "total": false,
             "values": false
           },
@@ -146,9 +146,9 @@
             },
             {
               "refId": "F",
-	      "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
-	    },
-	    {
+              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
+            },
+            {
               "refId": "G",
               "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.tank.counter32), 1e-9)), 6, 7)"
             },
@@ -394,7 +394,7 @@
           "yaxes": [
             {
               "format": "s",
-              "logBase": 1,
+              "logBase": 10,
               "max": null,
               "min": 0,
               "show": true
@@ -614,7 +614,7 @@
             {
               "format": "short",
               "label": null,
-              "logBase": 1,
+              "logBase": 10,
               "max": null,
               "min": null,
               "show": true
@@ -1487,7 +1487,7 @@
               "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.mem.to_iter.latency.mean.gauge32), 'mem to iter')",
               "textEditor": false
             },
-	    {
+            {
               "refId": "G",
               "target": "alias(averageSeries(metrictank.stats.$environment.$instance.plan.run.latency.mean.gauge32), 'plan run')",
               "textEditor": false

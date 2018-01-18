@@ -129,6 +129,11 @@ type CasIdx struct {
 	wg         sync.WaitGroup
 }
 
+type cqlIterator interface {
+	Scan(dest ...interface{}) bool
+	Close() error
+}
+
 func New() *CasIdx {
 	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
@@ -351,8 +356,8 @@ func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, 
 	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter, cutoff uint32) []schema.MetricDefinition {
-	mdef := schema.MetricDefinition{}
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff uint32) []schema.MetricDefinition {
+	defsByNames := make(map[string][]*schema.MetricDefinition)
 	var id, name, metric, unit, mtype string
 	var orgId, interval int
 	var partition int32
@@ -360,24 +365,39 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter *gocql.Iter, cutoff u
 	var tags []string
 	cutoff64 := int64(cutoff)
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
-		if lastupdate < cutoff64 {
-			continue
+		mdef := &schema.MetricDefinition{
+			Id:         id,
+			OrgId:      orgId,
+			Partition:  partition,
+			Name:       name,
+			Metric:     metric,
+			Interval:   interval,
+			Unit:       unit,
+			Mtype:      mtype,
+			Tags:       tags,
+			LastUpdate: lastupdate,
 		}
-		mdef.Id = id
-		mdef.OrgId = orgId
-		mdef.Partition = partition
-		mdef.Name = name
-		mdef.Metric = metric
-		mdef.Interval = interval
-		mdef.Unit = unit
-		mdef.Mtype = mtype
-		mdef.Tags = tags
-		mdef.LastUpdate = lastupdate
-		defs = append(defs, mdef)
+		nameWithTags := mdef.NameWithTags()
+		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], mdef)
 	}
 	if err := iter.Close(); err != nil {
 		log.Fatal(4, "Could not close iterator: %s", err.Error())
 	}
+
+NAMES:
+	for name, defsByName := range defsByNames {
+		for _, def := range defsByName {
+			if def.LastUpdate >= cutoff64 {
+				// if one of the defs in a name is not stale, then we'll need to add
+				// all the associated MDs to the defs slice
+				for _, defToAdd := range defsByNames[name] {
+					defs = append(defs, *defToAdd)
+				}
+				continue NAMES
+			}
+		}
+	}
+
 	return defs
 }
 

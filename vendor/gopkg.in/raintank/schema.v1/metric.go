@@ -62,7 +62,7 @@ func (m *MetricData) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
 	}
-	if !validateTags(m.Tags) {
+	if !ValidateTags(m.Tags) {
 		return errInvalidTagFormat
 	}
 	return nil
@@ -208,7 +208,7 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
 	}
-	if !validateTags(m.Tags) {
+	if !ValidateTags(m.Tags) {
 		return errInvalidTagFormat
 	}
 	return nil
@@ -263,36 +263,33 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	return md
 }
 
-// validateTags verifies that all the tags are of a valid format. If one or more
-// are invalid it returns false, otherwise true.
-// a valid format is anything that looks like key=value, the length of key and
-// value must be >0 and both must not contain the ; character.
-func validateTags(tags []string) bool {
+// ValidateTags returns whether all tags are in a valid format.
+// a valid format is anything that looks like key=value,
+// the length of key and value must be >0 and both must not contain the ; character.
+func ValidateTags(tags []string) bool {
 	for _, t := range tags {
 		if len(t) == 0 {
 			return false
 		}
 
-		// any = must not be the first character
-		if t[0] == 61 {
+		if t[0] == '=' {
 			return false
 		}
 
 		foundEqual := false
 		for pos := 0; pos < len(t); pos++ {
-			// no ; allowed
-			if t[pos] == 59 {
+			if t[pos] == ';' {
 				return false
 			}
 
 			if !foundEqual {
 				// no ! allowed in key
-				if t[pos] == 33 {
+				if t[pos] == '!' {
 					return false
 				}
 
 				// found the first =, so this will be the separator between key & value
-				if t[pos] == 61 {
+				if t[pos] == '=' {
 					// first equal sign must not be the last character
 					if pos == len(t)-1 {
 						return false
