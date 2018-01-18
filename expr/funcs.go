@@ -55,6 +55,8 @@ func init() {
 		"consolidateBy":  {NewConsolidateBy, true},
 		"diffSeries":     {NewAggregateConstructor("diff", crossSeriesDiff), true},
 		"divideSeries":   {NewDivideSeries, true},
+		"exclude":        {NewExclude, true},
+		"grep":           {NewGrep, true},
 		"groupByTags":    {NewGroupByTags, true},
 		"max":            {NewAggregateConstructor("max", crossSeriesMax), true},
 		"maxSeries":      {NewAggregateConstructor("max", crossSeriesMax), true},

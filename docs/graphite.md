@@ -36,6 +36,8 @@ averageSeries(seriesLists) series                     | avg          | Stable
 consolidateBy(seriesList, func) seriesList            |              | Stable
 diffSeries(seriesLists) series                        |              | Stable
 divideSeries(seriesList, dividend, divisor) seriesList|              | Stable
+exclude(seriesList, pattern) seriesList               |              | Stable
+grep(seriesList, pattern) seriesList                  |              | Stable
 groupByTags(seriesList, func, tagList) seriesList     |              | Stable
 maxSeries(seriesList) series                          | max          | Stable
 minSeries(seriesList) series                          | min          | Stable
