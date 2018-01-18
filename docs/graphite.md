@@ -34,16 +34,16 @@ aliasByNode(seriesList, nodeList) seriesList          | aliasByTags  | Stable
 aliasSub(seriesList, pattern, replacement) seriesList |              | Stable
 averageSeries(seriesLists) series                     | avg          | Stable
 consolidateBy(seriesList, func) seriesList            |              | Stable
-diffSeries(seriesLists) series                        | diff         | Stable
+diffSeries(seriesLists) series                        |              | Stable
 divideSeries(seriesList, dividend, divisor) seriesList|              | Stable
 groupByTags(seriesList, func, tagList) seriesList     |              | Stable
 maxSeries(seriesList) series                          | max          | Stable
 minSeries(seriesList) series                          | min          | Stable
-multiplySeries(seriesList) series                     | multiply     | Stable
+multiplySeries(seriesList) series                     |              | Stable
 movingAverage(seriesLists, windowSize) seriesList     |              | Unstable
 perSecond(seriesLists) seriesList                     |              | Stable
-rangeOfSeries(seriesList) series                      | rangeOf      | Stable
-scale(seriesLists, num) series                        | sum          | Stable
-stddevSeries(seriesList) series                       | stddev       | Stable
+rangeOfSeries(seriesList) series                      |              | Stable
+scale(seriesLists, num) series                        |              | Stable
+stddevSeries(seriesList) series                       |              | Stable
 sumSeries(seriesLists) series                         | sum          | Stable
 transformNull(seriesList, default=0) seriesList       |              | Stable
