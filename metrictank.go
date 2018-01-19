@@ -103,6 +103,11 @@ func main() {
 	startupTime = time.Now()
 
 	/***********************************
+		Initialize Logger
+	***********************************/
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+
+	/***********************************
 		Initialize Configuration
 	***********************************/
 	flag.Parse()
@@ -152,9 +157,8 @@ func main() {
 	config.ParseAll()
 
 	/***********************************
-		Initialize Logging
+		Set logging levels
 	***********************************/
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
 	mdata.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
