@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -55,31 +54,30 @@ func getUnitString(s string) string {
 	return ""
 }
 
-func ParseTimeOffset(offset string) (time.Duration, error) {
+func ParseTimeOffset(offset string) (int, error) {
 	unitIndex := splitNumAlpha(offset)
 	if unitIndex < 0 {
 		return 0, fmt.Errorf("Invalid offset provided %s", offset)
 	}
 
-	t, err := strconv.Atoi(offset[:unitIndex])
+	t, err := strconv.ParseUint(offset[:unitIndex], 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("Invalid offset provided: %s", err)
 	}
 
-	// To mimic python version, custom parsing is used rather than time.ParseDuration
 	switch unitString := getUnitString(offset[unitIndex:]); unitString {
 	case SECONDS_STRING:
-		return time.Duration(t) * time.Second, nil
+		return t, nil
 	case MINUTES_STRING:
-		return time.Duration(t) * time.Minute, nil
+		return t*60, nil
 	case HOURS_STRING:
-		return time.Duration(t) * time.Hour, nil
+		return t*60*60, nil
 	case DAYS_STRING:
-		return time.Duration(t*24) * time.Hour, nil
+		return t*60*60*24, nil
 	case WEEKS_STRING:
-		return time.Duration(t*24*7) * time.Hour, nil
+		return t*60*60*24*7, nil
 	case YEARS_STRING:
-		return time.Duration(t*24*7*365) * time.Hour, nil
+		return t*60*60*24*7*365, nil
 	}
 
 	return 0, fmt.Errorf("Unable to parse offset %s", offset)
