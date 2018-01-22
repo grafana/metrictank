@@ -473,7 +473,7 @@ func TestGetByTag(t *testing.T) {
 
 		resPaths := make([]string, 0, len(res))
 		for id := range res {
-			def, ok := ix.DefById[id.String()]
+			def, ok := ix.defById[id.String()]
 			if !ok {
 				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id.String())
 			}
