@@ -41,3 +41,7 @@ func Lcm(vals []uint32) uint32 {
 	}
 	return out
 }
+
+func IsDigit(r byte) bool {
+	return '0' <= r && r <= '9'
+}

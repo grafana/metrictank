@@ -68,6 +68,7 @@ func init() {
 		"rangeOfSeries":  {NewAggregateConstructor("rangeOf", crossSeriesRange), true},
 		"scale":          {NewScale, true},
 		"smartSummarize": {NewSmartSummarize, false},
+		"sortByName":     {NewSortByName, true},
 		"stddevSeries":   {NewAggregateConstructor("stddev", crossSeriesStddev), true},
 		"sum":            {NewAggregateConstructor("sum", crossSeriesSum), true},
 		"sumSeries":      {NewAggregateConstructor("sum", crossSeriesSum), true},

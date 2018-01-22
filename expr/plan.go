@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
@@ -222,7 +221,6 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 		if err != nil {
 			return nil, err
 		}
-		sort.Sort(models.SeriesByTarget(series))
 		out = append(out, series...)
 	}
 	for i, o := range out {
