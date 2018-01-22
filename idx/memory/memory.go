@@ -103,7 +103,8 @@ func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
 	}
 }
 
-// org id -> <name>;<key>=<name> -> Set of references to schema.MetricDefinition
+// org id -> nameWithTags -> Set of references to schema.MetricDefinition
+// nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
 type defByTagSet map[int]map[string]map[*schema.MetricDefinition]struct{}
 
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
@@ -175,22 +176,16 @@ func (n *Node) String() string {
 type MemoryIdx struct {
 	sync.RWMutex
 
-	// MetricDefinitions keyed by their ID as string. Includes all MDs, with
-	// and also without tags. It also mixes all orgs into one flat map.
-	DefById map[string]*idx.Archive
+	// used for both hierarchy and tag index, so includes all MDs, with
+	// and without tags. It also mixes all orgs into one flat map.
+	DefById map[string]*idx.Archive // by ID string
 
-	// Index trees keyed by org id. Each tree is keyed by the node paths in
-	// the format .node1.node2" and refers to a Node struct.
-	Tree map[int]*Tree
+	// used by hierarchy index only
+	Tree map[int]*Tree // by orgId
 
-	// Tag indices keyed by org id. Each tag index is keyed first by the tag
-	// name and then the key value, each combo refers to a set of metric IDs
-	// as strings.
-	tags map[int]TagIndex
-
-	// DefByTagSet is keyed by org id, and then by a string which is the name
-	// plus all tags in the <name>;<tag>=<value>... format.
+	// used by tag index
 	DefByTagSet defByTagSet
+	tags        map[int]TagIndex // by orgId
 }
 
 func New() *MemoryIdx {
