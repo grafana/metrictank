@@ -103,27 +103,51 @@ func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
 	}
 }
 
-// <name>;<key>=<name> -> Set of references to schema.MetricDefinition
-type defByTagSet map[string]map[*schema.MetricDefinition]struct{}
+// org id -> <name>;<key>=<name> -> Set of references to schema.MetricDefinition
+type defByTagSet map[int]map[string]map[*schema.MetricDefinition]struct{}
 
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
-	fullName := def.NameWithTags()
-	if _, ok := defs[fullName]; !ok {
-		defs[fullName] = make(map[*schema.MetricDefinition]struct{}, 1)
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[def.OrgId]; !ok {
+		orgDefs = make(map[string]map[*schema.MetricDefinition]struct{})
+		defs[def.OrgId] = orgDefs
 	}
-	defs[fullName][def] = struct{}{}
+
+	fullName := def.NameWithTags()
+	if _, ok = orgDefs[fullName]; !ok {
+		orgDefs[fullName] = make(map[*schema.MetricDefinition]struct{}, 1)
+	}
+	orgDefs[fullName][def] = struct{}{}
 }
 
 func (defs defByTagSet) del(def *schema.MetricDefinition) {
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[def.OrgId]; !ok {
+		return
+	}
+
 	fullName := def.NameWithTags()
-	delete(defs[fullName], def)
-	if len(defs[fullName]) == 0 {
-		delete(defs, fullName)
+	delete(orgDefs[fullName], def)
+
+	if len(orgDefs[fullName]) == 0 {
+		delete(orgDefs, fullName)
+	}
+
+	if len(orgDefs) == 0 {
+		delete(defs, def.OrgId)
 	}
 }
 
-func (defs defByTagSet) defs(fullName string) map[*schema.MetricDefinition]struct{} {
-	return defs[fullName]
+func (defs defByTagSet) defs(id int, fullName string) map[*schema.MetricDefinition]struct{} {
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[id]; !ok {
+		return nil
+	}
+
+	return orgDefs[fullName]
 }
 
 type Node struct {
@@ -150,12 +174,22 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]*idx.Archive
-	Tree    map[int]*Tree
 
-	// org id -> key name -> key value -> id
+	// MetricDefinitions keyed by their ID as string. Includes all MDs, with
+	// and also without tags. It also mixes all orgs into one flat map.
+	DefById map[string]*idx.Archive
+
+	// Index trees keyed by org id. Each tree is keyed by the node paths in
+	// the format .node1.node2" and refers to a Node struct.
+	Tree map[int]*Tree
+
+	// Tag indices keyed by org id. Each tag index is keyed first by the tag
+	// name and then the key value, each combo refers to a set of metric IDs
+	// as strings.
 	tags map[int]TagIndex
 
+	// DefByTagSet is keyed by org id, and then by a string which is the name
+	// plus all tags in the <name>;<tag>=<value>... format.
 	DefByTagSet defByTagSet
 }
 
@@ -1228,7 +1262,7 @@ DEFS:
 
 			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
 		} else {
-			defs := m.DefByTagSet.defs(def.NameWithTags())
+			defs := m.DefByTagSet.defs(def.OrgId, def.NameWithTags())
 			// if any other MetricDef with the same tag set is not expired yet,
 			// then we do not want to prune any of them
 			for def := range defs {
