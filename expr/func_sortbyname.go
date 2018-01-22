@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/util"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type FuncSortByName struct {
@@ -20,8 +21,8 @@ func NewSortByName() GraphiteFunc {
 func (s *FuncSortByName) Signature() ([]Arg, []Arg) {
 	return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgBool{key: "natural", val: &s.natural},
-			ArgBool{key: "reverse", val: &s.reverse},
+			ArgBool{key: "natural", opt: true, val: &s.natural},
+			ArgBool{key: "reverse", opt: true, val: &s.reverse},
 		}, []Arg{
 			ArgSeriesList{},
 		}
@@ -31,34 +32,15 @@ func (s *FuncSortByName) Context(context Context) Context {
 	return context
 }
 
-func stringLess(a, b string) bool {
-	return a < b
-}
-
-type seriesSort struct {
-	series []models.Series
-	cmp    func(string, string) bool
-}
-
-func (ss seriesSort) Len() int {
-	return len(ss.series)
-}
-
-func (ss seriesSort) Less(i, j int) bool {
-	return ss.cmp(ss.series[i].Target, ss.series[j].Target)
-}
-
-func (ss seriesSort) Swap(i, j int) {
-	ss.series[i], ss.series[j] = ss.series[j], ss.series[i]
-}
-
 func (s *FuncSortByName) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	series, err := s.in.Exec(cache)
 	if err != nil {
 		return nil, err
 	}
 
-	sortFunc := seriesSort{series, stringLess}
+	log.Info("nat=%v, rev=%v", s.natural, s.reverse)
+
+	sortFunc := seriesTargetSort{series, stringLess}
 	if s.natural {
 		sortFunc.cmp = util.NaturalLess
 	}
@@ -69,5 +51,28 @@ func (s *FuncSortByName) Exec(cache map[Req][]models.Series) ([]models.Series, e
 		sort.Sort(sortFunc)
 	}
 
+	for i := 0; i < 10; i++ {
+		log.Info(series[i].Target)
+	}
+
 	return series, nil
 }
+
+// Provides a comparison function pointer
+func stringLess(a, b string) bool {
+	return a < b
+}
+
+// Pluggable comparison function, sorts by series target
+type seriesTargetSort struct {
+	series []models.Series
+	cmp    func(string, string) bool
+}
+
+func (ss seriesTargetSort) Len() int { return len(ss.series) }
+
+func (ss seriesTargetSort) Less(i, j int) bool {
+	return ss.cmp(ss.series[i].Target, ss.series[j].Target)
+}
+
+func (ss seriesTargetSort) Swap(i, j int) { ss.series[i], ss.series[j] = ss.series[j], ss.series[i] }

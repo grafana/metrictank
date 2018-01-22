@@ -9,11 +9,16 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
-func shuffleStrings(slice []string) {
-	for i := len(slice) - 1; i > 0; i-- {
+func shuffleStrings(slice []string) []string {
+	ret := make([]string, len(slice))
+	copy(ret, slice)
+
+	for i := len(ret) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
-		slice[i], slice[j] = slice[j], slice[i]
+		ret[i], ret[j] = ret[j], ret[i]
 	}
+
+	return ret
 }
 
 func reverseCopy(ss []string) []string {
@@ -44,9 +49,7 @@ func genRandStrings(numStrings int) ([]string, []string) {
 
 func TestSortByName(t *testing.T) {
 	lexSort, natSort := genRandStrings(10000)
-	shuffled := make([]string, len(lexSort))
-	copy(shuffled, lexSort)
-	shuffleStrings(shuffled)
+	shuffled := shuffleStrings(lexSort)
 
 	cases := []struct {
 		in            []string
@@ -112,19 +115,61 @@ func TestSortByName(t *testing.T) {
 	}
 }
 
-/*
-func benchmarkSortByName(b *testing.B, natural, reverse, numSeries int) {
-	var input []models.Series
-	for i := 0; i < numSeries; i++ {
-		series := models.Series{
-			Target: fmt.Sprintf("metrictank.stats.env.instance.input.plugin%d.metrics_received.counter32", i),
-		}
-		input = append(input, series)
+func BenchmarkSortByName_lexicographical_10000(b *testing.B) {
+	benchmarkSortByName(b, false, false, 10000)
+}
+
+func BenchmarkSortByName_lexicographical_reverse_10000(b *testing.B) {
+	benchmarkSortByName(b, false, true, 10000)
+}
+
+func BenchmarkSortByName_natural_10000(b *testing.B) {
+	benchmarkSortByName(b, true, false, 10000)
+}
+
+func BenchmarkSortByName_natural_reverse_10000(b *testing.B) {
+	benchmarkSortByName(b, true, true, 10000)
+}
+
+func benchmarkSortByName(b *testing.B, natural, reverse bool, numSeries int) {
+	lexSort, natSort := genRandStrings(numSeries)
+
+	shuffled := shuffleStrings(lexSort)
+	var in []models.Series
+	for _, name := range shuffled {
+		in = append(in, models.Series{
+			Target: name,
+		})
 	}
-	shuffleSeries(input)
+
+	expected := lexSort
+	if natural {
+		expected = natSort
+	}
+
+	if reverse {
+		expected = reverseCopy(expected)
+	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sort.Sort(seriesSlice{input, NaturalLess})
+		f := NewSortByName()
+		sort := f.(*FuncSortByName)
+		sort.reverse = reverse
+		sort.natural = natural
+		sort.in = NewMock(in)
+		got, err := f.Exec(make(map[Req][]models.Series))
+		if err != nil {
+			b.Fatalf("(nat=%t, rev=%t): err should be nil. got %q", natural, reverse, err)
+		}
+		if len(got) != len(expected) {
+			b.Fatalf("(nat=%t, rev=%t): expected %d output series, got %d", natural, reverse, len(expected), len(got))
+		}
+		for j, o := range expected {
+			g := got[j]
+			if o != g.Target {
+				b.Fatalf("(nat=%t, rev=%t): Mismatch at pos %d. Expected target %q, got %q", natural, reverse, j, o, g.Target)
+			}
+		}
 	}
 }
-*/

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 //go:generate stringer -type=exprType
@@ -63,6 +65,8 @@ func (e expr) Print(indent int) string {
 // for non-basic args, see consumeSeriesArg which should be called after deducing the required from/to.
 // the returned pos is always the index where the next argument should be.
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
+	log.Info("Consuming %v", e.args[pos].str)
+
 	got := e.args[pos]
 	switch v := exp.(type) {
 	case ArgSeries, ArgSeriesList:
@@ -248,6 +252,9 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	if !found {
 		return ErrUnknownKwarg{key}
 	}
+
+	log.Info("Consuming %s=%v", key, e.namedArgs[key].str)
+
 	got := e.namedArgs[key]
 	switch v := exp.(type) {
 	case ArgInt:
@@ -274,6 +281,7 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		if got.etype != etBool {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
+		log.Info("found it and the bool is %v", got.bool)
 		*v.val = got.bool
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)

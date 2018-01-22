@@ -40,6 +40,7 @@ func NaturalLess(s, t string) bool {
 	return tItr.hasNext() && !sItr.hasNext()
 }
 
+// Used to iterate over strings in "chunks" of either entirely digits or entirely not digits
 type chunkIter struct {
 	base string
 	pos  int
@@ -66,21 +67,15 @@ func compareChunks(a, b string) int {
 	}
 
 	if IsDigit(a[0]) && IsDigit(b[0]) {
+		// Both numeric, compare as numbers
 		aNum, _ := strconv.Atoi(a)
 		bNum, _ := strconv.Atoi(b)
 		return aNum - bNum
-	} else if a < b {
+	}
+
+	// Not both numeric, compare as strings
+	if a < b {
 		return -1
 	}
-
 	return 1
-}
-
-func getChunk(r string) int {
-	for i := range r {
-		if IsDigit(r[i]) {
-			return i
-		}
-	}
-	return len(r)
 }
