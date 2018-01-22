@@ -5,7 +5,6 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/util"
-	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type FuncSortByName struct {
@@ -38,8 +37,6 @@ func (s *FuncSortByName) Exec(cache map[Req][]models.Series) ([]models.Series, e
 		return nil, err
 	}
 
-	log.Info("nat=%v, rev=%v", s.natural, s.reverse)
-
 	sortFunc := seriesTargetSort{series, stringLess}
 	if s.natural {
 		sortFunc.cmp = util.NaturalLess
@@ -49,10 +46,6 @@ func (s *FuncSortByName) Exec(cache map[Req][]models.Series) ([]models.Series, e
 		sort.Sort(sort.Reverse(sortFunc))
 	} else {
 		sort.Sort(sortFunc)
-	}
-
-	for i := 0; i < 10; i++ {
-		log.Info(series[i].Target)
 	}
 
 	return series, nil
