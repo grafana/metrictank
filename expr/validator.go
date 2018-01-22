@@ -2,6 +2,8 @@ package expr
 
 import (
 	"errors"
+
+	"github.com/grafana/metrictank/consolidation"
 )
 
 var ErrIntPositive = errors.New("integer must be positive")
@@ -23,3 +25,8 @@ func IsAggFunc(e *expr) error {
 	}
 	return nil
 }
+
+func IsConsolFunc(e *expr) error {
+	return consolidation.Validate(e.str)
+}
+
