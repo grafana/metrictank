@@ -2,10 +2,13 @@ package expr
 
 import (
 	"errors"
+
+	"github.com/grafana/metrictank/consolidation"
 )
 
 var ErrIntPositive = errors.New("integer must be positive")
 var ErrInvalidAggFunc = errors.New("Invalid aggregation func")
+var ErrInvalidOffsetUnit = errors.New("Invalid offset unit")
 
 // Validator is a function to validate an input
 type Validator func(e *expr) error
@@ -22,4 +25,13 @@ func IsAggFunc(e *expr) error {
 		return ErrInvalidAggFunc
 	}
 	return nil
+}
+
+func IsConsolFunc(e *expr) error {
+	return consolidation.Validate(e.str)
+}
+
+func IsIntervalString(e *expr) error {
+	_, err := ParseTimeOffset(e.str)
+	return err
 }

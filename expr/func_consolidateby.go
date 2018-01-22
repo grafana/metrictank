@@ -17,12 +17,9 @@ func NewConsolidateBy() GraphiteFunc {
 }
 
 func (s *FuncConsolidateBy) Signature() ([]Arg, []Arg) {
-	validConsol := func(e *expr) error {
-		return consolidation.Validate(e.str)
-	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgString{val: &s.by, validator: []Validator{validConsol}},
+		ArgString{val: &s.by, validator: []Validator{IsConsolFunc}},
 	}, []Arg{ArgSeriesList{}}
 }
 
