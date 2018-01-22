@@ -71,13 +71,13 @@ func ParseTimeOffset(offset string) (int, error) {
 	case MINUTES_STRING:
 		return t*60, nil
 	case HOURS_STRING:
-		return t*60*60, nil
+		return t*3600, nil
 	case DAYS_STRING:
-		return t*60*60*24, nil
+		return t*86400, nil
 	case WEEKS_STRING:
-		return t*60*60*24*7, nil
+		return t*604800, nil
 	case YEARS_STRING:
-		return t*60*60*24*7*365, nil
+		return t*31536000, nil
 	}
 
 	return 0, fmt.Errorf("Unable to parse offset %s", offset)
