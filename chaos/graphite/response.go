@@ -1,4 +1,4 @@
-package chaos
+package graphite
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-type Response []Series
+type Data []Series
 
 type Series struct {
 	Target     string

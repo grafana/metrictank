@@ -1,11 +1,11 @@
-package chaos
+package fakemetrics
 
 import (
 	"fmt"
 	"log"
 	"time"
 
-	"github.com/grafana/metrictank/chaos/out/kafkamdm"
+	"github.com/grafana/metrictank/chaos/fakemetrics/out/kafkamdm"
 	"github.com/grafana/metrictank/clock"
 	"github.com/raintank/met/helper"
 	"gopkg.in/raintank/schema.v1"
@@ -31,13 +31,12 @@ func init() {
 	}
 }
 
-func fakeMetrics() {
+func Kafka() {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
 	if err != nil {
 		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
 	}
-
 	// advantage over regular ticker:
 	// 1) no ticks dropped
 	// 2) ticks come asap after the start of a new second, so we can measure better how long it took to get the data

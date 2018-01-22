@@ -1,4 +1,4 @@
-package chaos
+package docker
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/grafana/metrictank/chaos/track"
 )
 
 var cli *client.Client
@@ -61,18 +62,18 @@ func stop(name string) error {
 }
 */
 
-// isolate isolates traffic between containers in setA and containers in setB
-func isolate(setA, setB []string, dur string) error {
+// Isolate isolates traffic between containers in setA and containers in setB
+func Isolate(setA, setB []string, dur string) error {
 	// note: isolateOut should return very fast (order of ms)
 	// so we can run all this in serial
 	for _, a := range setA {
-		err := isolateOut(a, dur, setB...)
+		err := IsolateOut(a, dur, setB...)
 		if err != nil {
 			return err
 		}
 	}
 	for _, b := range setB {
-		err := isolateOut(b, dur, setA...)
+		err := IsolateOut(b, dur, setA...)
 		if err != nil {
 			return err
 		}
@@ -80,8 +81,8 @@ func isolate(setA, setB []string, dur string) error {
 	return nil
 }
 
-// isolateOut isolates traffic from the given docker container to all others matching the expression
-func isolateOut(name, dur string, targets ...string) error {
+// IsolateOut isolates traffic from the given docker container to all others matching the expression
+func IsolateOut(name, dur string, targets ...string) error {
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
 		return err
@@ -108,7 +109,7 @@ func isolateOut(name, dur string, targets ...string) error {
 	}
 
 	// log all pumba's output
-	_, err = NewTracker(cmd, false, false, "pumba-stdout", "pumba-stderr")
+	_, err = track.NewTracker(cmd, false, false, "pumba-stdout", "pumba-stderr")
 	if err != nil {
 		return err
 	}

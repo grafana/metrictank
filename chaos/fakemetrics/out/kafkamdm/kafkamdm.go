@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/grafana/metrictank/chaos/out"
+	"github.com/grafana/metrictank/chaos/fakemetrics/out"
 	p "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"

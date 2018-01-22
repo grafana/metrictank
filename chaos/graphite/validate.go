@@ -1,23 +1,23 @@
-package chaos
+package graphite
 
 import "math"
 
-// response is a convenience type:
+// Response is a convenience type:
 // it provides original http and json decode errors, if applicable
 // and also the decoded response body, if any
-type response struct {
+type Response struct {
 	httpErr   error
 	decodeErr error
 	code      int
 	traceID   string
-	r         Response
+	r         Data
 }
 
-type Validator func(resp response) bool
+type Validator func(resp Response) bool
 
-// validateTargets returns a function that validates that the response contains exactly all named targets
-func validateTargets(targets []string) Validator {
-	return func(resp response) bool {
+// ValidateTargets returns a function that validates that the response contains exactly all named targets
+func ValidateTargets(targets []string) Validator {
+	return func(resp Response) bool {
 		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {
 			return false
 		}
@@ -33,7 +33,7 @@ func validateTargets(targets []string) Validator {
 	}
 }
 
-// validateCorrect returns a validator with a min number,
+// ValidateCorrect returns a validator with a min number,
 // which will validate whether we received a "sufficiently correct"
 // response.  We assume the response corresponds to a sumSeries() query
 // of multiple series, typically across shards across different instances.
@@ -44,8 +44,8 @@ func validateTargets(targets []string) Validator {
 // to allow 4 shards being down and unaccounted for, pass 8.
 // NOTE: 8 points are ignored (see comments further down) so you should only call this
 // for sufficiently long series, e.g. 15 points or so.
-func validateCorrect(num float64) Validator {
-	return func(resp response) bool {
+func ValidateCorrect(num float64) Validator {
+	return func(resp Response) bool {
 		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {
 			return false
 		}
@@ -72,9 +72,9 @@ func validateCorrect(num float64) Validator {
 	}
 }
 
-// validaterCode returns a validator that validates whether the response has the given code
-func validateCode(code int) Validator {
-	return func(resp response) bool {
+// ValidaterCode returns a validator that validates whether the response has the given code
+func ValidateCode(code int) Validator {
+	return func(resp Response) bool {
 		if resp.code == code {
 			return true
 		}
@@ -82,14 +82,14 @@ func validateCode(code int) Validator {
 	}
 }
 
-// validatorAvgWindowed returns a validator that validates the number of series and the avg value of each series
+// ValidatorAvgWindowed returns a validator that validates the number of series and the avg value of each series
 // it is windowed to allow the dataset to include one or two values that would be evened out by a value
 // just outside of the response. For example:
 // response: NaN 4 4 4 5 3 4 4 4 5
 // clearly here we can trust that if the avg value should be 4, that there would be a 3 coming after the response
 // but we don't want to wait for that.
 // NOTE: ignores up to 2 points from each series, adjust your input size accordingly for desired confidence
-func validatorAvgWindowed(numPoints int, avg float64) Validator {
+func ValidatorAvgWindowed(numPoints int, avg float64) Validator {
 	try := func(datapoints []Point) bool {
 		for i := 0; i <= 1; i++ {
 		Try:
@@ -109,7 +109,7 @@ func validatorAvgWindowed(numPoints int, avg float64) Validator {
 		}
 		return false
 	}
-	return func(resp response) bool {
+	return func(resp Response) bool {
 		for _, series := range resp.r {
 			if len(series.Datapoints) != numPoints {
 				return false

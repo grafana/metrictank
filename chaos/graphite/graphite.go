@@ -1,4 +1,4 @@
-package chaos
+package graphite
 
 import (
 	"encoding/json"
@@ -20,8 +20,8 @@ func init() {
 	}
 }
 
-func renderQuery(base, target, from string) response {
-	var r response
+func renderQuery(base, target, from string) Response {
+	var r Response
 	url := fmt.Sprintf("%s/render?target=%s&format=json&from=%s", base, target, from)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -44,14 +44,14 @@ func renderQuery(base, target, from string) response {
 	return r
 }
 
-func retryGraphite(query, from string, times int, validate Validator) (bool, response) {
+func RetryGraphite(query, from string, times int, validate Validator) (bool, Response) {
 	return retry(query, from, times, validate, "http://localhost")
 }
-func retryMT(query, from string, times int, validate Validator) (bool, response) {
+func RetryMT(query, from string, times int, validate Validator) (bool, Response) {
 	return retry(query, from, times, validate, "http://localhost:6060")
 }
-func retry(query, from string, times int, validate Validator, base string) (bool, response) {
-	var resp response
+func retry(query, from string, times int, validate Validator, base string) (bool, Response) {
+	var resp Response
 	for i := 0; i < times; i++ {
 		if i > 0 {
 			time.Sleep(time.Second)
@@ -72,17 +72,17 @@ type checkResultsTemp struct {
 	empty      int
 	timeout    int
 	other      int
-	firstOther *response
+	firstOther *Response
 }
 
 // final outcome of check results
-type checkResults struct {
-	valid []int // each position corresponds to a validator
+type CheckResults struct {
+	Valid []int // each position corresponds to a validator
 	// categories of invalid responses
-	empty      int
-	timeout    int
-	other      int
-	firstOther *response
+	Empty      int
+	Timeout    int
+	Other      int
+	FirstOther *Response
 }
 
 func newCheckResultsTemp(validators []Validator) *checkResultsTemp {
@@ -133,7 +133,7 @@ func checkWorker(base, query, from string, wg *sync.WaitGroup, cr *checkResultsT
 // meaning the counts of each response matching each validator function, and the number
 // of timeouts, and finally all others (non-timeouting invalid responses)
 // we recommend for 60s duration to use 6000 requests, e.g. 100 per second
-func checkMT(endpoints []int, query, from string, dur time.Duration, reqs int, validators ...Validator) checkResults {
+func CheckMT(endpoints []int, query, from string, dur time.Duration, reqs int, validators ...Validator) CheckResults {
 	pre := time.Now()
 	ret := newCheckResultsTemp(validators)
 	period := dur / time.Duration(reqs)
@@ -154,11 +154,11 @@ func checkMT(endpoints []int, query, from string, dur time.Duration, reqs int, v
 	if time.Since(pre) > (110*dur/100)+2*time.Second {
 		panic(fmt.Sprintf("checkMT ran too long for some reason. expected %s. took actually %s. system overloaded?", dur, time.Since(pre)))
 	}
-	return checkResults{
-		valid:      ret.valid,
-		empty:      ret.empty,
-		timeout:    ret.timeout,
-		other:      ret.other,
-		firstOther: ret.firstOther,
+	return CheckResults{
+		Valid:      ret.valid,
+		Empty:      ret.empty,
+		Timeout:    ret.timeout,
+		Other:      ret.other,
+		FirstOther: ret.firstOther,
 	}
 }
