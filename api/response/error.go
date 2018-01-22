@@ -2,7 +2,6 @@ package response
 
 import (
 	"encoding/json"
-	"net/http"
 )
 
 type Error interface {
@@ -58,19 +57,6 @@ func WrapErrorForTagDB(e error) *ErrorResp {
 func NewError(code int, err string) *ErrorResp {
 	return &ErrorResp{
 		code: code,
-		err:  err,
-	}
-}
-
-func NewInternalError(err string) *ErrorResp {
-	return &ErrorResp{
-		code: http.StatusInternalServerError,
-		err:  err,
-	}
-}
-func NewBadRequest(err string) *ErrorResp {
-	return &ErrorResp{
-		code: http.StatusBadRequest,
 		err:  err,
 	}
 }
