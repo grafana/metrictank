@@ -60,9 +60,10 @@ func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool
 	return data
 }
 
-// testWithAndWithoutTagSupport calls a test with all combinations of
-// the settings TagSupport and tagsInTree. In some cases those settings can
-// affect the logic quite a lot, so we need to test all combinations
+// testWithAndWithoutTagSupport calls a test with the TagSupprt setting
+// turned on and off. This is to verify that something works as expected
+// no matter what this flag is set to, it does not mean that the behavior
+// of a method should be changing dependent on that setting.
 func testWithAndWithoutTagSupport(t *testing.T, f func(*testing.T)) {
 	t.Helper()
 	_tagSupport := TagSupport
