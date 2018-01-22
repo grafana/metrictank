@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/raintank/dur"
 )
 
 var ErrIntPositive = errors.New("integer must be positive")
@@ -30,3 +31,7 @@ func IsConsolFunc(e *expr) error {
 	return consolidation.Validate(e.str)
 }
 
+func IsIntervalString(e *expr) error {
+	_, err := dur.ParseDuration(e.str)
+	return err
+}

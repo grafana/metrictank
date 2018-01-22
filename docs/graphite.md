@@ -49,4 +49,5 @@ rangeOfSeries(seriesList) series                      |              | Stable
 scale(seriesLists, num) series                        |              | Stable
 stddevSeries(seriesList) series                       |              | Stable
 sumSeries(seriesLists) series                         | sum          | Stable
+summarize(seriesList) seriesList                      |              | Stable
 transformNull(seriesList, default=0) seriesList       |              | Stable
