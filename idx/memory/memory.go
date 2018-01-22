@@ -252,6 +252,9 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 // deindexTags takes a given metric definition and removes all references
 // to it from the tag index. It assumes a lock is already held.
+// a return value of "false" means there was an error and the deindexing was
+// unsuccessful, "true" means the indexing was at least partially or completely
+// successful
 func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
 	id, err := idx.NewMetricIDFromString(def.Id)
 	if err != nil {
