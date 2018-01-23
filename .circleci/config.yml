@@ -50,7 +50,7 @@ jobs:
           at: .
       - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
-      - run: scripts/qa/end2end.sh
+      - run: go test -v ./chaos/tests/simple_carbon
 
   deploy:
     docker:

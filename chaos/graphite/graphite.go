@@ -47,6 +47,11 @@ func renderQuery(base, target, from string) Response {
 func RetryGraphite(query, from string, times int, validate Validator) (bool, Response) {
 	return retry(query, from, times, validate, "http://localhost")
 }
+
+func RetryGraphite8080(query, from string, times int, validate Validator) (bool, Response) {
+	return retry(query, from, times, validate, "http://localhost:8080")
+}
+
 func RetryMT(query, from string, times int, validate Validator) (bool, Response) {
 	return retry(query, from, times, validate, "http://localhost:6060")
 }

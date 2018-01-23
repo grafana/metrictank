@@ -118,3 +118,21 @@ func ValidatorAvgWindowed(numPoints int, cmp Comparator) Validator {
 		return true
 	}
 }
+
+// ValidatorLenNulls returns a validator that validates that any of the series contained
+// within the response, has a length of l and no more than prefix nulls up front.
+func ValidatorLenNulls(prefix, l int) Validator {
+	return func(resp Response) bool {
+		for _, series := range resp.r {
+			if len(series.Datapoints) != l {
+				return false
+			}
+			for i, dp := range series.Datapoints {
+				if math.IsNaN(dp.Val) && i+1 > prefix {
+					return false
+				}
+			}
+		}
+		return true
+	}
+}

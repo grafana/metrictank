@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/grafana/metrictank/chaos/fakemetrics/out"
+	"github.com/grafana/metrictank/chaos/fakemetrics/out/carbon"
 	"github.com/grafana/metrictank/chaos/fakemetrics/out/kafkamdm"
 	"github.com/grafana/metrictank/clock"
 	"github.com/raintank/met/helper"
@@ -16,7 +18,13 @@ const numPartitions = 12
 var metrics []*schema.MetricData
 
 func init() {
-	for i := 0; i < numPartitions; i++ {
+	generateMetrics(numPartitions)
+}
+
+func generateMetrics(num int) {
+	metrics = make([]*schema.MetricData, num)
+
+	for i := 0; i < num; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		m := &schema.MetricData{
 			OrgId:    1,
@@ -27,7 +35,7 @@ func init() {
 			Mtype:    "gauge",
 		}
 		m.SetId()
-		metrics = append(metrics, m)
+		metrics[i] = m
 	}
 }
 
@@ -37,6 +45,20 @@ func Kafka() {
 	if err != nil {
 		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
 	}
+	run(out)
+}
+
+func Carbon(num int) {
+	stats, _ := helper.New(false, "", "standard", "", "")
+	out, err := carbon.New("localhost:2003", stats)
+	if err != nil {
+		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
+	}
+	generateMetrics(num)
+	run(out)
+}
+
+func run(out out.Out) {
 	// advantage over regular ticker:
 	// 1) no ticks dropped
 	// 2) ticks come asap after the start of a new second, so we can measure better how long it took to get the data
@@ -49,7 +71,7 @@ func Kafka() {
 		}
 		err := out.Flush(metrics)
 		if err != nil {
-			panic(fmt.Sprintf("failed to send data to kafka: %s", err))
+			panic(fmt.Sprintf("failed to send data to output: %s", err))
 		}
 	}
 }
