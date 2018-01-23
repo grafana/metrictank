@@ -64,6 +64,7 @@ jobs:
           path: build
       - store_artifacts:
           path: build_pkg
+      - setup_remote_docker
       - deploy:
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
