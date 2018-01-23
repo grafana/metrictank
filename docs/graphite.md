@@ -35,7 +35,8 @@ aliasSub(seriesList, pattern, replacement) seriesList |              | Stable
 averageSeries(seriesLists) series                     | avg          | Stable
 consolidateBy(seriesList, func) seriesList            |              | Stable
 diffSeries(seriesLists) series                        |              | Stable
-divideSeries(seriesList, dividend, divisor) seriesList|              | Stable
+divideSeries(dividend, divisor) seriesList            |              | Stable
+divideSeriesLists(dividends, divisors) seriesList     |              | Stable
 exclude(seriesList, pattern) seriesList               |              | Stable
 grep(seriesList, pattern) seriesList                  |              | Stable
 groupByTags(seriesList, func, tagList) seriesList     |              | Stable
