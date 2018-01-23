@@ -57,7 +57,7 @@ jobs:
     steps:
       - checkout
       - attach_workspace:
-          at: build
+          at: .
       - run: scripts/depends.sh
       - run: scripts/build_packages.sh
       - store_artifacts:
