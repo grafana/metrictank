@@ -1,13 +1,35 @@
 version: 2
 jobs:
   build:
-    working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
-    machine: true
+    working_directory: /go/src/github.com/grafana/metrictank
+    docker:
+      - image: circleci/golang:1.9.2
     steps:
-      - run: go version
-      - run: echo $GOPATH
-      - run: docker version
-      - run: docker-compose version
+      - checkout
+      - run: scripts/build.sh
+      - run: scripts/build_tools.sh
+      - setup_remote_docker
+      - run: scripts/build_docker.sh
+      - run: mkdir build_docker && docker save -o build_docker/metrictank.tar grafana/metrictank
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build
+            - build_docker
+
+  test:
+    working_directory: /go/src/github.com/grafana/metrictank
+    docker:
+      - image: circleci/golang:1.9.2
+    steps:
+      - checkout
+      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
+
+  qa:
+    working_directory: /go/src/github.com/grafana/metrictank
+    docker:
+      - image: circleci/golang:1.9.2
+    steps:
       - checkout
       - run: scripts/qa/gofmt.sh
       - run: scripts/qa/go-generate.sh
@@ -17,12 +39,25 @@ jobs:
       - run: scripts/qa/unused.sh
       - run: scripts/qa/vendor.sh
       - run: go vet ./...
-      - run: scripts/build.sh
-      - run: scripts/build_tools.sh
-      - run: scripts/build_docker.sh
+
+  qa-post-build:
+    working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
+    machine: true
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
       - run: scripts/qa/docs.sh
-      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
+      - run: docker load -i build_docker/metrictank.tar
       - run: scripts/qa/end2end.sh
+
+  deploy:
+    docker:
+      - image: circleci/ruby:2.3
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
       - run: scripts/depends.sh
       - run: scripts/build_packages.sh
       - store_artifacts:
@@ -34,5 +69,23 @@ jobs:
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               scripts/push/packagecloud.sh
               docker login -u $DOCKER_USER -p $DOCKER_PASS
+              docker load -i build_docker/metrictank.tar
               scripts/push/docker.sh
             fi
+
+workflows:
+  version: 2
+  build_accept_deploy:
+    jobs:
+      - build
+      - test
+      - qa
+      - qa-post-build:
+          requires:
+            - build
+      - deploy:
+          requires:
+            - build
+            - test
+            - qa
+            - qa-post-build

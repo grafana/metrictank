@@ -4,6 +4,5 @@ set -x
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
-sudo apt install rubygems ruby-dev
-sudo gem install bundler
+which bundler &>/dev/null || sudo gem install bundler
 bundle install

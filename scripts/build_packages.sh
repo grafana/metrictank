@@ -8,7 +8,6 @@ BUILD_TMP=$CODE_DIR/build_tmp # used for temporary data used to construct the pa
 mkdir $BUILD_TMP
 mkdir $BUILD_PKG
 
-sudo apt-get update # otherwise the below install command doesn't work
 sudo apt-get install rpm # to be able to make rpms
 
 ARCH="$(uname -m)"
