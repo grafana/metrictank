@@ -45,15 +45,15 @@ var (
 
 	Enabled         bool
 	matchCacheSize  int
-	tagSupport      bool
-	tagQueryWorkers int // number of workers to spin up when evaluation tag expressions
+	TagSupport      bool
+	TagQueryWorkers int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
-	memoryIdx.BoolVar(&tagSupport, "tag-support", false, "enables/disables querying based on tags")
-	memoryIdx.IntVar(&tagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
+	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	globalconf.Register("memory-idx", memoryIdx)
 }
@@ -103,6 +103,54 @@ func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
 	}
 }
 
+// org id -> nameWithTags -> Set of references to schema.MetricDefinition
+// nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
+type defByTagSet map[int]map[string]map[*schema.MetricDefinition]struct{}
+
+func (defs defByTagSet) add(def *schema.MetricDefinition) {
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[def.OrgId]; !ok {
+		orgDefs = make(map[string]map[*schema.MetricDefinition]struct{})
+		defs[def.OrgId] = orgDefs
+	}
+
+	fullName := def.NameWithTags()
+	if _, ok = orgDefs[fullName]; !ok {
+		orgDefs[fullName] = make(map[*schema.MetricDefinition]struct{}, 1)
+	}
+	orgDefs[fullName][def] = struct{}{}
+}
+
+func (defs defByTagSet) del(def *schema.MetricDefinition) {
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[def.OrgId]; !ok {
+		return
+	}
+
+	fullName := def.NameWithTags()
+	delete(orgDefs[fullName], def)
+
+	if len(orgDefs[fullName]) == 0 {
+		delete(orgDefs, fullName)
+	}
+
+	if len(orgDefs) == 0 {
+		delete(defs, def.OrgId)
+	}
+}
+
+func (defs defByTagSet) defs(id int, fullName string) map[*schema.MetricDefinition]struct{} {
+	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+	var ok bool
+	if orgDefs, ok = defs[id]; !ok {
+		return nil
+	}
+
+	return orgDefs[fullName]
+}
+
 type Node struct {
 	Path     string
 	Children []string
@@ -127,18 +175,25 @@ func (n *Node) String() string {
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
-	DefById map[string]*idx.Archive
-	Tree    map[int]*Tree
 
-	// org id -> key name -> key value -> id
-	tags map[int]TagIndex
+	// used for both hierarchy and tag index, so includes all MDs, with
+	// and without tags. It also mixes all orgs into one flat map.
+	defById map[string]*idx.Archive // by ID string
+
+	// used by hierarchy index only
+	tree map[int]*Tree // by orgId
+
+	// used by tag index
+	defByTagSet defByTagSet
+	tags        map[int]TagIndex // by orgId
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		DefById: make(map[string]*idx.Archive),
-		Tree:    make(map[int]*Tree),
-		tags:    make(map[int]TagIndex),
+		defById:     make(map[string]*idx.Archive),
+		defByTagSet: make(defByTagSet),
+		tree:        make(map[int]*Tree),
+		tags:        make(map[int]TagIndex),
 	}
 }
 
@@ -154,7 +209,7 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	existing, ok := m.DefById[data.Id]
+	existing, ok := m.defById[data.Id]
 	if ok {
 		log.Debug("metricDef with id %s already in index.", data.Id)
 		existing.LastUpdate = data.Time
@@ -170,7 +225,7 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 
-	if tagSupport {
+	if TagSupport {
 		m.indexTags(def)
 	}
 
@@ -180,10 +235,10 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 func (m *MemoryIdx) Update(entry idx.Archive) {
 	m.Lock()
 	defer m.Unlock()
-	if _, ok := m.DefById[entry.Id]; !ok {
+	if _, ok := m.defById[entry.Id]; !ok {
 		return
 	}
-	*(m.DefById[entry.Id]) = entry
+	*(m.defById[entry.Id]) = entry
 }
 
 // indexTags reads the tags of a given metric definition and creates the
@@ -220,25 +275,23 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tags.addTagId(tagName, tagValue, id)
 	}
 	tags.addTagId("name", def.Name, id)
+
+	m.defByTagSet.add(def)
 }
 
 // deindexTags takes a given metric definition and removes all references
 // to it from the tag index. It assumes a lock is already held.
-func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
-	tags, ok := m.tags[def.OrgId]
-	if !ok {
-		corruptIndex.Inc()
-		log.Error(3, "memory-idx: corrupt index. ID %q can't be removed. no tag index for org %d", def.Id, def.OrgId)
-		return
-	}
-
+// a return value of "false" means there was an error and the deindexing was
+// unsuccessful, "true" means the indexing was at least partially or completely
+// successful
+func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
 	id, err := idx.NewMetricIDFromString(def.Id)
 	if err != nil {
 		// should never happen because all IDs in the index must have
 		// a valid format
 		invalidId.Inc()
 		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-		return
+		return false
 	}
 
 	for _, tag := range def.Tags {
@@ -257,6 +310,10 @@ func (m *MemoryIdx) deindexTags(def *schema.MetricDefinition) {
 	}
 
 	tags.delTagId("name", def.Name, id)
+
+	m.defByTagSet.del(def)
+
+	return true
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
@@ -268,13 +325,13 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	for i := range defs {
 		def := &defs[i]
 		pre = time.Now()
-		if _, ok := m.DefById[def.Id]; ok {
+		if _, ok := m.defById[def.Id]; ok {
 			continue
 		}
 
 		m.add(def)
 
-		if tagSupport {
+		if TagSupport {
 			m.indexTags(def)
 		}
 
@@ -283,7 +340,7 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		// but it will be close enough and it will always be true that the lastSave was at
 		// or after this time.  For metrics that are sent at or close to real time (the typical
 		// use case), then the value will be within a couple of seconds of the true lastSave.
-		m.DefById[def.Id].LastSave = uint32(def.LastUpdate)
+		m.defById[def.Id].LastSave = uint32(def.LastUpdate)
 		num++
 		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
@@ -303,8 +360,17 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		AggId:            aggId,
 	}
 
+	if TagSupport && len(def.Tags) > 0 {
+		if _, ok := m.defById[def.Id]; !ok {
+			m.defById[def.Id] = archive
+			statAdd.Inc()
+			log.Debug("memory-idx: adding %s to DefById", path)
+		}
+		return *archive
+	}
+
 	//first check to see if a tree has been created for this OrgId
-	tree, ok := m.Tree[def.OrgId]
+	tree, ok := m.tree[def.OrgId]
 	if !ok || len(tree.Items) == 0 {
 		log.Debug("memory-idx: first metricDef seen for orgId %d", def.OrgId)
 		root := &Node{
@@ -312,10 +378,10 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 			Children: make([]string, 0),
 			Defs:     make([]string, 0),
 		}
-		m.Tree[def.OrgId] = &Tree{
+		m.tree[def.OrgId] = &Tree{
 			Items: map[string]*Node{"": root},
 		}
-		tree = m.Tree[def.OrgId]
+		tree = m.tree[def.OrgId]
 	} else {
 		// now see if there is an existing branch or leaf with the same path.
 		// An existing leaf is possible if there are multiple metricDefs for the same path due
@@ -323,19 +389,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		if node, ok := tree.Items[path]; ok {
 			log.Debug("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
 			node.Defs = append(node.Defs, def.Id)
-			m.DefById[def.Id] = archive
+			m.defById[def.Id] = archive
 			statAdd.Inc()
 			return *archive
 		}
 	}
 
-	pos := strings.Index(path, ";")
-	if pos == -1 {
-		pos = strings.LastIndex(path, ".")
-	} else {
-		// find the last '.' that is not part of a tag
-		pos = strings.LastIndex(path[:pos], ".")
-	}
+	pos := strings.LastIndex(path, ".")
 
 	// now walk backwards through the node path to find the first branch which exists that
 	// this path extends.
@@ -375,7 +435,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		Children: []string{},
 		Defs:     []string{def.Id},
 	}
-	m.DefById[def.Id] = archive
+	m.defById[def.Id] = archive
 	statAdd.Inc()
 
 	return *archive
@@ -385,7 +445,7 @@ func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
-	def, ok := m.DefById[id]
+	def, ok := m.defById[id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
 		return *def, ok
@@ -398,7 +458,7 @@ func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
 func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 	m.RLock()
 	defer m.RUnlock()
-	tree, ok := m.Tree[orgId]
+	tree, ok := m.tree[orgId]
 	if !ok {
 		return nil
 	}
@@ -408,14 +468,14 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 	}
 	archives := make([]idx.Archive, len(node.Defs))
 	for i, def := range node.Defs {
-		archive := m.DefById[def]
+		archive := m.defById[def]
 		archives[i] = *archive
 	}
 	return archives
 }
 
 func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[string]uint64, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -454,7 +514,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 		count := uint64(0)
 		if from > 0 {
 			for id := range ids {
-				def, ok := m.DefById[id.String()]
+				def, ok := m.defById[id.String()]
 				if !ok {
 					corruptIndex.Inc()
 					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
@@ -487,7 +547,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -515,7 +575,7 @@ func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, fro
 			return nil, nil
 		}
 
-		resMap := query.RunGetTags(tags, m.DefById)
+		resMap := query.RunGetTags(tags, m.defById)
 		for tag := range resMap {
 			res = append(res, tag)
 		}
@@ -570,7 +630,7 @@ func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, fro
 //
 // the results will always be sorted alphabetically for consistency
 func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -603,13 +663,13 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 			return nil, nil
 		}
 
-		ids := query.Run(tags, m.DefById)
+		ids := query.Run(tags, m.defById)
 		valueMap := make(map[string]struct{})
 		prefix := tag + "="
 		for id := range ids {
 			var ok bool
 			var def *idx.Archive
-			if def, ok = m.DefById[id.String()]; !ok {
+			if def, ok = m.defById[id.String()]; !ok {
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
 				corruptIndex.Inc()
@@ -673,7 +733,7 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 // If the third parameter is >0 then only metrics will be accounted of which the
 // LastUpdate time is >= the given value.
 func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -725,7 +785,7 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
 	for _, ids := range tags[tag] {
 		for id := range ids {
-			def, ok := m.DefById[id.String()]
+			def, ok := m.defById[id.String()]
 			if !ok {
 				corruptIndex.Inc()
 				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
@@ -742,40 +802,8 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 	return false
 }
 
-// resolveIDs resolves a list of ids (IdSet) into a list of complete
-// Node structs. It assumes that at least a read lock is already
-// held by the caller
-func (m *MemoryIdx) resolveIDs(orgId int, ids IdSet) []idx.Node {
-	res := make([]idx.Node, 0, len(ids))
-	tree := m.Tree[orgId]
-	for id := range ids {
-		def, ok := m.DefById[id.String()]
-		if !ok {
-			corruptIndex.Inc()
-			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
-			continue
-		}
-
-		name := def.NameWithTags()
-		node, ok := tree.Items[name]
-		if !ok {
-			corruptIndex.Inc()
-			log.Error(3, "memory-idx: node %s missing. Index is corrupt.", name)
-			continue
-		}
-
-		res = append(res, idx.Node{
-			Path:        name,
-			Leaf:        node.Leaf(),
-			HasChildren: node.HasChildren(),
-			Defs:        []idx.Archive{*def},
-		})
-	}
-	return res
-}
-
 func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
-	if !tagSupport {
+	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
 	}
@@ -785,19 +813,36 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]id
 		return nil, err
 	}
 
-	return m.idsByTagQuery(orgId, query), nil
-}
-
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) []idx.Node {
 	m.RLock()
 	defer m.RUnlock()
 
+	ids := m.idsByTagQuery(orgId, query)
+	res := make([]idx.Node, 0, len(ids))
+	for id := range ids {
+		def, ok := m.defById[id.String()]
+		if !ok {
+			corruptIndex.Inc()
+			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
+			continue
+		}
+
+		res = append(res, idx.Node{
+			Path:        def.NameWithTags(),
+			Leaf:        true,
+			HasChildren: false,
+			Defs:        []idx.Archive{*def},
+		})
+	}
+	return res, nil
+}
+
+func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) IdSet {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
 	}
 
-	return m.resolveIDs(orgId, query.Run(tags, m.DefById))
+	return query.Run(tags, m.defById)
 }
 
 func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
@@ -828,7 +873,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 			if idxNode.Leaf {
 				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
 				for _, id := range n.Defs {
-					def := m.DefById[id]
+					def := m.defById[id]
 					if from != 0 && def.LastUpdate < from {
 						statFiltered.Inc()
 						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, def.LastUpdate)
@@ -854,7 +899,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 
 func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	var results []*Node
-	tree, ok := m.Tree[orgId]
+	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
 		return results, nil
@@ -943,34 +988,100 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
-	orgs := []int{-1, orgId}
+
+	orgs := make(map[int]struct{})
 	if orgId == -1 {
 		log.Info("memory-idx: returning all metricDefs for all orgs")
-		orgs = make([]int, len(m.Tree))
-		i := 0
-		for org := range m.Tree {
-			orgs[i] = org
-			i++
+		for org := range m.tree {
+			orgs[org] = struct{}{}
 		}
+		for org := range m.tags {
+			orgs[org] = struct{}{}
+		}
+	} else {
+		orgs[-1] = struct{}{}
+		orgs[orgId] = struct{}{}
 	}
+
 	defs := make([]idx.Archive, 0)
-	for _, org := range orgs {
-		tree, ok := m.Tree[org]
-		if !ok {
+	for _, def := range m.defById {
+		if _, ok := orgs[def.OrgId]; !ok {
 			continue
 		}
-		for _, n := range tree.Items {
-			if !n.Leaf() {
-				continue
-			}
-			for _, id := range n.Defs {
-				defs = append(defs, *m.DefById[id])
-			}
-		}
+		defs = append(defs, *def)
 	}
+
 	statListDuration.Value(time.Since(pre))
 
 	return defs
+}
+
+func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, error) {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	queries := make([]TagQuery, 0, len(paths))
+	for _, path := range paths {
+		elements := strings.Split(path, ";")
+		if len(elements) < 2 {
+			continue
+		}
+		expressions := elements[1:]
+		expressions = append(expressions, "name="+elements[0])
+
+		q, err := NewTagQuery(expressions, 0)
+		if err != nil {
+			return nil, err
+		}
+		queries = append(queries, q)
+	}
+
+	ids := make(IdSet)
+	for _, query := range queries {
+		m.RLock()
+		queryIds := m.idsByTagQuery(orgId, query)
+		m.RUnlock()
+
+		for id := range queryIds {
+			ids[id] = struct{}{}
+		}
+	}
+
+	m.Lock()
+	defer m.Unlock()
+	return m.deleteTaggedByIdSet(orgId, ids), nil
+}
+
+// deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
+// it is important that only IDs of series with tags get passed in here, because
+// otherwise the result might be inconsistencies between DefByIDs and the tree index.
+func (m *MemoryIdx) deleteTaggedByIdSet(orgId int, ids IdSet) []idx.Archive {
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	deletedDefs := make([]idx.Archive, 0, len(ids))
+	for id := range ids {
+		idStr := id.String()
+		def, ok := m.defById[idStr]
+		if !ok {
+			// not necessarily a corruption, the id could have been deleted
+			// while we switched from read to write lock
+			continue
+		}
+		if !m.deindexTags(tags, &def.MetricDefinition) {
+			continue
+		}
+		deletedDefs = append(deletedDefs, *def)
+		delete(m.defById, idStr)
+	}
+
+	statMetricsActive.Add(-1 * len(ids))
+
+	return deletedDefs
 }
 
 func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
@@ -994,7 +1105,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 }
 
 func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
-	tree := m.Tree[orgId]
+	tree := m.tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
 	if deleteChildren && n.HasChildren() {
 		log.Debug("memory-idx: deleting branch %s", n.Path)
@@ -1016,16 +1127,11 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 	// delete the metricDefs
 	for _, id := range n.Defs {
 		log.Debug("memory-idx: deleting %s from index", id)
-		deletedDefs = append(deletedDefs, *m.DefById[id])
-		delete(m.DefById, id)
+		deletedDefs = append(deletedDefs, *m.defById[id])
+		delete(m.defById, id)
 	}
-	n.Defs = nil
 
-	if tagSupport {
-		for _, def := range deletedDefs {
-			m.deindexTags(&(def.MetricDefinition))
-		}
-	}
+	n.Defs = nil
 
 	if n.HasChildren() {
 		return deletedDefs
@@ -1095,49 +1201,107 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 // delete series from the index if they have not been seen since "oldest"
 func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
-	var pruned []idx.Archive
-	pre := time.Now()
-	orgs := []int{orgId}
+	orgs := make(map[int]struct{})
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs across all orgs")
 		m.RLock()
-		orgs = make([]int, len(m.Tree))
-		i := 0
-		for org := range m.Tree {
-			orgs[i] = org
-			i++
+		for org := range m.tree {
+			orgs[org] = struct{}{}
+		}
+		if TagSupport {
+			for org := range m.tags {
+				orgs[org] = struct{}{}
+			}
 		}
 		m.RUnlock()
+	} else {
+		orgs[orgId] = struct{}{}
 	}
-	for _, org := range orgs {
-		m.RLock()
-		tree, ok := m.Tree[org]
-		if !ok {
-			m.RUnlock()
+
+	var pruned []idx.Archive
+	toPruneUntagged := make(map[int]map[string]struct{}, len(orgs))
+	toPruneTagged := make(map[int]IdSet, len(orgs))
+	for org := range orgs {
+		toPruneTagged[org] = make(IdSet)
+		toPruneUntagged[org] = make(map[string]struct{})
+	}
+	pre := time.Now()
+
+	m.RLock()
+DEFS:
+	for _, def := range m.defById {
+		if _, ok := orgs[def.OrgId]; !ok {
+			continue DEFS
+		}
+
+		if def.LastUpdate >= oldestUnix {
+			continue DEFS
+		}
+
+		if len(def.Tags) == 0 {
+			tree, ok := m.tree[def.OrgId]
+			if !ok {
+				continue DEFS
+			}
+
+			n, ok := tree.Items[def.Name]
+			if !ok || !n.Leaf() {
+				continue DEFS
+			}
+
+			for _, id := range n.Defs {
+				if m.defById[id].LastUpdate >= oldestUnix {
+					continue DEFS
+				}
+			}
+
+			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
+		} else {
+			defs := m.defByTagSet.defs(def.OrgId, def.NameWithTags())
+			// if any other MetricDef with the same tag set is not expired yet,
+			// then we do not want to prune any of them
+			for def := range defs {
+				if def.LastUpdate >= oldestUnix {
+					continue DEFS
+				}
+			}
+
+			for def := range defs {
+				id, err := idx.NewMetricIDFromString(def.Id)
+				if err != nil {
+					log.Error(3, "memory-idx: corrupt index. ID format %s seems to be invalid", def.Id)
+					continue
+				}
+
+				toPruneTagged[def.OrgId][id] = struct{}{}
+			}
+		}
+	}
+	m.RUnlock()
+
+	for org, ids := range toPruneTagged {
+		if len(ids) == 0 {
+			continue
+		}
+		m.Lock()
+		defs := m.deleteTaggedByIdSet(org, ids)
+		m.Unlock()
+		pruned = append(pruned, defs...)
+	}
+
+	for org, paths := range toPruneUntagged {
+		if len(paths) == 0 {
 			continue
 		}
 
-		var toPrune []string
-
-		for _, n := range tree.Items {
-			if !n.Leaf() {
-				continue
-			}
-			staleCount := 0
-			for _, id := range n.Defs {
-				if m.DefById[id].LastUpdate < oldestUnix {
-					staleCount++
-				}
-			}
-			if staleCount == len(n.Defs) {
-				//we need to delete this node.
-				toPrune = append(toPrune, n.Path)
-			}
+		m.Lock()
+		tree, ok := m.tree[org]
+		if !ok {
+			m.Unlock()
+			continue
 		}
-		m.RUnlock()
 
-		for _, path := range toPrune {
-			m.Lock()
+		for path := range paths {
 			n, ok := tree.Items[path]
 			if !ok {
 				m.Unlock()
@@ -1147,15 +1311,17 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 
 			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 			defs := m.delete(org, n, true, false)
-			statMetricsActive.Add(-1 * len(defs))
 			pruned = append(pruned, defs...)
-			m.Unlock()
 		}
+		m.Unlock()
 	}
+
+	statMetricsActive.Add(-1 * len(pruned))
 
 	if orgId == -1 {
 		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 	}
+
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil
 }

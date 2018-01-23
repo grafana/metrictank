@@ -42,3 +42,8 @@ type IndexTagDetailsResp struct {
 type IndexFindByTagResp struct {
 	Metrics []idx.Node `json:"metrics"`
 }
+
+//go:generate msgp
+type IndexTagDelSeriesResp struct {
+	Count int
+}

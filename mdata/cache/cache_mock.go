@@ -17,6 +17,7 @@ type MockCache struct {
 	DelMetricArchives int
 	DelMetricSeries   int
 	DelMetricKeys     []string
+	ResetCalls        int
 }
 
 func NewMockCache() *MockCache {
@@ -57,5 +58,6 @@ func (mc *MockCache) DelMetric(rawMetric string) (int, int) {
 }
 
 func (mc *MockCache) Reset() (int, int) {
+	mc.ResetCalls++
 	return mc.DelMetricSeries, mc.DelMetricArchives
 }

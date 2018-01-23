@@ -8,6 +8,7 @@ import (
 	"github.com/go-macaron/binding"
 	"github.com/grafana/metrictank/idx"
 	pickle "github.com/kisielk/og-rek"
+	opentracing "github.com/opentracing/opentracing-go"
 	"gopkg.in/macaron.v1"
 )
 
@@ -123,6 +124,24 @@ type GraphiteTagFindSeries struct {
 
 type GraphiteTagFindSeriesResp struct {
 	Series []string `json:"series"`
+}
+
+type GraphiteTagDelSeries struct {
+	Paths     []string `json:"path" form:"path"`
+	Propagate bool     `json:"propagate" form:"propagate" binding:"Default(true)"`
+}
+
+func (g GraphiteTagDelSeries) Trace(span opentracing.Span) {
+	span.SetTag("paths", g.Paths)
+	span.SetTag("propagate", g.Propagate)
+}
+
+func (g GraphiteTagDelSeries) TraceDebug(span opentracing.Span) {
+}
+
+type GraphiteTagDelSeriesResp struct {
+	Count int            `json:"count"`
+	Peers map[string]int `json:"peers"`
 }
 
 type GraphiteFind struct {

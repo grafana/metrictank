@@ -44,6 +44,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tag_details", ready, bind(models.IndexTagDetails{})).Get(s.indexTagDetails).Post(s.indexTagDetails)
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
+	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
 
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
 
@@ -61,7 +62,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/metrics/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
 	r.Combo("/tags/autoComplete/tags", withOrg, ready, bind(models.GraphiteAutoCompleteTags{})).Get(s.graphiteAutoCompleteTags).Post(s.graphiteAutoCompleteTags)
 	r.Combo("/tags/autoComplete/values", withOrg, ready, bind(models.GraphiteAutoCompleteTagValues{})).Get(s.graphiteAutoCompleteTagValues).Post(s.graphiteAutoCompleteTagValues)
-
+	r.Post("/tags/delSeries", withOrg, ready, bind(models.GraphiteTagDelSeries{}), s.graphiteTagDelSeries)
 	r.Combo("/functions", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 	r.Combo("/functions/:func(.+)", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 }

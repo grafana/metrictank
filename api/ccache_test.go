@@ -18,7 +18,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func newSrv(delSeries, delArchives int, key string) (*Server, *cache.MockCache) {
+func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {
 	srv, _ := NewServer()
 	srv.RegisterRoutes()
 
@@ -36,29 +36,30 @@ func newSrv(delSeries, delArchives int, key string) (*Server, *cache.MockCache) 
 	srv.BindCache(mockCache)
 
 	metricIndex := memory.New()
-	metricIndex.AddOrUpdate(
-		&schema.MetricData{
-			Id:       "123",
-			OrgId:    1,
-			Name:     key,
-			Metric:   key,
-			Interval: 10,
-			Value:    1,
-		},
-		0,
-	)
 	srv.BindMetricIndex(metricIndex)
 	return srv, mockCache
 }
 
-func TestMetricDelete(t *testing.T) {
+func TestMetricDeleteWithPattern(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
+	testId := "12345"
 
-	srv, cache := newSrv(delSeries, delArchives, testKey)
+	srv, cache := newSrv(delSeries, delArchives)
+	srv.MetricIndex.AddOrUpdate(
+		&schema.MetricData{
+			Id:       testId,
+			OrgId:    1,
+			Name:     testKey,
+			Metric:   testKey,
+			Interval: 10,
+			Value:    1,
+		},
+		0,
+	)
 	req, _ := json.Marshal(models.CCacheDelete{
 		Patterns:  []string{"test.*"},
 		OrgId:     1,
@@ -78,12 +79,93 @@ func TestMetricDelete(t *testing.T) {
 	buf.ReadFrom(res.Body)
 	json.Unmarshal(buf.Bytes(), &respParsed)
 
-	if len(cache.DelMetricKeys) != 1 || cache.DelMetricKeys[0] != testKey {
-		t.Fatalf("Expected that key %s has been deleted, but it has not", testKey)
+	if len(cache.DelMetricKeys) != 1 || cache.DelMetricKeys[0] != testId {
+		t.Fatalf("Expected that key %s has been deleted, but it has not", testId)
 	}
 
 	if respParsed.DeletedSeries != delSeries || respParsed.DeletedArchives != delArchives {
 		t.Fatalf("Expected %d series and %d archives to get deleted, but got %d and %d", delSeries, delArchives, respParsed.DeletedSeries, respParsed.DeletedArchives)
+	}
+}
+func TestMetricDeleteWithTags(t *testing.T) {
+	_tagSupport := memory.TagSupport
+	defer func() { memory.TagSupport = _tagSupport }()
+	memory.TagSupport = true
+	memory.TagQueryWorkers = 1
+
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	delSeries := 1
+	delArchives := 3
+	testKey := "test.key"
+	testId := "1.01234567890123456789012345678901"
+
+	srv, cache := newSrv(delSeries, delArchives)
+	srv.MetricIndex.AddOrUpdate(
+		&schema.MetricData{
+			Id:       testId,
+			OrgId:    1,
+			Name:     testKey,
+			Metric:   testKey,
+			Interval: 10,
+			Tags:     []string{"mytag=myvalue"},
+			Value:    1,
+		},
+		0,
+	)
+	req, _ := json.Marshal(models.CCacheDelete{
+		Expr:      []string{"mytag=myvalue"},
+		OrgId:     1,
+		Propagate: false,
+	})
+
+	ts := httptest.NewServer(srv.Macaron)
+	defer ts.Close()
+
+	res, err := http.Post(ts.URL+"/ccache/delete", "application/json", bytes.NewReader(req))
+	if err != nil {
+		t.Fatalf("There was an error in the request: %s", err)
+	}
+
+	respParsed := models.CCacheDeleteResp{}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(res.Body)
+	json.Unmarshal(buf.Bytes(), &respParsed)
+
+	if len(cache.DelMetricKeys) != 1 || cache.DelMetricKeys[0] != testId {
+		t.Fatalf("Expected that key %s has been deleted, but it has not", testId)
+	}
+
+	if respParsed.DeletedSeries != delSeries || respParsed.DeletedArchives != delArchives {
+		t.Fatalf("Expected %d series and %d archives to get deleted, but got %d and %d", delSeries, delArchives, respParsed.DeletedSeries, respParsed.DeletedArchives)
+	}
+}
+
+func TestMetricDeleteFullFlush(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	req, _ := json.Marshal(models.CCacheDelete{
+		Patterns:  []string{"**"},
+		OrgId:     1,
+		Propagate: false,
+	})
+
+	srv, cache := newSrv(0, 0)
+	ts := httptest.NewServer(srv.Macaron)
+	defer ts.Close()
+
+	res, err := http.Post(ts.URL+"/ccache/delete", "application/json", bytes.NewReader(req))
+	if err != nil {
+		t.Fatalf("There was an error in the request: %s", err)
+	}
+
+	respParsed := models.CCacheDeleteResp{}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(res.Body)
+	json.Unmarshal(buf.Bytes(), &respParsed)
+
+	if cache.ResetCalls != 1 {
+		t.Fatalf("Expected Reset() to have been called on the cache, but it has not")
 	}
 }
 
@@ -105,8 +187,20 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
+	testId := "12345"
 
-	srv, _ := newSrv(delSeries, delArchives, testKey)
+	srv, _ := newSrv(delSeries, delArchives)
+	srv.MetricIndex.AddOrUpdate(
+		&schema.MetricData{
+			Id:       testId,
+			OrgId:    1,
+			Name:     testKey,
+			Metric:   testKey,
+			Interval: 10,
+			Value:    1,
+		},
+		0,
+	)
 	req, err := json.Marshal(models.CCacheDelete{
 		Patterns:  []string{"test.*"},
 		OrgId:     1,
@@ -155,12 +249,24 @@ func TestMetricDeletePropagation(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
+	testId := "12345"
 
 	// add up how many series/archives are expected to be deleted
 	expectedDeletedSeries += delSeries
 	expectedDeletedArchives += delArchives
 
-	srv, cache := newSrv(delSeries, delArchives, testKey)
+	srv, cache := newSrv(delSeries, delArchives)
+	srv.MetricIndex.AddOrUpdate(
+		&schema.MetricData{
+			Id:       testId,
+			OrgId:    1,
+			Name:     testKey,
+			Metric:   testKey,
+			Interval: 10,
+			Value:    1,
+		},
+		0,
+	)
 	req, err := json.Marshal(models.CCacheDelete{
 		Patterns:  []string{"test.*"},
 		OrgId:     1,
@@ -183,8 +289,8 @@ func TestMetricDeletePropagation(t *testing.T) {
 	respParsed := models.CCacheDeleteResp{}
 	json.Unmarshal(buf2.Bytes(), &respParsed)
 
-	if len(cache.DelMetricKeys) != 1 || cache.DelMetricKeys[0] != testKey {
-		t.Fatalf("Expected that key %s has been deleted, but it has not", testKey)
+	if len(cache.DelMetricKeys) != 1 || cache.DelMetricKeys[0] != testId {
+		t.Fatalf("Expected that key %s has been deleted, but it has not", testId)
 	}
 
 	deletedArchives := respParsed.DeletedArchives

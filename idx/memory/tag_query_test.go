@@ -384,9 +384,9 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 }
 
 func TestGetByTag(t *testing.T) {
-	_tagSupport := tagSupport
-	defer func() { tagSupport = _tagSupport }()
-	tagSupport = true
+	_tagSupport := TagSupport
+	defer func() { TagSupport = _tagSupport }()
+	TagSupport = true
 
 	ix := New()
 	ix.Init()
@@ -472,63 +472,18 @@ func TestGetByTag(t *testing.T) {
 		}
 
 		resPaths := make([]string, 0, len(res))
-		for _, r := range res {
-			resPaths = append(resPaths, r.Path)
+		for id := range res {
+			def, ok := ix.defById[id.String()]
+			if !ok {
+				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id.String())
+			}
+			resPaths = append(resPaths, def.NameWithTags())
 		}
 		sort.Strings(tc.expectation)
 		sort.Strings(resPaths)
 		if !reflect.DeepEqual(resPaths, tc.expectation) {
 			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", res, tc.expectation)
 		}
-	}
-}
-
-func TestDeleteTaggedSeries(t *testing.T) {
-	_tagSupport := tagSupport
-	defer func() { tagSupport = _tagSupport }()
-	tagSupport = true
-
-	ix := New()
-	ix.Init()
-
-	orgId := 1
-
-	mds := getMetricData(orgId, 2, 50, 10, "metric.public")
-	mds[10].Tags = []string{"key1=value1", "key2=value2"}
-	mds[10].SetId()
-
-	for _, md := range mds {
-		ix.AddOrUpdate(md, 1)
-	}
-
-	tagQuery, _ := NewTagQuery([]string{"key1=value1", "key2=value2"}, 0)
-	res := ix.idsByTagQuery(orgId, tagQuery)
-
-	if len(res) != 1 {
-		t.Fatalf("Expected to get 1 result, but got %d", len(res))
-	}
-
-	if len(ix.tags[orgId]) != 3 {
-		t.Fatalf("Expected tag index to contain 3 keys, but it has %d: %+v", len(ix.tags), ix.tags)
-	}
-
-	deleted, err := ix.Delete(orgId, schema.MetricDefinitionFromMetricData(mds[10]).NameWithTags())
-	if err != nil {
-		t.Fatalf("Error deleting metric: %s", err)
-	}
-
-	if len(deleted) != 1 {
-		t.Fatalf("Expected 1 metric to get deleted, but got %d", len(deleted))
-	}
-
-	res = ix.idsByTagQuery(orgId, tagQuery)
-
-	if len(res) != 0 {
-		t.Fatalf("Expected to get 0 results, but got %d", len(res))
-	}
-
-	if len(ix.tags[orgId]) > 1 {
-		t.Fatalf("Expected tag index to only have one (name) tag, but it has more: %+v", ix.tags)
 	}
 }
 

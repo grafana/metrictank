@@ -147,9 +147,9 @@ func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) [
 }
 
 func TestMain(m *testing.M) {
-	defer func(t bool) { tagSupport = t }(tagSupport)
-	tagSupport = true
-	tagQueryWorkers = 5
+	defer func(t bool) { TagSupport = t }(TagSupport)
+	TagSupport = true
+	TagQueryWorkers = 5
 	matchCacheSize = 1000
 	os.Exit(m.Run())
 }
@@ -770,7 +770,7 @@ func ixFindByTag(b *testing.B, org, q int) {
 	if len(series) != tagQueries[q].ExpectedResults {
 		for _, s := range series {
 			memoryIdx := ix.(*MemoryIdx)
-			b.Log(memoryIdx.DefById[s.Path].Tags)
+			b.Log(memoryIdx.defById[s.Path].Tags)
 		}
 		b.Fatalf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series))
 	}

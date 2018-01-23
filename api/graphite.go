@@ -865,7 +865,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter s
 	}
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details")
+	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details", false)
 	if err != nil {
 		return nil, err
 	}
@@ -935,7 +935,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []
 	}
 
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1011,7 +1011,7 @@ func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from
 	}
 
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags")
+	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1068,7 +1068,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix 
 	}
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +1123,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 	}
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
+	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1155,4 +1155,40 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, ta
 func (s *Server) graphiteFunctions(ctx *middleware.Context) {
 	ctx.Req.Request.Body = ctx.Body
 	graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+}
+
+func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.GraphiteTagDelSeries) {
+	deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	res := models.GraphiteTagDelSeriesResp{}
+	res.Count = len(deleted)
+
+	if !request.Propagate {
+		response.Write(ctx, response.NewJson(200, res, ""))
+		return
+	}
+
+	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
+	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries", true)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	res.Peers = make(map[string]int, len(responses))
+	peerResp := models.IndexTagDelSeriesResp{}
+	for peer, resp := range responses {
+		_, err = peerResp.UnmarshalMsg(resp.buf)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		res.Peers[peer] = peerResp.Count
+	}
+
+	response.Write(ctx, response.NewJson(200, res, ""))
 }
