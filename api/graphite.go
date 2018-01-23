@@ -772,6 +772,11 @@ func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]
 		data[q] = append(data[q], serie)
 	}
 
+	// Sort each merged series so that the output of a function is well-defined and repeatable.
+	for k := range data {
+		sort.Sort(models.SeriesByTarget(data[k]))
+	}
+
 	preRun := time.Now()
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/grafana/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
@@ -237,17 +238,13 @@ func isFnChar(r byte) bool {
 		'0' <= r && r <= '9'
 }
 
-func isDigit(r byte) bool {
-	return '0' <= r && r <= '9'
-}
-
 func parseConst(s string) (*expr, string, error) {
 
 	var i int
 	var float bool
 	// All valid characters for a floating-point constant
 	// Just slurp them all in and let ParseFloat sort 'em out
-	for i < len(s) && (isDigit(s[i]) || s[i] == '.' || s[i] == '+' || s[i] == '-' || s[i] == 'e' || s[i] == 'E') {
+	for i < len(s) && (util.IsDigit(s[i]) || s[i] == '.' || s[i] == '+' || s[i] == '-' || s[i] == 'e' || s[i] == 'E') {
 		// note that exponent syntax results into a float value.
 		// so even values like 1e3 (1000) or 2000e-3 (2) which can be expressed as integers,
 		// are considered floating point values.  if a function expets an int, then just don't use 'e' syntax.
