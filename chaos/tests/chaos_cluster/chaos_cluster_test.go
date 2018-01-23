@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	cmd = exec.CommandContext(ctx, docker.Path("docker/launch.sh"), "docker-chaos")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
-	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(ctx, cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err)
 	}

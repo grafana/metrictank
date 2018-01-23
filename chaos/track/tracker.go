@@ -2,6 +2,7 @@ package track
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 // Tracker allows to track stdout and stderr of running commands
 // and wait for certain messages to appear
 type Tracker struct {
+	ctx           context.Context
 	stdout        io.ReadCloser
 	stderr        io.ReadCloser
 	stdoutChan    chan string
@@ -23,7 +25,7 @@ type Tracker struct {
 	prefixStderr  string
 }
 
-func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixStderr string) (*Tracker, error) {
+func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixStderr string) (*Tracker, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -33,6 +35,7 @@ func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixSt
 		return nil, err
 	}
 	t := &Tracker{
+		ctx,
 		stdout,
 		stderr,
 		make(chan string),
@@ -62,6 +65,13 @@ func (t *Tracker) track(in io.ReadCloser, out chan string) {
 		out <- scanner.Text()
 	}
 	if err := scanner.Err(); err != nil {
+		if t.ctx != nil {
+			select {
+			case <-t.ctx.Done():
+				return
+			default:
+			}
+		}
 		t.errChan <- err
 	}
 }
