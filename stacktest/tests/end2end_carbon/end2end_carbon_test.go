@@ -1,4 +1,4 @@
-package simple_carbon
+package end2end_carbon
 
 import (
 	"context"
@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/grafana/metrictank/chaos/docker"
-	"github.com/grafana/metrictank/chaos/fakemetrics"
-	"github.com/grafana/metrictank/chaos/grafana"
-	"github.com/grafana/metrictank/chaos/graphite"
-	"github.com/grafana/metrictank/chaos/track"
+	"github.com/grafana/metrictank/stacktest/docker"
+	"github.com/grafana/metrictank/stacktest/fakemetrics"
+	"github.com/grafana/metrictank/stacktest/grafana"
+	"github.com/grafana/metrictank/stacktest/graphite"
+	"github.com/grafana/metrictank/stacktest/track"
 )
 
 // TODO: cleanup when ctrl-C go test (teardown all containers)

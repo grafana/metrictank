@@ -7,7 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/grafana/metrictank/chaos/track"
+	"github.com/grafana/metrictank/stacktest/track"
 )
 
 var cli *client.Client

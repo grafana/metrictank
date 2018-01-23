@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/chaos/fakemetrics/out"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
 	"gopkg.in/raintank/schema.v1"
 )

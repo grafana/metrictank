@@ -25,7 +25,7 @@ jobs:
       - image: circleci/golang:1.10
     steps:
       - checkout
-      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
+      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
@@ -50,7 +50,7 @@ jobs:
           at: .
       - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
-      - run: go test -v ./chaos/tests/simple_carbon
+      - run: go test -v ./stacktest/tests/end2end_carbon
 
   deploy:
     docker:

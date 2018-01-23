@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/grafana/metrictank/chaos/fakemetrics/out"
-	"github.com/grafana/metrictank/chaos/fakemetrics/out/carbon"
-	"github.com/grafana/metrictank/chaos/fakemetrics/out/kafkamdm"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out/carbon"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm"
 	"github.com/grafana/metrictank/clock"
 	"github.com/raintank/met/helper"
 	"gopkg.in/raintank/schema.v1"
