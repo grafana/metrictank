@@ -89,7 +89,7 @@ func ValidateCode(code int) Validator {
 // clearly here we can trust that if the avg value should be 4, that there would be a 3 coming after the response
 // but we don't want to wait for that.
 // NOTE: ignores up to 2 points from each series, adjust your input size accordingly for desired confidence
-func ValidatorAvgWindowed(numPoints int, avg float64) Validator {
+func ValidatorAvgWindowed(numPoints int, cmp Comparator) Validator {
 	try := func(datapoints []Point) bool {
 		for i := 0; i <= 1; i++ {
 		Try:
@@ -102,7 +102,7 @@ func ValidatorAvgWindowed(numPoints int, avg float64) Validator {
 					}
 					sum += p.Val
 				}
-				if sum/float64(len(points)) == avg {
+				if cmp(sum / float64(len(points))) {
 					return true
 				}
 			}

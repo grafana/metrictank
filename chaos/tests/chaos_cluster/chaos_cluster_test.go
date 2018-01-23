@@ -94,7 +94,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metrics_received.counter32)",
 		}
 		// avg rate must be 4 (metrics ingested per second by each instance)
-		return graphite.ValidateTargets(exp)(resp) && graphite.ValidatorAvgWindowed(8, 4)(resp)
+		return graphite.ValidateTargets(exp)(resp) && graphite.ValidatorAvgWindowed(8, graphite.Eq(4))(resp)
 	})
 	if !suc6 {
 		grafana.PostAnnotation("TestClusterBaseIngestWorkload:FAIL")
