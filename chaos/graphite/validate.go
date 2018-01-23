@@ -75,10 +75,7 @@ func ValidateCorrect(num float64) Validator {
 // ValidaterCode returns a validator that validates whether the response has the given code
 func ValidateCode(code int) Validator {
 	return func(resp Response) bool {
-		if resp.code == code {
-			return true
-		}
-		return false
+		return resp.code == code
 	}
 }
 
