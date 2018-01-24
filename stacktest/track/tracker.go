@@ -2,17 +2,16 @@ package track
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os/exec"
 	"regexp"
+	"sync"
 )
 
 // Tracker allows to track stdout and stderr of running commands
 // and wait for certain messages to appear
 type Tracker struct {
-	ctx           context.Context
 	stdout        io.ReadCloser
 	stderr        io.ReadCloser
 	stdoutChan    chan string
@@ -23,9 +22,10 @@ type Tracker struct {
 	logStderr     chan bool
 	prefixStdout  string
 	prefixStderr  string
+	wg            sync.WaitGroup
 }
 
-func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixStderr string) (*Tracker, error) {
+func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixStderr string) (*Tracker, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -35,7 +35,6 @@ func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, p
 		return nil, err
 	}
 	t := &Tracker{
-		ctx,
 		stdout,
 		stderr,
 		make(chan string),
@@ -46,6 +45,7 @@ func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, p
 		make(chan bool),
 		prefixStdout,
 		prefixStderr,
+		sync.WaitGroup{},
 	}
 	if prefixStdout == "" {
 		t.prefixStdout = "stdout:"
@@ -55,6 +55,7 @@ func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, p
 	}
 	go t.track(t.stdout, t.stdoutChan)
 	go t.track(t.stderr, t.stderrChan)
+	t.wg.Add(1)
 	go t.manage(logStdout, logStderr)
 	return t, nil
 }
@@ -62,21 +63,19 @@ func NewTracker(ctx context.Context, cmd *exec.Cmd, logStdout, logStderr bool, p
 func (t *Tracker) track(in io.ReadCloser, out chan string) {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
-		out <- scanner.Text()
+		read := scanner.Text()
+		out <- read
 	}
-	if err := scanner.Err(); err != nil {
-		if t.ctx != nil {
-			select {
-			case <-t.ctx.Done():
-				return
-			default:
-			}
-		}
+	err := scanner.Err()
+	if err != nil {
 		t.errChan <- err
 	}
+	close(out)
 }
 
 func (t *Tracker) manage(logStdout, logStderr bool) {
+	var doneStdout bool
+	var doneStderr bool
 	var matcherCtx []MatcherCtx
 	for {
 		select {
@@ -86,7 +85,11 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			logStderr = t
 		case m := <-t.newMatcherCtx:
 			matcherCtx = append(matcherCtx, m)
-		case str := <-t.stdoutChan:
+		case str, ok := <-t.stdoutChan:
+			if !ok {
+				doneStdout = true
+				break
+			}
 			if logStdout {
 				fmt.Println(t.prefixStdout, str)
 			}
@@ -97,7 +100,11 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 				}
 			}
 			matcherCtx = tmp
-		case str := <-t.stderrChan:
+		case str, ok := <-t.stderrChan:
+			if !ok {
+				doneStderr = true
+				break
+			}
 			if logStderr {
 				fmt.Println(t.prefixStderr, str)
 			}
@@ -110,6 +117,10 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			matcherCtx = tmp
 		case err := <-t.errChan:
 			panic(err)
+		}
+		if doneStdout && doneStderr {
+			t.wg.Done()
+			return
 		}
 	}
 }
@@ -169,4 +180,9 @@ func (t *Tracker) LogStdout(b bool) {
 }
 func (t *Tracker) LogStderr(b bool) {
 	t.logStderr <- b
+}
+
+// Wait waits until stdout and stdin are closed
+func (t *Tracker) Wait() {
+	t.wg.Wait()
 }

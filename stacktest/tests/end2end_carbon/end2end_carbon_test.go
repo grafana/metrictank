@@ -1,12 +1,11 @@
 package end2end_carbon
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -26,20 +25,31 @@ var fm *fakemetrics.FakeMetrics
 const metricsPerSecond = 1000
 
 func TestMain(m *testing.M) {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-
 	fmt.Println("stopping docker-dev stack should it be running...")
-	cmd := exec.CommandContext(ctx, "docker-compose", "down")
+	cmd := exec.Command("docker-compose", "down")
 	cmd.Dir = docker.Path("docker/docker-dev")
-	err := cmd.Start()
+	var err error
+	tracker, err = track.NewTracker(cmd, false, false, "compose-down-stdout", "compose-down-stderr")
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
+	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
+	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
+	tracker.Wait()
+	if err := cmd.Wait(); err != nil {
+		log.Printf("ERROR: could not cleanly shutdown running docker-compose down command: %s", err)
+		os.Exit(2)
+	}
 
 	fmt.Println("launching docker-dev stack...")
-	cmd = exec.CommandContext(ctx, docker.Path("docker/launch.sh"), "docker-dev")
+	cmd = exec.Command(docker.Path("docker/launch.sh"), "docker-dev")
 
-	tracker, err = track.NewTracker(ctx, cmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,9 +63,11 @@ func TestMain(m *testing.M) {
 	fm.Close()
 
 	fmt.Println("stopping docker-compose stack...")
-	cancelFunc()
+	cmd.Process.Signal(syscall.SIGINT)
+	tracker.Wait()
 	if err := cmd.Wait(); err != nil {
-		if strings.Contains(err.Error(), "signal: killed") {
+		// 130 means ctrl-C (interrupt) which is what we want
+		if err.Error() == "exit status 130" {
 			os.Exit(retcode)
 		}
 		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)

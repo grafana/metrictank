@@ -109,7 +109,7 @@ func IsolateOut(name, dur string, targets ...string) error {
 	}
 
 	// log all pumba's output
-	_, err = track.NewTracker(context.TODO(), cmd, false, false, "pumba-stdout", "pumba-stderr")
+	_, err = track.NewTracker(cmd, false, false, "pumba-stdout", "pumba-stderr")
 	if err != nil {
 		return err
 	}
