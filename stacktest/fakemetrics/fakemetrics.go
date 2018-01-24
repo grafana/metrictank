@@ -5,24 +5,17 @@ import (
 	"log"
 	"time"
 
+	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/carbon"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm"
-	"github.com/grafana/metrictank/clock"
+	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"gopkg.in/raintank/schema.v1"
 )
 
-const numPartitions = 12
-
-var metrics []*schema.MetricData
-
-func init() {
-	generateMetrics(numPartitions)
-}
-
-func generateMetrics(num int) {
-	metrics = make([]*schema.MetricData, num)
+func generateMetrics(num int) []*schema.MetricData {
+	metrics := make([]*schema.MetricData, num)
 
 	for i := 0; i < num; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
@@ -37,41 +30,72 @@ func generateMetrics(num int) {
 		m.SetId()
 		metrics[i] = m
 	}
+
+	return metrics
 }
 
-func Kafka() {
+type FakeMetrics struct {
+	o       out.Out
+	metrics []*schema.MetricData
+	close   chan struct{}
+	closed  bool
+}
+
+func NewFakeMetrics(metrics []*schema.MetricData, o out.Out, stats met.Backend) *FakeMetrics {
+	fm := &FakeMetrics{
+		o:       o,
+		metrics: metrics,
+		close:   make(chan struct{}),
+	}
+	go fm.run()
+	return fm
+}
+
+func NewKafka(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
 	if err != nil {
 		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
 	}
-	run(out)
+	return NewFakeMetrics(generateMetrics(num), out, stats)
 }
 
-func Carbon(num int) {
+func NewCarbon(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := carbon.New("localhost:2003", stats)
 	if err != nil {
 		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
 	}
-	generateMetrics(num)
-	run(out)
+	return NewFakeMetrics(generateMetrics(num), out, stats)
 }
 
-func run(out out.Out) {
+func (f *FakeMetrics) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.close <- struct{}{}
+	return f.o.Close()
+}
+
+func (f *FakeMetrics) run() {
 	// advantage over regular ticker:
 	// 1) no ticks dropped
 	// 2) ticks come asap after the start of a new second, so we can measure better how long it took to get the data
 	ticker := clock.AlignedTick(time.Second)
 
-	for tick := range ticker {
-		unix := tick.Unix()
-		for i := range metrics {
-			metrics[i].Time = unix
-		}
-		err := out.Flush(metrics)
-		if err != nil {
-			panic(fmt.Sprintf("failed to send data to output: %s", err))
+	for {
+		select {
+		case <-f.close:
+			return
+		case tick := <-ticker:
+			unix := tick.Unix()
+			for i := range f.metrics {
+				f.metrics[i].Time = unix
+			}
+			err := f.o.Flush(f.metrics)
+			if err != nil {
+				panic(fmt.Sprintf("failed to send data to output: %s", err))
+			}
 		}
 	}
 }

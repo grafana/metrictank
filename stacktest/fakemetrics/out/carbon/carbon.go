@@ -2,6 +2,7 @@ package carbon
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -12,11 +13,14 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+var errClosed = errors.New("output is closed")
+
 type Carbon struct {
 	sync.Mutex
 	out.OutStats
-	addr string
-	conn net.Conn
+	addr   string
+	conn   net.Conn
+	closed bool
 }
 
 func New(addr string, stats met.Backend) (*Carbon, error) {
@@ -30,11 +34,20 @@ func New(addr string, stats met.Backend) (*Carbon, error) {
 		out.NewStats(stats, "carbon"),
 		addr,
 		conn,
+		false,
 	}, nil
 }
 
 func (n *Carbon) Close() error {
-	return n.conn.Close()
+	n.Lock()
+	if n.closed {
+		n.Unlock()
+		return nil
+	}
+	err := n.conn.Close()
+	n.closed = true
+	n.Unlock()
+	return err
 }
 
 func (n *Carbon) Flush(metrics []*schema.MetricData) error {
@@ -42,13 +55,16 @@ func (n *Carbon) Flush(metrics []*schema.MetricData) error {
 		n.FlushDuration.Value(0)
 		return nil
 	}
+	n.Lock()
+	if n.closed {
+		return errClosed
+	}
 	preFlush := time.Now()
 	buf := bytes.NewBufferString("")
 	for _, m := range metrics {
 		buf.WriteString(fmt.Sprintf("%s %f %d\n", m.Name, m.Value, m.Time))
 	}
 	prePub := time.Now()
-	n.Lock()
 	_, err := n.conn.Write(buf.Bytes())
 	n.Unlock()
 	if err != nil {

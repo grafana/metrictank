@@ -20,7 +20,10 @@ import (
 
 // TODO: cleanup when ctrl-C go test (teardown all containers)
 
+const numPartitions = 12
+
 var tracker *track.Tracker
+var fm *fakemetrics.FakeMetrics
 
 func TestMain(m *testing.M) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -48,6 +51,7 @@ func TestMain(m *testing.M) {
 	}
 
 	retcode := m.Run()
+	fm.Close()
 
 	fmt.Println("stopping docker-compose stack...")
 	cancelFunc()
@@ -82,7 +86,7 @@ func TestClusterStartup(t *testing.T) {
 func TestClusterBaseIngestWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestClusterBaseIngestWorkload:begin")
 
-	go fakemetrics.Kafka()
+	fm = fakemetrics.NewKafka(numPartitions)
 
 	suc6, resp := graphite.RetryGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-8s", 18, func(resp graphite.Response) bool {
 		exp := []string{

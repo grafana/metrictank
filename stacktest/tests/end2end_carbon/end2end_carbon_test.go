@@ -21,6 +21,7 @@ import (
 // TODO: cleanup when ctrl-C go test (teardown all containers)
 
 var tracker *track.Tracker
+var fm *fakemetrics.FakeMetrics
 
 const metricsPerSecond = 1000
 
@@ -49,6 +50,7 @@ func TestMain(m *testing.M) {
 	}
 
 	retcode := m.Run()
+	fm.Close()
 
 	fmt.Println("stopping docker-compose stack...")
 	cancelFunc()
@@ -82,7 +84,7 @@ func TestStartup(t *testing.T) {
 func TestBaseIngestWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestBaseIngestWorkload:begin")
 
-	go fakemetrics.Carbon(metricsPerSecond)
+	fm = fakemetrics.NewCarbon(metricsPerSecond)
 
 	suc6, resp := graphite.RetryGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metrics_received.counter32)", "-8s", 18, func(resp graphite.Response) bool {
 		exp := []string{
