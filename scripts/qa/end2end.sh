@@ -1,6 +1,6 @@
 #!/bin/sh
 
-function log () {
+log () {
 	echo "$(date +'%Y/%m/%d %H:%M:%S') $@"
 }
 
