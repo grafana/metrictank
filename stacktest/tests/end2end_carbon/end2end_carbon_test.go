@@ -25,29 +25,9 @@ var fm *fakemetrics.FakeMetrics
 const metricsPerSecond = 1000
 
 func TestMain(m *testing.M) {
-	fmt.Println("stopping docker-dev stack should it be running...")
-	cmd := exec.Command("docker-compose", "down")
-	cmd.Dir = docker.Path("docker/docker-dev")
-	var err error
-	tracker, err = track.NewTracker(cmd, false, false, "compose-down-stdout", "compose-down-stderr")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
-	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
-	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
-	tracker.Wait()
-	if err := cmd.Wait(); err != nil {
-		log.Printf("ERROR: could not cleanly shutdown running docker-compose down command: %s", err)
-		os.Exit(2)
-	}
-
 	fmt.Println("launching docker-dev stack...")
-	cmd = exec.Command(docker.Path("docker/launch.sh"), "docker-dev")
+	cmd := exec.Command(docker.Path("docker/launch.sh"), "docker-dev")
+	var err error
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
@@ -64,6 +44,9 @@ func TestMain(m *testing.M) {
 
 	fmt.Println("stopping docker-compose stack...")
 	cmd.Process.Signal(syscall.SIGINT)
+	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
+	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
+	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
 	tracker.Wait()
 	if err := cmd.Wait(); err != nil {
 		// 130 means ctrl-C (interrupt) which is what we want
