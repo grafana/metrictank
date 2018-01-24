@@ -70,7 +70,7 @@ func TestStartup(t *testing.T) {
 	case <-tracker.Match(matchers):
 		fmt.Println("stack now running.")
 		fmt.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
-	case <-time.After(time.Second * 40):
+	case <-time.After(time.Second * 70):
 		grafana.PostAnnotation("TestStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
 	}
