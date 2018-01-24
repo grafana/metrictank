@@ -10,7 +10,7 @@ Group=root
 Type=simple
 Restart=on-failure
 WorkingDirectory=/var/run/metrictank
-ExecStart=/usr/sbin/metrictank -config=/etc/metrictank/metrictank.ini
+ExecStart=/usr/bin/metrictank -config=/etc/metrictank/metrictank.ini
 LimitNOFILE=102400
 TimeoutStopSec=60
 

@@ -26,4 +26,4 @@ setgid root
 console log # log stdout/stderr to /var/log/upstart/
 
 
-exec /usr/sbin/metrictank "-config=/etc/metrictank/metrictank.ini"
+exec /usr/bin/metrictank "-config=/etc/metrictank/metrictank.ini"

@@ -19,7 +19,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 export PATH
 
 name=metrictank
-program=/usr/sbin/metrictank
+program=/usr/bin/metrictank
 args=-config\\\=/etc/metrictank/metrictank.ini
 pidfile="/var/run/$name.pid"
 
