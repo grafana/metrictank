@@ -20,6 +20,8 @@ func TestDivideSeriesListsSingle(t *testing.T) {
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
+					{Val: 0, Ts: 30},
+					{Val: 1, Ts: 40},
 				},
 			},
 		},
@@ -30,18 +32,22 @@ func TestDivideSeriesListsSingle(t *testing.T) {
 				Datapoints: []schema.Point{
 					{Val: 1, Ts: 10},
 					{Val: 1, Ts: 20},
+					{Val: 0, Ts: 30},
+					{Val: 0, Ts: 40},
 				},
 			},
 		},
 		[]models.Series{
 			{
-				Target: "DivideSeriesLists(foo;a=a;b=b,bar;a=a1;b=b)",
+				Target: "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
+					{Val: math.NaN(), Ts: 30},
+					{Val: math.NaN(), Ts: 40},
 				},
 				Tags: map[string]string{
-					"name": "DivideSeriesLists(foo;a=a;b=b,bar;a=a1;b=b)",
+					"name": "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				},
 			},
 		},
@@ -90,23 +96,23 @@ func TestDivideSeriesListsMultiple(t *testing.T) {
 		},
 		[]models.Series{
 			{
-				Target: "DivideSeriesLists(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
+				Target: "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
 				},
 				Tags: map[string]string{
-					"name": "DivideSeriesLists(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
+					"name": "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				},
 			},
 			{
-				Target: "DivideSeriesLists(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
+				Target: "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
 					{Val: 20, Ts: 10},
 					{Val: 50, Ts: 20},
 				},
 				Tags: map[string]string{
-					"name": "DivideSeriesLists(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
+					"name": "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
 				},
 			},
 		},
