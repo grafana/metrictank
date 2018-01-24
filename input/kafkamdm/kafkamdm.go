@@ -196,7 +196,7 @@ func New() *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) {
+func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) error {
 	k.Handler = handler
 	k.fatal = fatal
 	var err error
@@ -215,11 +215,12 @@ func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) {
 			}
 			if err != nil {
 				log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
-				close(k.fatal)
+				return err
 			}
 			go k.consumePartition(topic, partition, offset)
 		}
 	}
+	return nil
 }
 
 // tryGetOffset will to query kafka repeatedly for the requested offset and give up after attempts unsuccesfull attempts
