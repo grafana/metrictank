@@ -110,6 +110,6 @@ func TestBaseIngestWorkload(t *testing.T) {
 	})
 	if !suc6 {
 		grafana.PostAnnotation("TestBaseIngestWorkload:FAIL")
-		t.Fatalf("cluster did not reach a state where the MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
+		t.Fatalf("cluster did not reach a state where the MT instance processes at least %d points per second. last response was: %s", metricsPerSecond, spew.Sdump(resp))
 	}
 }
