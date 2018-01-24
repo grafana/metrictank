@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x # debugging
-
 FAKEMETRICS_REPO="github.com/raintank/fakemetrics"
 FAKEMETRICS_PID="/tmp/fakemetrics.pid"
 
