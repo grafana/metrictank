@@ -217,6 +217,7 @@ func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) error {
 				log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
 				return err
 			}
+			k.wg.Add(1)
 			go k.consumePartition(topic, partition, offset)
 		}
 	}
@@ -260,7 +261,6 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 
 // this will continually consume from the topic until k.stopConsuming is triggered.
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
-	k.wg.Add(1)
 	defer k.wg.Done()
 
 	partitionOffsetMetric := partitionOffset[partition]
