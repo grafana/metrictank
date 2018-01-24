@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -898,11 +899,10 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 }
 
 func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
-	var results []*Node
 	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return results, nil
+		return nil, nil
 	}
 
 	var nodes []string
@@ -927,19 +927,22 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			break
 		}
 	}
-	var startNode *Node
-	if pos == 0 {
-		//we need to start at the root.
-		log.Debug("memory-idx: starting search at the root node")
-		startNode = tree.Items[""]
-	} else {
-		branch := strings.Join(nodes[0:pos], ".")
-		log.Debug("memory-idx: starting search at branch %s", branch)
-		startNode, ok = tree.Items[branch]
-		if !ok {
-			log.Debug("memory-idx: branch %s does not exist in the index for orgId %d", branch, orgId)
-			return results, nil
-		}
+	var branch string
+	if pos != 0 {
+		branch = strings.Join(nodes[:pos], ".")
+	}
+	log.Debug("memory-idx: starting search at orgId %d, node %q", orgId, branch)
+	startNode, ok := tree.Items[branch]
+
+	if !ok {
+		log.Debug("memory-idx: branch %q does not exist in the index for orgId %d", branch, orgId)
+		return nil, nil
+	}
+
+	if startNode == nil {
+		corruptIndex.Inc()
+		log.Error(3, "memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
+		return nil, errors.NewInternal("hit an empty path in the index")
 	}
 
 	children := []*Node{startNode}
@@ -952,7 +955,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 			return nil, err
 		}
 
-		grandChildren := make([]*Node, 0)
+		var grandChildren []*Node
 		for _, c := range children {
 			if !c.HasChildren() {
 				log.Debug("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
@@ -966,7 +969,14 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 				if c.Path == "" {
 					newBranch = m
 				}
-				grandChildren = append(grandChildren, tree.Items[newBranch])
+				grandChild := tree.Items[newBranch]
+				if grandChild == nil {
+					corruptIndex.Inc()
+					log.Error(3, "memory-idx: grandChild is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q,path=%q", orgId, pattern, i, pos, p, newBranch)
+					return nil, errors.NewInternal("hit an empty path in the index")
+				}
+
+				grandChildren = append(grandChildren, grandChild)
 			}
 		}
 		children = grandChildren
@@ -977,11 +987,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	}
 
 	log.Debug("memory-idx: reached pattern length. %d nodes matched", len(children))
-	for _, c := range children {
-		results = append(results, c)
-	}
-
-	return results, nil
+	return children, nil
 }
 
 func (m *MemoryIdx) List(orgId int) []idx.Archive {
@@ -1151,7 +1157,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 	// branch ""        -> node "foo"
 	nodes := strings.Split(n.Path, ".")
 	for i := len(nodes) - 1; i >= 0; i-- {
-		branch := strings.Join(nodes[0:i], ".")
+		branch := strings.Join(nodes[:i], ".")
 		log.Debug("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {
@@ -1349,7 +1355,7 @@ func getMatcher(path string) (func([]string) []string, error) {
 			r, err := regexp.Compile(toRegexp(p))
 			if err != nil {
 				log.Debug("memory-idx: regexp failed to compile. %s - %s", p, err)
-				return nil, err
+				return nil, errors.NewBadRequest(err.Error())
 			}
 			regexes = append(regexes, r)
 		}

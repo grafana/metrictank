@@ -132,8 +132,11 @@ func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []stri
 		defer span.Finish()
 		nodes, err := s.MetricIndex.Find(orgId, pattern, seenAfter)
 		if err != nil {
-			tags.Error.Set(span, true)
-			return nil, response.NewError(http.StatusBadRequest, err.Error())
+			err := response.WrapError(err)
+			if err.Code() != http.StatusBadRequest {
+				tracing.Failure(span)
+			}
+			return nil, err
 		}
 		result = append(result, Series{
 			Pattern: pattern,
@@ -273,9 +276,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
 	out, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
 	if err != nil {
-		tracing.Failure(span)
+		err := response.WrapError(err)
+		if err.Code() != http.StatusBadRequest {
+			tracing.Failure(span)
+		}
 		tracing.Error(span, err)
-		response.Write(ctx, response.WrapError(err))
+		response.Write(ctx, err)
 		return
 	}
 
