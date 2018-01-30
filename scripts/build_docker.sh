@@ -18,4 +18,6 @@ docker tag grafana/metrictank grafana/metrictank:$VERSION
 
 # k8s image
 cd ${DIR}/k8s
-docker build -t us.gcr.io/metrictank-gcr/metrictank:${VERSION} .
+docker build -t us.gcr.io/metrictank-gcr/metrictank .
+docker tag us.gcr.io/metrictank-gcr/metrictank us.gcr.io/metrictank-gcr/metrictank:latest
+docker tag us.gcr.io/metrictank-gcr/metrictank us.gcr.io/metrictank-gcr/metrictank:${VERSION}
