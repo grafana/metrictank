@@ -351,7 +351,7 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 				cntFixed,
 			), req.OutInterval, nil
 		} else {
-			fixed, err := s.getSeriesFixed(ctx, req, consolidation.None)
+			fixed, err := s.getSeriesFixed(ctx, req, req.Consolidator)
 			return fixed, req.OutInterval, err
 		}
 	} else {
