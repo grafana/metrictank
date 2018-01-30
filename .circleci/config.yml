@@ -71,7 +71,9 @@ jobs:
               scripts/push/packagecloud.sh
               docker login -u $DOCKER_USER -p $DOCKER_PASS
               docker load -i build_docker/metrictank.tar
-              scripts/push/docker.sh
+              scripts/push/dockerhub.sh
+              scripts/push/gcr.sh
+              scripts/push/extra-qa.sh
             fi
 
 workflows:
