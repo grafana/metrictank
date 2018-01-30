@@ -65,15 +65,11 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			newEnd = newEnd - (newEnd % interval) + interval
 		}
 
-		out, alignedEnd := summarizeValues(serie, aggFunc, interval, newStart, newEnd)
-
-		if s.alignToFrom {
-			newEnd = alignedEnd
-		}
+		out := summarizeValues(serie, aggFunc, interval, newStart, newEnd)
 
 		output := models.Series{
 			Target:     newName(serie.Target),
-			QueryPatt:  newName(serie.QueryPatt), // Should this match target?
+			QueryPatt:  newName(serie.QueryPatt),
 			Tags:       serie.Tags,
 			Datapoints: out,
 			Interval:   interval,
@@ -84,13 +80,12 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	return outputs, nil
 }
 
-func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start, end uint32) ([]schema.Point, uint32) {
+func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start, end uint32) []schema.Point {
 	out := pointSlicePool.Get().([]schema.Point)
 
 	numPoints := int(util.Min(uint32(len(serie.Datapoints)), (start-end)/interval))
 
-	ts := start
-	for i := 0; i < numPoints && ts < end; ts += interval {
+	for ts, i := start, 0; i < numPoints && ts < end; ts += interval {
 		s := i
 		for ; i < numPoints && serie.Datapoints[i].Ts < ts+interval; i++ {
 			if serie.Datapoints[i].Ts <= ts {
@@ -101,5 +96,5 @@ func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start
 		out = append(out, schema.Point{Val: aggFunc(serie.Datapoints[s:i]), Ts: ts})
 	}
 
-	return out, ts
+	return out
 }
