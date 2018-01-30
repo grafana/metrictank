@@ -117,11 +117,11 @@ func (agg *Aggregator) GC(chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
 	ret := true
 
 	if lastWriteTime+agg.span > chunkMinTs {
-		// Last datapoint was less than one chunkSpan before chunkMinTs, hold out for more data
+		// Last datapoint was less than one aggregation window before chunkMinTs, hold out for more data
 		return false
 	}
 
-	// Haven't seen datapoints in an entire chunkSpan, time to flush
+	// Haven't seen datapoints in an entire aggregation window before chunkMinTs, time to flush
 	if agg.agg.Cnt != 0 {
 		agg.flush()
 	}
