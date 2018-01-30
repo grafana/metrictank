@@ -144,9 +144,9 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			var agg *AggMetric
 			switch consolidator {
 			case consolidation.None:
-				panic("cannot get an archive for no consolidation")
+				return Result{}, fmt.Errorf("cannot get an archive for no consolidation")
 			case consolidation.Avg:
-				panic("avg consolidator has no matching Archive(). you need sum and cnt")
+				return Result{}, fmt.Errorf("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
 				agg = a.cntMetric
 			case consolidation.Lst:
@@ -158,7 +158,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			case consolidation.Sum:
 				agg = a.sumMetric
 			default:
-				panic(fmt.Sprintf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator))
+				return Result{}, fmt.Errorf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
 			}
 			if agg == nil {
 				return Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
