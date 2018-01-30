@@ -10,7 +10,9 @@ jobs:
       - run: scripts/build_tools.sh
       - setup_remote_docker
       - run: scripts/build_docker.sh
-      - run: mkdir build_docker && docker save -o build_docker/metrictank.tar grafana/metrictank
+      - run: mkdir build_docker
+      - run: docker save -o build_docker/metrictank.tar grafana/metrictank
+      - run: docker save -o build_docker/metrictank-gcr.tar us.gcr.io/metrictank-gcr/metrictank
       - persist_to_workspace:
           root: .
           paths:
@@ -71,6 +73,7 @@ jobs:
               scripts/push/packagecloud.sh
               docker login -u $DOCKER_USER -p $DOCKER_PASS
               docker load -i build_docker/metrictank.tar
+              docker load -i build_docker/metrictank-gcr.tar
               scripts/push/dockerhub.sh
               scripts/push/gcr.sh
               scripts/push/extra-qa.sh
