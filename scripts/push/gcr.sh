@@ -3,7 +3,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/../..
 
-VERSION=`git describe --always`
+VERSION=`git describe --abbrev=7`
 
 docker login -u _json_key -p "$GOOGLE_AUTH" https://us.gcr.io
 echo docker push us.gcr.io/metrictank-gcr/metrictank:$VERSION

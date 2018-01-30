@@ -3,7 +3,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/..
 
-GITVERSION=`git describe --always`
+GITVERSION=`git describe --abbrev=7`
 BUILDDIR=$(pwd)/build
 
 # Make dir

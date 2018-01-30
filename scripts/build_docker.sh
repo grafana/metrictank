@@ -5,7 +5,7 @@ set -x
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}
 
-VERSION=`git describe --always`
+VERSION=`git describe --abbrev=7`
 
 # regular image
 rm -rf build/*

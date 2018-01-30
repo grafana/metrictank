@@ -11,7 +11,7 @@ mkdir $BUILD_PKG
 sudo apt-get install rpm # to be able to make rpms
 
 ARCH="$(uname -m)"
-VERSION=$(git describe --long --always)
+VERSION=$(git describe --long --abbrev=7)
 
 
 ## debian wheezy ##

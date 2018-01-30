@@ -3,7 +3,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/../..
 
-VERSION=`git describe --always`
+VERSION=`git describe --abbrev=7`
 
 echo docker push grafana/metrictank:$VERSION
 docker push grafana/metrictank:$VERSION || exit 2

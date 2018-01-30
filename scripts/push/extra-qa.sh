@@ -4,7 +4,7 @@ log () {
         echo "$(date +'%Y/%m/%d %H:%M:%S') $@"
 }
 
-VERSION=`git describe --always`
+VERSION=`git describe --abbrev=7`
 
 # try returns if did not succeed and is retryable
 # exits in all other cases

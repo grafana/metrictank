@@ -8,7 +8,7 @@ cd ${DIR}/..
 # and https://stackoverflow.com/questions/37531605/how-to-test-if-git-repository-is-shallow
 [ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
-GITVERSION=`git describe --always`
+GITVERSION=`git describe --abbrev=7`
 BUILDDIR=$(pwd)/build
 
 # Make dir
