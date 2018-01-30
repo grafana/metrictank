@@ -565,7 +565,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	// this aggMetric has never had metrics written to it.
 	// if the rob is empty or disabled, this AggMetric can be deleted
 	if len(a.Chunks) == 0 {
-		return a.rob == nil || a.rob.IsEmpty()
+		return (a.rob == nil || a.rob.IsEmpty()) && a.gcAggregators(chunkMinTs, metricMinTs)
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
@@ -578,7 +578,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			// already closed and should be saved, though we cant guarantee that.
 			// Check if we should just delete the metric from memory.
 			if a.lastWrite < metricMinTs {
-				return true
+				return a.gcAggregators(chunkMinTs, metricMinTs)
 			}
 		} else {
 			// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
@@ -595,4 +595,12 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		}
 	}
 	return false
+}
+
+func (a *AggMetric) gcAggregators(chunkMinTs, metricMinTs uint32) bool {
+	ret := true
+	for _, agg := range a.aggregators {
+		ret = agg.GC(chunkMinTs, metricMinTs, a.lastWrite) && ret
+	}
+	return ret
 }
