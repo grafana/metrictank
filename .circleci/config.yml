@@ -73,6 +73,7 @@ jobs:
               docker load -i build_docker/metrictank.tar
               scripts/push/dockerhub.sh
               scripts/push/gcr.sh
+              scripts/push/extra-qa.sh
             fi
 
 workflows:
