@@ -45,6 +45,9 @@ var (
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
+	apiServer   *api.Server
+	inputs      []input.Plugin
+	store       mdata.Store
 
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
@@ -268,7 +271,7 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, mdata.TTLs())
+	store, err = mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, mdata.TTLs())
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -288,7 +291,6 @@ func main() {
 	/***********************************
 		Initialize our Inputs
 	***********************************/
-	inputs := make([]input.Plugin, 0)
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inputs = append(inputs, inCarbon.New())
@@ -333,7 +335,7 @@ func main() {
 	/***********************************
 		Initialize our API server
 	***********************************/
-	apiServer, err := api.NewServer()
+	apiServer, err = api.NewServer()
 	if err != nil {
 		log.Fatal(4, "Failed to start API. %s", err.Error())
 	}
@@ -374,11 +376,16 @@ func main() {
 	/***********************************
 		Start our inputs
 	***********************************/
+	pluginFatal := make(chan struct{})
 	for _, plugin := range inputs {
 		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
 			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
 		}
-		plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()))
+		err = plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()), pluginFatal)
+		if err != nil {
+			shutdown()
+			return
+		}
 		plugin.MaintainPriority()
 	}
 
@@ -402,9 +409,16 @@ func main() {
 	/***********************************
 		Wait for Shutdown
 	***********************************/
-	sig := <-sigChan
-	log.Info("Received signal %q. Shutting down", sig)
+	select {
+	case sig := <-sigChan:
+		log.Info("Received signal %q. Shutting down", sig)
+	case <-pluginFatal:
+		log.Info("An input plugin signalled a fatal error. Shutting down")
+	}
+	shutdown()
+}
 
+func shutdown() {
 	// Leave the cluster. All other nodes will be notified we have left
 	// and so will stop sending us requests.
 	cluster.Stop()
@@ -442,5 +456,4 @@ func main() {
 	metricIndex.Stop()
 	log.Info("terminating.")
 	log.Close()
-
 }

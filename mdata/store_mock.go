@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/grafana/metrictank/mdata/chunk"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 // MockStore is an in-memory Store implementation for unit tests
@@ -48,4 +49,7 @@ func (c *MockStore) Search(ctx context.Context, metric string, ttl, start, end u
 }
 
 func (c *MockStore) Stop() {
+}
+
+func (c *MockStore) SetTracer(t opentracing.Tracer) {
 }

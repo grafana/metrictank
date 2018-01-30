@@ -106,16 +106,18 @@ func (c *Carbon) IntervalGetter(i IntervalGetter) {
 	c.intervalGetter = i
 }
 
-func (c *Carbon) Start(handler input.Handler) {
+func (c *Carbon) Start(handler input.Handler, fatal chan struct{}) error {
 	c.Handler = handler
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
-		log.Fatal(4, "carbon-in: %s", err.Error())
+		log.Error(4, "carbon-in: %s", err.Error())
+		return err
 	}
 	c.listener = l
 	log.Info("carbon-in: listening on %v/tcp", c.addr)
 	c.quit = make(chan struct{})
 	go c.accept()
+	return nil
 }
 
 // MaintainPriority is very simplistic for carbon. there is no backfill,

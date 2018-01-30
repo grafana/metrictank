@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/grafana/metrictank/mdata/chunk"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type devnullStore struct {
@@ -28,4 +29,7 @@ func (c *devnullStore) Search(ctx context.Context, key string, ttl, start, end u
 }
 
 func (c *devnullStore) Stop() {
+}
+
+func (c *devnullStore) SetTracer(t opentracing.Tracer) {
 }
