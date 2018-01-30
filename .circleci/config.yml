@@ -60,7 +60,6 @@ jobs:
           at: .
       - run: scripts/depends.sh
       - run: scripts/build_packages.sh
-      - run: echo ${GOOGLE_AUTH} > ${HOME}/gcp-key.json
       - store_artifacts:
           path: build
       - store_artifacts:
