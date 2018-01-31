@@ -1,6 +1,7 @@
 package mdata
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -144,9 +145,15 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			var agg *AggMetric
 			switch consolidator {
 			case consolidation.None:
-				return Result{}, fmt.Errorf("cannot get an archive for no consolidation")
+				err := errors.New("internal error: AggMetric.GetAggregated(): cannot get an archive for no consolidation")
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			case consolidation.Avg:
-				return Result{}, fmt.Errorf("avg consolidator has no matching Archive(). you need sum and cnt")
+				err := errors.New("internal error: AggMetric.GetAggregated(): avg consolidator has no matching Archive(). you need sum and cnt")
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			case consolidation.Cnt:
 				agg = a.cntMetric
 			case consolidation.Lst:
@@ -158,7 +165,10 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			case consolidation.Sum:
 				agg = a.sumMetric
 			default:
-				return Result{}, fmt.Errorf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
+				err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			}
 			if agg == nil {
 				return Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
@@ -166,7 +176,10 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			return agg.Get(from, to), nil
 		}
 	}
-	panic(fmt.Sprintf("GetAggregated called with unknown aggSpan %d", aggSpan))
+	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown aggSpan %d", aggSpan)
+	log.Error(3, "AM: %s", err.Error())
+	badAggSpan.Inc()
+	return Result{}, err
 }
 
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to

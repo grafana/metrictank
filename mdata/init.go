@@ -51,6 +51,14 @@ var (
 	// metric tank.gc_metric is the number of times the metrics GC is about to inspect a metric (series)
 	gcMetric = stats.NewCounter32("tank.gc_metric")
 
+	// metric recovered_errors.aggmetric.getaggregated.bad-consolidator is how many times we detected an GetAggregated call
+	// with an incorrect consolidator specified
+	badConsolidator = stats.NewCounter32("recovered_errors.aggmetric.getaggregated.bad-consolidator")
+
+	// metric recovered_errors.aggmetric.getaggregated.bad-aggspan is how many times we detected an GetAggregated call
+	// with an incorrect aggspan specified
+	badAggSpan = stats.NewCounter32("recovered_errors.aggmetric.getaggregated.bad-aggspan")
+
 	// set either via ConfigProcess or from the unit tests. other code should not touch
 	Schemas      conf.Schemas
 	Aggregations conf.Aggregations
