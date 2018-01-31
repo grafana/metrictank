@@ -17,7 +17,7 @@ VERSION=$(git describe --long --abbrev=7)
 ## debian wheezy ##
 
 BUILD=${BUILD_TMP}/sysvinit
-mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/metrictank
 PKG=${BUILD_PKG}/sysvinit
 mkdir -p ${PKG}
@@ -25,7 +25,7 @@ mkdir -p ${PKG}
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
@@ -41,7 +41,7 @@ fpm -s dir -t deb \
 ## ubuntu 14.04 ##
 
 BUILD=${BUILD_TMP}/upstart
-mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/metrictank
 PKG=${BUILD_PKG}/upstart
@@ -50,7 +50,7 @@ mkdir -p ${PKG}
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
-cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
@@ -65,7 +65,7 @@ fpm -s dir -t deb \
 ## ubuntu 16.04, Debian 8, CentOS 7 ##
 
 BUILD=${BUILD_TMP}/systemd
-mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
 mkdir -p ${BUILD}/var/run/metrictank
@@ -76,7 +76,7 @@ cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
-cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${VERSION}_${ARCH}.deb"
 fpm -s dir -t deb \
@@ -89,7 +89,7 @@ fpm -s dir -t deb \
 ## centos 7 ##
 
 BUILD=${BUILD_TMP}/systemd-centos7
-mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
 mkdir -p ${BUILD}/var/run/metrictank
@@ -100,7 +100,7 @@ cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
-cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${VERSION}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
@@ -113,7 +113,7 @@ fpm -s dir -t rpm \
 ## CentOS 6 ##
 
 BUILD=${BUILD_TMP}/upstart-0.6.5
-mkdir -p ${BUILD}/usr/sbin
+mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/metrictank
 PKG=${BUILD_PKG}/upstart-0.6.5
@@ -123,7 +123,7 @@ cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init
-cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/sbin/
+cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${VERSION}.el6.${ARCH}.rpm"
 fpm -s dir -t rpm \
