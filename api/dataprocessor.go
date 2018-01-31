@@ -413,7 +413,10 @@ func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidato
 }
 
 func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
-	res := s.getSeriesAggMetrics(ctx)
+	res, err := s.getSeriesAggMetrics(ctx)
+	if err != nil {
+		return res, err
+	}
 	select {
 	case <-ctx.ctx.Done():
 		//request canceled
@@ -468,14 +471,14 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 	return points
 }
 
-func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
+func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) {
 	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesAggMetrics")
 	defer span.Finish()
 	metric, ok := s.MemoryStore.Get(ctx.Key)
 	if !ok {
 		return mdata.Result{
 			Oldest: ctx.Req.To,
-		}
+		}, nil
 	}
 
 	if ctx.Cons != consolidation.None {
@@ -483,7 +486,7 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) mdata.Result {
 		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
 	} else {
 		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
-		return metric.Get(ctx.From, ctx.To)
+		return metric.Get(ctx.From, ctx.To), nil
 	}
 }
 

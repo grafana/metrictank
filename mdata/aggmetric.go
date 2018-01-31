@@ -1,6 +1,7 @@
 package mdata
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -137,30 +138,48 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) Result {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (Result, error) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
+			var agg *AggMetric
 			switch consolidator {
 			case consolidation.None:
-				panic("cannot get an archive for no consolidation")
+				err := errors.New("internal error: AggMetric.GetAggregated(): cannot get an archive for no consolidation")
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			case consolidation.Avg:
-				panic("avg consolidator has no matching Archive(). you need sum and cnt")
+				err := errors.New("internal error: AggMetric.GetAggregated(): avg consolidator has no matching Archive(). you need sum and cnt")
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			case consolidation.Cnt:
-				return a.cntMetric.Get(from, to)
+				agg = a.cntMetric
 			case consolidation.Lst:
-				return a.lstMetric.Get(from, to)
+				agg = a.lstMetric
 			case consolidation.Min:
-				return a.minMetric.Get(from, to)
+				agg = a.minMetric
 			case consolidation.Max:
-				return a.maxMetric.Get(from, to)
+				agg = a.maxMetric
 			case consolidation.Sum:
-				return a.sumMetric.Get(from, to)
+				agg = a.sumMetric
+			default:
+				err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
+				log.Error(3, "AM: %s", err.Error())
+				badConsolidator.Inc()
+				return Result{}, err
 			}
-			panic(fmt.Sprintf("AggMetric.GetAggregated(): unknown consolidator %q", consolidator))
+			if agg == nil {
+				return Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
+			}
+			return agg.Get(from, to), nil
 		}
 	}
-	panic(fmt.Sprintf("GetAggregated called with unknown aggSpan %d", aggSpan))
+	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown aggSpan %d", aggSpan)
+	log.Error(3, "AM: %s", err.Error())
+	badAggSpan.Inc()
+	return Result{}, err
 }
 
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to

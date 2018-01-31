@@ -773,7 +773,10 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 		metric.Add(i, float64(i^2))
 	}
 
-	res := srv.getSeriesAggMetrics(ctx)
+	res, err := srv.getSeriesAggMetrics(ctx)
+	if err != nil {
+		t.Errorf("Got unexpected error %q", err)
+	}
 	timestamps := make([]uint32, 0)
 	values := make([]float64, 0)
 
