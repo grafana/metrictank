@@ -67,11 +67,11 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	switch v := exp.(type) {
 	case ArgSeries, ArgSeriesList:
 		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 	case ArgSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", string(got.etype)}
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
 		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
@@ -79,7 +79,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 	case ArgInt:
 		if got.etype != etInt {
-			return 0, ErrBadArgumentStr{"int", string(got.etype)}
+			return 0, ErrBadArgumentStr{"int", got.etype.String()}
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
@@ -101,7 +101,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	case ArgFloat:
 		// integer is also a valid float, just happened to have no decimals
 		if got.etype != etFloat && got.etype != etInt {
-			return 0, ErrBadArgumentStr{"float", string(got.etype)}
+			return 0, ErrBadArgumentStr{"float", got.etype.String()}
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
@@ -115,7 +115,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 	case ArgString:
 		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+			return 0, ErrBadArgumentStr{"string", got.etype.String()}
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
@@ -136,7 +136,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		return pos, nil
 	case ArgRegex:
 		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string (regex)", string(got.etype)}
+			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}
 		}
 		for _, va := range v.validator {
 			if err := va(got); err != nil {
@@ -150,7 +150,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		*v.val = re
 	case ArgBool:
 		if got.etype != etBool {
-			return 0, ErrBadArgumentStr{"string", string(got.etype)}
+			return 0, ErrBadArgumentStr{"string", got.etype.String()}
 		}
 		*v.val = got.bool
 	case ArgStringsOrInts:
@@ -192,7 +192,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	switch v := exp.(type) {
 	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
@@ -201,7 +201,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 		*v.val = fn
 	case ArgSeriesList:
 		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
@@ -210,7 +210,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 		*v.val = fn
 	case ArgSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
-			return 0, nil, ErrBadArgumentStr{"func or name", string(got.etype)}
+			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 		fn, reqs, err = newplan(got, context, stable, reqs)
 		if err != nil {
