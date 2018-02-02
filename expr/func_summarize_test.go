@@ -112,13 +112,91 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 		},
 	}
 	// Note that graphite does not accept 10 as default seconds, but dur lib defaults to seconds without units!
-	testSummarize("Interval Default", input, outputSum[0], "10", "sum", false, t)
-	testSummarize("Interval Default", input, outputSum[1], "10", "sum", true, t)
-	testSummarize("Interval Default", input, outputMax[0], "10", "max", false, t)
-	testSummarize("Interval Default", input, outputMax[1], "10", "max", true, t)
+	testSummarize("Default Interval", input, outputSum[0], "10", "sum", false, t)
+	testSummarize("Default Interval", input, outputSum[1], "10", "sum", true, t)
+	testSummarize("Default Interval", input, outputMax[0], "10", "max", false, t)
+	testSummarize("Default Interval", input, outputMax[1], "10", "max", true, t)
 }
 
-func TestSummarizeSingleIdentity(t *testing.T) {
+func TestSummarizeOversampled(t *testing.T) {
+
+	var aOversampled = []schema.Point{
+		{Val: 0, Ts: 10},
+		{Val: math.NaN(), Ts: 15},
+		{Val: 0, Ts: 20},
+		{Val: math.NaN(), Ts: 25},
+		{Val: 5.5, Ts: 30},
+		{Val: math.NaN(), Ts: 35},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 45},
+		{Val: math.NaN(), Ts: 50},
+		{Val: math.NaN(), Ts: 55},
+		{Val: 1234567890, Ts: 60},
+	}
+
+	input := []models.Series{
+		{
+			Target:     "a",
+			QueryPatt:  "a",
+			QueryFrom:  10,
+			QueryTo:    60,
+			Interval:   10,
+			Datapoints: getCopy(a),
+		},
+	}
+	outputSum := [][]models.Series{
+		{
+			{
+				Target:     "summarize(a, \"5\", \"sum\")",
+				QueryPatt:  "summarize(a, \"5\", \"sum\")",
+				QueryFrom:  10,
+				QueryTo:    60,
+				Interval:   5,
+				Datapoints: getCopy(aOversampled),
+			},
+		},
+		{
+			{
+				Target:     "summarize(a, \"5\", \"sum\", true)",
+				QueryPatt:  "summarize(a, \"5\", \"sum\", true)",
+				QueryFrom:  10,
+				QueryTo:    60,
+				Interval:   5,
+				Datapoints: getCopy(aOversampled),
+			},
+		},
+	}
+	outputMax := [][]models.Series{
+		{
+			{
+				Target:     "summarize(a, \"5\", \"max\")",
+				QueryPatt:  "summarize(a, \"5\", \"max\")",
+				QueryFrom:  10,
+				QueryTo:    60,
+				Interval:   5,
+				Datapoints: getCopy(aOversampled),
+			},
+		},
+		{
+			{
+				Target:     "summarize(a, \"5\", \"max\", true)",
+				QueryPatt:  "summarize(a, \"5\", \"max\", true)",
+				QueryFrom:  10,
+				QueryTo:    60,
+				Interval:   5,
+				Datapoints: getCopy(aOversampled),
+			},
+		},
+	}
+	// Note that graphite does not accept 10 as default seconds, but dur lib defaults to seconds without units!
+	testSummarize("Oversampled Identity", input, outputSum[0], "5", "sum", false, t)
+	testSummarize("Oversampled Identity", input, outputSum[1], "5", "sum", true, t)
+	//testSummarize("Oversampled Identity", input, outputMax[0], "5", "max", false, t)
+	//testSummarize("Oversampled Identity", input, outputMax[1], "5", "max", true, t)
+	_ = outputMax // Max fails because it can't handle 0 terms, sum does not handle the 0 term check
+}
+
+func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 	input := []models.Series{
 		{
 			Target:     "a",
@@ -173,10 +251,10 @@ func TestSummarizeSingleIdentity(t *testing.T) {
 			},
 		},
 	}
-	testSummarize("identity Single", input, outputSum[0], "10s", "sum", false, t)
-	testSummarize("identity Single", input, outputSum[1], "10s", "sum", true, t)
-	testSummarize("identity Single", input, outputMax[0], "10s", "max", false, t)
-	testSummarize("identity Single", input, outputMax[1], "10s", "max", true, t)
+	testSummarize("Nyquist Single Identity", input, outputSum[0], "10s", "sum", false, t)
+	testSummarize("Nyquist Single Identity", input, outputSum[1], "10s", "sum", true, t)
+	testSummarize("Nyquist Single Identity", input, outputMax[0], "10s", "max", false, t)
+	testSummarize("Nyquist Single Identity", input, outputMax[1], "10s", "max", true, t)
 }
 
 func TestSummarizeMultipleIdentity(t *testing.T) {
