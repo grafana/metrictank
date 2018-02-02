@@ -25,7 +25,7 @@ func NewSummarize() GraphiteFunc {
 func (s *FuncSummarize) Signature() ([]Arg, []Arg) {
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgString{key: "interval", val: &s.intervalString, validator: []Validator{IsIntervalString}},
+		ArgString{val: &s.intervalString, validator: []Validator{IsIntervalString}},
 		ArgString{key: "func", opt: true, val: &s.fn, validator: []Validator{IsConsolFunc}},
 		ArgBool{key: "alignToFrom", opt: true, val: &s.alignToFrom},
 	}, []Arg{ArgSeriesList{}}
