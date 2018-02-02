@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/batch"
@@ -93,7 +94,12 @@ func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start
 			}
 		}
 
-		out = append(out, schema.Point{Val: aggFunc(serie.Datapoints[s:i]), Ts: ts})
+		aggPoint := schema.Point{Val: math.NaN(), Ts: ts}
+		if s != i {
+			aggPoint.Val = aggFunc(serie.Datapoints[s:i])
+		}
+
+		out = append(out, aggPoint)
 	}
 
 	return out

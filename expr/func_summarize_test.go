@@ -191,9 +191,8 @@ func TestSummarizeOversampled(t *testing.T) {
 	// Note that graphite does not accept 10 as default seconds, but dur lib defaults to seconds without units!
 	testSummarize("Oversampled Identity", input, outputSum[0], "5", "sum", false, t)
 	testSummarize("Oversampled Identity", input, outputSum[1], "5", "sum", true, t)
-	//testSummarize("Oversampled Identity", input, outputMax[0], "5", "max", false, t)
-	//testSummarize("Oversampled Identity", input, outputMax[1], "5", "max", true, t)
-	_ = outputMax // Max fails because it can't handle 0 terms, sum does not handle the 0 term check
+	testSummarize("Oversampled Identity", input, outputMax[0], "5", "max", false, t)
+	testSummarize("Oversampled Identity", input, outputMax[1], "5", "max", true, t)
 }
 
 func TestSummarizeNyquistSingleIdentity(t *testing.T) {
