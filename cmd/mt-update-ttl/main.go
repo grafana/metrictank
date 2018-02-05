@@ -3,8 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -29,6 +32,10 @@ var (
 	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
 	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
+
+	startTs    = flag.Int("start-timestamp", 0, "timestamp at which to start, defaults to 0")
+	endTs      = flag.Int("end-timestamp", math.MaxInt32, "timestamp at which to stop, defaults to int max")
+	numThreads = flag.Int("threads", 1, "number of workers to use to process data")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 )
@@ -129,38 +136,69 @@ func getTTL(now, ts, ttl int) int {
 	return newTTL
 }
 
-func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
-	var key string
+func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Session, startTime, endTime, ttl int, rownum, numKeys *int64, tableIn, tableOut string) {
+	defer wg.Done()
 	var ts int
 	var data []byte
-	var query string
-	iter := session.Query(fmt.Sprintf("SELECT key, ts, data FROM %s", tableIn)).Iter()
-	rownum := 0
-	for iter.Scan(&key, &ts, &data) {
-		newTTL := getTTL(int(time.Now().Unix()), ts, ttl)
-		if tableIn == tableOut {
-			query = fmt.Sprintf("UPDATE %s USING TTL %d SET data = ? WHERE key = ? AND ts = ?", tableIn, newTTL)
-		} else {
-			query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
-		}
-		if *verbose {
-			fmt.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", rownum, tableIn, key, ts, data)
-			fmt.Println("Query:", query)
+	var query, token string
+	dataQuery := fmt.Sprintf("SELECT token(key), ts, data FROM %s where key=? AND ts>=? AND ts<?", tableIn)
 
-		}
+	for key := range jobs {
+		iter := session.Query(dataQuery, key, startTime, endTime).Iter()
+		for iter.Scan(&token, &ts, &data) {
+			newTTL := getTTL(int(time.Now().Unix()), ts, ttl)
+			if tableIn == tableOut {
+				query = fmt.Sprintf("UPDATE %s USING TTL %d SET data = ? WHERE key = ? AND ts = ?", tableIn, newTTL)
+			} else {
+				query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
+			}
+			if *verbose {
+				fmt.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", rownum, tableIn, key, ts, data)
+				fmt.Println("Query:", query)
+			}
 
-		err := session.Query(query, data, key, ts).Exec()
+			err := session.Query(query, data, key, ts).Exec()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %s %d: %q", tableOut, key, ts, err)
+			}
+
+			processedRows := atomic.AddInt64(rownum, 1)
+			if processedRows%10000 == 0 {
+				fmt.Println("In progress: processed", processedRows, "rows and", *numKeys, "keys, last token", token)
+			}
+		}
+		err := iter.Close()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %s %d: %q", tableOut, key, ts, err)
-			iter.Close()
-			os.Exit(2)
+			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d rows", tableIn, err, rownum)
 		}
-		rownum++
+		atomic.AddInt64(numKeys, 1)
 	}
-	err := iter.Close()
+}
+
+func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
+	var key string
+	var numKeys, rownum int64
+
+	keyItr := session.Query(fmt.Sprintf("SELECT distinct key FROM %s", tableIn)).Iter()
+
+	jobs := make(chan string, 100)
+
+	var wg sync.WaitGroup
+	for i := 0; i < *numThreads; i++ {
+		wg.Add(1)
+		go worker(i, jobs, &wg, session, *startTs, *endTs, ttl, &rownum, &numKeys, tableIn, tableOut)
+	}
+
+	for keyItr.Scan(&key) {
+		jobs <- key
+	}
+
+	close(jobs)
+	err := keyItr.Close()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d rows", tableIn, err, rownum)
-		os.Exit(2)
 	}
-	fmt.Println("processed", rownum, "rows")
+
+	wg.Wait()
+	fmt.Println("Complete: processed", rownum, "rows")
 }
