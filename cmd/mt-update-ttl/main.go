@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"strings"
@@ -153,8 +154,8 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 				query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
 			}
 			if *verbose {
-				fmt.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", rownum, tableIn, key, ts, data)
-				fmt.Println("Query:", query)
+				log.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", rownum, tableIn, key, ts, data)
+				log.Println("Query:", query)
 			}
 
 			err := session.Query(query, data, key, ts).Exec()
@@ -164,7 +165,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 
 			processedRows := atomic.AddInt64(rownum, 1)
 			if processedRows%10000 == 0 {
-				fmt.Println("In progress: processed", processedRows, "rows and", *numKeys, "keys, last token", token)
+				log.Println("In progress: processed", processedRows, "rows and", *numKeys, "keys, last token", token)
 			}
 		}
 		err := iter.Close()
@@ -200,5 +201,5 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	}
 
 	wg.Wait()
-	fmt.Println("Complete: processed", rownum, "rows")
+	log.Println("Complete: processed", rownum, "rows")
 }
