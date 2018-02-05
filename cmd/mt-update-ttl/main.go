@@ -55,8 +55,9 @@ func main() {
 	}
 	flag.Parse()
 
-	if flag.NArg() < 2 {
+	if flag.NArg() < 2 || flag.NArg() > 3 {
 		flag.Usage()
+		os.Exit(2)
 	}
 
 	ttl := int(dur.MustParseNDuration("ttl", flag.Arg(0)))
