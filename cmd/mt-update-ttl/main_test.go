@@ -24,3 +24,25 @@ func TestGetTTL(t *testing.T) {
 		}
 	}
 }
+
+type completenessCase struct {
+	token int64
+	est   float64
+}
+
+func TestCompleteness(t *testing.T) {
+	cases := []completenessCase{
+		{-9223372036854775808, 0},
+		{-9223372036854775808 / 2, 0.25},
+		{0, 0.5},
+		{9223372036854775807 / 3, float64(4) / float64(6)},
+		{9223372036854775807, 1},
+	}
+	for i, c := range cases {
+		est := completenessEstimate(c.token)
+		if est != c.est {
+			t.Errorf("case %d: expected %f got %f", i, c.est, est)
+		}
+	}
+
+}

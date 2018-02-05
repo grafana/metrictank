@@ -16,6 +16,9 @@ import (
 	"github.com/raintank/dur"
 )
 
+const minToken = -9223372036854775808
+const maxToken = 9223372036854775807
+
 var (
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace            = flag.String("cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
@@ -39,6 +42,9 @@ var (
 	numThreads = flag.Int("threads", 1, "number of workers to use to process data")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
+
+	doneKeys uint64
+	doneRows uint64
 )
 
 func main() {
@@ -138,15 +144,23 @@ func getTTL(now, ts, ttl int) int {
 	return newTTL
 }
 
-func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Session, startTime, endTime, ttl int, rownum, numKeys *int64, tableIn, tableOut string) {
+func completenessEstimate(token int64) float64 {
+	if token < 0 {
+		return 0.5 - float64(token)/float64(2*minToken)
+	}
+	return 0.5 + float64(token)/float64(2*maxToken)
+}
+
+func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Session, startTime, endTime, ttl int, tableIn, tableOut string) {
 	defer wg.Done()
+	var token int64
 	var ts int
 	var data []byte
-	var query, token string
-	dataQuery := fmt.Sprintf("SELECT token(key), ts, data FROM %s where key=? AND ts>=? AND ts<?", tableIn)
+	var query string
+	queryTpl := fmt.Sprintf("SELECT token(key), ts, data FROM %s where key=? AND ts>=? AND ts<?", tableIn)
 
 	for key := range jobs {
-		iter := session.Query(dataQuery, key, startTime, endTime).Iter()
+		iter := session.Query(queryTpl, key, startTime, endTime).Iter()
 		for iter.Scan(&token, &ts, &data) {
 			newTTL := getTTL(int(time.Now().Unix()), ts, ttl)
 			if tableIn == tableOut {
@@ -155,7 +169,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 				query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
 			}
 			if *verbose {
-				log.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", rownum, tableIn, key, ts, data)
+				log.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, data)
 				log.Println("Query:", query)
 			}
 
@@ -164,22 +178,24 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 				fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %s %d: %q", tableOut, key, ts, err)
 			}
 
-			processedRows := atomic.AddInt64(rownum, 1)
-			if processedRows%10000 == 0 {
-				log.Println("In progress: processed", processedRows, "rows and", *numKeys, "keys, last token", token)
+			doneRowsSnap := atomic.AddUint64(&doneRows, 1)
+			if doneRowsSnap%10000 == 0 {
+				doneKeysSnap := atomic.LoadUint64(&doneKeys)
+				completeness := completenessEstimate(token)
+				log.Printf("WORKING: processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", doneKeysSnap, doneRowsSnap, token, completeness*100)
 			}
 		}
 		err := iter.Close()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d rows", tableIn, err, rownum)
+			doneKeysSnap := atomic.LoadUint64(&doneKeys)
+			doneRowsSnap := atomic.LoadUint64(&doneRows)
+			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeysSnap, doneRowsSnap)
 		}
-		atomic.AddInt64(numKeys, 1)
+		atomic.AddUint64(&doneKeys, 1)
 	}
 }
 
 func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
-	var key string
-	var numKeys, rownum int64
 
 	keyItr := session.Query(fmt.Sprintf("SELECT distinct key FROM %s", tableIn)).Iter()
 
@@ -188,9 +204,10 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	var wg sync.WaitGroup
 	for i := 0; i < *numThreads; i++ {
 		wg.Add(1)
-		go worker(i, jobs, &wg, session, *startTs, *endTs, ttl, &rownum, &numKeys, tableIn, tableOut)
+		go worker(i, jobs, &wg, session, *startTs, *endTs, ttl, tableIn, tableOut)
 	}
 
+	var key string
 	for keyItr.Scan(&key) {
 		jobs <- key
 	}
@@ -198,9 +215,9 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	close(jobs)
 	err := keyItr.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d rows", tableIn, err, rownum)
+		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeys, doneRows)
 	}
 
 	wg.Wait()
-	log.Println("Complete: processed", rownum, "rows")
+	log.Printf("DONE.  Processed %d keys, %d rows", doneKeys, doneRows)
 }
