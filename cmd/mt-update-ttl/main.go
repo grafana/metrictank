@@ -16,7 +16,6 @@ import (
 	"github.com/raintank/dur"
 )
 
-const minToken = -9223372036854775808
 const maxToken = 9223372036854775807
 
 var (
@@ -145,10 +144,7 @@ func getTTL(now, ts, ttl int) int {
 }
 
 func completenessEstimate(token int64) float64 {
-	if token < 0 {
-		return 0.5 - float64(token)/float64(2*minToken)
-	}
-	return 0.5 + float64(token)/float64(2*maxToken)
+	return ((float64(token) / float64(maxToken)) + 1) / 2
 }
 
 func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Session, startTime, endTime, ttl int, tableIn, tableOut string) {
