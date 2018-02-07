@@ -27,6 +27,7 @@ import (
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
 	inPrometheus "github.com/grafana/metrictank/input/prometheus"
+	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/notifierKafka"
@@ -168,6 +169,7 @@ func main() {
 	***********************************/
 	mdata.LogLevel = logLevel
 	memory.LogLevel = logLevel
+	kafka.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
@@ -220,7 +222,7 @@ func main() {
 	inKafkaMdm.ConfigProcess(*instance)
 	inPrometheus.ConfigProcess()
 	notifierNsq.ConfigProcess()
-	notifierKafka.ConfigProcess(*instance)
+	notifierKafka.ConfigProcess()
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 

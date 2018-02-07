@@ -1,7 +1,20 @@
 #!/bin/bash
+
+set -x
 # Find the directory we exist within
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}/..
+SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+SOURCE_DIR=$SCRIPTS_DIR/..
+BUILD_DIR=$SOURCE_DIR/build
+TMP_DIR=$(mktemp -d)
+
+cd $SOURCE_DIR
+
+if ! [ -d $PKG_CONFIG_PATH ] || [ -z $PKG_CONFIG_PATH ]
+then
+	source scripts/build_deps.sh
+else
+	echo "not building librdkafka"
+fi
 
 # make sure CircleCI gets all tags properly.
 # see https://discuss.circleci.com/t/where-are-my-git-tags/2371
@@ -17,16 +30,16 @@ mkdir -p $BUILDDIR
 # Clean build bin dir
 rm -rf $BUILDDIR/*
 
-# disable cgo
-export CGO_ENABLED=0
+# enable cgo
+export CGO_ENABLED=1
 
 OUTPUT=$BUILDDIR/metrictank
 
 if [ "$1" == "-race" ]
 then
   set -x
-  CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
+  go build -tags static -race -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
 else
   set -x
-  go build -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
+  go build -tags static -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
 fi

@@ -2,8 +2,10 @@ package kafka
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/Shopify/sarama"
+	confluent "github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 // returns elements that are in a but not in b
@@ -21,25 +23,45 @@ Iter:
 	return diff
 }
 
-func GetPartitions(client sarama.Client, topics []string) ([]int32, error) {
-	partitionCount := 0
-	partitions := make([]int32, 0)
-	var err error
+func GetPartitions(client *confluent.Consumer, topics []string, retries, backoff, timeout int) ([]int32, error) {
+	var partitions []int32
 	for i, topic := range topics {
-		partitions, err = client.Partitions(topic)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get partitions for topic %s. %s", topic, err)
-		}
-		if len(partitions) == 0 {
-			return nil, fmt.Errorf("No partitions returned for topic %s", topic)
-		}
-		if i > 0 {
-			if len(partitions) != partitionCount {
-				return nil, fmt.Errorf("Configured topics have different partition counts, this is not supported")
+		for retry := retries; retry > 0; retry-- {
+			metadata, err := client.GetMetadata(&topic, false, timeout)
+			if err != nil {
+				log.Warn("kafka: failed to get metadata from kafka client. %s, %d retries", err, retry)
+				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				continue
 			}
-			continue
+
+			// if kafka's auto.create.topics is enabled (default) then a topic will get created with the default
+			// settings after our first GetMetadata call for it. But because the topic creation can take a moment
+			// we'll need to retry a fraction of a second later in order to actually get the according metadata.
+			tm, ok := metadata.Topics[topic]
+			if !ok || tm.Error.Code() == confluent.ErrUnknownTopic {
+				log.Warn("kafka: unknown topic %s, %d retries", topic, retry)
+				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				continue
+			}
+			if len(tm.Partitions) == 0 {
+				log.Warn("kafka: 0 partitions returned for %s, %d retries left, %d backoffMs", topic, retry, backoff)
+				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				continue
+			}
+
+			if i == 0 {
+				partitions = make([]int32, 0, len(tm.Partitions))
+				for _, partitionMetadata := range tm.Partitions {
+					partitions = append(partitions, partitionMetadata.ID)
+				}
+			} else {
+				if len(tm.Partitions) != len(partitions) {
+					return nil, fmt.Errorf("Configured topics have different partition counts, this is not supported")
+				}
+			}
 		}
-		partitionCount = len(partitions)
 	}
+
+	log.Info("kafka: partitions for topics %+v: %+v", topics, partitions)
 	return partitions, nil
 }

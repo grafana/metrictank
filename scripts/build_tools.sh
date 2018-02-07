@@ -9,8 +9,8 @@ BUILDDIR=$(pwd)/build
 # Make dir
 mkdir -p $BUILDDIR
 
-# disable cgo
-export CGO_ENABLED=0
+# enable cgo
+export CGO_ENABLED=1
 
 function fail () {
 	echo "Aborting due to failure." >&2
@@ -24,10 +24,10 @@ for tool in *; do
   if [ "$1" == "-race" ]
   then
     set -x
-    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    go build -tags static -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   else
     set -x
-    go build -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
+    go build -tags static -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$tool || fail
   fi
   set +x
   cd ..
