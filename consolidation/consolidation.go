@@ -23,6 +23,11 @@ const (
 	Max
 	Min
 	Cnt // not available through http api
+	Mult
+	Med
+	Diff
+	StdDev
+	Range
 )
 
 // String provides human friendly names
@@ -40,6 +45,16 @@ func (c Consolidator) String() string {
 		return "MinimumConsolidator"
 	case Max:
 		return "MaximumConsolidator"
+	case Mult:
+		return "MultiplyConsolidator"
+	case Med:
+		return "MedianConsolidator"
+	case Diff:
+		return "DifferenceConsolidator"
+	case StdDev:
+		return "StdDevConsolidator"
+	case Range:
+		return "RangeConsolidator"
 	case Sum:
 		return "SumConsolidator"
 	}
@@ -96,6 +111,16 @@ func FromConsolidateBy(c string) Consolidator {
 		return Min
 	case "max":
 		return Max
+	case "mult", "multiply":
+		return Mult
+	case "med", "median":
+		return Med
+	case "diff":
+		return Diff
+	case "stddev":
+		return StdDev
+	case "range":
+		return Range
 	case "sum":
 		return Sum
 	}
@@ -116,6 +141,16 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 		consFunc = batch.Min
 	case Max:
 		consFunc = batch.Max
+	case Mult:
+		consFunc = batch.Mult
+	case Med:
+		consFunc = batch.Med
+	case Diff:
+		consFunc = batch.Diff
+	case StdDev:
+		consFunc = batch.StdDev
+	case Range:
+		consFunc = batch.Range
 	case Sum:
 		consFunc = batch.Sum
 	}
@@ -123,7 +158,17 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 }
 
 func Validate(fn string) error {
-	if fn == "avg" || fn == "average" || fn == "last" || fn == "min" || fn == "max" || fn == "sum" {
+	if fn == "avg" ||
+		fn == "average" ||
+		fn == "count" || fn == "last" || // bonus
+		fn == "min" ||
+		fn == "max" ||
+		fn == "mult" || fn == "multiply" ||
+		fn == "med" || fn == "median" ||
+		fn == "diff" ||
+		fn == "stddev" ||
+		fn == "range" ||
+		fn == "sum" {
 		return nil
 	}
 	return errUnknownConsolidationFunction
