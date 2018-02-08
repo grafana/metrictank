@@ -11,9 +11,6 @@ import (
 type AggFunc func(in []schema.Point) float64
 
 func Avg(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("avg() called in aggregator with 0 terms")
-	}
 	valid := float64(0)
 	sum := float64(0)
 	for _, term := range in {
@@ -42,9 +39,6 @@ func Cnt(in []schema.Point) float64 {
 }
 
 func Lst(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("last() called in aggregator with 0 terms")
-	}
 	lst := math.NaN()
 	for _, v := range in {
 		if !math.IsNaN(v.Val) {
@@ -55,9 +49,6 @@ func Lst(in []schema.Point) float64 {
 }
 
 func Min(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("min() called in aggregator with 0 terms")
-	}
 	valid := false
 	min := math.Inf(1)
 	for _, v := range in {
@@ -75,9 +66,6 @@ func Min(in []schema.Point) float64 {
 }
 
 func Max(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("max() called in aggregator with 0 terms")
-	}
 	valid := false
 	max := math.Inf(-1)
 	for _, v := range in {
