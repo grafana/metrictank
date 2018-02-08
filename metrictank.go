@@ -345,6 +345,7 @@ func main() {
 	apiServer.BindBackendStore(store)
 	apiServer.BindCache(ccache)
 	apiServer.BindTracer(tracer)
+	apiServer.BindPromQueryEngine()
 	cluster.Tracer = tracer
 	go apiServer.Run()
 
