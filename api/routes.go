@@ -18,7 +18,7 @@ func (s *Server) RegisterRoutes() {
 	r.Use(macaron.Renderer())
 	r.Use(middleware.OrgMiddleware(multiTenant))
 	r.Use(middleware.CorsHandler())
-
+	form := binding.Form
 	bind := binding.Bind
 	withOrg := middleware.RequireOrg()
 	cBody := middleware.CaptureBody
@@ -65,4 +65,7 @@ func (s *Server) RegisterRoutes() {
 	r.Post("/tags/delSeries", withOrg, ready, bind(models.GraphiteTagDelSeries{}), s.graphiteTagDelSeries)
 	r.Combo("/functions", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 	r.Combo("/functions/:func(.+)", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
+
+	// Prometheus endpointes
+	r.Combo("/prometheus/query_range", cBody, withOrg, ready, form(models.PrometheusQueryRange{})).Get(s.queryRange).Post(s.queryRange)
 }
