@@ -75,6 +75,9 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			Datapoints: out,
 			Interval:   interval,
 		}
+		output.Tags["summarize"] = s.intervalString
+		output.Tags["summarizeFunction"] = s.fn
+
 		outputs = append(outputs, output)
 		cache[Req{}] = append(cache[Req{}], output)
 	}
