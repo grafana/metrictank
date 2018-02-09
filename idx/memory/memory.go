@@ -63,7 +63,7 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type IdSet map[idx.MetricID]struct{} // set of ids
+type IdSet map[string]struct{} // set of ids
 
 func (ids IdSet) String() string {
 	var res string
@@ -71,7 +71,7 @@ func (ids IdSet) String() string {
 		if len(res) > 0 {
 			res += " "
 		}
-		res += id.String()
+		res += id
 	}
 	return res
 
@@ -80,7 +80,7 @@ func (ids IdSet) String() string {
 type TagValue map[string]IdSet    // value -> set of ids
 type TagIndex map[string]TagValue // key -> list of values
 
-func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
+func (t *TagIndex) addTagId(name, value string, id string) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
 		ti[name] = make(TagValue)
@@ -91,7 +91,7 @@ func (t *TagIndex) addTagId(name, value string, id idx.MetricID) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) delTagId(name, value string, id idx.MetricID) {
+func (t *TagIndex) delTagId(name, value string, id string) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -252,15 +252,6 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 		m.tags[def.OrgId] = tags
 	}
 
-	id, err := idx.NewMetricIDFromString(def.Id)
-	if err != nil {
-		// should never happen because all IDs in the index must have
-		// a valid format
-		invalidId.Inc()
-		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-		return
-	}
-
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
@@ -273,9 +264,9 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
-		tags.addTagId(tagName, tagValue, id)
+		tags.addTagId(tagName, tagValue, def.Id)
 	}
-	tags.addTagId("name", def.Name, id)
+	tags.addTagId("name", def.Name, def.Id)
 
 	m.defByTagSet.add(def)
 }
@@ -286,15 +277,6 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 // unsuccessful, "true" means the indexing was at least partially or completely
 // successful
 func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
-	id, err := idx.NewMetricIDFromString(def.Id)
-	if err != nil {
-		// should never happen because all IDs in the index must have
-		// a valid format
-		invalidId.Inc()
-		log.Error(3, "memory-idx: ID %q has invalid format", def.Id)
-		return false
-	}
-
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
@@ -307,10 +289,10 @@ func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) boo
 
 		tagName := tagSplits[0]
 		tagValue := tagSplits[1]
-		tags.delTagId(tagName, tagValue, id)
+		tags.delTagId(tagName, tagValue, def.Id)
 	}
 
-	tags.delTagId("name", def.Name, id)
+	tags.delTagId("name", def.Name, def.Id)
 
 	m.defByTagSet.del(def)
 
@@ -515,7 +497,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 		count := uint64(0)
 		if from > 0 {
 			for id := range ids {
-				def, ok := m.defById[id.String()]
+				def, ok := m.defById[id]
 				if !ok {
 					corruptIndex.Inc()
 					log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
@@ -670,7 +652,7 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 		for id := range ids {
 			var ok bool
 			var def *idx.Archive
-			if def, ok = m.defById[id.String()]; !ok {
+			if def, ok = m.defById[id]; !ok {
 				// should never happen because every ID in the tag index
 				// must be present in the byId lookup table
 				corruptIndex.Inc()
@@ -786,7 +768,7 @@ func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error)
 func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
 	for _, ids := range tags[tag] {
 		for id := range ids {
-			def, ok := m.defById[id.String()]
+			def, ok := m.defById[id]
 			if !ok {
 				corruptIndex.Inc()
 				log.Error(3, "memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
@@ -820,7 +802,7 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]id
 	ids := m.idsByTagQuery(orgId, query)
 	res := make([]idx.Node, 0, len(ids))
 	for id := range ids {
-		def, ok := m.defById[id.String()]
+		def, ok := m.defById[id]
 		if !ok {
 			corruptIndex.Inc()
 			log.Error(3, "memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
@@ -1071,7 +1053,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId int, ids IdSet) []idx.Archive {
 
 	deletedDefs := make([]idx.Archive, 0, len(ids))
 	for id := range ids {
-		idStr := id.String()
+		idStr := id
 		def, ok := m.defById[idStr]
 		if !ok {
 			// not necessarily a corruption, the id could have been deleted
@@ -1273,13 +1255,7 @@ DEFS:
 			}
 
 			for def := range defs {
-				id, err := idx.NewMetricIDFromString(def.Id)
-				if err != nil {
-					log.Error(3, "memory-idx: corrupt index. ID format %s seems to be invalid", def.Id)
-					continue
-				}
-
-				toPruneTagged[def.OrgId][id] = struct{}{}
+				toPruneTagged[def.OrgId][def.Id] = struct{}{}
 			}
 		}
 	}
