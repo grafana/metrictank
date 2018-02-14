@@ -12,20 +12,35 @@ import (
 type MockStore struct {
 	// the itgens to be searched and returned, indexed by metric
 	results map[string][]chunk.IterGen
+	// count of chunks in the store.
+	items int
+	// dont save any data.
+	Drop bool
 }
 
 func NewMockStore() *MockStore {
-	return &MockStore{make(map[string][]chunk.IterGen)}
+	return &MockStore{
+		results: make(map[string][]chunk.IterGen),
+		Drop:    false,
+	}
 }
 
-func (c *MockStore) ResetMock() {
+func (c *MockStore) Reset() {
 	c.results = make(map[string][]chunk.IterGen)
+	c.items = 0
+}
+
+func (c *MockStore) Items() int {
+	return c.items
 }
 
 // Add adds a chunk to the store
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
-	itgen := chunk.NewBareIterGen(cwr.Chunk.Series.Bytes(), cwr.Chunk.Series.T0, cwr.Span)
-	c.results[cwr.Key] = append(c.results[cwr.Key], *itgen)
+	if !c.Drop {
+		itgen := chunk.NewBareIterGen(cwr.Chunk.Series.Bytes(), cwr.Chunk.Series.T0, cwr.Span)
+		c.results[cwr.Key] = append(c.results[cwr.Key], *itgen)
+		c.items++
+	}
 }
 
 // searches through the mock results and returns the right ones according to start / end

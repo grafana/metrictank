@@ -1,4 +1,4 @@
-package mdata
+package cassandra
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
+	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
@@ -80,12 +81,15 @@ var (
 	errmetrics = cassandra.NewErrMetrics("store.cassandra")
 )
 
-/*
-https://godoc.org/github.com/gocql/gocql#Session
-Session is the interface used by users to interact with the database.
-It's safe for concurrent use by multiple goroutines and a typical usage scenario is to have one global session
-object to interact with the whole Cassandra cluster.
-*/
+type ChunkReadRequest struct {
+	month     uint32
+	sortKey   uint32
+	q         string
+	p         []interface{}
+	timestamp time.Time
+	out       chan outcome
+	ctx       context.Context
+}
 
 type TTLTables map[uint32]ttlTable
 type ttlTable struct {
@@ -95,7 +99,7 @@ type ttlTable struct {
 
 type CassandraStore struct {
 	Session          *gocql.Session
-	writeQueues      []chan *ChunkWriteRequest
+	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
 	ttlTables        TTLTables
@@ -285,7 +289,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
 	c := &CassandraStore{
 		Session:          session,
-		writeQueues:      make([]chan *ChunkWriteRequest, writers),
+		writeQueues:      make([]chan *mdata.ChunkWriteRequest, writers),
 		writeQueueMeters: make([]*stats.Range32, writers),
 		readQueue:        make(chan *ChunkReadRequest, readqsize),
 		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
@@ -295,7 +299,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	}
 
 	for i := 0; i < writers; i++ {
-		c.writeQueues[i] = make(chan *ChunkWriteRequest, writeqsize)
+		c.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, writeqsize)
 		c.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
 		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
 	}
@@ -311,7 +315,7 @@ func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
 	c.tracer = t
 }
 
-func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
+func (c *CassandraStore) Add(cwr *mdata.ChunkWriteRequest) {
 	sum := 0
 	for _, char := range cwr.Key {
 		sum += int(char)
@@ -323,7 +327,7 @@ func (c *CassandraStore) Add(cwr *ChunkWriteRequest) {
 
 /* process writeQueue.
  */
-func (c *CassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter *stats.Range32) {
+func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *stats.Range32) {
 	tick := time.Tick(time.Duration(1) * time.Second)
 	for {
 		select {
@@ -344,7 +348,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *ChunkWriteRequest, meter 
 				if err == nil {
 					success = true
 					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					SendPersistMessage(cwr.Key, cwr.Chunk.T0)
+					mdata.SendPersistMessage(cwr.Key, cwr.Chunk.T0)
 					log.Debug("CS: save complete. %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {

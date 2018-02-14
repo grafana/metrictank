@@ -13,7 +13,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	opentracing "github.com/opentracing/opentracing-go"
 
-	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
 	"github.com/rakyll/globalconf"
 )
@@ -160,7 +160,7 @@ func main() {
 		}
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, nil)
+	store, err := cassandra.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}

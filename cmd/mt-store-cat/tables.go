@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/store/cassandra"
 )
 
 type TablesByTTL []string
@@ -19,7 +19,7 @@ func (t TablesByTTL) Less(i, j int) bool {
 	return iTTL < jTTL
 }
 
-func getTables(store *mdata.CassandraStore, keyspace string, match string) ([]string, error) {
+func getTables(store *cassandra.CassandraStore, keyspace string, match string) ([]string, error) {
 	var tables []string
 	meta, err := store.Session.KeyspaceMetadata(keyspace)
 	if err != nil {

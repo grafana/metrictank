@@ -10,13 +10,14 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
+	backendStore "github.com/grafana/metrictank/store"
 	"gopkg.in/raintank/schema.v1"
 )
 
 func BenchmarkProcessUniqueMetrics(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	store := mdata.NewDevnullStore()
+	store := backendStore.NewDevnullStore()
 
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
@@ -54,7 +55,7 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 func BenchmarkProcessSameMetric(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	store := mdata.NewDevnullStore()
+	store := backendStore.NewDevnullStore()
 
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)

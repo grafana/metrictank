@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
 )
 
@@ -54,7 +54,7 @@ func main() {
 		return
 	}
 
-	display(int64(mdata.Month_sec), "cassandra rowkey month")
+	display(int64(cassandra.Month_sec), "cassandra rowkey month")
 
 	if *spanStr != "" {
 		span := dur.MustParseNDuration("span", *spanStr)
