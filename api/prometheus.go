@@ -17,7 +17,45 @@ import (
 	"github.com/prometheus/prometheus/storage"
 )
 
-type OrgID string
+type orgID string
+
+type prometheusResponse struct {
+	Status    string      `json:"status"`
+	Data      interface{} `json:"data,omitempty"`
+	ErrorType string      `json:"errorType,omitempty"`
+	Error     string      `json:"error,omitempty"`
+}
+
+type querier struct {
+	Server
+	OrgID int
+}
+
+func (s *Server) labelValues(ctx *middleware.Context) {
+	name := ctx.Params(":name")
+
+	if !model.LabelNameRE.MatchString(name) {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("invalid label name: %v", name)))
+		return
+	}
+
+	q, err := s.Querier(context.WithValue(context.Background(), orgID("org-id"), ctx.OrgId), 0, 0)
+
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("unable to create queryable: %v", err)))
+		return
+	}
+	defer q.Close()
+
+	vals, err := q.LabelValues(name)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("error: %v", err)))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, prometheusResponse{Status: "success", Data: vals}, ""))
+	return
+}
 
 func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQueryRange) {
 	start, err := parseTime(request.Start)
@@ -45,7 +83,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 		response.Write(ctx, response.NewError(http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err)))
 		return
 	}
-	res := qry.Exec(context.WithValue(context.Background(), OrgID("org-id"), ctx.OrgId))
+	res := qry.Exec(context.WithValue(context.Background(), orgID("org-id"), ctx.OrgId))
 	if res.Err != nil {
 		switch res.Err.(type) {
 		case promql.ErrQueryCanceled:
@@ -74,7 +112,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
 	return &querier{
 		*s,
-		ctx.Value("org-id").(int),
+		ctx.Value(orgID("org-id")).(int),
 	}, nil
 }
 
@@ -103,11 +141,6 @@ func parseDuration(s string) (time.Duration, error) {
 	return 0, fmt.Errorf("cannot parse %q to a valid duration", s)
 }
 
-type querier struct {
-	Server
-	OrgId int
-}
-
 // Select returns a set of series that matches the given label matchers.
 func (q *querier) Select(...*labels.Matcher) (storage.SeriesSet, error) {
 	return nil, fmt.Errorf("Select not implemented")
@@ -115,35 +148,14 @@ func (q *querier) Select(...*labels.Matcher) (storage.SeriesSet, error) {
 
 // LabelValues returns all potential values for a label name.
 func (q *querier) LabelValues(name string) ([]string, error) {
-	result, err := q.MetricIndex.TagDetails(q.OrgId, name, "", 0)
+	result, err := q.MetricIndex.FindTagValues(q.OrgID, name, "", []string{}, 0, 100000)
 	if err != nil {
 		return nil, err
 	}
 	if result == nil {
-		result = make(map[string]uint64)
+		result = []string{}
 	}
-	data := models.IndexTagDetails{OrgId: q.OrgId, Tag: name, Filter: filter, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details", false)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
-	resp := models.IndexTagDetailsResp{}
-	for _, r := range resps {
-		_, err = resp.UnmarshalMsg(r.buf)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range resp.Values {
-			result[k] = result[k] + v
-		}
-	}
-	return nil, fmt.Errorf("LabelValues not implemented")
+	return result, nil
 }
 
 // Close releases the resources of the Querier.
