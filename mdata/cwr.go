@@ -1,21 +1,10 @@
 package mdata
 
 import (
-	"context"
 	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
 )
-
-type ChunkReadRequest struct {
-	month     uint32
-	sortKey   uint32
-	q         string
-	p         []interface{}
-	timestamp time.Time
-	out       chan outcome
-	ctx       context.Context
-}
 
 type ChunkWriteRequest struct {
 	Metric    *AggMetric

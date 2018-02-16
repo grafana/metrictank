@@ -16,9 +16,9 @@ import (
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
-	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
+	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
 )
 
@@ -95,7 +95,7 @@ var (
 
 type Server struct {
 	Session     *gocql.Session
-	TTLTables   mdata.TTLTables
+	TTLTables   cassandraStore.TTLTables
 	Partitioner partitioner.Partitioner
 	Index       idx.MetricIndex
 	HTTPServer  *http.Server
@@ -149,7 +149,7 @@ func main() {
 		log.SetLevel(log.InfoLevel)
 	}
 
-	store, err := mdata.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, nil)
+	store, err := cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
 	}
@@ -159,7 +159,7 @@ func main() {
 	for _, split := range splits {
 		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
 	}
-	ttlTables := mdata.GetTTLTables(ttls, *windowFactor, mdata.Table_name_format)
+	ttlTables := cassandraStore.GetTTLTables(ttls, *windowFactor, cassandraStore.Table_name_format)
 
 	p, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
@@ -258,11 +258,11 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 	}
 	log.Debug(query)
 	for _, ig := range itergens {
-		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/mdata.Month_sec)
+		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/cassandraStore.Month_sec)
 		success := false
 		attempts := 0
 		for !success {
-			err := s.Session.Query(query, rowKey, ig.Ts, mdata.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+			err := s.Session.Query(query, rowKey, ig.Ts, cassandraStore.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
 			if err != nil {
 				if (attempts % 20) == 0 {
 					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)

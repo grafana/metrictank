@@ -340,7 +340,8 @@ func TestPrevBoundary(t *testing.T) {
 
 func TestGetSeriesFixed(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
-	store := mdata.NewDevnullStore()
+	store := mdata.NewMockStore()
+	store.Drop = true
 
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
@@ -746,7 +747,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 				// stop cache go routines before reinstantiating it at the top of the loop
 				c.Stop()
-				store.ResetMock()
+				store.Reset()
 			}
 		}
 	}

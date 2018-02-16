@@ -9,7 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/store/cassandra"
 )
 
 var (
@@ -65,7 +65,7 @@ func main() {
 		fmt.Printf("retentions:%10s %10s %10s %10s %10s %15s %10s\n", "interval", "retention", "chunkspan", "numchunks", "ready", "tablename", "windowsize")
 		for _, ret := range schema.Retentions {
 			retention := ret.MaxRetention()
-			table := mdata.GetTTLTable(uint32(retention), *windowFactor, mdata.Table_name_format)
+			table := cassandra.GetTTLTable(uint32(retention), *windowFactor, cassandra.Table_name_format)
 			retStr := time.Duration(time.Duration(retention) * time.Second).String()
 			if retention%(3600*24) == 0 {
 				retStr = fmt.Sprintf("%dd", retention/3600/24)

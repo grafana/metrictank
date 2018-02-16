@@ -1,8 +1,9 @@
-package mdata
+package store
 
 import (
 	"context"
 
+	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 )
@@ -16,7 +17,7 @@ func NewDevnullStore() *devnullStore {
 	return d
 }
 
-func (c *devnullStore) Add(cwr *ChunkWriteRequest) {
+func (c *devnullStore) Add(cwr *mdata.ChunkWriteRequest) {
 	c.AddCount++
 }
 

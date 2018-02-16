@@ -25,7 +25,8 @@ func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
 
-	store := mdata.NewDevnullStore()
+	store := mdata.NewMockStore()
+	store.Drop = true
 	srv.BindBackendStore(store)
 
 	mockCache := cache.NewMockCache()

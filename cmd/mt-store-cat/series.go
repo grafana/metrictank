@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/api"
-	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/store/cassandra"
 	"gopkg.in/raintank/schema.v1"
 )
 
-func points(ctx context.Context, store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func points(ctx context.Context, store *cassandra.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
@@ -32,7 +32,7 @@ func points(ctx context.Context, store *mdata.CassandraStore, tables []string, m
 	}
 }
 
-func pointSummary(ctx context.Context, store *mdata.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
@@ -51,7 +51,7 @@ func pointSummary(ctx context.Context, store *mdata.CassandraStore, tables []str
 	}
 }
 
-func getSeries(ctx context.Context, store *mdata.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
+func getSeries(ctx context.Context, store *cassandra.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
 	itgens, err := store.SearchTable(ctx, id, table, fromUnix, toUnix)
 	if err != nil {
