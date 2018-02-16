@@ -22,6 +22,13 @@ type ProemtheusQueryData struct {
 	Result     promql.Value     `json:"result"`
 }
 
+func NewPrometheusSeriesSet(series []storage.Series) *PrometheusSeriesSet {
+	return &PrometheusSeriesSet{
+		series: series,
+		cur:    0,
+	}
+}
+
 type PrometheusSeriesSet struct {
 	cur    int
 	series []storage.Series
@@ -43,6 +50,13 @@ func (p *PrometheusSeriesSet) Err() error {
 type PrometheusSeries struct {
 	labels  labels.Labels
 	samples []model.SamplePair
+}
+
+func NewPrometheusSeries(tags map[string]string, samples []model.SamplePair) *PrometheusSeries {
+	return &PrometheusSeries{
+		labels:  labels.FromMap(tags),
+		samples: samples,
+	}
 }
 
 func (p *PrometheusSeries) Labels() labels.Labels {
