@@ -26,6 +26,7 @@ import (
 	"github.com/grafana/metrictank/input"
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
+	inPrometheus "github.com/grafana/metrictank/input/prometheus"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/notifierKafka"
@@ -137,6 +138,7 @@ func main() {
 	// load config for metric ingestors
 	inCarbon.ConfigSetup()
 	inKafkaMdm.ConfigSetup()
+	inPrometheus.ConfigSetup()
 
 	// load config for cluster handlers
 	notifierNsq.ConfigSetup()
@@ -218,7 +220,7 @@ func main() {
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled {
+	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")
 	}
 
@@ -294,6 +296,10 @@ func main() {
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inputs = append(inputs, inCarbon.New())
+	}
+
+	if inPrometheus.Enabled {
+		inputs = append(inputs, inPrometheus.New())
 	}
 
 	if inKafkaMdm.Enabled {
