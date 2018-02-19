@@ -253,7 +253,6 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 				cons := consolidation.Consolidator(fn)
 
 				newReq := models.NewReq(archive.Id, archive.NameWithTags(), target, q.from, q.to, math.MaxUint32, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
-				fmt.Printf("From: %v\n To:%v\n", newReq.From, newReq.To)
 				reqs = append(reqs, newReq)
 			}
 		}
@@ -277,7 +276,6 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		log.Error(3, "HTTP Render alignReq error: %s", err)
 		return nil, err
 	}
-	fmt.Println(reqs)
 
 	out, err := q.getTargets(q.ctx, reqs)
 	if err != nil {
@@ -310,7 +308,6 @@ func (q *querier) Close() error {
 func SeriesToSeriesSet(out []models.Series) (*models.PrometheusSeriesSet, error) {
 	series := []storage.Series{}
 	for _, metric := range out {
-		fmt.Println(metric)
 		series = append(series, models.NewPrometheusSeries(buildTagSet(metric.Target), dataPointsToPrometheusSamplePairs(metric.Datapoints)))
 	}
 	return models.NewPrometheusSeriesSet(series), nil
