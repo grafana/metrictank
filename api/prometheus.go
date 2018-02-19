@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -72,29 +73,34 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse start time: %v", err)))
 		return
 	}
+
 	end, err := parseTime(request.End)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse end time: %v", err)))
 		return
 	}
+
 	step, err := parseDuration(request.Step)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse step duration: %v", err)))
 		return
 	}
+
 	if step <= 0 {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("step value is less than or equal to zero: %v", err)))
 		return
 	}
 
 	qry, err := s.PromQueryEngine.NewRangeQuery(request.Query, start, end, step)
+
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err)))
 		return
 	}
-	res := qry.Exec(context.WithValue(ctx.Req.Context(), orgID("org-id"), ctx.OrgId))
-	fmt.Println(res.Err)
-	fmt.Println(res.String())
+
+	newCtx := context.WithValue(ctx.Req.Context(), orgID("org-id"), ctx.OrgId)
+	res := qry.Exec(newCtx)
+
 	if res.Err != nil {
 		switch res.Err.(type) {
 		case promql.ErrQueryCanceled:
@@ -112,12 +118,39 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	}
 
 	response.Write(ctx, response.NewJson(200,
-		models.ProemtheusQueryData{
+		models.PrometheusQueryData{
 			ResultType: res.Value.Type(),
 			Result:     res.Value,
 		},
 		"",
 	))
+}
+
+func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusSeriesQuery) {
+	start, err := parseTime(request.Start)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse start time: %v", err)))
+		return
+	}
+
+	end, err := parseTime(request.End)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse end time: %v", err)))
+		return
+	}
+
+	q, err := s.Querier(ctx.Req.Context(), timestamp.FromTime(start), timestamp.FromTime(end))
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err)))
+		return
+	}
+
+	q.Select()
+	for _, matcher := range request.Match {
+
+	}
+
+	response.Write(ctx, response.NewError(200, "test"))
 }
 
 func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
@@ -156,12 +189,12 @@ func parseDuration(s string) (time.Duration, error) {
 }
 
 // Select returns a set of series that matches the given label matchers.
-func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error) {
+func (q *querier) Select(selectors *storage.SelectParams, matchers ...*labels.Matcher) (storage.SeriesSet, error) {
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
 	var target string
 	var reqs []models.Req
-	fmt.Println(q.from)
+
 	expressions := []string{}
 	for _, matcher := range matchers {
 		if matcher.Name == model.MetricNameLabel {
@@ -177,8 +210,6 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 
 	minFrom = util.Min(minFrom, q.from)
 	maxTo = util.Max(maxTo, q.to)
-	fmt.Println(q.from)
-	fmt.Println(q.to)
 	for _, s := range series {
 		for _, metric := range s.Series {
 			for _, archive := range metric.Defs {
