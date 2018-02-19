@@ -16,7 +16,7 @@ import (
 	"github.com/raintank/dur"
 )
 
-const maxToken = 9223372036854775807
+const maxToken = math.MaxInt64 // 9223372036854775807
 
 var (
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -143,6 +143,11 @@ func getTTL(now, ts, ttl int) int {
 	return newTTL
 }
 
+// completenessEstimate estimates completess of this process (as a number between 0 and 1)
+// by inspecting a cassandra token. The data is ordered by token, so assuming a uniform distribution
+// across the token space, we can estimate process.
+// the token space is -9,223,372,036,854,775,808 through 9,223,372,036,854,775,807
+// so for example, if we're working on token 3007409301797035962 then we're about 0.66 complete
 func completenessEstimate(token int64) float64 {
 	return ((float64(token) / float64(maxToken)) + 1) / 2
 }
@@ -165,27 +170,26 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 				query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
 			}
 			if *verbose {
-				log.Printf("processing rownum=%d table=%q key=%q ts=%d data='%x'\n", atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, data)
-				log.Println("Query:", query)
+				log.Printf("id=%d processing rownum=%d table=%q key=%q ts=%d query=%q data='%x'\n", id, atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, query, data)
 			}
 
 			err := session.Query(query, data, key, ts).Exec()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %s %d: %q", tableOut, key, ts, err)
+				fmt.Fprintf(os.Stderr, "ERROR: id=%d failed updating %s %s %d: %q", id, tableOut, key, ts, err)
 			}
 
 			doneRowsSnap := atomic.AddUint64(&doneRows, 1)
 			if doneRowsSnap%10000 == 0 {
 				doneKeysSnap := atomic.LoadUint64(&doneKeys)
 				completeness := completenessEstimate(token)
-				log.Printf("WORKING: processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", doneKeysSnap, doneRowsSnap, token, completeness*100)
+				log.Printf("WORKING: id=%d processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", id, doneKeysSnap, doneRowsSnap, token, completeness*100)
 			}
 		}
 		err := iter.Close()
 		if err != nil {
 			doneKeysSnap := atomic.LoadUint64(&doneKeys)
 			doneRowsSnap := atomic.LoadUint64(&doneRows)
-			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeysSnap, doneRowsSnap)
+			fmt.Fprintf(os.Stderr, "ERROR: id=%d failed querying %s: %q. processed %d keys, %d rows", id, tableIn, err, doneKeysSnap, doneRowsSnap)
 		}
 		atomic.AddUint64(&doneKeys, 1)
 	}
@@ -198,8 +202,8 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	jobs := make(chan string, 100)
 
 	var wg sync.WaitGroup
+	wg.Add(*numThreads)
 	for i := 0; i < *numThreads; i++ {
-		wg.Add(1)
 		go worker(i, jobs, &wg, session, *startTs, *endTs, ttl, tableIn, tableOut)
 	}
 
@@ -212,6 +216,8 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	err := keyItr.Close()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeys, doneRows)
+		wg.Wait()
+		os.Exit(2)
 	}
 
 	wg.Wait()
