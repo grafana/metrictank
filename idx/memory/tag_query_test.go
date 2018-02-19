@@ -11,9 +11,9 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-var ids []idx.MetricID
+var ids []string
 
-func getTestIDs(t *testing.T) []idx.MetricID {
+func getTestIDs(t *testing.T) []string {
 	if len(ids) > 0 {
 		return ids
 	}
@@ -29,11 +29,7 @@ func getTestIDs(t *testing.T) []idx.MetricID {
 		"1.72345678901234567890123456789012",
 	}
 	for _, idStr := range idStrings {
-		id, err := idx.NewMetricIDFromString(idStr)
-		if err != nil {
-			t.Fatalf("Did not expect an error when converting id string to object: %s", idStr)
-		}
-		ids = append(ids, id)
+		ids = append(ids, idStr)
 	}
 
 	return ids
@@ -41,7 +37,7 @@ func getTestIDs(t *testing.T) []idx.MetricID {
 
 func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	type testCase struct {
-		id         idx.MetricID
+		id         string
 		lastUpdate int64
 		tags       []string
 	}
@@ -63,7 +59,7 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	byId := make(map[string]*idx.Archive)
 
 	for i, d := range data {
-		idStr := d.id.String()
+		idStr := d.id
 		byId[idStr] = &idx.Archive{}
 		byId[idStr].Name = fmt.Sprintf("metric%d", i)
 		byId[idStr].Tags = d.tags
@@ -393,12 +389,12 @@ func TestGetByTag(t *testing.T) {
 
 	idString := "1.000000000000000000000000000000%02x"
 	mds := make([]schema.MetricData, 20)
-	ids := make([]idx.MetricID, 20)
+	ids := make([]string, 20)
 	for i := range mds {
-		ids[i], _ = idx.NewMetricIDFromString(fmt.Sprintf(idString, i))
+		ids[i] = fmt.Sprintf(idString, i)
 		mds[i].Metric = fmt.Sprintf("metric.%d", i)
 		mds[i].Name = mds[i].Metric
-		mds[i].Id = ids[i].String()
+		mds[i].Id = ids[i]
 		mds[i].OrgId = 1
 		mds[i].Interval = 1
 		mds[i].Time = 12345
@@ -473,9 +469,9 @@ func TestGetByTag(t *testing.T) {
 
 		resPaths := make([]string, 0, len(res))
 		for id := range res {
-			def, ok := ix.defById[id.String()]
+			def, ok := ix.defById[id]
 			if !ok {
-				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id.String())
+				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id)
 			}
 			resPaths = append(resPaths, def.NameWithTags())
 		}
