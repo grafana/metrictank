@@ -5,7 +5,6 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage"
 )
 
@@ -21,11 +20,6 @@ type PrometheusSeriesQuery struct {
 	Match []string `form:"match[]"` //<string>: Prometheus expression query string.
 	Start string   `form:"start"`   //<rfc3339 | unix_timestamp>: Start timestamp.
 	End   string   `form:"end"`     //<rfc3339 | unix_timestamp>: End timestamp.
-}
-
-type PrometheusQueryData struct {
-	ResultType promql.ValueType `json:"resultType"`
-	Result     promql.Value     `json:"result"`
 }
 
 type PrometheusSeriesSet struct {
