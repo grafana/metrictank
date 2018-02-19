@@ -95,8 +95,9 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	start, err := parseTime(request.Start)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("could not parse start time: %v", err),
+			Status:    statusError,
+			Error:     fmt.Sprintf("could not parse start time: %v", err),
+			ErrorType: errorBadData,
 		}, ""))
 		return
 	}
@@ -104,8 +105,9 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	end, err := parseTime(request.End)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("could not parse end time: %v", err),
+			Status:    statusError,
+			Error:     fmt.Sprintf("could not parse end time: %v", err),
+			ErrorType: errorBadData,
 		}, ""))
 		return
 	}
@@ -113,16 +115,18 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	step, err := parseDuration(request.Step)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("could not parse step duration: %v", err),
+			Status:    statusError,
+			Error:     fmt.Sprintf("could not parse step duration: %v", err),
+			ErrorType: errorBadData,
 		}, ""))
 		return
 	}
 
 	if step <= 0 {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("step value is less than or equal to zero: %v", step),
+			Status:    statusError,
+			Error:     fmt.Sprintf("step value is less than or equal to zero: %v", step),
+			ErrorType: errorBadData,
 		}, ""))
 		return
 	}
@@ -131,8 +135,9 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("query failed: %v", err),
+			Status:    statusError,
+			Error:     fmt.Sprintf("query failed: %v", err),
+			ErrorType: errorExec,
 		}, ""))
 		return
 	}
@@ -142,8 +147,9 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 
 	if res.Err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status: statusError,
-			Error:  fmt.Sprintf("query failed: %v", res.Err),
+			Status:    statusError,
+			Error:     fmt.Sprintf("query failed: %v", res.Err),
+			ErrorType: errorExec,
 		}, ""))
 		return
 	}
@@ -186,7 +192,7 @@ func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier
 	return &querier{
 		*s,
 		uint32(mint / 1000), //Convert from NS to S
-		uint32(maxt / 1000), //TODO abstract this out into a seperate function that is more accurate
+		uint32(maxt / 1000), //TODO abstract this out into a separate function that is more accurate
 		ctx.Value(orgID("org-id")).(int),
 		ctx,
 	}, nil
