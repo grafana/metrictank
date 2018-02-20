@@ -69,21 +69,33 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
 	if !model.LabelNameRE.MatchString(name) {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("invalid label name: %v", name)))
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Sprintf("unable to create label name: %v", name),
+			ErrorType: errorExec,
+		}, ""))
 		return
 	}
 
 	q, err := s.Querier(context.WithValue(context.Background(), orgID("org-id"), ctx.OrgId), 0, 0)
 
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("unable to create queryable: %v", err)))
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Sprintf("unable to create queryable: %v", err),
+			ErrorType: errorExec,
+		}, ""))
 		return
 	}
 	defer q.Close()
 
 	vals, err := q.LabelValues(name)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("error: %v", err)))
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Sprintf("query failed: %v", err),
+			ErrorType: errorExec,
+		}, ""))
 		return
 	}
 
@@ -146,11 +158,33 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	res := qry.Exec(newCtx)
 
 	if res.Err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Sprintf("query failed: %v", res.Err),
-			ErrorType: errorExec,
-		}, ""))
+		if res.Err != nil {
+			switch res.Err.(type) {
+			case promql.ErrQueryCanceled:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					ErrorType: errorCanceled,
+				}, ""))
+			case promql.ErrQueryTimeout:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					ErrorType: errorTimeout,
+				}, ""))
+			case promql.ErrStorage:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					ErrorType: errorInternal,
+				}, ""))
+			}
+			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+				Status:    statusError,
+				Error:     fmt.Sprintf("query failed: %v", res.Err),
+				ErrorType: errorExec,
+			}, ""))
+		}
 		return
 	}
 
