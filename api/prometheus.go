@@ -86,7 +86,6 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 		return
 	}
 	defer q.Close()
-
 	vals, err := q.LabelValues(name)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
@@ -322,9 +321,14 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 
 // LabelValues returns all potential values for a label name.
 func (q *querier) LabelValues(name string) ([]string, error) {
-	result, err := q.MetricIndex.FindTagValues(q.OrgID, name, "", []string{}, 0, 100000)
+	expressions := []string{"name=~[a-zA-Z_][a-zA-Z0-9_]*$"}
+	if name == model.MetricNameLabel {
+		name = "name"
+		expressions = append(expressions, "name=~[a-zA-Z_:][a-zA-Z0-9_:]*$")
+	}
+	result, err := q.MetricIndex.FindTagValues(q.OrgID, name, "", expressions, 0, 100000)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to fetch label values for key:%s, error: %v", name, err)
 	}
 	if result == nil {
 		result = []string{}
