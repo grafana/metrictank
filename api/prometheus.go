@@ -36,13 +36,11 @@ const (
 type errorType string
 
 const (
-	errorNone        errorType = ""
-	errorTimeout     errorType = "timeout"
-	errorCanceled    errorType = "canceled"
-	errorExec        errorType = "execution"
-	errorBadData     errorType = "bad_data"
-	errorInternal    errorType = "internal"
-	errorUnavailable errorType = "unavailable"
+	errorTimeout  errorType = "timeout"
+	errorCanceled errorType = "canceled"
+	errorExec     errorType = "execution"
+	errorBadData  errorType = "bad_data"
+	errorInternal errorType = "internal"
 )
 
 type prometheusQueryResult struct {
