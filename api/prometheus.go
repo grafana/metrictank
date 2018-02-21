@@ -17,7 +17,6 @@ import (
 	"github.com/grafana/metrictank/util"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/timestamp"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -25,7 +24,6 @@ import (
 )
 
 type orgID string
-
 type status string
 
 const (
@@ -57,10 +55,11 @@ type prometheusQueryData struct {
 
 type querier struct {
 	Server
-	from  uint32
-	to    uint32
-	OrgID int
-	ctx   context.Context
+	from         uint32
+	to           uint32
+	OrgID        int
+	metadataOnly bool
+	ctx          context.Context
 }
 
 func (s *Server) labelValues(ctx *middleware.Context) {
@@ -210,13 +209,71 @@ func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusS
 		return
 	}
 
-	_, err = s.Querier(ctx.Req.Context(), timestamp.FromTime(start), timestamp.FromTime(end))
+	newCtx := context.WithValue(ctx.Req.Context(), orgID("org-id"), ctx.OrgId)
+
+	q := querier{
+		*s,
+		uint32(start.Unix()),
+		uint32(end.Unix()),
+		ctx.OrgId,
+		true,
+		newCtx,
+	}
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err)))
 		return
 	}
+	var matcherSets [][]*labels.Matcher
+	for _, s := range request.Match {
+		matchers, err := promql.ParseMetricSelector(s)
+		if err != nil {
+			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+				Status:    statusError,
+				Error:     fmt.Sprintf("query failed: %v", err),
+				ErrorType: errorBadData,
+			}, ""))
+			return
+		}
+		matcherSets = append(matcherSets, matchers)
+	}
 
-	response.Write(ctx, response.NewError(200, "test"))
+	var sets []storage.SeriesSet
+	for _, mset := range matcherSets {
+		s, err := q.Select(mset...)
+		if err != nil {
+			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+				Status:    statusError,
+				Error:     fmt.Sprintf("query failed: %v", err),
+				ErrorType: errorExec,
+			}, ""))
+			return
+		}
+		sets = append(sets, s)
+	}
+
+	set := storage.NewMergeSeriesSet(sets)
+	metrics := []labels.Labels{}
+	for set.Next() {
+		metrics = append(metrics, set.At().Labels())
+	}
+	if set.Err() != nil {
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Sprintf("query failed: %v", err),
+			ErrorType: errorExec,
+		}, ""))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200,
+		prometheusQueryResult{
+			Data:   metrics,
+			Status: statusSuccess,
+		},
+		"",
+	))
+
+	return
 }
 
 func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
@@ -225,6 +282,7 @@ func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier
 		uint32(mint / 1000), //Convert from NS to S
 		uint32(maxt / 1000), //TODO abstract this out into a separate function that is more accurate
 		ctx.Value(orgID("org-id")).(int),
+		false,
 		ctx,
 	}, nil
 }
@@ -266,12 +324,20 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		if matcher.Name == model.MetricNameLabel {
 			matcher.Name = "name"
 		}
-		expressions = append(expressions, fmt.Sprintf("%s%s%s", matcher.Name, matcher.Type, matcher.Value))
+		if matcher.Type == labels.MatchNotRegexp {
+			expressions = append(expressions, fmt.Sprintf("%s!=~%s", matcher.Name, matcher.Value))
+		} else {
+			expressions = append(expressions, fmt.Sprintf("%s%s%s", matcher.Name, matcher.Type, matcher.Value))
+		}
 	}
 
 	series, err := q.clusterFindByTag(q.ctx, q.OrgID, expressions, 0)
 	if err != nil {
 		return nil, err
+	}
+
+	if q.metadataOnly {
+		return BuildMetadataSeriesSet(series)
 	}
 
 	minFrom = util.Min(minFrom, q.from)
@@ -314,9 +380,7 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		return nil, err
 	}
 
-	seriesSet, err := SeriesToSeriesSet(out)
-
-	return seriesSet, err
+	return SeriesToSeriesSet(out)
 }
 
 // LabelValues returns all potential values for a label name.
@@ -361,6 +425,18 @@ func dataPointsToPrometheusSamplePairs(data []schema.Point) []model.SamplePair {
 		})
 	}
 	return samples
+}
+
+func BuildMetadataSeriesSet(seriesNames []Series) (*models.PrometheusSeriesSet, error) {
+	series := []storage.Series{}
+	for _, s := range seriesNames {
+		for _, metric := range s.Series {
+			for _, archive := range metric.Defs {
+				series = append(series, models.NewPrometheusSeries(buildTagSet(archive.NameWithTags()), []model.SamplePair{}))
+			}
+		}
+	}
+	return models.NewPrometheusSeriesSet(series), nil
 }
 
 // Turns graphite target name into prometheus graphite name

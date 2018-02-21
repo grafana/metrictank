@@ -30,7 +30,6 @@ type PrometheusSeriesSet struct {
 func NewPrometheusSeriesSet(series []storage.Series) *PrometheusSeriesSet {
 	return &PrometheusSeriesSet{
 		series: series,
-		cur:    0,
 	}
 }
 
