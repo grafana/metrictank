@@ -1,4 +1,4 @@
-package mdata
+package notifier
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/memorystore"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -46,7 +48,7 @@ func InitPersistNotifier(handlers ...NotifierHandler) {
 	notifierHandlers = handlers
 }
 
-func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
+func Handle(metrics mdata.Metrics, data []byte, idx idx.MetricIndex) {
 	version := uint8(data[0])
 	if version == uint8(PersistMessageBatchV1) {
 		batch := PersistMessageBatch{}
@@ -58,7 +60,7 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 		messagesReceived.Add(len(batch.SavedChunks))
 		for _, c := range batch.SavedChunks {
 			key := strings.Split(c.Key, "_")
-			var consolidator consolidation.Consolidator
+			consolidator := consolidation.None
 			var aggSpan int
 			if len(key) == 3 {
 				consolidator = consolidation.FromArchive(key[1])
@@ -70,17 +72,15 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 			}
 			// we only need to handle saves for series that we know about.
 			// if the series is not in the index, then we dont need to worry about it.
-			def, ok := idx.Get(key[0])
+			archive, ok := idx.Get(key[0])
 			if !ok {
 				log.Debug("notifier: skipping metric with id %s as it is not in the index", key[0])
 				continue
 			}
-			agg := metrics.GetOrCreate(key[0], def.Name, def.SchemaId, def.AggId)
-			if len(key) == 3 {
-				agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
-			} else {
-				agg.(*AggMetric).SyncChunkSaveState(c.T0)
-			}
+			agg := mdata.Aggregations.Get(archive.AggId)
+			schema := mdata.Schemas.Get(archive.SchemaId)
+			metric, _ := metrics.LoadOrStore(archive.Id, memorystore.NewAggMetric(archive.Id, schema.Retentions, schema.ReorderWindow, &agg))
+			metric.SyncChunkSaveState(c.T0, consolidator, uint32(aggSpan))
 		}
 	} else {
 		log.Error(3, "notifier: unknown version %d", version)

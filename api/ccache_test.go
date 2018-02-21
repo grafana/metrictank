@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata/memorystore"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -32,11 +33,15 @@ func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {
 	mockCache := cache.NewMockCache()
 	mockCache.DelMetricSeries = delSeries
 	mockCache.DelMetricArchives = delArchives
-	metrics := mdata.NewAggMetrics(store, mockCache, false, 0, 0, 0)
+	metrics := memorystore.NewAggMetrics(0, 0, 0)
+	mdata.MemoryStore = metrics
+	mdata.BackendStore = store
+	mdata.Cache = mockCache
 	srv.BindMemoryStore(metrics)
 	srv.BindCache(mockCache)
 
 	metricIndex := memory.New()
+	mdata.Idx = metricIndex
 	srv.BindMetricIndex(metricIndex)
 	return srv, mockCache
 }

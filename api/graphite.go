@@ -366,6 +366,8 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
+	case "raw":
+		response.Write(ctx, response.NewJson(200, nodes, request.Jsonp))
 	}
 }
 

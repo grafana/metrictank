@@ -16,7 +16,7 @@ import (
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
-	"gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 )
 
 // metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
@@ -345,15 +345,14 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 }
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
-	md := schema.MetricData{}
-	_, err := md.UnmarshalMsg(data)
+	point, err := msg.DataPointFromMsg(data)
 	if err != nil {
 		metricsDecodeErr.Inc()
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
 	metricsPerMessage.ValueUint32(1)
-	k.Handler.Process(&md, partition)
+	k.Handler.Process(point, partition)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

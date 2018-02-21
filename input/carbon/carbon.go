@@ -33,7 +33,6 @@ type Carbon struct {
 	handlerWaitGroup sync.WaitGroup
 	quit             chan struct{}
 	connTrack        *ConnTrack
-	intervalGetter   IntervalGetter
 }
 
 type ConnTrack struct {
@@ -100,10 +99,6 @@ func New() *Carbon {
 		addr:      addrT,
 		connTrack: NewConnTrack(),
 	}
-}
-
-func (c *Carbon) IntervalGetter(i IntervalGetter) {
-	c.intervalGetter = i
 }
 
 func (c *Carbon) Start(handler input.Handler, fatal chan struct{}) error {
@@ -186,9 +181,10 @@ func (c *Carbon) handle(conn net.Conn) {
 		}
 		nameSplits := strings.Split(string(key), ";")
 		md := &schema.MetricData{
+			Id:       nameSplits[0], //this is a temporary ID. It will be updated once we determine the Interval
 			Name:     nameSplits[0],
 			Metric:   nameSplits[0],
-			Interval: c.intervalGetter.GetInterval(nameSplits[0]),
+			Interval: -1,
 			Value:    val,
 			Unit:     "unknown",
 			Time:     int64(ts),
@@ -196,7 +192,7 @@ func (c *Carbon) handle(conn net.Conn) {
 			Tags:     nameSplits[1:],
 			OrgId:    1, // admin org
 		}
-		md.SetId()
+
 		metricsPerMessage.ValueUint32(1)
 		c.Handler.Process(md, int32(partitionId))
 	}

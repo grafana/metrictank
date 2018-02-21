@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/memorystore"
 	"github.com/kisielk/whisper-go/whisper"
 )
 
@@ -180,7 +180,7 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 // rollups of the raw data.
 func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes uint32) map[string][]whisper.Point {
 	out := make(map[string][]whisper.Point)
-	agg := mdata.NewAggregation()
+	agg := memorystore.NewAggregation()
 	currentBoundary := uint32(0)
 
 	flush := func() {
@@ -235,7 +235,7 @@ func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 		if inPoint.Timestamp == 0 {
 			continue
 		}
-		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
+		boundary := memorystore.AggBoundary(inPoint.Timestamp, outRes)
 		if boundary > uint32(*importUpTo) {
 			break
 		}

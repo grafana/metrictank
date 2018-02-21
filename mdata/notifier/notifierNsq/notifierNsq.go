@@ -9,7 +9,8 @@ import (
 	"github.com/bitly/go-hostpool"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/notifierNsq/instrumented_nsq"
+	"github.com/grafana/metrictank/mdata/notifier"
+	"github.com/grafana/metrictank/mdata/notifier/notifierNsq/instrumented_nsq"
 	"github.com/grafana/metrictank/stats"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -22,8 +23,8 @@ var (
 
 type NotifierNSQ struct {
 	instance string
-	in       chan mdata.SavedChunk
-	buf      []mdata.SavedChunk
+	in       chan notifier.SavedChunk
+	buf      []notifier.SavedChunk
 	metrics  mdata.Metrics
 	idx      idx.MetricIndex
 }
@@ -52,7 +53,7 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 	}
 	c := &NotifierNSQ{
 		instance: instance,
-		in:       make(chan mdata.SavedChunk),
+		in:       make(chan notifier.SavedChunk),
 		metrics:  metrics,
 		idx:      idx,
 	}
@@ -73,11 +74,11 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 }
 
 func (c *NotifierNSQ) HandleMessage(m *nsq.Message) error {
-	mdata.Handle(c.metrics, m.Body, c.idx)
+	notifier.Handle(c.metrics, m.Body, c.idx)
 	return nil
 }
 
-func (c *NotifierNSQ) Send(sc mdata.SavedChunk) {
+func (c *NotifierNSQ) Send(sc notifier.SavedChunk) {
 	c.in <- sc
 }
 
@@ -103,7 +104,7 @@ func (c *NotifierNSQ) flush() {
 		return
 	}
 
-	msg := mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
+	msg := notifier.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf}
 	c.buf = nil
 
 	go func() {
@@ -114,7 +115,7 @@ func (c *NotifierNSQ) flush() {
 			log.Fatal(4, "CLU nsq-cluster failed to marshal persistMessage to json.")
 		}
 		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
+		binary.Write(buf, binary.LittleEndian, uint8(notifier.PersistMessageBatchV1))
 		buf.Write(data)
 		messagesSize.Value(buf.Len())
 

@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/notifier"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
 	"github.com/hailocab/go-hostpool"
@@ -347,8 +348,8 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 
 				if err == nil {
 					success = true
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(cwr.Key, cwr.Chunk.T0)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0, 0, 0)
+					notifier.SendPersistMessage(cwr.Key, cwr.Chunk.T0)
 					log.Debug("CS: save complete. %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {

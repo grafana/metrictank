@@ -28,8 +28,10 @@ import (
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
-	"github.com/grafana/metrictank/mdata/notifierKafka"
-	"github.com/grafana/metrictank/mdata/notifierNsq"
+	"github.com/grafana/metrictank/mdata/memorystore"
+	"github.com/grafana/metrictank/mdata/notifier"
+	"github.com/grafana/metrictank/mdata/notifier/notifierKafka"
+	"github.com/grafana/metrictank/mdata/notifier/notifierNsq"
 	"github.com/grafana/metrictank/stats"
 	statsConfig "github.com/grafana/metrictank/stats/config"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
@@ -44,7 +46,7 @@ var (
 	startupTime  time.Time
 	gitHash      = "(none)"
 
-	metrics     *mdata.AggMetrics
+	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
 	apiServer   *api.Server
 	inputs      []input.Plugin
@@ -277,6 +279,8 @@ func main() {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
 	store.SetTracer(tracer)
+	mdata.BackendStore = store
+	mdata.DropFirstChunk = *dropFirstChunk
 
 	/***********************************
 		Initialize the Chunk Cache
@@ -284,11 +288,13 @@ func main() {
 	ccache := cache.NewCCache()
 	ccache.SetTracer(tracer)
 
+	mdata.Cache = ccache
+
 	/***********************************
 		Initialize our MemoryStore
 	***********************************/
-	metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, chunkMaxStale, metricMaxStale, gcInterval)
-
+	metrics = memorystore.NewAggMetrics(chunkMaxStale, metricMaxStale, gcInterval)
+	mdata.MemoryStore = metrics
 	/***********************************
 		Initialize our Inputs
 	***********************************/
@@ -333,6 +339,8 @@ func main() {
 		log.Fatal(4, "No metricIndex handlers enabled.")
 	}
 
+	mdata.Idx = metricIndex
+
 	/***********************************
 		Initialize our API server
 	***********************************/
@@ -361,7 +369,7 @@ func main() {
 	/***********************************
 		Initialize MetricPersist notifiers
 	***********************************/
-	handlers := make([]mdata.NotifierHandler, 0)
+	handlers := make([]notifier.NotifierHandler, 0)
 	if notifierKafka.Enabled {
 		// The notifierKafka handler will block here until it has processed the backlog of metricPersist messages.
 		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
@@ -372,17 +380,14 @@ func main() {
 		handlers = append(handlers, notifierNsq.New(*instance, metrics, metricIndex))
 	}
 
-	mdata.InitPersistNotifier(handlers...)
+	notifier.InitPersistNotifier(handlers...)
 
 	/***********************************
 		Start our inputs
 	***********************************/
 	pluginFatal := make(chan struct{})
 	for _, plugin := range inputs {
-		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
-			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
-		}
-		err = plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()), pluginFatal)
+		err = plugin.Start(input.NewDefaultHandler(plugin.Name()), pluginFatal)
 		if err != nil {
 			shutdown()
 			return

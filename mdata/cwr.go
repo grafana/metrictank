@@ -7,7 +7,7 @@ import (
 )
 
 type ChunkWriteRequest struct {
-	Metric    *AggMetric
+	Metric    Metric
 	Key       string
 	Chunk     *chunk.Chunk
 	TTL       uint32
@@ -15,6 +15,6 @@ type ChunkWriteRequest struct {
 	Span      uint32
 }
 
-func NewChunkWriteRequest(metric *AggMetric, key string, chunk *chunk.Chunk, ttl, span uint32, ts time.Time) ChunkWriteRequest {
+func NewChunkWriteRequest(metric Metric, key string, chunk *chunk.Chunk, ttl, span uint32, ts time.Time) ChunkWriteRequest {
 	return ChunkWriteRequest{metric, key, chunk, ttl, ts, span}
 }

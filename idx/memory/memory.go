@@ -206,21 +206,25 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+func (m *MemoryIdx) AddOrUpdate(data schema.DataPoint, partition int32) idx.Archive {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	existing, ok := m.defById[data.Id]
+	existing, ok := m.defById[data.GetId()]
 	if ok {
-		log.Debug("metricDef with id %s already in index.", data.Id)
-		existing.LastUpdate = data.Time
+		log.Debug("metricDef with id %s already in index.", data.GetId())
+		existing.LastUpdate = int64(data.GetTime())
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
 		return *existing
 	}
+	if data.Data() == nil {
+		// we cant index a DataPoint that doesnt contain of the MetricData metadata.
+		return idx.Archive{}
+	}
 
-	def := schema.MetricDefinitionFromMetricData(data)
+	def := schema.MetricDefinitionFromMetricData(data.Data())
 	def.Partition = partition
 	archive := m.add(def)
 	statMetricsActive.Inc()

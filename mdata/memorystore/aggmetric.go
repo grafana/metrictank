@@ -1,4 +1,4 @@
-package mdata
+package memorystore
 
 import (
 	"errors"
@@ -10,9 +10,44 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v1"
+)
+
+var (
+	// metric tank.chunk_operations.create is a counter of how many chunks are created
+	chunkCreate = stats.NewCounter32("tank.chunk_operations.create")
+
+	// metric tank.chunk_operations.clear is a counter of how many chunks are cleared (replaced by new chunks)
+	chunkClear = stats.NewCounter32("tank.chunk_operations.clear")
+
+	// metric tank.metrics_too_old is points that go back in time beyond the scope of the optional reorder window.
+	// these points will end up being dropped and lost.
+	metricsTooOld = stats.NewCounter32("tank.metrics_too_old")
+
+	// metric tank.add_to_closed_chunk is points received for the most recent chunk
+	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
+	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
+	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
+	addToClosedChunk = stats.NewCounter32("tank.add_to_closed_chunk")
+
+	// metric mem.to_iter is how long it takes to transform in-memory chunks to iterators
+	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")
+
+	// metric tank.persist is how long it takes to persist a chunk (and chunks preceding it)
+	// this is subject to backpressure from the store when the store's queue runs full
+	persistDuration = stats.NewLatencyHistogram15s32("tank.persist")
+
+	// metric recovered_errors.aggmetric.getaggregated.bad-consolidator is how many times we detected an GetAggregated call
+	// with an incorrect consolidator specified
+	badConsolidator = stats.NewCounter32("recovered_errors.aggmetric.getaggregated.bad-consolidator")
+
+	// metric recovered_errors.aggmetric.getaggregated.bad-aggspan is how many times we detected an GetAggregated call
+	// with an incorrect aggspan specified
+	badAggSpan = stats.NewCounter32("recovered_errors.aggmetric.getaggregated.bad-aggspan")
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -23,17 +58,15 @@ import (
 // in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
 // AggMetric is concurrency-safe
 type AggMetric struct {
-	store       Store
-	cachePusher cache.CachePusher
 	sync.RWMutex
 	Key             string
+	AlternateKey    string // if the metric.Interval is being autoDetected then metrics ingested will have this ID.
 	rob             *ReorderBuffer
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*chunk.Chunk
 	aggregators     []*Aggregator
-	dropFirstChunk  bool
 	firstChunkT0    uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
@@ -45,20 +78,17 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, reorderWindow uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
+func NewAggMetric(key string, retentions conf.Retentions, reorderWindow uint32, agg *conf.Aggregation) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
 
 	m := AggMetric{
-		cachePusher:    cachePusher,
-		store:          store,
-		Key:            key,
-		ChunkSpan:      ret.ChunkSpan,
-		NumChunks:      ret.NumChunks,
-		Chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk: dropFirstChunk,
-		ttl:            uint32(ret.MaxRetention()),
+		Key:       key,
+		ChunkSpan: ret.ChunkSpan,
+		NumChunks: ret.NumChunks,
+		Chunks:    make([]*chunk.Chunk, 0, ret.NumChunks),
+		ttl:       uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
@@ -68,14 +98,18 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retent
 	}
 
 	for _, ret := range retentions[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk))
+		m.aggregators = append(m.aggregators, NewAggregator(key, ret, *agg))
 	}
 
 	return &m
 }
 
 // Sync the saved state of a chunk by its T0.
-func (a *AggMetric) SyncChunkSaveState(ts uint32) {
+func (a *AggMetric) SyncChunkSaveState(ts uint32, consolidator consolidation.Consolidator, aggSpan uint32) {
+	if consolidator != consolidation.None {
+		a.syncAggregatedChunkSaveState(ts, consolidator, aggSpan)
+		return
+	}
 	a.Lock()
 	defer a.Unlock()
 	if ts > a.lastSaveFinish {
@@ -84,13 +118,13 @@ func (a *AggMetric) SyncChunkSaveState(ts uint32) {
 	if ts > a.lastSaveStart {
 		a.lastSaveStart = ts
 	}
-	if LogLevel < 2 {
+	if mdata.LogLevel < 2 {
 		log.Debug("AM metric %s at chunk T0=%d has been saved.", a.Key, ts)
 	}
 }
 
 // Sync the saved state of a chunk by its T0.
-func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consolidation.Consolidator, aggSpan uint32) {
+func (a *AggMetric) syncAggregatedChunkSaveState(ts uint32, consolidator consolidation.Consolidator, aggSpan uint32) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -101,27 +135,27 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 				panic("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
 				if a.cntMetric != nil {
-					a.cntMetric.SyncChunkSaveState(ts)
+					a.cntMetric.SyncChunkSaveState(ts, consolidation.None, 0)
 				}
 				return
 			case consolidation.Min:
 				if a.minMetric != nil {
-					a.minMetric.SyncChunkSaveState(ts)
+					a.minMetric.SyncChunkSaveState(ts, consolidation.None, 0)
 				}
 				return
 			case consolidation.Max:
 				if a.maxMetric != nil {
-					a.maxMetric.SyncChunkSaveState(ts)
+					a.maxMetric.SyncChunkSaveState(ts, consolidation.None, 0)
 				}
 				return
 			case consolidation.Sum:
 				if a.sumMetric != nil {
-					a.sumMetric.SyncChunkSaveState(ts)
+					a.sumMetric.SyncChunkSaveState(ts, consolidation.None, 0)
 				}
 				return
 			case consolidation.Lst:
 				if a.lstMetric != nil {
-					a.lstMetric.SyncChunkSaveState(ts)
+					a.lstMetric.SyncChunkSaveState(ts, consolidation.None, 0)
 				}
 				return
 			default:
@@ -138,7 +172,7 @@ func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
 	return a.Chunks[pos]
 }
 
-func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (Result, error) {
+func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (mdata.Result, error) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
@@ -148,12 +182,12 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 				err := errors.New("internal error: AggMetric.GetAggregated(): cannot get an archive for no consolidation")
 				log.Error(3, "AM: %s", err.Error())
 				badConsolidator.Inc()
-				return Result{}, err
+				return mdata.Result{}, err
 			case consolidation.Avg:
 				err := errors.New("internal error: AggMetric.GetAggregated(): avg consolidator has no matching Archive(). you need sum and cnt")
 				log.Error(3, "AM: %s", err.Error())
 				badConsolidator.Inc()
-				return Result{}, err
+				return mdata.Result{}, err
 			case consolidation.Cnt:
 				agg = a.cntMetric
 			case consolidation.Lst:
@@ -168,10 +202,10 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 				err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
 				log.Error(3, "AM: %s", err.Error())
 				badConsolidator.Inc()
-				return Result{}, err
+				return mdata.Result{}, err
 			}
 			if agg == nil {
-				return Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
+				return mdata.Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
 			}
 			return agg.Get(from, to), nil
 		}
@@ -179,16 +213,16 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown aggSpan %d", aggSpan)
 	log.Error(3, "AM: %s", err.Error())
 	badAggSpan.Inc()
-	return Result{}, err
+	return mdata.Result{}, err
 }
 
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
 // also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
-func (a *AggMetric) Get(from, to uint32) Result {
+func (a *AggMetric) Get(from, to uint32) mdata.Result {
 	pre := time.Now()
-	if LogLevel < 2 {
-		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
+	if mdata.LogLevel < 2 {
+		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, mdata.TS(from), mdata.TS(to), to-from-1)
 	}
 	if from >= to {
 		panic("invalid request. to must > from")
@@ -196,7 +230,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 	a.RLock()
 	defer a.RUnlock()
 
-	result := Result{
+	result := mdata.Result{
 		Oldest: math.MaxInt32,
 	}
 
@@ -212,7 +246,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 
 	if len(a.Chunks) == 0 {
 		// we dont have any data yet.
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
 		return result
@@ -232,7 +266,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		//   only aware of older data and not the newer data in cassandra. this is unlikely
 		//   and it's better to not serve this scenario well in favor of the above case.
 		//   seems like a fair tradeoff anyway that you have to refill all the way first.
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
 		result.Oldest = from
@@ -278,7 +312,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
 		result.Oldest = oldestChunk.T0
@@ -343,7 +377,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 // this function must only be called while holding the lock
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM %s pushing %d,%f to aggregator %d", a.Key, ts, val, agg.span)
 		}
 		agg.Add(ts, val)
@@ -352,7 +386,7 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	// push into cache
-	go a.cachePusher.CacheIfHot(
+	go mdata.Cache.CacheIfHot(
 		a.Key,
 		0,
 		*chunk.NewBareIterGen(
@@ -379,9 +413,9 @@ func (a *AggMetric) persist(pos int) {
 	}
 
 	// create an array of chunks that need to be sent to the writeQueue.
-	pending := make([]*ChunkWriteRequest, 1)
+	pending := make([]*mdata.ChunkWriteRequest, 1)
 	// add the current chunk to the list of chunks to send to the writeQueue
-	pending[0] = &ChunkWriteRequest{
+	pending[0] = &mdata.ChunkWriteRequest{
 		Metric:    a,
 		Key:       a.Key,
 		Span:      a.ChunkSpan,
@@ -399,10 +433,10 @@ func (a *AggMetric) persist(pos int) {
 	}
 	previousChunk := a.Chunks[previousPos]
 	for (previousChunk.T0 < chunk.T0) && (a.lastSaveStart < previousChunk.T0) {
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
 		}
-		pending = append(pending, &ChunkWriteRequest{
+		pending = append(pending, &mdata.ChunkWriteRequest{
 			Metric:    a,
 			Key:       a.Key,
 			Span:      a.ChunkSpan,
@@ -420,7 +454,7 @@ func (a *AggMetric) persist(pos int) {
 	// Every chunk with a T0 <= this chunks' T0 is now either saved, or in the writeQueue.
 	a.lastSaveStart = chunk.T0
 
-	if LogLevel < 2 {
+	if mdata.LogLevel < 2 {
 		log.Debug("AM persist(): sending %d chunks to write queue", len(pending))
 	}
 
@@ -434,18 +468,31 @@ func (a *AggMetric) persist(pos int) {
 	// last-to-first ensuring that older data is added to the store
 	// before newer data.
 	for pendingChunk >= 0 {
-		if LogLevel < 2 {
+		if mdata.LogLevel < 2 {
 			log.Debug("AM persist(): sealing chunk %d/%d (%s:%d) and adding to write queue.", pendingChunk, len(pending), a.Key, chunk.T0)
 		}
-		a.store.Add(pending[pendingChunk])
+		mdata.BackendStore.Add(pending[pendingChunk])
 		pendingChunk--
 	}
 	persistDuration.Value(time.Now().Sub(pre))
 	return
 }
 
+func (a *AggMetric) Add(p schema.DataPoint, partition int32) {
+	if p.GetId() == a.AlternateKey {
+		switch p.(type) {
+		case *schema.MetricData:
+			p.(*schema.MetricData).Id = a.Key
+		case *schema.MetricPoint:
+			p.(*schema.MetricPoint).Id = a.Key
+		}
+	}
+	mdata.Idx.AddOrUpdate(p, partition)
+	a.AddPoint(p.Point())
+}
+
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
-func (a *AggMetric) Add(ts uint32, val float64) {
+func (a *AggMetric) AddPoint(ts uint32, val float64) {
 	a.Lock()
 	defer a.Unlock()
 
@@ -486,7 +533,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 		log.Debug("AM %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
 		a.lastWrite = uint32(time.Now().Unix())
-		if a.dropFirstChunk {
+		if mdata.DropFirstChunk {
 			a.lastSaveStart = t0
 			a.lastSaveFinish = t0
 		}
@@ -527,7 +574,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		a.pushToCache(currentChunk)
 		// If we are a primary node, then add the chunk to the write queue to be saved to Cassandra
 		if cluster.Manager.IsPrimary() {
-			if LogLevel < 2 {
+			if mdata.LogLevel < 2 {
 				log.Debug("AM persist(): node is primary, saving chunk. %s T0: %d", a.Key, currentChunk.T0)
 			}
 			// persist the chunk. If the writeQueue is full, then this will block.
@@ -605,7 +652,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 			log.Debug("Found stale Chunk, adding end-of-stream bytes. key: %s T0: %d", a.Key, currentChunk.T0)
 			currentChunk.Finish()
 			if cluster.Manager.IsPrimary() {
-				if LogLevel < 2 {
+				if mdata.LogLevel < 2 {
 					log.Debug("AM persist(): node is primary, saving chunk. %s T0: %d", a.Key, currentChunk.T0)
 				}
 				// persist the chunk. If the writeQueue is full, then this will block.

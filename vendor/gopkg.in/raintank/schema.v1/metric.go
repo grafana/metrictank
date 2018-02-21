@@ -30,7 +30,45 @@ type PartitionedMetric interface {
 	KeyBySeries([]byte) []byte
 }
 
+type DataPoint interface {
+	GetId() string
+	Point() (uint32, float64)
+	GetValue() float64
+	GetTime() uint32
+	Validate() error
+	Data() *MetricData
+}
+
 //go:generate msgp
+
+type MetricPoint struct {
+	Id    string
+	Time  uint32
+	Value float64
+}
+
+func (m *MetricPoint) Point() (uint32, float64) {
+	return m.Time, m.Value
+}
+func (m *MetricPoint) GetTime() uint32 {
+	return m.Time
+}
+
+func (m *MetricPoint) GetValue() float64 {
+	return m.Value
+}
+
+func (m *MetricPoint) GetId() string {
+	return m.Id
+}
+
+func (m *MetricPoint) Validate() error {
+	return nil
+}
+
+func (m *MetricPoint) Data() *MetricData {
+	return nil
+}
 
 // MetricData contains all metric metadata (some as fields, some as tags) and a datapoint
 type MetricData struct {
@@ -44,6 +82,26 @@ type MetricData struct {
 	Time     int64    `json:"time"`
 	Mtype    string   `json:"mtype"`
 	Tags     []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+}
+
+func (m *MetricData) Data() *MetricData {
+	return m
+}
+
+func (m *MetricData) Point() (uint32, float64) {
+	return uint32(m.Time), m.Value
+}
+
+func (m *MetricData) GetTime() uint32 {
+	return uint32(m.Time)
+}
+
+func (m *MetricData) GetValue() float64 {
+	return m.Value
+}
+
+func (m *MetricData) GetId() string {
+	return m.Id
 }
 
 func (m *MetricData) Validate() error {

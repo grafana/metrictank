@@ -12,14 +12,15 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/notifier"
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type NotifierKafka struct {
 	instance  string
-	in        chan mdata.SavedChunk
-	buf       []mdata.SavedChunk
+	in        chan notifier.SavedChunk
+	buf       []notifier.SavedChunk
 	wg        sync.WaitGroup
 	idx       idx.MetricIndex
 	metrics   mdata.Metrics
@@ -57,7 +58,7 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 
 	c := NotifierKafka{
 		instance:  instance,
-		in:        make(chan mdata.SavedChunk),
+		in:        make(chan notifier.SavedChunk),
 		idx:       idx,
 		metrics:   metrics,
 		bPool:     util.NewBufferPool(),
@@ -147,7 +148,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			if mdata.LogLevel < 2 {
 				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			}
-			mdata.Handle(c.metrics, msg.Value, c.idx)
+			notifier.Handle(c.metrics, msg.Value, c.idx)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
@@ -197,7 +198,7 @@ func (c *NotifierKafka) Stop() {
 	}()
 }
 
-func (c *NotifierKafka) Send(sc mdata.SavedChunk) {
+func (c *NotifierKafka) Send(sc notifier.SavedChunk) {
 	c.in <- sc
 }
 
@@ -226,7 +227,7 @@ func (c *NotifierKafka) flush() {
 	// In order to correctly route the saveMessages to the correct partition,
 	// we cant send them in batches anymore.
 	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
-	var pMsg mdata.PersistMessageBatch
+	var pMsg notifier.PersistMessageBatch
 	for i, msg := range c.buf {
 		def, ok := c.idx.Get(strings.SplitN(msg.Key, "_", 2)[0])
 		if !ok {
@@ -234,9 +235,9 @@ func (c *NotifierKafka) flush() {
 			continue
 		}
 		buf := bytes.NewBuffer(c.bPool.Get())
-		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
+		binary.Write(buf, binary.LittleEndian, uint8(notifier.PersistMessageBatchV1))
 		encoder := json.NewEncoder(buf)
-		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
+		pMsg = notifier.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
 		err := encoder.Encode(&pMsg)
 		if err != nil {
 			log.Fatal(4, "kafka-cluster failed to marshal persistMessage to json.")
