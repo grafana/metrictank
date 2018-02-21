@@ -1,4 +1,4 @@
-package mdata
+package memorystore
 
 import (
 	"reflect"

@@ -1,10 +1,9 @@
-package mdata
+package memorystore
 
 import (
 	"fmt"
 
 	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/mdata/cache"
 )
 
 // AggBoundary returns ts if it is a boundary, or the next boundary otherwise.
@@ -31,7 +30,7 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool) *Aggregator {
+func NewAggregator(key string, ret conf.Retention, agg conf.Aggregation) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
 		panic("NewAggregator called without aggregations. this should never happen")
 	}
@@ -45,26 +44,26 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret c
 		switch agg {
 		case conf.Avg:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.sumMetric = NewAggMetric(fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 			if aggregator.cntMetric == nil {
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_cnt_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.cntMetric = NewAggMetric(fmt.Sprintf("%s_cnt_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 		case conf.Sum:
 			if aggregator.sumMetric == nil {
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.sumMetric = NewAggMetric(fmt.Sprintf("%s_sum_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 		case conf.Lst:
 			if aggregator.lstMetric == nil {
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_lst_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.lstMetric = NewAggMetric(fmt.Sprintf("%s_lst_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 		case conf.Max:
 			if aggregator.maxMetric == nil {
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_max_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.maxMetric = NewAggMetric(fmt.Sprintf("%s_max_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 		case conf.Min:
 			if aggregator.minMetric == nil {
-				aggregator.minMetric = NewAggMetric(store, cachePusher, fmt.Sprintf("%s_min_%d", key, span), conf.Retentions{ret}, 0, nil, dropFirstChunk)
+				aggregator.minMetric = NewAggMetric(fmt.Sprintf("%s_min_%d", key, span), conf.Retentions{ret}, 0, nil)
 			}
 		}
 	}
@@ -74,19 +73,19 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key string, ret c
 // flush adds points to the aggregation-series and resets aggregation state
 func (agg *Aggregator) flush() {
 	if agg.minMetric != nil {
-		agg.minMetric.Add(agg.currentBoundary, agg.agg.Min)
+		agg.minMetric.AddPoint(agg.currentBoundary, agg.agg.Min)
 	}
 	if agg.maxMetric != nil {
-		agg.maxMetric.Add(agg.currentBoundary, agg.agg.Max)
+		agg.maxMetric.AddPoint(agg.currentBoundary, agg.agg.Max)
 	}
 	if agg.sumMetric != nil {
-		agg.sumMetric.Add(agg.currentBoundary, agg.agg.Sum)
+		agg.sumMetric.AddPoint(agg.currentBoundary, agg.agg.Sum)
 	}
 	if agg.cntMetric != nil {
-		agg.cntMetric.Add(agg.currentBoundary, agg.agg.Cnt)
+		agg.cntMetric.AddPoint(agg.currentBoundary, agg.agg.Cnt)
 	}
 	if agg.lstMetric != nil {
-		agg.lstMetric.Add(agg.currentBoundary, agg.agg.Lst)
+		agg.lstMetric.AddPoint(agg.currentBoundary, agg.agg.Lst)
 	}
 	//msg := fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 	agg.agg.Reset()

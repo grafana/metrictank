@@ -9,3 +9,8 @@ const (
 	FormatMetricDataArrayJson Format = iota
 	FormatMetricDataArrayMsgp
 )
+
+const (
+	FormatMetricData Format = iota
+	FormatMetricPoint
+)

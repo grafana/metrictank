@@ -264,9 +264,13 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+func (c *CasIdx) AddOrUpdate(data schema.DataPoint, partition int32) idx.Archive {
 	pre := time.Now()
-	existing, inMemory := c.MemoryIdx.Get(data.Id)
+	existing, inMemory := c.MemoryIdx.Get(data.GetId())
+	if !inMemory && data.Data() == nil {
+		// DataPoint does not have all of the metricData info. So we cant index it.
+		return idx.Archive{}
+	}
 	archive := c.MemoryIdx.AddOrUpdate(data, partition)
 	stat := statUpdateDuration
 	if !inMemory {
@@ -294,13 +298,6 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 	if archive.LastSave >= (now - updateInterval32) {
 		stat.Value(time.Since(pre))
 		return archive
-	}
-
-	// This is just a safety precaution to prevent corrupt index entries.
-	// This ensures that the index entry always contains the correct metricDefinition data.
-	if inMemory {
-		archive.MetricDefinition = *schema.MetricDefinitionFromMetricData(data)
-		archive.MetricDefinition.Partition = partition
 	}
 
 	// if the entry has not been saved for 1.5x updateInterval

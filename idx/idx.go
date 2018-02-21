@@ -101,7 +101,7 @@ type MetricIndex interface {
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(*schema.MetricData, int32) Archive
+	AddOrUpdate(schema.DataPoint, int32) Archive
 
 	// Get returns the archive for the requested id.
 	Get(string) (Archive, bool)

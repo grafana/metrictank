@@ -1,0 +1,82 @@
+version: '2'
+
+services:
+  metrictank:
+    hostname: metrictank
+    image: grafana/metrictank
+    ports:
+     - "6060:6060"
+     - "2003:2003"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+      - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+    environment:
+     WAIT_HOSTS: cassandra:9042,tsdb-gw:2003
+     WAIT_TIMEOUT: 120
+    links:
+     - cassandra
+     - tsdb-gw
+
+  tsdb-gw:
+    hostname: tsdb-gw
+    image: raintank/tsdb-gw
+    ports:
+      - "8081:80"
+    volumes:
+      - ./tsdb-gw:/etc/raintank
+    environment:
+     WAIT_HOSTS: kafka:9092
+     WAIT_TIMEOUT: 60
+    links:
+     - kafka
+
+  kafka:
+    hostname: kafka
+    image: raintank/kafka
+    environment:
+      ADVERTISED_HOST: kafka
+      NUM_PARTITIONS: 8
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "9999:9999"
+    volumes:
+      - /tmp/kafka-logs
+
+  cassandra:
+    hostname: cassandra
+    image: cassandra:3.11
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    ports:
+     - "9042:9042"
+
+  graphite:
+    hostname: graphite
+    image: raintank/graphite-mt
+    ports:
+     - "8080:80"
+    environment:
+      GRAPHITE_CLUSTER_SERVERS: metrictank:6060
+      GRAPHITE_STATSD_HOST: statsd
+      SINGLE_TENANT: yes
+      WSGI_PROCESSES: 4
+      WSGI_THREADS: 25
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+  statsd:
+    hostname: statsd
+    image:  jaconel/statsd
+    ports:
+     - "8125:8125/udp"
+    environment:
+      GRAPHITE_GLOBAL_PREFIX: not_very_secret_key.stats
+      GRAPHITE_PORT_2003_TCP_ADD: tsdb-gw

@@ -57,7 +57,14 @@ func newInputOOOFinder(format string) *inputOOOFinder {
 	}
 }
 
-func (ip *inputOOOFinder) Process(metric *schema.MetricData, partition int32) {
+func (ip *inputOOOFinder) Process(point schema.DataPoint, partition int32) {
+	metric := point.Data()
+	// we can only print full metricData messages.
+	// TODO: we should update this tool to support printing the optimized
+	// schame.MetricPoint as well.
+	if metric == nil {
+		return
+	}
 	if *prefix != "" && !strings.HasPrefix(metric.Metric, *prefix) {
 		return
 	}

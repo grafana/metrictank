@@ -147,7 +147,7 @@ type GraphiteTagDelSeriesResp struct {
 type GraphiteFind struct {
 	FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`
-	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle)"`
+	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle,raw)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
 }
 

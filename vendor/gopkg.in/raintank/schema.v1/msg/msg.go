@@ -91,3 +91,64 @@ func CreateMsg(metrics []*schema.MetricData, id int64, version Format) ([]byte, 
 	}
 	return buf.Bytes(), nil
 }
+
+// Marshal a DataPoint to byte stream
+func DataPointToMsg(p schema.DataPoint, b []byte) ([]byte, error) {
+	buf := bytes.NewBuffer(b)
+	switch p.(type) {
+	case *schema.MetricData:
+		err := binary.Write(buf, binary.LittleEndian, uint8(FormatMetricData))
+		if err != nil {
+			return nil, fmt.Errorf(errFmtBinWriteFailed, err)
+		}
+		msg, err := p.(*schema.MetricData).MarshalMsg(nil)
+		if err != nil {
+			return nil, fmt.Errorf(errFmtBinWriteFailed, err)
+		}
+		buf.Write(msg)
+	case *schema.MetricPoint:
+		err := binary.Write(buf, binary.LittleEndian, uint8(FormatMetricPoint))
+		if err != nil {
+			return nil, fmt.Errorf(errFmtBinWriteFailed, err)
+		}
+		msg, err := p.(*schema.MetricPoint).MarshalMsg(nil)
+		if err != nil {
+			return nil, fmt.Errorf(errFmtBinWriteFailed, err)
+		}
+		buf.Write(msg)
+	default:
+		return nil, fmt.Errorf("unknown DataPoint type")
+	}
+
+	return buf.Bytes(), nil
+}
+
+func DataPointFromMsg(b []byte) (schema.DataPoint, error) {
+	switch Format(b[0]) {
+	case FormatMetricPoint:
+		p := &schema.MetricPoint{}
+		_, err := p.UnmarshalMsg(b[1:])
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
+	case FormatMetricData:
+		p := &schema.MetricData{}
+		_, err := p.UnmarshalMsg(b[1:])
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
+	default:
+		// if format is not known, lets assume that this is a MetricData message with no version byte
+		p := &schema.MetricData{}
+		_, err := p.UnmarshalMsg(b)
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+
+	// this will never be reached
+	return nil, fmt.Errorf(errFmtUnknownFormat, Format(b[0]))
+}

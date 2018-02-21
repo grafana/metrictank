@@ -1,7 +1,16 @@
-package mdata
+package memorystore
 
 import (
+	"github.com/grafana/metrictank/stats"
 	"gopkg.in/raintank/schema.v1"
+)
+
+var (
+	// metric tank.metrics_reordered is the number of points received that are going back in time, but are still
+	// within the reorder window. in such a case they will be inserted in the correct order.
+	// E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
+	// ts is not older than the 60th datapoint counting from the newest.
+	metricsReordered = stats.NewCounter32("tank.metrics_reordered")
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.
