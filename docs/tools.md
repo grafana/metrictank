@@ -438,6 +438,12 @@ Flags:
     	username for authentication (default "cassandra")
   -cql-protocol-version int
     	cql protocol version to use (default 4)
+  -end-timestamp int
+    	timestamp at which to stop, defaults to int max (default 2147483647)
+  -start-timestamp int
+    	timestamp at which to start, defaults to 0
+  -threads int
+    	number of workers to use to process data (default 1)
   -verbose
     	show every record being processed
 ```
