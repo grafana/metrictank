@@ -5,8 +5,20 @@ cd ${DIR}/../..
 
 VERSION=`git describe --abbrev=7`
 
+echo
+echo "### docker login to us.gcr.io"
+echo
+
 docker login -u _json_key -p "$GOOGLE_AUTH" https://us.gcr.io
-echo docker push us.gcr.io/metrictank-gcr/metrictank:$VERSION
+
+echo
+echo "### docker push us.gcr.io/metrictank-gcr/metrictank:$VERSION"
+echo
+
 docker push us.gcr.io/metrictank-gcr/metrictank:$VERSION || exit 2
-echo docker push us.gcr.io/metrictank-gcr/metrictank:latest
+
+echo
+echo "### docker push us.gcr.io/metrictank-gcr/metrictank:latest"
+echo
+
 docker push us.gcr.io/metrictank-gcr/metrictank:latest

@@ -6,6 +6,10 @@ log () {
 
 VERSION=`git describe --abbrev=7`
 
+echo
+echo "### extra-qa.sh"
+echo
+
 # try returns if did not succeed and is retryable
 # exits in all other cases
 try () {

@@ -5,7 +5,14 @@ cd ${DIR}/../..
 
 VERSION=`git describe --abbrev=7`
 
-echo docker push grafana/metrictank:$VERSION
+echo
+echo "### docker push grafana/metrictank:$VERSION"
+echo
+
 docker push grafana/metrictank:$VERSION || exit 2
-echo docker push grafana/metrictank:latest
+
+echo
+echo "### docker push grafana/metrictank:latest"
+echo
+
 docker push grafana/metrictank:latest
