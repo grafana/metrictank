@@ -10,12 +10,12 @@ if ! mkdir -p $MT_PROFTRIGGER_PATH; then
 fi
 
 # set offsets
-if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xoldest" ]; then
-  MT_KAFKA_MDM_IN_OFFSET=$(/getOffset.py $MT_KAFKA_MDM_IN_TOPICS)
+if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xauto" ]; then
+  export MT_KAFKA_MDM_IN_OFFSET=$(/getOffset.py $MT_KAFKA_MDM_IN_TOPICS)
 fi
 
-if [ x"$MT_KAFKA_CLUSTER_OFFSET" = "xoldest" ]; then
-  MT_KAFKA_CLUSTER_OFFSET=$(/getOffset.py $MT_KAFKA_CLUSTER_TOPIC)
+if [ x"$MT_KAFKA_CLUSTER_OFFSET" = "xauto" ]; then
+  export MT_KAFKA_CLUSTER_OFFSET=$(/getOffset.py $MT_KAFKA_CLUSTER_TOPIC)
 fi
 
 # set cluster PEERs
