@@ -45,7 +45,7 @@ type prometheusQueryResult struct {
 	Status    status      `json:"status"`
 	Data      interface{} `json:"data,omitempty"`
 	ErrorType errorType   `json:"errorType,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Error     error       `json:"error,omitempty"`
 }
 
 type prometheusQueryData struct {
@@ -68,7 +68,7 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 	if !model.LabelNameRE.MatchString(name) {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("unable to create label name: %v", name),
+			Error:     fmt.Errorf("unable to create label name: %v", name),
 			ErrorType: errorExec,
 		}, ""))
 		return
@@ -79,7 +79,7 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("unable to create queryable: %v", err),
+			Error:     fmt.Errorf("unable to create queryable: %v", err),
 			ErrorType: errorExec,
 		}, ""))
 		return
@@ -89,7 +89,7 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("query failed: %v", err),
+			Error:     fmt.Errorf("query failed: %v", err),
 			ErrorType: errorExec,
 		}, ""))
 		return
@@ -104,7 +104,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("could not parse start time: %v", err),
+			Error:     fmt.Errorf("could not parse start time: %v", err),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -114,7 +114,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("could not parse end time: %v", err),
+			Error:     fmt.Errorf("could not parse end time: %v", err),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -124,7 +124,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("could not parse step duration: %v", err),
+			Error:     fmt.Errorf("could not parse step duration: %v", err),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -133,7 +133,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	if step <= 0 {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("step value is less than or equal to zero: %v", step),
+			Error:     fmt.Errorf("step value is less than or equal to zero: %v", step),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -144,7 +144,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("query failed: %v", err),
+			Error:     fmt.Errorf("query failed: %v", err),
 			ErrorType: errorExec,
 		}, ""))
 		return
@@ -159,25 +159,25 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 			case promql.ErrQueryCanceled:
 				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 					Status:    statusError,
-					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					Error:     fmt.Errorf("query failed: %v", res.Err),
 					ErrorType: errorCanceled,
 				}, ""))
 			case promql.ErrQueryTimeout:
 				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 					Status:    statusError,
-					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					Error:     fmt.Errorf("query failed: %v", res.Err),
 					ErrorType: errorTimeout,
 				}, ""))
 			case promql.ErrStorage:
 				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 					Status:    statusError,
-					Error:     fmt.Sprintf("query failed: %v", res.Err),
+					Error:     fmt.Errorf("query failed: %v", res.Err),
 					ErrorType: errorInternal,
 				}, ""))
 			}
 			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 				Status:    statusError,
-				Error:     fmt.Sprintf("query failed: %v", res.Err),
+				Error:     fmt.Errorf("query failed: %v", res.Err),
 				ErrorType: errorExec,
 			}, ""))
 		}
@@ -229,7 +229,7 @@ func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusS
 		if err != nil {
 			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 				Status:    statusError,
-				Error:     fmt.Sprintf("query failed: %v", err),
+				Error:     fmt.Errorf("query failed: %v", err),
 				ErrorType: errorBadData,
 			}, ""))
 			return
@@ -243,7 +243,7 @@ func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusS
 		if err != nil {
 			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 				Status:    statusError,
-				Error:     fmt.Sprintf("query failed: %v", err),
+				Error:     fmt.Errorf("query failed: %v", err),
 				ErrorType: errorExec,
 			}, ""))
 			return
@@ -259,7 +259,7 @@ func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusS
 	if set.Err() != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Sprintf("query failed: %v", err),
+			Error:     fmt.Errorf("query failed: %v", err),
 			ErrorType: errorExec,
 		}, ""))
 		return
