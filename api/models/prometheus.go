@@ -29,17 +29,18 @@ type PrometheusSeriesSet struct {
 
 func NewPrometheusSeriesSet(series []storage.Series) *PrometheusSeriesSet {
 	return &PrometheusSeriesSet{
+		cur:    -1,
 		series: series,
 	}
 }
 
 func (p *PrometheusSeriesSet) Next() bool {
 	p.cur++
-	return p.cur-1 < len(p.series)
+	return p.cur < len(p.series)
 }
 
 func (p *PrometheusSeriesSet) At() storage.Series {
-	return p.series[p.cur-1]
+	return p.series[p.cur]
 }
 
 func (p *PrometheusSeriesSet) Err() error {
