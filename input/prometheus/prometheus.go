@@ -102,7 +102,7 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 					md := &schema.MetricData{
 						Name:     name,
 						Metric:   name,
-						Interval: 0,
+						Interval: 15,
 						Value:    sample.Value,
 						Unit:     "unknown",
 						Time:     (sample.Timestamp / 1000),
