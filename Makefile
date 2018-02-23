@@ -28,3 +28,7 @@ all:
 	$(MAKE) bin
 	$(MAKE) docker
 	$(MAKE) qa
+
+clean:
+	rm build/*
+	rm scripts/build/*
