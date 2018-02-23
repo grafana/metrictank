@@ -62,7 +62,7 @@ type querier struct {
 	ctx          context.Context
 }
 
-func (s *Server) labelValues(ctx *middleware.Context) {
+func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
 	if !model.LabelNameRE.MatchString(name) {
@@ -99,7 +99,7 @@ func (s *Server) labelValues(ctx *middleware.Context) {
 	return
 }
 
-func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQueryRange) {
+func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.PrometheusQueryRange) {
 	start, err := parseTime(request.Start)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
@@ -196,7 +196,7 @@ func (s *Server) queryRange(ctx *middleware.Context, request models.PrometheusQu
 	))
 }
 
-func (s *Server) querySeries(ctx *middleware.Context, request models.PrometheusSeriesQuery) {
+func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.PrometheusSeriesQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse start time: %v", err)))
