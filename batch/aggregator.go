@@ -84,19 +84,16 @@ func Max(in []schema.Point) float64 {
 }
 
 func Mult(in []schema.Point) float64 {
-	valid := false
-	mult := float64(1)
-	for _, term := range in {
-		if math.IsNaN(term.Val) {
-			// NaN * anything equals NaN()
-			mult = math.NaN()
-			break
-		}
-		valid = true
-		mult *= term.Val
+	if len(in) == 0 {
+		return math.NaN()
 	}
-	if !valid {
-		mult = math.NaN()
+	mult := float64(1)
+	for _, fact := range in {
+		if math.IsNaN(fact.Val) {
+			// NaN * anything equals NaN()
+			return math.NaN()
+		}
+		mult *= fact.Val
 	}
 	return mult
 }
@@ -139,26 +136,41 @@ func Diff(in []schema.Point) float64 {
 
 func StdDev(in []schema.Point) float64 {
 	avg := Avg(in)
-	if !math.IsNaN(avg) {
-		num := float64(0)
-		totalDeviationSquared := float64(0)
-		for i := 0; i < len(in); i++ {
-			p := in[i].Val
-			if !math.IsNaN(p) {
-				num++
-				deviation := p - avg
-				totalDeviationSquared += deviation * deviation
-			}
-		}
-		std := math.Sqrt(totalDeviationSquared / num)
-		return std
+	if math.IsNaN(avg) {
+		return avg
 	}
-	return math.NaN()
+	num := float64(0)
+	sumDeviationsSquared := float64(0)
+	for i := 0; i < len(in); i++ {
+		p := in[i].Val
+		if !math.IsNaN(p) {
+			num++
+			deviation := p - avg
+			sumDeviationsSquared += deviation * deviation
+		}
+	}
+	std := math.Sqrt(sumDeviationsSquared / num)
+	return std
 }
 
 func Range(in []schema.Point) float64 {
-	min := Min(in)
-	max := Max(in)
+	valid := false
+	min := math.Inf(1)
+	max := math.Inf(-1)
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			valid = true
+			if v.Val < min {
+				min = v.Val
+			}
+			if v.Val > max {
+				max = v.Val
+			}
+		}
+	}
+	if !valid {
+		return math.NaN()
+	}
 	return max - min
 }
 
