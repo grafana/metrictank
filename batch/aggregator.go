@@ -6,14 +6,12 @@ package batch
 import (
 	"gopkg.in/raintank/schema.v1"
 	"math"
+	"sort"
 )
 
 type AggFunc func(in []schema.Point) float64
 
 func Avg(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("avg() called in aggregator with 0 terms")
-	}
 	valid := float64(0)
 	sum := float64(0)
 	for _, term := range in {
@@ -42,9 +40,6 @@ func Cnt(in []schema.Point) float64 {
 }
 
 func Lst(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("last() called in aggregator with 0 terms")
-	}
 	lst := math.NaN()
 	for _, v := range in {
 		if !math.IsNaN(v.Val) {
@@ -55,9 +50,6 @@ func Lst(in []schema.Point) float64 {
 }
 
 func Min(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("min() called in aggregator with 0 terms")
-	}
 	valid := false
 	min := math.Inf(1)
 	for _, v := range in {
@@ -75,9 +67,6 @@ func Min(in []schema.Point) float64 {
 }
 
 func Max(in []schema.Point) float64 {
-	if len(in) == 0 {
-		panic("max() called in aggregator with 0 terms")
-	}
 	valid := false
 	max := math.Inf(-1)
 	for _, v := range in {
@@ -92,6 +81,97 @@ func Max(in []schema.Point) float64 {
 		max = math.NaN()
 	}
 	return max
+}
+
+func Mult(in []schema.Point) float64 {
+	if len(in) == 0 {
+		return math.NaN()
+	}
+	mult := float64(1)
+	for _, fact := range in {
+		if math.IsNaN(fact.Val) {
+			// NaN * anything equals NaN()
+			return math.NaN()
+		}
+		mult *= fact.Val
+	}
+	return mult
+}
+
+func Med(in []schema.Point) float64 {
+	med := math.NaN()
+	vals := make([]float64, 0, len(in))
+	for i := 0; i < len(in); i++ {
+		p := in[i].Val
+		if !math.IsNaN(p) {
+			vals = append(vals, p)
+		}
+	}
+	if len(vals) != 0 {
+		sort.Float64s(vals)
+		mid := len(vals) / 2
+		if len(vals)%2 == 0 {
+			med = (vals[mid-1] + vals[mid]) / 2
+		} else {
+			med = vals[mid]
+		}
+	}
+	return med
+}
+
+func Diff(in []schema.Point) float64 {
+	diff := math.NaN()
+	for i := 0; i < len(in); i++ {
+		p := in[i].Val
+		if !math.IsNaN(p) {
+			if math.IsNaN(diff) {
+				diff = p
+			} else {
+				diff -= p
+			}
+		}
+	}
+	return diff
+}
+
+func StdDev(in []schema.Point) float64 {
+	avg := Avg(in)
+	if math.IsNaN(avg) {
+		return avg
+	}
+	num := float64(0)
+	sumDeviationsSquared := float64(0)
+	for i := 0; i < len(in); i++ {
+		p := in[i].Val
+		if !math.IsNaN(p) {
+			num++
+			deviation := p - avg
+			sumDeviationsSquared += deviation * deviation
+		}
+	}
+	std := math.Sqrt(sumDeviationsSquared / num)
+	return std
+}
+
+func Range(in []schema.Point) float64 {
+	valid := false
+	min := math.Inf(1)
+	max := math.Inf(-1)
+	for _, v := range in {
+		if !math.IsNaN(v.Val) {
+			valid = true
+			if v.Val < min {
+				min = v.Val
+			}
+			if v.Val > max {
+				max = v.Val
+			}
+		}
+	}
+	if !valid {
+		return math.NaN()
+	}
+	return max - min
 }
 
 func Sum(in []schema.Point) float64 {
