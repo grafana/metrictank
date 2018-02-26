@@ -196,6 +196,74 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 	))
 }
 
+func (s *Server) prometheusQueryInstant(ctx *middleware.Context, request models.PrometheusQueryInstant) {
+	ts, err := parseTime(request.Time)
+	if err != nil {
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Errorf("could not parse ts time: %v", err),
+			ErrorType: errorBadData,
+		}, ""))
+		return
+	}
+
+	qry, err := s.PromQueryEngine.NewInstantQuery(request.Query, ts)
+
+	if err != nil {
+		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			Status:    statusError,
+			Error:     fmt.Errorf("query failed: %v", err),
+			ErrorType: errorExec,
+		}, ""))
+		return
+	}
+
+	newCtx := context.WithValue(ctx.Req.Context(), orgID("org-id"), ctx.OrgId)
+	res := qry.Exec(newCtx)
+
+	if res.Err != nil {
+		if res.Err != nil {
+			switch res.Err.(type) {
+			case promql.ErrQueryCanceled:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Errorf("query failed: %v", res.Err),
+					ErrorType: errorCanceled,
+				}, ""))
+			case promql.ErrQueryTimeout:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Errorf("query failed: %v", res.Err),
+					ErrorType: errorTimeout,
+				}, ""))
+			case promql.ErrStorage:
+				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+					Status:    statusError,
+					Error:     fmt.Errorf("query failed: %v", res.Err),
+					ErrorType: errorInternal,
+				}, ""))
+			}
+			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+				Status:    statusError,
+				Error:     fmt.Errorf("query failed: %v", res.Err),
+				ErrorType: errorExec,
+			}, ""))
+		}
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200,
+		prometheusQueryResult{
+			Data: prometheusQueryData{
+				ResultType: res.Value.Type(),
+				Result:     res.Value,
+			},
+			Status: statusSuccess,
+		},
+		"",
+	))
+}
+
 func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.PrometheusSeriesQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {

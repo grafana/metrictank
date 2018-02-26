@@ -16,6 +16,12 @@ type PrometheusQueryRange struct {
 	Timeout string `form:"timeout"` //<duration>: Evaluation timeout. Optional. Defaults to and is capped by the value of the -query.timeout flag.
 }
 
+type PrometheusQueryInstant struct {
+	Query   string `form:"query"`   //<string>: Prometheus expression query string.
+	Time    string `form:"time"`    //<rfc3339 | unix_timestamp>: Start timestamp.
+	Timeout string `form:"timeout"` //<duration>: Evaluation timeout. Optional. Defaults to and is capped by the value of the -query.timeout flag.
+}
+
 type PrometheusSeriesQuery struct {
 	Match []string `form:"match[]"` //<string>: Prometheus expression query string.
 	Start string   `form:"start"`   //<rfc3339 | unix_timestamp>: Start timestamp.
