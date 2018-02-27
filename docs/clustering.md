@@ -90,4 +90,9 @@ If you get the following error:
 ```
 
 This is because you start multiple metrictanks concurrently and they all try to initialize cassandra.
-You should start one instance, and once it's running, do the others.
+Enable the `create-keyspace` on only one node, or leave it enabled for all, but only start the others after successfully starting the first.
+
+## Other
+- use min-available-shards to control how many unavailable shards are tolerable
+- use max-priority to control how much priority / data log is tolerable (note: lowest lag shards are preferred)
+- note: currently if a shard fails, it doesn't retry other instance in the same request

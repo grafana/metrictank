@@ -12,6 +12,7 @@ Here are some important functional differences to keep in mind:
 * graphite timezone defaults to Chicago, we default to server time
 * many functions are not implemented yet in metrictank itself, but it autodetects this and will proxy requests it cannot handle to graphite-web
   (which then uses metrictank as a simple backend).  See below for details
+* automatic raw interval detection
 
 
 
