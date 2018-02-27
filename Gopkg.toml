@@ -62,6 +62,7 @@
 
 [[constraint]]
   name = "github.com/gocql/gocql"
+  revision = "d9815cdf0ff24e2efa9b8062f4f94a6dd347ae51"
 
 [[constraint]]
   branch = "master"
@@ -162,3 +163,11 @@
 
 [[constraint]]
   name = "gopkg.in/raintank/schema.v1"
+
+[[constraint]]
+  name = "github.com/prometheus/prometheus"
+  version = "2.1.0"
+
+[[override]]
+  name = "golang.org/x/net"
+  revision = "cbe0f9307d0156177f9dd5dc85da1a31abc5f2fb"
