@@ -67,7 +67,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/functions/:func(.+)", withOrg, ready).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 
 	// Prometheus endpointes
-	r.Combo("/prometheus/api/v1/query_range", cBody, withOrg, ready, form(models.PrometheusQueryRange{})).Get(s.prometheusQueryRange).Post(s.prometheusQueryRange)
+	r.Combo("/prometheus/api/v1/query_range", cBody, withOrg, ready, form(models.PrometheusRangeQuery{})).Get(s.prometheusQueryRange).Post(s.prometheusQueryRange)
 	r.Combo("/prometheus/api/v1/series", cBody, withOrg, ready, form(models.PrometheusSeriesQuery{})).Get(s.prometheusQuerySeries).Post(s.prometheusQuerySeries)
 	r.Get("/prometheus/api/v1/label/:name/values", cBody, withOrg, ready, s.prometheusLabelValues)
 }

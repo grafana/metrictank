@@ -99,7 +99,7 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	return
 }
 
-func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.PrometheusQueryRange) {
+func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.PrometheusRangeQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {
 		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
