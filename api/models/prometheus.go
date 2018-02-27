@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/prometheus/storage"
 )
 
-type PrometheusQueryRange struct {
+type PrometheusRangeQuery struct {
 	Query   string `form:"query"`   //<string>: Prometheus expression query string.
 	Start   string `form:"start"`   //<rfc3339 | unix_timestamp>: Start timestamp.
 	End     string `form:"end"`     //<rfc3339 | unix_timestamp>: End timestamp.
