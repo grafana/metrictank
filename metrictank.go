@@ -216,6 +216,7 @@ func main() {
 	***********************************/
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
+	inPrometheus.ConfigProcess()
 	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)

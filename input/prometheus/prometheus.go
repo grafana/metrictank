@@ -139,3 +139,10 @@ func ConfigSetup() {
 	inPrometheus.IntVar(&partitionID, "partition", 0, "partition Id.")
 	globalconf.Register("prometheus-in", inPrometheus)
 }
+
+func ConfigProcess() {
+	if !Enabled {
+		return
+	}
+	cluster.Manager.SetPartitions([]int32{int32(partitionID)})
+}
