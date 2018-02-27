@@ -205,6 +205,17 @@ addr = :2003
 partition = 0
 ```
 
+### prometheus input (optional)
+
+```
+[prometheus-in]
+enabled = false
+# http listen address
+addr = :8000
+# represents the "partition" of your data if you decide to partition your data.
+partition = 0
+```
+
 ### kafka-mdm input (optional, recommended)
 
 ```
