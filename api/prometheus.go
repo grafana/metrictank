@@ -12,14 +12,10 @@ import (
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/util"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage"
-	"github.com/raintank/worldping-api/pkg/log"
 	schema "gopkg.in/raintank/schema.v1"
 )
 
@@ -53,15 +49,6 @@ type prometheusQueryData struct {
 	Result     promql.Value     `json:"result"`
 }
 
-type querier struct {
-	Server
-	from         uint32
-	to           uint32
-	OrgID        int
-	metadataOnly bool
-	ctx          context.Context
-}
-
 func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
@@ -74,16 +61,8 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 		return
 	}
 
-	q, err := s.Querier(context.WithValue(context.Background(), orgID("org-id"), ctx.OrgId), 0, 0)
+	q := NewQuerier(ctx.Req.Context(), s, 0, 0, ctx.OrgId, false)
 
-	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("unable to create queryable: %v", err),
-			ErrorType: errorExec,
-		}, ""))
-		return
-	}
 	defer q.Close()
 	vals, err := q.LabelValues(name)
 	if err != nil {
@@ -277,20 +256,8 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 		return
 	}
 
-	newCtx := context.WithValue(ctx.Req.Context(), orgID("org-id"), ctx.OrgId)
+	q := NewQuerier(ctx.Req.Context(), s, uint32(start.Unix()), uint32(end.Unix()), ctx.OrgId, true)
 
-	q := querier{
-		*s,
-		uint32(start.Unix()),
-		uint32(end.Unix()),
-		ctx.OrgId,
-		true,
-		newCtx,
-	}
-	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err)))
-		return
-	}
 	var matcherSets [][]*labels.Matcher
 	for _, s := range request.Match {
 		matchers, err := promql.ParseMetricSelector(s)
@@ -344,17 +311,6 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 	return
 }
 
-func (s *Server) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
-	return &querier{
-		*s,
-		uint32(mint / 1000), //Convert from NS to S
-		uint32(maxt / 1000), //TODO abstract this out into a separate function that is more accurate
-		ctx.Value(orgID("org-id")).(int),
-		false,
-		ctx,
-	}, nil
-}
-
 func parseTime(s string) (time.Time, error) {
 	if t, err := strconv.ParseFloat(s, 64); err == nil {
 		s, ns := math.Modf(t)
@@ -378,99 +334,6 @@ func parseDuration(s string) (time.Duration, error) {
 		return time.Duration(d), nil
 	}
 	return 0, fmt.Errorf("cannot parse %q to a valid duration", s)
-}
-
-// Select returns a set of series that matches the given label matchers.
-func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error) {
-	minFrom := uint32(math.MaxUint32)
-	var maxTo uint32
-	var target string
-	var reqs []models.Req
-
-	expressions := []string{}
-	for _, matcher := range matchers {
-		if matcher.Name == model.MetricNameLabel {
-			matcher.Name = "name"
-		}
-		if matcher.Type == labels.MatchNotRegexp {
-			expressions = append(expressions, fmt.Sprintf("%s!=~%s", matcher.Name, matcher.Value))
-		} else {
-			expressions = append(expressions, fmt.Sprintf("%s%s%s", matcher.Name, matcher.Type, matcher.Value))
-		}
-	}
-
-	series, err := q.clusterFindByTag(q.ctx, q.OrgID, expressions, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	if q.metadataOnly {
-		return BuildMetadataSeriesSet(series)
-	}
-
-	minFrom = util.Min(minFrom, q.from)
-	maxTo = util.Max(maxTo, q.to)
-	for _, s := range series {
-		for _, metric := range s.Series {
-			for _, archive := range metric.Defs {
-				consReq := consolidation.None
-				fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-				cons := consolidation.Consolidator(fn)
-
-				newReq := models.NewReq(archive.Id, archive.NameWithTags(), target, q.from, q.to, math.MaxUint32, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
-				reqs = append(reqs, newReq)
-			}
-		}
-	}
-
-	select {
-	case <-q.ctx.Done():
-		//request canceled
-		return nil, fmt.Errorf("request canceled")
-	default:
-	}
-
-	reqRenderSeriesCount.Value(len(reqs))
-	if len(reqs) == 0 {
-		return nil, fmt.Errorf("no series found")
-	}
-
-	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
-	reqs, _, _, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
-	if err != nil {
-		log.Error(3, "HTTP Render alignReq error: %s", err)
-		return nil, err
-	}
-
-	out, err := q.getTargets(q.ctx, reqs)
-	if err != nil {
-		log.Error(3, "HTTP Render %s", err.Error())
-		return nil, err
-	}
-
-	return SeriesToSeriesSet(out)
-}
-
-// LabelValues returns all potential values for a label name.
-func (q *querier) LabelValues(name string) ([]string, error) {
-	expressions := []string{"name=~[a-zA-Z_][a-zA-Z0-9_]*$"}
-	if name == model.MetricNameLabel {
-		name = "name"
-		expressions = append(expressions, "name=~[a-zA-Z_:][a-zA-Z0-9_:]*$")
-	}
-	result, err := q.MetricIndex.FindTagValues(q.OrgID, name, "", expressions, 0, 100000)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch label values for key:%s, error: %v", name, err)
-	}
-	if result == nil {
-		result = []string{}
-	}
-	return result, nil
-}
-
-// Close releases the resources of the Querier.
-func (q *querier) Close() error {
-	return nil
 }
 
 func SeriesToSeriesSet(out []models.Series) (*models.PrometheusSeriesSet, error) {
