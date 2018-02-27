@@ -53,7 +53,7 @@ type prometheusQueryData struct {
 func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
-	if !model.LabelNameRE.MatchString(name) {
+	if !model.LabelName(name).IsValid() {
 		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
 			Error:     errors.New("invalid name"),
