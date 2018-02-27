@@ -45,6 +45,46 @@ type prometheusQueryResult struct {
 	Error     error       `json:"error,omitempty"`
 }
 
+func promQueryResultTimeout(err error) response.Response {
+	return response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		Status:    statusError,
+		Error:     err,
+		ErrorType: errorTimeout,
+	}, "")
+}
+
+func promQueryResultBadData(err error) response.Response {
+	return response.NewJson(http.StatusBadRequest, prometheusQueryResult{
+		Status:    statusError,
+		Error:     err,
+		ErrorType: errorBadData,
+	}, "")
+}
+
+func promQueryResultExecError(err error) response.Response {
+	return response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		Status:    statusError,
+		Error:     err,
+		ErrorType: errorExec,
+	}, "")
+}
+
+func promQueryResultInternalError(err error) response.Response {
+	return response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		Status:    statusError,
+		Error:     err,
+		ErrorType: errorInternal,
+	}, "")
+}
+
+func promQueryResultCanceled(err error) response.Response {
+	return response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		Status:    statusError,
+		Error:     err,
+		ErrorType: errorCanceled,
+	}, "")
+}
+
 type prometheusQueryData struct {
 	ResultType promql.ValueType `json:"resultType"`
 	Result     promql.Value     `json:"result"`
@@ -54,11 +94,7 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
 	if !model.LabelName(name).IsValid() {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     errors.New("invalid name"),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(errors.New("invalid name")))
 		return
 	}
 
@@ -67,11 +103,7 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	defer q.Close()
 	vals, err := q.LabelValues(name)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("query failed: %v", err),
-			ErrorType: errorExec,
-		}, ""))
+		response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", err)))
 		return
 	}
 
@@ -82,51 +114,31 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.PrometheusRangeQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("invalid start time: %v", err),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(fmt.Errorf("invalid start time: %v", err)))
 		return
 	}
 
 	end, err := parseTime(request.End)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("invalid end time: %v", err),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(fmt.Errorf("invalid end time: %v", err)))
 		return
 	}
 
 	step, err := parseDuration(request.Step)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("could not parse step duration: %v", err),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(fmt.Errorf("invalid step duration: %v", err)))
 		return
 	}
 
 	if step <= 0 {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("step value is less than or equal to zero: %v", step),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(fmt.Errorf("step value is less than or equal to zero: %v", step)))
 		return
 	}
 
 	qry, err := s.PromQueryEngine.NewRangeQuery(request.Query, start, end, step)
 
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("query failed: %v", err),
-			ErrorType: errorExec,
-		}, ""))
+		response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", err)))
 		return
 	}
 
@@ -137,29 +149,13 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 		if res.Err != nil {
 			switch res.Err.(type) {
 			case promql.ErrQueryCanceled:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorCanceled,
-				}, ""))
+				response.Write(ctx, promQueryResultCanceled(fmt.Errorf("query failed: %v", res.Err)))
 			case promql.ErrQueryTimeout:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorTimeout,
-				}, ""))
+				response.Write(ctx, promQueryResultTimeout(fmt.Errorf("query failed: %v", res.Err)))
 			case promql.ErrStorage:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorInternal,
-				}, ""))
+				response.Write(ctx, promQueryResultInternalError(fmt.Errorf("query failed: %v", res.Err)))
 			}
-			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-				Status:    statusError,
-				Error:     fmt.Errorf("query failed: %v", res.Err),
-				ErrorType: errorExec,
-			}, ""))
+			response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", res.Err)))
 		}
 		return
 	}
@@ -179,22 +175,14 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 func (s *Server) prometheusQueryInstant(ctx *middleware.Context, request models.PrometheusQueryInstant) {
 	ts, err := parseTime(request.Time)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("could not parse ts time: %v", err),
-			ErrorType: errorBadData,
-		}, ""))
+		response.Write(ctx, promQueryResultBadData(fmt.Errorf("invalid ts time: %v", err)))
 		return
 	}
 
 	qry, err := s.PromQueryEngine.NewInstantQuery(request.Query, ts)
 
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("query failed: %v", err),
-			ErrorType: errorExec,
-		}, ""))
+		response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", err)))
 		return
 	}
 
@@ -205,29 +193,13 @@ func (s *Server) prometheusQueryInstant(ctx *middleware.Context, request models.
 		if res.Err != nil {
 			switch res.Err.(type) {
 			case promql.ErrQueryCanceled:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorCanceled,
-				}, ""))
+				response.Write(ctx, promQueryResultCanceled(fmt.Errorf("query failed: %v", res.Err)))
 			case promql.ErrQueryTimeout:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorTimeout,
-				}, ""))
+				response.Write(ctx, promQueryResultTimeout(fmt.Errorf("query failed: %v", res.Err)))
 			case promql.ErrStorage:
-				response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-					Status:    statusError,
-					Error:     fmt.Errorf("query failed: %v", res.Err),
-					ErrorType: errorInternal,
-				}, ""))
+				response.Write(ctx, promQueryResultInternalError(fmt.Errorf("query failed: %v", res.Err)))
 			}
-			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-				Status:    statusError,
-				Error:     fmt.Errorf("query failed: %v", res.Err),
-				ErrorType: errorExec,
-			}, ""))
+			response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", res.Err)))
 		}
 		return
 	}
@@ -247,13 +219,13 @@ func (s *Server) prometheusQueryInstant(ctx *middleware.Context, request models.
 func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.PrometheusSeriesQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse start time: %v", err)))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("invalid start time: %v", err)))
 		return
 	}
 
 	end, err := parseTime(request.End)
 	if err != nil {
-		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("could not parse end time: %v", err)))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, fmt.Sprintf("invalid end time: %v", err)))
 		return
 	}
 
@@ -263,11 +235,7 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 	for _, s := range request.Match {
 		matchers, err := promql.ParseMetricSelector(s)
 		if err != nil {
-			response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
-				Status:    statusError,
-				Error:     fmt.Errorf("query failed: %v", err),
-				ErrorType: errorBadData,
-			}, ""))
+			response.Write(ctx, promQueryResultBadData(fmt.Errorf("invalid metric selector: %v", err)))
 			return
 		}
 		matcherSets = append(matcherSets, matchers)
@@ -277,11 +245,7 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 	for _, mset := range matcherSets {
 		s, err := q.Select(mset...)
 		if err != nil {
-			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-				Status:    statusError,
-				Error:     fmt.Errorf("query failed: %v", err),
-				ErrorType: errorExec,
-			}, ""))
+			response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", err)))
 			return
 		}
 		sets = append(sets, s)
@@ -293,11 +257,7 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 		metrics = append(metrics, set.At().Labels())
 	}
 	if set.Err() != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
-			Status:    statusError,
-			Error:     fmt.Errorf("query failed: %v", err),
-			ErrorType: errorExec,
-		}, ""))
+		response.Write(ctx, promQueryResultExecError(fmt.Errorf("query failed: %v", err)))
 		return
 	}
 
