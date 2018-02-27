@@ -60,8 +60,8 @@ func (p *prometheusWriteHandler) Stop() {
 }
 
 func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request) {
-	defer req.Body.Close()
 	if req.Body != nil {
+		defer req.Body.Close()
 		compressed, err := ioutil.ReadAll(req.Body)
 
 		if err != nil {
@@ -114,7 +114,10 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 					p.Process(md, int32(partitionID))
 				}
 			} else {
-				log.Warn("prometheus metric received with empty name")
+				w.WriteHeader(400)
+				w.Write([]byte("invalid metric received: __name__ label can not equal \"\""))
+				log.Warn("prometheus metric received with empty name: %v", ts.String())
+				return
 			}
 		}
 		if err != nil {
