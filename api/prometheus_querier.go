@@ -124,14 +124,7 @@ func (q *querier) LabelValues(name string) ([]string, error) {
 		name = "name"
 		expressions = append(expressions, "name=~[a-zA-Z_:][a-zA-Z0-9_:]*$")
 	}
-	result, err := q.MetricIndex.FindTagValues(q.OrgID, name, "", expressions, 0, 100000)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch label values for key:%s, error: %v", name, err)
-	}
-	if result == nil {
-		result = []string{}
-	}
-	return result, nil
+	return q.MetricIndex.FindTagValues(q.OrgID, name, "", expressions, 0, 100000)
 }
 
 // Close releases the resources of the Querier.
