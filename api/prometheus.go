@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -53,10 +54,10 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 	name := ctx.Params(":name")
 
 	if !model.LabelNameRE.MatchString(name) {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Errorf("unable to create label name: %v", name),
-			ErrorType: errorExec,
+			Error:     errors.New("invalid name"),
+			ErrorType: errorBadData,
 		}, ""))
 		return
 	}
@@ -81,9 +82,9 @@ func (s *Server) prometheusLabelValues(ctx *middleware.Context) {
 func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.PrometheusRangeQuery) {
 	start, err := parseTime(request.Start)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Errorf("could not parse start time: %v", err),
+			Error:     fmt.Errorf("invalid start time: %v", err),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -91,9 +92,9 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 
 	end, err := parseTime(request.End)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
-			Error:     fmt.Errorf("could not parse end time: %v", err),
+			Error:     fmt.Errorf("invalid end time: %v", err),
 			ErrorType: errorBadData,
 		}, ""))
 		return
@@ -101,7 +102,7 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 
 	step, err := parseDuration(request.Step)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
 			Error:     fmt.Errorf("could not parse step duration: %v", err),
 			ErrorType: errorBadData,
@@ -110,7 +111,7 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 	}
 
 	if step <= 0 {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
 			Error:     fmt.Errorf("step value is less than or equal to zero: %v", step),
 			ErrorType: errorBadData,
@@ -178,7 +179,7 @@ func (s *Server) prometheusQueryRange(ctx *middleware.Context, request models.Pr
 func (s *Server) prometheusQueryInstant(ctx *middleware.Context, request models.PrometheusQueryInstant) {
 	ts, err := parseTime(request.Time)
 	if err != nil {
-		response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+		response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 			Status:    statusError,
 			Error:     fmt.Errorf("could not parse ts time: %v", err),
 			ErrorType: errorBadData,
@@ -262,7 +263,7 @@ func (s *Server) prometheusQuerySeries(ctx *middleware.Context, request models.P
 	for _, s := range request.Match {
 		matchers, err := promql.ParseMetricSelector(s)
 		if err != nil {
-			response.Write(ctx, response.NewJson(http.StatusInternalServerError, prometheusQueryResult{
+			response.Write(ctx, response.NewJson(http.StatusBadRequest, prometheusQueryResult{
 				Status:    statusError,
 				Error:     fmt.Errorf("query failed: %v", err),
 				ErrorType: errorBadData,
