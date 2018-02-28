@@ -36,3 +36,21 @@ func TestPrometheusSeriesSet(t *testing.T) {
 		t.Fatalf("Expected Next() to be false.")
 	}
 }
+
+func TestPrometheusIterator(t *testing.T) {
+	s := &PrometheusSeries{
+		labels:  labels.FromStrings("foo", "bar"),
+		samples: []model.SamplePair{{Value: 1, Timestamp: 2}},
+	}
+	i := newPrometheusSeriesIterator(s)
+	if !i.Seek(0) {
+		t.Fatalf("seek(0) should result in data")
+	}
+	timestamp, val := i.At()
+	if val != 1 || timestamp != 2 {
+		t.Fatalf("Unexpected point (%d, %f) returned.", timestamp, val)
+	}
+	if i.Seek(1) {
+		t.Fatalf("seek(1) should not result in data. at least I think so. jlisi?")
+	}
+}
