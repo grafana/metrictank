@@ -19,9 +19,8 @@ import (
 // Querier creates a new querier that will operate on the subject server
 // it needs the org-id stored in a context value
 func (s *Server) Querier(ctx context.Context, min, max int64) (storage.Querier, error) {
-	// from what I understand, min/max are nanoseconds. @jlisi can correct this if i'm wrong
-	from := uint32(min / 1e9)
-	to := uint32(max / 1e9)
+	from := uint32(min / 1000)
+	to := uint32(max / 1000)
 	return NewQuerier(ctx, s, from, to, ctx.Value(orgID("org-id")).(int), false), nil
 }
 
