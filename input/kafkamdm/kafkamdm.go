@@ -210,12 +210,16 @@ func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) error {
 				offset = sarama.OffsetNewest
 			case "last":
 				offset, err = offsetMgr.Last(topic, partition)
+				if err != nil {
+					log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+					return err
+				}
 			default:
 				offset, err = k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
-			}
-			if err != nil {
-				log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
-				return err
+				if err != nil {
+					offset = sarama.OffsetOldest
+					log.Warn("kafka-mdm failed to get offset %s: %s -> will use oldest instead", offsetDuration, err)
+				}
 			}
 			k.wg.Add(1)
 			go k.consumePartition(topic, partition, offset)

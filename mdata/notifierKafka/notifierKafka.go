@@ -88,11 +88,15 @@ func (c *NotifierKafka) start() {
 			offset = -1
 		case "last":
 			offset, err = c.offsetMgr.Last(topic, partition)
+			if err != nil {
+				log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+			}
 		default:
 			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
-		}
-		if err != nil {
-			log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+			if err != nil {
+				offset = sarama.OffsetOldest
+				log.Warn("kafka-cluster failed to get offset %s: %s -> will use oldest instead", offsetDuration, err)
+			}
 		}
 		partitionLogSize[partition].Set(int(bootTimeOffsets[partition]))
 		if offset >= 0 {

@@ -215,6 +215,7 @@ brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
+# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # the further back in time you go, the more old data you can load into metrictank, but the longer it takes to catch up to realtime data
 offset = last
 # kafka partitions to consume. use '*' or a comma separated list of id's
@@ -322,6 +323,8 @@ partitions = *
 # method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)
 partition-scheme = bySeries
 # offset to start consuming from. Can be one of newest, oldest,last or a time duration
+# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
+# Should match your kafka-mdm-in setting
 offset = last
 # save interval for offsets
 offset-commit-interval = 5s
