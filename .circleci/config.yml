@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.9.2
+      - image: circleci/golang:1.10
     steps:
       - checkout
       - run: scripts/build.sh
@@ -22,7 +22,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.9.2
+      - image: circleci/golang:1.10
     steps:
       - checkout
       - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/chaos)
@@ -30,7 +30,7 @@ jobs:
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.9.2
+      - image: circleci/golang:1.10
     steps:
       - checkout
       - run: scripts/qa/gofmt.sh
@@ -40,7 +40,6 @@ jobs:
       - run: scripts/qa/tools_gitignore.sh
       - run: scripts/qa/unused.sh
       - run: scripts/qa/vendor.sh
-      - run: go vet ./...
 
   qa-post-build:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank

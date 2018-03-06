@@ -22,7 +22,7 @@ for tool in mt-*; do
 	echo "## $tool"
 	echo
 	echo '```'
-	./$tool -h 2>&1
+	./$tool -h 2>&1 | sed 's#run at most n tests in parallel (default .*)#run at most n tests in parallel (default num-processors)#'
 	echo '```'
 	echo
 done
