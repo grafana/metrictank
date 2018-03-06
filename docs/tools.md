@@ -415,7 +415,7 @@ Flags:
   -test.outputdir dir
     	write profiles to dir
   -test.parallel n
-    	run at most n tests in parallel (default 8)
+    	run at most n tests in parallel (default num-processors)
   -test.run regexp
     	run only tests and examples matching regexp
   -test.short
@@ -567,7 +567,7 @@ Usage of ./mt-whisper-importer-reader:
   -test.outputdir dir
     	write profiles to dir
   -test.parallel n
-    	run at most n tests in parallel (default 8)
+    	run at most n tests in parallel (default num-processors)
   -test.run regexp
     	run only tests and examples matching regexp
   -test.short
