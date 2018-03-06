@@ -325,6 +325,7 @@ func BuildMetadataSeriesSet(seriesNames []Series) (*models.PrometheusSeriesSet, 
 		for _, metric := range s.Series {
 			for _, archive := range metric.Defs {
 				series = append(series, models.NewPrometheusSeries(buildTagSet(archive.NameWithTags()), []model.SamplePair{}))
+				break // just the first is enough
 			}
 		}
 	}
