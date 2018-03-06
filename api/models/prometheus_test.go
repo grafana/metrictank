@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/common/model"
@@ -10,7 +11,7 @@ import (
 
 func TestPrometheusSeriesSet(t *testing.T) {
 	series1 := &PrometheusSeries{
-		labels:  labels.FromStrings("foo", "bar"),
+		labels:  labels.FromStrings("bar", "foo"),
 		samples: []model.SamplePair{{Value: 1, Timestamp: 2}},
 	}
 	series2 := &PrometheusSeries{
@@ -19,9 +20,6 @@ func TestPrometheusSeriesSet(t *testing.T) {
 	}
 	c := &PrometheusSeriesSet{
 		series: []storage.Series{series1, series2},
-	}
-	if !c.Next() {
-		t.Fatalf("Expected Next() to be true.")
 	}
 	if c.At() != series1 {
 		t.Fatalf("Unexpected series returned.")
@@ -50,7 +48,15 @@ func TestPrometheusIterator(t *testing.T) {
 	if val != 1 || timestamp != 2 {
 		t.Fatalf("Unexpected point (%d, %f) returned.", timestamp, val)
 	}
-	if i.Seek(1) {
-		t.Fatalf("seek(1) should not result in data. at least I think so. jlisi?")
+	if !i.Seek(1) {
+		fmt.Println(i.At())
+		t.Fatalf("seek(1) should result in data")
+	}
+	if !i.Seek(2) {
+		fmt.Println(i.At())
+		t.Fatalf("seek(2) should result in data")
+	}
+	if i.Seek(3) {
+		t.Fatalf("seek(3) should not result in data")
 	}
 }
