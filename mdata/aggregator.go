@@ -112,3 +112,35 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
 }
+
+func (agg *Aggregator) GC(chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
+	ret := true
+
+	if lastWriteTime+agg.span > chunkMinTs {
+		// Last datapoint was less than one aggregation window before chunkMinTs, hold out for more data
+		return false
+	}
+
+	// Haven't seen datapoints in an entire aggregation window before chunkMinTs, time to flush
+	if agg.agg.Cnt != 0 {
+		agg.flush()
+	}
+
+	if agg.minMetric != nil {
+		ret = agg.minMetric.GC(chunkMinTs, metricMinTs) && ret
+	}
+	if agg.maxMetric != nil {
+		ret = agg.maxMetric.GC(chunkMinTs, metricMinTs) && ret
+	}
+	if agg.sumMetric != nil {
+		ret = agg.sumMetric.GC(chunkMinTs, metricMinTs) && ret
+	}
+	if agg.cntMetric != nil {
+		ret = agg.cntMetric.GC(chunkMinTs, metricMinTs) && ret
+	}
+	if agg.lstMetric != nil {
+		ret = agg.lstMetric.GC(chunkMinTs, metricMinTs) && ret
+	}
+
+	return ret
+}
