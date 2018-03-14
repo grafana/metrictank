@@ -134,6 +134,18 @@ func BenchmarkDeSerializeMetricPointId2Msgp(b *testing.B) {
 	}
 }
 
+func BenchmarkSerializeMetricPointId1ManualStaticBuffer(b *testing.B) {
+	metrics := getDifferentMetricPointId1s(b.N)
+	data := make([]byte, 0, b.N*28)
+	b.ResetTimer()
+	var err error
+	for _, m := range metrics {
+		data, err = m.MarshalManual(data)
+		checkErr(b, err)
+	}
+	b.Logf("with %10d metrics -> final size: %.1f bytes per metric", b.N, float64(len(data))/float64(b.N))
+}
+
 func BenchmarkSerializeMetricPointId1Manual(b *testing.B) {
 	metrics := getDifferentMetricPointId1s(b.N)
 	b.ResetTimer()

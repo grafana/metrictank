@@ -96,6 +96,15 @@ func ensure(b []byte, sz int) []byte {
 	return b[:l+sz]
 }
 
+// MarshalManual28 marshals directly to b
+// b must have a cap-len difference of at least 28 bytes.
+func (z *MetricPointId1) MarshalManual28(b []byte) (o []byte, err error) {
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint32(b[16:], z.Time)
+	binary.LittleEndian.PutUint64(b[20:], math.Float64bits(z.Value))
+	return b, nil
+}
+
 func (z *MetricPointId1) MarshalManual(b []byte) (o []byte, err error) {
 	b = ensure(b, 28) // 16+4+8
 	copy(b, z.Id[:])
