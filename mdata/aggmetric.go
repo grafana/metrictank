@@ -561,15 +561,38 @@ func (a *AggMetric) add(ts uint32, val float64) {
 	a.addAggregators(ts, val)
 }
 
+// collectable returns whether the AggMetric is garbage collectable
+// caller must hold AggMetric lock
+func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
+
+	currentChunk := a.getChunk(a.CurrentChunkPos)
+
+	// no chunks at all means "possibly collectable"
+	// the caller (AggMetric.GC()) still has its own checks to
+	// handle the "no chunks" correctly later.
+	// also: we want AggMetric.GC() to go ahead with flushing the ROB in this case
+	if currentChunk == nil {
+		return true
+	}
+
+	// an aggmetric is collectable based on two conditions:
+	// * the last chunk hasn't been written to in a configurable amount
+	// * the chunk is no longer "active":
+	//   any reasonable realtime stream (e.g. up to 15 min behind wall-clock)
+	//   would have no more points for the current chunk
+
+	return a.lastWrite < chunkMinTs && currentChunk.Series.T0+a.ChunkSpan+15*60 < now
+}
+
 // GC returns whether or not this AggMetric is stale and can be removed
 // chunkMinTs -> min timestamp of a chunk before to be considered stale and to be persisted to Cassandra
 // metricMinTs -> min timestamp for a metric before to be considered stale and to be purged from the tank
-func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
+func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
 
-	// abort unless the AggMetric is collectable due to being too old
-	if a.lastWrite >= chunkMinTs {
+	// abort unless it looks like the AggMetric is collectable
+	if !a.collectable(now, chunkMinTs) {
 		return false
 	}
 
@@ -587,7 +610,7 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 
 	// this aggMetric has never had metrics written to it.
 	if len(a.Chunks) == 0 {
-		return a.gcAggregators(chunkMinTs, metricMinTs)
+		return a.gcAggregators(now, chunkMinTs, metricMinTs)
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
@@ -595,11 +618,19 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
+	// we must check collectable again. Imagine this scenario:
+	// * we didn't have any chunks when calling collectable() the first time so it returned true
+	// * data from the ROB is flushed and moved into a new chunk
+	// * this new chunk is active so we're not collectable, even though earlier we thought we were.
+	if !a.collectable(now, chunkMinTs) {
+		return false
+	}
+
 	if currentChunk.Closed {
 		// already closed and should be saved, though we cant guarantee that.
 		// Check if we should just delete the metric from memory.
 		if a.lastWrite < metricMinTs {
-			return a.gcAggregators(chunkMinTs, metricMinTs)
+			return a.gcAggregators(now, chunkMinTs, metricMinTs)
 		}
 	} else {
 		// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
@@ -617,10 +648,10 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	return false
 }
 
-func (a *AggMetric) gcAggregators(chunkMinTs, metricMinTs uint32) bool {
+func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) bool {
 	ret := true
 	for _, agg := range a.aggregators {
-		ret = agg.GC(chunkMinTs, metricMinTs, a.lastWrite) && ret
+		ret = agg.GC(now, chunkMinTs, metricMinTs, a.lastWrite) && ret
 	}
 	return ret
 }

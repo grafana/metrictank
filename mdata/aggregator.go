@@ -113,7 +113,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	}
 }
 
-func (agg *Aggregator) GC(chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
+func (agg *Aggregator) GC(now, chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
 	ret := true
 
 	if lastWriteTime+agg.span > chunkMinTs {
@@ -127,19 +127,19 @@ func (agg *Aggregator) GC(chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
 	}
 
 	if agg.minMetric != nil {
-		ret = agg.minMetric.GC(chunkMinTs, metricMinTs) && ret
+		ret = agg.minMetric.GC(now, chunkMinTs, metricMinTs) && ret
 	}
 	if agg.maxMetric != nil {
-		ret = agg.maxMetric.GC(chunkMinTs, metricMinTs) && ret
+		ret = agg.maxMetric.GC(now, chunkMinTs, metricMinTs) && ret
 	}
 	if agg.sumMetric != nil {
-		ret = agg.sumMetric.GC(chunkMinTs, metricMinTs) && ret
+		ret = agg.sumMetric.GC(now, chunkMinTs, metricMinTs) && ret
 	}
 	if agg.cntMetric != nil {
-		ret = agg.cntMetric.GC(chunkMinTs, metricMinTs) && ret
+		ret = agg.cntMetric.GC(now, chunkMinTs, metricMinTs) && ret
 	}
 	if agg.lstMetric != nil {
-		ret = agg.lstMetric.GC(chunkMinTs, metricMinTs) && ret
+		ret = agg.lstMetric.GC(now, chunkMinTs, metricMinTs) && ret
 	}
 
 	return ret
