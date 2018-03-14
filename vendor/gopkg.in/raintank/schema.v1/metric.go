@@ -70,6 +70,19 @@ func (m *MetricPoint) Data() *MetricData {
 	return nil
 }
 
+type MetricPointId1 struct {
+	Id    [16]byte
+	Time  uint32
+	Value float64
+}
+
+type MetricPointId2 struct {
+	Org   uint32
+	Id    [16]byte
+	Time  uint32
+	Value float64
+}
+
 // MetricData contains all metric metadata (some as fields, some as tags) and a datapoint
 type MetricData struct {
 	Id       string   `json:"id"`

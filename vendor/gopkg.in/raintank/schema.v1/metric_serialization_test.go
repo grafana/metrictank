@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"crypto/md5"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -65,6 +66,47 @@ func getDifferentMetricPoints(amount int) []MetricPoint {
 	out := make([]MetricPoint, amount)
 	for i := 0; i < amount; i++ {
 		out[i] = MetricPoint{
+			Id:    ids[i%len(ids)],
+			Value: r.Float64(),
+			Time:  baseTime + uint32(i),
+		}
+	}
+	return out
+}
+
+func getDifferentMetricPointId1s(amount int) []MetricPointId1 {
+	ids := [][16]byte{
+		md5.Sum([]byte("litmus.http.error_state.")),
+		md5.Sum([]byte("litmus.hello.dieter_plaetinck.be")),
+		md5.Sum([]byte("litmus.ok.raintank_dns_error_state_foo_longer")),
+		md5.Sum([]byte("hi.alerting.state")),
+	}
+	baseTime := uint32(1512345678) // somewhat randomly chosen but realistic (dec 2017)
+	r := rand.New(rand.NewSource(438))
+	out := make([]MetricPointId1, amount)
+	for i := 0; i < amount; i++ {
+		out[i] = MetricPointId1{
+			Id:    ids[i%len(ids)],
+			Value: r.Float64(),
+			Time:  baseTime + uint32(i),
+		}
+	}
+	return out
+}
+
+func getDifferentMetricPointId2s(amount int) []MetricPointId2 {
+	ids := [][16]byte{
+		md5.Sum([]byte("litmus.http.error_state.")),
+		md5.Sum([]byte("litmus.hello.dieter_plaetinck.be")),
+		md5.Sum([]byte("litmus.ok.raintank_dns_error_state_foo_longer")),
+		md5.Sum([]byte("hi.alerting.state")),
+	}
+	baseTime := uint32(1512345678) // somewhat randomly chosen but realistic (dec 2017)
+	r := rand.New(rand.NewSource(438))
+	out := make([]MetricPointId2, amount)
+	for i := 0; i < amount; i++ {
+		out[i] = MetricPointId2{
+			Org:   uint32(i),
 			Id:    ids[i%len(ids)],
 			Value: r.Float64(),
 			Time:  baseTime + uint32(i),
