@@ -3,7 +3,7 @@ package schema
 import "testing"
 
 func BenchmarkSerializeMetricDataArrayMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	m := MetricDataArray(metrics)
 	data, err := m.MarshalMsg(nil)
@@ -12,7 +12,7 @@ func BenchmarkSerializeMetricDataArrayMsgp(b *testing.B) {
 }
 
 func BenchmarkDeSerializeMetricDataArrayMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	m := MetricDataArray(metrics)
 	data, err := m.MarshalMsg(nil)
 	checkErr(b, err)
@@ -23,7 +23,7 @@ func BenchmarkDeSerializeMetricDataArrayMsgp(b *testing.B) {
 }
 
 func BenchmarkSerializeMetricDataMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	var data []byte
 	var err error
@@ -35,7 +35,7 @@ func BenchmarkSerializeMetricDataMsgp(b *testing.B) {
 }
 
 func BenchmarkDeSerializeMetricDataMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	var data []byte
 	var err error
 	for _, m := range metrics {
@@ -44,6 +44,34 @@ func BenchmarkDeSerializeMetricDataMsgp(b *testing.B) {
 	}
 	b.ResetTimer()
 	p := &MetricData{}
+	for len(data) != 0 {
+		data, err = p.UnmarshalMsg(data)
+		checkErr(b, err)
+	}
+}
+
+func BenchmarkSerializeMetricPointMsgp(b *testing.B) {
+	metrics := getDifferentMetricPoints(b.N)
+	b.ResetTimer()
+	var data []byte
+	var err error
+	for _, m := range metrics {
+		data, err = m.MarshalMsg(data)
+		checkErr(b, err)
+	}
+	b.Logf("with %10d metrics -> final size: %.1f bytes per metric", b.N, float64(len(data))/float64(b.N))
+}
+
+func BenchmarkDeSerializeMetricPointMsgp(b *testing.B) {
+	metrics := getDifferentMetricPoints(b.N)
+	var data []byte
+	var err error
+	for _, m := range metrics {
+		data, err = m.MarshalMsg(data)
+		checkErr(b, err)
+	}
+	b.ResetTimer()
+	p := &MetricPoint{}
 	for len(data) != 0 {
 		data, err = p.UnmarshalMsg(data)
 		checkErr(b, err)

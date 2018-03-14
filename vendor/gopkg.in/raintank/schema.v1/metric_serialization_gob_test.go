@@ -7,7 +7,7 @@ import (
 )
 
 func BenchmarkSerializeMetricDataArrayGob(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -16,7 +16,7 @@ func BenchmarkSerializeMetricDataArrayGob(b *testing.B) {
 	b.Logf("with %10d metrics -> final size: %.1f bytes per metric", b.N, float64(buf.Len())/float64(b.N))
 }
 func BenchmarkDeSerializeMetricDataArrayGob(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(metrics)

@@ -6,7 +6,7 @@ import (
 )
 
 func BenchmarkSerializeMetricDataArrayJson(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	data, err := json.Marshal(metrics)
 	checkErr(b, err)
@@ -14,7 +14,7 @@ func BenchmarkSerializeMetricDataArrayJson(b *testing.B) {
 }
 
 func BenchmarkDeSerializeMetricDataArrayJson(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	data, err := json.Marshal(metrics)
 	checkErr(b, err)
 	var out []*MetricData

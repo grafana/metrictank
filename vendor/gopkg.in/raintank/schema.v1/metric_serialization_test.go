@@ -12,7 +12,7 @@ func checkErr(tb testing.TB, err error) {
 	}
 }
 
-func getDifferentMetrics(amount int) []*MetricData {
+func getDifferentMetricDataArray(amount int) []*MetricData {
 	names := []string{
 		"litmus.http.error_state.",
 		"litmus.hello.dieter_plaetinck.be",
@@ -33,6 +33,7 @@ func getDifferentMetrics(amount int) []*MetricData {
 			"some_other_tag:ok",
 		},
 	}
+	baseTime := int64(1512345678) // somewhat randomly chosen but realistic (dec 2017)
 	r := rand.New(rand.NewSource(438))
 	out := make([]*MetricData, amount)
 	for i := 0; i < amount; i++ {
@@ -43,9 +44,30 @@ func getDifferentMetrics(amount int) []*MetricData {
 			Interval: intervals[i%len(intervals)],
 			Value:    r.Float64(),
 			Unit:     "foo",
-			Time:     r.Int63(),
+			Time:     baseTime + int64(i),
 			Mtype:    "bleh",
 			Tags:     tags[i%len(tags)],
+		}
+		out[i].SetId()
+	}
+	return out
+}
+
+func getDifferentMetricPoints(amount int) []MetricPoint {
+	ids := []string{
+		"1.6f7f966befca84c637b9e1800f5fc9de",
+		"1322.03b1159fab0bc475dd3d94dcde4bf5fa",
+		"65298.047a7232d9ab39e614927d6f8c984f3a",
+		"598919.abdd07523ee7a8b1afc34b452edfcec9",
+	}
+	baseTime := uint32(1512345678) // somewhat randomly chosen but realistic (dec 2017)
+	r := rand.New(rand.NewSource(438))
+	out := make([]MetricPoint, amount)
+	for i := 0; i < amount; i++ {
+		out[i] = MetricPoint{
+			Id:    ids[i%len(ids)],
+			Value: r.Float64(),
+			Time:  baseTime + uint32(i),
 		}
 	}
 	return out
