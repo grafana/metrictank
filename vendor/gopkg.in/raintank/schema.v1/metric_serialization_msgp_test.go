@@ -3,7 +3,7 @@ package schema
 import "testing"
 
 func BenchmarkSerializeMetricDataArrayMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	m := MetricDataArray(metrics)
 	data, err := m.MarshalMsg(nil)
@@ -12,7 +12,7 @@ func BenchmarkSerializeMetricDataArrayMsgp(b *testing.B) {
 }
 
 func BenchmarkDeSerializeMetricDataArrayMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	m := MetricDataArray(metrics)
 	data, err := m.MarshalMsg(nil)
 	checkErr(b, err)
@@ -23,7 +23,7 @@ func BenchmarkDeSerializeMetricDataArrayMsgp(b *testing.B) {
 }
 
 func BenchmarkSerializeMetricDataMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	b.ResetTimer()
 	var data []byte
 	var err error
@@ -35,7 +35,7 @@ func BenchmarkSerializeMetricDataMsgp(b *testing.B) {
 }
 
 func BenchmarkDeSerializeMetricDataMsgp(b *testing.B) {
-	metrics := getDifferentMetrics(b.N)
+	metrics := getDifferentMetricDataArray(b.N)
 	var data []byte
 	var err error
 	for _, m := range metrics {
