@@ -568,9 +568,13 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	a.Lock()
 	defer a.Unlock()
 
-	// if the reorderBuffer is enabled and we have not received a datapoint in a while,
-	// then flush the reorder buffer.
-	if a.rob != nil && a.lastWrite < chunkMinTs {
+	// abort unless the AggMetric is collectable due to being too old
+	if a.lastWrite >= chunkMinTs {
+		return false
+	}
+
+	// make sure any points in the reorderBuffer are moved into our chunks so we can save the data
+	if a.rob != nil {
 		tmpLastWrite := a.lastWrite
 		pts := a.rob.Flush()
 		for _, p := range pts {
@@ -582,9 +586,8 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 	}
 
 	// this aggMetric has never had metrics written to it.
-	// if the rob is empty or disabled, this AggMetric can be deleted
 	if len(a.Chunks) == 0 {
-		return (a.rob == nil || a.rob.IsEmpty()) && a.gcAggregators(chunkMinTs, metricMinTs)
+		return a.gcAggregators(chunkMinTs, metricMinTs)
 	}
 
 	currentChunk := a.getChunk(a.CurrentChunkPos)
@@ -592,25 +595,23 @@ func (a *AggMetric) GC(chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
-	if a.lastWrite < chunkMinTs {
-		if currentChunk.Closed {
-			// already closed and should be saved, though we cant guarantee that.
-			// Check if we should just delete the metric from memory.
-			if a.lastWrite < metricMinTs {
-				return a.gcAggregators(chunkMinTs, metricMinTs)
+	if currentChunk.Closed {
+		// already closed and should be saved, though we cant guarantee that.
+		// Check if we should just delete the metric from memory.
+		if a.lastWrite < metricMinTs {
+			return a.gcAggregators(chunkMinTs, metricMinTs)
+		}
+	} else {
+		// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
+		// we are a primary
+		log.Debug("Found stale Chunk, adding end-of-stream bytes. key: %s T0: %d", a.Key, currentChunk.T0)
+		currentChunk.Finish()
+		if cluster.Manager.IsPrimary() {
+			if LogLevel < 2 {
+				log.Debug("AM persist(): node is primary, saving chunk. %s T0: %d", a.Key, currentChunk.T0)
 			}
-		} else {
-			// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
-			// we are a primary
-			log.Debug("Found stale Chunk, adding end-of-stream bytes. key: %s T0: %d", a.Key, currentChunk.T0)
-			currentChunk.Finish()
-			if cluster.Manager.IsPrimary() {
-				if LogLevel < 2 {
-					log.Debug("AM persist(): node is primary, saving chunk. %s T0: %d", a.Key, currentChunk.T0)
-				}
-				// persist the chunk. If the writeQueue is full, then this will block.
-				a.persist(a.CurrentChunkPos)
-			}
+			// persist the chunk. If the writeQueue is full, then this will block.
+			a.persist(a.CurrentChunkPos)
 		}
 	}
 	return false
