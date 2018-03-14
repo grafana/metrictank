@@ -154,12 +154,59 @@ func TestMetricPointId1MarshalManualMsgp(t *testing.T) {
 		},
 	}
 	for i, in := range tests {
-		data, err := in.MarshalManual(nil)
+		// marshal with nil input
+		data1, err := in.MarshalManual(nil)
 		if err != nil {
 			t.Fatalf("case %d got err %s", i, err.Error())
 		}
+		if len(data1) != 28 {
+			t.Fatalf("case %d did not result in 28B data packet", i)
+		}
+
+		// marshal with sufficient input
+		buf2 := make([]byte, 28)
+		data2, err := in.MarshalManual(buf2)
+		if err != nil {
+			t.Fatalf("case %d got err %s", i, err.Error())
+		}
+		if !reflect.DeepEqual(data1, data2[:28]) {
+			t.Fatalf("case %d marshaling mismatch.", i)
+		}
+
+		// marshal with very big input
+		buf3 := make([]byte, 512)
+		data3, err := in.MarshalManual(buf3)
+		if err != nil {
+			t.Fatalf("case %d got err %s", i, err.Error())
+		}
+		if !reflect.DeepEqual(data1, data3[:28]) {
+			t.Fatalf("case %d marshaling mismatch", i)
+		}
+
+		// marshalmanual28 with sufficient input
+		buf4 := make([]byte, 28)
+		data4, err := in.MarshalManual28(buf4)
+		if err != nil {
+			t.Fatalf("case %d got err %s", i, err.Error())
+		}
+		if !reflect.DeepEqual(data1, data4[:28]) {
+			t.Fatalf("case %d marshaling mismatch.", i)
+		}
+
+		// marshalmanual28 with very big input
+		buf5 := make([]byte, 512)
+		data5, err := in.MarshalManual28(buf5)
+		if err != nil {
+			t.Fatalf("case %d got err %s", i, err.Error())
+		}
+		if !reflect.DeepEqual(data1, data5[:28]) {
+			t.Fatalf("case %d marshaling mismatch", i)
+		}
+
+		// unmarshal
+
 		out := MetricPointId1{}
-		leftover, err := out.UnmarshalManual(data)
+		leftover, err := out.UnmarshalManual(data1)
 		if err != nil {
 			t.Fatalf("case %d got err %s", i, err.Error())
 		}
