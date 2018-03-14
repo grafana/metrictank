@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -31,6 +32,90 @@ type PartitionedMetric interface {
 }
 
 //go:generate msgp
+
+type MetricPointId1 struct {
+	Id    [16]byte
+	Value float64
+	Time  uint32
+}
+
+func (m *MetricPointId1) Valid() bool {
+	return m.Time != 0
+}
+
+type MetricPointId2 struct {
+	Id    [16]byte
+	Value float64
+	Time  uint32
+	Org   uint32
+}
+
+func (m *MetricPointId2) Valid() bool {
+	return m.Time != 0
+}
+
+// ensure 'sz' extra bytes in 'b' btw len(b) and cap(b)
+func ensure(b []byte, sz int) []byte {
+	l := len(b)
+	c := cap(b)
+	if c-l < sz {
+		o := make([]byte, (2*c)+sz) // exponential growth
+		n := copy(o, b)
+		return o[:n+sz]
+	}
+	return b[:l+sz]
+}
+
+// MarshalDirect28 marshals directly to b
+// b must have a cap-len difference of at least 28 bytes.
+func (z *MetricPointId1) MarshalDirect28(b []byte) (o []byte, err error) {
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint64(b[16:], math.Float64bits(z.Value))
+	binary.LittleEndian.PutUint32(b[24:], z.Time)
+	return b, nil
+}
+
+func (z *MetricPointId1) MarshalDirect(b []byte) (o []byte, err error) {
+	b = ensure(b, 28) // 16+8+4
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint64(b[16:], math.Float64bits(z.Value))
+	binary.LittleEndian.PutUint32(b[24:], z.Time)
+	return b, nil
+}
+
+func (z *MetricPointId1) UnmarshalDirect(bts []byte) (o []byte, err error) {
+	copy(z.Id[:], bts[:16])
+	z.Value = math.Float64frombits(binary.LittleEndian.Uint64(bts[16:24]))
+	z.Time = binary.LittleEndian.Uint32(bts[24:])
+	return bts[28:], nil
+}
+
+// MarshalDirect32 marshals directly to b
+// b must have a cap-len difference of at least 32 bytes.
+func (z *MetricPointId2) MarshalDirect32(b []byte) (o []byte, err error) {
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint64(b[16:], math.Float64bits(z.Value))
+	binary.LittleEndian.PutUint32(b[24:], z.Time)
+	binary.LittleEndian.PutUint32(b[28:], z.Org)
+	return b, nil
+}
+
+func (z *MetricPointId2) MarshalDirect(b []byte) (o []byte, err error) {
+	b = ensure(b, 32) // 16+8+4+4
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint64(b[16:], math.Float64bits(z.Value))
+	binary.LittleEndian.PutUint32(b[24:], z.Time)
+	binary.LittleEndian.PutUint32(b[28:], z.Org)
+	return b, nil
+}
+
+func (z *MetricPointId2) UnmarshalDirect(bts []byte) (o []byte, err error) {
+	copy(z.Id[:], bts[:16])
+	z.Value = math.Float64frombits(binary.LittleEndian.Uint64(bts[16:24]))
+	z.Time = binary.LittleEndian.Uint32(bts[24:])
+	z.Org = binary.LittleEndian.Uint32(bts[28:])
+	return bts[32:], nil
+}
 
 // MetricData contains all metric metadata (some as fields, some as tags) and a datapoint
 type MetricData struct {
