@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -81,6 +82,33 @@ type MetricPointId2 struct {
 	Id    [16]byte
 	Time  uint32
 	Value float64
+}
+
+// ensure 'sz' extra bytes in 'b' btw len(b) and cap(b)
+func ensure(b []byte, sz int) []byte {
+	l := len(b)
+	c := cap(b)
+	if c-l < sz {
+		o := make([]byte, (2*c)+sz) // exponential growth
+		n := copy(o, b)
+		return o[:n+sz]
+	}
+	return b[:l+sz]
+}
+
+func (z *MetricPointId1) MarshalManual(b []byte) (o []byte, err error) {
+	b = ensure(b, 28) // 16+4+8
+	copy(b, z.Id[:])
+	binary.LittleEndian.PutUint32(b[16:], z.Time)
+	binary.LittleEndian.PutUint64(b[20:], math.Float64bits(z.Value))
+	return b, nil
+}
+
+func (z *MetricPointId1) UnmarshalManual(bts []byte) (o []byte, err error) {
+	copy(z.Id[:], bts[:16])
+	z.Time = binary.LittleEndian.Uint32(bts[16:20])
+	z.Value = math.Float64frombits(binary.LittleEndian.Uint64(bts[20:]))
+	return bts[28:], nil
 }
 
 // MetricData contains all metric metadata (some as fields, some as tags) and a datapoint
