@@ -3,12 +3,15 @@ package memory
 import (
 	"crypto/rand"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/mdata"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -731,4 +734,46 @@ func BenchmarkDeletes(b *testing.B) {
 	b.ResetTimer()
 
 	ix.Delete(1, "some.*")
+}
+
+func TestMatchSchemaWithTags(t *testing.T) {
+	_tagSupport := TagSupport
+	_schemas := mdata.Schemas
+	defer func() { TagSupport = _tagSupport }()
+	defer func() { mdata.Schemas = _schemas }()
+
+	TagSupport = true
+	mdata.Schemas = conf.NewSchemas([]conf.Schema{
+		{
+			Name:       "tag1_is_value3_or_value5",
+			Pattern:    regexp.MustCompile(".*;tag1=value[35](;.*|$)"),
+			Retentions: conf.Retentions([]conf.Retention{conf.NewRetentionMT(1, 3600*24*1, 600, 2, true)}),
+		},
+	})
+
+	ix := New()
+	ix.Init()
+
+	data := make([]*schema.MetricDefinition, 10)
+	archives := make([]idx.Archive, 10)
+	for i := 0; i < 10; i++ {
+		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
+		data[i] = &schema.MetricDefinition{
+			Name:     name,
+			Metric:   name,
+			OrgId:    1,
+			Interval: 1,
+			Tags:     []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},
+		}
+		data[i].SetId()
+		archives[i] = ix.add(data[i])
+	}
+
+	// only those MDs with tag1=value3 or tag1=value5 should get the first schema id
+	expectedSchemas := []uint16{1, 1, 1, 0, 1, 0, 1, 1, 1, 1}
+	for i := 0; i < 10; i++ {
+		if archives[i].SchemaId != expectedSchemas[i] {
+			t.Fatalf("Expected schema of archive %d to be %d, but it was %d", i, expectedSchemas[i], archives[i].SchemaId)
+		}
+	}
 }

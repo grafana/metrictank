@@ -334,8 +334,8 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.NameWithTags()
 
-	schemaId, _ := mdata.MatchSchema(def.Name, def.Interval)
-	aggId, _ := mdata.MatchAgg(def.Name)
+	schemaId, _ := mdata.MatchSchema(path, def.Interval)
+	aggId, _ := mdata.MatchAgg(path)
 	sort.Strings(def.Tags)
 	archive := &idx.Archive{
 		MetricDefinition: *def,
