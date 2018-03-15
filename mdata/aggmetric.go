@@ -573,7 +573,10 @@ func (a *AggMetric) add(ts uint32, val float64) {
 // caller must hold AggMetric lock
 func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
 
-	currentChunk := a.getChunk(a.CurrentChunkPos)
+	var currentChunk *chunk.Chunk
+	if len(a.Chunks) != 0 {
+		currentChunk = a.getChunk(a.CurrentChunkPos)
+	}
 
 	// no chunks at all means "possibly collectable"
 	// the caller (AggMetric.GC()) still has its own checks to
