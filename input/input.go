@@ -8,13 +8,13 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/msg"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 type Handler interface {
-	Process(metric *schema.MetricData, partition int32)
+	Process(pointMsg msg.Point, partition int32)
 }
 
 // TODO: clever way to document all metrics for all different inputs
@@ -46,29 +46,43 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 
 // process makes sure the data is stored and the metadata is in the index
 // concurrency-safe.
-func (in DefaultHandler) Process(metric *schema.MetricData, partition int32) {
-	if metric == nil {
-		return
-	}
+func (in DefaultHandler) Process(pointMsg msg.Point, partition int32) {
 	in.metricsReceived.Inc()
-	err := metric.Validate()
-	if err != nil {
-		in.MetricInvalid.Inc()
-		log.Debug("in: Invalid metric %s %v", err, metric)
-		return
-	}
-	if metric.Time == 0 {
-		in.MetricInvalid.Inc()
-		log.Warn("in: invalid metric. metric.Time is 0. %s", metric.Id)
-		return
+	var timestamp uint32
+	var value float64
+
+	if pointMsg.Val == 0 {
+		err := pointMsg.Md.Validate()
+		if err != nil {
+			in.MetricInvalid.Inc()
+			log.Debug("in: Invalid metric %s %v", err, pointMsg.Md)
+			return
+		}
+		if pointMsg.Md.Time == 0 {
+			in.MetricInvalid.Inc()
+			log.Warn("in: invalid metric. metric.Time is 0. %s", pointMsg.Md.Id)
+			return
+		}
+
+		timestamp = uint32(pointMsg.Md.Time)
+		value = pointMsg.Md.Value
+	} else {
+		if !pointMsg.Point.Valid() {
+			in.MetricInvalid.Inc()
+			log.Debug("in: Invalid metric %v", pointMsg.Point)
+			return
+		}
+		timestamp = pointMsg.Point.MetricPointId1.Time
+		value = pointMsg.Point.MetricPointId1.Value
+
 	}
 
 	pre := time.Now()
-	archive := in.metricIndex.AddOrUpdate(metric, partition)
+	archive := in.metricIndex.AddOrUpdate(pointMsg, partition)
 	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 	pre = time.Now()
-	m := in.metrics.GetOrCreate(metric.Id, metric.Name, archive.SchemaId, archive.AggId)
-	m.Add(uint32(metric.Time), metric.Value)
+	m := in.metrics.GetOrCreate(key, archive.SchemaId, archive.AggId)
+	m.Add(timestamp, value)
 	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 }
