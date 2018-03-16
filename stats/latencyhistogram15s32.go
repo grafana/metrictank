@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -29,8 +30,11 @@ func (l *LatencyHistogram15s32) Value(t time.Duration) {
 
 func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	snap := l.hist.Snapshot()
-	// TODO: once we can actually do cool stuff (e.g. visualize) histogram bucket data, report it
-	// for now, only report the summaries :(
+	for i, cnt := range snap[:len(snap)-1] {
+		bucket := l.hist.Limits[i]
+		buf = WriteUint32(buf, prefix, []byte(fmt.Sprintf("latency.histogram.%d", bucket)), cnt, now)
+	}
+	buf = WriteUint32(buf, prefix, []byte("latency.histogram.29000000"), snap[len(snap)-1], now)
 	r, ok := l.hist.Report(snap)
 	if ok {
 		sum := atomic.SwapUint64(&l.sum, 0)

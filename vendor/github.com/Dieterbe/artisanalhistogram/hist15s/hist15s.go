@@ -10,13 +10,13 @@ const maxVal = uint32(29999999) // used to report max number as 29s even if it's
 
 // Hist15s is optimized for measurements between 1ms and 15s
 type Hist15s struct {
-	limits [32]uint32 // in micros
+	Limits [32]uint32 // in micros
 	counts [32]uint32
 }
 
 func New() Hist15s {
 	return Hist15s{
-		limits: [32]uint32{
+		Limits: [32]uint32{
 			1000,           // 0
 			2000,           // 1
 			3000,           // 2
@@ -80,8 +80,8 @@ func (h *Hist15s) AddDuration(value time.Duration) {
 	micros := uint32(value.Nanoseconds() / 1000)
 	min, i, max := 0, 16, 32
 	for {
-		if micros <= h.limits[i] {
-			if i == 0 || micros > h.limits[i-1] {
+		if micros <= h.Limits[i] {
+			if i == 0 || micros > h.Limits[i-1] {
 				atomic.AddUint32(&h.counts[i], 1)
 				return
 			}
@@ -127,7 +127,7 @@ func (h *Hist15s) Report(data []uint32) (Report, bool) {
 				r.Count = 1
 				return r, false
 			}
-			limit := h.limits[i]
+			limit := h.Limits[i]
 			// special case, report as 29s
 			if i == 31 {
 				limit = maxVal
@@ -143,15 +143,15 @@ func (h *Hist15s) Report(data []uint32) (Report, bool) {
 	if r.Count == 0 {
 		return r, false
 	}
-	r.Median = h.limits[Quantile(data, 0.50, r.Count)]
+	r.Median = h.Limits[Quantile(data, 0.50, r.Count)]
 	if r.Median == math.MaxUint32 {
 		r.Median = maxVal
 	}
-	r.P75 = h.limits[Quantile(data, 0.75, r.Count)]
+	r.P75 = h.Limits[Quantile(data, 0.75, r.Count)]
 	if r.P75 == math.MaxUint32 {
 		r.P75 = maxVal
 	}
-	r.P90 = h.limits[Quantile(data, 0.90, r.Count)]
+	r.P90 = h.Limits[Quantile(data, 0.90, r.Count)]
 	if r.P90 == math.MaxUint32 {
 		r.P90 = maxVal
 	}
