@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type CCacheMetric struct {
@@ -20,7 +21,7 @@ type CCacheMetric struct {
 	// the list of chunk time stamps in ascending order
 	keys []uint32
 
-	SuffixLen uint8
+	rawKey schema.AMKey
 }
 
 func NewCCacheMetric() *CCacheMetric {
@@ -29,8 +30,7 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(suffixLen uint8, prev uint32, itergen chunk.IterGen) {
-	mc.SuffixLen = suffixLen
+func (mc *CCacheMetric) Init(rawKey schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Add(prev, itergen)
 }
 
@@ -195,7 +195,7 @@ func (mc *CCacheMetric) seekDesc(ts uint32) (uint32, bool) {
 	return 0, false
 }
 
-func (mc *CCacheMetric) searchForward(ctx context.Context, metric string, from, until uint32, res *CCSearchResult) {
+func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, from, until uint32, res *CCSearchResult) {
 	ts, ok := mc.seekAsc(from)
 	if !ok {
 		return
@@ -253,7 +253,7 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
 //
-func (mc *CCacheMetric) Search(ctx context.Context, metric string, res *CCSearchResult, from, until uint32) {
+func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
 

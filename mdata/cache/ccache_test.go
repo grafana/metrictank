@@ -7,6 +7,7 @@ import (
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/test"
+	"gopkg.in/raintank/schema.v1"
 )
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values
@@ -33,7 +34,7 @@ func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.It
 	return *itgen
 }
 
-func getConnectedChunks(t *testing.T, metric string) *CCache {
+func getConnectedChunks(t *testing.T, metric schema.AMKey) *CCache {
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -52,9 +53,15 @@ func getConnectedChunks(t *testing.T, metric string) *CCache {
 	return cc
 }
 
+func getTestKey(name string) schema.AMKey {
+	k := schema.AMKey{}
+	copy(k.MKey.Key[:], []byte(name))
+	return k
+}
+
 // test AddIfHot method without passing a previous timestamp on a hot metric
 func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -89,7 +96,7 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 
 // test AddIfHot method without passing a previous timestamp on a cold metric
 func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -114,7 +121,7 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 
 // test AddIfHot method on a hot metric
 func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -149,7 +156,7 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 
 // test AddIfHot method on a cold metric
 func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -173,7 +180,7 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 }
 
 func TestConsecutiveAdding(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -209,7 +216,7 @@ func TestConsecutiveAdding(t *testing.T) {
 
 // tests if chunks get connected to previous even if it is is not specified, based on span
 func TestDisconnectedAdding(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -243,7 +250,7 @@ func TestDisconnectedAdding(t *testing.T) {
 // tests if chunks get connected to previous even if it is is not specified,
 // basesd on a span which is the result of a guess that's based on the distance to the previous chunk
 func TestDisconnectedAddingByGuessing(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -289,7 +296,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 }
 
 func TestSearchFromBeginningComplete(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 1006, 1025)
 
@@ -307,7 +314,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 }
 
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 1006, 1030)
 	if res.Complete {
@@ -324,7 +331,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 }
 
 func TestSearchFromEnd(t *testing.T) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 500, 1025)
 
@@ -364,7 +371,7 @@ func TestSearchDisconnectedStartEndNonSpanaware(t *testing.T) {
 func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 	var cc *CCache
 	var res *CCSearchResult
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 	itgen1 := getItgen(t, values, 1000, spanaware)
@@ -437,7 +444,7 @@ func TestSearchDisconnectedWithGapStartEndNonSpanaware(t *testing.T) {
 }
 
 func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bool) {
-	metric := "metric1"
+	metric := getTestKey("metric1")
 	var cc *CCache
 	var res *CCSearchResult
 
@@ -521,11 +528,11 @@ func TestMetricDelete(t *testing.T) {
 func testMetricDelete(t *testing.T, cc *CCache) {
 	var res *CCSearchResult
 
-	rawMetric1 := "some.tree.metric1"
-	metric1_1 := "some.tree.metric1_600_cnt"
-	metric1_2 := "some.tree.metric1_600_sum"
-	rawMetric2 := "some.tree.metric2"
-	metric2_1 := "some.tree.metric2_6000_cnt"
+	rawMetric1 := getTestKey("some.tree.metric1")
+	metric1_1 := getTestKey("some.tree.metric1_600_cnt")
+	metric1_2 := getTestKey("some.tree.metric1_600_sum")
+	rawMetric2 := getTestKey("some.tree.metric2")
+	metric2_1 := getTestKey("some.tree.metric2_6000_cnt")
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	itgenCount := 10
 	itgens := make([]chunk.IterGen, 0, itgenCount)

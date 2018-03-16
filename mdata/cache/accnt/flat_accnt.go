@@ -1,8 +1,10 @@
 package accnt
 
 import (
-	"github.com/raintank/worldping-api/pkg/log"
 	"sort"
+
+	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v1"
 )
 
 const evictQSize = 1000
@@ -19,7 +21,7 @@ const eventQSize = 100000
 // evict loop.
 type FlatAccnt struct {
 	// metric accounting per metric key
-	metrics map[string]*FlatAccntMet
+	metrics map[schema.AMKey]*FlatAccntMet
 
 	// the size limit, once this is reached we'll start evicting data
 	maxSize uint64
@@ -60,20 +62,20 @@ type FlatAccntEvent struct {
 
 // payload to be sent with an add event
 type AddPayload struct {
-	metric string
+	metric schema.AMKey
 	ts     uint32
 	size   uint64
 }
 
 // payload to be sent with a hit event
 type HitPayload struct {
-	metric string
+	metric schema.AMKey
 	ts     uint32
 }
 
 // payload to be sent with del metric event
 type DelMetPayload struct {
-	metric string
+	metric schema.AMKey
 }
 
 // payload to be sent with a get total request event
@@ -83,7 +85,7 @@ type GetTotalPayload struct {
 
 func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 	accnt := FlatAccnt{
-		metrics: make(map[string]*FlatAccntMet),
+		metrics: make(map[schema.AMKey]*FlatAccntMet),
 		maxSize: maxSize,
 		lru:     NewLRU(),
 		evictQ:  make(chan *EvictTarget, evictQSize),
@@ -95,7 +97,7 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 	return &accnt
 }
 
-func (a *FlatAccnt) DelMetric(metric string) {
+func (a *FlatAccnt) DelMetric(metric schema.AMKey) {
 	a.act(evnt_del_met, &DelMetPayload{metric})
 }
 
@@ -105,11 +107,11 @@ func (a *FlatAccnt) GetTotal() uint64 {
 	return <-res_chan
 }
 
-func (a *FlatAccnt) AddChunk(metric string, ts uint32, size uint64) {
+func (a *FlatAccnt) AddChunk(metric schema.AMKey, ts uint32, size uint64) {
 	a.act(evnt_add_chnk, &AddPayload{metric, ts, size})
 }
 
-func (a *FlatAccnt) HitChunk(metric string, ts uint32) {
+func (a *FlatAccnt) HitChunk(metric schema.AMKey, ts uint32) {
 	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
 }
 
@@ -167,7 +169,7 @@ func (a *FlatAccnt) eventLoop() {
 			case evnt_stop:
 				return
 			case evnt_reset:
-				a.metrics = make(map[string]*FlatAccntMet)
+				a.metrics = make(map[schema.AMKey]*FlatAccntMet)
 				a.lru.reset()
 				cacheSizeUsed.SetUint64(0)
 			}
@@ -184,7 +186,7 @@ func (a *FlatAccnt) getTotal(res_chan chan uint64) {
 	res_chan <- cacheSizeUsed.Peek()
 }
 
-func (a *FlatAccnt) delMet(metric string) {
+func (a *FlatAccnt) delMet(metric schema.AMKey) {
 	met, ok := a.metrics[metric]
 	if !ok {
 		return
@@ -203,7 +205,7 @@ func (a *FlatAccnt) delMet(metric string) {
 	delete(a.metrics, metric)
 }
 
-func (a *FlatAccnt) add(metric string, ts uint32, size uint64) {
+func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 	var met *FlatAccntMet
 	var ok bool
 

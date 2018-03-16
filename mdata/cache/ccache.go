@@ -13,6 +13,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	"gopkg.in/raintank/schema.v1"
 )
 
 var (
@@ -31,10 +32,10 @@ type CCache struct {
 	sync.RWMutex
 
 	// one CCacheMetric struct per metric key, indexed by the key
-	metricCache map[string]*CCacheMetric
+	metricCache map[schema.AMKey]*CCacheMetric
 
 	// sets of metric keys, indexed by their raw metric keys
-	metricRawKeys map[string]map[string]struct{}
+	metricRawKeys map[schema.AMKey]map[schema.AMKey]struct{}
 
 	// accounting for the cache. keeps track of when data needs to be evicted
 	// and what should be evicted
@@ -48,8 +49,8 @@ type CCache struct {
 
 func NewCCache() *CCache {
 	cc := &CCache{
-		metricCache:   make(map[string]*CCacheMetric),
-		metricRawKeys: make(map[string]map[string]struct{}),
+		metricCache:   make(map[schema.AMKey]*CCacheMetric),
+		metricRawKeys: make(map[schema.AMKey]map[schema.AMKey]struct{}),
 		accnt:         accnt.NewFlatAccnt(maxSize),
 		stop:          make(chan interface{}),
 		tracer:        opentracing.NoopTracer{},
@@ -75,7 +76,7 @@ func (c *CCache) evictLoop() {
 }
 
 // takes a raw key and deletes all archives associated with it from cache
-func (c *CCache) DelMetric(rawMetric string) (int, int) {
+func (c *CCache) DelMetric(rawMetric schema.AMKey) (int, int) {
 	archives, series := 0, 0
 
 	c.Lock()
@@ -99,7 +100,7 @@ func (c *CCache) DelMetric(rawMetric string) (int, int) {
 }
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
-func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	c.RLock()
 
 	var met *CCacheMetric
@@ -125,20 +126,20 @@ func (c *CCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
 	met.Add(prev, itergen)
 }
 
-func (c *CCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) Add(metric, rawMetric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	c.Lock()
 	defer c.Unlock()
 
 	ccm, ok := c.metricCache[metric]
 	if !ok {
 		ccm = NewCCacheMetric()
-		ccm.Init(uint8(len(metric)-len(rawMetric)), prev, itergen)
+		ccm.Init(rawMetric, prev, itergen)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association
 		ccms, ok := c.metricRawKeys[rawMetric]
 		if !ok {
-			c.metricRawKeys[rawMetric] = map[string]struct{}{
+			c.metricRawKeys[rawMetric] = map[schema.AMKey]struct{}{
 				metric: {},
 			}
 		} else {
@@ -157,8 +158,8 @@ func (cc *CCache) Reset() (int, int) {
 	cc.accnt.Reset()
 	series := len(cc.metricRawKeys)
 	archives := len(cc.metricCache)
-	cc.metricCache = make(map[string]*CCacheMetric)
-	cc.metricRawKeys = make(map[string]map[string]struct{})
+	cc.metricCache = make(map[schema.AMKey]*CCacheMetric)
+	cc.metricRawKeys = make(map[schema.AMKey]map[schema.AMKey]struct{})
 	cc.Unlock()
 	return series, archives
 }
@@ -187,15 +188,14 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 		delete(c.metricCache, target.Metric)
 
 		// this key should alway be present, if not there there is a corruption of the state
-		rawMetric := target.Metric[:len(target.Metric)-int(ccm.SuffixLen)]
-		delete(c.metricRawKeys[rawMetric], target.Metric)
-		if len(c.metricRawKeys[rawMetric]) == 0 {
-			delete(c.metricRawKeys, rawMetric)
+		delete(c.metricRawKeys[ccm.rawKey], target.Metric)
+		if len(c.metricRawKeys[ccm.rawKey]) == 0 {
+			delete(c.metricRawKeys, ccm.rawKey)
 		}
 	}
 }
 
-func (c *CCache) Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult {
+func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult {
 	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
 	defer span.Finish()
 	var hit chunk.IterGen
