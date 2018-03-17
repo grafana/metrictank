@@ -298,22 +298,28 @@ func TestMetricPointId1MarshalDirectMultiple(t *testing.T) {
 func TestMetricPointId2MarshalDirect(t *testing.T) {
 	tests := []MetricPointId2{
 		{
-			Id:    [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 255},
-			Time:  0,
-			Value: 0,
-			Org:   0,
+			MetricPointId1{
+				Id:    [16]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 255},
+				Time:  0,
+				Value: 0,
+			},
+			0,
 		},
 		{
-			Id:    [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			Time:  1234567890,
-			Value: 123.456789,
-			Org:   2812345,
+			MetricPointId1{
+				Id:    [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				Time:  1234567890,
+				Value: 123.456789,
+			},
+			2812345,
 		},
 		{
-			Id:    [16]byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
-			Time:  math.MaxUint32,
-			Value: math.MaxFloat64,
-			Org:   math.MaxUint32,
+			MetricPointId1{
+				Id:    [16]byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
+				Time:  math.MaxUint32,
+				Value: math.MaxFloat64,
+			},
+			math.MaxUint32,
 		},
 	}
 	for i, in := range tests {

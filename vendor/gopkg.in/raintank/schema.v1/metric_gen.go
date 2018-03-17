@@ -936,18 +936,8 @@ func (z *MetricPointId2) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "Id":
-			err = dc.ReadExactBytes((z.Id)[:])
-			if err != nil {
-				return
-			}
-		case "Value":
-			z.Value, err = dc.ReadFloat64()
-			if err != nil {
-				return
-			}
-		case "Time":
-			z.Time, err = dc.ReadUint32()
+		case "MetricPointId1":
+			err = z.MetricPointId1.DecodeMsg(dc)
 			if err != nil {
 				return
 			}
@@ -968,31 +958,13 @@ func (z *MetricPointId2) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *MetricPointId2) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 4
-	// write "Id"
-	err = en.Append(0x84, 0xa2, 0x49, 0x64)
+	// map header, size 2
+	// write "MetricPointId1"
+	err = en.Append(0x82, 0xae, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x50, 0x6f, 0x69, 0x6e, 0x74, 0x49, 0x64, 0x31)
 	if err != nil {
 		return
 	}
-	err = en.WriteBytes((z.Id)[:])
-	if err != nil {
-		return
-	}
-	// write "Value"
-	err = en.Append(0xa5, 0x56, 0x61, 0x6c, 0x75, 0x65)
-	if err != nil {
-		return
-	}
-	err = en.WriteFloat64(z.Value)
-	if err != nil {
-		return
-	}
-	// write "Time"
-	err = en.Append(0xa4, 0x54, 0x69, 0x6d, 0x65)
-	if err != nil {
-		return
-	}
-	err = en.WriteUint32(z.Time)
+	err = z.MetricPointId1.EncodeMsg(en)
 	if err != nil {
 		return
 	}
@@ -1011,16 +983,13 @@ func (z *MetricPointId2) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *MetricPointId2) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 4
-	// string "Id"
-	o = append(o, 0x84, 0xa2, 0x49, 0x64)
-	o = msgp.AppendBytes(o, (z.Id)[:])
-	// string "Value"
-	o = append(o, 0xa5, 0x56, 0x61, 0x6c, 0x75, 0x65)
-	o = msgp.AppendFloat64(o, z.Value)
-	// string "Time"
-	o = append(o, 0xa4, 0x54, 0x69, 0x6d, 0x65)
-	o = msgp.AppendUint32(o, z.Time)
+	// map header, size 2
+	// string "MetricPointId1"
+	o = append(o, 0x82, 0xae, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x50, 0x6f, 0x69, 0x6e, 0x74, 0x49, 0x64, 0x31)
+	o, err = z.MetricPointId1.MarshalMsg(o)
+	if err != nil {
+		return
+	}
 	// string "Org"
 	o = append(o, 0xa3, 0x4f, 0x72, 0x67)
 	o = msgp.AppendUint32(o, z.Org)
@@ -1043,18 +1012,8 @@ func (z *MetricPointId2) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "Id":
-			bts, err = msgp.ReadExactBytes(bts, (z.Id)[:])
-			if err != nil {
-				return
-			}
-		case "Value":
-			z.Value, bts, err = msgp.ReadFloat64Bytes(bts)
-			if err != nil {
-				return
-			}
-		case "Time":
-			z.Time, bts, err = msgp.ReadUint32Bytes(bts)
+		case "MetricPointId1":
+			bts, err = z.MetricPointId1.UnmarshalMsg(bts)
 			if err != nil {
 				return
 			}
@@ -1076,6 +1035,6 @@ func (z *MetricPointId2) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *MetricPointId2) Msgsize() (s int) {
-	s = 1 + 3 + msgp.ArrayHeaderSize + (16 * (msgp.ByteSize)) + 6 + msgp.Float64Size + 5 + msgp.Uint32Size + 4 + msgp.Uint32Size
+	s = 1 + 15 + z.MetricPointId1.Msgsize() + 4 + msgp.Uint32Size
 	return
 }

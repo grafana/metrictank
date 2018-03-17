@@ -86,10 +86,12 @@ func getDifferentMetricPointId2s(amount int) []MetricPointId2 {
 	out := make([]MetricPointId2, amount)
 	for i := 0; i < amount; i++ {
 		out[i] = MetricPointId2{
-			Org:   uint32(i),
-			Id:    ids[i%len(ids)],
-			Value: r.Float64(),
-			Time:  baseTime + uint32(i),
+			MetricPointId1{
+				Id:    ids[i%len(ids)],
+				Value: r.Float64(),
+				Time:  baseTime + uint32(i),
+			},
+			uint32(i),
 		}
 	}
 	return out
