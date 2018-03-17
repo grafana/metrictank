@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/batch"
 )
 
@@ -63,22 +65,22 @@ func (c Consolidator) String() string {
 
 // provide the name of a stored archive
 // see aggregator.go for which archives are available
-func (c Consolidator) Archive() string {
+func (c Consolidator) Archive() schema.Method {
 	switch c {
 	case None:
 		panic("cannot get an archive for no consolidation")
 	case Avg:
 		panic("avg consolidator has no matching Archive(). you need sum and cnt")
 	case Cnt:
-		return "cnt"
+		return schema.Cnt
 	case Lst:
-		return "lst"
+		return schema.Lst
 	case Min:
-		return "min"
+		return schema.Min
 	case Max:
-		return "max"
+		return schema.Max
 	case Sum:
-		return "sum"
+		return schema.Sum
 	}
 	panic(fmt.Sprintf("Consolidator.Archive(): unknown consolidator %q", c))
 }

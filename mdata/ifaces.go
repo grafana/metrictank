@@ -3,14 +3,16 @@ package mdata
 import (
 	"context"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type Metrics interface {
-	Get(key string) (Metric, bool)
-	GetOrCreate(key, name string, schemaId, aggId uint16) Metric
+	Get(key schema.MKey) (Metric, bool)
+	GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metric
 }
 
 type Metric interface {

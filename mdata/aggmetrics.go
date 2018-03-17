@@ -6,14 +6,19 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v1"
 )
 
+// AggMetrics is an in-memory store of AggMetric objects
+// note: they are keyed by MKey here because each
+// AggMetric manages access to, and references of,
+// their rollup archives themselves
 type AggMetrics struct {
 	store          Store
 	cachePusher    cache.CachePusher
 	dropFirstChunk bool
 	sync.RWMutex
-	Metrics        map[string]*AggMetric
+	Metrics        map[schema.MKey]*AggMetric
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
@@ -24,7 +29,7 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bo
 		store:          store,
 		cachePusher:    cachePusher,
 		dropFirstChunk: dropFirstChunk,
-		Metrics:        make(map[string]*AggMetric),
+		Metrics:        make(map[schema.MKey]*AggMetric),
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
 		gcInterval:     gcInterval,
@@ -52,7 +57,7 @@ func (ms *AggMetrics) GC() {
 		// we only need to lock long enough to get the list of actives metrics.
 		// it doesn't matter if new metrics are added while we iterate this list.
 		ms.RLock()
-		keys := make([]string, 0, len(ms.Metrics))
+		keys := make([]schema.MKey, 0, len(ms.Metrics))
 		for k := range ms.Metrics {
 			keys = append(keys, k)
 		}
@@ -74,20 +79,23 @@ func (ms *AggMetrics) GC() {
 	}
 }
 
-func (ms *AggMetrics) Get(key string) (Metric, bool) {
+func (ms *AggMetrics) Get(key schema.MKey) (Metric, bool) {
 	ms.RLock()
 	m, ok := ms.Metrics[key]
 	ms.RUnlock()
 	return m, ok
 }
 
-func (ms *AggMetrics) GetOrCreate(key, name string, schemaId, aggId uint16) Metric {
+func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metric {
 	ms.Lock()
 	m, ok := ms.Metrics[key]
 	if !ok {
+		k := schema.AMKey{
+			MKey: key,
+		}
 		agg := Aggregations.Get(aggId)
 		schema := Schemas.Get(schemaId)
-		m = NewAggMetric(ms.store, ms.cachePusher, key, schema.Retentions, schema.ReorderWindow, &agg, ms.dropFirstChunk)
+		m = NewAggMetric(ms.store, ms.cachePusher, k, schema.Retentions, schema.ReorderWindow, &agg, ms.dropFirstChunk)
 		ms.Metrics[key] = m
 		metricsActive.Set(len(ms.Metrics))
 	}
