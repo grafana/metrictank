@@ -528,11 +528,11 @@ func TestMetricDelete(t *testing.T) {
 func testMetricDelete(t *testing.T, cc *CCache) {
 	var res *CCSearchResult
 
-	rawMetric1 := getTestKey("some.tree.metric1")
-	metric1_1 := getTestKey("some.tree.metric1_600_cnt")
-	metric1_2 := getTestKey("some.tree.metric1_600_sum")
-	rawMetric2 := getTestKey("some.tree.metric2")
-	metric2_1 := getTestKey("some.tree.metric2_6000_cnt")
+	rawMetric1 := getTestKey("a.b.1")
+	metric1_1 := getTestKey("a.b.1_600_cnt")
+	metric1_2 := getTestKey("a.b.1_600_sum")
+	rawMetric2 := getTestKey("a.b.2")
+	metric2_1 := getTestKey("a.b.2_6000_cnt")
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	itgenCount := 10
 	itgens := make([]chunk.IterGen, 0, itgenCount)
