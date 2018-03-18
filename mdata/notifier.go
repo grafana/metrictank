@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/stats"
@@ -30,6 +32,8 @@ type PersistMessageBatch struct {
 	SavedChunks []SavedChunk `json:"saved_chunks"`
 }
 
+// SavedChunk represents a chunk persisted to the store
+// Key is a stringified schema.AMKey
 type SavedChunk struct {
 	Key string `json:"key"`
 	T0  uint32 `json:"t0"`
@@ -68,14 +72,19 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 					continue
 				}
 			}
+			mkey, err := schema.MKeyFromString(key[0])
+			if err != nil {
+				log.Error(3, "notifier: failed to convert %q to MKey: %s", c.Key, err)
+				continue
+			}
 			// we only need to handle saves for series that we know about.
 			// if the series is not in the index, then we dont need to worry about it.
-			def, ok := idx.Get(key[0])
+			def, ok := idx.Get(mkey)
 			if !ok {
 				log.Debug("notifier: skipping metric with id %s as it is not in the index", key[0])
 				continue
 			}
-			agg := metrics.GetOrCreate(key[0], def.Name, def.SchemaId, def.AggId)
+			agg := metrics.GetOrCreate(mkey, def.SchemaId, def.AggId)
 			if len(key) == 3 {
 				agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, uint32(aggSpan))
 			} else {

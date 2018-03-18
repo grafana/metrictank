@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/kafka"
@@ -232,7 +234,13 @@ func (c *NotifierKafka) flush() {
 	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
 	var pMsg mdata.PersistMessageBatch
 	for i, msg := range c.buf {
-		def, ok := c.idx.Get(strings.SplitN(msg.Key, "_", 2)[0])
+		mkey, err := schema.MKeyFromString(strings.SplitN(msg.Key, "_", 2)[0])
+		if err != nil {
+			log.Error(3, "kafka-cluster: failed to parse key %q", msg.Key)
+			continue
+		}
+
+		def, ok := c.idx.Get(mkey)
 		if !ok {
 			log.Error(3, "kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
 			continue
@@ -241,7 +249,7 @@ func (c *NotifierKafka) flush() {
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
 		encoder := json.NewEncoder(buf)
 		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
-		err := encoder.Encode(&pMsg)
+		err = encoder.Encode(&pMsg)
 		if err != nil {
 			log.Fatal(4, "kafka-cluster failed to marshal persistMessage to json.")
 		}
