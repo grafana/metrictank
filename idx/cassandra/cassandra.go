@@ -264,7 +264,7 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+func (c *CasIdx) AddOrUpdate(point msg.Point, partition int32) idx.Archive {
 	pre := time.Now()
 	existing, inMemory := c.MemoryIdx.Get(data.Id)
 	archive := c.MemoryIdx.AddOrUpdate(data, partition)
@@ -358,8 +358,14 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff u
 	var tags []string
 	cutoff64 := int64(cutoff)
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+		mkey, err := schema.MKeyFromString(id)
+		if err != nil {
+			log.Error(3, "cassandra-idx: load() could not parse ID %q: %s -> skipping", id, err)
+			continue
+		}
+
 		mdef := &schema.MetricDefinition{
-			Id:         id,
+			Id:         mkey,
 			OrgId:      orgId,
 			Partition:  partition,
 			Name:       name,
@@ -413,7 +419,7 @@ func (c *CasIdx) processWriteQueue() {
 		for !success {
 			if err := c.session.Query(
 				qry,
-				req.def.Id,
+				req.def.Id.String(),
 				req.def.OrgId,
 				req.def.Partition,
 				req.def.Name,

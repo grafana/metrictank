@@ -63,7 +63,7 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type IdSet map[string]struct{} // set of ids
+type IdSet map[schema.MKey]struct{} // set of ids
 
 func (ids IdSet) String() string {
 	var res string
@@ -71,7 +71,7 @@ func (ids IdSet) String() string {
 		if len(res) > 0 {
 			res += " "
 		}
-		res += id
+		res += id.String()
 	}
 	return res
 
@@ -80,7 +80,7 @@ func (ids IdSet) String() string {
 type TagValue map[string]IdSet    // value -> set of ids
 type TagIndex map[string]TagValue // key -> list of values
 
-func (t *TagIndex) addTagId(name, value string, id string) {
+func (t *TagIndex) addTagId(name, value string, id schema.MKey) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
 		ti[name] = make(TagValue)
@@ -91,7 +91,7 @@ func (t *TagIndex) addTagId(name, value string, id string) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) delTagId(name, value string, id string) {
+func (t *TagIndex) delTagId(name, value string, id schema.MKey) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -155,7 +155,7 @@ func (defs defByTagSet) defs(id int, fullName string) map[*schema.MetricDefiniti
 type Node struct {
 	Path     string
 	Children []string
-	Defs     []string
+	Defs     []schema.MKey
 }
 
 func (n *Node) HasChildren() bool {
@@ -179,7 +179,7 @@ type MemoryIdx struct {
 
 	// used for both hierarchy and tag index, so includes all MDs, with
 	// and without tags. It also mixes all orgs into one flat map.
-	defById map[string]*idx.Archive // by ID string
+	defById map[schema.MKey]*idx.Archive
 
 	// used by hierarchy index only
 	tree map[int]*Tree // by orgId
@@ -191,7 +191,7 @@ type MemoryIdx struct {
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		defById:     make(map[string]*idx.Archive),
+		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[int]*Tree),
 		tags:        make(map[int]TagIndex),
@@ -359,7 +359,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		root := &Node{
 			Path:     "",
 			Children: make([]string, 0),
-			Defs:     make([]string, 0),
+			Defs:     make([]schema.MKey, 0),
 		}
 		m.tree[def.OrgId] = &Tree{
 			Items: map[string]*Node{"": root},
@@ -396,7 +396,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		tree.Items[branch] = &Node{
 			Path:     branch,
 			Children: []string{prevNode},
-			Defs:     make([]string, 0),
+			Defs:     make([]schema.MKey, 0),
 		}
 
 		prevPos = pos
@@ -416,7 +416,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	tree.Items[path] = &Node{
 		Path:     path,
 		Children: []string{},
-		Defs:     []string{def.Id},
+		Defs:     []schema.MKey{def.Id},
 	}
 	m.defById[def.Id] = archive
 	statAdd.Inc()
@@ -424,7 +424,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	return *archive
 }
 
-func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
+func (m *MemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
