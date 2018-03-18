@@ -53,3 +53,17 @@ func (m MKey) String() string {
 	return fmt.Sprintf("%d.%x", m.Org, m.Key)
 
 }
+
+// AMKey is a multi-tenant key with archive extension
+// so you can refer to rollup archives
+type AMKey struct {
+	MKey    MKey
+	Archive Archive
+}
+
+func (a AMKey) String() string {
+	if a.Archive == 0 {
+		return a.MKey.String()
+	}
+	return a.MKey.String() + "_" + a.Archive.String()
+}
