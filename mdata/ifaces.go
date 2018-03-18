@@ -23,7 +23,7 @@ type Metric interface {
 
 type Store interface {
 	Add(cwr *ChunkWriteRequest)
-	Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error)
+	Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error)
 	Stop()
 	SetTracer(t opentracing.Tracer)
 }
