@@ -3,11 +3,7 @@
 package idx
 
 import (
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	schema "gopkg.in/raintank/schema.v1"
@@ -16,9 +12,8 @@ import (
 var OrgIdPublic = 0
 
 var (
-	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
-	BranchUnderLeaf    = errors.New("can't add branch under leaf")
-	errInvalidIdString = errors.New("invalid ID string")
+	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
+	BranchUnderLeaf   = errors.New("can't add branch under leaf")
 )
 
 //go:generate msgp
@@ -34,45 +29,6 @@ type Archive struct {
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-type MetricID struct {
-	org int
-	key [16]byte
-}
-
-func NewMetricIDFromString(s string) (MetricID, error) {
-	id := MetricID{}
-	err := id.FromString(s)
-	return id, err
-}
-
-func (id *MetricID) FromString(s string) error {
-	splits := strings.Split(s, ".")
-	if len(splits) != 2 || len(splits[1]) != 32 {
-		return errInvalidIdString
-	}
-
-	var err error
-	id.org, err = strconv.Atoi(splits[0])
-	if err != nil {
-		return err
-	}
-
-	dst := make([]byte, 16)
-	n, err := hex.Decode(dst, []byte(splits[1]))
-	if err != nil {
-		return err
-	}
-	if n != 16 {
-		return errInvalidIdString
-	}
-	copy(id.key[:], dst)
-	return nil
-}
-
-func (id *MetricID) String() string {
-	return fmt.Sprintf("%d.%x", id.org, id.key)
 }
 
 // used primarily by tests, for convenience
