@@ -7,6 +7,9 @@ import (
 	"strconv"
 )
 
+//go:generate msgp
+//msgp:ignore Key AMKey
+
 var ErrStringTooShort = errors.New("string to short")
 
 // Key identifies a metric

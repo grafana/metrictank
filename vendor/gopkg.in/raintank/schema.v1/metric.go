@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -199,7 +198,7 @@ type MetricDataArray []*MetricData
 
 // for ES
 type MetricDefinition struct {
-	Id       string `json:"id"`
+	Id       MKey   `json:"id"`
 	OrgId    int    `json:"org_id"`
 	Name     string `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
 	Metric   string `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
@@ -275,7 +274,10 @@ func (m *MetricDefinition) SetId() {
 		buffer.WriteString(t)
 	}
 
-	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
+	m.Id = MKey{
+		md5.Sum(buffer.Bytes()),
+		uint32(m.OrgId),
+	}
 }
 
 func (m *MetricDefinition) Validate() error {
@@ -319,23 +321,15 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 	return b
 }
 
-func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
-	def := new(MetricDefinition)
-	if err := json.Unmarshal(b, &def); err != nil {
-		return nil, err
-	}
-
-	return def, nil
-}
-
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
 // to the original MetricData
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	tags := make([]string, len(d.Tags))
 	copy(tags, d.Tags)
+	mkey, _ := MKeyFromString(d.Id)
 
 	md := &MetricDefinition{
-		Id:         d.Id,
+		Id:         mkey,
 		Name:       d.Name,
 		OrgId:      d.OrgId,
 		Metric:     d.Metric,
