@@ -54,7 +54,7 @@ func getDifferentMetricDataArray(amount int) []*MetricData {
 	return out
 }
 
-func getDifferentMetricPointId1s(amount int) []MetricPointId1 {
+func getDifferentMetricPoints(amount int) []MetricPoint {
 	ids := [][16]byte{
 		md5.Sum([]byte("litmus.http.error_state.")),
 		md5.Sum([]byte("litmus.hello.dieter_plaetinck.be")),
@@ -63,35 +63,15 @@ func getDifferentMetricPointId1s(amount int) []MetricPointId1 {
 	}
 	baseTime := uint32(1512345678) // somewhat randomly chosen but realistic (dec 2017)
 	r := rand.New(rand.NewSource(438))
-	out := make([]MetricPointId1, amount)
+	out := make([]MetricPoint, amount)
 	for i := 0; i < amount; i++ {
-		out[i] = MetricPointId1{
-			Id:    ids[i%len(ids)],
+		out[i] = MetricPoint{
+			MKey: MKey{
+				Key: ids[i%len(ids)],
+				Org: uint32(i),
+			},
 			Value: r.Float64(),
 			Time:  baseTime + uint32(i),
-		}
-	}
-	return out
-}
-
-func getDifferentMetricPointId2s(amount int) []MetricPointId2 {
-	ids := [][16]byte{
-		md5.Sum([]byte("litmus.http.error_state.")),
-		md5.Sum([]byte("litmus.hello.dieter_plaetinck.be")),
-		md5.Sum([]byte("litmus.ok.raintank_dns_error_state_foo_longer")),
-		md5.Sum([]byte("hi.alerting.state")),
-	}
-	baseTime := uint32(1512345678) // somewhat randomly chosen but realistic (dec 2017)
-	r := rand.New(rand.NewSource(438))
-	out := make([]MetricPointId2, amount)
-	for i := 0; i < amount; i++ {
-		out[i] = MetricPointId2{
-			MetricPointId1{
-				Id:    ids[i%len(ids)],
-				Value: r.Float64(),
-				Time:  baseTime + uint32(i),
-			},
-			uint32(i),
 		}
 	}
 	return out

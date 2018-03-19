@@ -8,7 +8,8 @@ import (
 )
 
 //go:generate msgp
-//msgp:ignore Key AMKey
+//msgp:ignore AMKey
+// don't ignore Key, MKey because it's used for MetricDefinition
 
 var ErrStringTooShort = errors.New("string to short")
 
@@ -17,12 +18,12 @@ type Key [16]byte
 
 // MKey uniquely identifies a metric in a multi-tenant context
 type MKey struct {
-	Key [16]byte
+	Key Key
 	Org uint32
 }
 
 // KeyFromString parses a string id to an MKey
-// string id must be of form orgid.<hexadecimal hash>
+// string id must be of form orgid.<hexadecimal 128bit hash>
 func MKeyFromString(s string) (MKey, error) {
 	l := len(s)
 

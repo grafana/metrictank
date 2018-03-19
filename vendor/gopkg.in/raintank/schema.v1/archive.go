@@ -9,8 +9,8 @@ import (
 // Archive represents a metric archive
 // the zero value represents a raw metric
 // any non-zero value represents a certain
-// aggregation method (lower bits) and
-// aggregation span (higher bits)
+// aggregation method (lower 4 bits) and
+// aggregation span (higher 4 bits)
 type Archive uint8
 
 func NewArchive(method Method, span uint32) Archive {
@@ -37,13 +37,14 @@ const (
 	Cnt                   // cnt
 )
 
-// input will be like 600 -> to optimized form
-// but also optimized to human friendly
-
+// maps human friendly span numbers (in seconds) to optimized code form
 var spanHumanToCode map[uint32]uint8
+
+// maps span codes to human friendly span numbers in seconds
 var spanCodeToHuman map[uint8]uint32
 
 func init() {
+	// all the aggregation spans we support, their index position in this slice is their code
 	spans := []uint32{2, 5, 10, 15, 30, 60, 90, 120, 150, 300, 600, 900, 1200, 1800, 45 * 60, 3600, 3600 + 30*60, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600}
 
 	spanHumanToCode = make(map[uint32]uint8)
