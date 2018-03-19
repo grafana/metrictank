@@ -296,13 +296,6 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 		return archive
 	}
 
-	// This is just a safety precaution to prevent corrupt index entries.
-	// This ensures that the index entry always contains the correct metricDefinition data.
-	if inMemory {
-		archive.MetricDefinition = *schema.MetricDefinitionFromMetricData(data)
-		archive.MetricDefinition.Partition = partition
-	}
-
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
 	if archive.LastSave < (now - updateInterval32 - updateInterval32/2) {
