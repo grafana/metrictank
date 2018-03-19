@@ -304,8 +304,8 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 	}
 
 	// if the entry has not been saved for 1.5x updateInterval
-	// then perform a blocking save. (bit shifting to the right 1 bit, divides by 2)
-	if archive.LastSave < (now - updateInterval32 - (updateInterval32 >> 1)) {
+	// then perform a blocking save.
+	if archive.LastSave < (now - updateInterval32 - updateInterval32/2) {
 		log.Debug("cassandra-idx updating def in index.")
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
