@@ -18,17 +18,17 @@ and bugs to fix.  It should be considered an *alpha* project.
 ## limitations
 
 * no performance/availability isolation between tenants per instance. (only data isolation)
-* clustering is basic: statically defined peers, master promotions are manual, etc. See [clustering](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for more.
 * minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
 * the datastructures can use performance engineering.   [A Go GC issue may occasionally inflate response times](https://github.com/golang/go/issues/14812).
-* the native input protocol is inefficient.  Should not send all metadata with each point.
+* the native input protocol is inefficient.  Should not send all metadata with each point ([wip](https://github.com/grafana/metrictank/pull/876)
 * we use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/grafana/metrictank/blob/master/docs/tags.md).
-* for any series you can't write points that are earlier than previously written points. (unless you restart MT)
+* can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
 
 ## interesting design characteristics (feature or limitation.. up to you)
 
 * upgrades / process restarts requires running multiple instances (potentially only for the duration of the maintenance) and re-assigning the primary role.
 Otherwise data loss of current chunks will be incurred.  See [operations guide](https://github.com/grafana/metrictank/blob/master/docs/operations.md)
+* clustering works best with an orchestrator like kubernetes. MT itself does not automate master promotions. See [clustering](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for more.
 * only float64 values. Ints and bools currently stored as floats (works quite well due to the gorilla compression),
   No text support.
 * only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://grafana.com/blog/2016/03/31/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
@@ -38,6 +38,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 
 * 100% open source
 * graphite is a first class citizen. As of graphite-1.0.1, metrictank can be used as a graphite CLUSTER_SERVER.
+* can also be used with Prometheus (but the experience won't be as good as something built just for prometheus, which we're also working on)
 * accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
