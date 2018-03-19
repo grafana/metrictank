@@ -10,7 +10,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
-	"github.com/grafana/metrictank/msg"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -100,8 +99,7 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 			}
 			if name != "" {
 				for _, sample := range ts.Samples {
-					pointMsg := msg.Point{}
-					pointMsg.Md = &schema.MetricData{
+					md := &schema.MetricData{
 						Name:     name,
 						Metric:   name,
 						Interval: 15,
@@ -112,8 +110,8 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 						Tags:     tagSet,
 						OrgId:    1,
 					}
-					pointMsg.Md.SetId()
-					p.Process(pointMsg, int32(partitionID))
+					md.SetId()
+					p.ProcessMetricData(md, int32(partitionID))
 				}
 			} else {
 				w.WriteHeader(400)

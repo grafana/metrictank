@@ -10,13 +10,13 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/msg"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type Handler interface {
-	Process(pointMsg msg.Point, partition int32)
+	ProcessMetricData(md *schema.MetricData, partition int32)
+	ProcessMetricPoint(point schema.MetricPointId2, partition int32)
 }
 
 // TODO: clever way to document all metrics for all different inputs
@@ -46,55 +46,63 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 	}
 }
 
-// process makes sure the data is stored and the metadata is in the index
+// ProcessMetricPoint updates the index if possible, and stores the data if we have an index entry
 // concurrency-safe.
-func (in DefaultHandler) Process(pointMsg msg.Point, partition int32) {
+func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPointId2, partition int32) {
 	in.metricsReceived.Inc()
-	var mkey schema.MKey
-	var timestamp uint32
-	var value float64
-
-	if pointMsg.Val == 0 {
-		err := pointMsg.Md.Validate()
-		if err != nil {
-			in.MetricInvalid.Inc()
-			log.Debug("in: Invalid metric %v: %s", pointMsg.Md, err)
-			return
-		}
-		if pointMsg.Md.Time == 0 {
-			in.MetricInvalid.Inc()
-			log.Warn("in: invalid metric. metric.Time is 0. %s", pointMsg.Md.Id)
-			return
-		}
-
-		mkey, err = schema.MKeyFromString(pointMsg.Md.Id)
-		if err != nil {
-			log.Debug("in: Invalid metric %v: %s", pointMsg.Md, err)
-		}
-
-		timestamp = uint32(pointMsg.Md.Time)
-		value = pointMsg.Md.Value
-	} else {
-		if !pointMsg.Point.Valid() {
-			in.MetricInvalid.Inc()
-			log.Debug("in: Invalid metric %v", pointMsg.Point)
-			return
-		}
-		mkey = schema.MKey{
-			Key: pointMsg.Point.MetricPointId1.Id,
-			Org: pointMsg.Point.Org,
-		}
-		timestamp = pointMsg.Point.MetricPointId1.Time
-		value = pointMsg.Point.MetricPointId1.Value
-
+	if !point.Valid() {
+		in.MetricInvalid.Inc()
+		log.Debug("in: Invalid metric %v", point)
+		return
+	}
+	mkey := schema.MKey{
+		Key: point.MetricPointId1.Id,
+		Org: point.Org,
 	}
 
 	pre := time.Now()
-	archive := in.metricIndex.AddOrUpdate(pointMsg, partition)
+	archive, ok := in.metricIndex.UpdateMaybe(point, partition)
+	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
+
+	if !ok {
+		return
+	}
+
+	pre = time.Now()
+	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId)
+	m.Add(point.MetricPointId1.Time, point.MetricPointId1.Value)
+	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
+
+}
+
+// ProcessMetricData assures the data is stored and the metadata is in the index
+// concurrency-safe.
+func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int32) {
+	in.metricsReceived.Inc()
+	err := md.Validate()
+	if err != nil {
+		in.MetricInvalid.Inc()
+		log.Debug("in: Invalid metric %v: %s", md, err)
+		return
+	}
+	if md.Time == 0 {
+		in.MetricInvalid.Inc()
+		log.Warn("in: invalid metric. metric.Time is 0. %s", md.Id)
+		return
+	}
+
+	mkey, err := schema.MKeyFromString(md.Id)
+	if err != nil {
+		log.Error(3, "in: Invalid metric %v: could not parse ID: %s", md, err)
+		return
+	}
+
+	pre := time.Now()
+	archive := in.metricIndex.AddOrUpdate(mkey, md, partition)
 	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 	pre = time.Now()
 	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId)
-	m.Add(timestamp, value)
+	m.Add(uint32(md.Time), md.Value)
 	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 }

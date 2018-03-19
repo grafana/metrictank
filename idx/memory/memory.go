@@ -206,13 +206,43 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+// UpdateMaybe updates an existing archive, if found.
+// it returns the existing archive (if any), and whether it was found
+func (m *MemoryIdx) UpdateMaybe(point schema.MetricPointId2, partition int32) (idx.Archive, bool) {
+	pre := time.Now()
+
+	mkey := schema.MKey{
+		Key: point.MetricPointId1.Id,
+		Org: point.Org,
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	existing, ok := m.defById[mkey]
+	if ok {
+		log.Debug("metricDef with id %v already in index", mkey)
+		existing.LastUpdate = int64(point.MetricPointId1.Time)
+		existing.Partition = partition
+		statUpdate.Inc()
+		statUpdateDuration.Value(time.Since(pre))
+		return *existing, true
+	}
+
+	return idx.Archive{}, false
+}
+
+// AddOrUpdate returns the corresponding Archive for the MetricData.
+// if it is existing -> updates lastUpdate based on .Time, and partition
+// if was new        -> adds new MetricDefinition to index
+func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) idx.Archive {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	existing, ok := m.defById[data.Id]
+
+	existing, ok := m.defById[mkey]
 	if ok {
-		log.Debug("metricDef with id %s already in index.", data.Id)
+		log.Debug("metricDef with id %s already in index.", mkey)
 		existing.LastUpdate = data.Time
 		existing.Partition = partition
 		statUpdate.Inc()

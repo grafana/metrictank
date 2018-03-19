@@ -6,8 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/grafana/metrictank/msg"
-
 	schema "gopkg.in/raintank/schema.v1"
 )
 
@@ -59,9 +57,13 @@ type MetricIndex interface {
 	// Stop shuts down the index.
 	Stop()
 
+	// UpdateMaybe updates an existing archive, if found.
+	// it returns the existing archive (if any), and whether it was found
+	UpdateMaybe(point schema.MetricPointId2, partition int32) (Archive, bool)
+
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(point msg.Point, partition int32) Archive
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) Archive
 
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (Archive, bool)

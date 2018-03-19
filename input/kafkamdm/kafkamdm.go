@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -15,7 +17,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
-	"github.com/grafana/metrictank/msg"
 	"github.com/grafana/metrictank/stats"
 )
 
@@ -351,30 +352,30 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 }
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
-	pointMsg := msg.Point{}
 	if len(data) == 29 && data[0] == 0 {
-		pointMsg.Val = 1
-		pointMsg.Point.MetricPointId1.UnmarshalDirect(data[1:])
-		pointMsg.Point.Org = uint32(orgId)
-		k.Handler.Process(pointMsg, partition)
+		var point schema.MetricPointId2
+		point.MetricPointId1.UnmarshalDirect(data[1:])
+		point.Org = uint32(orgId)
+		k.Handler.ProcessMetricPoint(point, partition)
 		return
 	}
 
 	if len(data) == 33 && data[0] == 1 {
-		pointMsg.Val = 1
-		pointMsg.Point.UnmarshalDirect(data[1:])
-		k.Handler.Process(pointMsg, partition)
+		var point schema.MetricPointId2
+		point.UnmarshalDirect(data[1:])
+		k.Handler.ProcessMetricPoint(point, partition)
 		return
 	}
 
-	_, err := pointMsg.Md.UnmarshalMsg(data)
+	md := schema.MetricData{}
+	_, err := md.UnmarshalMsg(data)
 	if err != nil {
 		metricsDecodeErr.Inc()
 		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 		return
 	}
 	metricsPerMessage.ValueUint32(1)
-	k.Handler.Process(pointMsg, partition)
+	k.Handler.ProcessMetricData(&md, partition)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

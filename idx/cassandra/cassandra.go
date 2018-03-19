@@ -264,10 +264,40 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(point msg.Point, partition int32) idx.Archive {
+func (c *CasIdx) UpdateMaybe(point schema.MetricPointId2, partition int32) (idx.Archive, bool) {
 	pre := time.Now()
-	existing, inMemory := c.MemoryIdx.Get(data.Id)
-	archive := c.MemoryIdx.AddOrUpdate(data, partition)
+	mkey := schema.MKey{
+		Key: point.MetricPointId1.Id,
+		Org: point.Org,
+	}
+
+	// note that both functions return an 'ok' bool.
+	// albeit very unlikely,
+	// the idx entry could be pruned in between the two calls and so they could be different
+	existing, inMemory := c.MemoryIdx.Get(mkey)
+	archive, inMemory2 := c.MemoryIdx.UpdateMaybe(point, partition)
+
+	if !updateCassIdx {
+		statUpdateDuration.Value(time.Since(pre))
+		return archive, inMemory2
+	}
+
+	if inMemory {
+		c.deleteOldIfMoved(existing, partition)
+	}
+
+	if inMemory2 {
+		archive = c.updateCassandraIfStale(inMemory, archive, partition)
+	}
+
+	statUpdateDuration.Value(time.Since(pre))
+	return archive, inMemory2
+}
+
+func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) idx.Archive {
+	pre := time.Now()
+	existing, inMemory := c.MemoryIdx.Get(mkey)
+	archive := c.MemoryIdx.AddOrUpdate(mkey, data, partition)
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
@@ -277,22 +307,35 @@ func (c *CasIdx) AddOrUpdate(point msg.Point, partition int32) idx.Archive {
 		return archive
 	}
 
-	now := uint32(time.Now().Unix())
+	if inMemory {
+		c.deleteOldIfMoved(existing, partition)
+	}
 
-	// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-	// an existing metricDef will just create a new row in the table and wont remove the old row.
-	// So we need to explicitly delete the old entry.
-	if inMemory && existing.Partition != partition {
+	archive = c.updateCassandraIfStale(inMemory, archive, partition)
+	stat.Value(time.Since(pre))
+	return archive
+}
+
+// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
+// an existing metricDef will just create a new row in the table and wont remove the old row.
+// So we need to explicitly delete the old entry.
+func (c *CasIdx) deleteOldIfMoved(existing idx.Archive, partition int32) {
+	if existing.Partition != partition {
 		go func() {
 			if err := c.deleteDef(&existing); err != nil {
 				log.Error(3, err.Error())
 			}
 		}()
 	}
+}
+
+// updateCassandraIfStale saves the archive to cassandra if needed and
+// updates the memory index with the updated fields.
+func (c *CasIdx) updateCassandraIfStale(inMemory bool, archive idx.Archive, partition int32) idx.Archive {
+	now := uint32(time.Now().Unix())
 
 	// check if we need to save to cassandra.
 	if archive.LastSave >= (now - updateInterval32) {
-		stat.Value(time.Since(pre))
 		return archive
 	}
 
@@ -320,7 +363,6 @@ func (c *CasIdx) AddOrUpdate(point msg.Point, partition int32) idx.Archive {
 		}
 	}
 
-	stat.Value(time.Since(pre))
 	return archive
 }
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
-	"github.com/grafana/metrictank/msg"
 	"github.com/grafana/metrictank/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -186,8 +185,7 @@ func (c *Carbon) handle(conn net.Conn) {
 			continue
 		}
 		nameSplits := strings.Split(string(key), ";")
-		pointMsg := msg.Point{}
-		pointMsg.Md = &schema.MetricData{
+		md := &schema.MetricData{
 			Name:     nameSplits[0],
 			Metric:   nameSplits[0],
 			Interval: c.intervalGetter.GetInterval(nameSplits[0]),
@@ -198,9 +196,9 @@ func (c *Carbon) handle(conn net.Conn) {
 			Tags:     nameSplits[1:],
 			OrgId:    1, // admin org
 		}
-		pointMsg.Md.SetId()
+		md.SetId()
 		metricsPerMessage.ValueUint32(1)
-		c.Handler.Process(pointMsg, int32(partitionId))
+		c.Handler.ProcessMetricData(md, int32(partitionId))
 	}
 	c.handlerWaitGroup.Done()
 }
