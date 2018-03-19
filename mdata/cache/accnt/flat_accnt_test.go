@@ -1,13 +1,34 @@
 package accnt
 
 import (
+	"fmt"
 	"testing"
+
+	"gopkg.in/raintank/schema.v1"
 )
 
 func resetCounters() {
 	cacheChunkAdd.SetUint32(0)
 	cacheChunkEvict.SetUint32(0)
 	cacheSizeUsed.SetUint64(0)
+}
+
+func archiveFromRawMetric(raw schema.MKey, method schema.Method, span int) schema.AMKey {
+	arch := schema.NewArchive(method, span)
+	key := schema.AMKey{
+		MKey:    raw,
+		Archive: arch,
+	}
+	return key
+}
+
+func getTestKey(name string, t *testing.T) schema.AMKey {
+	keyPrefix := "1.1234567890123456789012345678901"
+	key, err := schema.MKeyFromString(fmt.Sprintf("%s%s", keyPrefix, name))
+	if err != nil {
+		t.Fatalf("Error generating test key: %s", err)
+	}
+	return schema.AMKey{MKey: key}
 }
 
 func TestAddingEvicting(t *testing.T) {
@@ -17,8 +38,8 @@ func TestAddingEvicting(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	var metric1 string = "metric1"
-	var metric2 string = "metric2"
+	metric1 := archiveFromRawMetric(getTestKey("1", t).MKey, schema.Cnt, 600)
+	metric2 := archiveFromRawMetric(getTestKey("2", t).MKey, schema.Cnt, 600)
 	var ts1 uint32 = 1
 	var ts2 uint32 = 2
 
@@ -85,9 +106,9 @@ func TestLRUOrdering(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	var metric1 string = "metric1"
-	var metric2 string = "metric2"
-	var metric3 string = "metric3"
+	metric1 := archiveFromRawMetric(getTestKey("1", t).MKey, schema.Cnt, 600)
+	metric2 := archiveFromRawMetric(getTestKey("2", t).MKey, schema.Cnt, 600)
+	metric3 := archiveFromRawMetric(getTestKey("3", t).MKey, schema.Cnt, 600)
 	var ts1 uint32 = 1
 
 	a.AddChunk(metric1, ts1, 3) // total size now 3
@@ -117,8 +138,8 @@ func TestMetricDeleting(t *testing.T) {
 	resetCounters()
 	a := NewFlatAccnt(12)
 
-	metric1 := "metric1"
-	metric2 := "metric2"
+	metric1 := archiveFromRawMetric(getTestKey("1", t).MKey, schema.Cnt, 600)
+	metric2 := archiveFromRawMetric(getTestKey("2", t).MKey, schema.Cnt, 600)
 
 	a.AddChunk(metric1, 1, 2)
 	a.AddChunk(metric2, 1, 2)

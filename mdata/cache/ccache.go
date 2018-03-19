@@ -35,7 +35,7 @@ type CCache struct {
 	metricCache map[schema.AMKey]*CCacheMetric
 
 	// sets of metric keys, indexed by their raw metric keys
-	metricRawKeys map[schema.AMKey]map[schema.AMKey]struct{}
+	metricRawKeys map[schema.MKey]map[schema.Archive]struct{}
 
 	// accounting for the cache. keeps track of when data needs to be evicted
 	// and what should be evicted
@@ -50,7 +50,7 @@ type CCache struct {
 func NewCCache() *CCache {
 	cc := &CCache{
 		metricCache:   make(map[schema.AMKey]*CCacheMetric),
-		metricRawKeys: make(map[schema.AMKey]map[schema.AMKey]struct{}),
+		metricRawKeys: make(map[schema.MKey]map[schema.Archive]struct{}),
 		accnt:         accnt.NewFlatAccnt(maxSize),
 		stop:          make(chan interface{}),
 		tracer:        opentracing.NoopTracer{},
@@ -76,20 +76,22 @@ func (c *CCache) evictLoop() {
 }
 
 // takes a raw key and deletes all archives associated with it from cache
-func (c *CCache) DelMetric(rawMetric schema.AMKey) (int, int) {
+func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
 	archives, series := 0, 0
 
 	c.Lock()
 	defer c.Unlock()
 
-	mets, ok := c.metricRawKeys[rawMetric]
+	archs, ok := c.metricRawKeys[rawMetric]
 	if !ok {
 		return archives, series
 	}
 
-	for met := range mets {
-		delete(c.metricCache, met)
-		c.accnt.DelMetric(met)
+	metric := schema.AMKey{MKey: rawMetric}
+	for arch := range archs {
+		metric.Archive = arch
+		delete(c.metricCache, metric)
+		c.accnt.DelMetric(metric)
 		archives++
 	}
 
@@ -126,25 +128,25 @@ func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.Iter
 	met.Add(prev, itergen)
 }
 
-func (c *CCache) Add(metric, rawMetric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	c.Lock()
 	defer c.Unlock()
 
 	ccm, ok := c.metricCache[metric]
 	if !ok {
 		ccm = NewCCacheMetric()
-		ccm.Init(rawMetric, prev, itergen)
+		ccm.Init(metric.MKey, prev, itergen)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association
-		ccms, ok := c.metricRawKeys[rawMetric]
+		ccms, ok := c.metricRawKeys[metric.MKey]
 		if !ok {
-			c.metricRawKeys[rawMetric] = map[schema.AMKey]struct{}{
-				metric: {},
+			c.metricRawKeys[metric.MKey] = map[schema.Archive]struct{}{
+				metric.Archive: struct{}{},
 			}
 		} else {
 			// otherwise, make sure the association exists
-			ccms[metric] = struct{}{}
+			ccms[metric.Archive] = struct{}{}
 		}
 	} else {
 		ccm.Add(prev, itergen)
@@ -159,7 +161,7 @@ func (cc *CCache) Reset() (int, int) {
 	series := len(cc.metricRawKeys)
 	archives := len(cc.metricCache)
 	cc.metricCache = make(map[schema.AMKey]*CCacheMetric)
-	cc.metricRawKeys = make(map[schema.AMKey]map[schema.AMKey]struct{})
+	cc.metricRawKeys = make(map[schema.MKey]map[schema.Archive]struct{})
 	cc.Unlock()
 	return series, archives
 }
@@ -188,9 +190,9 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 		delete(c.metricCache, target.Metric)
 
 		// this key should alway be present, if not there there is a corruption of the state
-		delete(c.metricRawKeys[ccm.rawKey], target.Metric)
-		if len(c.metricRawKeys[ccm.rawKey]) == 0 {
-			delete(c.metricRawKeys, ccm.rawKey)
+		delete(c.metricRawKeys[ccm.MKey], target.Metric.Archive)
+		if len(c.metricRawKeys[ccm.MKey]) == 0 {
+			delete(c.metricRawKeys, ccm.MKey)
 		}
 	}
 }

@@ -21,7 +21,7 @@ type CCacheMetric struct {
 	// the list of chunk time stamps in ascending order
 	keys []uint32
 
-	rawKey schema.AMKey
+	MKey schema.MKey
 }
 
 func NewCCacheMetric() *CCacheMetric {
@@ -30,8 +30,9 @@ func NewCCacheMetric() *CCacheMetric {
 	}
 }
 
-func (mc *CCacheMetric) Init(rawKey schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (mc *CCacheMetric) Init(MKey schema.MKey, prev uint32, itergen chunk.IterGen) {
 	mc.Add(prev, itergen)
+	mc.MKey = MKey
 }
 
 func (mc *CCacheMetric) Del(ts uint32) int {

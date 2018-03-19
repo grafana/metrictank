@@ -8,11 +8,11 @@ import (
 )
 
 type Cache interface {
-	Add(metric, rawMetric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	Stop()
 	Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult
-	DelMetric(rawMetric schema.AMKey) (int, int)
+	DelMetric(rawMetric schema.MKey) (int, int)
 	Reset() (int, int)
 }
 
