@@ -71,3 +71,11 @@ func (a AMKey) String() string {
 	}
 	return a.MKey.String() + "_" + a.Archive.String()
 }
+
+// GetAMKey helps to easily get an AMKey from a given MKey
+func GetAMKey(m MKey, method Method, span uint32) AMKey {
+	return AMKey{
+		MKey:    m,
+		Archive: NewArchive(method, span),
+	}
+}
