@@ -9,6 +9,7 @@ import (
 	"time"
 
 	schema "gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -71,7 +72,7 @@ var partitionLag map[int32]*stats.Gauge64
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
-	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPointId1 messages, assume this org id")
+	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPoint messages, assume this org id")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
@@ -352,17 +353,13 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 }
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
-	if len(data) == 29 && data[0] == 0 {
-		var point schema.MetricPointId2
-		point.MetricPointId1.UnmarshalDirect(data[1:])
-		point.Org = uint32(orgId)
-		k.Handler.ProcessMetricPoint(point, partition)
-		return
-	}
-
-	if len(data) == 33 && data[0] == 1 {
-		var point schema.MetricPointId2
-		point.UnmarshalDirect(data[1:])
+	if msg.IsPointMsg(data) {
+		_, point, err := msg.ReadPointMsg(data, uint32(orgId))
+		if err != nil {
+			metricsDecodeErr.Inc()
+			log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+			return
+		}
 		k.Handler.ProcessMetricPoint(point, partition)
 		return
 	}

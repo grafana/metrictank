@@ -208,21 +208,16 @@ func (m *MemoryIdx) Stop() {
 
 // UpdateMaybe updates an existing archive, if found.
 // it returns the existing archive (if any), and whether it was found
-func (m *MemoryIdx) UpdateMaybe(point schema.MetricPointId2, partition int32) (idx.Archive, bool) {
+func (m *MemoryIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Archive, bool) {
 	pre := time.Now()
-
-	mkey := schema.MKey{
-		Key: point.MetricPointId1.Id,
-		Org: point.Org,
-	}
 
 	m.Lock()
 	defer m.Unlock()
 
-	existing, ok := m.defById[mkey]
+	existing, ok := m.defById[point.MKey]
 	if ok {
-		log.Debug("metricDef with id %v already in index", mkey)
-		existing.LastUpdate = int64(point.MetricPointId1.Time)
+		log.Debug("metricDef with id %v already in index", point.MKey)
+		existing.LastUpdate = int64(point.Time)
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))

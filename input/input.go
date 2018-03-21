@@ -16,7 +16,7 @@ import (
 
 type Handler interface {
 	ProcessMetricData(md *schema.MetricData, partition int32)
-	ProcessMetricPoint(point schema.MetricPointId2, partition int32)
+	ProcessMetricPoint(point schema.MetricPoint, partition int32)
 }
 
 // TODO: clever way to document all metrics for all different inputs
@@ -48,16 +48,12 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 
 // ProcessMetricPoint updates the index if possible, and stores the data if we have an index entry
 // concurrency-safe.
-func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPointId2, partition int32) {
+func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, partition int32) {
 	in.metricsReceived.Inc()
 	if !point.Valid() {
 		in.MetricInvalid.Inc()
 		log.Debug("in: Invalid metric %v", point)
 		return
-	}
-	mkey := schema.MKey{
-		Key: point.MetricPointId1.Id,
-		Org: point.Org,
 	}
 
 	pre := time.Now()
@@ -69,8 +65,8 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPointId2, partiti
 	}
 
 	pre = time.Now()
-	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId)
-	m.Add(point.MetricPointId1.Time, point.MetricPointId1.Value)
+	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId)
+	m.Add(point.Time, point.Value)
 	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 
 }

@@ -264,17 +264,13 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) UpdateMaybe(point schema.MetricPointId2, partition int32) (idx.Archive, bool) {
+func (c *CasIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Archive, bool) {
 	pre := time.Now()
-	mkey := schema.MKey{
-		Key: point.MetricPointId1.Id,
-		Org: point.Org,
-	}
 
 	// note that both functions return an 'ok' bool.
 	// albeit very unlikely,
 	// the idx entry could be pruned in between the two calls and so they could be different
-	existing, inMemory := c.MemoryIdx.Get(mkey)
+	existing, inMemory := c.MemoryIdx.Get(point.MKey)
 	archive, inMemory2 := c.MemoryIdx.UpdateMaybe(point, partition)
 
 	if !updateCassIdx {
