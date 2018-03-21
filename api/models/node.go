@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/grafana/metrictank/cluster"
 	opentracing "github.com/opentracing/opentracing-go"
+	schema "gopkg.in/raintank/schema.v1"
 )
 
 type NodeStatus struct {
@@ -136,7 +137,7 @@ func (i IndexTagDelSeries) TraceDebug(span opentracing.Span) {
 }
 
 type IndexGet struct {
-	Id string `json:"id" form:"id" binding:"Required"`
+	MKey schema.MKey `json:"id" form:"id" binding:"Required"`
 }
 
 type IndexFind struct {

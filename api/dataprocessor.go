@@ -380,14 +380,10 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 	}
 }
 
-func logLoad(typ, key string, from, to uint32) {
+func logLoad(typ string, key schema.AMKey, from, to uint32) {
 	if LogLevel < 2 {
-		log.Debug("DP load from %-6s %-20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
+		log.Debug("DP load from %-6s %20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 	}
-}
-
-func AggMetricKey(key, archive string, aggSpan uint32) string {
-	return fmt.Sprintf("%s_%s_%d", key, archive, aggSpan)
 }
 
 func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
@@ -474,18 +470,17 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) {
 	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesAggMetrics")
 	defer span.Finish()
-	metric, ok := s.MemoryStore.Get(ctx.Key)
+	metric, ok := s.MemoryStore.Get(ctx.AMKey.MKey)
 	if !ok {
 		return mdata.Result{
 			Oldest: ctx.Req.To,
 		}, nil
 	}
 
+	logLoad("memory", ctx.AMKey, ctx.From, ctx.To)
 	if ctx.Cons != consolidation.None {
-		logLoad("memory", ctx.AggKey, ctx.From, ctx.To)
 		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
 	} else {
-		logLoad("memory", ctx.Req.Key, ctx.From, ctx.To)
 		return metric.Get(ctx.From, ctx.To), nil
 	}
 }
@@ -495,22 +490,17 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 	var iters []chunk.Iter
 	var prevts uint32
 
-	key := ctx.Key
-	if ctx.Cons != consolidation.None {
-		key = ctx.AggKey
-	}
-
 	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesCachedStore")
 	defer span.Finish()
-	span.SetTag("key", key)
+	span.SetTag("key", ctx.AMKey)
 	span.SetTag("from", ctx.From)
 	span.SetTag("until", until)
 
 	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
-	logLoad("cassan", ctx.Key, ctx.From, ctx.To)
+	logLoad("cassan", ctx.AMKey, ctx.From, ctx.To)
 
-	log.Debug("cache: searching query key %s, from %d, until %d", key, ctx.From, until)
-	cacheRes := s.Cache.Search(ctx.ctx, key, ctx.From, until)
+	log.Debug("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
+	cacheRes := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
 	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
 	// check to see if the request has been canceled, if so abort now.
@@ -544,7 +534,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 	// the request cannot completely be served from cache, it will require cassandra involvement
 	if !cacheRes.Complete {
 		if cacheRes.From != cacheRes.Until {
-			storeIterGens, err := s.BackendStore.Search(ctx.ctx, key, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
+			storeIterGens, err := s.BackendStore.Search(ctx.ctx, ctx.AMKey, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
 				return iters, err
 			}
@@ -566,7 +556,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 				}
 				// it's important that the itgens get added in chronological order,
 				// currently we rely on cassandra returning results in order
-				s.Cache.Add(key, ctx.Key, prevts, itgen)
+				s.Cache.Add(ctx.AMKey, prevts, itgen)
 				prevts = itgen.Ts
 				iters = append(iters, *it)
 			}
@@ -632,6 +622,7 @@ func mergeSeries(in []models.Series) []models.Series {
 	return merged
 }
 
+// requestContext is a more concrete specification to load data based on a models.Req
 type requestContext struct {
 	ctx context.Context
 
@@ -639,11 +630,10 @@ type requestContext struct {
 	Req *models.Req
 
 	// internal request needed to satisfy user request.
-	Cons   consolidation.Consolidator // to satisfy avg request from user, this would be sum or cnt
-	From   uint32                     // may be different than user request, see below
-	To     uint32                     // may be different than user request, see below
-	Key    string                     // key to query
-	AggKey string                     // aggkey to query (if needed)
+	Cons  consolidation.Consolidator // to satisfy avg request from user, this would be sum or cnt
+	From  uint32                     // may be different than user request, see below
+	To    uint32                     // may be different than user request, see below
+	AMKey schema.AMKey               // set by combining Req's key, consolidator and archive info
 }
 
 func prevBoundary(ts uint32, span uint32) uint32 {
@@ -656,7 +646,6 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		ctx:  ctx,
 		Req:  req,
 		Cons: consolidator,
-		Key:  req.Key,
 	}
 
 	// while aggregated archives are quantized, raw intervals are not.  quantizing happens after fetching the data,
@@ -673,10 +662,11 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	if consolidator == consolidation.None {
 		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
 		rc.To = prevBoundary(req.To, req.ArchInterval) + 1
+		rc.AMKey = schema.AMKey{MKey: req.MKey}
 	} else {
 		rc.From = req.From
 		rc.To = req.To
-		rc.AggKey = AggMetricKey(req.Key, consolidator.Archive(), req.ArchInterval)
+		rc.AMKey = schema.GetAMKey(req.MKey, consolidator.Archive(), req.ArchInterval)
 	}
 
 	return &rc

@@ -3,6 +3,8 @@ package models
 import (
 	"fmt"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/util"
@@ -10,9 +12,10 @@ import (
 	"github.com/opentracing/opentracing-go/log"
 )
 
+// Req is a request for data by MKey and parameters such as consolidator, max points, etc
 type Req struct {
 	// these fields can be set straight away:
-	Key          string                     `json:"key"`     // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
+	MKey         schema.MKey                `json:"key"`     // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
 	Target       string                     `json:"target"`  // the target we should return either to graphite or as if we're graphite.  simply the graphite metric key from the index
 	Pattern      string                     `json:"pattern"` // the original query pattern specified by user (not wrapped by any functions). e.g. `foo.b*`. To be able to tie the result data back to the data need as requested
 	From         uint32                     `json:"from"`
@@ -36,7 +39,7 @@ type Req struct {
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
+func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
 	return Req{
 		key,
 		target,
@@ -59,18 +62,18 @@ func NewReq(key, target, patt string, from, to, maxPoints, rawInterval uint32, c
 }
 
 func (r Req) String() string {
-	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s.", r.Key, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator)
+	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s.", r.MKey, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator)
 }
 
 func (r Req) DebugString() string {
 	return fmt.Sprintf("Req key=%q target=%q pattern=%q %d - %d (%s - %s) (span %d) maxPoints=%d rawInt=%d cons=%s consReq=%d schemaId=%d aggId=%d archive=%d archInt=%d ttl=%d outInt=%d aggNum=%d",
-		r.Key, r.Target, r.Pattern, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.RawInterval, r.Consolidator, r.ConsReq, r.SchemaId, r.AggId, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
+		r.MKey, r.Target, r.Pattern, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.RawInterval, r.Consolidator, r.ConsReq, r.SchemaId, r.AggId, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
 }
 
 // Trace puts all request properties as tags in a span
 // good for when a span deals with 1 request
 func (r Req) Trace(span opentracing.Span) {
-	span.SetTag("key", r.Key)
+	span.SetTag("key", r.MKey)
 	span.SetTag("target", r.Target)
 	span.SetTag("pattern", r.Pattern)
 	span.SetTag("from", r.From)
@@ -95,7 +98,7 @@ func (r Req) Trace(span opentracing.Span) {
 // 1000~1500 bytes
 func (r Req) TraceLog(span opentracing.Span) {
 	span.LogFields(
-		log.String("key", r.Key),
+		log.Object("key", r.MKey),
 		log.String("target", r.Target),
 		log.String("pattern", r.Pattern),
 		log.Int("from", int(r.From)),

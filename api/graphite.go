@@ -11,6 +11,7 @@ import (
 	"time"
 
 	macaron "gopkg.in/macaron.v1"
+	schema "gopkg.in/raintank/schema.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
@@ -445,7 +446,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	}()
 
 	series := make([]idx.Archive, 0)
-	seenDefs := make(map[string]struct{})
+	seenDefs := make(map[schema.MKey]struct{})
 	for resp := range responses {
 		if resp.err != nil {
 			response.Write(ctx, response.WrapError(err))

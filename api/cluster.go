@@ -163,7 +163,7 @@ func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByT
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
-	def, ok := s.MetricIndex.Get(req.Id)
+	def, ok := s.MetricIndex.Get(req.MKey)
 	if !ok {
 		response.Write(ctx, response.NewError(http.StatusNotFound, "Not Found"))
 		return
