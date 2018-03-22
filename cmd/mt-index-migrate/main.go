@@ -151,8 +151,13 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	var lastupdate int64
 	var tags []string
 	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+		mkey, err := schema.MKeyFromString(id)
+		if err != nil {
+			log.Error(3, "could not parse ID %q: %s -> skipping", id, err)
+			continue
+		}
 		mdef := schema.MetricDefinition{
-			Id:         id,
+			Id:         mkey,
 			OrgId:      orgId,
 			Partition:  partition,
 			Name:       name,
