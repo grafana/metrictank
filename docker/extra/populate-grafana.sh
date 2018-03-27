@@ -10,7 +10,7 @@ for file in $env/datasources/*; do
   echo
 done
 
-for file in $env/../../dashboard.json $env/../extra/dashboards/*; do
+for file in $env/../../dashboard.json $env/../extra/dashboards/* $env/../extra/dashboards/dockprom/*; do
   if grep -q "__inputs" $file; then
     echo "> importing dashboard $file"
     curl -u admin:admin \
