@@ -1,7 +1,7 @@
 {
-  "name":"graphite",
+  "name":"graphite2",
   "type":"graphite",
-  "url":"http://graphite",
+  "url":"http://graphite2",
   "access":"proxy",
   "isDefault":false
 }

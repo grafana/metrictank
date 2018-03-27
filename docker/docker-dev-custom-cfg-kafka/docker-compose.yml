@@ -40,15 +40,27 @@ services:
     ports:
      - "9042:9042"
 
-  graphite:
-    hostname: graphite
-    image: raintank/graphite-mt
+  graphite1:
+    hostname: graphite1
+    image: raintank/graphite-mt:singletenant
     ports:
-     - "8080:80"
+     - "8081:80"
     environment:
       GRAPHITE_CLUSTER_SERVERS: metrictank:6060
       GRAPHITE_STATSD_HOST: statsdaemon
-      SINGLE_TENANT: yes
+      SINGLE_TENANT: "1"
+      WSGI_PROCESSES: 4
+      WSGI_THREADS: 25
+
+  graphite2:
+    hostname: graphite2
+    image: raintank/graphite-mt:singletenant
+    ports:
+     - "8082:80"
+    environment:
+      GRAPHITE_CLUSTER_SERVERS: metrictank:6060
+      GRAPHITE_STATSD_HOST: statsdaemon
+      SINGLE_TENANT: "2"
       WSGI_PROCESSES: 4
       WSGI_THREADS: 25
 
