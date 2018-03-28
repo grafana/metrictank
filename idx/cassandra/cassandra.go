@@ -288,7 +288,11 @@ func (c *CasIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Arc
 	}
 
 	if inMemory2 {
-		archive = c.updateCassandraIfStale(inMemory, archive, partition)
+		// check if we need to save to cassandra.
+		now := uint32(time.Now().Unix())
+		if archive.LastSave < (now - updateInterval32) {
+			archive = c.updateCassandra(now, inMemory, archive, partition)
+		}
 	}
 
 	statUpdateDuration.Value(time.Since(pre))
@@ -317,20 +321,19 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 		}
 	}
 
-	archive = c.updateCassandraIfStale(inMemory, archive, partition)
+	// check if we need to save to cassandra.
+	now := uint32(time.Now().Unix())
+	if archive.LastSave < (now - updateInterval32) {
+		archive = c.updateCassandra(now, inMemory, archive, partition)
+	}
+
 	stat.Value(time.Since(pre))
 	return archive
 }
 
-// updateCassandraIfStale saves the archive to cassandra if needed and
+// updateCassandra saves the archive to cassandra and
 // updates the memory index with the updated fields.
-func (c *CasIdx) updateCassandraIfStale(inMemory bool, archive idx.Archive, partition int32) idx.Archive {
-	now := uint32(time.Now().Unix())
-
-	// check if we need to save to cassandra.
-	if archive.LastSave >= (now - updateInterval32) {
-		return archive
-	}
+func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
 
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
