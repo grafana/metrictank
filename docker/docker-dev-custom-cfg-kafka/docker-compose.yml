@@ -5,8 +5,9 @@ services:
     hostname: metrictank
     image: grafana/metrictank
     ports:
-     - "6060:6060"
      - "2003:2003"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -40,27 +41,15 @@ services:
     ports:
      - "9042:9042"
 
-  graphite1:
-    hostname: graphite1
-    image: raintank/graphite-mt:singletenant
-    ports:
-     - "8081:80"
+  graphite:
+    hostname: graphite
+    image: raintank/graphite-mt
+    expose:
+     - 80
     environment:
       GRAPHITE_CLUSTER_SERVERS: metrictank:6060
       GRAPHITE_STATSD_HOST: statsdaemon
       SINGLE_TENANT: "1"
-      WSGI_PROCESSES: 4
-      WSGI_THREADS: 25
-
-  graphite2:
-    hostname: graphite2
-    image: raintank/graphite-mt:singletenant
-    ports:
-     - "8082:80"
-    environment:
-      GRAPHITE_CLUSTER_SERVERS: metrictank:6060
-      GRAPHITE_STATSD_HOST: statsdaemon
-      SINGLE_TENANT: "2"
       WSGI_PROCESSES: 4
       WSGI_THREADS: 25
 
@@ -91,8 +80,8 @@ services:
       - '--storage.tsdb.retention=200h'
       - '--web.enable-lifecycle'
     restart: unless-stopped
-    expose:
-      - 9090
+    ports:
+     - "9090:9090"
     labels:
       org.label-schema.group: "monitoring"
 
@@ -127,5 +116,21 @@ services:
     restart: unless-stopped
     expose:
       - 8080
+    labels:
+      org.label-schema.group: "monitoring"
+
+  caddy:
+    image: stefanprodan/caddy
+    container_name: caddy
+    ports:
+      - "6060:6061"
+      - "6061:6061"
+      - "6062:6062"
+      - "8080:8081"
+      - "8081:8081"
+      - "8082:8082"
+    volumes:
+      - ./caddy/:/etc/caddy/
+    restart: unless-stopped
     labels:
       org.label-schema.group: "monitoring"
