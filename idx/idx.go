@@ -59,11 +59,11 @@ type MetricIndex interface {
 
 	// UpdateMaybe updates an existing archive, if found.
 	// it returns the existing archive (if any), and whether it was found
-	UpdateMaybe(point schema.MetricPoint, partition int32) (Archive, bool)
+	UpdateMaybe(point schema.MetricPoint, partition int32) (Archive, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) Archive
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (Archive, int32, bool)
 
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (Archive, bool)
