@@ -819,7 +819,7 @@
           "targets": [
             {
               "expr": "sum(rate(node_cpu[1m])) by (mode) * 100 / scalar(count(node_cpu{mode=\"user\"}))",
-              "intervalFactor": 10,
+              "intervalFactor": 1,
               "legendFormat": "{{ mode }}",
               "metric": "node_cpu",
               "refId": "A",

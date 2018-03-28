@@ -737,7 +737,7 @@
             {
               "expr": "sum(irate(node_disk_bytes_read[5m]))",
               "interval": "2s",
-              "intervalFactor": 4,
+              "intervalFactor": 1,
               "legendFormat": "read",
               "metric": "",
               "refId": "A",
@@ -746,7 +746,7 @@
             {
               "expr": "sum(irate(node_disk_bytes_written[5m]))",
               "interval": "2s",
-              "intervalFactor": 4,
+              "intervalFactor": 1,
               "legendFormat": "written",
               "metric": "",
               "refId": "B",
@@ -755,7 +755,7 @@
             {
               "expr": "sum(irate(node_disk_io_time_ms[5m]))",
               "interval": "2s",
-              "intervalFactor": 4,
+              "intervalFactor": 1,
               "legendFormat": "io time",
               "metric": "",
               "refId": "C",
@@ -843,8 +843,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m])) / scalar(count(node_cpu{mode=\"user\"})) * 100",
-              "intervalFactor": 10,
+              "expr": "label_replace(sum by (name) (rate(container_cpu_usage_seconds_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m])) * 100, \"name\", \"$1\", \"name\", \"dockerdevcustomcfgkafka_(.*)_1\")",
+
+              "intervalFactor": 1,
               "legendFormat": "{{ name }}",
               "metric": "container_cpu_user_seconds_total",
               "refId": "A",
@@ -932,7 +933,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (name)(container_memory_usage_bytes{image!=\"\",container_label_org_label_schema_group=\"\"})",
+              "expr": "label_replace(sum by (name)(container_memory_usage_bytes{image!=\"\",container_label_org_label_schema_group=\"\"}), \"name\", \"$1\", \"name\", \"dockerdevcustomcfgkafka_(.*)_1\")",
               "intervalFactor": 1,
               "legendFormat": "{{ name }}",
               "metric": "container_memory_usage",
@@ -1013,8 +1014,8 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (name) (container_memory_cache{image!=\"\",container_label_org_label_schema_group=\"\"})",
-              "intervalFactor": 2,
+              "expr": "label_replace(sum by (name)(container_memory_cache{image!=\"\",container_label_org_label_schema_group=\"\"}), \"name\", \"$1\", \"name\", \"dockerdevcustomcfgkafka_(.*)_1\")",
+              "intervalFactor": 1,
               "legendFormat": "{{name}}",
               "metric": "container_memory_cache",
               "refId": "A",
@@ -1102,8 +1103,8 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (name) (rate(container_network_receive_bytes_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m]))",
-              "intervalFactor": 10,
+              "expr": "label_replace(sum by (name) (rate(container_network_receive_bytes_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m])), \"name\", \"$1\", \"name\", \"dockerdevcustomcfgkafka_(.*)_1\")",
+              "intervalFactor": 1,
               "legendFormat": "{{ name }}",
               "metric": "container_network_receive_bytes_total",
               "refId": "A",
@@ -1183,8 +1184,8 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (name) (rate(container_network_transmit_bytes_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m]))",
-              "intervalFactor": 10,
+              "expr": "label_replace(sum by (name) (rate(container_network_transmit_bytes_total{image!=\"\",container_label_org_label_schema_group=\"\"}[1m])), \"name\", \"$1\", \"name\", \"dockerdevcustomcfgkafka_(.*)_1\")",
+              "intervalFactor": 1,
               "legendFormat": "{{ name }}",
               "metric": "container_network_transmit_bytes_total",
               "refId": "A",
