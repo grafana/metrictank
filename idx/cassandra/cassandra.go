@@ -279,7 +279,12 @@ func (c *CasIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Arc
 	}
 
 	if inMemory {
-		c.deleteOldIfMoved(existing, partition)
+		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
+		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// So we need to explicitly delete the old entry.
+		if existing.Partition != partition {
+			c.deleteDefAsync(existing)
+		}
 	}
 
 	if inMemory2 {
@@ -304,25 +309,17 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 	}
 
 	if inMemory {
-		c.deleteOldIfMoved(existing, partition)
+		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
+		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// So we need to explicitly delete the old entry.
+		if existing.Partition != partition {
+			c.deleteDefAsync(existing)
+		}
 	}
 
 	archive = c.updateCassandraIfStale(inMemory, archive, partition)
 	stat.Value(time.Since(pre))
 	return archive
-}
-
-// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-// an existing metricDef will just create a new row in the table and wont remove the old row.
-// So we need to explicitly delete the old entry.
-func (c *CasIdx) deleteOldIfMoved(existing idx.Archive, partition int32) {
-	if existing.Partition != partition {
-		go func() {
-			if err := c.deleteDef(&existing); err != nil {
-				log.Error(3, err.Error())
-			}
-		}()
-	}
 }
 
 // updateCassandraIfStale saves the archive to cassandra if needed and
@@ -527,6 +524,14 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 		}
 	}
 	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
+}
+
+func (c *CasIdx) deleteDefAsync(def idx.Archive) {
+	go func() {
+		if err := c.deleteDef(&def); err != nil {
+			log.Error(3, err.Error())
+		}
+	}()
 }
 
 func (c *CasIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
