@@ -283,7 +283,7 @@ func (c *CasIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Arc
 		// an existing metricDef will just create a new row in the table and wont remove the old row.
 		// So we need to explicitly delete the old entry.
 		if existing.Partition != partition {
-			c.deleteDefAsync(existing)
+			c.deleteDefAsync(existing.Id, existing.Partition)
 		}
 	}
 
@@ -317,7 +317,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 		// an existing metricDef will just create a new row in the table and wont remove the old row.
 		// So we need to explicitly delete the old entry.
 		if existing.Partition != partition {
-			c.deleteDefAsync(existing)
+			c.deleteDefAsync(existing.Id, existing.Partition)
 		}
 	}
 
@@ -499,7 +499,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	}
 	if updateCassIdx {
 		for _, def := range defs {
-			err = c.deleteDef(&def)
+			err = c.deleteDef(def.Id, def.Partition)
 			if err != nil {
 				log.Error(3, "cassandra-idx: %s", err.Error())
 			}
@@ -509,16 +509,17 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	return defs, err
 }
 
-func (c *CasIdx) deleteDef(def *idx.Archive) error {
+func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 	pre := time.Now()
 	attempts := 0
+	keyStr := key.String()
 	for attempts < 5 {
 		attempts++
-		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
+		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", part, keyStr).Exec()
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
-			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", keyStr, err)
 			time.Sleep(time.Second)
 		} else {
 			statQueryDeleteOk.Inc()
@@ -526,12 +527,12 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
+	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", keyStr, attempts)
 }
 
-func (c *CasIdx) deleteDefAsync(def idx.Archive) {
+func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
 	go func() {
-		if err := c.deleteDef(&def); err != nil {
+		if err := c.deleteDef(key, part); err != nil {
 			log.Error(3, err.Error())
 		}
 	}()
