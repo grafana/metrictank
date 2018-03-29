@@ -53,21 +53,9 @@ func getConnectedChunks(t *testing.T, metric schema.AMKey) *CCache {
 	return cc
 }
 
-func getTestAMKey(suffix uint8) schema.AMKey {
-	return schema.AMKey{
-		MKey: getTestMKey(suffix),
-	}
-}
-
-func getTestMKey(suffix uint8) schema.MKey {
-	return schema.MKey{
-		Key: [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, suffix},
-	}
-}
-
 // test AddIfHot method without passing a previous timestamp on a hot metric
 func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -102,7 +90,7 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 
 // test AddIfHot method without passing a previous timestamp on a cold metric
 func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -127,7 +115,7 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 
 // test AddIfHot method on a hot metric
 func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -162,7 +150,7 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 
 // test AddIfHot method on a cold metric
 func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -186,7 +174,7 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 }
 
 func TestConsecutiveAdding(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -222,7 +210,7 @@ func TestConsecutiveAdding(t *testing.T) {
 
 // tests if chunks get connected to previous even if it is is not specified, based on span
 func TestDisconnectedAdding(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -256,7 +244,7 @@ func TestDisconnectedAdding(t *testing.T) {
 // tests if chunks get connected to previous even if it is is not specified,
 // basesd on a span which is the result of a guess that's based on the distance to the previous chunk
 func TestDisconnectedAddingByGuessing(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := NewCCache()
 
 	values := []uint32{1, 2, 3, 4, 5}
@@ -302,7 +290,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 }
 
 func TestSearchFromBeginningComplete(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 1006, 1025)
 
@@ -320,7 +308,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 }
 
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 1006, 1030)
 	if res.Complete {
@@ -337,7 +325,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 }
 
 func TestSearchFromEnd(t *testing.T) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
 	res := cc.Search(test.NewContext(), metric, 500, 1025)
 
@@ -377,7 +365,7 @@ func TestSearchDisconnectedStartEndNonSpanaware(t *testing.T) {
 func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 	var cc *CCache
 	var res *CCSearchResult
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
 	itgen1 := getItgen(t, values, 1000, spanaware)
@@ -450,7 +438,7 @@ func TestSearchDisconnectedWithGapStartEndNonSpanaware(t *testing.T) {
 }
 
 func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bool) {
-	metric := getTestAMKey(1)
+	metric := test.GetAMKey(1)
 	var cc *CCache
 	var res *CCSearchResult
 
@@ -534,10 +522,10 @@ func TestMetricDelete(t *testing.T) {
 func testMetricDelete(t *testing.T, cc *CCache) {
 	var res *CCSearchResult
 
-	rawMetric1 := getTestAMKey(1)
+	rawMetric1 := test.GetAMKey(1)
 	metric1_1 := schema.GetAMKey(rawMetric1.MKey, schema.Cnt, 600)
 	metric1_2 := schema.GetAMKey(rawMetric1.MKey, schema.Sum, 600)
-	rawMetric2 := getTestMKey(2)
+	rawMetric2 := test.GetMKey(2)
 	metric2_1 := schema.GetAMKey(rawMetric2, schema.Cnt, 6000)
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	itgenCount := 10

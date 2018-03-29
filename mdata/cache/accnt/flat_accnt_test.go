@@ -3,6 +3,8 @@ package accnt
 import (
 	"testing"
 
+	"github.com/grafana/metrictank/test"
+
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -12,12 +14,6 @@ func resetCounters() {
 	cacheSizeUsed.SetUint64(0)
 }
 
-func getTestMKey(suffix uint8) schema.MKey {
-	return schema.MKey{
-		Key: [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, suffix},
-	}
-}
-
 func TestAddingEvicting(t *testing.T) {
 	resetCounters()
 	a := NewFlatAccnt(10)
@@ -25,8 +21,8 @@ func TestAddingEvicting(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	metric1 := schema.GetAMKey(getTestMKey(1), schema.Cnt, 600)
-	metric2 := schema.GetAMKey(getTestMKey(2), schema.Cnt, 600)
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
 	var ts1 uint32 = 1
 	var ts2 uint32 = 2
 
@@ -93,9 +89,9 @@ func TestLRUOrdering(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	metric1 := schema.GetAMKey(getTestMKey(1), schema.Cnt, 600)
-	metric2 := schema.GetAMKey(getTestMKey(2), schema.Cnt, 600)
-	metric3 := schema.GetAMKey(getTestMKey(3), schema.Cnt, 600)
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
+	metric3 := schema.GetAMKey(test.GetMKey(3), schema.Cnt, 600)
 	var ts1 uint32 = 1
 
 	a.AddChunk(metric1, ts1, 3) // total size now 3
@@ -125,8 +121,8 @@ func TestMetricDeleting(t *testing.T) {
 	resetCounters()
 	a := NewFlatAccnt(12)
 
-	metric1 := schema.GetAMKey(getTestMKey(1), schema.Cnt, 600)
-	metric2 := schema.GetAMKey(getTestMKey(2), schema.Cnt, 600)
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
 
 	a.AddChunk(metric1, 1, 2)
 	a.AddChunk(metric2, 1, 2)
