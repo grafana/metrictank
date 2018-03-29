@@ -8,36 +8,34 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/test"
 	"gopkg.in/raintank/schema.v1"
 )
 
-var ids []string
+var ids []schema.MKey
 
-func getTestIDs(t *testing.T) []string {
+func getTestIDs(t *testing.T) []schema.MKey {
 	if len(ids) > 0 {
 		return ids
 	}
 
-	idStrings := []string{
-		"1.02345678901234567890123456789012",
-		"1.12345678901234567890123456789012",
-		"1.22345678901234567890123456789012",
-		"1.32345678901234567890123456789012",
-		"1.42345678901234567890123456789012",
-		"1.52345678901234567890123456789012",
-		"1.62345678901234567890123456789012",
-		"1.72345678901234567890123456789012",
-	}
-	for _, idStr := range idStrings {
-		ids = append(ids, idStr)
+	ids = []schema.MKey{
+		test.GetMKey(0),
+		test.GetMKey(1),
+		test.GetMKey(2),
+		test.GetMKey(3),
+		test.GetMKey(4),
+		test.GetMKey(5),
+		test.GetMKey(6),
+		test.GetMKey(7),
 	}
 
 	return ids
 }
 
-func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
+func getTestIndex(t *testing.T) (TagIndex, map[schema.MKey]*idx.Archive) {
 	type testCase struct {
-		id         string
+		id         schema.MKey
 		lastUpdate int64
 		tags       []string
 	}
@@ -56,19 +54,18 @@ func getTestIndex(t *testing.T) (TagIndex, map[string]*idx.Archive) {
 	}
 
 	tagIdx := make(TagIndex)
-	byId := make(map[string]*idx.Archive)
+	byId := make(map[schema.MKey]*idx.Archive)
 
 	for i, d := range data {
-		idStr := d.id
-		byId[idStr] = &idx.Archive{}
-		byId[idStr].Name = fmt.Sprintf("metric%d", i)
-		byId[idStr].Tags = d.tags
-		byId[idStr].LastUpdate = d.lastUpdate
+		byId[d.id] = &idx.Archive{}
+		byId[d.id].Name = fmt.Sprintf("metric%d", i)
+		byId[d.id].Tags = d.tags
+		byId[d.id].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
 			tagIdx.addTagId(tagSplits[0], tagSplits[1], d.id)
 		}
-		tagIdx.addTagId("name", byId[idStr].Name, d.id)
+		tagIdx.addTagId("name", byId[d.id].Name, d.id)
 	}
 
 	return tagIdx, byId
@@ -404,8 +401,13 @@ func TestGetByTag(t *testing.T) {
 	mds[18].Tags = []string{"key1=value2", "key2=value2"}
 	mds[3].Tags = []string{"key1=value1", "key3=value3"}
 
-	for _, md := range mds {
-		ix.AddOrUpdate(&md, 1)
+	for i, md := range mds {
+		mds[i].SetId()
+		mkey, err := schema.MKeyFromString(mds[i].Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, &md, 1)
 	}
 
 	type testCase struct {

@@ -17,7 +17,7 @@ type MockCache struct {
 	SearchCount       int
 	DelMetricArchives int
 	DelMetricSeries   int
-	DelMetricKeys     []schema.AMKey
+	DelMetricKeys     []schema.MKey
 	ResetCalls        int
 }
 
@@ -25,7 +25,7 @@ func NewMockCache() *MockCache {
 	return &MockCache{}
 }
 
-func (mc *MockCache) Add(metric, rawMetric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (mc *MockCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.AddCount++
@@ -53,7 +53,7 @@ func (mc *MockCache) Search(ctx context.Context, metric schema.AMKey, from uint3
 	return nil
 }
 
-func (mc *MockCache) DelMetric(rawMetric schema.AMKey) (int, int) {
+func (mc *MockCache) DelMetric(rawMetric schema.MKey) (int, int) {
 	mc.DelMetricKeys = append(mc.DelMetricKeys, rawMetric)
 	return mc.DelMetricSeries, mc.DelMetricArchives
 }

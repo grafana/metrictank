@@ -182,7 +182,8 @@ func InitSmallIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	for i, series := range diskMetrics(5, 100, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -194,7 +195,8 @@ func InitSmallIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 }
 
@@ -226,7 +228,8 @@ func InitLargeIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	for i, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -238,7 +241,8 @@ func InitLargeIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	// orgId 1 has 1,680,000 series
 
@@ -252,7 +256,8 @@ func InitLargeIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	for i, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
@@ -264,7 +269,8 @@ func InitLargeIndex() {
 			Time:     int64(i + 100),
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, _ := schema.MKeyFromString(data.Id)
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	//orgId 2 has 168,000 mertics
 }
@@ -405,11 +411,12 @@ func TestTagSorting(t *testing.T) {
 		Time:     int64(123),
 	}
 	md1.SetId()
+	mkey, _ := schema.MKeyFromString(md1.Id)
 
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
-	index.AddOrUpdate(md1, 1)
+	index.AddOrUpdate(mkey, md1, 1)
 
 	res, err := index.FindByTag(1, []string{"b=a"}, 0)
 	if err != nil {
@@ -770,7 +777,7 @@ func ixFindByTag(b *testing.B, org, q int) {
 	if len(series) != tagQueries[q].ExpectedResults {
 		for _, s := range series {
 			memoryIdx := ix.(*MemoryIdx)
-			b.Log(memoryIdx.defById[s.Path].Tags)
+			b.Log(memoryIdx.defById[s.Defs[0].Id].Tags)
 		}
 		b.Fatalf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series))
 	}

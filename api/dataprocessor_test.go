@@ -356,86 +356,46 @@ func TestGetSeriesFixed(t *testing.T) {
 		{Val: 30, Ts: 30},
 	}
 
+	var num int
+
 	for offset := uint32(1); offset <= 10; offset++ {
 		for from := uint32(11); from <= 20; from++ { // should always yield result with first point at 20 (because from is inclusive)
 			for to := uint32(31); to <= 40; to++ { // should always yield result with last point at 30 (because to is exclusive)
-				name := fmt.Sprintf("case.data.offset.%d.query:%d-%d", offset, from, to)
+				num += 1
+				id := test.GetMKey(num)
 
-				metric := metrics.GetOrCreate(name, name, 0, 0)
+				metric := metrics.GetOrCreate(id, 0, 0)
 				metric.Add(offset, 10)    // this point will always be quantized to 10
 				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(name, name, name, from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
+				req := models.NewReq(id, "", "", from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
 				points, err := srv.getSeriesFixed(test.NewContext(), req, consolidation.None)
 				if err != nil {
-					t.Errorf("case %q - error: %s", name, err)
+					t.Errorf("case %d: offset %d, from %d to %d -> error: %s", num, offset, from, to, err)
 				}
 				if !reflect.DeepEqual(expected, points) {
-					t.Errorf("case %q - exp: %v - got %v", name, expected, points)
+					t.Errorf("case %d: offset %d, from %d to %d -> exp: %v - got %v", num, offset, from, to, expected, points)
 				}
 			}
 		}
 	}
 }
 
-func reqRaw(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
-	req := models.NewReq(key, key, key, from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
+func reqRaw(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
+	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
 	return req
 }
-func reqOut(key string, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, key, key, from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
+func reqOut(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
+	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.TTL = ttl
 	req.OutInterval = outInterval
 	req.AggNum = aggNum
 	return req
-}
-
-// return true if a and b are equal. Equal means that all of the struct
-// fields are equal.  For the req.Node, we just compare the node.Name rather
-// then doing a deep comparison.
-func compareReqEqual(a, b models.Req) bool {
-	if a.Key != b.Key {
-		return false
-	}
-	if a.Target != b.Target {
-		return false
-	}
-	if a.From != b.From {
-		return false
-	}
-	if a.To != b.To {
-		return false
-	}
-	if a.MaxPoints != b.MaxPoints {
-		return false
-	}
-	if a.RawInterval != b.RawInterval {
-		return false
-	}
-	if a.Consolidator != b.Consolidator {
-		return false
-	}
-	if a.Node.GetName() != b.Node.GetName() {
-		return false
-	}
-	if a.Archive != b.Archive {
-		return false
-	}
-	if a.ArchInterval != b.ArchInterval {
-		return false
-	}
-	if a.OutInterval != b.OutInterval {
-		return false
-	}
-	if a.AggNum != b.AggNum {
-		return false
-	}
-	return true
 }
 
 func TestMergeSeries(t *testing.T) {
@@ -479,54 +439,6 @@ func TestMergeSeries(t *testing.T) {
 			}
 
 		}
-	}
-}
-
-func TestRequestContextWithoutConsolidator(t *testing.T) {
-	metric := "metric1"
-	archInterval := uint32(10)
-	req := reqRaw(metric, 44, 88, 100, 10, consolidation.None, 0, 0)
-	req.ArchInterval = archInterval
-	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
-
-	expectFrom := uint32(41)
-	if ctx.From != expectFrom {
-		t.Errorf("requestContext.From is not at boundary as expected, expected/got %d/%d", expectFrom, ctx.From)
-	}
-
-	expectTo := uint32(81)
-	if ctx.To != expectTo {
-		t.Errorf("requestContext.To is not at boundary as expected, expected/got %d/%d", expectTo, ctx.To)
-	}
-
-	expectedAggKey := ""
-	if ctx.AggKey != expectedAggKey {
-		t.Errorf("requestContext.AggKey is not empty as expected, expected/got \"%s\"/\"%s\"", expectedAggKey, ctx.AggKey)
-	}
-}
-
-func TestRequestContextWithConsolidator(t *testing.T) {
-	metric := "metric1"
-	archInterval := uint32(10)
-	from := uint32(44)
-	to := uint32(88)
-	req := reqRaw(metric, from, to, 100, 10, consolidation.Sum, 0, 0)
-	req.ArchInterval = archInterval
-	ctx := newRequestContext(test.NewContext(), &req, consolidation.Sum)
-
-	expectFrom := from
-	if ctx.From != expectFrom {
-		t.Errorf("requestContext.From is not original value as expected, expected/got %d/%d", expectFrom, ctx.From)
-	}
-
-	expectTo := to
-	if ctx.To != expectTo {
-		t.Errorf("requestContext.To is not original value as expected, expected/got %d/%d", expectTo, ctx.To)
-	}
-
-	expectedAggKey := fmt.Sprintf("%s_%s_%d", metric, "sum", archInterval)
-	if ctx.AggKey != expectedAggKey {
-		t.Errorf("requestContext.AggKey is not as expected, expected/got \"%s\"/\"%s\"", expectedAggKey, ctx.AggKey)
 	}
 }
 
@@ -580,7 +492,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv.BindMemoryStore(metrics)
-	metric := "metric1"
+	metric := test.GetAMKey(1)
 	var c *cache.CCache
 	var itgen *chunk.IterGen
 	var prevts uint32
@@ -628,7 +540,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				for i := 0; i < len(tc.Pattern); i++ {
 					itgen = chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
 					if pattern[i] == 'c' || pattern[i] == 'b' {
-						c.Add(metric, metric, prevts, *itgen)
+						c.Add(metric, prevts, *itgen)
 					}
 					if pattern[i] == 's' || pattern[i] == 'b' {
 						cwr := mdata.NewChunkWriteRequest(nil, metric, &chunks[i], 0, span, time.Now())
@@ -638,7 +550,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				}
 
 				// create a request for the current range
-				req := reqRaw(metric, from, to, span, 1, consolidation.None, 0, 0)
+				req := reqRaw(metric.MKey, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
 				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 				iters, err := srv.getSeriesCachedStore(ctx, to)
@@ -763,13 +675,13 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	srv.BindMemoryStore(metrics)
 	from := uint32(1744)
 	to := uint32(1888)
-	metricKey := "metric1"
+	metricKey := test.GetMKey(1)
 	archInterval := uint32(10)
 	req := reqRaw(metricKey, from, to, 100, 10, consolidation.None, 0, 0)
 	req.ArchInterval = archInterval
 	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
-	metric := metrics.GetOrCreate(metricKey, metricKey, 0, 0)
+	metric := metrics.GetOrCreate(metricKey, 0, 0)
 	for i := uint32(50); i < 3000; i++ {
 		metric.Add(i, float64(i^2))
 	}

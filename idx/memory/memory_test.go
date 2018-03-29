@@ -12,10 +12,12 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/test"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
 
+// getSeriesNames returns a count-length slice of random strings comprised of the prefix and count nodes.like.this
 func getSeriesNames(depth, count int, prefix string) []string {
 	series := make([]string, count)
 	for i := 0; i < count; i++ {
@@ -43,6 +45,7 @@ func getRandomString(n int, alphabets ...byte) string {
 	return string(bytes)
 }
 
+// getMetricData returns a count-length slice of MetricData's with random Name and the given org id
 func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool) []*schema.MetricData {
 	data := make([]*schema.MetricData, count)
 	series := getSeriesNames(depth, count, prefix)
@@ -97,7 +100,8 @@ func testGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.AddOrUpdate(s, 1)
+				mkey, _ := schema.MKeyFromString(s.Id)
+				ix.AddOrUpdate(mkey, s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -115,7 +119,8 @@ func testGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.AddOrUpdate(series, 1)
+			mkey, _ := schema.MKeyFromString(series.Id)
+			ix.AddOrUpdate(mkey, series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -136,23 +141,44 @@ func testFind(t *testing.T) {
 	ix.Init()
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo", false) {
 		s.Time = 1 * 86400
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 		s.Time = 2 * 86400
 		s.Interval = 60
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		mkey, err = schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
+
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo", false) {
 		s.Time = 1 * 86400
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -269,10 +295,18 @@ func testDelete(t *testing.T) {
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 
 	for _, s := range publicSeries {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range org1Series {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 }
 
@@ -287,10 +321,18 @@ func TestDeleteTagged(t *testing.T) {
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", true)
 
 	for _, s := range publicSeries {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range org1Series {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	Convey("when deleting by tag", t, func() {
@@ -298,7 +340,7 @@ func TestDeleteTagged(t *testing.T) {
 		ids, err := ix.DeleteTagged(1, []string{testName})
 		So(err, ShouldBeNil)
 		So(ids, ShouldHaveLength, 1)
-		So(ids[0].Id, ShouldEqual, org1Series[3].Id)
+		So(ids[0].Id.String(), ShouldEqual, org1Series[3].Id)
 		Convey("series should not be present in the metricDef index", func() {
 			nodes, err := ix.FindByTag(1, []string{"series_id=3"}, 0)
 			So(err, ShouldBeNil)
@@ -331,7 +373,11 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 			Interval: 10,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 
 	Convey("when deleting 100k series", t, func() {
@@ -389,20 +435,32 @@ func testMixedBranchLeaf(t *testing.T) {
 	third.SetId()
 
 	Convey("when adding the first metric", t, func() {
+		mkey, err := schema.MKeyFromString(first.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		ix.AddOrUpdate(first, 1)
+		ix.AddOrUpdate(mkey, first, 1)
 		Convey("we should be able to add a leaf under another leaf", func() {
+			mkey, err := schema.MKeyFromString(second.Id)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			ix.AddOrUpdate(second, 1)
-			_, ok := ix.Get(second.Id)
+			ix.AddOrUpdate(mkey, second, 1)
+			_, ok := ix.Get(mkey)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)
 			So(len(defs), ShouldEqual, 2)
 		})
 		Convey("we should be able to add a leaf that collides with an existing branch", func() {
+			mkey, err := schema.MKeyFromString(third.Id)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			ix.AddOrUpdate(third, 1)
-			_, ok := ix.Get(third.Id)
+			ix.AddOrUpdate(mkey, third, 1)
+			_, ok := ix.Get(mkey)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)
 			So(len(defs), ShouldEqual, 3)
@@ -449,22 +507,29 @@ func testMixedBranchLeafDelete(t *testing.T) {
 			Interval: 10,
 		},
 	}
+	var mkeys []schema.MKey
 	for _, s := range series {
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mkeys = append(mkeys, mkey)
+		ix.AddOrUpdate(mkey, s, 1)
 	}
+
 	Convey("when deleting mixed leaf/branch", t, func() {
 		defs, err := ix.Delete(1, "a.b.c")
 		So(err, ShouldBeNil)
 		So(defs, ShouldHaveLength, 2)
-		deletedIds := make([]string, len(defs))
+		deletedIds := make([]schema.MKey, len(defs))
 		for i, d := range defs {
 			deletedIds[i] = d.Id
 		}
-		So(series[0].Id, ShouldBeIn, deletedIds)
-		So(series[1].Id, ShouldBeIn, deletedIds)
+		So(test.MustMKeyFromString(series[0].Id), ShouldBeIn, deletedIds)
+		So(test.MustMKeyFromString(series[1].Id), ShouldBeIn, deletedIds)
 		Convey("series should not be present in the metricDef index", func() {
-			_, ok := ix.Get(series[0].Id)
+			_, ok := ix.Get(mkeys[0])
 			So(ok, ShouldEqual, false)
 			Convey("series should not be present in searches", func() {
 				found, err := ix.Find(1, "a.b.c", 0)
@@ -480,10 +545,12 @@ func testMixedBranchLeafDelete(t *testing.T) {
 		defs, err := ix.Delete(1, "a.b.c2.d.*")
 		So(err, ShouldBeNil)
 		So(defs, ShouldHaveLength, 1)
-		So(defs[0].Id, ShouldEqual, series[3].Id)
+		if defs[0].Id != mkeys[3] {
+			t.Fatalf("%v must equal %v", defs[0].Id, mkeys[3])
+		}
 
 		Convey("deleted series should not be present in the metricDef index", func() {
-			_, ok := ix.Get(series[3].Id)
+			_, ok := ix.Get(mkeys[3])
 			So(ok, ShouldEqual, false)
 			Convey("deleted series should not be present in searches", func() {
 				found, err := ix.Find(1, "a.b.c2.*", 0)
@@ -506,7 +573,11 @@ func TestPruneTaggedSeries(t *testing.T) {
 	for _, s := range series {
 		s.Time = 1
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	// add new series
@@ -514,7 +585,11 @@ func TestPruneTaggedSeries(t *testing.T) {
 	for _, s := range series {
 		s.Time = 10
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	Convey("after populating index", t, func() {
@@ -540,7 +615,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
 			Metric:   defs[0].Metric,
-			Id:       defs[0].Id,
+			Id:       defs[0].Id.String(),
 			Tags:     defs[0].Tags,
 			Mtype:    defs[0].Mtype,
 			OrgId:    1,
@@ -548,7 +623,11 @@ func TestPruneTaggedSeries(t *testing.T) {
 			Time:     100,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
 		Convey("When purging old series", func() {
 			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
@@ -579,7 +658,11 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	series[1].SetId()
 
 	for _, s := range series {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	Convey("after populating index", t, func() {
@@ -635,7 +718,11 @@ func testPrune(t *testing.T) {
 			Time:     1,
 		}
 		d.SetId()
-		ix.AddOrUpdate(d, 1)
+		mkey, err := schema.MKeyFromString(d.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, d, 1)
 	}
 	//new series
 	for _, s := range getSeriesNames(2, 5, "metric.foo") {
@@ -647,7 +734,11 @@ func testPrune(t *testing.T) {
 			Time:     10,
 		}
 		d.SetId()
-		ix.AddOrUpdate(d, 1)
+		mkey, err := schema.MKeyFromString(d.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, d, 1)
 	}
 	Convey("after populating index", t, func() {
 		defs := ix.List(1)
@@ -671,13 +762,17 @@ func testPrune(t *testing.T) {
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
 			Metric:   defs[0].Metric,
-			Id:       defs[0].Id,
+			Id:       defs[0].Id.String(),
 			OrgId:    1,
 			Interval: 30,
 			Time:     100,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 0)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 0)
 		Convey("When purging old series", func() {
 			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
@@ -701,7 +796,11 @@ func TestSingleNodeMetric(t *testing.T) {
 		OrgId:    1,
 	}
 	data.SetId()
-	ix.AddOrUpdate(data, 1)
+	mkey, err := schema.MKeyFromString(data.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix.AddOrUpdate(mkey, data, 1)
 }
 
 func BenchmarkIndexing(b *testing.B) {
@@ -721,7 +820,11 @@ func BenchmarkIndexing(b *testing.B) {
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 }
 
@@ -740,7 +843,11 @@ func BenchmarkDeletes(b *testing.B) {
 			Interval: 10,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()

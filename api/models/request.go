@@ -117,3 +117,63 @@ func (r Req) TraceLog(span opentracing.Span) {
 		log.Int("aggNum", int(r.AggNum)),
 	)
 }
+
+// Equals compares all fields of a to b for equality.
+// Except
+// * TTL (because alignRequests may change it)
+//   for 100% correctness we may want to fix this in the future
+//   but for now, should be harmless since the field is not
+//   that important for archive fetching
+// * For the Node field we just compare the node.Name
+// rather then doing a deep comparison.
+func (a Req) Equals(b Req) bool {
+	if a.MKey != b.MKey {
+		return false
+	}
+	if a.Target != b.Target {
+		return false
+	}
+	if a.Pattern != b.Pattern {
+		return false
+	}
+	if a.From != b.From {
+		return false
+	}
+	if a.To != b.To {
+		return false
+	}
+	if a.MaxPoints != b.MaxPoints {
+		return false
+	}
+	if a.RawInterval != b.RawInterval {
+		return false
+	}
+	if a.Consolidator != b.Consolidator {
+		return false
+	}
+	if a.ConsReq != b.ConsReq {
+		return false
+	}
+	if a.Node.GetName() != b.Node.GetName() {
+		return false
+	}
+	if a.SchemaId != b.SchemaId {
+		return false
+	}
+	if a.AggId != b.AggId {
+		return false
+	}
+	if a.Archive != b.Archive {
+		return false
+	}
+	if a.ArchInterval != b.ArchInterval {
+		return false
+	}
+	if a.OutInterval != b.OutInterval {
+		return false
+	}
+	if a.AggNum != b.AggNum {
+		return false
+	}
+	return true
+}
