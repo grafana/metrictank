@@ -13,6 +13,7 @@ import (
 // aggregation span (higher 4 bits)
 type Archive uint8
 
+// important: caller must make sure to call IsSpanValid first
 func NewArchive(method Method, span uint32) Archive {
 	code := spanHumanToCode[span]
 	return Archive(uint8(method) | code<<4)
@@ -24,6 +25,11 @@ func (a Archive) String() string {
 	method := Method(a & 0x0F)
 	span := uint8(a >> 4)
 	return method.String() + "_" + strconv.FormatInt(int64(spanCodeToHuman[span]), 10)
+}
+
+func IsSpanValid(span uint32) bool {
+	_, ok := spanHumanToCode[span]
+	return ok
 }
 
 type Method uint8
