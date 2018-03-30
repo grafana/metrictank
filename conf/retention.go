@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/dur"
 )
@@ -86,7 +88,7 @@ func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready
 // ParseRetentions parses retention definitions into a Retentions structure
 func ParseRetentions(defs string) (Retentions, error) {
 	retentions := make(Retentions, 0)
-	for _, def := range strings.Split(defs, ",") {
+	for i, def := range strings.Split(defs, ",") {
 		def = strings.TrimSpace(def)
 		parts := strings.Split(def, ":")
 		if len(parts) < 2 || len(parts) > 5 {
@@ -107,6 +109,10 @@ func ParseRetentions(defs string) (Retentions, error) {
 			if err != nil {
 				return nil, err
 			}
+		}
+		if i != 0 && !schema.IsSpanValid(uint32(retention.SecondsPerPoint)) {
+			return nil, fmt.Errorf("invalid retention: can't encode span of %d", retention.SecondsPerPoint)
+
 		}
 		if len(parts) >= 3 {
 			retention.ChunkSpan, err = dur.ParseNDuration(parts[2])
