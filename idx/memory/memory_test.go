@@ -86,7 +86,7 @@ func testGetAddKey(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 	org2Series := getMetricData(2, 2, 5, 10, "metric.org2", false)
 
@@ -99,7 +99,7 @@ func testGetAddKey(t *testing.T) {
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
 				numSeries := len(series)
-				if orgId != -1 {
+				if orgId != idx.OrgIdPublic {
 					numSeries += 5
 				}
 				So(defs, ShouldHaveLength, numSeries)
@@ -128,7 +128,7 @@ func TestFind(t *testing.T) {
 func testFind(t *testing.T) {
 	ix := New()
 	ix.Init()
-	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo", false) {
+	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
@@ -256,7 +256,7 @@ func testDelete(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 
 	for _, s := range publicSeries {
@@ -271,7 +271,7 @@ func TestDeleteTagged(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", true)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", true)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", true)
 
 	for _, s := range publicSeries {

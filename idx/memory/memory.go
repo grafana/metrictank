@@ -836,15 +836,17 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 	if err != nil {
 		return nil, err
 	}
-	publicNodes, err := m.find(-1, pattern)
-	if err != nil {
-		return nil, err
+	if orgId != idx.OrgIdPublic {
+		publicNodes, err := m.find(idx.OrgIdPublic, pattern)
+		if err != nil {
+			return nil, err
+		}
+		matchedNodes = append(matchedNodes, publicNodes...)
 	}
-	matchedNodes = append(matchedNodes, publicNodes...)
 	log.Debug("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
 	results := make([]idx.Node, 0)
 	seen := make(map[string]struct{})
-	// if there are public (orgId -1) and private leaf nodes with the same series
+	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
 		if _, ok := seen[n.Path]; !ok {
