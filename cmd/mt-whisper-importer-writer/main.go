@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster"
@@ -219,13 +221,17 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		throwError("Metric has no archives")
 		return
 	}
+	mkey, err := schema.MKeyFromString(metric.MetricData.Id)
+	if err != nil {
+		throwError(fmt.Sprintf("Invalid MetricData.Id: %s", err))
+	}
 
 	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
 	if err != nil {
 		throwError(fmt.Sprintf("Error partitioning: %q", err))
 		return
 	}
-	s.Index.AddOrUpdate(&metric.MetricData, partition)
+	s.Index.AddOrUpdate(mkey, &metric.MetricData, partition)
 
 	for archiveIdx, a := range metric.Archives {
 		archiveTTL := a.SecondsPerPoint * a.Points
