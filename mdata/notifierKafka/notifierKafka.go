@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"strings"
 	"sync"
 	"time"
 
@@ -234,13 +233,13 @@ func (c *NotifierKafka) flush() {
 	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
 	var pMsg mdata.PersistMessageBatch
 	for i, msg := range c.buf {
-		mkey, err := schema.MKeyFromString(strings.SplitN(msg.Key, "_", 2)[0])
+		amkey, err := schema.AMKeyFromString(msg.Key)
 		if err != nil {
 			log.Error(3, "kafka-cluster: failed to parse key %q", msg.Key)
 			continue
 		}
 
-		def, ok := c.idx.Get(mkey)
+		def, ok := c.idx.Get(amkey.MKey)
 		if !ok {
 			log.Error(3, "kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
 			continue
