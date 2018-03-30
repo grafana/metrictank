@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -90,7 +92,7 @@ func main() {
 		fmt.Println("   With great power comes great responsibility")
 		fmt.Println(" * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`")
 		fmt.Println(" * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it")
-		fmt.Println(" * Doesn't automatically return data for aggregated series. It's up to you to query for id_<rollup>_<span> when appropriate")
+		fmt.Println(" * Doesn't automatically return data for aggregated series. It's up to you to query for an AMKey (id_<rollup>_<span>) when appropriate")
 		fmt.Println(" * (rollup is one of sum, cnt, lst, max, min and span is a number in seconds)")
 	}
 	flag.Parse()
@@ -223,34 +225,28 @@ func main() {
 			return
 		}
 		for _, m := range metrics {
-			fmt.Println(m.id, m.name)
+			fmt.Println(m)
 		}
 	} else {
+		amkey, err := schema.AMKeyFromString(metricSelector)
+		if err != nil {
+			log.Error(3, "can't parse metric selector as AMKey: %s", err)
+			return
+		}
+
 		fmt.Println("# Looking for this metric:")
 
-		id := metricSelector
-
-		// the input selector is an aggregated series like '12574.d144038944994c54b892ae33e3d8802b_sum_600'
-		// for the query lookup, strip off the last bits since aggregated series have no index entry.
-		if strings.Count(metricSelector, "_") == 2 {
-			id = metricSelector[:strings.Index(metricSelector, "_")]
-		}
-		metrics, err = getMetric(store, id)
+		metrics, err = getMetric(store, amkey)
 		if err != nil {
 			log.Error(3, "cassandra query error. %s", err)
 			return
 		}
 		if len(metrics) == 0 {
-			fmt.Printf("metric id %q not found", id)
+			fmt.Printf("metric id %v not found", amkey.MKey)
 			return
 		}
-		for i, m := range metrics {
-			if m.id != metricSelector {
-				fmt.Println(metricSelector, "(base", m.id, ")", m.name)
-				metrics[i].id = metricSelector // this is what we'll actually have to search for
-			} else {
-				fmt.Println(m.id, m.name)
-			}
+		for _, m := range metrics {
+			fmt.Println(m)
 		}
 	}
 

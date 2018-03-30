@@ -19,10 +19,10 @@ func points(ctx context.Context, store *cassandra.CassandraStore, tables []strin
 		for _, table := range tables {
 			fmt.Println("### Table", table)
 			if fix != 0 {
-				points := getSeries(ctx, store, table, metric.id, fromUnix, toUnix, fix)
+				points := getSeries(ctx, store, table, metric.AMKey, fromUnix, toUnix, fix)
 				printPointsNormal(points, fromUnix, toUnix)
 			} else {
-				igens, err := store.SearchTable(ctx, metric.id, table, fromUnix, toUnix)
+				igens, err := store.SearchTable(ctx, metric.AMKey, table, fromUnix, toUnix)
 				if err != nil {
 					panic(err)
 				}
@@ -38,10 +38,10 @@ func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables [
 		for _, table := range tables {
 			fmt.Println("### Table", table)
 			if fix != 0 {
-				points := getSeries(ctx, store, table, metric.id, fromUnix, toUnix, fix)
+				points := getSeries(ctx, store, table, metric.AMKey, fromUnix, toUnix, fix)
 				printPointsSummary(points, fromUnix, toUnix)
 			} else {
-				igens, err := store.SearchTable(ctx, metric.id, table, fromUnix, toUnix)
+				igens, err := store.SearchTable(ctx, metric.AMKey, table, fromUnix, toUnix)
 				if err != nil {
 					panic(err)
 				}
@@ -51,9 +51,9 @@ func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables [
 	}
 }
 
-func getSeries(ctx context.Context, store *cassandra.CassandraStore, table, id string, fromUnix, toUnix, interval uint32) []schema.Point {
+func getSeries(ctx context.Context, store *cassandra.CassandraStore, table string, amkey schema.AMKey, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
-	itgens, err := store.SearchTable(ctx, id, table, fromUnix, toUnix)
+	itgens, err := store.SearchTable(ctx, amkey, table, fromUnix, toUnix)
 	if err != nil {
 		panic(err)
 	}

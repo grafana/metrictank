@@ -28,7 +28,7 @@ func chunkSummary(ctx context.Context, store *cassandra.CassandraStore, tables [
 		} else {
 			for _, metric := range metrics {
 				for month := start_month; month <= end_month; month += cassandra.Month_sec {
-					row_key := fmt.Sprintf("%s_%d", metric.id, month/cassandra.Month_sec)
+					row_key := fmt.Sprintf("%s_%d", metric.AMKey.String(), month/cassandra.Month_sec)
 					query := fmt.Sprintf("select key, ttl(data) from %s where key=?", tbl)
 					iter := store.Session.Query(query, row_key).Iter()
 					showKeyTTL(iter, groupTTL)
