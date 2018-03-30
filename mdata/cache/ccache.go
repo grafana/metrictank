@@ -142,7 +142,7 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 		ccms, ok := c.metricRawKeys[metric.MKey]
 		if !ok {
 			c.metricRawKeys[metric.MKey] = map[schema.Archive]struct{}{
-				metric.Archive: struct{}{},
+				metric.Archive: {},
 			}
 		} else {
 			// otherwise, make sure the association exists
