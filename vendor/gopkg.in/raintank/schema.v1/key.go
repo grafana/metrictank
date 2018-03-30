@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 //go:generate msgp
@@ -12,6 +13,7 @@ import (
 // don't ignore Key, MKey because it's used for MetricDefinition
 
 var ErrStringTooShort = errors.New("string to short")
+var ErrInvalidFormat = errors.New("invalid format")
 
 // Key identifies a metric
 type Key [16]byte
@@ -78,4 +80,36 @@ func GetAMKey(m MKey, method Method, span uint32) AMKey {
 		MKey:    m,
 		Archive: NewArchive(method, span),
 	}
+}
+
+func AMKeyFromString(s string) (AMKey, error) {
+	underscores := strings.Count(s, "_")
+	amk := AMKey{}
+	switch underscores {
+	case 0:
+		mk, err := MKeyFromString(s)
+		amk.MKey = mk
+		return amk, err
+	case 2:
+		splits := strings.Split(s, "_")
+		mk, err := MKeyFromString(splits[0])
+		if err != nil {
+			return amk, err
+		}
+		amk.MKey = mk
+		method, err := MethodFromString(splits[1])
+		if err != nil {
+			return amk, err
+		}
+		span, err := strconv.ParseInt(splits[2], 10, 32)
+		if err == nil {
+			return amk, err
+		}
+		if !IsSpanValid(uint32(span)) {
+			return amk, fmt.Errorf("invalid span %d", span)
+		}
+		amk.Archive = NewArchive(method, uint32(span))
+		return amk, nil
+	}
+	return amk, ErrInvalidFormat
 }

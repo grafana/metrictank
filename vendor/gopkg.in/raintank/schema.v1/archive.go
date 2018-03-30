@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"errors"
 	"strconv"
 )
 
@@ -42,6 +43,24 @@ const (
 	Min                   // min
 	Cnt                   // cnt
 )
+
+func MethodFromString(input string) (Method, error) {
+	switch input {
+	case "avg":
+		return Avg, nil
+	case "sum":
+		return Sum, nil
+	case "lst":
+		return Lst, nil
+	case "max":
+		return Max, nil
+	case "min":
+		return Min, nil
+	case "cnt":
+		return Cnt, nil
+	}
+	return 0, errors.New("no such method")
+}
 
 // maps human friendly span numbers (in seconds) to optimized code form
 var spanHumanToCode map[uint32]uint8
