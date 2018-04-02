@@ -23,9 +23,15 @@ func NewArchive(method Method, span uint32) Archive {
 // String returns the traditional key suffix like sum_600 etc
 // (invalid to call this for raw archives)
 func (a Archive) String() string {
-	method := Method(a & 0x0F)
-	span := uint8(a >> 4)
-	return method.String() + "_" + strconv.FormatInt(int64(spanCodeToHuman[span]), 10)
+	return a.Method().String() + "_" + strconv.FormatInt(int64(a.Span()), 10)
+}
+
+func (a Archive) Method() Method {
+	return Method(a & 0x0F)
+}
+
+func (a Archive) Span() uint32 {
+	return spanCodeToHuman[uint8(a>>4)]
 }
 
 func IsSpanValid(span uint32) bool {
