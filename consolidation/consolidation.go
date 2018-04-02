@@ -85,17 +85,17 @@ func (c Consolidator) Archive() schema.Method {
 	panic(fmt.Sprintf("Consolidator.Archive(): unknown consolidator %q", c))
 }
 
-func FromArchive(archive string) Consolidator {
+func FromArchive(archive schema.Method) Consolidator {
 	switch archive {
-	case "cnt":
+	case schema.Cnt:
 		return Cnt
-	case "lst":
+	case schema.Lst:
 		return Lst
-	case "min":
+	case schema.Min:
 		return Min
-	case "max":
+	case schema.Max:
 		return Max
-	case "sum":
+	case schema.Sum:
 		return Sum
 	}
 	return None
