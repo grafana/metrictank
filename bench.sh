@@ -1,8 +1,4 @@
 #!/bin/bash
-# TODO. received stats point vs array, onfirm function of first MD then MP
-# also test with/without snappy
-# TODO: fakemetrics keycache expiration doesn't work
-
 # memory analysis:
 # problem with this is start stats are flakey. better start it 2 min earlier
 # start stack at like x:19, so its ready 10 seconds before x:20
@@ -32,24 +28,27 @@ stop
 
 wait_time
 log "START MDM-OLD"
+docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=none --add-tags=false
+sleep $duration
+stop
+
+sleep 150
+wait_time
+log "START MDM-NEW"
+docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=none --add-tags=false
+sleep $duration
+stop
+
+wait_time
+log "START MDM-OLD SNAPPY"
 docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 
 wait_time
-log "START MDM-NEW"
+log "START MDM-NEW SNAPPY"
 docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 
-wait_time
-log "START MDM-OLD"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
-sleep $duration
-stop
-
-wait_time
-log "START MDM-NEW"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
-sleep $duration
-stop
+log "all done"
