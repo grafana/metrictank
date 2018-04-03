@@ -127,11 +127,9 @@ type MetricIndex interface {
 	// List returns all Archives for the passed OrgId, or for all organisations if -1 is provided.
 	List(int) []Archive
 
-	// Prune deletes all metrics from the index for the passed org where
-	// the last time the metric was seen is older then the passed timestamp. If the org
-	// passed is -1, then the all orgs should be examined for stale metrics to be deleted.
+	// Prune deletes all metrics that haven't been seen since the given timestamp.
 	// It returns all Archives deleted and any error encountered.
-	Prune(int, time.Time) ([]Archive, error)
+	Prune(time.Time) ([]Archive, error)
 
 	// FindByTag takes a list of expressions in the format key<operator>value.
 	// The allowed operators are: =, !=, =~, !=~.

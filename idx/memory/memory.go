@@ -1187,24 +1187,20 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 }
 
 // delete series from the index if they have not been seen since "oldest"
-func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
+func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
 	orgs := make(map[int]struct{})
-	if orgId == -1 {
-		log.Info("memory-idx: pruning stale metricDefs across all orgs")
-		m.RLock()
-		for org := range m.tree {
+	log.Info("memory-idx: pruning stale metricDefs across all orgs")
+	m.RLock()
+	for org := range m.tree {
+		orgs[org] = struct{}{}
+	}
+	if TagSupport {
+		for org := range m.tags {
 			orgs[org] = struct{}{}
 		}
-		if TagSupport {
-			for org := range m.tags {
-				orgs[org] = struct{}{}
-			}
-		}
-		m.RUnlock()
-	} else {
-		orgs[orgId] = struct{}{}
 	}
+	m.RUnlock()
 
 	var pruned []idx.Archive
 	toPruneUntagged := make(map[int]map[string]struct{}, len(orgs))
@@ -1218,10 +1214,6 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	m.RLock()
 DEFS:
 	for _, def := range m.defById {
-		if _, ok := orgs[def.OrgId]; !ok {
-			continue DEFS
-		}
-
 		if def.LastUpdate >= oldestUnix {
 			continue DEFS
 		}
@@ -1300,9 +1292,7 @@ DEFS:
 
 	statMetricsActive.Add(-1 * len(pruned))
 
-	if orgId == -1 {
-		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
-	}
+	log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil

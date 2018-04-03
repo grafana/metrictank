@@ -511,7 +511,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 	})
 
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 5)
 		nodes, err := ix.FindByTag(1, []string{"name=~metric\\.bah.*", "series_id=~[0-4]"}, 0)
@@ -538,7 +538,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 		Convey("When purging old series", func() {
-			purged, err := ix.Prune(1, time.Unix(12, 0))
+			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
 			So(purged, ShouldHaveLength, 4)
 			nodes, err := ix.FindByTag(1, []string{"name=~metric\\.foo.*", "series_id=~[0-4]"}, 0)
@@ -581,7 +581,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	}
 
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 0)
 	})
@@ -593,7 +593,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	})
 
 	Convey("When purging newer series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(20, 0))
+		purged, err := ix.Prune(time.Unix(20, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 2)
 	})
@@ -642,7 +642,7 @@ func testPrune(t *testing.T) {
 		So(defs, ShouldHaveLength, 10)
 	})
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 5)
 		nodes, err := ix.Find(1, "metric.bah.*", 0)
@@ -667,7 +667,7 @@ func testPrune(t *testing.T) {
 		data.SetId()
 		ix.AddOrUpdate(data, 0)
 		Convey("When purging old series", func() {
-			purged, err := ix.Prune(1, time.Unix(12, 0))
+			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
 			So(purged, ShouldHaveLength, 4)
 			nodes, err := ix.Find(1, "metric.foo.*", 0)
