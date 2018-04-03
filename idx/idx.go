@@ -124,7 +124,7 @@ type MetricIndex interface {
 	// the timestamp.
 	Find(int, string, int64) ([]Node, error)
 
-	// List returns all Archives for the passed OrgId, or for all organisations if -1 is provided.
+	// List returns all Archives for the passed OrgId and the public orgId
 	List(int) []Archive
 
 	// Prune deletes all metrics that haven't been seen since the given timestamp.

@@ -36,7 +36,6 @@ POST /metrics/index.json
 * header `X-Org-Id` required
 
 Returns metrics stored under the given org, as well as public data under org -1 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
-If orgId is -1, returns the metrics for all orgs. (but you can't necessarily distinguish which org a metric is from)
 
 #### Example
 

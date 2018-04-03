@@ -977,26 +977,11 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	m.RLock()
 	defer m.RUnlock()
 
-	orgs := make(map[int]struct{})
-	if orgId == -1 {
-		log.Info("memory-idx: returning all metricDefs for all orgs")
-		for org := range m.tree {
-			orgs[org] = struct{}{}
-		}
-		for org := range m.tags {
-			orgs[org] = struct{}{}
-		}
-	} else {
-		orgs[-1] = struct{}{}
-		orgs[orgId] = struct{}{}
-	}
-
 	defs := make([]idx.Archive, 0)
 	for _, def := range m.defById {
-		if _, ok := orgs[def.OrgId]; !ok {
-			continue
+		if def.OrgId == orgId || def.OrgId == idx.OrgIdPublic {
+			defs = append(defs, *def)
 		}
-		defs = append(defs, *def)
 	}
 
 	statListDuration.Value(time.Since(pre))

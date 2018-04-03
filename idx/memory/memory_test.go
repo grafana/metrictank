@@ -506,7 +506,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 	}
 
 	Convey("after populating index", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 10)
 	})
 
@@ -523,7 +523,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 	})
 
 	Convey("after purge", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
@@ -638,7 +638,7 @@ func testPrune(t *testing.T) {
 		ix.AddOrUpdate(d, 1)
 	}
 	Convey("after populating index", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 10)
 	})
 	Convey("When purging old series", t, func() {
@@ -654,7 +654,7 @@ func testPrune(t *testing.T) {
 
 	})
 	Convey("after purge", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
