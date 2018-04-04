@@ -306,11 +306,6 @@
   revision = "9bdd37bfb26bd039c08b0f36be6f80ceede4aaf3"
 
 [[projects]]
-  name = "github.com/jpillora/backoff"
-  packages = ["."]
-  revision = "06c7a16c845dc8e0bf575fafeeca0f5462f5eb4d"
-
-[[projects]]
   name = "github.com/jtolds/gls"
   packages = ["."]
   revision = "8ddce2a84170772b95dd5d576c48d517b22cac63"
@@ -743,6 +738,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f0f58298f0ec7db8baa3d1e3f15e3055a35b9d70623d66467a99e6146605c9b1"
+  inputs-digest = "63370741741523b4f8a63db039aab356266c8b413105c9bd7784a3e9812f0dae"
   solver-name = "gps-cdcl"
   solver-version = 1
