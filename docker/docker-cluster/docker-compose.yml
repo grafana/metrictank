@@ -4,8 +4,8 @@ services:
   metrictank0:
     hostname: metrictank0
     image: grafana/metrictank
-    ports:
-     - "6060:6060"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -27,8 +27,8 @@ services:
   metrictank1:
     hostname: metrictank1
     image: grafana/metrictank
-    ports:
-      - "6061:6060"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -50,8 +50,8 @@ services:
   metrictank2:
     hostname: metrictank2
     image: grafana/metrictank
-    ports:
-      - "6062:6060"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -73,8 +73,8 @@ services:
   metrictank3:
     hostname: metrictank3
     image: grafana/metrictank
-    ports:
-      - "6063:6060"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -158,3 +158,17 @@ services:
     ports:
       - "6831:6831/udp"
       - "16686:16686"
+
+  caddy:
+    image: stefanprodan/caddy
+    container_name: caddy
+    ports:
+      - "6061:6061"
+      - "6062:6062"
+      - "8081:8081"
+      - "8082:8082"
+    volumes:
+      - ./caddy/:/etc/caddy/
+    restart: unless-stopped
+    labels:
+      org.label-schema.group: "monitoring"
