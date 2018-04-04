@@ -10,4 +10,4 @@ A metrictank based stack is multi-tenant. Here's how it works:
 * For a secure setup, you must make sure these headers cannot be specified by users. You may need to run something in front to set the header correctly after authentication
   (e.g. [tsdb-gw](https://github.com/raintank/tsdb-gw)
 * orgs can only see the data that lives under their org-id, and also public data
-* public data is stored under orgId -1 and is visible to everyone.
+* public data is stored under orgId 0 and is visible to everyone.
