@@ -86,7 +86,7 @@ func testGetAddKey(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 	org2Series := getMetricData(2, 2, 5, 10, "metric.org2", false)
 
@@ -99,7 +99,7 @@ func testGetAddKey(t *testing.T) {
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
 				numSeries := len(series)
-				if orgId != -1 {
+				if orgId != idx.OrgIdPublic {
 					numSeries += 5
 				}
 				So(defs, ShouldHaveLength, numSeries)
@@ -128,7 +128,7 @@ func TestFind(t *testing.T) {
 func testFind(t *testing.T) {
 	ix := New()
 	ix.Init()
-	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo", false) {
+	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
 		ix.AddOrUpdate(s, 1)
 	}
@@ -256,7 +256,7 @@ func testDelete(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", false)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 
 	for _, s := range publicSeries {
@@ -271,7 +271,7 @@ func TestDeleteTagged(t *testing.T) {
 	ix := New()
 	ix.Init()
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public", true)
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", true)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", true)
 
 	for _, s := range publicSeries {
@@ -506,12 +506,12 @@ func TestPruneTaggedSeries(t *testing.T) {
 	}
 
 	Convey("after populating index", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 10)
 	})
 
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 5)
 		nodes, err := ix.FindByTag(1, []string{"name=~metric\\.bah.*", "series_id=~[0-4]"}, 0)
@@ -523,7 +523,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 	})
 
 	Convey("after purge", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
@@ -538,7 +538,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		data.SetId()
 		ix.AddOrUpdate(data, 1)
 		Convey("When purging old series", func() {
-			purged, err := ix.Prune(1, time.Unix(12, 0))
+			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
 			So(purged, ShouldHaveLength, 4)
 			nodes, err := ix.FindByTag(1, []string{"name=~metric\\.foo.*", "series_id=~[0-4]"}, 0)
@@ -581,7 +581,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	}
 
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 0)
 	})
@@ -593,7 +593,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	})
 
 	Convey("When purging newer series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(20, 0))
+		purged, err := ix.Prune(time.Unix(20, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 2)
 	})
@@ -638,11 +638,11 @@ func testPrune(t *testing.T) {
 		ix.AddOrUpdate(d, 1)
 	}
 	Convey("after populating index", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 10)
 	})
 	Convey("When purging old series", t, func() {
-		purged, err := ix.Prune(1, time.Unix(2, 0))
+		purged, err := ix.Prune(time.Unix(2, 0))
 		So(err, ShouldBeNil)
 		So(purged, ShouldHaveLength, 5)
 		nodes, err := ix.Find(1, "metric.bah.*", 0)
@@ -654,7 +654,7 @@ func testPrune(t *testing.T) {
 
 	})
 	Convey("after purge", t, func() {
-		defs := ix.List(-1)
+		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
@@ -667,7 +667,7 @@ func testPrune(t *testing.T) {
 		data.SetId()
 		ix.AddOrUpdate(data, 0)
 		Convey("When purging old series", func() {
-			purged, err := ix.Prune(1, time.Unix(12, 0))
+			purged, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
 			So(purged, ShouldHaveLength, 4)
 			nodes, err := ix.Find(1, "metric.foo.*", 0)

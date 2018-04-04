@@ -836,15 +836,17 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 	if err != nil {
 		return nil, err
 	}
-	publicNodes, err := m.find(-1, pattern)
-	if err != nil {
-		return nil, err
+	if orgId != idx.OrgIdPublic {
+		publicNodes, err := m.find(idx.OrgIdPublic, pattern)
+		if err != nil {
+			return nil, err
+		}
+		matchedNodes = append(matchedNodes, publicNodes...)
 	}
-	matchedNodes = append(matchedNodes, publicNodes...)
 	log.Debug("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
 	results := make([]idx.Node, 0)
 	seen := make(map[string]struct{})
-	// if there are public (orgId -1) and private leaf nodes with the same series
+	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
 		if _, ok := seen[n.Path]; !ok {
@@ -977,26 +979,11 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	m.RLock()
 	defer m.RUnlock()
 
-	orgs := make(map[int]struct{})
-	if orgId == -1 {
-		log.Info("memory-idx: returning all metricDefs for all orgs")
-		for org := range m.tree {
-			orgs[org] = struct{}{}
-		}
-		for org := range m.tags {
-			orgs[org] = struct{}{}
-		}
-	} else {
-		orgs[-1] = struct{}{}
-		orgs[orgId] = struct{}{}
-	}
-
 	defs := make([]idx.Archive, 0)
 	for _, def := range m.defById {
-		if _, ok := orgs[def.OrgId]; !ok {
-			continue
+		if def.OrgId == orgId || def.OrgId == idx.OrgIdPublic {
+			defs = append(defs, *def)
 		}
-		defs = append(defs, *def)
 	}
 
 	statListDuration.Value(time.Since(pre))
@@ -1187,24 +1174,20 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 }
 
 // delete series from the index if they have not been seen since "oldest"
-func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
+func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
 	orgs := make(map[int]struct{})
-	if orgId == -1 {
-		log.Info("memory-idx: pruning stale metricDefs across all orgs")
-		m.RLock()
-		for org := range m.tree {
+	log.Info("memory-idx: pruning stale metricDefs across all orgs")
+	m.RLock()
+	for org := range m.tree {
+		orgs[org] = struct{}{}
+	}
+	if TagSupport {
+		for org := range m.tags {
 			orgs[org] = struct{}{}
 		}
-		if TagSupport {
-			for org := range m.tags {
-				orgs[org] = struct{}{}
-			}
-		}
-		m.RUnlock()
-	} else {
-		orgs[orgId] = struct{}{}
 	}
+	m.RUnlock()
 
 	var pruned []idx.Archive
 	toPruneUntagged := make(map[int]map[string]struct{}, len(orgs))
@@ -1218,10 +1201,6 @@ func (m *MemoryIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
 	m.RLock()
 DEFS:
 	for _, def := range m.defById {
-		if _, ok := orgs[def.OrgId]; !ok {
-			continue DEFS
-		}
-
 		if def.LastUpdate >= oldestUnix {
 			continue DEFS
 		}
@@ -1300,9 +1279,7 @@ DEFS:
 
 	statMetricsActive.Add(-1 * len(pruned))
 
-	if orgId == -1 {
-		log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
-	}
+	log.Info("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
 
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, nil

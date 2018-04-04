@@ -13,6 +13,8 @@ import (
 	schema "gopkg.in/raintank/schema.v1"
 )
 
+const OrgIdPublic = 0
+
 var (
 	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")
 	BranchUnderLeaf    = errors.New("can't add branch under leaf")
@@ -118,20 +120,18 @@ type MetricIndex interface {
 
 	// Find searches the index.  The method is passed an OrgId, a query
 	// pattern and a unix timestamp. Searches should return all nodes that match for
-	// the given OrgId and OrgId -1.  The pattern should be handled in the same way
+	// the given OrgId and OrgIdPublic.  The pattern should be handled in the same way
 	// Graphite would. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
 	// And the unix stimestamp is used to ignore series that have been stale since
 	// the timestamp.
 	Find(int, string, int64) ([]Node, error)
 
-	// List returns all Archives for the passed OrgId, or for all organisations if -1 is provided.
+	// List returns all Archives for the passed OrgId and the public orgId
 	List(int) []Archive
 
-	// Prune deletes all metrics from the index for the passed org where
-	// the last time the metric was seen is older then the passed timestamp. If the org
-	// passed is -1, then the all orgs should be examined for stale metrics to be deleted.
+	// Prune deletes all metrics that haven't been seen since the given timestamp.
 	// It returns all Archives deleted and any error encountered.
-	Prune(int, time.Time) ([]Archive, error)
+	Prune(time.Time) ([]Archive, error)
 
 	// FindByTag takes a list of expressions in the format key<operator>value.
 	// The allowed operators are: =, !=, =~, !=~.

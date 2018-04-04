@@ -492,9 +492,9 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
 }
 
-func (c *CasIdx) Prune(orgId int, oldest time.Time) ([]idx.Archive, error) {
+func (c *CasIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	pre := time.Now()
-	pruned, err := c.MemoryIdx.Prune(orgId, oldest)
+	pruned, err := c.MemoryIdx.Prune(oldest)
 	statPruneDuration.Value(time.Since(pre))
 	return pruned, err
 }
@@ -504,7 +504,7 @@ func (c *CasIdx) prune() {
 	for range ticker.C {
 		log.Debug("cassandra-idx: pruning items from index that have not been seen for %s", maxStale.String())
 		staleTs := time.Now().Add(maxStale * -1)
-		_, err := c.Prune(-1, staleTs)
+		_, err := c.Prune(staleTs)
 		if err != nil {
 			log.Error(3, "cassandra-idx: prune error. %s", err)
 		}

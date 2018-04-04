@@ -125,7 +125,7 @@ func TestGetAddKey(t *testing.T) {
 	ix := New()
 	initForTests(ix)
 
-	publicSeries := getMetricData(-1, 2, 5, 10, "metric.public")
+	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public")
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1")
 	org2Series := getMetricData(2, 2, 5, 10, "metric.org2")
 
@@ -138,7 +138,7 @@ func TestGetAddKey(t *testing.T) {
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
 				numSeries := len(series)
-				if orgId != -1 {
+				if orgId != idx.OrgIdPublic {
 					numSeries += 5
 				}
 				So(defs, ShouldHaveLength, numSeries)
@@ -258,7 +258,7 @@ func TestAddToWriteQueue(t *testing.T) {
 func TestFind(t *testing.T) {
 	ix := New()
 	initForTests(ix)
-	for _, s := range getMetricData(-1, 2, 5, 10, "metric.demo") {
+	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo") {
 		ix.AddOrUpdate(s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
