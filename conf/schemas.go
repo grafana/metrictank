@@ -46,8 +46,8 @@ func NewSchemas(schemas []Schema) Schemas {
 	return s
 }
 
-func (s Schemas) List() []Schema {
-	return s.raw
+func (s Schemas) List() ([]Schema, Schema) {
+	return s.raw, s.DefaultSchema
 }
 
 func (s *Schemas) BuildIndex() {
