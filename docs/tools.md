@@ -534,6 +534,16 @@ Usage of ./mt-whisper-importer-reader:
     	Organization ID the data belongs to  (default 1)
   -position-file string
     	file to store position and load position from
+  -stats-addr string
+    	stats graphite address (default "localhost:2003")
+  -stats-buffer-size int
+    	how many messages (holding all measurements from one interval. rule of thumb: a message is ~25kB) to buffer up in case graphite endpoint is unavailable. With the default of 20k you will use max about 500MB and bridge 5 hours of downtime when needed (default 20000)
+  -stats-enabled
+    	Enables sending import stats to a configured graphite endpoint
+  -stats-interval int
+    	interval at which to send statistics (default 1)
+  -stats-prefix string
+    	stats prefix (will add trailing dot automatically if needed) (default "metrictank.importer.reader")
   -test.bench regexp
     	run only benchmarks matching regexp
   -test.benchmem
