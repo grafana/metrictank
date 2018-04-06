@@ -144,10 +144,14 @@ func main() {
 	}
 	log.Infof("log level set to %s", log.GetLevel())
 
+	if *dstSchemas == "" {
+		log.Fatalf("flag '--dst-schemas' can not be empty")
+	}
+
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
 	if err != nil {
-		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
+		log.Fatalf("Error when parsing schemas file '%s', error: %q", *dstSchemas, err)
 	}
 
 	var pos *posTracker
@@ -163,6 +167,7 @@ func main() {
 		log.Infoln("graphite stats enabled")
 		stats.NewGraphite(*statsPrefix, *statsAddr, *statsInterval, *statsBufferSize)
 	} else {
+		log.Infoln("graphite stats disabled")
 		stats.NewDevnull()
 	}
 
