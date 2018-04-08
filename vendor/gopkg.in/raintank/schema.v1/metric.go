@@ -11,7 +11,6 @@ import (
 )
 
 var errInvalidIntervalzero = errors.New("interval cannot be 0")
-var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var errInvalidEmptyName = errors.New("name cannot be empty")
 var errInvalidEmptyMetric = errors.New("metric cannot be empty")
 var errInvalidMtype = errors.New("invalid mtype")
@@ -47,9 +46,6 @@ type MetricData struct {
 }
 
 func (m *MetricData) Validate() error {
-	if m.OrgId == 0 {
-		return errInvalidOrgIdzero
-	}
 	if m.Interval == 0 {
 		return errInvalidIntervalzero
 	}
@@ -193,9 +189,6 @@ func (m *MetricDefinition) SetId() {
 }
 
 func (m *MetricDefinition) Validate() error {
-	if m.OrgId == 0 {
-		return errInvalidOrgIdzero
-	}
 	if m.Interval == 0 {
 		return errInvalidIntervalzero
 	}
