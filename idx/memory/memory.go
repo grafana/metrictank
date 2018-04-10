@@ -19,6 +19,8 @@ import (
 )
 
 var (
+	LogLevel int
+
 	// metric idx.memory.update is the number of updates to the memory idx
 	statUpdate = stats.NewCounter32("idx.memory.ops.update")
 	// metric idx.memory.add is the number of additions to the memory idx
@@ -217,7 +219,9 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 	existing, ok := m.defById[point.MKey]
 	if ok {
 		oldPart := existing.Partition
-		log.Debug("metricDef with id %v already in index", point.MKey)
+		if LogLevel < 2 {
+			log.Debug("metricDef with id %v already in index", point.MKey)
+		}
 		existing.LastUpdate = int64(point.Time)
 		existing.Partition = partition
 		statUpdate.Inc()
