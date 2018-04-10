@@ -41,7 +41,6 @@ func getDifferentMetricDataArray(amount int) []*MetricData {
 		out[i] = &MetricData{
 			OrgId:    i,
 			Name:     names[i%len(names)] + "foo.bar" + strconv.Itoa(i),
-			Metric:   names[i%len(names)],
 			Interval: intervals[i%len(intervals)],
 			Value:    r.Float64(),
 			Unit:     "foo",
