@@ -13,7 +13,7 @@ import (
 	schema "gopkg.in/raintank/schema.v1"
 )
 
-const OrgIdPublic = 0
+var OrgIdPublic = 0
 
 var (
 	BothBranchAndLeaf  = errors.New("node can't be both branch and leaf")

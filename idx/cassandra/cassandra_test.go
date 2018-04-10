@@ -122,6 +122,9 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 }
 
 func TestGetAddKey(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
+
 	ix := New()
 	initForTests(ix)
 
@@ -256,6 +259,8 @@ func TestAddToWriteQueue(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
 	ix := New()
 	initForTests(ix)
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo") {

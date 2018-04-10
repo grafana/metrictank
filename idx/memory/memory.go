@@ -836,7 +836,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 	if err != nil {
 		return nil, err
 	}
-	if orgId != idx.OrgIdPublic {
+	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
 		publicNodes, err := m.find(idx.OrgIdPublic, pattern)
 		if err != nil {
 			return nil, err

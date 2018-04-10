@@ -49,6 +49,9 @@ gc-interval = 1h
 # shorter warmup means metrictank will need to query cassandra more if it doesn't have requested data yet.
 # in clusters, best to assure the primary has saved all the data that a newly warmup instance will need to query, to prevent gaps in charts
 warm-up-period = 1h
+# org Id for publically (any org) accessible data
+# leave at 0 to disable.
+public-org = 0
 ```
 
 ## metric data storage in cassandra ##

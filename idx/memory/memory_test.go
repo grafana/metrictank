@@ -83,6 +83,9 @@ func TestGetAddKey(t *testing.T) {
 }
 
 func testGetAddKey(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
+
 	ix := New()
 	ix.Init()
 
@@ -126,6 +129,9 @@ func TestFind(t *testing.T) {
 }
 
 func testFind(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
+
 	ix := New()
 	ix.Init()
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo", false) {
@@ -253,6 +259,9 @@ func TestDelete(t *testing.T) {
 }
 
 func testDelete(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
+
 	ix := New()
 	ix.Init()
 
@@ -268,6 +277,9 @@ func testDelete(t *testing.T) {
 }
 
 func TestDeleteTagged(t *testing.T) {
+	idx.OrgIdPublic = 100
+	defer func() { idx.OrgIdPublic = 0 }()
+
 	ix := New()
 	ix.Init()
 
