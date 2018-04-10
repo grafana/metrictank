@@ -182,8 +182,10 @@ Flags:
 
   -config string
     	configuration file path (default "/etc/metrictank/metrictank.ini")
-  -format string
-    	template to render the data with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+  -format-md string
+    	template to render MetricData with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
+  -format-point string
+    	template to render MetricPoint data with (default "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}")
   -prefix string
     	only show metrics that have this prefix
   -substr string
@@ -202,53 +204,32 @@ Inspects what's flowing through kafka (in mdm format) and reports out of order d
 * it sniffs points being added on a per-series (metric Id) level
 * for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp
 * if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
-every event is printed using the specified format
+every event is printed using the specified, respective format based on the message format
 
 # Event formatting
 Uses standard golang templating. E.g. {{field}} with these available fields:
-.Head.subfield - head is last successfully added message
-.Bad.subfield - Bad is the current point that could not be added (assuming no re-order buffer)
-(subfield is any property of the out-of-order MetricData: Time OrgId Id Name Metric Interval Value Unit Mtype Tags and also these 2 extra fileds: Part (partition) and Seen (when the msg was consumed from kafka)
 NumBad - number of failed points since last successful add
 DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)
 DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)
+.Head.* - head is last successfully added message
+.Bad.* - Bad is the current point that could not be added (assuming no re-order buffer)
+under Head and Bad, the following subfields are available:
+Part (partition) and Seen (when the msg was consumed from kafka)
+for MetricData, prefix these with Md. : Time OrgId Id Name Metric Interval Value Unit Mtype Tags
+for MetricPoint, prefix these with Mp. : Time MKey Value
 
 Flags:
 
   -config string
     	configuration file path (default "/etc/metrictank/metrictank.ini")
+  -do-unknown-mp
+    	process MetricPoint messages for which no MetricData messages have been seen, and hence for which we can't apply prefix/substr filter (default true)
   -format string
-    	template to render event with (default "{{.Bad.Id}} {{.Bad.Name}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}")
+    	template to render event with (default "{{.Bad.Md.Id}} {{.Bad.Md.Name}} {{.Bad.Mp.MKey}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}")
   -prefix string
     	only show metrics with a name that has this prefix
   -substr string
     	only show metrics with a name that has this substring
-```
-
-
-## mt-replicator-via-tsdb
-
-```
-mt-replicator-via-tsdb
-
-Replicates a kafka mdm topic on a given cluster to a remote tsdb-gw server
-
-Flags:
-
-  -batch-size int
-    	number of metrics to send in each batch. (default 10000)
-  -config string
-    	configuration file path
-  -destination-key string
-    	admin-key of destination tsdb-gw server (default "admin-key")
-  -destination-url string
-    	tsdb-gw address to send metrics to (default "http://localhost/metrics")
-  -instance string
-    	instance identifier. must be unique. Used for naming queue consumers and emitted metrics (default "default")
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
-  -version
-    	print version string
 ```
 
 
@@ -441,7 +422,7 @@ Notes:
    With great power comes great responsibility
  * points that are not in the `from <= ts < to` range, are prefixed with `-`. In range has prefix of '>`
  * When using chunk-summary, if there's data that should have been expired by cassandra, but for some reason didn't, we won't see or report it
- * Doesn't automatically return data for aggregated series. It's up to you to query for id_<rollup>_<span> when appropriate
+ * Doesn't automatically return data for aggregated series. It's up to you to query for an AMKey (id_<rollup>_<span>) when appropriate
  * (rollup is one of sum, cnt, lst, max, min and span is a number in seconds)
 ```
 
@@ -534,52 +515,6 @@ Usage of ./mt-whisper-importer-reader:
     	Organization ID the data belongs to  (default 1)
   -position-file string
     	file to store position and load position from
-  -test.bench regexp
-    	run only benchmarks matching regexp
-  -test.benchmem
-    	print memory allocations for benchmarks
-  -test.benchtime d
-    	run each benchmark for duration d (default 1s)
-  -test.blockprofile file
-    	write a goroutine blocking profile to file
-  -test.blockprofilerate rate
-    	set blocking profile rate (see runtime.SetBlockProfileRate) (default 1)
-  -test.count n
-    	run tests and benchmarks n times (default 1)
-  -test.coverprofile file
-    	write a coverage profile to file
-  -test.cpu list
-    	comma-separated list of cpu counts to run each test with
-  -test.cpuprofile file
-    	write a cpu profile to file
-  -test.failfast
-    	do not start new tests after the first test failure
-  -test.list regexp
-    	list tests, examples, and benchmarks matching regexp then exit
-  -test.memprofile file
-    	write a memory profile to file
-  -test.memprofilerate rate
-    	set memory profiling rate (see runtime.MemProfileRate)
-  -test.mutexprofile string
-    	write a mutex contention profile to the named file after execution
-  -test.mutexprofilefraction int
-    	if >= 0, calls runtime.SetMutexProfileFraction() (default 1)
-  -test.outputdir dir
-    	write profiles to dir
-  -test.parallel n
-    	run at most n tests in parallel (default num-processors)
-  -test.run regexp
-    	run only tests and examples matching regexp
-  -test.short
-    	run smaller test suite to save time
-  -test.testlogfile file
-    	write test action log to file (for use only by cmd/go)
-  -test.timeout d
-    	panic test binary after duration d (default 0, timeout disabled)
-  -test.trace file
-    	write an execution trace to file
-  -test.v
-    	verbose: print additional output
   -threads int
     	Number of workers threads to process and convert .wsp files (default 10)
   -verbose
