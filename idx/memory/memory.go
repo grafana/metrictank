@@ -260,13 +260,14 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	return archive, 0, false
 }
 
-func (m *MemoryIdx) Update(entry idx.Archive) {
+// UpdateArchive updates the archive information
+func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 	m.Lock()
 	defer m.Unlock()
-	if _, ok := m.defById[entry.Id]; !ok {
+	if _, ok := m.defById[archive.Id]; !ok {
 		return
 	}
-	*(m.defById[entry.Id]) = entry
+	*(m.defById[archive.Id]) = archive
 }
 
 // indexTags reads the tags of a given metric definition and creates the

@@ -246,7 +246,7 @@ func TestAddToWriteQueue(t *testing.T) {
 
 				archive, _ := ix.Get(mkey)
 				archive.LastSave = uint32(time.Now().Unix() - 100)
-				ix.Update(archive)
+				ix.UpdateArchive(archive)
 			}
 			for _, s := range metrics {
 				mkey, err := schema.MKeyFromString(s.Id)
