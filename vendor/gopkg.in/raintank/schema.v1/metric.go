@@ -40,7 +40,7 @@ type MetricData struct {
 	Unit     string   `json:"unit"`
 	Time     int64    `json:"time"`
 	Mtype    string   `json:"mtype"`
-	Tags     []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	Tags     []string `json:"tags"`
 }
 
 func (m *MetricData) Validate() error {
@@ -105,12 +105,11 @@ func (m *MetricData) SetId() {
 // can be used by some encoders, such as msgp
 type MetricDataArray []*MetricData
 
-// for ES
 type MetricDefinition struct {
-	Id       MKey   `json:"id"`
+	Id       MKey   `json:"mkey"`
 	OrgId    int    `json:"org_id"`
 	Name     string `json:"name"`
-	Interval int    `json:"interval"`                                      // minimum 10
+	Interval int    `json:"interval"`
 	Unit     string `json:"unit"`
 	Mtype    string `json:"mtype"`
 
@@ -118,7 +117,7 @@ type MetricDefinition struct {
 	// to this slice which allows querying by name as a tag. this special tag
 	// should not be stored or transmitted over the network, otherwise it may
 	// just get overwritten by the receiver.
-	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	Tags       []string `json:"tags"`
 	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
 	Partition  int32    `json:"partition"`
 
