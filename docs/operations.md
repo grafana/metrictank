@@ -22,6 +22,7 @@ Just make sure to have a properly configured statsd setup (or adjust the dashboa
 * `metrictank.stats.$environment.$instance.cluster.primary.gauge1`: assure you have exactly 1 primary node (saving to cassandra) or as many as you have shardgroups, for sharded setups.
 * `metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.{min,max}.gauge32`: make sure the write queues are able to drain and don't reach capacity, otherwise ingest will block
 * `metrictank.stats.$environment.$instance.input.*.pressure.idx.counter32`: index pressure as a ns counter, rise is between 0 and 10^9 each second. Alert if increase is more than 4x10^8 each second: this would signify the index can't keep up with indexing new data and is blocking ingestion pipeline.
+* `metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
 * `metrictank.stats.$environment.$instance.api.request_handle.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
 * `metrictank.stats.$environment.$instance.store.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.
 * `perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)`: Points dropped due to chunks being closed. Need to tune the chunk-max-stale setting or fix your data stream to not send old points so late.
