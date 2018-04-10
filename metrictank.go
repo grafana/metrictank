@@ -62,6 +62,7 @@ var (
 	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
+	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
 
 	// Cassandra:
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -322,6 +323,12 @@ func main() {
 		Initialize our MetricIdx
 	***********************************/
 	pre := time.Now()
+
+	if *publicOrg < 0 {
+		log.Fatal(4, "public-org cannot be <0")
+	}
+
+	idx.OrgIdPublic = *publicOrg
 
 	if memory.Enabled {
 		if metricIndex != nil {

@@ -35,7 +35,7 @@ POST /metrics/index.json
 
 * header `X-Org-Id` required
 
-Returns metrics stored under the given org, as well as public data under org 0 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
+Returns metrics stored under the given org, as well as public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 
 #### Example
 
@@ -56,7 +56,7 @@ POST /metrics/find
 * format: json, treejson, completer, pickle, or msgpack. (defaults to json)
 * jsonp
 
-Returns metrics which match the query and are stored under the given org or are public data under org 0 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
+Returns metrics which match the query and are stored under the given org or are public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 the completer format is for completion UI's such as graphite-web.
 json and treejson are the same.
 
@@ -112,7 +112,7 @@ POST /render
 
   If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
 
-Data queried for must be stored under the given org or be public data under org 0 (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
+Data queried for must be stored under the given org or be public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 
 #### Example
 
