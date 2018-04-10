@@ -214,8 +214,8 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	log.Debugf(
-		"Receiving Id:%s OrgId:%d Metric:%s AggMeth:%d ArchCnt:%d",
-		metric.MetricData.Id, metric.MetricData.OrgId, metric.MetricData.Metric, metric.AggregationMethod, len(metric.Archives))
+		"Receiving Id:%s OrgId:%d Name:%s AggMeth:%d ArchCnt:%d",
+		metric.MetricData.Id, metric.MetricData.OrgId, metric.MetricData.Name, metric.AggregationMethod, len(metric.Archives))
 
 	if len(metric.Archives) == 0 {
 		throwError("Metric has no archives")

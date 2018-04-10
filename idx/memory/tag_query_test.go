@@ -389,8 +389,7 @@ func TestGetByTag(t *testing.T) {
 	ids := make([]string, 20)
 	for i := range mds {
 		ids[i] = fmt.Sprintf(idString, i)
-		mds[i].Metric = fmt.Sprintf("metric.%d", i)
-		mds[i].Name = mds[i].Metric
+		mds[i].Name = fmt.Sprintf("metric.%d", i)
 		mds[i].Id = ids[i]
 		mds[i].OrgId = 1
 		mds[i].Interval = 1
@@ -416,7 +415,7 @@ func TestGetByTag(t *testing.T) {
 	}
 
 	fullName := func(md schema.MetricData) string {
-		name := md.Metric
+		name := md.Name
 		sort.Strings(md.Tags)
 		for _, tag := range md.Tags {
 			name += ";"

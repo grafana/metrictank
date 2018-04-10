@@ -84,15 +84,14 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	counter := 0
 	pre := time.Now()
 	for def := range defsChan {
-		qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		if *dryRun {
 			fmt.Printf(
-				"INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d', '%d','%s', '%s','%d', '%s','%s', '%v', '%d')\n",
+				"INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d', '%d','%s', '%d', '%s','%s', '%v', '%d')\n",
 				def.Id,
 				def.OrgId,
 				def.Partition,
 				def.Name,
-				def.Metric,
 				def.Interval,
 				def.Unit,
 				def.Mtype,
@@ -109,7 +108,6 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 				def.OrgId,
 				def.Partition,
 				def.Name,
-				def.Metric,
 				def.Interval,
 				def.Unit,
 				def.Mtype,
@@ -143,14 +141,14 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	if err != nil {
 		log.Fatal(4, "failed to initialize partitioner. %s", err)
 	}
-	iter := session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
+	iter := session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 
-	var id, name, metric, unit, mtype string
+	var id, name, unit, mtype string
 	var orgId, interval int
 	var partition int32
 	var lastupdate int64
 	var tags []string
-	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+	for iter.Scan(&id, &orgId, &partition, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mkey, err := schema.MKeyFromString(id)
 		if err != nil {
 			log.Error(3, "could not parse ID %q: %s -> skipping", id, err)
@@ -161,7 +159,6 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 			OrgId:      orgId,
 			Partition:  partition,
 			Name:       name,
-			Metric:     metric,
 			Interval:   interval,
 			Unit:       unit,
 			Mtype:      mtype,

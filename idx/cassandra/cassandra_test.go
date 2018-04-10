@@ -24,7 +24,6 @@ type cassRow struct {
 	orgId      int
 	partition  int32
 	name       string
-	metric     string
 	interval   int
 	unit       string
 	mtype      string
@@ -37,7 +36,7 @@ func (i *testIterator) Scan(dest ...interface{}) bool {
 		return false
 	}
 
-	if len(dest) < 10 {
+	if len(dest) < 9 {
 		return false
 	}
 
@@ -46,12 +45,11 @@ func (i *testIterator) Scan(dest ...interface{}) bool {
 	*(dest[1].(*int)) = row.orgId
 	*(dest[2].(*int32)) = row.partition
 	*(dest[3].(*string)) = row.name
-	*(dest[4].(*string)) = row.metric
-	*(dest[5].(*int)) = row.interval
-	*(dest[6].(*string)) = row.unit
-	*(dest[7].(*string)) = row.mtype
-	*(dest[8].(*[]string)) = row.tags
-	*(dest[9].(*int64)) = row.lastUpdate
+	*(dest[4].(*int)) = row.interval
+	*(dest[5].(*string)) = row.unit
+	*(dest[6].(*string)) = row.mtype
+	*(dest[7].(*[]string)) = row.tags
+	*(dest[8].(*int64)) = row.lastUpdate
 
 	i.rows = i.rows[1:]
 
@@ -113,7 +111,6 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 
 		data[i] = &schema.MetricData{
 			Name:     s,
-			Metric:   s,
 			OrgId:    orgId,
 			Interval: interval,
 		}
@@ -452,7 +449,6 @@ func insertDefs(ix idx.MetricIndex, i int) {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
-			Metric:   series,
 			Interval: 10,
 			OrgId:    1,
 		}
@@ -528,7 +524,6 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
-			Metric:   series,
 			Interval: 10,
 			OrgId:    1,
 			Time:     10,
@@ -556,7 +551,6 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   1,
 		lastUpdate: 1,
 	})
@@ -565,7 +559,6 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   3,
 		lastUpdate: 2,
 	})
@@ -574,7 +567,6 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met2",
-		metric:     "met2",
 		interval:   1,
 		lastUpdate: 1,
 	})
@@ -583,7 +575,6 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met2",
-		metric:     "met2",
 		interval:   3,
 		lastUpdate: 1,
 	})
@@ -609,7 +600,6 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   1,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1"},
@@ -619,7 +609,6 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   2,
 		lastUpdate: 2,
 		tags:       []string{"tag1=val1"},
@@ -629,7 +618,6 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   3,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1;tag2=val2"},
@@ -639,7 +627,6 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   4,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1;tag2=val2"},

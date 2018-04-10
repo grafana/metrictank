@@ -21,7 +21,7 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	formatMd = flag.String("format-md", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render MetricData with")
+	formatMd = flag.String("format-md", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render MetricData with")
 	formatP  = flag.String("format-point", "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}", "template to render MetricPoint data with")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
@@ -54,10 +54,10 @@ func newInputPrinter(formatMd, formatP string) inputPrinter {
 }
 
 func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition int32) {
-	if *prefix != "" && !strings.HasPrefix(metric.Metric, *prefix) {
+	if *prefix != "" && !strings.HasPrefix(metric.Name, *prefix) {
 		return
 	}
-	if *substr != "" && !strings.Contains(metric.Metric, *substr) {
+	if *substr != "" && !strings.Contains(metric.Name, *substr) {
 		return
 	}
 	stdoutLock.Lock()

@@ -187,7 +187,6 @@ func (c *Carbon) handle(conn net.Conn) {
 		nameSplits := strings.Split(string(key), ";")
 		md := &schema.MetricData{
 			Name:     nameSplits[0],
-			Metric:   nameSplits[0],
 			Interval: c.intervalGetter.GetInterval(nameSplits[0]),
 			Value:    val,
 			Unit:     "unknown",

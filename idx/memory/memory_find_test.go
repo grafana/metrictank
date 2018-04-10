@@ -175,7 +175,6 @@ func InitSmallIndex() {
 	for i, series := range cpuMetrics(5, 100, 0, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
@@ -188,7 +187,6 @@ func InitSmallIndex() {
 	for i, series := range diskMetrics(5, 100, 0, 10, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
@@ -221,7 +219,6 @@ func InitLargeIndex() {
 	for i, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
@@ -234,7 +231,6 @@ func InitLargeIndex() {
 	for i, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    1,
@@ -249,7 +245,6 @@ func InitLargeIndex() {
 	for i, series := range cpuMetrics(5, 100, 950, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
@@ -262,7 +257,6 @@ func InitLargeIndex() {
 	for i, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
-			Metric:   series.Name,
 			Tags:     series.Tags,
 			Interval: 10,
 			OrgId:    2,
@@ -404,7 +398,6 @@ func TestTagSorting(t *testing.T) {
 
 	md1 := &schema.MetricData{
 		Name:     "name1",
-		Metric:   "name1",
 		Tags:     []string{},
 		Interval: 10,
 		OrgId:    1,
@@ -433,7 +426,6 @@ func TestTagSorting(t *testing.T) {
 	md2 := []schema.MetricDefinition{
 		{
 			Name:       "name2",
-			Metric:     "name2",
 			Tags:       []string{},
 			Interval:   10,
 			OrgId:      1,

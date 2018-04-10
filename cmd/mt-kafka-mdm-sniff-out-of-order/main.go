@@ -67,10 +67,10 @@ func newInputOOOFinder(format string) *inputOOOFinder {
 }
 
 func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition int32) {
-	if *prefix != "" && !strings.HasPrefix(metric.Metric, *prefix) {
+	if *prefix != "" && !strings.HasPrefix(metric.Name, *prefix) {
 		return
 	}
-	if *substr != "" && !strings.Contains(metric.Metric, *substr) {
+	if *substr != "" && !strings.Contains(metric.Name, *substr) {
 		return
 	}
 	mkey, err := schema.MKeyFromString(metric.Id)
@@ -171,7 +171,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "for MetricData, prefix these with Md. : Time OrgId Id Name Metric Interval Value Unit Mtype Tags")
 		fmt.Fprintln(os.Stderr, "for MetricPoint, prefix these with Mp. : Time MKey Value")
 
-		//	formatMd = flag.String("format-md", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render MetricData with")
+		//	formatMd = flag.String("format-md", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render MetricData with")
 		//	formatP  = flag.String("format-point", "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}", "template to render MetricPoint data with")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()

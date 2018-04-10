@@ -53,7 +53,6 @@ func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool
 	for i, s := range series {
 		data[i] = &schema.MetricData{
 			Name:     s,
-			Metric:   s,
 			OrgId:    orgId,
 			Interval: interval,
 		}
@@ -368,7 +367,6 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 		key = fmt.Sprintf("some.metric.%d.%d", i, i)
 		data = &schema.MetricData{
 			Name:     key,
-			Metric:   key,
 			OrgId:    1,
 			Interval: 10,
 		}
@@ -414,19 +412,16 @@ func testMixedBranchLeaf(t *testing.T) {
 
 	first := &schema.MetricData{
 		Name:     "foo.bar",
-		Metric:   "foo.bar",
 		OrgId:    1,
 		Interval: 10,
 	}
 	second := &schema.MetricData{
 		Name:     "foo.bar.baz",
-		Metric:   "foo.bar.baz",
 		OrgId:    1,
 		Interval: 10,
 	}
 	third := &schema.MetricData{
 		Name:     "foo",
-		Metric:   "foo",
 		OrgId:    1,
 		Interval: 10,
 	}
@@ -478,31 +473,26 @@ func testMixedBranchLeafDelete(t *testing.T) {
 	series := []*schema.MetricData{
 		{
 			Name:     "a.b.c",
-			Metric:   "a.b.c",
 			OrgId:    1,
 			Interval: 10,
 		},
 		{
 			Name:     "a.b.c.d",
-			Metric:   "a.b.c.d",
 			OrgId:    1,
 			Interval: 10,
 		},
 		{
 			Name:     "a.b.c2",
-			Metric:   "a.b.c2",
 			OrgId:    1,
 			Interval: 10,
 		},
 		{
 			Name:     "a.b.c2.d.e",
-			Metric:   "a.b.c2.d.e",
 			OrgId:    1,
 			Interval: 10,
 		},
 		{
 			Name:     "a.b.c2.d2.e",
-			Metric:   "a.b.c2.d2.e",
 			OrgId:    1,
 			Interval: 10,
 		},
@@ -614,7 +604,6 @@ func TestPruneTaggedSeries(t *testing.T) {
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
-			Metric:   defs[0].Metric,
 			Id:       defs[0].Id.String(),
 			Tags:     defs[0].Tags,
 			Mtype:    defs[0].Mtype,
@@ -712,7 +701,6 @@ func testPrune(t *testing.T) {
 	for _, s := range getSeriesNames(2, 5, "metric.bah") {
 		d := &schema.MetricData{
 			Name:     s,
-			Metric:   s,
 			OrgId:    1,
 			Interval: 10,
 			Time:     1,
@@ -728,7 +716,6 @@ func testPrune(t *testing.T) {
 	for _, s := range getSeriesNames(2, 5, "metric.foo") {
 		d := &schema.MetricData{
 			Name:     s,
-			Metric:   s,
 			OrgId:    1,
 			Interval: 10,
 			Time:     10,
@@ -761,7 +748,6 @@ func testPrune(t *testing.T) {
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
 			Name:     defs[0].Name,
-			Metric:   defs[0].Metric,
 			Id:       defs[0].Id.String(),
 			OrgId:    1,
 			Interval: 30,
@@ -791,7 +777,6 @@ func TestSingleNodeMetric(t *testing.T) {
 
 	data := &schema.MetricData{
 		Name:     "node1",
-		Metric:   "node1",
 		Interval: 10,
 		OrgId:    1,
 	}
@@ -815,7 +800,6 @@ func BenchmarkIndexing(b *testing.B) {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
-			Metric:   series,
 			Interval: 10,
 			OrgId:    1,
 		}
@@ -838,7 +822,6 @@ func BenchmarkDeletes(b *testing.B) {
 		key = fmt.Sprintf("some.metric.%d.%d", i, i)
 		data = &schema.MetricData{
 			Name:     key,
-			Metric:   key,
 			OrgId:    1,
 			Interval: 10,
 		}
@@ -879,7 +862,6 @@ func TestMatchSchemaWithTags(t *testing.T) {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &schema.MetricDefinition{
 			Name:     name,
-			Metric:   name,
 			OrgId:    1,
 			Interval: 1,
 			Tags:     []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},

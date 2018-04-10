@@ -109,7 +109,7 @@ type MetricDataArray []*MetricData
 type MetricDefinition struct {
 	Id       MKey   `json:"id"`
 	OrgId    int    `json:"org_id"`
-	Name     string `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
+	Name     string `json:"name"`
 	Interval int    `json:"interval"`                                      // minimum 10
 	Unit     string `json:"unit"`
 	Mtype    string `json:"mtype"`

@@ -376,24 +376,24 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter, cutoff)
 }
 
 func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
 	return c.load(defs, iter, cutoff)
 }
 
 func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff uint32) []schema.MetricDefinition {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
-	var id, name, metric, unit, mtype string
+	var id, name, unit, mtype string
 	var orgId, interval int
 	var partition int32
 	var lastupdate int64
 	var tags []string
 	cutoff64 := int64(cutoff)
-	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+	for iter.Scan(&id, &orgId, &partition, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mkey, err := schema.MKeyFromString(id)
 		if err != nil {
 			log.Error(3, "cassandra-idx: load() could not parse ID %q: %s -> skipping", id, err)
@@ -405,7 +405,6 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff u
 			OrgId:      orgId,
 			Partition:  partition,
 			Name:       name,
-			Metric:     metric,
 			Interval:   interval,
 			Unit:       unit,
 			Mtype:      mtype,
@@ -441,7 +440,7 @@ func (c *CasIdx) processWriteQueue() {
 	var attempts int
 	var err error
 	var req writeReq
-	qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
@@ -459,7 +458,6 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.OrgId,
 				req.def.Partition,
 				req.def.Name,
-				req.def.Metric,
 				req.def.Interval,
 				req.def.Unit,
 				req.def.Mtype,

@@ -276,7 +276,6 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 
 	md := schema.MetricData{
 		Name:     name,
-		Metric:   name,
 		Interval: int(w.Header.Archives[0].SecondsPerPoint),
 		Value:    0,
 		Unit:     "unknown",
