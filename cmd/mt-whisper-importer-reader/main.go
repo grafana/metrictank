@@ -23,6 +23,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
+	"github.com/grafana/metrictank/stats"
 	"github.com/kisielk/whisper-go/whisper"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -98,8 +99,37 @@ var (
 		false,
 		"More detailed logging",
 	)
+	statsEnabled = flag.Bool(
+		"stats-enabled",
+		false,
+		"Enables sending import stats to a configured graphite endpoint",
+	)
+	statsAddr = flag.String(
+		"stats-addr",
+		"localhost:2003",
+		"stats graphite address",
+	)
+	statsPrefix = flag.String(
+		"stats-prefix",
+		"metrictank.importer.reader",
+		"stats prefix (will add trailing dot automatically if needed)",
+	)
+	statsInterval = flag.Int(
+		"stats-interval",
+		1,
+		"interval at which to send statistics",
+	)
+	statsBufferSize = flag.Int(
+		"stats-buffer-size",
+		20000,
+		"how many messages (holding all measurements from one interval. rule of thumb: a message is ~25kB) to buffer up in case graphite endpoint is unavailable. With the default of 20k you will use max about 500MB and bridge 5 hours of downtime when needed",
+	)
+
 	schemas        conf.Schemas
 	nameFilter     *regexp.Regexp
+	filesTotal     = stats.NewCounter32("files.total")
+	filesProcessed = stats.NewCounter32("files.processed")
+	filesSkipped   = stats.NewCounter32("files.skipped")
 	processedCount uint32
 	skippedCount   uint32
 )
@@ -112,11 +142,16 @@ func main() {
 	} else {
 		log.SetLevel(log.InfoLevel)
 	}
+	log.Infof("log level set to %s", log.GetLevel())
+
+	if *dstSchemas == "" {
+		log.Fatalf("flag '--dst-schemas' can not be empty")
+	}
 
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
 	if err != nil {
-		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
+		log.Fatalf("Error when parsing schemas file '%s', error: %q", *dstSchemas, err)
 	}
 
 	var pos *posTracker
@@ -126,6 +161,14 @@ func main() {
 			log.Fatalf("Error instantiating position tracker: %s", err)
 		}
 		defer pos.Close()
+	}
+
+	if *statsEnabled {
+		log.Infoln("graphite stats enabled")
+		stats.NewGraphite(*statsPrefix, *statsAddr, *statsInterval, *statsBufferSize)
+	} else {
+		log.Infoln("graphite stats disabled")
+		stats.NewDevnull()
 	}
 
 	fileChan := make(chan string)
@@ -212,6 +255,7 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 			pos.Done(file)
 		}
 		processed := atomic.AddUint32(&processedCount, 1)
+		filesProcessed.Inc()
 		if processed%100 == 0 {
 			skipped := atomic.LoadUint32(&skippedCount)
 			log.Infof("Processed %d files, %d skipped", processed, skipped)
@@ -380,6 +424,24 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 
 // scan a directory and feed the list of whisper files relative to base into the given channel
 func getFileListIntoChan(pos *posTracker, fileChan chan string) {
+	log.Infof("determining the size of the import for whisper directory %s", *whisperDirectory)
+	filepath.Walk(
+		*whisperDirectory,
+		func(path string, info os.FileInfo, err error) error {
+			log.Debugf("scanning %v", path)
+			if path == *whisperDirectory {
+				return nil
+			}
+			if len(path) < 4 || path[len(path)-4:] != ".wsp" {
+				return nil
+			}
+			filesTotal.Inc()
+			return nil
+		},
+	)
+
+	log.Infof("starting import of %d whisper files", filesTotal.Peek())
+
 	filepath.Walk(
 		*whisperDirectory,
 		func(path string, info os.FileInfo, err error) error {
@@ -390,6 +452,7 @@ func getFileListIntoChan(pos *posTracker, fileChan chan string) {
 			if !nameFilter.Match([]byte(getMetricName(name))) {
 				log.Debugf("Skipping file %s with name %s", path, name)
 				atomic.AddUint32(&skippedCount, 1)
+				filesSkipped.Inc()
 				return nil
 			}
 			if len(path) < 4 || path[len(path)-4:] != ".wsp" {
