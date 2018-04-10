@@ -57,7 +57,7 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, partition 
 	}
 
 	pre := time.Now()
-	archive, _, ok := in.metricIndex.UpdateMaybe(point, partition)
+	archive, _, ok := in.metricIndex.Update(point, partition)
 	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 	if !ok {

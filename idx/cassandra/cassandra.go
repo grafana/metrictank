@@ -264,10 +264,12 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+// Update updates an existing archive, if found.
+// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
+func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := c.MemoryIdx.UpdateMaybe(point, partition)
+	archive, oldPartition, inMemory := c.MemoryIdx.Update(point, partition)
 
 	if !updateCassIdx {
 		statUpdateDuration.Value(time.Since(pre))

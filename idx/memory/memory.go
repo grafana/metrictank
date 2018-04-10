@@ -206,9 +206,9 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-// UpdateMaybe updates an existing archive, if found.
-// it returns the existing archive (if any), and whether it was found
-func (m *MemoryIdx) UpdateMaybe(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+// Update updates an existing archive, if found.
+// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
+func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	m.Lock()

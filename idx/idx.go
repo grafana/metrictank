@@ -57,9 +57,9 @@ type MetricIndex interface {
 	// Stop shuts down the index.
 	Stop()
 
-	// UpdateMaybe updates an existing archive, if found.
-	// it returns the existing archive (if any), and whether it was found
-	UpdateMaybe(point schema.MetricPoint, partition int32) (Archive, int32, bool)
+	// Update updates an existing archive, if found.
+	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
+	Update(point schema.MetricPoint, partition int32) (Archive, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
