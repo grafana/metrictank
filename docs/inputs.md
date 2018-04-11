@@ -23,9 +23,16 @@ note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
 
 ## Kafka-mdm (recommended)
 
-`mdm = MetricData Messagepack-encoded` [MetricData schema definition](https://github.com/raintank/schema/blob/master/metric.go#L20)  
-This is a kafka input wherein each point is sent as a unique kafka message.
+The Kafka input supports 2 formats:
+* MetricData Messagepack-encoded (legacy: slow and verbose. they contain the data points as well as all metric data. see #876)
+* MetricPoint messages. (more optimized: contains only id, value and timestamp. see #876)
+
+See the [schema repository](https://github.com/raintank/schema) for more details.
+
 This is the recommended input option if you want a queue. It also simplifies the operational model: since you can make nodes replay data
 you don't have to reassign primary/secondary roles at runtime, you can just restart write nodes and have them replay data, for example.
 Note that [carbon-relay-ng](https://github.com/graphite-ng/carbon-relay-ng) can be used to pipe a carbon stream into Kafka.
 
+In the future we plan to do more optimisations such as:
+* batch encoding instead of a kafka message per point.
+* further compression (e.g. multiple points with shared timestamp).
