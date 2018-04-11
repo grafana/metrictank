@@ -240,7 +240,7 @@ offset-commit-interval = 5s
 # it will be created (incl parent dirs) if not existing.
 data-dir =
 # The number of metrics to buffer in internal and external channels
-channel-buffer-size = 1000000
+channel-buffer-size = 1000
 # The minimum number of message bytes to fetch in a request
 consumer-fetch-min = 1
 # The default number of message bytes to fetch in a request
