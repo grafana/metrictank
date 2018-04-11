@@ -686,7 +686,7 @@ func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	}
 }
 
-func ixFind(b *testing.B, org, q int) {
+func ixFind(b *testing.B, org uint32, q int) {
 	b.Helper()
 	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
@@ -707,14 +707,14 @@ func BenchmarkFind(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ixFind(b, org, q)
 	}
 }
 
 type testQ struct {
 	q   int
-	org int
+	org uint32
 }
 
 func BenchmarkConcurrent4Find(b *testing.B) {
@@ -733,7 +733,7 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
@@ -755,13 +755,13 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % queryCount
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
 }
 
-func ixFindByTag(b *testing.B, org, q int) {
+func ixFindByTag(b *testing.B, org uint32, q int) {
 	series, err := ix.FindByTag(org, tagQueries[q].Expressions, 0)
 	if err != nil {
 		panic(err)
@@ -781,7 +781,7 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := n % 2
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ixFindByTag(b, org, q)
 	}
 }
@@ -792,7 +792,7 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 2
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ixFindByTag(b, org, q)
 	}
 }
@@ -803,7 +803,7 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 4
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ixFindByTag(b, org, q)
 	}
 }
@@ -814,7 +814,7 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		q := (n % 2) + 6
-		org := (n % 2) + 1
+		org := uint32((n % 2) + 1)
 		ixFindByTag(b, org, q)
 	}
 }

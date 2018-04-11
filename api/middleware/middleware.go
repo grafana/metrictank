@@ -12,7 +12,7 @@ import (
 
 type Context struct {
 	*macaron.Context
-	OrgId int
+	OrgId uint32
 	Body  io.ReadCloser
 }
 
@@ -31,7 +31,7 @@ func OrgMiddleware(multiTenant bool) macaron.Handler {
 	}
 }
 
-func getOrg(req *http.Request, multiTenant bool) (int, error) {
+func getOrg(req *http.Request, multiTenant bool) (uint32, error) {
 	if !multiTenant {
 		return 1, nil
 	}
@@ -40,10 +40,10 @@ func getOrg(req *http.Request, multiTenant bool) (int, error) {
 		return 0, nil
 	}
 	org, err := strconv.Atoi(orgStr)
-	if err != nil {
+	if err != nil || org < 1 {
 		return 0, errors.New("bad org-id")
 	}
-	return org, nil
+	return uint32(org), nil
 }
 
 func RequireOrg() macaron.Handler {

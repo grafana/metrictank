@@ -156,7 +156,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 		}
 		mdef := schema.MetricDefinition{
 			Id:         mkey,
-			OrgId:      orgId,
+			OrgId:      uint32(orgId),
 			Partition:  partition,
 			Name:       name,
 			Interval:   interval,

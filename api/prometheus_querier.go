@@ -21,7 +21,7 @@ import (
 func (s *Server) Querier(ctx context.Context, min, max int64) (storage.Querier, error) {
 	from := uint32(min / 1000)
 	to := uint32(max / 1000)
-	return NewQuerier(ctx, s, from, to, ctx.Value(orgID("org-id")).(int), false), nil
+	return NewQuerier(ctx, s, from, to, ctx.Value(orgID("org-id")).(uint32), false), nil
 }
 
 // querier implements Prometheus' Querier interface
@@ -29,12 +29,12 @@ type querier struct {
 	*Server
 	from         uint32
 	to           uint32
-	OrgID        int
+	OrgID        uint32
 	metadataOnly bool
 	ctx          context.Context
 }
 
-func NewQuerier(ctx context.Context, s *Server, from, to uint32, orgId int, metadataOnly bool) storage.Querier {
+func NewQuerier(ctx context.Context, s *Server, from, to uint32, orgId uint32, metadataOnly bool) storage.Querier {
 	return &querier{
 		s,
 		from,

@@ -9,7 +9,7 @@ type CCacheDelete struct {
 	Patterns []string `json:"patterns" form:"patterns" `
 	// tag expressions to select series
 	Expr      []string `json:"expr" form:"expr"`
-	OrgId     int      `json:"orgId" form:"orgId" binding:"Required"`
+	OrgId     uint32   `json:"orgId" form:"orgId" binding:"Required"`
 	Propagate bool     `json:"propagate" form:"propagate"`
 }
 

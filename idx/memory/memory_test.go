@@ -46,14 +46,14 @@ func getRandomString(n int, alphabets ...byte) string {
 }
 
 // getMetricData returns a count-length slice of MetricData's with random Name and the given org id
-func getMetricData(orgId, depth, count, interval int, prefix string, tagged bool) []*schema.MetricData {
+func getMetricData(orgId uint32, depth, count, interval int, prefix string, tagged bool) []*schema.MetricData {
 	data := make([]*schema.MetricData, count)
 	series := getSeriesNames(depth, count, prefix)
 
 	for i, s := range series {
 		data[i] = &schema.MetricData{
 			Name:     s,
-			OrgId:    orgId,
+			OrgId:    int(orgId),
 			Interval: interval,
 		}
 		if tagged {
@@ -96,7 +96,7 @@ func testGetAddKey(t *testing.T) {
 	org2Series := getMetricData(2, 2, 5, 10, "metric.org2", false)
 
 	for _, series := range [][]*schema.MetricData{publicSeries, org1Series, org2Series} {
-		orgId := series[0].OrgId
+		orgId := uint32(series[0].OrgId)
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
 				mkey, _ := schema.MKeyFromString(s.Id)

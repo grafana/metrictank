@@ -54,7 +54,7 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
+func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
 	peers, err := cluster.MembersForQuery()
 	if err != nil {
 		log.Error(3, "HTTP findSeries unable to get peers, %s", err)
@@ -118,7 +118,7 @@ func (s *Server) findSeries(ctx context.Context, orgId int, patterns []string, s
 	return series, nil
 }
 
-func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []string, seenAfter int64) ([]Series, error) {
+func (s *Server) findSeriesLocal(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
 	result := make([]Series, 0)
 	for _, pattern := range patterns {
 		select {
@@ -149,7 +149,7 @@ func (s *Server) findSeriesLocal(ctx context.Context, orgId int, patterns []stri
 	return result, nil
 }
 
-func (s *Server) findSeriesRemote(ctx context.Context, orgId int, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
+func (s *Server) findSeriesRemote(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
 	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.GetName(), orgId, patterns)
 	data := models.IndexFind{
 		Patterns: patterns,
@@ -370,11 +370,11 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 }
 
-func (s *Server) listLocal(orgId int) []idx.Archive {
+func (s *Server) listLocal(orgId uint32) []idx.Archive {
 	return s.MetricIndex.List(orgId)
 }
 
-func (s *Server) listRemote(ctx context.Context, orgId int, peer cluster.Node) ([]idx.Archive, error) {
+func (s *Server) listRemote(ctx context.Context, orgId uint32, peer cluster.Node) ([]idx.Archive, error) {
 	log.Debug("HTTP IndexJson() querying %s/index/list for %d", peer.GetName(), orgId)
 	buf, err := peer.Post(ctx, "listRemote", "/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
@@ -635,12 +635,12 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) metricsDeleteLocal(orgId int, query string) (int, error) {
+func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 	defs, err := s.MetricIndex.Delete(orgId, query)
 	return len(defs), err
 }
 
-func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query string, peer cluster.Node) (int, error) {
+func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query string, peer cluster.Node) (int, error) {
 	log.Debug("HTTP metricDelete calling %s/index/delete for %d:%q", peer.GetName(), orgId, query)
 
 	body := models.IndexDelete{
@@ -673,7 +673,7 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId int, query strin
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
-func (s *Server) executePlan(ctx context.Context, orgId int, plan expr.Plan) ([]models.Series, error) {
+func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) ([]models.Series, error) {
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
@@ -861,7 +861,7 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTagDetails(ctx context.Context, orgId int, tag, filter string, from int64) (map[string]uint64, error) {
+func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filter string, from int64) (map[string]uint64, error) {
 	result, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
 	if err != nil {
 		return nil, err
@@ -923,7 +923,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
-func (s *Server) clusterFindByTag(ctx context.Context, orgId int, expressions []string, from int64) ([]Series, error) {
+func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64) ([]Series, error) {
 	seriesSet := make(map[string]Series)
 
 	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
@@ -1005,7 +1005,7 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTags(ctx context.Context, orgId int, filter string, from int64) ([]string, error) {
+func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, from int64) ([]string, error) {
 	result, err := s.MetricIndex.Tags(orgId, filter, from)
 	if err != nil {
 		return nil, err
@@ -1068,7 +1068,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 	response.Write(ctx, response.NewJson(200, tags, ""))
 }
 
-func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	result, err := s.MetricIndex.FindTags(orgId, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
@@ -1123,7 +1123,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	result, err := s.MetricIndex.FindTagValues(orgId, tag, prefix, expressions, from, limit)
 	if err != nil {
 		return nil, err
