@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/test"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -47,15 +48,15 @@ func TestMetricDeleteWithPattern(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
-	testId := "12345"
+	testId := test.GetMKey(12345)
 
 	srv, cache := newSrv(delSeries, delArchives)
 	srv.MetricIndex.AddOrUpdate(
+		testId,
 		&schema.MetricData{
-			Id:       testId,
+			Id:       testId.String(),
 			OrgId:    1,
 			Name:     testKey,
-			Metric:   testKey,
 			Interval: 10,
 			Value:    1,
 		},
@@ -99,15 +100,15 @@ func TestMetricDeleteWithTags(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
-	testId := "1.01234567890123456789012345678901"
+	testId := test.GetMKey(12345)
 
 	srv, cache := newSrv(delSeries, delArchives)
 	srv.MetricIndex.AddOrUpdate(
+		testId,
 		&schema.MetricData{
-			Id:       testId,
+			Id:       testId.String(),
 			OrgId:    1,
 			Name:     testKey,
-			Metric:   testKey,
 			Interval: 10,
 			Tags:     []string{"mytag=myvalue"},
 			Value:    1,
@@ -188,15 +189,15 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
-	testId := "12345"
+	testId := test.GetMKey(12345)
 
 	srv, _ := newSrv(delSeries, delArchives)
 	srv.MetricIndex.AddOrUpdate(
+		testId,
 		&schema.MetricData{
-			Id:       testId,
+			Id:       testId.String(),
 			OrgId:    1,
 			Name:     testKey,
-			Metric:   testKey,
 			Interval: 10,
 			Value:    1,
 		},
@@ -250,7 +251,7 @@ func TestMetricDeletePropagation(t *testing.T) {
 	delSeries := 1
 	delArchives := 3
 	testKey := "test.key"
-	testId := "12345"
+	testId := test.GetMKey(12345)
 
 	// add up how many series/archives are expected to be deleted
 	expectedDeletedSeries += delSeries
@@ -258,11 +259,11 @@ func TestMetricDeletePropagation(t *testing.T) {
 
 	srv, cache := newSrv(delSeries, delArchives)
 	srv.MetricIndex.AddOrUpdate(
+		testId,
 		&schema.MetricData{
-			Id:       testId,
+			Id:       testId.String(),
 			OrgId:    1,
 			Name:     testKey,
-			Metric:   testKey,
 			Interval: 10,
 			Value:    1,
 		},

@@ -29,7 +29,7 @@ request_parameters = {
     },
     'data': {
         'target':
-            'perSecond(metrictank.stats.docker-env.default.input.carbon.metrics_received.counter32)',
+            'perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)',
     },
 }
 

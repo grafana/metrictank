@@ -702,28 +702,6 @@ func generatePoints(ts, interval uint32, value float64, offset, count int, inc f
 	return res
 }
 
-func TestRowKey(t *testing.T) {
-	type rowKeyTest struct {
-		rollup   int
-		id       string
-		method   string
-		spp      int
-		expected string
-	}
-	tests := []rowKeyTest{
-		{0, "aaa", "sum", 600, "aaa"},
-		{1, "aaa", "sum", 600, "aaa_sum_600"},
-		{2, "bbb", "avg", 10, "bbb_avg_10"},
-	}
-
-	for _, test := range tests {
-		rowKey := getRowKey(test.rollup, test.id, test.method, test.spp)
-		if test.expected != rowKey {
-			t.Fatalf("Unexpected row key:\nExpected: %s\nGot: %s\n", test.expected, rowKey)
-		}
-	}
-}
-
 func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
 	// the actual data in these points doesn't matter, we just want to be sure
 	// that the chunks resulting from these points include the same data

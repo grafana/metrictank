@@ -3,14 +3,16 @@ package mdata
 import (
 	"context"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type Metrics interface {
-	Get(key string) (Metric, bool)
-	GetOrCreate(key, name string, schemaId, aggId uint16) Metric
+	Get(key schema.MKey) (Metric, bool)
+	GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metric
 }
 
 type Metric interface {
@@ -21,7 +23,7 @@ type Metric interface {
 
 type Store interface {
 	Add(cwr *ChunkWriteRequest)
-	Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error)
+	Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error)
 	Stop()
 	SetTracer(t opentracing.Tracer)
 }

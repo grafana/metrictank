@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
+
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
@@ -16,7 +19,6 @@ import (
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
@@ -44,6 +46,7 @@ func (k *KafkaMdm) Name() string {
 
 var LogLevel int
 var Enabled bool
+var orgId uint
 var brokerStr string
 var brokers []string
 var topicStr string
@@ -69,6 +72,7 @@ var partitionLag map[int32]*stats.Gauge64
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
+	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPoint messages, assume this org id")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
@@ -349,6 +353,17 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 }
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
+	if msg.IsPointMsg(data) {
+		_, point, err := msg.ReadPointMsg(data, uint32(orgId))
+		if err != nil {
+			metricsDecodeErr.Inc()
+			log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+			return
+		}
+		k.Handler.ProcessMetricPoint(point, partition)
+		return
+	}
+
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
@@ -357,7 +372,7 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 		return
 	}
 	metricsPerMessage.ValueUint32(1)
-	k.Handler.Process(&md, partition)
+	k.Handler.ProcessMetricData(&md, partition)
 }
 
 // Stop will initiate a graceful stop of the Consumer (permanent)

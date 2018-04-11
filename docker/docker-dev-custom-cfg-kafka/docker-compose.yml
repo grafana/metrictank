@@ -5,8 +5,9 @@ services:
     hostname: metrictank
     image: grafana/metrictank
     ports:
-     - "6060:6060"
      - "2003:2003"
+    expose:
+     - 6060
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
@@ -43,12 +44,12 @@ services:
   graphite:
     hostname: graphite
     image: raintank/graphite-mt
-    ports:
-     - "8080:80"
+    expose:
+     - 80
     environment:
       GRAPHITE_CLUSTER_SERVERS: metrictank:6060
       GRAPHITE_STATSD_HOST: statsdaemon
-      SINGLE_TENANT: yes
+      SINGLE_TENANT: "1"
       WSGI_PROCESSES: 4
       WSGI_THREADS: 25
 
@@ -65,3 +66,71 @@ services:
      - "8125:8125/udp"
     volumes:
      - "../statsdaemon.ini:/etc/statsdaemon.ini"
+
+  prometheus:
+    image: prom/prometheus:v2.2.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    ports:
+     - "9090:9090"
+    labels:
+      org.label-schema.group: "monitoring"
+
+  nodeexporter:
+    image: prom/node-exporter:v0.15.2
+    container_name: nodeexporter
+    user: root
+    privileged: true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+    labels:
+      org.label-schema.group: "monitoring"
+
+  cadvisor:
+    image: google/cadvisor:v0.28.3
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    restart: unless-stopped
+    expose:
+      - 8080
+    labels:
+      org.label-schema.group: "monitoring"
+
+  caddy:
+    image: stefanprodan/caddy
+    container_name: caddy
+    ports:
+      - "6060:6061"
+      - "6061:6061"
+      - "6062:6062"
+      - "8080:8081"
+      - "8081:8081"
+      - "8082:8082"
+    volumes:
+      - ./caddy/:/etc/caddy/
+    restart: unless-stopped
+    labels:
+      org.label-schema.group: "monitoring"

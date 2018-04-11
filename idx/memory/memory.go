@@ -19,6 +19,8 @@ import (
 )
 
 var (
+	LogLevel int
+
 	// metric idx.memory.update is the number of updates to the memory idx
 	statUpdate = stats.NewCounter32("idx.memory.ops.update")
 	// metric idx.memory.add is the number of additions to the memory idx
@@ -63,7 +65,7 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type IdSet map[string]struct{} // set of ids
+type IdSet map[schema.MKey]struct{} // set of ids
 
 func (ids IdSet) String() string {
 	var res string
@@ -71,7 +73,7 @@ func (ids IdSet) String() string {
 		if len(res) > 0 {
 			res += " "
 		}
-		res += id
+		res += id.String()
 	}
 	return res
 
@@ -80,7 +82,7 @@ func (ids IdSet) String() string {
 type TagValue map[string]IdSet    // value -> set of ids
 type TagIndex map[string]TagValue // key -> list of values
 
-func (t *TagIndex) addTagId(name, value string, id string) {
+func (t *TagIndex) addTagId(name, value string, id schema.MKey) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
 		ti[name] = make(TagValue)
@@ -91,7 +93,7 @@ func (t *TagIndex) addTagId(name, value string, id string) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) delTagId(name, value string, id string) {
+func (t *TagIndex) delTagId(name, value string, id schema.MKey) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -155,7 +157,7 @@ func (defs defByTagSet) defs(id int, fullName string) map[*schema.MetricDefiniti
 type Node struct {
 	Path     string
 	Children []string
-	Defs     []string
+	Defs     []schema.MKey
 }
 
 func (n *Node) HasChildren() bool {
@@ -179,7 +181,7 @@ type MemoryIdx struct {
 
 	// used for both hierarchy and tag index, so includes all MDs, with
 	// and without tags. It also mixes all orgs into one flat map.
-	defById map[string]*idx.Archive // by ID string
+	defById map[schema.MKey]*idx.Archive
 
 	// used by hierarchy index only
 	tree map[int]*Tree // by orgId
@@ -191,7 +193,7 @@ type MemoryIdx struct {
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		defById:     make(map[string]*idx.Archive),
+		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[int]*Tree),
 		tags:        make(map[int]TagIndex),
@@ -206,18 +208,47 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
-func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+// Update updates an existing archive, if found.
+// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
+func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+	pre := time.Now()
+
+	m.Lock()
+	defer m.Unlock()
+
+	existing, ok := m.defById[point.MKey]
+	if ok {
+		oldPart := existing.Partition
+		if LogLevel < 2 {
+			log.Debug("metricDef with id %v already in index", point.MKey)
+		}
+		existing.LastUpdate = int64(point.Time)
+		existing.Partition = partition
+		statUpdate.Inc()
+		statUpdateDuration.Value(time.Since(pre))
+		return *existing, oldPart, true
+	}
+
+	return idx.Archive{}, 0, false
+}
+
+// AddOrUpdate returns the corresponding Archive for the MetricData.
+// if it is existing -> updates lastUpdate based on .Time, and partition
+// if was new        -> adds new MetricDefinition to index
+func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	existing, ok := m.defById[data.Id]
+
+	existing, ok := m.defById[mkey]
 	if ok {
-		log.Debug("metricDef with id %s already in index.", data.Id)
+		oldPart := existing.Partition
+		log.Debug("metricDef with id %s already in index.", mkey)
 		existing.LastUpdate = data.Time
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
-		return *existing
+		return *existing, oldPart, ok
 	}
 
 	def := schema.MetricDefinitionFromMetricData(data)
@@ -230,16 +261,17 @@ func (m *MemoryIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Ar
 		m.indexTags(def)
 	}
 
-	return archive
+	return archive, 0, false
 }
 
-func (m *MemoryIdx) Update(entry idx.Archive) {
+// UpdateArchive updates the archive information
+func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 	m.Lock()
 	defer m.Unlock()
-	if _, ok := m.defById[entry.Id]; !ok {
+	if _, ok := m.defById[archive.Id]; !ok {
 		return
 	}
-	*(m.defById[entry.Id]) = entry
+	*(m.defById[archive.Id]) = archive
 }
 
 // indexTags reads the tags of a given metric definition and creates the
@@ -359,7 +391,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		root := &Node{
 			Path:     "",
 			Children: make([]string, 0),
-			Defs:     make([]string, 0),
+			Defs:     make([]schema.MKey, 0),
 		}
 		m.tree[def.OrgId] = &Tree{
 			Items: map[string]*Node{"": root},
@@ -396,7 +428,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		tree.Items[branch] = &Node{
 			Path:     branch,
 			Children: []string{prevNode},
-			Defs:     make([]string, 0),
+			Defs:     make([]schema.MKey, 0),
 		}
 
 		prevPos = pos
@@ -416,7 +448,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	tree.Items[path] = &Node{
 		Path:     path,
 		Children: []string{},
-		Defs:     []string{def.Id},
+		Defs:     []schema.MKey{def.Id},
 	}
 	m.defById[def.Id] = archive
 	statAdd.Inc()
@@ -424,7 +456,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	return *archive
 }
 
-func (m *MemoryIdx) Get(id string) (idx.Archive, bool) {
+func (m *MemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()

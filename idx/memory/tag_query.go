@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -97,8 +99,8 @@ type TagQuery struct {
 
 	startWith match // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 
-	index TagIndex                // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId  map[string]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	index TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId  map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
 
 	wg *sync.WaitGroup
 }
@@ -333,7 +335,7 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 }
 
 // getInitialByEqual generates the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(expr kv, idCh chan string, stopCh chan struct{}) {
+func (q *TagQuery) getInitialByEqual(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
 
 KEYS:
@@ -349,7 +351,7 @@ KEYS:
 }
 
 // getInitialByPrefix generates the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan string, stopCh chan struct{}) {
+func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
 
 VALUES:
@@ -371,7 +373,7 @@ VALUES:
 }
 
 // getInitialByMatch generates the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan string, stopCh chan struct{}) {
+func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
 
 	// shortcut if value == nil.
@@ -412,7 +414,7 @@ VALUES2:
 
 // getInitialByTagPrefix generates the initial resultset by creating a list of
 // metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix(idCh chan string, stopCh chan struct{}) {
+func (q *TagQuery) getInitialByTagPrefix(idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
 
 TAGS:
@@ -437,7 +439,7 @@ TAGS:
 
 // getInitialByTagMatch generates the initial resultset by creating a list of
 // metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch(idCh chan string, stopCh chan struct{}) {
+func (q *TagQuery) getInitialByTagMatch(idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
 
 TAGS:
@@ -461,8 +463,8 @@ TAGS:
 // getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
 // a channel through which the IDs of the initial result set will be sent
 // a stop channel, which when closed, will cause it to abort the background worker.
-func (q *TagQuery) getInitialIds() (chan string, chan struct{}) {
-	idCh := make(chan string, 1000)
+func (q *TagQuery) getInitialIds() (chan schema.MKey, chan struct{}) {
+	idCh := make(chan schema.MKey, 1000)
 	stopCh := make(chan struct{})
 	q.wg.Add(1)
 
@@ -492,7 +494,7 @@ func (q *TagQuery) getInitialIds() (chan string, chan struct{}) {
 // all required tests in order to decide whether this metric should be part
 // of the final result set or not
 // in map/reduce terms this is the reduce function
-func (q *TagQuery) testByAllExpressions(id string, def *idx.Archive, omitTagFilters bool) bool {
+func (q *TagQuery) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTagFilters bool) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -695,7 +697,7 @@ func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
 }
 
 // testByEqual filters a given metric by the defined "=" expressions
-func (q *TagQuery) testByEqual(id string, exprs []kv, not bool) bool {
+func (q *TagQuery) testByEqual(id schema.MKey, exprs []kv, not bool) bool {
 	for _, e := range exprs {
 		indexIds := q.index[e.key][e.value]
 
@@ -722,7 +724,7 @@ func (q *TagQuery) testByEqual(id string, exprs []kv, not bool) bool {
 // required tests to decide whether a metric should be part of the final
 // result set or not
 // it returns the final result set via the given resCh parameter
-func (q *TagQuery) filterIdsFromChan(idCh, resCh chan string) {
+func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
@@ -772,14 +774,14 @@ func (q *TagQuery) sortByCost() {
 }
 
 // Run executes the tag query on the given index and returns a list of ids
-func (q *TagQuery) Run(index TagIndex, byId map[string]*idx.Archive) IdSet {
+func (q *TagQuery) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
 	q.index = index
 	q.byId = byId
 
 	q.sortByCost()
 
 	idCh, _ := q.getInitialIds()
-	resCh := make(chan string)
+	resCh := make(chan schema.MKey)
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
@@ -836,7 +838,7 @@ func (q *TagQuery) getMaxTagCount() int {
 // according to the criteria associated with this query
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
-func (q *TagQuery) filterTagsFromChan(idCh chan string, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
+func (q *TagQuery) filterTagsFromChan(idCh chan schema.MKey, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
@@ -953,7 +955,7 @@ func (q *TagQuery) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQuery) RunGetTags(index TagIndex, byId map[string]*idx.Archive) map[string]struct{} {
+func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 

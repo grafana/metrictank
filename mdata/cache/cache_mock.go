@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/grafana/metrictank/mdata/chunk"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type MockCache struct {
@@ -16,7 +17,7 @@ type MockCache struct {
 	SearchCount       int
 	DelMetricArchives int
 	DelMetricSeries   int
-	DelMetricKeys     []string
+	DelMetricKeys     []schema.MKey
 	ResetCalls        int
 }
 
@@ -24,13 +25,13 @@ func NewMockCache() *MockCache {
 	return &MockCache{}
 }
 
-func (mc *MockCache) Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen) {
+func (mc *MockCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.AddCount++
 }
 
-func (mc *MockCache) CacheIfHot(metric string, prev uint32, itergen chunk.IterGen) {
+func (mc *MockCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.CacheIfHotCount++
@@ -45,14 +46,14 @@ func (mc *MockCache) Stop() {
 	mc.StopCount++
 }
 
-func (mc *MockCache) Search(ctx context.Context, metric string, from uint32, until uint32) *CCSearchResult {
+func (mc *MockCache) Search(ctx context.Context, metric schema.AMKey, from uint32, until uint32) *CCSearchResult {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.SearchCount++
 	return nil
 }
 
-func (mc *MockCache) DelMetric(rawMetric string) (int, int) {
+func (mc *MockCache) DelMetric(rawMetric schema.MKey) (int, int) {
 	mc.DelMetricKeys = append(mc.DelMetricKeys, rawMetric)
 	return mc.DelMetricSeries, mc.DelMetricArchives
 }

@@ -1,7 +1,7 @@
 {
   "name":"graphite",
   "type":"graphite",
-  "url":"http://graphite",
+  "url":"http://caddy:8081",
   "access":"proxy",
   "isDefault":false
 }

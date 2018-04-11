@@ -19,7 +19,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
@@ -277,7 +276,6 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 
 	md := schema.MetricData{
 		Name:     name,
-		Metric:   name,
 		Interval: int(w.Header.Archives[0].SecondsPerPoint),
 		Value:    0,
 		Unit:     "unknown",
@@ -287,7 +285,7 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 		OrgId:    *orgId,
 	}
 	md.SetId()
-	_, schema := schemas.Match(md.Name, int(w.Header.Archives[0].SecondsPerPoint))
+	_, schem := schemas.Match(md.Name, int(w.Header.Archives[0].SecondsPerPoint))
 
 	points := make(map[int][]whisper.Point)
 	for i := range w.Header.Archives {
@@ -299,20 +297,24 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 	}
 
 	conversion := newConversion(w.Header.Archives, points, method)
-	for retIdx, retention := range schema.Retentions {
+	for retIdx, retention := range schem.Retentions {
 		convertedPoints := conversion.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
 			if len(p) == 0 {
 				continue
 			}
-			rowKey := getRowKey(retIdx, md.Id, m, retention.SecondsPerPoint)
+			mkey, err := schema.MKeyFromString(md.Id)
+			if err != nil {
+				panic(err)
+			}
+			rowKey := getRowKey(retIdx, mkey, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			log.Debugf("Archive %d Method %s got %d points = %d chunks at a span of %d", retIdx, m, len(p), len(encodedChunks), retention.ChunkSpan)
 			res.Archives = append(res.Archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
 				Points:          uint32(retention.NumberOfPoints),
 				Chunks:          encodedChunks,
-				RowKey:          rowKey,
+				RowKey:          rowKey.String(),
 			})
 			if int64(p[len(p)-1].Timestamp) > md.Time {
 				md.Time = int64(p[len(p)-1].Timestamp)
@@ -324,15 +326,14 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 	return res, nil
 }
 
-func getRowKey(retIdx int, id, meth string, secondsPerPoint int) string {
+func getRowKey(retIdx int, mkey schema.MKey, meth string, secondsPerPoint int) schema.AMKey {
 	if retIdx == 0 {
-		return id
-	} else {
-		return api.AggMetricKey(
-			id,
-			meth,
-			uint32(secondsPerPoint),
-		)
+		return schema.AMKey{MKey: mkey}
+	}
+	m, _ := schema.MethodFromString(meth)
+	return schema.AMKey{
+		MKey:    mkey,
+		Archive: schema.NewArchive(m, uint32(secondsPerPoint)),
 	}
 }
 

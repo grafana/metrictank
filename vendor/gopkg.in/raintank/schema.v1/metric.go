@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -13,7 +12,6 @@ import (
 var errInvalidIntervalzero = errors.New("interval cannot be 0")
 var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var errInvalidEmptyName = errors.New("name cannot be empty")
-var errInvalidEmptyMetric = errors.New("metric cannot be empty")
 var errInvalidMtype = errors.New("invalid mtype")
 var errInvalidTagFormat = errors.New("invalid tag format")
 
@@ -37,13 +35,12 @@ type MetricData struct {
 	Id       string   `json:"id"`
 	OrgId    int      `json:"org_id"`
 	Name     string   `json:"name"`
-	Metric   string   `json:"metric"`
 	Interval int      `json:"interval"`
 	Value    float64  `json:"value"`
 	Unit     string   `json:"unit"`
 	Time     int64    `json:"time"`
 	Mtype    string   `json:"mtype"`
-	Tags     []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	Tags     []string `json:"tags"`
 }
 
 func (m *MetricData) Validate() error {
@@ -55,9 +52,6 @@ func (m *MetricData) Validate() error {
 	}
 	if m.Name == "" {
 		return errInvalidEmptyName
-	}
-	if m.Metric == "" {
-		return errInvalidEmptyMetric
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
@@ -93,7 +87,7 @@ func (m *MetricData) KeyBySeries(b []byte) []byte {
 func (m *MetricData) SetId() {
 	sort.Strings(m.Tags)
 
-	buffer := bytes.NewBufferString(m.Metric)
+	buffer := bytes.NewBufferString(m.Name)
 	buffer.WriteByte(0)
 	buffer.WriteString(m.Unit)
 	buffer.WriteByte(0)
@@ -111,13 +105,11 @@ func (m *MetricData) SetId() {
 // can be used by some encoders, such as msgp
 type MetricDataArray []*MetricData
 
-// for ES
 type MetricDefinition struct {
-	Id       string `json:"id"`
+	Id       MKey   `json:"mkey"`
 	OrgId    int    `json:"org_id"`
-	Name     string `json:"name" elastic:"type:string,index:not_analyzed"` // graphite format
-	Metric   string `json:"metric"`                                        // kairosdb format (like graphite, but not including some tags)
-	Interval int    `json:"interval"`                                      // minimum 10
+	Name     string `json:"name"`
+	Interval int    `json:"interval"`
 	Unit     string `json:"unit"`
 	Mtype    string `json:"mtype"`
 
@@ -125,7 +117,7 @@ type MetricDefinition struct {
 	// to this slice which allows querying by name as a tag. this special tag
 	// should not be stored or transmitted over the network, otherwise it may
 	// just get overwritten by the receiver.
-	Tags       []string `json:"tags" elastic:"type:string,index:not_analyzed"`
+	Tags       []string `json:"tags"`
 	LastUpdate int64    `json:"lastUpdate"` // unix timestamp
 	Partition  int32    `json:"partition"`
 
@@ -172,7 +164,7 @@ func (m *MetricDefinition) NameWithTags() string {
 func (m *MetricDefinition) SetId() {
 	sort.Strings(m.Tags)
 
-	buffer := bytes.NewBufferString(m.Metric)
+	buffer := bytes.NewBufferString(m.Name)
 	buffer.WriteByte(0)
 	buffer.WriteString(m.Unit)
 	buffer.WriteByte(0)
@@ -189,7 +181,10 @@ func (m *MetricDefinition) SetId() {
 		buffer.WriteString(t)
 	}
 
-	m.Id = fmt.Sprintf("%d.%x", m.OrgId, md5.Sum(buffer.Bytes()))
+	m.Id = MKey{
+		md5.Sum(buffer.Bytes()),
+		uint32(m.OrgId),
+	}
 }
 
 func (m *MetricDefinition) Validate() error {
@@ -201,9 +196,6 @@ func (m *MetricDefinition) Validate() error {
 	}
 	if m.Name == "" {
 		return errInvalidEmptyName
-	}
-	if m.Metric == "" {
-		return errInvalidEmptyMetric
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return errInvalidMtype
@@ -233,26 +225,17 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 	return b
 }
 
-func MetricDefinitionFromJSON(b []byte) (*MetricDefinition, error) {
-	def := new(MetricDefinition)
-	if err := json.Unmarshal(b, &def); err != nil {
-		return nil, err
-	}
-
-	return def, nil
-}
-
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
 // to the original MetricData
 func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	tags := make([]string, len(d.Tags))
 	copy(tags, d.Tags)
+	mkey, _ := MKeyFromString(d.Id)
 
 	md := &MetricDefinition{
-		Id:         d.Id,
+		Id:         mkey,
 		Name:       d.Name,
 		OrgId:      d.OrgId,
-		Metric:     d.Metric,
 		Mtype:      d.Mtype,
 		Interval:   d.Interval,
 		LastUpdate: d.Time,

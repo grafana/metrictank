@@ -167,6 +167,7 @@ func main() {
 		Set logging levels
 	***********************************/
 	mdata.LogLevel = logLevel
+	memory.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055

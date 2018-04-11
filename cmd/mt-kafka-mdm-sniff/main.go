@@ -21,42 +21,63 @@ import (
 
 var (
 	confFile = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
-	format   = flag.String("format", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Metric}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render the data with")
+	formatMd = flag.String("format-md", "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}", "template to render MetricData with")
+	formatP  = flag.String("format-point", "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}", "template to render MetricPoint data with")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
 
 	stdoutLock = sync.Mutex{}
 )
 
-type Data struct {
+type DataMd struct {
 	Part int32
 	schema.MetricData
 }
 
+type DataP struct {
+	Part int32
+	schema.MetricPoint
+}
+
 type inputPrinter struct {
-	template.Template
-	data Data
+	tplMd template.Template
+	tplP  template.Template
 }
 
-func newInputPrinter(format string) inputPrinter {
-	tpl := template.Must(template.New("format").Parse(format + "\n"))
+func newInputPrinter(formatMd, formatP string) inputPrinter {
+	tplMd := template.Must(template.New("format").Parse(formatMd + "\n"))
+	tplP := template.Must(template.New("format").Parse(formatP + "\n"))
 	return inputPrinter{
-		*tpl,
-		Data{},
+		*tplMd,
+		*tplP,
 	}
 }
 
-func (ip inputPrinter) Process(metric *schema.MetricData, partition int32) {
-	if *prefix != "" && !strings.HasPrefix(metric.Metric, *prefix) {
+func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition int32) {
+	if *prefix != "" && !strings.HasPrefix(metric.Name, *prefix) {
 		return
 	}
-	if *substr != "" && !strings.Contains(metric.Metric, *substr) {
+	if *substr != "" && !strings.Contains(metric.Name, *substr) {
 		return
 	}
-	ip.data.MetricData = *metric
-	ip.data.Part = partition
 	stdoutLock.Lock()
-	err := ip.Execute(os.Stdout, ip.data)
+	err := ip.tplMd.Execute(os.Stdout, DataMd{
+		partition,
+		*metric,
+	})
+
+	stdoutLock.Unlock()
+	if err != nil {
+		log.Error(0, "executing template: %s", err)
+	}
+}
+
+func (ip inputPrinter) ProcessMetricPoint(point schema.MetricPoint, partition int32) {
+	stdoutLock.Lock()
+	err := ip.tplP.Execute(os.Stdout, DataP{
+		partition,
+		point,
+	})
 	stdoutLock.Unlock()
 	if err != nil {
 		log.Error(0, "executing template: %s", err)
@@ -102,7 +123,7 @@ func main() {
 
 	mdm := inKafkaMdm.New()
 	pluginFatal := make(chan struct{})
-	mdm.Start(newInputPrinter(*format), pluginFatal)
+	mdm.Start(newInputPrinter(*formatMd, *formatP), pluginFatal)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	select {

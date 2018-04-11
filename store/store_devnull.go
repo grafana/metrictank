@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -25,7 +27,7 @@ func (c *devnullStore) Reset() {
 	c.AddCount = 0
 }
 
-func (c *devnullStore) Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *devnullStore) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	return nil, nil
 }
 

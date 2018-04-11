@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
+	"gopkg.in/raintank/schema.v1"
 )
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
@@ -26,7 +27,7 @@ type AggMetric struct {
 	store       Store
 	cachePusher cache.CachePusher
 	sync.RWMutex
-	Key             string
+	Key             schema.AMKey
 	rob             *ReorderBuffer
 	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
 	NumChunks       uint32 // max size of the circular buffer
@@ -45,7 +46,7 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key string, retentions conf.Retentions, reorderWindow uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
@@ -640,11 +641,11 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 	} else {
 		// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
 		// we are a primary
-		log.Debug("Found stale Chunk, adding end-of-stream bytes. key: %s T0: %d", a.Key, currentChunk.T0)
+		log.Debug("Found stale Chunk, adding end-of-stream bytes. key: %v T0: %d", a.Key, currentChunk.T0)
 		currentChunk.Finish()
 		if cluster.Manager.IsPrimary() {
 			if LogLevel < 2 {
-				log.Debug("AM persist(): node is primary, saving chunk. %s T0: %d", a.Key, currentChunk.T0)
+				log.Debug("AM persist(): node is primary, saving chunk. %v T0: %d", a.Key, currentChunk.T0)
 			}
 			// persist the chunk. If the writeQueue is full, then this will block.
 			a.persist(a.CurrentChunkPos)

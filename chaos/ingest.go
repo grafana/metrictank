@@ -21,7 +21,6 @@ func init() {
 		m := &schema.MetricData{
 			OrgId:    1,
 			Name:     name,
-			Metric:   name,
 			Interval: 1,
 			Value:    1,
 			Unit:     "s",

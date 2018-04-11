@@ -4,19 +4,20 @@ import (
 	"context"
 
 	"github.com/grafana/metrictank/mdata/chunk"
+	"gopkg.in/raintank/schema.v1"
 )
 
 type Cache interface {
-	Add(metric, rawMetric string, prev uint32, itergen chunk.IterGen)
-	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
+	Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	Stop()
-	Search(ctx context.Context, metric string, from, until uint32) *CCSearchResult
-	DelMetric(rawMetric string) (int, int)
+	Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult
+	DelMetric(rawMetric schema.MKey) (int, int)
 	Reset() (int, int)
 }
 
 type CachePusher interface {
-	CacheIfHot(metric string, prev uint32, itergen chunk.IterGen)
+	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 }
 
 type CCSearchResult struct {

@@ -264,52 +264,82 @@ func (c *CasIdx) Stop() {
 	c.session.Close()
 }
 
-func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archive {
+// Update updates an existing archive, if found.
+// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
+func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
-	existing, inMemory := c.MemoryIdx.Get(data.Id)
-	archive := c.MemoryIdx.AddOrUpdate(data, partition)
+
+	archive, oldPartition, inMemory := c.MemoryIdx.Update(point, partition)
+
+	if !updateCassIdx {
+		statUpdateDuration.Value(time.Since(pre))
+		return archive, oldPartition, inMemory
+	}
+
+	if inMemory {
+		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
+		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// So we need to explicitly delete the old entry.
+		if oldPartition != partition {
+			c.deleteDefAsync(point.MKey, oldPartition)
+		}
+
+		// check if we need to save to cassandra.
+		now := uint32(time.Now().Unix())
+		if archive.LastSave < (now - updateInterval32) {
+			archive = c.updateCassandra(now, inMemory, archive, partition)
+		}
+	}
+
+	statUpdateDuration.Value(time.Since(pre))
+	return archive, oldPartition, inMemory
+}
+
+func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
+	pre := time.Now()
+
+	archive, oldPartition, inMemory := c.MemoryIdx.AddOrUpdate(mkey, data, partition)
+
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
 	}
+
 	if !updateCassIdx {
 		stat.Value(time.Since(pre))
-		return archive
+		return archive, oldPartition, inMemory
 	}
 
-	now := uint32(time.Now().Unix())
-
-	// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-	// an existing metricDef will just create a new row in the table and wont remove the old row.
-	// So we need to explicitly delete the old entry.
-	if inMemory && existing.Partition != partition {
-		go func() {
-			if err := c.deleteDef(&existing); err != nil {
-				log.Error(3, err.Error())
-			}
-		}()
+	if inMemory {
+		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
+		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// So we need to explicitly delete the old entry.
+		if oldPartition != partition {
+			c.deleteDefAsync(mkey, oldPartition)
+		}
 	}
 
 	// check if we need to save to cassandra.
-	if archive.LastSave >= (now - updateInterval32) {
-		stat.Value(time.Since(pre))
-		return archive
+	now := uint32(time.Now().Unix())
+	if archive.LastSave < (now - updateInterval32) {
+		archive = c.updateCassandra(now, inMemory, archive, partition)
 	}
 
-	// This is just a safety precaution to prevent corrupt index entries.
-	// This ensures that the index entry always contains the correct metricDefinition data.
-	if inMemory {
-		archive.MetricDefinition = *schema.MetricDefinitionFromMetricData(data)
-		archive.MetricDefinition.Partition = partition
-	}
+	stat.Value(time.Since(pre))
+	return archive, oldPartition, inMemory
+}
+
+// updateCassandra saves the archive to cassandra and
+// updates the memory index with the updated fields.
+func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
 
 	// if the entry has not been saved for 1.5x updateInterval
-	// then perform a blocking save. (bit shifting to the right 1 bit, divides by 2)
-	if archive.LastSave < (now - updateInterval32 - (updateInterval32 >> 1)) {
+	// then perform a blocking save.
+	if archive.LastSave < (now - updateInterval32 - updateInterval32/2) {
 		log.Debug("cassandra-idx updating def in index.")
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
-		c.MemoryIdx.Update(archive)
+		c.MemoryIdx.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we wont update the LastSave timestamp. The next time
@@ -320,14 +350,13 @@ func (c *CasIdx) AddOrUpdate(data *schema.MetricData, partition int32) idx.Archi
 		select {
 		case c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
 			archive.LastSave = now
-			c.MemoryIdx.Update(archive)
+			c.MemoryIdx.UpdateArchive(archive)
 		default:
 			statSaveSkipped.Inc()
 			log.Debug("writeQueue is full, update not saved.")
 		}
 	}
 
-	stat.Value(time.Since(pre))
 	return archive
 }
 
@@ -347,30 +376,35 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter, cutoff)
 }
 
 func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
 	return c.load(defs, iter, cutoff)
 }
 
 func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff uint32) []schema.MetricDefinition {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
-	var id, name, metric, unit, mtype string
+	var id, name, unit, mtype string
 	var orgId, interval int
 	var partition int32
 	var lastupdate int64
 	var tags []string
 	cutoff64 := int64(cutoff)
-	for iter.Scan(&id, &orgId, &partition, &name, &metric, &interval, &unit, &mtype, &tags, &lastupdate) {
+	for iter.Scan(&id, &orgId, &partition, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
+		mkey, err := schema.MKeyFromString(id)
+		if err != nil {
+			log.Error(3, "cassandra-idx: load() could not parse ID %q: %s -> skipping", id, err)
+			continue
+		}
+
 		mdef := &schema.MetricDefinition{
-			Id:         id,
+			Id:         mkey,
 			OrgId:      orgId,
 			Partition:  partition,
 			Name:       name,
-			Metric:     metric,
 			Interval:   interval,
 			Unit:       unit,
 			Mtype:      mtype,
@@ -406,7 +440,7 @@ func (c *CasIdx) processWriteQueue() {
 	var attempts int
 	var err error
 	var req writeReq
-	qry := `INSERT INTO metric_idx (id, orgid, partition, name, metric, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
 			log.Error(3, "Failed to marshal metricDef. %s", err)
@@ -420,11 +454,10 @@ func (c *CasIdx) processWriteQueue() {
 		for !success {
 			if err := c.session.Query(
 				qry,
-				req.def.Id,
+				req.def.Id.String(),
 				req.def.OrgId,
 				req.def.Partition,
 				req.def.Name,
-				req.def.Metric,
 				req.def.Interval,
 				req.def.Unit,
 				req.def.Mtype,
@@ -462,7 +495,7 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	}
 	if updateCassIdx {
 		for _, def := range defs {
-			err = c.deleteDef(&def)
+			err = c.deleteDef(def.Id, def.Partition)
 			if err != nil {
 				log.Error(3, "cassandra-idx: %s", err.Error())
 			}
@@ -472,16 +505,17 @@ func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	return defs, err
 }
 
-func (c *CasIdx) deleteDef(def *idx.Archive) error {
+func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 	pre := time.Now()
 	attempts := 0
+	keyStr := key.String()
 	for attempts < 5 {
 		attempts++
-		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", def.Partition, def.Id).Exec()
+		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", part, keyStr).Exec()
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
-			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", def.Id, err)
+			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", keyStr, err)
 			time.Sleep(time.Second)
 		} else {
 			statQueryDeleteOk.Inc()
@@ -489,7 +523,15 @@ func (c *CasIdx) deleteDef(def *idx.Archive) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", def.Id, attempts)
+	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", keyStr, attempts)
+}
+
+func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
+	go func() {
+		if err := c.deleteDef(key, part); err != nil {
+			log.Error(3, err.Error())
+		}
+	}()
 }
 
 func (c *CasIdx) Prune(oldest time.Time) ([]idx.Archive, error) {

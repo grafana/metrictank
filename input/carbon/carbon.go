@@ -187,7 +187,6 @@ func (c *Carbon) handle(conn net.Conn) {
 		nameSplits := strings.Split(string(key), ";")
 		md := &schema.MetricData{
 			Name:     nameSplits[0],
-			Metric:   nameSplits[0],
 			Interval: c.intervalGetter.GetInterval(nameSplits[0]),
 			Value:    val,
 			Unit:     "unknown",
@@ -198,7 +197,7 @@ func (c *Carbon) handle(conn net.Conn) {
 		}
 		md.SetId()
 		metricsPerMessage.ValueUint32(1)
-		c.Handler.Process(md, int32(partitionId))
+		c.Handler.ProcessMetricData(md, int32(partitionId))
 	}
 	c.handlerWaitGroup.Done()
 }

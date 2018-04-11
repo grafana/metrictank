@@ -10,6 +10,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/test"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -23,7 +24,6 @@ type cassRow struct {
 	orgId      int
 	partition  int32
 	name       string
-	metric     string
 	interval   int
 	unit       string
 	mtype      string
@@ -36,7 +36,7 @@ func (i *testIterator) Scan(dest ...interface{}) bool {
 		return false
 	}
 
-	if len(dest) < 10 {
+	if len(dest) < 9 {
 		return false
 	}
 
@@ -45,12 +45,11 @@ func (i *testIterator) Scan(dest ...interface{}) bool {
 	*(dest[1].(*int)) = row.orgId
 	*(dest[2].(*int32)) = row.partition
 	*(dest[3].(*string)) = row.name
-	*(dest[4].(*string)) = row.metric
-	*(dest[5].(*int)) = row.interval
-	*(dest[6].(*string)) = row.unit
-	*(dest[7].(*string)) = row.mtype
-	*(dest[8].(*[]string)) = row.tags
-	*(dest[9].(*int64)) = row.lastUpdate
+	*(dest[4].(*int)) = row.interval
+	*(dest[5].(*string)) = row.unit
+	*(dest[6].(*string)) = row.mtype
+	*(dest[7].(*[]string)) = row.tags
+	*(dest[8].(*int64)) = row.lastUpdate
 
 	i.rows = i.rows[1:]
 
@@ -112,7 +111,6 @@ func getMetricData(orgId, depth, count, interval int, prefix string) []*schema.M
 
 		data[i] = &schema.MetricData{
 			Name:     s,
-			Metric:   s,
 			OrgId:    orgId,
 			Interval: interval,
 		}
@@ -136,7 +134,11 @@ func TestGetAddKey(t *testing.T) {
 		orgId := series[0].OrgId
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
-				ix.AddOrUpdate(s, 1)
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatalf("could not get key for %q: %s", s.Id, err)
+				}
+				ix.AddOrUpdate(mkey, s, 1)
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -154,7 +156,12 @@ func TestGetAddKey(t *testing.T) {
 		for _, series := range org1Series {
 			series.Interval = 60
 			series.SetId()
-			ix.AddOrUpdate(series, 1)
+			mkey, err := schema.MKeyFromString(series.Id)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ix.AddOrUpdate(mkey, series, 1)
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -183,10 +190,17 @@ func TestAddToWriteQueue(t *testing.T) {
 	Convey("When writeQueue is enabled", t, func() {
 		Convey("When new metrics being added", func() {
 			for _, s := range metrics {
-				ix.AddOrUpdate(s, 1)
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				ix.AddOrUpdate(mkey, s, 1)
 				select {
 				case wr := <-ix.writeQueue:
-					So(wr.def.Id, ShouldEqual, s.Id)
+					if wr.def.Id != mkey {
+						t.Fatalf("wrong key")
+					}
 					archive, inMem := ix.Get(wr.def.Id)
 					So(inMem, ShouldBeTrue)
 					now := uint32(time.Now().Unix())
@@ -198,8 +212,13 @@ func TestAddToWriteQueue(t *testing.T) {
 		})
 		Convey("When existing metrics are added and lastSave is recent", func() {
 			for _, s := range metrics {
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				s.Time = time.Now().Unix()
-				ix.AddOrUpdate(s, 1)
+				ix.AddOrUpdate(mkey, s, 1)
 			}
 			wrCount := 0
 
@@ -217,15 +236,26 @@ func TestAddToWriteQueue(t *testing.T) {
 		Convey("When existing metrics are added and lastSave is old", func() {
 			for _, s := range metrics {
 				s.Time = time.Now().Unix()
-				archive, _ := ix.Get(s.Id)
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				archive, _ := ix.Get(mkey)
 				archive.LastSave = uint32(time.Now().Unix() - 100)
-				ix.Update(archive)
+				ix.UpdateArchive(archive)
 			}
 			for _, s := range metrics {
-				ix.AddOrUpdate(s, 1)
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ix.AddOrUpdate(mkey, s, 1)
 				select {
 				case wr := <-ix.writeQueue:
-					So(wr.def.Id, ShouldEqual, s.Id)
+					if wr.def.Id != mkey {
+						t.Fatal("wrong key")
+					}
 					archive, inMem := ix.Get(wr.def.Id)
 					So(inMem, ShouldBeTrue)
 					now := uint32(time.Now().Unix())
@@ -247,7 +277,11 @@ func TestAddToWriteQueue(t *testing.T) {
 			}()
 
 			for _, s := range newMetrics {
-				ix.AddOrUpdate(s, 1)
+				mkey, err := schema.MKeyFromString(s.Id)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ix.AddOrUpdate(mkey, s, 1)
 			}
 			//it should take at least 1 second to add the defs, as the queue will be full
 			// until the above goroutine empties it, leading to a blocking write.
@@ -264,19 +298,39 @@ func TestFind(t *testing.T) {
 	ix := New()
 	initForTests(ix)
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo") {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo") {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo") {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 		s.Interval = 60
 		s.SetId()
-		ix.AddOrUpdate(s, 1)
+		mkey, err = schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo") {
-		ix.AddOrUpdate(s, 1)
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, s, 1)
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -395,12 +449,15 @@ func insertDefs(ix idx.MetricIndex, i int) {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
-			Metric:   series,
 			Interval: 10,
 			OrgId:    1,
 		}
 		data.SetId()
-		ix.AddOrUpdate(data, 1)
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			panic(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
 	}
 }
 
@@ -467,7 +524,6 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 		series = "some.metric." + strconv.Itoa(n)
 		data = &schema.MetricData{
 			Name:     series,
-			Metric:   series,
 			Interval: 10,
 			OrgId:    1,
 			Time:     10,
@@ -479,7 +535,11 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		ix.AddOrUpdate(updates[n], 1)
+		mkey, err := schema.MKeyFromString(updates[n].Id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, updates[n], 1)
 	}
 	ix.Stop()
 }
@@ -487,38 +547,34 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 func TestPruneStaleOnLoad(t *testing.T) {
 	iter := testIterator{}
 	iter.rows = append(iter.rows, cassRow{
-		id:         "1",
+		id:         test.GetMKey(1).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   1,
 		lastUpdate: 1,
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "2",
+		id:         test.GetMKey(2).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   3,
 		lastUpdate: 2,
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "3",
+		id:         test.GetMKey(3).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met2",
-		metric:     "met2",
 		interval:   1,
 		lastUpdate: 1,
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "4",
+		id:         test.GetMKey(4).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met2",
-		metric:     "met2",
 		interval:   3,
 		lastUpdate: 1,
 	})
@@ -532,7 +588,7 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
 	}
 
-	if defs[0].Id != "1" || defs[1].Id != "2" {
+	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(2) {
 		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
 	}
 }
@@ -540,41 +596,37 @@ func TestPruneStaleOnLoad(t *testing.T) {
 func TestPruneStaleOnLoadWithTags(t *testing.T) {
 	iter := testIterator{}
 	iter.rows = append(iter.rows, cassRow{
-		id:         "1",
+		id:         test.GetMKey(1).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   1,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1"},
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "2",
+		id:         test.GetMKey(2).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   2,
 		lastUpdate: 2,
 		tags:       []string{"tag1=val1"},
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "3",
+		id:         test.GetMKey(3).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   3,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1;tag2=val2"},
 	})
 	iter.rows = append(iter.rows, cassRow{
-		id:         "4",
+		id:         test.GetMKey(4).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
-		metric:     "met1",
 		interval:   4,
 		lastUpdate: 1,
 		tags:       []string{"tag1=val1;tag2=val2"},
@@ -589,7 +641,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
 	}
 
-	if defs[0].Id != "1" || defs[1].Id != "2" {
+	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(2) {
 		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
 	}
 }

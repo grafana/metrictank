@@ -1,0 +1,31 @@
+:6061 {
+    proxy / metrictank:6060 {
+            header_upstream x-org-id 1
+        }
+    errors stderr
+    tls off
+}
+
+:6062 {
+    proxy / metrictank:6060 {
+            header_upstream x-org-id 2
+        }
+    errors stderr
+    tls off
+}
+
+:8081 {
+    proxy / graphite {
+            header_upstream x-org-id 1
+        }
+    errors stderr
+    tls off
+}
+
+:8082 {
+    proxy / graphite {
+            header_upstream x-org-id 2
+        }
+    errors stderr
+    tls off
+}

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -123,7 +125,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	agg := NewAggMetric(mockstore, &mockCache, "foo", ret, 0, nil, false)
+	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), ret, 0, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -159,7 +161,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, "foo", ret, 0, nil, false))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, nil, false))
 
 	// basic case, single range
 	c.Add(101, 101)
@@ -237,7 +239,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, "foo", ret, 10, &agg, false))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, &agg, false))
 
 	// basic adds and verifies with test data
 	c.Add(101, 101)
@@ -277,7 +279,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
-	m := NewAggMetric(mockstore, &cache.MockCache{}, "foo", ret, 0, nil, true)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, nil, true)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -288,7 +290,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	m.Add(31, 31)
 	m.Add(32, 32)
 	m.Add(40, 40)
-	itgens, err := mockstore.Search(test.NewContext(), "foo", 0, 0, 1000)
+	itgens, err := mockstore.Search(test.NewContext(), test.GetAMKey(42), 0, 0, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,9 +324,9 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	chunkMaxStale := uint32(3600)
 	metricMaxStale := uint32(21600)
 
-	keys := make([]string, 1000)
+	keys := make([]schema.MKey, 1000)
 	for i := 0; i < 1000; i++ {
-		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+		keys[i] = test.GetMKey(i)
 	}
 
 	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
@@ -333,7 +335,7 @@ func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
 			k := keys[metricI]
-			m := metrics.GetOrCreate(k, k, 0, 0)
+			m := metrics.GetOrCreate(k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
@@ -355,9 +357,9 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	keys := make([]string, 1000)
+	keys := make([]schema.MKey, 1000)
 	for i := 0; i < 1000; i++ {
-		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+		keys[i] = test.GetMKey(i)
 	}
 
 	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
@@ -366,7 +368,7 @@ func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 1000; metricI++ {
 			k := keys[metricI]
-			m := metrics.GetOrCreate(k, k, 0, 0)
+			m := metrics.GetOrCreate(k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
@@ -388,9 +390,9 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	keys := make([]string, 10000)
-	for i := 0; i < 10000; i++ {
-		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	keys := make([]schema.MKey, 1000)
+	for i := 0; i < 1000; i++ {
+		keys[i] = test.GetMKey(i)
 	}
 
 	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
@@ -399,7 +401,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 10000; metricI++ {
 			k := keys[metricI]
-			m := metrics.GetOrCreate(k, k, 0, 0)
+			m := metrics.GetOrCreate(k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}
@@ -421,9 +423,9 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	keys := make([]string, 100000)
-	for i := 0; i < 100000; i++ {
-		keys[i] = fmt.Sprintf("hello.this.is.a.test.key.%d", i)
+	keys := make([]schema.MKey, 1000)
+	for i := 0; i < 1000; i++ {
+		keys[i] = test.GetMKey(i)
 	}
 
 	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
@@ -432,7 +434,7 @@ func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
 	for t := uint32(1); t < maxT; t += 10 {
 		for metricI := 0; metricI < 100000; metricI++ {
 			k := keys[metricI]
-			m := metrics.GetOrCreate(k, k, 0, 0)
+			m := metrics.GetOrCreate(k, 0, 0)
 			m.Add(t, float64(t))
 		}
 	}

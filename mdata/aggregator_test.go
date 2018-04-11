@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/test"
 	"gopkg.in/raintank/schema.v1"
 )
 
@@ -70,13 +71,13 @@ func TestAggregator(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg, conf.Min, conf.Max, conf.Sum, conf.Lst},
 	}
 
-	agg := NewAggregator(mockstore, &cache.MockCache{}, "test", ret, aggs, false)
+	agg := NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(0), ret, aggs, false)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	expected := []schema.Point{}
 	compare("simple-min-unfinished", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, "test", ret, aggs, false)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
@@ -85,7 +86,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, "test", ret, aggs, false)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(2), ret, aggs, false)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(120, 4)
@@ -94,7 +95,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, "test", ret, aggs, false)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(3), ret, aggs, false)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(150, 1.123)
@@ -105,7 +106,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-two-blocks-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, "test", ret, aggs, false)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(4), ret, aggs, false)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(190, 2451.123)

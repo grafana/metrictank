@@ -14,7 +14,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func BenchmarkProcessUniqueMetrics(b *testing.B) {
+func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	store := backendStore.NewDevnullStore()
@@ -35,7 +35,6 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 			Id:       "some.id.of.a.metric",
 			OrgId:    500,
 			Name:     name,
-			Metric:   name,
 			Interval: 10,
 			Value:    1234.567,
 			Unit:     "ms",
@@ -48,11 +47,11 @@ func BenchmarkProcessUniqueMetrics(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		in.Process(datas[i], 1)
+		in.ProcessMetricData(datas[i], 1)
 	}
 }
 
-func BenchmarkProcessSameMetric(b *testing.B) {
+func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	store := backendStore.NewDevnullStore()
@@ -73,7 +72,6 @@ func BenchmarkProcessSameMetric(b *testing.B) {
 			Id:       "some.id.of.a.metric",
 			OrgId:    500,
 			Name:     name,
-			Metric:   name,
 			Interval: 10,
 			Value:    1234.567,
 			Unit:     "ms",
@@ -86,6 +84,6 @@ func BenchmarkProcessSameMetric(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		in.Process(datas[i], 1)
+		in.ProcessMetricData(datas[i], 1)
 	}
 }

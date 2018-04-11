@@ -98,9 +98,16 @@
               "yaxis": 2
             },
             {
-              "alias": "/ in/",
+              "alias": "/received/",
               "lines": true,
-              "points": false
+              "points": false,
+              "color": "#3f6833"
+            },
+            {
+              "alias": "/metricpoint.received/",
+              "lines": true,
+              "points": false,
+              "color": "#7eb26d"
             },
             {
               "alias": "/invalid/",
@@ -108,6 +115,10 @@
             },
             {
               "alias": "/decode err/",
+              "color": "#890F02"
+            },
+            {
+              "alias": "/unknown/",
               "color": "#890F02"
             },
             {
@@ -126,34 +137,38 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasSub(sumSeries(perSecond(metrictank.stats.$environment.$instance.input.*.metrics_received.counter32)), '.*\\.([^\\.]+)\\.metrics_received.*', '\\1 in')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32)), 'too old')"
-            },
-            {
-              "refId": "C",
-              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)), 'add-to-saved')"
-            },
-            {
-              "refId": "D",
               "target": "aliasSub(sumSeries(perSecond(metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32)), '.*\\.([^\\.]+)\\.metrics_decode_err.*', '\\1 decode err')"
             },
             {
+              "refId": "B",
+              "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.received.counter32), 'sum', 5, 6, 7)"
+            },
+            {
+              "refId": "C",
+              "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.invalid.counter32), 'sum', 5, 6, 7)"
+            },
+            {
+              "refId": "D",
+              "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.unknown.counter32), 'sum', 5, 6, 7)"
+            },
+            {
               "refId": "E",
-              "target": "aliasSub(sumSeries(perSecond(metrictank.stats.$environment.$instance.input.*.metric_invalid.counter32)), '.*\\.([^\\.]+)\\.metric_invalid.*', '\\1 metric invalid')"
+              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32)), 'too old')"
             },
             {
               "refId": "F",
-              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
+              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)), 'add-to-saved')"
             },
             {
               "refId": "G",
-              "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.tank.counter32), 1e-9)), 6, 7)"
+              "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
             },
             {
               "refId": "H",
+              "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.tank.counter32), 1e-9)), 6, 7)"
+            },
+            {
+              "refId": "I",
               "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.idx.counter32), 1e-9)), 6, 7)"
             }
           ],

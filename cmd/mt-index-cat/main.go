@@ -172,10 +172,10 @@ func main() {
 	for _, d := range defs {
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
-		if !strings.HasPrefix(d.Metric, prefix) {
+		if !strings.HasPrefix(d.Name, prefix) {
 			continue
 		}
-		if !strings.Contains(d.Metric, substr) {
+		if !strings.Contains(d.Name, substr) {
 			continue
 		}
 		if tags == "none" && len(d.Tags) != 0 {

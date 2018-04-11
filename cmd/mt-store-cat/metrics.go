@@ -5,12 +5,18 @@ import (
 	"sort"
 	"strings"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/grafana/metrictank/store/cassandra"
 )
 
 type Metric struct {
-	id   string
-	name string
+	AMKey schema.AMKey
+	name  string
+}
+
+func (m Metric) String() string {
+	return m.AMKey.String() + "(" + m.name + ")"
 }
 
 type MetricsByName []Metric
@@ -24,8 +30,16 @@ func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error
 	var metrics []Metric
 	iter := store.Session.Query("select id, metric from metric_idx").Iter()
 	var m Metric
-	for iter.Scan(&m.id, &m.name) {
+	var idString string
+	for iter.Scan(&idString, &m.name) {
 		if strings.HasPrefix(m.name, prefix) {
+			mkey, err := schema.MKeyFromString(idString)
+			if err != nil {
+				panic(err)
+			}
+			m.AMKey = schema.AMKey{
+				MKey: mkey,
+			}
 			metrics = append(metrics, m)
 		}
 	}
@@ -37,15 +51,25 @@ func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error
 	return metrics, nil
 }
 
-func getMetric(store *cassandra.CassandraStore, id string) ([]Metric, error) {
+func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, error) {
 	var metrics []Metric
-	iter := store.Session.Query("select id, metric from metric_idx where id=? ALLOW FILTERING", id).Iter()
+	// index only stores MKey's, not AMKey's.
+	iter := store.Session.Query("select id, metric from metric_idx where id=? ALLOW FILTERING", amkey.MKey).Iter()
 	var m Metric
-	for iter.Scan(&m.id, &m.name) {
+	var idString string
+	for iter.Scan(idString, &m.name) {
+		mkey, err := schema.MKeyFromString(idString)
+		if err != nil {
+			panic(err)
+		}
+		m.AMKey = schema.AMKey{
+			MKey:    mkey,
+			Archive: amkey.Archive,
+		}
 		metrics = append(metrics, m)
 	}
 	if len(metrics) > 1 {
-		panic(fmt.Sprintf("wtf. found more than one entry for id %q: %v", id, metrics))
+		panic(fmt.Sprintf("wtf. found more than one entry for id %v: %v", amkey, metrics))
 	}
 	err := iter.Close()
 	if err != nil {

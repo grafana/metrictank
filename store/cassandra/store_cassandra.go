@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	schema "gopkg.in/raintank/schema.v1"
+
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/mdata"
@@ -316,9 +318,9 @@ func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
 }
 
 func (c *CassandraStore) Add(cwr *mdata.ChunkWriteRequest) {
-	sum := 0
-	for _, char := range cwr.Key {
-		sum += int(char)
+	sum := int(cwr.Key.MKey.Org)
+	for _, b := range cwr.Key.MKey.Key {
+		sum += int(b)
 	}
 	which := sum % len(c.writeQueues)
 	c.writeQueueMeters[which].Value(len(c.writeQueues[which]))
@@ -342,14 +344,15 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			buf := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
 			success := false
 			attempts := 0
+			keyStr := cwr.Key.String()
 			for !success {
-				err := c.insertChunk(cwr.Key, cwr.Chunk.T0, cwr.TTL, buf)
+				err := c.insertChunk(keyStr, cwr.Chunk.T0, cwr.TTL, buf)
 
 				if err == nil {
 					success = true
 					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(cwr.Key, cwr.Chunk.T0)
-					log.Debug("CS: save complete. %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
+					mdata.SendPersistMessage(keyStr, cwr.Chunk.T0)
+					log.Debug("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
@@ -455,7 +458,7 @@ func (c *CassandraStore) processReadQueue() {
 
 // Basic search of cassandra in the table for given ttl
 // start inclusive, end exclusive
-func (c *CassandraStore) Search(ctx context.Context, key string, ttl, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	table, err := c.getTable(ttl)
 	if err != nil {
 		return nil, err
@@ -465,7 +468,7 @@ func (c *CassandraStore) Search(ctx context.Context, key string, ttl, start, end
 
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
-func (c *CassandraStore) SearchTable(ctx context.Context, key, table string, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table string, start, end uint32) ([]chunk.IterGen, error) {
 	_, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
 	defer span.Finish()
 	tags.SpanKindRPCClient.Set(span)

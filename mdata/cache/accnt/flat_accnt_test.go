@@ -2,6 +2,10 @@ package accnt
 
 import (
 	"testing"
+
+	"github.com/grafana/metrictank/test"
+
+	"gopkg.in/raintank/schema.v1"
 )
 
 func resetCounters() {
@@ -17,8 +21,8 @@ func TestAddingEvicting(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	var metric1 string = "metric1"
-	var metric2 string = "metric2"
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
 	var ts1 uint32 = 1
 	var ts2 uint32 = 2
 
@@ -85,9 +89,9 @@ func TestLRUOrdering(t *testing.T) {
 
 	// some test data
 	var et *EvictTarget
-	var metric1 string = "metric1"
-	var metric2 string = "metric2"
-	var metric3 string = "metric3"
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
+	metric3 := schema.GetAMKey(test.GetMKey(3), schema.Cnt, 600)
 	var ts1 uint32 = 1
 
 	a.AddChunk(metric1, ts1, 3) // total size now 3
@@ -117,8 +121,8 @@ func TestMetricDeleting(t *testing.T) {
 	resetCounters()
 	a := NewFlatAccnt(12)
 
-	metric1 := "metric1"
-	metric2 := "metric2"
+	metric1 := schema.GetAMKey(test.GetMKey(1), schema.Cnt, 600)
+	metric2 := schema.GetAMKey(test.GetMKey(2), schema.Cnt, 600)
 
 	a.AddChunk(metric1, 1, 2)
 	a.AddChunk(metric2, 1, 2)
