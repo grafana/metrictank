@@ -453,7 +453,7 @@ func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
 				return
 			}
 		case "OrgId":
-			z.OrgId, err = dc.ReadInt()
+			z.OrgId, err = dc.ReadUint32()
 			if err != nil {
 				return
 			}
@@ -531,7 +531,7 @@ func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	err = en.WriteInt(z.OrgId)
+	err = en.WriteUint32(z.OrgId)
 	if err != nil {
 		return
 	}
@@ -619,7 +619,7 @@ func (z *MetricDefinition) MarshalMsg(b []byte) (o []byte, err error) {
 	}
 	// string "OrgId"
 	o = append(o, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
-	o = msgp.AppendInt(o, z.OrgId)
+	o = msgp.AppendUint32(o, z.OrgId)
 	// string "Name"
 	o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
 	o = msgp.AppendString(o, z.Name)
@@ -669,7 +669,7 @@ func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				return
 			}
 		case "OrgId":
-			z.OrgId, bts, err = msgp.ReadIntBytes(bts)
+			z.OrgId, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
 				return
 			}
@@ -733,7 +733,7 @@ func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *MetricDefinition) Msgsize() (s int) {
-	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Name) + 9 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Unit) + 6 + msgp.StringPrefixSize + len(z.Mtype) + 5 + msgp.ArrayHeaderSize
+	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.StringPrefixSize + len(z.Name) + 9 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Unit) + 6 + msgp.StringPrefixSize + len(z.Mtype) + 5 + msgp.ArrayHeaderSize
 	for za0001 := range z.Tags {
 		s += msgp.StringPrefixSize + len(z.Tags[za0001])
 	}
