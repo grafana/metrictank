@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/grafana/metrictank/chaos/out"
 	p "github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"

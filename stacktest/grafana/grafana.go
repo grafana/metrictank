@@ -1,4 +1,4 @@
-package chaos
+package grafana
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ type annotation struct {
 	Text        string
 }
 
-func postAnnotation(msg string) {
+func PostAnnotation(msg string) {
 	go func() {
 		a := annotation{
 			Time: int(time.Now().UnixNano() / 1000 / 1000),

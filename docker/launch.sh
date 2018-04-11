@@ -26,9 +26,12 @@ cd $basedir/$env
 trap ctrl_c INT
 
 function ctrl_c() {
+    kill -INT "$child" 2>/dev/null
     docker-compose down
 }
 
 docker-compose down
 ../extra/populate-grafana.sh $PWD &
-docker-compose up --force-recreate
+docker-compose up --force-recreate &
+child=$!
+wait "$child"

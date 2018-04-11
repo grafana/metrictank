@@ -1,4 +1,4 @@
-package chaos
+package docker
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 
 // path takes a relative path within the metrictank repository and returns the full absolute filepath,
 // assuming metrictank repo is in the first directory specified in GOPATH
-func path(dst string) string {
+func Path(dst string) string {
 	gopath := os.Getenv("GOPATH")
 	if gopath == "" {
 		var err error
