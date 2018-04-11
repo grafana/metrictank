@@ -2,14 +2,16 @@ package cluster
 
 import (
 	"errors"
-	"math/rand"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type ModeType string
+
+var counter uint32
 
 const (
 	ModeSingle = "single"
@@ -105,12 +107,13 @@ func MembersForQuery() ([]Node, error) {
 				}
 				continue
 			}
-			if membersMap[part].priority == member.GetPriority() {
+			priority := member.GetPriority()
+			if membersMap[part].priority == priority {
 				membersMap[part].nodes = append(membersMap[part].nodes, member)
-			} else if membersMap[part].priority > member.GetPriority() {
+			} else if membersMap[part].priority > priority {
 				// this node has higher priority (lower number) then previously seen candidates
 				membersMap[part] = &partitionCandidates{
-					priority: member.GetPriority(),
+					priority: priority,
 					nodes:    []Node{member},
 				}
 			}
@@ -124,6 +127,8 @@ func MembersForQuery() ([]Node, error) {
 	answer := make([]Node, 0)
 	// we want to get the minimum number of nodes
 	// needed to cover all partitions
+
+	count := int(atomic.AddUint32(&counter, 1))
 
 LOOP:
 	for _, candidates := range membersMap {
@@ -140,9 +145,10 @@ LOOP:
 				continue LOOP
 			}
 		}
-		// if no nodes have been selected yet then grab a
-		// random node from the set of available nodes
-		selected := candidates.nodes[rand.Intn(len(candidates.nodes))]
+		// if no nodes have been selected yet then grab a node from
+		// the set of available nodes in such a way that nodes are
+		// weighted fairly across MembersForQuery calls
+		selected := candidates.nodes[count%len(candidates.nodes)]
 		selectedMembers[selected.GetName()] = struct{}{}
 		answer = append(answer, selected)
 	}

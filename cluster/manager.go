@@ -3,6 +3,7 @@ package cluster
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -163,6 +164,7 @@ func (c *MemberlistManager) memberList() []HTTPNode {
 		i++
 	}
 	c.RUnlock()
+	sort.Sort(HTTPNodesByName(list))
 	return list
 }
 

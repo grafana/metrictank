@@ -206,3 +206,9 @@ func handleResp(rsp *http.Response) ([]byte, error) {
 	}
 	return ioutil.ReadAll(rsp.Body)
 }
+
+type HTTPNodesByName []HTTPNode
+
+func (n HTTPNodesByName) Len() int           { return len(n) }
+func (n HTTPNodesByName) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
+func (n HTTPNodesByName) Less(i, j int) bool { return n[i].GetName() < n[j].GetName() }
