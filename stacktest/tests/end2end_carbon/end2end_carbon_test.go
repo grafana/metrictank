@@ -81,9 +81,9 @@ func TestBaseIngestWorkload(t *testing.T) {
 
 	fm = fakemetrics.NewCarbon(metricsPerSecond)
 
-	suc6, resp := graphite.RetryGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metrics_received.counter32)", "-8s", 18, func(resp graphite.Response) bool {
+	suc6, resp := graphite.RetryGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metricdata.received.counter32)", "-8s", 18, func(resp graphite.Response) bool {
 		exp := []string{
-			"perSecond(metrictank.stats.docker-env.default.input.carbon.metrics_received.counter32)",
+			"perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)",
 		}
 		a := graphite.ValidateTargets(exp)(resp)
 		b := graphite.ValidatorLenNulls(1, 8)(resp)
