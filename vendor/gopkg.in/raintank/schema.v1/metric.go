@@ -107,7 +107,7 @@ type MetricDataArray []*MetricData
 
 type MetricDefinition struct {
 	Id       MKey   `json:"mkey"`
-	OrgId    int    `json:"org_id"`
+	OrgId    uint32 `json:"org_id"`
 	Name     string `json:"name"`
 	Interval int    `json:"interval"`
 	Unit     string `json:"unit"`
@@ -235,7 +235,7 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	md := &MetricDefinition{
 		Id:         mkey,
 		Name:       d.Name,
-		OrgId:      d.OrgId,
+		OrgId:      uint32(d.OrgId),
 		Mtype:      d.Mtype,
 		Interval:   d.Interval,
 		LastUpdate: d.Time,

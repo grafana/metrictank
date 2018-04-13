@@ -399,10 +399,13 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff u
 			log.Error(3, "cassandra-idx: load() could not parse ID %q: %s -> skipping", id, err)
 			continue
 		}
+		if orgId < 0 {
+			orgId = int(idx.OrgIdPublic)
+		}
 
 		mdef := &schema.MetricDefinition{
 			Id:         mkey,
-			OrgId:      orgId,
+			OrgId:      uint32(orgId),
 			Partition:  partition,
 			Name:       name,
 			Interval:   interval,
@@ -487,7 +490,7 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
+func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	pre := time.Now()
 	defs, err := c.MemoryIdx.Delete(orgId, pattern)
 	if err != nil {

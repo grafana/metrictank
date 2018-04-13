@@ -26,7 +26,7 @@ type ClusterMembersResp struct {
 }
 
 type IndexList struct {
-	OrgId int `json:"orgId" form:"orgId" binding:"Required"`
+	OrgId uint32 `json:"orgId" form:"orgId" binding:"Required"`
 }
 
 func (i IndexList) Trace(span opentracing.Span) {
@@ -37,7 +37,7 @@ func (i IndexList) TraceDebug(span opentracing.Span) {
 }
 
 type IndexFindByTag struct {
-	OrgId int      `json:"orgId" binding:"Required"`
+	OrgId uint32   `json:"orgId" binding:"Required"`
 	Expr  []string `json:"expressions"`
 	From  int64    `json:"from"`
 }
@@ -52,7 +52,7 @@ func (i IndexFindByTag) TraceDebug(span opentracing.Span) {
 }
 
 type IndexTagDetails struct {
-	OrgId  int    `json:"orgId" binding:"Required"`
+	OrgId  uint32 `json:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
 	Tag    string `json:"tag" binding:"Required"`
 	From   int64  `json:"from"`
@@ -69,7 +69,7 @@ func (i IndexTagDetails) TraceDebug(span opentracing.Span) {
 }
 
 type IndexTags struct {
-	OrgId  int    `json:"orgId" binding:"Required"`
+	OrgId  uint32 `json:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
 	From   int64  `json:"from"`
 }
@@ -84,7 +84,7 @@ func (i IndexTags) TraceDebug(span opentracing.Span) {
 }
 
 type IndexAutoCompleteTags struct {
-	OrgId  int      `json:"orgId" binding:"Required"`
+	OrgId  uint32   `json:"orgId" binding:"Required"`
 	Prefix string   `json:"Prefix"`
 	Expr   []string `json:"expressions"`
 	From   int64    `json:"from"`
@@ -103,7 +103,7 @@ func (i IndexAutoCompleteTags) TraceDebug(span opentracing.Span) {
 }
 
 type IndexAutoCompleteTagValues struct {
-	OrgId  int      `json:"orgId" binding:"Required"`
+	OrgId  uint32   `json:"orgId" binding:"Required"`
 	Tag    string   `json:"tag"`
 	Prefix string   `json:"prefix"`
 	Expr   []string `json:"expressions"`
@@ -124,7 +124,7 @@ func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
 }
 
 type IndexTagDelSeries struct {
-	OrgId int      `json:"orgId" binding:"Required"`
+	OrgId uint32   `json:"orgId" binding:"Required"`
 	Paths []string `json:"path" form:"path"`
 }
 
@@ -142,7 +142,7 @@ type IndexGet struct {
 
 type IndexFind struct {
 	Patterns []string `json:"patterns" form:"patterns" binding:"Required"`
-	OrgId    int      `json:"orgId" form:"orgId" binding:"Required"`
+	OrgId    uint32   `json:"orgId" form:"orgId" binding:"Required"`
 	From     int64    `json:"from" form:"from"`
 }
 
@@ -177,7 +177,7 @@ func (g GetData) TraceDebug(span opentracing.Span) {
 
 type IndexDelete struct {
 	Query string `json:"query" form:"query" binding:"Required"`
-	OrgId int    `json:"orgId" form:"orgId" binding:"Required"`
+	OrgId uint32 `json:"orgId" form:"orgId" binding:"Required"`
 }
 
 func (i IndexDelete) Trace(span opentracing.Span) {

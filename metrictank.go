@@ -329,7 +329,7 @@ func main() {
 		log.Fatal(4, "public-org cannot be <0")
 	}
 
-	idx.OrgIdPublic = *publicOrg
+	idx.OrgIdPublic = uint32(*publicOrg)
 
 	if memory.Enabled {
 		if metricIndex != nil {

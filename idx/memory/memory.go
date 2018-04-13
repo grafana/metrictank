@@ -108,7 +108,7 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey) {
 
 // org id -> nameWithTags -> Set of references to schema.MetricDefinition
 // nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
-type defByTagSet map[int]map[string]map[*schema.MetricDefinition]struct{}
+type defByTagSet map[uint32]map[string]map[*schema.MetricDefinition]struct{}
 
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
@@ -144,7 +144,7 @@ func (defs defByTagSet) del(def *schema.MetricDefinition) {
 	}
 }
 
-func (defs defByTagSet) defs(id int, fullName string) map[*schema.MetricDefinition]struct{} {
+func (defs defByTagSet) defs(id uint32, fullName string) map[*schema.MetricDefinition]struct{} {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
 	var ok bool
 	if orgDefs, ok = defs[id]; !ok {
@@ -184,19 +184,19 @@ type MemoryIdx struct {
 	defById map[schema.MKey]*idx.Archive
 
 	// used by hierarchy index only
-	tree map[int]*Tree // by orgId
+	tree map[uint32]*Tree // by orgId
 
 	// used by tag index
 	defByTagSet defByTagSet
-	tags        map[int]TagIndex // by orgId
+	tags        map[uint32]TagIndex // by orgId
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
-		tree:        make(map[int]*Tree),
-		tags:        make(map[int]TagIndex),
+		tree:        make(map[uint32]*Tree),
+		tags:        make(map[uint32]TagIndex),
 	}
 }
 
@@ -470,7 +470,7 @@ func (m *MemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 
 // GetPath returns the node under the given org and path.
 // this is an alternative to Find for when you have a path, not a pattern, and want to lookup in a specific org tree only.
-func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
+func (m *MemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
 	m.RLock()
 	defer m.RUnlock()
 	tree, ok := m.tree[orgId]
@@ -489,7 +489,7 @@ func (m *MemoryIdx) GetPath(orgId int, path string) []idx.Archive {
 	return archives
 }
 
-func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[string]uint64, error) {
+func (m *MemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (map[string]uint64, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -561,7 +561,7 @@ func (m *MemoryIdx) TagDetails(orgId int, key, filter string, from int64) (map[s
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *MemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -644,7 +644,7 @@ func (m *MemoryIdx) FindTags(orgId int, prefix string, expressions []string, fro
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *MemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -747,7 +747,7 @@ func (m *MemoryIdx) FindTagValues(orgId int, tag, prefix string, expressions []s
 // organization. The return values are filtered by the regex in the second parameter.
 // If the third parameter is >0 then only metrics will be accounted of which the
 // LastUpdate time is >= the given value.
-func (m *MemoryIdx) Tags(orgId int, filter string, from int64) ([]string, error) {
+func (m *MemoryIdx) Tags(orgId uint32, filter string, from int64) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -817,7 +817,7 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 	return false
 }
 
-func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]idx.Node, error) {
+func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([]idx.Node, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -851,7 +851,7 @@ func (m *MemoryIdx) FindByTag(orgId int, expressions []string, from int64) ([]id
 	return res, nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) IdSet {
+func (m *MemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
@@ -860,7 +860,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId int, query TagQuery) IdSet {
 	return query.Run(tags, m.defById)
 }
 
-func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, error) {
+func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -914,7 +914,7 @@ func (m *MemoryIdx) Find(orgId int, pattern string, from int64) ([]idx.Node, err
 	return results, nil
 }
 
-func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
+func (m *MemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
 	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debug("memory-idx: orgId %d has no metrics indexed.", orgId)
@@ -1006,7 +1006,7 @@ func (m *MemoryIdx) find(orgId int, pattern string) ([]*Node, error) {
 	return children, nil
 }
 
-func (m *MemoryIdx) List(orgId int) []idx.Archive {
+func (m *MemoryIdx) List(orgId uint32) []idx.Archive {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -1023,7 +1023,7 @@ func (m *MemoryIdx) List(orgId int) []idx.Archive {
 	return defs
 }
 
-func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, error) {
+func (m *MemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -1064,7 +1064,7 @@ func (m *MemoryIdx) DeleteTagged(orgId int, paths []string) ([]idx.Archive, erro
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
 // it is important that only IDs of series with tags get passed in here, because
 // otherwise the result might be inconsistencies between DefByIDs and the tree index.
-func (m *MemoryIdx) deleteTaggedByIdSet(orgId int, ids IdSet) []idx.Archive {
+func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
@@ -1091,7 +1091,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId int, ids IdSet) []idx.Archive {
 	return deletedDefs
 }
 
-func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
+func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
@@ -1111,7 +1111,7 @@ func (m *MemoryIdx) Delete(orgId int, pattern string) ([]idx.Archive, error) {
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
+func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
 	tree := m.tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
 	if deleteChildren && n.HasChildren() {
@@ -1208,7 +1208,7 @@ func (m *MemoryIdx) delete(orgId int, n *Node, deleteEmptyParents, deleteChildre
 // delete series from the index if they have not been seen since "oldest"
 func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	oldestUnix := oldest.Unix()
-	orgs := make(map[int]struct{})
+	orgs := make(map[uint32]struct{})
 	log.Info("memory-idx: pruning stale metricDefs across all orgs")
 	m.RLock()
 	for org := range m.tree {
@@ -1222,8 +1222,8 @@ func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	m.RUnlock()
 
 	var pruned []idx.Archive
-	toPruneUntagged := make(map[int]map[string]struct{}, len(orgs))
-	toPruneTagged := make(map[int]IdSet, len(orgs))
+	toPruneUntagged := make(map[uint32]map[string]struct{}, len(orgs))
+	toPruneTagged := make(map[uint32]IdSet, len(orgs))
 	for org := range orgs {
 		toPruneTagged[org] = make(IdSet)
 		toPruneUntagged[org] = make(map[string]struct{})

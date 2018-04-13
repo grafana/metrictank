@@ -9,7 +9,7 @@ import (
 	schema "gopkg.in/raintank/schema.v1"
 )
 
-var OrgIdPublic = 0
+var OrgIdPublic = uint32(0)
 
 var (
 	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
@@ -69,23 +69,23 @@ type MetricIndex interface {
 	Get(key schema.MKey) (Archive, bool)
 
 	// GetPath returns the archives under the given path.
-	GetPath(orgId int, path string) []Archive
+	GetPath(orgId uint32, path string) []Archive
 
 	// Delete deletes items from the index
 	// If the pattern matches a branch node, then
 	// all leaf nodes on that branch are deleted. So if the pattern is
 	// "*", all items in the index are deleted.
 	// It returns a copy of all of the Archives deleted.
-	Delete(orgId int, pattern string) ([]Archive, error)
+	Delete(orgId uint32, pattern string) ([]Archive, error)
 
 	// Find searches the index for matching nodes.
 	// * orgId describes the org to search in (public data in orgIdPublic is automatically included)
 	// * pattern is handled like graphite does. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
 	// * from is a unix timestamp. series not updated since then are excluded.
-	Find(orgId int, pattern string, from int64) ([]Node, error)
+	Find(orgId uint32, pattern string, from int64) ([]Node, error)
 
 	// List returns all Archives for the passed OrgId and the public orgId
-	List(orgId int) []Archive
+	List(orgId uint32) []Archive
 
 	// Prune deletes all metrics that haven't been seen since the given timestamp.
 	// It returns all Archives deleted and any error encountered.
@@ -99,24 +99,24 @@ type MetricIndex interface {
 	// where the LastUpdate time is >= from will be returned as results.
 	// The returned results are not deduplicated and in certain cases it is possible
 	// that duplicate entries will be returned.
-	FindByTag(orgId int, expressions []string, from int64) ([]Node, error)
+	FindByTag(orgId uint32, expressions []string, from int64) ([]Node, error)
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
 	// If the third parameter is >0 then only metrics will be accounted of which the
 	// LastUpdate time is >= the given value.
-	Tags(orgId int, filter string, from int64) ([]string, error)
+	Tags(orgId uint32, filter string, from int64) ([]string, error)
 
 	// FindTags generates a list of possible tags that could complete a
 	// given prefix. It also accepts additional tag conditions to further narrow
 	// down the result set in the format of graphite's tag queries
-	FindTags(orgId int, prefix string, expressions []string, from int64, limit uint) ([]string, error)
+	FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error)
 
 	// FindTagValues generates a list of possible values that could
 	// complete a given value prefix. It requires a tag to be specified and only values
 	// of the given tag will be returned. It also accepts additional conditions to
 	// further narrow down the result set in the format of graphite's tag queries
-	FindTagValues(orgId int, tag string, prefix string, expressions []string, from int64, limit uint) ([]string, error)
+	FindTagValues(orgId uint32, tag string, prefix string, expressions []string, from int64, limit uint) ([]string, error)
 
 	// TagDetails returns a list of all values associated with a given tag key in the
 	// given org. The occurrences of each value is counted and the count is referred to by
@@ -125,9 +125,9 @@ type MetricIndex interface {
 	// the values before accounting for them.
 	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
 	// time is >= the from timestamp will be included.
-	TagDetails(orgId int, key string, filter string, from int64) (map[string]uint64, error)
+	TagDetails(orgId uint32, key string, filter string, from int64) (map[string]uint64, error)
 
 	// DeleteTagged deletes the specified series from the tag index and also the
 	// DefById index.
-	DeleteTagged(orgId int, paths []string) ([]Archive, error)
+	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
 }
