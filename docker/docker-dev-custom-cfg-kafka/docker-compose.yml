@@ -134,3 +134,19 @@ services:
     restart: unless-stopped
     labels:
       org.label-schema.group: "monitoring"
+
+  tsdb-gw:
+    hostname: tsdb-gw
+    image: raintank/tsdb-gw:0.8.0-111-g5fa198b
+    ports:
+     - "9000:80"
+    volumes:
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./gw:/etc/gw/
+    environment:
+     WAIT_HOSTS: kafka:9092
+     WAIT_TIMEOUT: 60
+    links:
+     - metrictank
+     - graphite
+     - kafka
