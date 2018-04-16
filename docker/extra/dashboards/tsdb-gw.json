@@ -551,7 +551,10 @@
       "panels": [
         {
           "alerting": {},
-          "aliasColors": {},
+          "aliasColors": {
+	    "published.metricpoint": "#7eb26d",
+            "published.metricdata": "#2f575e"
+	  },
           "bars": false,
           "dashLength": 10,
           "dashes": false,
@@ -586,7 +589,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "aliasByNode(perSecond(tsdb-gw.stats.$env.$host.metrics.published.counter32), 3)"
+              "target": "aliasByNode(perSecond(tsdb-gw.stats.$env.$host.output.kafka.published.*.counter32), 6, 7)"
             }
           ],
           "thresholds": [],
