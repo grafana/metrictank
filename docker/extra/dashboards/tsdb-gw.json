@@ -139,8 +139,8 @@
       "aliasColors": {
         "GC cpu fraction - promille": "#e24d42",
         "alloc rate": "#629e51",
-        "tsdb-gw.allocated_in_heap": "#e5ac0e",
-        "tsdb-gw.obtained_from_sys": "#65c5db"
+        "allocated_in_heap": "#e5ac0e",
+        "obtained_from_sys": "#65c5db"
       },
       "bars": false,
       "dashLength": 10,
@@ -186,7 +186,7 @@
         {
           "refCount": 0,
           "refId": "A",
-          "target": "aliasByNode(tsdb-gw.stats.$env.$host.memory.bytes.*.gauge64, 3, 6)"
+          "target": "groupByNode(tsdb-gw.stats.$env.$host.memory.bytes.*.gauge64, 6, 'avg')"
         },
         {
           "refCount": 0,
