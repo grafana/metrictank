@@ -12,6 +12,11 @@ services:
       - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+      - ../../scripts/config/storage-cassandra.toml:/etc/metrictank/storage-cassandra.toml
+      - ../../scripts/config/storage-scylladb.toml:/etc/metrictank/storage-scylladb.toml
+      - ../../scripts/config/idx-cassandra.toml:/etc/metrictank/idx-cassandra.toml
+      - ../../scripts/config/idx-scylladb.toml:/etc/metrictank/idx-scylladb.toml
+
     environment:
       WAIT_HOSTS: cassandra:9042
       WAIT_TIMEOUT: 60
