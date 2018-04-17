@@ -51,10 +51,7 @@
   "panels": [
     {
       "alerting": {},
-      "aliasColors": {
-        "published.metricdata": "#2f575e",
-        "published.metricpoint": "#7eb26d"
-      },
+      "aliasColors": {},
       "bars": false,
       "dashLength": 10,
       "dashes": false,
@@ -87,7 +84,29 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+            {
+              "alias": "/metricdata/",
+              "lines": true,
+              "points": false,
+              "color": "#2a4422",
+              "stack": "A"
+            },
+            {
+              "alias": "/metricpoint/",
+              "lines": true,
+              "points": false,
+              "color": "#3f6833",
+              "stack": "A"
+            },
+            {
+              "alias": "/metricpoint_no_org/",
+              "lines": true,
+              "points": false,
+              "color": "#7eb26d",
+              "stack": "A"
+            }
+      ],
       "spaceLength": 10,
       "stack": true,
       "steppedLine": false,

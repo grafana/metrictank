@@ -18,6 +18,7 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 )
 
 var (
@@ -111,7 +112,7 @@ func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition
 	ip.lock.Unlock()
 }
 
-func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, partition int32) {
+func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, format msg.Format, partition int32) {
 	now := Msg{
 		Part: partition,
 		Seen: time.Now(),
