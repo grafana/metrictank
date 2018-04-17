@@ -5,7 +5,6 @@ jobs:
     docker:
       - image: circleci/golang:1.10
     steps:
-      - run: sudo apt-get install libssl-dev openssl libsasl2-2 libsasl2-dev zlib1g-dev
       - checkout
       - run: scripts/build.sh
       - run: scripts/build_tools.sh
