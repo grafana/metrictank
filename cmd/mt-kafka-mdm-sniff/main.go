@@ -17,6 +17,7 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 )
 
 var (
@@ -72,7 +73,7 @@ func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition in
 	}
 }
 
-func (ip inputPrinter) ProcessMetricPoint(point schema.MetricPoint, partition int32) {
+func (ip inputPrinter) ProcessMetricPoint(point schema.MetricPoint, format msg.Format, partition int32) {
 	stdoutLock.Lock()
 	err := ip.tplP.Execute(os.Stdout, DataP{
 		partition,

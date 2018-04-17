@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1"
+	"gopkg.in/raintank/schema.v1/msg"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
@@ -16,7 +17,7 @@ import (
 
 type Handler interface {
 	ProcessMetricData(md *schema.MetricData, partition int32)
-	ProcessMetricPoint(point schema.MetricPoint, partition int32)
+	ProcessMetricPoint(point schema.MetricPoint, format msg.Format, partition int32)
 }
 
 // TODO: clever way to document all metrics for all different inputs
@@ -25,6 +26,7 @@ type Handler interface {
 type DefaultHandler struct {
 	receivedMD   *stats.Counter32
 	receivedMP   *stats.Counter32
+	receivedMPNO *stats.Counter32
 	invalidMD    *stats.Counter32
 	invalidMP    *stats.Counter32
 	unknownMP    *stats.Counter32
@@ -39,6 +41,7 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 	return DefaultHandler{
 		receivedMD:   stats.NewCounter32(fmt.Sprintf("input.%s.metricdata.received", input)),
 		receivedMP:   stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.received", input)),
+		receivedMPNO: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint_no_org.received", input)),
 		invalidMD:    stats.NewCounter32(fmt.Sprintf("input.%s.metricdata.invalid", input)),
 		invalidMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.invalid", input)),
 		unknownMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.unknown", input)),
@@ -52,8 +55,12 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 
 // ProcessMetricPoint updates the index if possible, and stores the data if we have an index entry
 // concurrency-safe.
-func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, partition int32) {
-	in.receivedMP.Inc()
+func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg.Format, partition int32) {
+	if format == msg.FormatMetricPoint {
+		in.receivedMP.Inc()
+	} else {
+		in.receivedMPNO.Inc()
+	}
 	if !point.Valid() {
 		in.invalidMP.Inc()
 		log.Debug("in: Invalid metric %v", point)

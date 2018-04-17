@@ -353,14 +353,15 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 }
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
-	if msg.IsPointMsg(data) {
+	format, isPointMsg := msg.IsPointMsg(data)
+	if isPointMsg {
 		_, point, err := msg.ReadPointMsg(data, uint32(orgId))
 		if err != nil {
 			metricsDecodeErr.Inc()
 			log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
 			return
 		}
-		k.Handler.ProcessMetricPoint(point, partition)
+		k.Handler.ProcessMetricPoint(point, format, partition)
 		return
 	}
 

@@ -111,13 +111,19 @@ func WritePointMsg(point schema.MetricPoint, buf []byte, version Format) (o []by
 	return nil, fmt.Errorf(errFmtUnsupportedFormat, version)
 }
 
-func IsPointMsg(data []byte) bool {
+func IsPointMsg(data []byte) (Format, bool) {
 	l := len(data)
 	if l == 0 {
-		return false
+		return 0, false
 	}
 	version := Format(data[0])
-	return (l == 29 && version == FormatMetricPointWithoutOrg) || (l == 33 && version == FormatMetricPoint)
+	if l == 29 && version == FormatMetricPointWithoutOrg {
+		return FormatMetricPointWithoutOrg, true
+	}
+	if l == 33 && version == FormatMetricPoint {
+		return FormatMetricPoint, true
+	}
+	return 0, false
 }
 
 func ReadPointMsg(data []byte, defaultOrg uint32) ([]byte, schema.MetricPoint, error) {
