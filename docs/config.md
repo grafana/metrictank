@@ -224,6 +224,8 @@ partition = 0
 ```
 [kafka-mdm-in]
 enabled = false
+# For incoming MetricPoint messages without org-id, assume this org id
+org-id = 0
 # tcp address (may be given multiple times as a comma-separated list)
 brokers = kafka:9092
 # kafka topic (may be given multiple times as a comma-separated list)
