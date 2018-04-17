@@ -71,12 +71,13 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/ruby:2.3
     steps:
       - checkout
       - attach_workspace:
           at: .
       - setup_remote_docker
+      - run: scripts/depends.sh
       - run: scripts/build_packages.sh
       - store_artifacts:
           path: build
