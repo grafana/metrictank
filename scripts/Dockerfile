@@ -23,7 +23,7 @@ ARG BASE_PATH
 
 LABEL maintainer="Dieter Plaetinck dieter@grafana.com"
 
-RUN apk add -U ca-certificates openssl cyrus-sasl tzdata
+RUN apk add -U ca-certificates openssl cyrus-sasl tzdata lz4
 
 RUN mkdir -p /etc/metrictank
 COPY scripts/config/metrictank-docker.ini /etc/metrictank/metrictank.ini
