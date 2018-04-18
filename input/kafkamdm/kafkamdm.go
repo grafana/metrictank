@@ -89,9 +89,7 @@ func ConfigProcess(instance string) {
 		if err != nil {
 			log.Fatal(2, "kafka-cluster failed to initialize consumer: %s", err)
 		}
-		if LogLevel < 2 {
-			log.Debug("kafkamdm: setting partitions on manager: %+v", consumer.Partitions)
-		}
+		log.Debug("kafkamdm: setting partitions on manager: %+v", consumer.Partitions)
 		cluster.Manager.SetPartitions(consumer.Partitions)
 		consumer.Stop()
 	}

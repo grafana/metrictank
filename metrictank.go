@@ -170,7 +170,6 @@ func main() {
 	mdata.LogLevel = logLevel
 	memory.LogLevel = logLevel
 	kafka.LogLevel = logLevel
-	inKafkaMdm.LogLevel = logLevel
 	api.LogLevel = logLevel
 	// workaround for https://github.com/grafana/grafana/issues/4055
 	switch logLevel {
