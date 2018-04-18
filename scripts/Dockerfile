@@ -2,7 +2,7 @@ ARG BASE_PATH=/go/src/github.com/grafana/metrictank
 
 FROM golang:1.9.3-alpine3.7 AS build
 ARG BASE_PATH=/go/src/github.com/grafana/metrictank
-RUN apk --update add build-base linux-headers openssl-dev cyrus-sasl-dev git bash python
+RUN apk --update add build-base linux-headers openssl-dev cyrus-sasl-dev git bash python lz4-dev
 
 # first only copy & build librdkafka, so this image layer can be cached
 RUN mkdir -p /tmp/vendor/github.com/edenhill/librdkafka /tmp/scripts
