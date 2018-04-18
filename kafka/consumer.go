@@ -16,7 +16,7 @@ import (
 var LogLevel int
 
 type Consumer struct {
-	conf             ConsumerConf
+	conf             ClientConf
 	wg               sync.WaitGroup
 	consumer         *confluent.Consumer
 	Partitions       []int32
@@ -29,7 +29,7 @@ type Consumer struct {
 	stopChan         chan struct{}
 }
 
-type ConsumerConf struct {
+type ClientConf struct {
 	ClientID             string
 	Broker               string
 	Partitions           string
@@ -50,8 +50,8 @@ type ConsumerConf struct {
 	OffsetCommitInterval time.Duration
 }
 
-func NewConfig() *ConsumerConf {
-	return &ConsumerConf{
+func NewConfig() *ClientConf {
+	return &ClientConf{
 		GaugePrefix:          "default.kafka.partition",
 		BatchNumMessages:     10000,
 		BufferMaxMs:          100,
@@ -67,30 +67,19 @@ func NewConfig() *ConsumerConf {
 	}
 }
 
-func NewConsumer(conf *ConsumerConf) (*Consumer, error) {
+func NewConsumer(conf *ClientConf) (*Consumer, error) {
 	if len(conf.Topics) < 1 {
 		return nil, fmt.Errorf("kafka-consumer: Requiring at least 1 topic")
 	}
 
-	consumer, err := confluent.NewConsumer(&confluent.ConfigMap{
-		"client.id":                             conf.ClientID,
-		"bootstrap.servers":                     conf.Broker,
-		"compression.codec":                     "snappy",
-		"group.id":                              conf.ClientID,
-		"fetch.min.bytes":                       conf.FetchMin,
-		"fetch.wait.max.ms":                     conf.MaxWaitMs,
-		"max.in.flight.requests.per.connection": conf.NetMaxOpenRequests,
-		"queue.buffering.max.messages":          conf.ChannelBufferSize,
-		"retries":                               10,
-		"session.timeout.ms":                    conf.SessionTimeout,
-		"queue.buffering.max.ms":                conf.BufferMaxMs,
-		"batch.num.messages":                    conf.BatchNumMessages,
-		"enable.partition.eof":                  false,
-		"enable.auto.offset.store":              false,
-		"enable.auto.commit":                    false,
-		"go.events.channel.enable":              true,
-		"go.application.rebalance.enable":       true,
-	})
+	clientConf := GetConfig(conf.Broker, conf.ClientID, "snappy", conf.BatchNumMessages, conf.BufferMaxMs, conf.ChannelBufferSize, conf.FetchMin, conf.NetMaxOpenRequests, conf.MaxWaitMs, conf.SessionTimeout)
+	clientConf.SetKey("retries", 10)
+	clientConf.SetKey("enable.partition.eof", false)
+	clientConf.SetKey("enable.auto.offset.store", false)
+	clientConf.SetKey("enable.auto.commit", false)
+	clientConf.SetKey("go.events.channel.enable", true)
+	clientConf.SetKey("go.application.rebalance.enable", true)
+	consumer, err := confluent.NewConsumer(clientConf)
 	if err != nil {
 		return nil, err
 	}
