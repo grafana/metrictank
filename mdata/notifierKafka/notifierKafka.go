@@ -33,7 +33,11 @@ type NotifierKafka struct {
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
-	producer, err := confluent.NewProducer(kafka.GetConfig(consumerConf.Broker, "snappy", consumerConf.BatchNumMessages, consumerConf.BufferMaxMs, consumerConf.ChannelBufferSize, consumerConf.FetchMin, consumerConf.NetMaxOpenRequests, consumerConf.MaxWaitMs, consumerConf.SessionTimeout))
+	consumerConf.ClientID = instance + "-notifier"
+	consumerConf.GaugePrefix = "cluster.notifier.kafka.partition"
+	consumerConf.Topics = []string{topic}
+
+	producer, err := confluent.NewProducer(kafka.GetConfig(consumerConf.Broker, consumerConf.ClientID, "snappy", consumerConf.BatchNumMessages, consumerConf.BufferMaxMs, consumerConf.ChannelBufferSize, consumerConf.FetchMin, consumerConf.NetMaxOpenRequests, consumerConf.MaxWaitMs, consumerConf.SessionTimeout))
 
 	if err != nil {
 		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
@@ -48,10 +52,6 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 		idx:      idx,
 		stopChan: make(chan struct{}),
 	}
-
-	consumerConf.ClientID = instance + "-notifier"
-	consumerConf.GaugePrefix = "cluster.notifier.kafka.partition"
-	consumerConf.Topics = []string{topic}
 	consumerConf.MessageHandler = c.handleMessage
 
 	c.consumer, err = kafka.NewConsumer(consumerConf)

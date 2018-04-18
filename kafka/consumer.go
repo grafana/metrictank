@@ -11,7 +11,6 @@ import (
 	confluent "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
-	"github.com/twinj/uuid"
 )
 
 var LogLevel int
@@ -77,7 +76,7 @@ func NewConsumer(conf *ConsumerConf) (*Consumer, error) {
 		"client.id":                             conf.ClientID,
 		"bootstrap.servers":                     conf.Broker,
 		"compression.codec":                     "snappy",
-		"group.id":                              uuid.NewV4().String(),
+		"group.id":                              conf.ClientID,
 		"fetch.min.bytes":                       conf.FetchMin,
 		"fetch.wait.max.ms":                     conf.MaxWaitMs,
 		"max.in.flight.requests.per.connection": conf.NetMaxOpenRequests,

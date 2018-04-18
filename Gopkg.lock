@@ -574,12 +574,6 @@
   version = "v1.0-beta"
 
 [[projects]]
-  name = "github.com/twinj/uuid"
-  packages = ["."]
-  revision = "835a10bbd6bce40820349a68b1368a62c3c5617c"
-  version = "v1.0.0"
-
-[[projects]]
   name = "github.com/uber/jaeger-client-go"
   packages = [
     ".",
@@ -731,6 +725,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "eea56bedbd1b188f2b809506f13b09af0c1ce4f4641e41d80001ca73b1c9b1dd"
+  inputs-digest = "f91c025956d615bad233b969186e1c4c8d3965e5017f4a7f915811b8eae5cd00"
   solver-name = "gps-cdcl"
   solver-version = 1
