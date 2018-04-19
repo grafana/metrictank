@@ -30,13 +30,13 @@ func init() {
 	fs.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
 	fs.DurationVar(&clientConf.BufferMax, "metrics-buffer-max", time.Millisecond*100, "Delay to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	fs.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000000, "Maximum number of messages allowed on the producer queue")
-	fs.IntVar(&clientConf.FetchMin, "consumer-fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")
-	fs.DurationVar(&clientConf.MaxWait, "consumer-max-wait", time.Millisecond*100, "Maximum time the broker may wait to fill the response with fetch.min.bytes")
+	fs.IntVar(&clientConf.FetchMin, "fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")
+	fs.DurationVar(&clientConf.MaxWait, "max-wait", time.Millisecond*100, "Maximum time the broker may wait to fill the response with fetch.min.bytes")
 	fs.DurationVar(&clientConf.MetadataBackoffTime, "metadata-backoff-time", time.Millisecond*500, "Time to wait between attempts to fetch metadata")
 	fs.IntVar(&clientConf.MetadataRetries, "metadata-retries", 5, "Number of retries to fetch metadata in case of failure")
-	fs.DurationVar(&clientConf.MetadataTimeout, "consumer-metadata-timeout", time.Second*10, "Maximum time to wait for the broker to send its metadata")
+	fs.DurationVar(&clientConf.MetadataTimeout, "metadata-timeout", time.Second*10, "Maximum time to wait for the broker to send its metadata")
 	fs.IntVar(&clientConf.NetMaxOpenRequests, "net-max-open-requests", 100, "Maximum number of in-flight requests per broker connection. This is a generic property applied to all broker communication, however it is primarily relevant to produce requests.")
-	fs.DurationVar(&clientConf.SessionTimeout, "consumer-session-timeout", time.Second*30, "Client group session and failure detection timeout")
+	fs.DurationVar(&clientConf.SessionTimeout, "session-timeout", time.Second*30, "Client group session and failure detection timeout")
 	fs.DurationVar(&backlogProcessTimeout, "backlog-process-timeout", time.Second*60, "Maximum time backlog processing can block during metrictank startup.")
 	fs.StringVar(&clientConf.Broker, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	fs.StringVar(&clientConf.StartAtOffset, "offset", "oldest", "Set the offset to start consuming from. Can be one of newest, oldest or a time duration")
@@ -56,7 +56,7 @@ func ConfigProcess() {
 	}
 
 	if clientConf.MaxWait == 0 {
-		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
+		log.Fatal(4, "kafkamdm: max-wait-time must be greater then 0")
 	}
 
 	if !clientConf.OffsetIsValid() {
