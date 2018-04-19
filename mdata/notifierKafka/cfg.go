@@ -60,6 +60,10 @@ func ConfigProcess() {
 		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
 	}
 
+	if !clientConf.OffsetIsValid() {
+		log.Fatal(4, "kafkamdm: offset %s is not valid", clientConf.StartAtOffset)
+	}
+
 	var err error
 	backlogProcessTimeout, err = time.ParseDuration(backlogProcessTimeoutStr)
 	if err != nil {

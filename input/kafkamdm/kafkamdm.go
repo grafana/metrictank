@@ -79,6 +79,10 @@ func ConfigProcess(instance string) {
 		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
 	}
 
+	if !clientConf.OffsetIsValid() {
+		log.Fatal(4, "kafkamdm: offset %s is not valid", clientConf.StartAtOffset)
+	}
+
 	clientConf.Topics = strings.Split(topicStr, ",")
 	clientConf.ClientID = instance + "-mdm"
 

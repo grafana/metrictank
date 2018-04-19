@@ -50,6 +50,19 @@ type ClientConf struct {
 	LagCollectionInterval time.Duration
 }
 
+func (c *ClientConf) OffsetIsValid() bool {
+	switch c.StartAtOffset {
+	case "newest":
+	case "oldest":
+	default:
+		_, err := time.ParseDuration(c.StartAtOffset)
+		if err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 func NewConfig() *ClientConf {
 	return &ClientConf{
 		GaugePrefix:           "default.kafka.partition",
