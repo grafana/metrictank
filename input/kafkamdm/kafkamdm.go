@@ -48,7 +48,7 @@ func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
 	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPoint messages without org-id, assume this org id")
-	inKafkaMdm.DurationVar(&clientConf.OffsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
+	inKafkaMdm.DurationVar(&clientConf.LagCollectionInterval, "lag-collection-interval", time.Second*5, "Interval at which the lag is calculated and saved")
 	inKafkaMdm.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
 	inKafkaMdm.IntVar(&clientConf.BufferMaxMs, "metrics-buffer-max-ms", 100, "Delay in milliseconds to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	inKafkaMdm.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000, "Maximum number of messages allowed on the producer queue")
@@ -71,8 +71,8 @@ func ConfigProcess(instance string) {
 		return
 	}
 
-	if clientConf.OffsetCommitInterval == 0 {
-		log.Fatal(4, "kafkamdm: offset-commit-interval must be greater then 0")
+	if clientConf.LagCollectionInterval == 0 {
+		log.Fatal(4, "kafkamdm: lag-collection-interval must be greater then 0")
 	}
 
 	if clientConf.MaxWaitMs == 0 {

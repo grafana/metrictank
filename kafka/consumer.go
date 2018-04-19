@@ -30,40 +30,40 @@ type Consumer struct {
 }
 
 type ClientConf struct {
-	ClientID             string
-	Broker               string
-	Partitions           string
-	StartAtOffset        string
-	GaugePrefix          string
-	Topics               []string
-	MessageHandler       func([]byte, int32)
-	BatchNumMessages     int
-	BufferMaxMs          int
-	ChannelBufferSize    int
-	FetchMin             int
-	NetMaxOpenRequests   int
-	MaxWaitMs            int
-	SessionTimeout       int
-	MetadataRetries      int
-	MetadataBackoffTime  int
-	MetadataTimeout      int
-	OffsetCommitInterval time.Duration
+	ClientID              string
+	Broker                string
+	Partitions            string
+	StartAtOffset         string
+	GaugePrefix           string
+	Topics                []string
+	MessageHandler        func([]byte, int32)
+	BatchNumMessages      int
+	BufferMaxMs           int
+	ChannelBufferSize     int
+	FetchMin              int
+	NetMaxOpenRequests    int
+	MaxWaitMs             int
+	SessionTimeout        int
+	MetadataRetries       int
+	MetadataBackoffTime   int
+	MetadataTimeout       int
+	LagCollectionInterval time.Duration
 }
 
 func NewConfig() *ClientConf {
 	return &ClientConf{
-		GaugePrefix:          "default.kafka.partition",
-		BatchNumMessages:     10000,
-		BufferMaxMs:          100,
-		ChannelBufferSize:    1000000,
-		FetchMin:             1,
-		NetMaxOpenRequests:   100,
-		MaxWaitMs:            100,
-		SessionTimeout:       30000,
-		MetadataRetries:      5,
-		MetadataBackoffTime:  500,
-		MetadataTimeout:      10000,
-		OffsetCommitInterval: time.Second * 5,
+		GaugePrefix:           "default.kafka.partition",
+		BatchNumMessages:      10000,
+		BufferMaxMs:           100,
+		ChannelBufferSize:     1000000,
+		FetchMin:              1,
+		NetMaxOpenRequests:    100,
+		MaxWaitMs:             100,
+		SessionTimeout:        30000,
+		MetadataRetries:       5,
+		MetadataBackoffTime:   500,
+		MetadataTimeout:       10000,
+		LagCollectionInterval: time.Second * 5,
 	}
 }
 
@@ -270,7 +270,7 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 		}
 	}
 
-	ticker := time.NewTicker(c.conf.OffsetCommitInterval)
+	ticker := time.NewTicker(c.conf.LagCollectionInterval)
 	for {
 		select {
 		case ts := <-ticker.C:

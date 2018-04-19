@@ -85,7 +85,7 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 	duration := ts.Sub(o.lastTs)
 	if duration < time.Second && duration > 0 {
 		// too small difference. either due to clock adjustment or this method
-		// is called very frequently, e.g. due to a subsecond offset-commit-interval.
+		// is called very frequently, e.g. due to a subsecond lag-collection-interval.
 		// We need to let more time pass to make an accurate calculation.
 		return
 	}

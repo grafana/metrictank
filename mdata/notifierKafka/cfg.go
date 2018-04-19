@@ -27,7 +27,7 @@ func init() {
 	clientConf = kafka.NewConfig()
 	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
 	fs.BoolVar(&Enabled, "enabled", false, "")
-	fs.DurationVar(&clientConf.OffsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
+	fs.DurationVar(&clientConf.LagCollectionInterval, "lag-collection-interval", time.Second*5, "Interval at which the lag is calculated and saved")
 	fs.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
 	fs.IntVar(&clientConf.BufferMaxMs, "metrics-buffer-max-ms", 100, "Delay in milliseconds to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	fs.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000000, "Maximum number of messages allowed on the producer queue")
@@ -52,8 +52,8 @@ func ConfigProcess() {
 		return
 	}
 
-	if clientConf.OffsetCommitInterval == 0 {
-		log.Fatal(4, "kafkamdm: offset-commit-interval must be greater then 0")
+	if clientConf.LagCollectionInterval == 0 {
+		log.Fatal(4, "kafkamdm: lag-collection-interval must be greater then 0")
 	}
 
 	if clientConf.MaxWaitMs == 0 {
