@@ -12,7 +12,6 @@ import (
 
 var clientConf *kafka.ClientConf
 var Enabled bool
-var backlogProcessTimeoutStr string
 var backlogProcessTimeout time.Duration
 var partitionScheme string
 var topic string
@@ -29,16 +28,16 @@ func init() {
 	fs.BoolVar(&Enabled, "enabled", false, "")
 	fs.DurationVar(&clientConf.LagCollectionInterval, "lag-collection-interval", time.Second*5, "Interval at which the lag is calculated and saved")
 	fs.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
-	fs.IntVar(&clientConf.BufferMaxMs, "metrics-buffer-max-ms", 100, "Delay in milliseconds to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
+	fs.DurationVar(&clientConf.BufferMax, "metrics-buffer-max", time.Millisecond*100, "Delay to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	fs.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000000, "Maximum number of messages allowed on the producer queue")
 	fs.IntVar(&clientConf.FetchMin, "consumer-fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")
-	fs.IntVar(&clientConf.MaxWaitMs, "consumer-max-wait-ms", 100, "Maximum time the broker may wait to fill the response with fetch.min.bytes")
-	fs.IntVar(&clientConf.MetadataBackoffTime, "metadata-backoff-time", 500, "Time to wait between attempts to fetch metadata in ms")
+	fs.DurationVar(&clientConf.MaxWait, "consumer-max-wait", time.Millisecond*100, "Maximum time the broker may wait to fill the response with fetch.min.bytes")
+	fs.DurationVar(&clientConf.MetadataBackoffTime, "metadata-backoff-time", time.Millisecond*500, "Time to wait between attempts to fetch metadata")
 	fs.IntVar(&clientConf.MetadataRetries, "metadata-retries", 5, "Number of retries to fetch metadata in case of failure")
-	fs.IntVar(&clientConf.MetadataTimeout, "consumer-metadata-timeout-ms", 10000, "Maximum time to wait for the broker to send its metadata in ms")
+	fs.DurationVar(&clientConf.MetadataTimeout, "consumer-metadata-timeout", time.Second*10, "Maximum time to wait for the broker to send its metadata")
 	fs.IntVar(&clientConf.NetMaxOpenRequests, "net-max-open-requests", 100, "Maximum number of in-flight requests per broker connection. This is a generic property applied to all broker communication, however it is primarily relevant to produce requests.")
-	fs.IntVar(&clientConf.SessionTimeout, "consumer-session-timeout", 30000, "Client group session and failure detection timeout in ms")
-	fs.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
+	fs.DurationVar(&clientConf.SessionTimeout, "consumer-session-timeout", time.Second*30, "Client group session and failure detection timeout")
+	fs.DurationVar(&backlogProcessTimeout, "backlog-process-timeout", time.Second*60, "Maximum time backlog processing can block during metrictank startup.")
 	fs.StringVar(&clientConf.Broker, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	fs.StringVar(&clientConf.StartAtOffset, "offset", "oldest", "Set the offset to start consuming from. Can be one of newest, oldest or a time duration")
 	fs.StringVar(&partitionScheme, "partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
@@ -56,17 +55,11 @@ func ConfigProcess() {
 		log.Fatal(4, "kafkamdm: lag-collection-interval must be greater then 0")
 	}
 
-	if clientConf.MaxWaitMs == 0 {
+	if clientConf.MaxWait == 0 {
 		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
 	}
 
 	if !clientConf.OffsetIsValid() {
 		log.Fatal(4, "kafkamdm: offset %s is not valid", clientConf.StartAtOffset)
-	}
-
-	var err error
-	backlogProcessTimeout, err = time.ParseDuration(backlogProcessTimeoutStr)
-	if err != nil {
-		log.Fatal(4, "kafka-cluster: unable to parse backlog-process-timeout. %s", err)
 	}
 }

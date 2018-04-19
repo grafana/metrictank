@@ -23,7 +23,7 @@ Iter:
 	return diff
 }
 
-func GetPartitions(client *confluent.Consumer, topics []string, retries, backoff, timeout int) ([]int32, error) {
+func GetPartitions(client *confluent.Consumer, topics []string, retries, timeout int, backoff time.Duration) ([]int32, error) {
 	var partitions []int32
 	for i, topic := range topics {
 		for retry := retries; retry > 0; retry-- {

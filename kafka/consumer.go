@@ -38,15 +38,15 @@ type ClientConf struct {
 	Topics                []string
 	MessageHandler        func([]byte, int32)
 	BatchNumMessages      int
-	BufferMaxMs           int
+	BufferMax             time.Duration
 	ChannelBufferSize     int
 	FetchMin              int
 	NetMaxOpenRequests    int
-	MaxWaitMs             int
-	SessionTimeout        int
+	MaxWait               time.Duration
+	SessionTimeout        time.Duration
 	MetadataRetries       int
-	MetadataBackoffTime   int
-	MetadataTimeout       int
+	MetadataBackoffTime   time.Duration
+	MetadataTimeout       time.Duration
 	LagCollectionInterval time.Duration
 }
 
@@ -63,19 +63,23 @@ func (c *ClientConf) OffsetIsValid() bool {
 	return true
 }
 
+func (c *ClientConf) GetConfluentConfig() *confluent.ConfigMap {
+	return GetConfig(c.Broker, c.ClientID, "snappy", c.BatchNumMessages, int(c.BufferMax/time.Millisecond), c.ChannelBufferSize, c.FetchMin, c.NetMaxOpenRequests, int(c.MaxWait/time.Millisecond), int(c.SessionTimeout/time.Millisecond))
+}
+
 func NewConfig() *ClientConf {
 	return &ClientConf{
 		GaugePrefix:           "default.kafka.partition",
 		BatchNumMessages:      10000,
-		BufferMaxMs:           100,
+		BufferMax:             time.Millisecond * 100,
 		ChannelBufferSize:     1000000,
 		FetchMin:              1,
 		NetMaxOpenRequests:    100,
-		MaxWaitMs:             100,
-		SessionTimeout:        30000,
+		MaxWait:               time.Millisecond * 100,
+		SessionTimeout:        time.Second * 30,
 		MetadataRetries:       5,
-		MetadataBackoffTime:   500,
-		MetadataTimeout:       10000,
+		MetadataBackoffTime:   time.Millisecond * 500,
+		MetadataTimeout:       time.Second * 10,
 		LagCollectionInterval: time.Second * 5,
 	}
 }
@@ -85,7 +89,7 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		return nil, fmt.Errorf("kafka-consumer: Requiring at least 1 topic")
 	}
 
-	clientConf := GetConfig(conf.Broker, conf.ClientID, "snappy", conf.BatchNumMessages, conf.BufferMaxMs, conf.ChannelBufferSize, conf.FetchMin, conf.NetMaxOpenRequests, conf.MaxWaitMs, conf.SessionTimeout)
+	clientConf := conf.GetConfluentConfig()
 	clientConf.SetKey("retries", 10)
 	clientConf.SetKey("enable.partition.eof", false)
 	clientConf.SetKey("enable.auto.offset.store", false)
@@ -108,7 +112,7 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		stopChan:         make(chan struct{}),
 	}
 
-	availParts, err := GetPartitions(c.consumer, c.conf.Topics, c.conf.MetadataRetries, c.conf.MetadataBackoffTime, c.conf.MetadataTimeout)
+	availParts, err := GetPartitions(c.consumer, c.conf.Topics, c.conf.MetadataRetries, int(c.conf.MetadataTimeout/time.Millisecond), c.conf.MetadataBackoffTime)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +136,7 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 	}
 
 	for _, part := range c.Partitions {
-		_, offset, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], part, c.conf.MetadataTimeout)
+		_, offset, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], part, int(c.conf.MetadataTimeout/time.Millisecond))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get newest offset for topic %s part %d: %s", c.conf.Topics[0], part, err)
 		}
@@ -266,7 +270,7 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 				}
 			}
 
-			_, newest, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], partition, c.conf.MetadataTimeout)
+			_, newest, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], partition, int(c.conf.MetadataTimeout/time.Millisecond))
 			if err != nil {
 				log.Error(3, "kafka-consumer: Error when querying for offsets: %s", err)
 			} else {
@@ -362,7 +366,7 @@ func (c *Consumer) tryGetOffset(topic string, partition int32, offsetI int64, at
 	attempt := 1
 	for {
 		if offset == confluent.OffsetBeginning || offset == confluent.OffsetEnd {
-			beginning, end, err = c.consumer.QueryWatermarkOffsets(topic, partition, c.conf.MetadataTimeout)
+			beginning, end, err = c.consumer.QueryWatermarkOffsets(topic, partition, int(c.conf.MetadataTimeout/time.Millisecond))
 			if err == nil {
 				if offset == confluent.OffsetBeginning {
 					return beginning, nil
@@ -372,7 +376,7 @@ func (c *Consumer) tryGetOffset(topic string, partition int32, offsetI int64, at
 			}
 		} else {
 			times := []confluent.TopicPartition{{Topic: &topic, Partition: partition, Offset: offset}}
-			times, err = c.consumer.OffsetsForTimes(times, c.conf.MetadataTimeout)
+			times, err = c.consumer.OffsetsForTimes(times, int(c.conf.MetadataTimeout/time.Millisecond))
 			if err != nil {
 				log.Error(3, "kafka-consumer: Failed to get offset", err)
 			} else if len(times) == 0 {

@@ -34,7 +34,7 @@ type NotifierKafka struct {
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
 	clientConf.ClientID = instance + "-notifier-producer"
-	producer, err := confluent.NewProducer(kafka.GetConfig(clientConf.Broker, clientConf.ClientID, "snappy", clientConf.BatchNumMessages, clientConf.BufferMaxMs, clientConf.ChannelBufferSize, clientConf.FetchMin, clientConf.NetMaxOpenRequests, clientConf.MaxWaitMs, clientConf.SessionTimeout))
+	producer, err := confluent.NewProducer(clientConf.GetConfluentConfig())
 
 	if err != nil {
 		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
@@ -77,13 +77,6 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 
 func (c *NotifierKafka) handleMessage(data []byte, partition int32) {
 	mdata.Handle(c.metrics, data, c.idx)
-}
-
-func (c *NotifierKafka) Stop() {
-	log.Info("kafka-notifier: stopping kafka input")
-	c.producer.Close()
-	c.consumer.Stop()
-	close(c.stopChan)
 }
 
 func (c *NotifierKafka) Send(sc mdata.SavedChunk) {
