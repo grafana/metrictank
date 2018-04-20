@@ -10,14 +10,14 @@ import (
 // Archive represents a metric archive
 // the zero value represents a raw metric
 // any non-zero value represents a certain
-// aggregation method (lower 4 bits) and
-// aggregation span (higher 4 bits)
-type Archive uint8
+// aggregation method (lower 8 bits) and
+// aggregation span (higher 8 bits)
+type Archive uint16
 
 // important: caller must make sure to call IsSpanValid first
 func NewArchive(method Method, span uint32) Archive {
-	code := spanHumanToCode[span]
-	return Archive(uint8(method) | code<<4)
+	code := uint16(spanHumanToCode[span])
+	return Archive(uint16(method) | code<<8)
 }
 
 // String returns the traditional key suffix like sum_600 etc
@@ -31,7 +31,7 @@ func (a Archive) Method() Method {
 }
 
 func (a Archive) Span() uint32 {
-	return spanCodeToHuman[uint8(a>>4)]
+	return spanCodeToHuman[uint8(a>>8)]
 }
 
 func IsSpanValid(span uint32) bool {
