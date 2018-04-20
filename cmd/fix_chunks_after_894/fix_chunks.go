@@ -18,9 +18,9 @@ var (
 	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
 	cassandraKeyspace            = flag.String("cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
 	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraConcurrency         = flag.Int("cassandra-concurrency", 20, "max number of concurrent reads to cassandra.")
+	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
 
 	numPartitions = flag.Int("partitions", 1, "number of partitions in use by the instance.")
 	numThreads    = flag.Int("threads", 1, "number of workers to use to process data")
@@ -102,6 +102,33 @@ func NewCassandraStore() (*gocql.Session, error) {
 	cluster.Keyspace = *cassandraKeyspace
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: 3}
 
+	switch *cassandraHostSelectionPolicy {
+	case "roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.RoundRobinHostPolicy()
+	case "hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(hostpool.New(nil))
+	case "hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.HostPoolHostPolicy(
+			hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+		)
+	case "tokenaware,roundrobin":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.RoundRobinHostPolicy(),
+		)
+	case "tokenaware,hostpool-simple":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(hostpool.New(nil)),
+		)
+	case "tokenaware,hostpool-epsilon-greedy":
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.HostPoolHostPolicy(
+				hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
+			),
+		)
+	default:
+		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", cassandraHostSelectionPolicy)
+	}
+
 	cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
 		gocql.HostPoolHostPolicy(
 			hostpool.NewEpsilonGreedy(nil, 0, &hostpool.LinearEpsilonValueCalculator{}),
@@ -125,8 +152,8 @@ func updateChunks(session *gocql.Session, keyChan <-chan string, wg *sync.WaitGr
 
 	for key := range keyChan {
 		for _, agg := range aggs {
-			badKey = key + "_" + agg + "_5_630"
-			replacementKey = key + "_" + agg + "_7200_630"
+			badKey = key + "_" + agg + "_5_" + rowSuffix
+			replacementKey = key + "_" + agg + "_7200_" + rowSuffix
 			iter := session.Query(queryTpl, key).Iter()
 			for iter.Scan(&ts, &data, &ttl) {
 				query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
