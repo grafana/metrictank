@@ -149,10 +149,17 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		*v.val = re
 	case ArgBool:
-		if got.etype != etBool {
-			return 0, ErrBadArgumentStr{"string", got.etype.String()}
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
 		}
-		*v.val = got.bool
+		if got.etype == etString {
+			if val, wasBool := strToBool(got.str); wasBool {
+				*v.val = val
+				break
+			}
+		}
+		return 0, ErrBadArgumentStr{"boolean", got.etype.String()}
 	case ArgStringsOrInts:
 		// consume all args (if any) in args that will yield a string or int
 		for ; len(e.args) > pos && (e.args[pos].etype == etString || e.args[pos].etype == etInt); pos++ {
@@ -271,10 +278,17 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		}
 		*v.val = got.str
 	case ArgBool:
-		if got.etype != etBool {
-			return ErrBadKwarg{key, exp, got.etype}
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
 		}
-		*v.val = got.bool
+		if got.etype == etString {
+			if val, wasBool := strToBool(got.str); wasBool {
+				*v.val = val
+				break
+			}
+		}
+		return ErrBadKwarg{key, exp, got.etype}
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}

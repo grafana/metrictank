@@ -325,6 +325,22 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
+		{
+			"func(metric, key2='true', key1='false')",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric"},
+				},
+				namedArgs: map[string]*expr{
+					"key2": {etype: etString, str: "true"},
+					"key1": {etype: etString, str: "false"},
+				},
+				argsStr: "metric, key2='true', key1='false'",
+			},
+			nil,
+		},
 
 		{
 			`foo.{bar,baz}.qux`,

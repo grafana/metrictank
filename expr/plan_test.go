@@ -49,6 +49,20 @@ func TestArgs(t *testing.T) {
 			nil,
 		},
 		{
+			"2 args normal, 2 optional by position (bools as strings)",
+			[]*expr{
+				{etype: etName, str: "foo.bar.*"},
+				{etype: etString, str: "1hour"},
+				{etype: etString, str: "sum"},
+				{etype: etString, str: "false"},
+			},
+			nil,
+			[]Req{
+				NewReq("foo.bar.*", from, to, 0),
+			},
+			nil,
+		},
+		{
 			"2 args normal, 2 optional by key",
 			[]*expr{
 				{etype: etName, str: "foo.bar.*"},
@@ -57,6 +71,21 @@ func TestArgs(t *testing.T) {
 			map[string]*expr{
 				"func":        {etype: etString, str: "sum"},
 				"alignToFrom": {etype: etBool, bool: true},
+			},
+			[]Req{
+				NewReq("foo.bar.*", from, to, 0),
+			},
+			nil,
+		},
+		{
+			"2 args normal, 2 optional by key (bools as strings)",
+			[]*expr{
+				{etype: etName, str: "foo.bar.*"},
+				{etype: etString, str: "1hour"},
+			},
+			map[string]*expr{
+				"func":        {etype: etString, str: "sum"},
+				"alignToFrom": {etype: etString, str: "true"},
 			},
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0),
