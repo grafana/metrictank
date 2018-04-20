@@ -79,6 +79,9 @@ Please include the following information:
 You can also send `SIGQUIT` via Control-Backslash to the process, in which case it will print the stack dump and then exit.
 See [behavior of signals in Go programs](https://golang.org/pkg/os/signal/#hdr-Default_behavior_of_signals_in_Go_programs) for more information.
 
+If you're feeling lucky or are a developer, you can also get a trace like so:
+`curl 'http://<ip>:<port>/debug/pprof/trace?seconds=20' --output trace.data`
+
 
 ## Primary failover
 
