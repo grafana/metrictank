@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,16 +22,16 @@ var (
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraConcurrency         = flag.Int("cassandra-concurrency", 20, "max number of concurrent reads to cassandra.")
 	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
+	cassandraTable               = flag.String("cassandra-table", "metric_16284", "name of the table to fix")
 
 	numPartitions = flag.Int("partitions", 1, "number of partitions in use by the instance.")
 	numThreads    = flag.Int("threads", 1, "number of workers to use to process data")
+	rowSuffix     = flag.Int("row-suffix", 630, "suffix indicating the month")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 
 	doneKeys  uint64
 	foundKeys uint64
-	table     = "metric_16284"
-	rowSuffix = "630"
 )
 
 func main() {
@@ -58,15 +59,19 @@ func main() {
 	// using that partition
 	partitionChan := make(chan int, *numPartitions)
 	for i := 0; i < *numPartitions; i++ {
+		fmt.Println(fmt.Sprintf("putting partition %d into chan", i))
 		partitionChan <- i
 	}
+	close(partitionChan)
 
 	// goroutine waitgroup, allows us to know when all spawned goroutines are done.
 	var metricIdxReaderWg sync.WaitGroup
 	var chunkUpdateWg sync.WaitGroup
+	metricIdxReaderWg.Add(*numThreads)
+	chunkUpdateWg.Add(*numThreads)
 	for i := 0; i < *numThreads; i++ {
-		go getMetricIDs(session, partitionChan, keyChan, &metricIdxReaderWg)
-		go updateChunks(session, keyChan, &chunkUpdateWg)
+		go getMetricIDs(session, &partitionChan, &keyChan, &metricIdxReaderWg)
+		go updateChunks(session, &keyChan, &chunkUpdateWg)
 	}
 	done := make(chan struct{})
 	go printProgress(done)
@@ -138,25 +143,25 @@ func NewCassandraStore() (*gocql.Session, error) {
 	return cluster.CreateSession()
 }
 
-func updateChunks(session *gocql.Session, keyChan <-chan string, wg *sync.WaitGroup) {
+func updateChunks(session *gocql.Session, keyChan *chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var data []byte
 	var ts int
 	var ttl int
 	var query string
-	queryTpl := fmt.Sprintf("SELECT ts, data, TTl(data) FROM %s where key = ?", table)
+	queryTpl := fmt.Sprintf("SELECT ts, data, TTL(data) FROM %s where key=?", *cassandraTable)
 
 	aggs := []string{"min", "max", "cnt", "sum", "lst"}
 	var badKey string
 	var replacementKey string
 
-	for key := range keyChan {
+	for key := range *keyChan {
 		for _, agg := range aggs {
-			badKey = key + "_" + agg + "_5_" + rowSuffix
-			replacementKey = key + "_" + agg + "_7200_" + rowSuffix
-			iter := session.Query(queryTpl, key).Iter()
+			badKey = key + "_" + agg + "_5_" + strconv.Itoa(*rowSuffix)
+			replacementKey = key + "_" + agg + "_7200_" + strconv.Itoa(*rowSuffix)
+			iter := session.Query(queryTpl, badKey).Iter()
 			for iter.Scan(&ts, &data, &ttl) {
-				query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
+				query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", *cassandraTable, ttl)
 				err := session.Query(query, replacementKey, ts, data).Exec()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %d: %q", replacementKey, ts, err)
@@ -172,20 +177,22 @@ func updateChunks(session *gocql.Session, keyChan <-chan string, wg *sync.WaitGr
 	}
 }
 
-func getMetricIDs(session *gocql.Session, partitionChan chan int, keyChan chan string, wg *sync.WaitGroup) {
+func getMetricIDs(session *gocql.Session, partitionChan *chan int, keyChan *chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// we only care about metrics that have been updated in the last 7days.
 	tooOld := time.Now().AddDate(0, 0, -7).Unix()
-	for partition := range partitionChan {
+	for partition := range *partitionChan {
+		fmt.Println(fmt.Sprintf("reading partition %d", partition))
 		keyItr := session.Query("SELECT id, lastupdate from metric_idx where partition = ?", partition).Iter()
 
 		var key string
 		var lastUpdate int64
 		for keyItr.Scan(&key, &lastUpdate) {
+			fmt.Println(fmt.Sprintf("got key %s", key))
 			if lastUpdate < tooOld {
 				continue
 			}
-			keyChan <- key
+			*keyChan <- key
 		}
 		err := keyItr.Close()
 		if err != nil {
