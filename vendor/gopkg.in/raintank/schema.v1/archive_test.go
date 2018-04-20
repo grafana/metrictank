@@ -28,5 +28,13 @@ func TestArchive(t *testing.T) {
 		if str != cas.expStr {
 			t.Fatalf("case %d: expected string %q, got %q", i, cas.expStr, str)
 		}
+		method := arch.Method()
+		if method != cas.method {
+			t.Fatalf("case %d: expected method %v, got %v", i, cas.method, method)
+		}
+		span := arch.Span()
+		if span != cas.span {
+			t.Fatalf("case %d: expected span %v, got %v", i, cas.span, span)
+		}
 	}
 }
