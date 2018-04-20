@@ -112,12 +112,13 @@ func Parse(e string) (*expr, string, error) {
 		return parseConst(e)
 	}
 
-	if strings.HasPrefix(e, "True") || strings.HasPrefix(e, "true") {
-		return &expr{bool: true, str: e[:4], etype: etBool}, e[4:], nil
-	}
-
-	if strings.HasPrefix(e, "False") || strings.HasPrefix(e, "false") {
-		return &expr{bool: false, str: e[:5], etype: etBool}, e[5:], nil
+	if val, wasBool := strToBool(e); wasBool {
+		// 'false' is 5 chars, 'true' is 4
+		size := 5
+		if val {
+			size = 4
+		}
+		return &expr{bool: val, str: e[:size], etype: etBool}, e[size:], nil
 	}
 
 	if e[0] == '\'' || e[0] == '"' {
@@ -149,6 +150,18 @@ func Parse(e string) (*expr, string, error) {
 	}
 
 	return &expr{str: name, etype: etName}, e, nil
+}
+
+func strToBool(val string) (bool, bool) {
+	if strings.HasPrefix(val, "True") || strings.HasPrefix(val, "true") {
+		return true, true
+	}
+
+	if strings.HasPrefix(val, "False") || strings.HasPrefix(val, "false") {
+		return false, true
+	}
+
+	return false, false
 }
 
 // caller must assure s starts with opening paren
