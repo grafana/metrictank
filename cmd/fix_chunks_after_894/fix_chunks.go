@@ -59,7 +59,6 @@ func main() {
 	// using that partition
 	partitionChan := make(chan int, *numPartitions)
 	for i := 0; i < *numPartitions; i++ {
-		fmt.Println(fmt.Sprintf("putting partition %d into chan", i))
 		partitionChan <- i
 	}
 	close(partitionChan)
@@ -162,6 +161,7 @@ func updateChunks(session *gocql.Session, keyChan *chan string, wg *sync.WaitGro
 			iter := session.Query(queryTpl, badKey).Iter()
 			for iter.Scan(&ts, &data, &ttl) {
 				query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", *cassandraTable, ttl)
+				fmt.Println(query)
 				err := session.Query(query, replacementKey, ts, data).Exec()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %d: %q", replacementKey, ts, err)
@@ -188,11 +188,13 @@ func getMetricIDs(session *gocql.Session, partitionChan *chan int, keyChan *chan
 		var key string
 		var lastUpdate int64
 		for keyItr.Scan(&key, &lastUpdate) {
-			fmt.Println(fmt.Sprintf("got key %s", key))
 			if lastUpdate < tooOld {
+				fmt.Println("too old %d vs %d", lastUpdate, tooOld)
 				continue
 			}
 			*keyChan <- key
+			fmt.Println(fmt.Sprintf("key: %s", key))
+			atomic.AddUint64(&foundKeys, 1)
 		}
 		err := keyItr.Close()
 		if err != nil {
