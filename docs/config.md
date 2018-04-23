@@ -88,6 +88,8 @@ cassandra-retries = 0
 cql-protocol-version = 4
 # enable the creation of the mdata keyspace and tables, only one node needs this
 cassandra-create-keyspace = true
+# cassandra CQL toml template
+cassandra-cql-template = /etc/metrictank/storage-cassandra.toml
 # enable SSL connection to cassandra
 cassandra-ssl = false
 # cassandra CA certficate path when using SSL
@@ -412,6 +414,8 @@ username = cassandra
 password = cassandra
 # enable the creation of the index keyspace and tables, only one node needs this
 create-keyspace = true
+# cassandra CQL toml template
+cassandra-idx-cql-template = /etc/metrictank/idx-cassandra.toml
 ```
 
 ### in-memory only

@@ -90,6 +90,8 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -cassandra-idx-cql-template string
+    	Cassandra CQL template for IDX keyspace creation (default "/etc/metrictank/idx-cassandra.toml")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
@@ -152,6 +154,8 @@ or for resetting partition information when the number of partitions being used 
 
 Flags:
 
+  -cassandra-idx-cql-template string
+    	Cassandra CQL toml template for keyspace/keytable IDX creation. (default "/etc/metrictank/idx-cassandra.toml")
   -dry-run
     	run in dry-run mode. No changes will be made. (default true)
   -dst-cass-addr string
@@ -271,6 +275,8 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-cql-template string
+    	Cassandra CQL templates for keyspace/table creation (default "/etc/metrictank/storage-cassandra.toml")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
@@ -327,6 +333,8 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-cql-template string
+    	Cassandra CQL templates for keyspace/table creation (default "/etc/metrictank/storage-cassandra.toml")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
@@ -598,6 +606,8 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -cassandra-idx-cql-template string
+    	Cassandra CQL template for IDX keyspace creation (default "/etc/metrictank/idx-cassandra.toml")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace

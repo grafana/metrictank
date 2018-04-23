@@ -13,26 +13,11 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 	"gopkg.in/raintank/schema.v1"
 )
-
-const KeyspaceSchema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const TableSchema = `CREATE TABLE IF NOT EXISTS %s.metric_idx (
-    id text,
-    orgid int,
-    partition int,
-    name text,
-    metric text,
-    interval int,
-    unit text,
-    mtype text,
-    tags set<text>,
-    lastupdate int,
-    PRIMARY KEY (partition, id)
-) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}`
 
 var (
 	// metric idx.cassadra.query-insert.ok is how many insert queries for a metric completed successfully (triggered by an add or an update)
@@ -63,26 +48,27 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
-	Enabled          bool
-	ssl              bool
-	auth             bool
-	hostverification bool
-	createKeyspace   bool
-	keyspace         string
-	hosts            string
-	capath           string
-	username         string
-	password         string
-	consistency      string
-	timeout          time.Duration
-	numConns         int
-	writeQueueSize   int
-	protoVer         int
-	maxStale         time.Duration
-	pruneInterval    time.Duration
-	updateCassIdx    bool
-	updateInterval   time.Duration
-	updateInterval32 uint32
+	Enabled              bool
+	ssl                  bool
+	auth                 bool
+	hostverification     bool
+	createKeyspace       bool
+	cassandraIdxTemplate string
+	keyspace             string
+	hosts                string
+	capath               string
+	username             string
+	password             string
+	consistency          string
+	timeout              time.Duration
+	numConns             int
+	writeQueueSize       int
+	protoVer             int
+	maxStale             time.Duration
+	pruneInterval        time.Duration
+	updateCassIdx        bool
+	updateInterval       time.Duration
+	updateInterval32     uint32
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -101,6 +87,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
+	casIdx.StringVar(&cassandraIdxTemplate, "cassandra-idx-cql-template", "/etc/metrictank/idx-cassandra.toml", "Cassandra CQL template for IDX keyspace creation")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
 	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
@@ -173,13 +160,17 @@ func (c *CasIdx) InitBare() error {
 		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
+	// read templates
+	keyspace_cql_template := util.ReadEntry(cassandraIdxTemplate, "cassandra-idx.create_keyspace_cql_template").(string)
+	keytable_cql_template := util.ReadEntry(cassandraIdxTemplate, "cassandra-idx.create_keytable_cql_template").(string)
+
 	// create the keyspace or ensure it exists
 	if createKeyspace {
-		err = tmpSession.Query(fmt.Sprintf(KeyspaceSchema, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(keyspace_cql_template, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		err = tmpSession.Query(fmt.Sprintf(TableSchema, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(keytable_cql_template, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
