@@ -22,7 +22,7 @@ var (
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraConcurrency         = flag.Int("cassandra-concurrency", 20, "max number of concurrent reads to cassandra.")
 	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTable               = flag.String("cassandra-table", "metric_16284", "name of the table to fix")
+	cassandraTable               = flag.String("cassandra-table", "metric_16384", "name of the table to fix")
 
 	numPartitions = flag.Int("partitions", 128, "number of partitions to look for (can be higher than needed)")
 	numThreads    = flag.Int("threads", 100, "number of workers to use to process data")
