@@ -37,6 +37,7 @@ func (mc *CCacheMetric) Init(MKey schema.MKey, prev uint32, itergen chunk.IterGe
 	mc.MKey = MKey
 }
 
+// Del deletes chunks for the given timestamp
 func (mc *CCacheMetric) Del(ts uint32) int {
 	mc.Lock()
 	defer mc.Unlock()
@@ -121,7 +122,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	return
 }
 
-// generate sorted slice of all chunk timestamps
+// generateKeys generates sorted slice of all chunk timestamps
 // assumes we have at least read lock
 func (mc *CCacheMetric) generateKeys() {
 	keys := make([]uint32, 0, len(mc.chunks))
@@ -242,6 +243,8 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 	}
 }
 
+// Search searches for the given metric
+//
 // the idea of this method is that we first look for the chunks where the
 // "from" and "until" ts are in. then we seek from the "from" towards "until"
 // and add as many cunks as possible to the result, if this did not result
@@ -249,13 +252,12 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 // order from "until" to "from"
 // if the first seek in chronological direction already ends up with all the
 // chunks we need to serve the request, the second one can be skipped.
-
+//
 // EXAMPLE:
 // from ts:                    |
 // until ts:                                                   |
 // cache:            |---|---|---|   |   |   |   |   |---|---|---|---|---|---|
 // chunks returned:          |---|                   |---|---|---|
-//
 func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CCSearchResult, from, until uint32) {
 	mc.RLock()
 	defer mc.RUnlock()
