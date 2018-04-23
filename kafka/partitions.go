@@ -30,7 +30,7 @@ func GetPartitions(client *confluent.Consumer, topics []string, retries, timeout
 			metadata, err := client.GetMetadata(&topic, false, timeout)
 			if err != nil {
 				log.Warn("kafka: failed to get metadata from kafka client. %s, %d retries", err, retry)
-				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				time.Sleep(backoff)
 				continue
 			}
 
@@ -40,12 +40,12 @@ func GetPartitions(client *confluent.Consumer, topics []string, retries, timeout
 			tm, ok := metadata.Topics[topic]
 			if !ok || tm.Error.Code() == confluent.ErrUnknownTopic {
 				log.Warn("kafka: unknown topic %s, %d retries", topic, retry)
-				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				time.Sleep(backoff)
 				continue
 			}
 			if len(tm.Partitions) == 0 {
 				log.Warn("kafka: 0 partitions returned for %s, %d retries left, %d backoffMs", topic, retry, backoff)
-				time.Sleep(time.Duration(backoff) * time.Millisecond)
+				time.Sleep(backoff)
 				continue
 			}
 
