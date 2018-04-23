@@ -12,6 +12,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+// CCacheMetric caches data chunks
 type CCacheMetric struct {
 	sync.RWMutex
 
@@ -24,6 +25,7 @@ type CCacheMetric struct {
 	MKey schema.MKey
 }
 
+// NewCCacheMetric creates a CCacheMetric
 func NewCCacheMetric() *CCacheMetric {
 	return &CCacheMetric{
 		chunks: make(map[uint32]*CCacheChunk),
@@ -154,7 +156,7 @@ func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	}
 }
 
-// returns the last Ts of this metric cache
+// lastTs returns the last Ts of this metric cache
 // since ranges are exclusive at the end this is actually the first Ts that is not cached
 func (mc *CCacheMetric) lastTs() uint32 {
 	mc.RLock()
