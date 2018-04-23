@@ -24,14 +24,16 @@ var (
 	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
 	cassandraTable               = flag.String("cassandra-table", "metric_16284", "name of the table to fix")
 
-	numPartitions = flag.Int("partitions", 1, "number of partitions in use by the instance.")
-	numThreads    = flag.Int("threads", 1, "number of workers to use to process data")
-	rowSuffix     = flag.Int("row-suffix", 630, "suffix indicating the month")
+	numPartitions = flag.Int("partitions", 128, "number of partitions to look for (can be higher than needed)")
+	numThreads    = flag.Int("threads", 100, "number of workers to use to process data")
+	monthStart    = flag.Int("month-start", 630, "starting month number row suffix")
+	monthEnd      = flag.Int("month-end", 630, "ending month number row suffix")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 
-	doneKeys  uint64
-	foundKeys uint64
+	scannedParts uint64
+	doneKeys     uint64
+	foundKeys    uint64
 )
 
 func main() {
@@ -52,9 +54,6 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}
 
-	// channel for sending metric keys from the index reader to the chunk updater
-	keyChan := make(chan string, 1000000)
-
 	// add all of our partitions to a queue.  Workers will then pop them off and process all of the metrics
 	// using that partition
 	partitionChan := make(chan int, *numPartitions)
@@ -63,38 +62,49 @@ func main() {
 	}
 	close(partitionChan)
 
-	// goroutine waitgroup, allows us to know when all spawned goroutines are done.
+	// channel for sending metric keys from the index reader to the chunk updater
+	keyChan := make(chan string, 1000000)
+
 	var metricIdxReaderWg sync.WaitGroup
 	var chunkUpdateWg sync.WaitGroup
 	metricIdxReaderWg.Add(*numThreads)
 	chunkUpdateWg.Add(*numThreads)
+
 	for i := 0; i < *numThreads; i++ {
-		go getMetricIDs(session, &partitionChan, &keyChan, &metricIdxReaderWg)
-		go updateChunks(session, &keyChan, &chunkUpdateWg)
+		go getMetricIDs(session, partitionChan, keyChan, &metricIdxReaderWg)
+		go updateChunks(session, keyChan, &chunkUpdateWg)
 	}
+
 	done := make(chan struct{})
-	go printProgress(done)
+	go printProgressLoop(done)
+
 	metricIdxReaderWg.Wait()
-	log.Printf("Finished reading metricIDs.  Found %d", foundKeys)
+	log.Println("Finished reading metricIDs.  Found", foundKeys)
 	close(keyChan)
+
 	chunkUpdateWg.Wait()
 	close(done)
-	log.Printf("Processing of chunks complete.")
-
+	log.Println("Processing of chunks complete.")
+	printProgress()
 }
 
-func printProgress(done chan struct{}) {
+func printProgressLoop(done chan struct{}) {
 	ticker := time.NewTicker(time.Second * 10)
 	for {
 		select {
 		case <-ticker.C:
-			found := atomic.LoadUint64(&foundKeys)
-			processed := atomic.LoadUint64(&doneKeys)
-			log.Printf("Found %d keys. Processed %d keys", found, processed)
+			printProgress()
 		case <-done:
 			return
 		}
 	}
+}
+
+func printProgress() {
+	scannedParts := atomic.LoadUint64(&scannedParts)
+	found := atomic.LoadUint64(&foundKeys)
+	processed := atomic.LoadUint64(&doneKeys)
+	log.Printf("Scanned %d partitions - Found %d keys - Processed %d keys", scannedParts, found, processed)
 }
 
 func NewCassandraStore() (*gocql.Session, error) {
@@ -142,7 +152,7 @@ func NewCassandraStore() (*gocql.Session, error) {
 	return cluster.CreateSession()
 }
 
-func updateChunks(session *gocql.Session, keyChan *chan string, wg *sync.WaitGroup) {
+func updateChunks(session *gocql.Session, keyChan <-chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var data []byte
 	var ts int
@@ -154,22 +164,23 @@ func updateChunks(session *gocql.Session, keyChan *chan string, wg *sync.WaitGro
 	var badKey string
 	var replacementKey string
 
-	for key := range *keyChan {
-		for _, agg := range aggs {
-			badKey = key + "_" + agg + "_5_" + strconv.Itoa(*rowSuffix)
-			replacementKey = key + "_" + agg + "_7200_" + strconv.Itoa(*rowSuffix)
-			iter := session.Query(queryTpl, badKey).Iter()
-			for iter.Scan(&ts, &data, &ttl) {
-				query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", *cassandraTable, ttl)
-				fmt.Println(query)
-				err := session.Query(query, replacementKey, ts, data).Exec()
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %d: %q", replacementKey, ts, err)
+	for key := range keyChan {
+		for month := *monthStart; month <= *monthEnd; month++ {
+			for _, agg := range aggs {
+				badKey = key + "_" + agg + "_5_" + strconv.Itoa(month)
+				replacementKey = key + "_" + agg + "_7200_" + strconv.Itoa(month)
+				iter := session.Query(queryTpl, badKey).Iter()
+				for iter.Scan(&ts, &data, &ttl) {
+					query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", *cassandraTable, ttl)
+					err := session.Query(query, replacementKey, ts, data).Exec()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "ERROR: failed updating %s %d: %q", replacementKey, ts, err)
+					}
 				}
-			}
-			err := iter.Close()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q.", badKey, err)
+				err := iter.Close()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q.", badKey, err)
+				}
 			}
 		}
 
@@ -177,28 +188,27 @@ func updateChunks(session *gocql.Session, keyChan *chan string, wg *sync.WaitGro
 	}
 }
 
-func getMetricIDs(session *gocql.Session, partitionChan *chan int, keyChan *chan string, wg *sync.WaitGroup) {
+func getMetricIDs(session *gocql.Session, partitionChan <-chan int, keyChan chan<- string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// we only care about metrics that have been updated in the last 7days.
 	tooOld := time.Now().AddDate(0, 0, -7).Unix()
-	for partition := range *partitionChan {
-		fmt.Println(fmt.Sprintf("reading partition %d", partition))
+	for partition := range partitionChan {
+		log.Println("getMetricIDs: reading partition", partition)
 		keyItr := session.Query("SELECT id, lastupdate from metric_idx where partition = ?", partition).Iter()
 
 		var key string
 		var lastUpdate int64
 		for keyItr.Scan(&key, &lastUpdate) {
 			if lastUpdate < tooOld {
-				fmt.Println("too old %d vs %d", lastUpdate, tooOld)
 				continue
 			}
-			*keyChan <- key
-			fmt.Println(fmt.Sprintf("key: %s", key))
+			keyChan <- key
 			atomic.AddUint64(&foundKeys, 1)
 		}
 		err := keyItr.Close()
 		if err != nil {
-			log.Fatalf("failed to read from metric_idx table. %s", err.Error())
+			log.Fatalf("getMetricIDs: failed to read from metric_idx table. %s", err.Error())
 		}
+		atomic.AddUint64(&scannedParts, 1)
 	}
 }
