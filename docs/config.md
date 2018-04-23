@@ -236,6 +236,8 @@ metrics-buffer-max = 100ms
 channel-buffer-size = 1000
 # The minimum number of message bytes to fetch in a request
 fetch-min = 1
+# Initial maximum number of bytes per topic+partition to request when fetching messages from the broker
+fetch-message-max = 32768
 # The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it
 max-wait = 1s
 # Time to wait between attempts to fetch metadata
@@ -359,6 +361,8 @@ channel-buffer-size = 1000
 backlog-process-timeout = 60s
 # The minimum number of message bytes to fetch in a request
 fetch-min = 1
+# Initial maximum number of bytes per topic+partition to request when fetching messages from the broker
+fetch-message-max = 32768
 # The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it
 max-wait = 1s
 # Time to wait between attempts to fetch metadata

@@ -16,17 +16,18 @@ import (
 var LogLevel int
 
 type Consumer struct {
-	conf             ClientConf
-	wg               sync.WaitGroup
-	consumer         *confluent.Consumer
-	Partitions       []int32
-	currentOffsets   map[int32]*int64
-	bootTimeOffsets  map[int32]int64
-	partitionOffset  map[int32]*stats.Gauge64
-	partitionLogSize map[int32]*stats.Gauge64
-	partitionLag     map[int32]*stats.Gauge64
-	LagMonitor       *LagMonitor
-	stopChan         chan struct{}
+	conf               ClientConf
+	wg                 sync.WaitGroup
+	consumer           *confluent.Consumer
+	partitionConsumers map[int32]*confluent.Consumer
+	Partitions         []int32
+	currentOffsets     map[int32]*int64
+	bootTimeOffsets    map[int32]int64
+	partitionOffset    map[int32]*stats.Gauge64
+	partitionLogSize   map[int32]*stats.Gauge64
+	partitionLag       map[int32]*stats.Gauge64
+	LagMonitor         *LagMonitor
+	stopChan           chan struct{}
 }
 
 type ClientConf struct {
@@ -41,6 +42,7 @@ type ClientConf struct {
 	BufferMax             time.Duration
 	ChannelBufferSize     int
 	FetchMin              int
+	FetchMessageMax       int
 	NetMaxOpenRequests    int
 	MaxWait               time.Duration
 	SessionTimeout        time.Duration
@@ -63,10 +65,6 @@ func (c *ClientConf) OffsetIsValid() bool {
 	return true
 }
 
-func (c *ClientConf) GetConfluentConfig() *confluent.ConfigMap {
-	return GetConfig(c.Broker, c.ClientID, "snappy", c.BatchNumMessages, int(c.BufferMax/time.Millisecond), c.ChannelBufferSize, c.FetchMin, c.NetMaxOpenRequests, int(c.MaxWait/time.Millisecond), int(c.SessionTimeout/time.Millisecond))
-}
-
 func NewConfig() *ClientConf {
 	return &ClientConf{
 		GaugePrefix:           "default.kafka.partition",
@@ -74,9 +72,10 @@ func NewConfig() *ClientConf {
 		BufferMax:             time.Millisecond * 100,
 		ChannelBufferSize:     1000000,
 		FetchMin:              1,
-		NetMaxOpenRequests:    100,
-		MaxWait:               time.Millisecond * 100,
+		FetchMessageMax:       32768,
+		MaxWait:               time.Second * 1,
 		SessionTimeout:        time.Second * 30,
+		NetMaxOpenRequests:    1000,
 		MetadataRetries:       5,
 		MetadataBackoffTime:   time.Millisecond * 500,
 		MetadataTimeout:       time.Second * 10,
@@ -84,32 +83,43 @@ func NewConfig() *ClientConf {
 	}
 }
 
+func (c *ClientConf) GetConfluentConfig(clientId string) *confluent.ConfigMap {
+	conf := GetConfig(c.Broker, "snappy", c.BatchNumMessages, int(c.BufferMax/time.Millisecond), c.ChannelBufferSize, c.FetchMin, c.FetchMessageMax, c.NetMaxOpenRequests, int(c.MaxWait/time.Millisecond), int(c.SessionTimeout/time.Millisecond))
+	conf.SetKey("group.id", clientId)
+	conf.SetKey("retries", 10)
+	return conf
+}
+
 func NewConsumer(conf *ClientConf) (*Consumer, error) {
 	if len(conf.Topics) < 1 {
 		return nil, fmt.Errorf("kafka-consumer: Requiring at least 1 topic")
 	}
 
-	clientConf := conf.GetConfluentConfig()
-	clientConf.SetKey("retries", 10)
-	clientConf.SetKey("enable.partition.eof", false)
-	clientConf.SetKey("enable.auto.offset.store", false)
-	clientConf.SetKey("enable.auto.commit", false)
-	clientConf.SetKey("go.events.channel.enable", true)
-	clientConf.SetKey("go.application.rebalance.enable", true)
-	consumer, err := confluent.NewConsumer(clientConf)
-	if err != nil {
-		return nil, err
+	getConsumer := func(clientId string) (*confluent.Consumer, error) {
+		clientConf := conf.GetConfluentConfig(clientId)
+		clientConf.SetKey("enable.partition.eof", false)
+		clientConf.SetKey("enable.auto.offset.store", false)
+		clientConf.SetKey("enable.auto.commit", false)
+		clientConf.SetKey("go.events.channel.enable", true)
+		clientConf.SetKey("go.events.channel.size", 100000)
+		clientConf.SetKey("go.application.rebalance.enable", true)
+		return confluent.NewConsumer(clientConf)
 	}
 
 	c := Consumer{
 		conf:             *conf,
-		consumer:         consumer,
 		currentOffsets:   make(map[int32]*int64),
 		bootTimeOffsets:  make(map[int32]int64),
 		partitionOffset:  make(map[int32]*stats.Gauge64),
 		partitionLogSize: make(map[int32]*stats.Gauge64),
 		partitionLag:     make(map[int32]*stats.Gauge64),
 		stopChan:         make(chan struct{}),
+	}
+
+	var err error
+	c.consumer, err = getConsumer(conf.ClientID + "-metadata")
+	if err != nil {
+		return nil, err
 	}
 
 	availParts, err := GetPartitions(c.consumer, c.conf.Topics, c.conf.MetadataRetries, int(c.conf.MetadataTimeout/time.Millisecond), c.conf.MetadataBackoffTime)
@@ -135,8 +145,14 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		}
 	}
 
+	c.partitionConsumers = make(map[int32]*confluent.Consumer, len(c.Partitions))
 	for _, part := range c.Partitions {
-		_, offset, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], part, int(c.conf.MetadataTimeout/time.Millisecond))
+		c.partitionConsumers[part], err = getConsumer(fmt.Sprintf("%s-partition-%d", conf.ClientID, part))
+		if err != nil {
+			return nil, err
+		}
+
+		_, offset, err := c.partitionConsumers[part].QueryWatermarkOffsets(c.conf.Topics[0], part, int(c.conf.MetadataTimeout/time.Millisecond))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get newest offset for topic %s part %d: %s", c.conf.Topics[0], part, err)
 		}
@@ -164,8 +180,8 @@ func (c *Consumer) Start(processBacklog *sync.WaitGroup) error {
 
 	go c.monitorLag(processBacklog)
 
-	for range c.Partitions {
-		go c.consume()
+	for _, partition := range c.Partitions {
+		go c.consume(partition)
 	}
 
 	return nil
@@ -202,13 +218,18 @@ func (c *Consumer) StartAndAwaitBacklog(backlogProcessTimeout time.Duration) err
 	return nil
 }
 
-func (c *Consumer) consume() {
+func (c *Consumer) consume(partition int32) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
-	var ok bool
 	var offsetPtr *int64
-	events := c.consumer.Events()
+	var ok bool
+	if offsetPtr, ok = c.currentOffsets[partition]; !ok || offsetPtr == nil {
+		log.Fatal(3, "kafka-consumer: Failed to get currentOffset for partition %d", partition)
+	}
+
+	log.Info("kafka-consumer: Consumer started for partition %d of topics %+v", partition, c.conf.Topics)
+	events := c.partitionConsumers[partition].Events()
 	for {
 		select {
 		case ev := <-events:
@@ -221,15 +242,10 @@ func (c *Consumer) consume() {
 				log.Info("kafka-consumer: Revoked partitions: %+v", e)
 			case *confluent.Message:
 				tp := e.TopicPartition
-				if LogLevel < 2 {
-					log.Debug("kafka-consumer: Received message: Topic %s, Partition: %d, Offset: %d, Key: %x", tp.Topic, tp.Partition, tp.Offset, e.Key)
-				}
-
-				if offsetPtr, ok = c.currentOffsets[tp.Partition]; !ok || offsetPtr == nil {
-					log.Error(3, "kafka-consumer: Received message of unexpected partition: %s:%d", tp.Topic, tp.Partition)
+				if tp.Partition != partition {
+					log.Error(3, "kafka-consumer: Received unexpected partition %d, expected %d", tp.Partition, partition)
 					continue
 				}
-
 				c.conf.MessageHandler(e.Value, tp.Partition)
 				atomic.StoreInt64(offsetPtr, int64(tp.Offset))
 			case *confluent.Error:
@@ -237,7 +253,7 @@ func (c *Consumer) consume() {
 				return
 			}
 		case <-c.stopChan:
-			log.Info("kafka-consumer: Consumer ended.")
+			log.Info("kafka-consumer: Consumer ended for partition %d topics %+v", partition, c.conf.Topics)
 			return
 		}
 	}
@@ -302,12 +318,14 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 func (c *Consumer) startConsumer() error {
 	var offset confluent.Offset
 	var err error
-	var topicPartitions confluent.TopicPartitions
 	c.currentOffsets = make(map[int32]*int64, len(c.Partitions))
 
-	for i, topic := range c.conf.Topics {
-		for _, partition := range c.Partitions {
-			var currentOffset int64
+	for _, partition := range c.Partitions {
+		var currentOffset int64
+		var topicPartitions confluent.TopicPartitions
+		c.currentOffsets[partition] = &currentOffset
+
+		for _, topic := range c.conf.Topics {
 			switch c.conf.StartAtOffset {
 			case "oldest":
 				currentOffset, err = c.tryGetOffset(topic, partition, int64(confluent.OffsetBeginning), 3, time.Second)
@@ -345,14 +363,15 @@ func (c *Consumer) startConsumer() error {
 				Partition: partition,
 				Offset:    offset,
 			})
+		}
 
-			if i == 0 {
-				c.currentOffsets[partition] = &currentOffset
-			}
+		err := c.partitionConsumers[partition].Assign(topicPartitions)
+		if err != nil {
+			return err
 		}
 	}
 
-	return c.consumer.Assign(topicPartitions)
+	return nil
 }
 
 func (c *Consumer) tryGetOffset(topic string, partition int32, offsetI int64, attempts int, sleep time.Duration) (int64, error) {
@@ -403,4 +422,7 @@ func (c *Consumer) Stop() {
 	close(c.stopChan)
 	c.wg.Wait()
 	c.consumer.Close()
+	for i := range c.partitionConsumers {
+		c.partitionConsumers[i].Close()
+	}
 }

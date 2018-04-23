@@ -31,6 +31,7 @@ func init() {
 	fs.DurationVar(&clientConf.BufferMax, "metrics-buffer-max", time.Millisecond*100, "Delay to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	fs.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000000, "Maximum number of messages allowed on the producer queue")
 	fs.IntVar(&clientConf.FetchMin, "fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")
+	fs.IntVar(&clientConf.FetchMessageMax, "fetch-message-max", 32768, "Initial maximum number of bytes per topic+partition to request when fetching messages from the broker.")
 	fs.DurationVar(&clientConf.MaxWait, "max-wait", time.Millisecond*100, "Maximum time the broker may wait to fill the response with fetch.min.bytes")
 	fs.DurationVar(&clientConf.MetadataBackoffTime, "metadata-backoff-time", time.Millisecond*500, "Time to wait between attempts to fetch metadata")
 	fs.IntVar(&clientConf.MetadataRetries, "metadata-retries", 5, "Number of retries to fetch metadata in case of failure")

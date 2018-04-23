@@ -34,7 +34,7 @@ type NotifierKafka struct {
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
 	clientConf.ClientID = instance + "-notifier-producer"
-	producer, err := confluent.NewProducer(clientConf.GetConfluentConfig())
+	producer, err := confluent.NewProducer(clientConf.GetConfluentConfig("notifier"))
 
 	if err != nil {
 		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
