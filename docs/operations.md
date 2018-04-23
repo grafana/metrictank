@@ -5,34 +5,35 @@
 You should monitor the dependencies according to their best practices.
 In particular, pay attention to delays in your kafka queue, if you use it.
 Especially for metric persistence messages which flow from primary to secondary nodes: if those have issues, chunks may be saved multiple times
-when you move around the primary role. (see [clustering transport](https://github.com/grafana/metrictank/blob/master/docs/clustering.md))
+when new primaries come online (or get promoted). (see [clustering transport](https://github.com/grafana/metrictank/blob/master/docs/clustering.md))
 
-Metrictank uses statsd to report metrics about itself. See [the list of documented metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
+Metrictank reports metrics about itself. See [the list of documented metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
 
 ### Dashboard
 
 You can import the [Metrictank dashboard from Grafana.net](https://grafana.net/dashboards/279) into your Grafana.
 this will give instant insights in all the performance metrics of Metrictank.
-Just make sure to have a properly configured statsd setup (or adjust the dashboard)
 
 
 ### Useful metrics to monitor/alert on
 
 * process is running and listening on its http port (and carbon port, if you enabled it) (use your monitoring agent of choice for this)
 * `metrictank.stats.$environment.$instance.cluster.primary.gauge1`: assure you have exactly 1 primary node (saving to cassandra) or as many as you have shardgroups, for sharded setups.
-* `metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.{min,max}.gauge32`: make sure the write queues are able to drain and don't reach capacity, otherwise ingest will block
+* `metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.{min,max}.gauge32`: make sure the write queues are able to drain.  For primary nodes that are also used for qureies, assert the write queues don't reach capacity, otherwise ingest will block and data will lag behind in queries.
 * `metrictank.stats.$environment.$instance.input.*.pressure.idx.counter32`: index pressure as a ns counter, rise is between 0 and 10^9 each second. Alert if increase is more than 4x10^8 each second: this would signify the index can't keep up with indexing new data and is blocking ingestion pipeline.
 * `metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
+* `metrictank.stats.$environment.$instance.input.*.*.invalid.counter32`: counter of incoming data that could not be decoded.
+* `metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32`: counter of points that are too old and can't be added.
 * `metrictank.stats.$environment.$instance.api.request_handle.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
 * `metrictank.stats.$environment.$instance.store.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.
 * `perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)`: Points dropped due to chunks being closed. Need to tune the chunk-max-stale setting or fix your data stream to not send old points so late.
+* `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
 
 If you expect consistent or predictable load, you may also want to monitor:
 
 * `metrictank.stats.$environment.$instance.store.cassandra.chunk_operations.save_ok.counter32`: number of saved chunks (based on your chunkspan settings)
 * `metrictank.stats.$environment.$instance.api.request_handle.values.rate32` : rate per second of render requests
-* `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
-
+* `metrictank.stats.$environment.$instance.input.*.*.received.counter32`: input counter (derive with perSecond(
 
 
 ## Crash
@@ -58,7 +59,7 @@ Metrictank crashed. What to do?
 
 #### If you run multiple instances
 
-* If the crashed instance was a secondary, you can just restart it and after it warmed up, it will ready to serve requests.  Verify that you have other instances who can serve requests, otherwise you may want to start it with a much shorter warm up time.  It will be ready to serve requests sooner, but may have to reach out to Cassandra more to load data.
+* If the crashed instance was a secondary, you can just restart it and after it warmed up (or backfilled data from Kafka), it will ready to serve requests.  Verify that you have other instances who can serve requests, otherwise you may want to start it with a much shorter warm up time.  It will be ready to serve requests sooner, but may have to reach out to Cassandra more to load data.
 * If the crashed instance was a primary, you have to bring up a new primary.  Based on when the primary was able to last save chunks, and how much data you keep in RAM (using [chunkspan * numchunks](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md), you can calculate how quickly you need to promote an already running secondary to primary to avaid dataloss.  If you don't have a secondary up long enough, pick whichever was up the longest.  
 
 
