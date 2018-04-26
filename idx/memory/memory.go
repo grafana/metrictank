@@ -222,7 +222,10 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 		if LogLevel < 2 {
 			log.Debug("metricDef with id %v already in index", point.MKey)
 		}
-		existing.LastUpdate = int64(point.Time)
+
+		if existing.LastUpdate < int64(point.Time) {
+			existing.LastUpdate = int64(point.Time)
+		}
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
@@ -244,7 +247,9 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	if ok {
 		oldPart := existing.Partition
 		log.Debug("metricDef with id %s already in index.", mkey)
-		existing.LastUpdate = data.Time
+		if existing.LastUpdate < int64(data.Time) {
+			existing.LastUpdate = int64(data.Time)
+		}
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
@@ -833,6 +838,7 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 
 	ids := m.idsByTagQuery(orgId, query)
 	res := make([]idx.Node, 0, len(ids))
+	seen := make(map[string]struct{})
 	for id := range ids {
 		def, ok := m.defById[id]
 		if !ok {
@@ -841,12 +847,27 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 			continue
 		}
 
-		res = append(res, idx.Node{
-			Path:        def.NameWithTags(),
-			Leaf:        true,
-			HasChildren: false,
-			Defs:        []idx.Archive{*def},
-		})
+		if _, ok := seen[def.NameWithTags()]; !ok {
+
+			defMap := m.defByTagSet.defs(orgId, def.NameWithTags())
+
+			defs := make([]idx.Archive, 0, len(defMap))
+
+			for d := range defMap {
+				if from != 0 && def.LastUpdate < from {
+					continue
+				}
+				defs = append(defs, *m.defById[d.Id])
+			}
+
+			res = append(res, idx.Node{
+				Path:        def.NameWithTags(),
+				Leaf:        true,
+				HasChildren: false,
+				Defs:        defs,
+			})
+			seen[def.NameWithTags()] = struct{}{}
+		}
 	}
 	return res, nil
 }

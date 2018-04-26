@@ -126,6 +126,19 @@ func testGetAddKey(t *testing.T) {
 			So(defs, ShouldHaveLength, 15)
 		})
 	})
+
+	if TagSupport {
+		Convey("When adding metricDefs with the same series name as existing metricDefs (tagged)", t, func() {
+			Convey("then findByTag", func() {
+				nodes, _ := ix.FindByTag(1, []string{"name!="}, 0)
+				defs := make([]idx.Archive, 0, len(nodes))
+				for i := range nodes {
+					defs = append(defs, nodes[i].Defs...)
+				}
+				So(defs, ShouldHaveLength, 10)
+			})
+		})
+	}
 }
 
 func TestFind(t *testing.T) {
@@ -673,7 +686,12 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	Convey("After purge", t, func() {
 		nodes, err := ix.FindByTag(1, findExpressions, 0)
 		So(err, ShouldBeNil)
-		So(nodes, ShouldHaveLength, 2)
+		So(nodes, ShouldHaveLength, 1)
+		defs := make([]idx.Archive, 0, len(nodes))
+		for i := range nodes {
+			defs = append(defs, nodes[i].Defs...)
+		}
+		So(defs, ShouldHaveLength, 2)
 	})
 
 	Convey("When purging newer series", t, func() {
