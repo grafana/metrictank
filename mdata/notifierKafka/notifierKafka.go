@@ -33,16 +33,25 @@ type NotifierKafka struct {
 }
 
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
-	clientConf.ClientID = instance + "-notifier-producer"
-	producer, err := confluent.NewProducer(clientConf.GetConfluentConfig("notifier"))
+	producerConf := &confluent.ConfigMap{
+		"bootstrap.servers":                     clientConf.Broker,
+		"compression.codec":                     "snappy",
+		"fetch.min.bytes":                       clientConf.FetchMin,
+		"fetch.message.max.bytes":               clientConf.FetchMessageMax,
+		"fetch.wait.max.ms":                     int(clientConf.MaxWait / time.Millisecond),
+		"max.in.flight.requests.per.connection": clientConf.NetMaxOpenRequests,
+		"queue.buffering.max.messages":          clientConf.ChannelBufferSize,
+		"session.timeout.ms":                    int(clientConf.SessionTimeout / time.Millisecond),
+		"queue.buffering.max.ms":                int(clientConf.BufferMax / time.Millisecond),
+		"batch.num.messages":                    clientConf.BatchNumMessages,
+		"group.id":                              instance + "-notifier-producer",
+		"retries":                               10,
+	}
+	producer, err := confluent.NewProducer(producerConf)
 
 	if err != nil {
 		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
 	}
-
-	clientConf.ClientID = instance + "-notifier-consumer"
-	clientConf.GaugePrefix = "cluster.notifier.kafka.partition"
-	clientConf.Topics = []string{topic}
 
 	c := NotifierKafka{
 		instance: instance,
@@ -53,6 +62,10 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 		idx:      idx,
 		stopChan: make(chan struct{}),
 	}
+
+	clientConf.ClientID = instance + "-notifier-consumer"
+	clientConf.GaugePrefix = "cluster.notifier.kafka.partition"
+	clientConf.Topics = []string{topic}
 	clientConf.MessageHandler = c.handleMessage
 
 	c.consumer, err = kafka.NewConsumer(clientConf)

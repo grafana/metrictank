@@ -87,26 +87,32 @@ func NewConfig() *ClientConf {
 	}
 }
 
-func (c *ClientConf) GetConfluentConfig(clientId string) *confluent.ConfigMap {
-	conf := GetConfig(c.Broker, "snappy", c.BatchNumMessages, int(c.BufferMax/time.Millisecond), c.ChannelBufferSize, c.FetchMin, c.FetchMessageMax, c.NetMaxOpenRequests, int(c.MaxWait/time.Millisecond), int(c.SessionTimeout/time.Millisecond))
-	conf.SetKey("group.id", clientId)
-	conf.SetKey("retries", 10)
-	return conf
-}
-
 func NewConsumer(conf *ClientConf) (*Consumer, error) {
 	if len(conf.Topics) < 1 {
 		return nil, fmt.Errorf("kafka-consumer: Requiring at least 1 topic")
 	}
 
 	getConsumer := func(clientId string) (*confluent.Consumer, error) {
-		clientConf := conf.GetConfluentConfig(clientId)
-		clientConf.SetKey("enable.partition.eof", false)
-		clientConf.SetKey("enable.auto.offset.store", false)
-		clientConf.SetKey("enable.auto.commit", false)
-		clientConf.SetKey("go.events.channel.enable", true)
-		clientConf.SetKey("go.events.channel.size", conf.EventsChannelSize)
-		clientConf.SetKey("go.application.rebalance.enable", true)
+		clientConf := &confluent.ConfigMap{
+			"bootstrap.servers":                     conf.Broker,
+			"compression.codec":                     "snappy",
+			"fetch.min.bytes":                       conf.FetchMin,
+			"fetch.message.max.bytes":               conf.FetchMessageMax,
+			"fetch.wait.max.ms":                     int(conf.MaxWait / time.Millisecond),
+			"max.in.flight.requests.per.connection": conf.NetMaxOpenRequests,
+			"queue.buffering.max.messages":          conf.ChannelBufferSize,
+			"session.timeout.ms":                    int(conf.SessionTimeout / time.Millisecond),
+			"queue.buffering.max.ms":                int(conf.BufferMax / time.Millisecond),
+			"batch.num.messages":                    conf.BatchNumMessages,
+			"group.id":                              clientId,
+			"retries":                               10,
+			"enable.partition.eof":                  false,
+			"enable.auto.offset.store":              false,
+			"enable.auto.commit":                    false,
+			"go.events.channel.enable":              true,
+			"go.events.channel.size":                conf.EventsChannelSize,
+			"go.application.rebalance.enable":       true,
+		}
 		return confluent.NewConsumer(clientConf)
 	}
 
