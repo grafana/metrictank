@@ -51,6 +51,7 @@ type ClientConf struct {
 	MetadataTimeout       time.Duration
 	LagCollectionInterval time.Duration
 	ConsumerThreads       int
+	EventsChannelSize     int
 }
 
 func (c *ClientConf) OffsetIsValid() bool {
@@ -71,7 +72,7 @@ func NewConfig() *ClientConf {
 		GaugePrefix:           "default.kafka.partition",
 		BatchNumMessages:      10000,
 		BufferMax:             time.Millisecond * 100,
-		ChannelBufferSize:     1000000,
+		ChannelBufferSize:     100,
 		FetchMin:              1,
 		FetchMessageMax:       32768,
 		MaxWait:               time.Second * 1,
@@ -81,7 +82,8 @@ func NewConfig() *ClientConf {
 		MetadataBackoffTime:   time.Millisecond * 500,
 		MetadataTimeout:       time.Second * 10,
 		LagCollectionInterval: time.Second * 5,
-		ConsumerThreads:       4,
+		ConsumerThreads:       1,
+		EventsChannelSize:     50,
 	}
 }
 
@@ -103,7 +105,7 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		clientConf.SetKey("enable.auto.offset.store", false)
 		clientConf.SetKey("enable.auto.commit", false)
 		clientConf.SetKey("go.events.channel.enable", true)
-		clientConf.SetKey("go.events.channel.size", 100000)
+		clientConf.SetKey("go.events.channel.size", conf.EventsChannelSize)
 		clientConf.SetKey("go.application.rebalance.enable", true)
 		return confluent.NewConsumer(clientConf)
 	}
