@@ -2,7 +2,6 @@ package kafkamdm
 
 import (
 	"flag"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -165,7 +164,6 @@ func (k *KafkaMdm) MaintainPriority() {
 				return
 			case <-ticker.C:
 				metric := k.consumer.LagMonitor.Metric()
-				fmt.Println(fmt.Sprintf("setting priority to %d", metric))
 				cluster.Manager.SetPriority(metric)
 			}
 		}
