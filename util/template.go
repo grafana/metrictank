@@ -14,7 +14,7 @@ func readTomlFile(TomlFilename string) *toml.Tree {
 	}
 	tree, err := toml.LoadFile(TomlFilename)
 	if err != nil {
-		log.Fatalf("Error decoding file :\n%s\nError was:%s\n", TomlFilename, err)
+		log.Fatalf("Error decoding file %q:\n%s\n", TomlFilename, err)
 	}
 	tomlFiles[TomlFilename] = tree
 	return tree
@@ -24,7 +24,7 @@ func ReadEntry(TomlFilename string, EntryName string) interface{} {
 	tree := readTomlFile(TomlFilename)
 	val := tree.Get(EntryName)
 	if val == nil {
-		log.Fatalf("Error '%s' does not exist in '%s'", EntryName, TomlFilename)
+		log.Fatalf("Error %q does not exist in %q", EntryName, TomlFilename)
 	}
 	return tree.Get(EntryName)
 }
