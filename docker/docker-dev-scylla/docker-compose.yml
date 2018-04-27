@@ -1,0 +1,55 @@
+version: '2'
+
+services:
+  metrictank:
+    hostname: metrictank
+    image: grafana/metrictank
+    ports:
+     - "6060:6060"
+     - "2003:2003"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+      - ../../scripts/config/schema-store-scylladb.toml:/etc/metrictank/schema-store-cassandra.toml
+      - ../../scripts/config/schema-idx-scylladb.toml:/etc/metrictank/schema-idx-cassandra.toml
+
+    environment:
+      WAIT_HOSTS: cassandra:9042
+      WAIT_TIMEOUT: 60
+      MT_HTTP_MULTI_TENANT: "false"
+      MT_MEMORY_IDX_TAG_SUPPORT: "true"
+    links:
+     - cassandra
+
+  cassandra:
+    hostname: cassandra
+    image: scylladb/scylla
+    ports:
+     - "9042:9042"
+
+  graphite:
+    hostname: graphite
+    image: raintank/graphite-mt
+    ports:
+     - "8080:80"
+    environment:
+      GRAPHITE_CLUSTER_SERVERS: metrictank:6060
+      GRAPHITE_STATSD_HOST: statsdaemon
+      WSGI_PROCESSES: 4
+      WSGI_THREADS: 25
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+  statsdaemon:
+    hostname: statsdaemon
+    image: raintank/statsdaemon
+    ports:
+     - "8125:8125/udp"
+    volumes:
+     - "../statsdaemon.ini:/etc/statsdaemon.ini"
