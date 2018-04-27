@@ -16,18 +16,18 @@ import (
 var LogLevel int
 
 type Consumer struct {
-	conf               ClientConf
-	wg                 sync.WaitGroup
-	consumer           *confluent.Consumer
-	partitionConsumers map[int32]*confluent.Consumer
-	Partitions         []int32
-	currentOffsets     map[int32]*int64
-	bootTimeOffsets    map[int32]int64
-	partitionOffset    map[int32]*stats.Gauge64
-	partitionLogSize   map[int32]*stats.Gauge64
-	partitionLag       map[int32]*stats.Gauge64
-	LagMonitor         *LagMonitor
-	stopChan           chan struct{}
+	conf     ClientConf
+	wg       sync.WaitGroup
+	consumer *confluent.Consumer
+	//partitionConsumers map[int32]*confluent.Consumer
+	Partitions       []int32
+	currentOffsets   map[int32]*int64
+	bootTimeOffsets  map[int32]int64
+	partitionOffset  map[int32]*stats.Gauge64
+	partitionLogSize map[int32]*stats.Gauge64
+	partitionLag     map[int32]*stats.Gauge64
+	LagMonitor       *LagMonitor
+	stopChan         chan struct{}
 }
 
 type ClientConf struct {
@@ -86,6 +86,7 @@ func NewConfig() *ClientConf {
 func (c *ClientConf) GetConfluentConfig(clientId string) *confluent.ConfigMap {
 	conf := GetConfig(c.Broker, "snappy", c.BatchNumMessages, int(c.BufferMax/time.Millisecond), c.ChannelBufferSize, c.FetchMin, c.FetchMessageMax, c.NetMaxOpenRequests, int(c.MaxWait/time.Millisecond), int(c.SessionTimeout/time.Millisecond))
 	conf.SetKey("group.id", clientId)
+	conf.SetKey("queued.min.messages", 1)
 	conf.SetKey("retries", 10)
 	return conf
 }
@@ -100,9 +101,9 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		clientConf.SetKey("enable.partition.eof", false)
 		clientConf.SetKey("enable.auto.offset.store", false)
 		clientConf.SetKey("enable.auto.commit", false)
-		clientConf.SetKey("go.events.channel.enable", true)
-		clientConf.SetKey("go.events.channel.size", 100000)
-		clientConf.SetKey("go.application.rebalance.enable", true)
+		//clientConf.SetKey("go.events.channel.enable", false)
+		//clientConf.SetKey("go.events.channel.size", 100000)
+		//clientConf.SetKey("go.application.rebalance.enable", false)
 		return confluent.NewConsumer(clientConf)
 	}
 
@@ -145,18 +146,19 @@ func NewConsumer(conf *ClientConf) (*Consumer, error) {
 		}
 	}
 
-	c.partitionConsumers = make(map[int32]*confluent.Consumer, len(c.Partitions))
+	//c.partitionConsumers = make(map[int32]*confluent.Consumer, len(c.Partitions))
 	for _, part := range c.Partitions {
-		c.partitionConsumers[part], err = getConsumer(fmt.Sprintf("%s-partition-%d", conf.ClientID, part))
+		/*c.partitionConsumers[part], err = getConsumer(fmt.Sprintf("%s-partition-%d", conf.ClientID, part))
 		if err != nil {
 			return nil, err
-		}
+		}*/
 
-		_, offset, err := c.partitionConsumers[part].QueryWatermarkOffsets(c.conf.Topics[0], part, int(c.conf.MetadataTimeout/time.Millisecond))
+		_, offset, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], part, int(c.conf.MetadataTimeout/time.Millisecond))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get newest offset for topic %s part %d: %s", c.conf.Topics[0], part, err)
 		}
 		c.bootTimeOffsets[part] = offset
+		fmt.Println(fmt.Sprintf("setting boottimeoffset %+v for part %d to %d", c.conf.Topics, part, offset))
 		c.partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("%s.%d.offset", c.conf.GaugePrefix, part))
 		c.partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("%s.%d.log_size", c.conf.GaugePrefix, part))
 		c.partitionLag[part] = stats.NewGauge64(fmt.Sprintf("%s.%d.lag", c.conf.GaugePrefix, part))
@@ -173,15 +175,15 @@ func (c *Consumer) InitLagMonitor(size int) {
 }
 
 func (c *Consumer) Start(processBacklog *sync.WaitGroup) error {
-	err := c.startConsumer()
-	if err != nil {
-		return fmt.Errorf("Failed to start consumer: %s", err)
+	for range c.Partitions {
+		go c.consume()
 	}
 
 	go c.monitorLag(processBacklog)
 
-	for _, partition := range c.Partitions {
-		go c.consume(partition)
+	err := c.startConsumer()
+	if err != nil {
+		return fmt.Errorf("Failed to start consumer: %s", err)
 	}
 
 	return nil
@@ -218,44 +220,61 @@ func (c *Consumer) StartAndAwaitBacklog(backlogProcessTimeout time.Duration) err
 	return nil
 }
 
-func (c *Consumer) consume(partition int32) {
+func (c *Consumer) consume() {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
 	var offsetPtr *int64
 	var ok bool
-	if offsetPtr, ok = c.currentOffsets[partition]; !ok || offsetPtr == nil {
-		log.Fatal(3, "kafka-consumer: Failed to get currentOffset for partition %d", partition)
-	}
 
-	log.Info("kafka-consumer: Consumer started for partition %d of topics %+v", partition, c.conf.Topics)
-	events := c.partitionConsumers[partition].Events()
+	log.Info("kafka-consumer: Consumer started for topics %+v", c.conf.Topics)
+	timeout := 1000
+	i := 0
+	j := 0
 	for {
-		select {
-		case ev := <-events:
-			switch e := ev.(type) {
-			case confluent.AssignedPartitions:
-				c.consumer.Assign(e.Partitions)
-				log.Info("kafka-consumer: Assigned partitions: %+v", e)
-			case confluent.RevokedPartitions:
-				c.consumer.Unassign()
-				log.Info("kafka-consumer: Revoked partitions: %+v", e)
-			case *confluent.Message:
-				tp := e.TopicPartition
-				if tp.Partition != partition {
-					log.Error(3, "kafka-consumer: Received unexpected partition %d, expected %d", tp.Partition, partition)
-					continue
+		ev := c.consumer.Poll(timeout)
+		switch e := ev.(type) {
+		case *confluent.AssignedPartitions:
+			c.consumer.Assign(e.Partitions)
+			log.Info("kafka-consumer: Assigned partitions: %+v", e)
+		case *confluent.RevokedPartitions:
+			c.consumer.Unassign()
+			log.Info("kafka-consumer: Revoked partitions: %+v", e)
+		case *confluent.Message:
+			tp := e.TopicPartition
+			c.conf.MessageHandler(e.Value, tp.Partition)
+			i++
+			if c.conf.Topics[0] == "metricpersist" {
+				fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
+			} else {
+				if i >= 10000 {
+					fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
+					i = 0
+					j++
 				}
-				c.conf.MessageHandler(e.Value, tp.Partition)
-				atomic.StoreInt64(offsetPtr, int64(tp.Offset))
-			case *confluent.Error:
-				log.Error(3, "kafka-consumer: Kafka consumer error: %s", e.String())
-				return
 			}
-		case <-c.stopChan:
-			log.Info("kafka-consumer: Consumer ended for partition %d topics %+v", partition, c.conf.Topics)
-			return
+			if offsetPtr, ok = c.currentOffsets[tp.Partition]; !ok || offsetPtr == nil {
+				log.Fatal(3, "kafka-consumer: Failed to get currentOffset for partition %d", tp.Partition)
+				continue
+			}
+			atomic.StoreInt64(offsetPtr, int64(tp.Offset))
+		case confluent.Error:
+			if e.Code() != confluent.ErrTimedOut {
+				log.Error(3, "kafka-consumer: Kafka consumer error: %s", e)
+			} else {
+				log.Error(3, "kafka-consumer: No more messages, timed out")
+			}
+		default:
+			if ev != nil {
+				log.Error(3, "kafka-consumer: Other message type: %+v", ev)
+			}
 		}
+		/*select {
+		case <-c.stopChan:
+			log.Info("kafka-consumer: Shutting down")
+			return
+		default:
+		}*/
 	}
 }
 
@@ -276,6 +295,7 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 				c.LagMonitor.StoreOffset(partition, offset, ts)
 			}
 			if !completed[partition] && offset >= c.bootTimeOffsets[partition]-1 {
+				fmt.Println(fmt.Sprintf("backlog for partition %d of %+v is done", partition, c.conf.Topics))
 				if processBacklog != nil {
 					processBacklog.Done()
 				}
@@ -284,6 +304,8 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 				if len(c.bootTimeOffsets) == 0 {
 					c.bootTimeOffsets = nil
 				}
+			} else if !completed[partition] {
+				fmt.Println(fmt.Sprintf("backlog for partition %d of %+v is not done yet done. offset: %d boot time offset: %d", partition, c.conf.Topics, offset, c.bootTimeOffsets[partition]-1))
 			}
 
 			_, newest, err := c.consumer.QueryWatermarkOffsets(c.conf.Topics[0], partition, int(c.conf.MetadataTimeout/time.Millisecond))
@@ -295,6 +317,7 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 
 			if err == nil {
 				lag := int(newest - offset)
+				fmt.Println(fmt.Sprintf("topcs %+v setting partition offset for %d to %d, size is %d, lag is %d", c.conf.Topics, partition, offset, newest, lag))
 				c.partitionLag[partition].Set(lag)
 				if c.LagMonitor != nil {
 					c.LagMonitor.StoreLag(partition, lag)
@@ -318,14 +341,13 @@ func (c *Consumer) monitorLag(processBacklog *sync.WaitGroup) {
 func (c *Consumer) startConsumer() error {
 	var offset confluent.Offset
 	var err error
+	var topicPartitions confluent.TopicPartitions
+
 	c.currentOffsets = make(map[int32]*int64, len(c.Partitions))
-
-	for _, partition := range c.Partitions {
-		var currentOffset int64
-		var topicPartitions confluent.TopicPartitions
-		c.currentOffsets[partition] = &currentOffset
-
-		for _, topic := range c.conf.Topics {
+	for _, topic := range c.conf.Topics {
+		for _, partition := range c.Partitions {
+			var currentOffset int64
+			c.currentOffsets[partition] = &currentOffset
 			switch c.conf.StartAtOffset {
 			case "oldest":
 				currentOffset, err = c.tryGetOffset(topic, partition, int64(confluent.OffsetBeginning), 3, time.Second)
@@ -364,11 +386,12 @@ func (c *Consumer) startConsumer() error {
 				Offset:    offset,
 			})
 		}
+	}
 
-		err := c.partitionConsumers[partition].Assign(topicPartitions)
-		if err != nil {
-			return err
-		}
+	fmt.Println(fmt.Sprintf("assigning topic partitions: %+v", topicPartitions))
+	err = c.consumer.Assign(topicPartitions)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -422,7 +445,4 @@ func (c *Consumer) Stop() {
 	close(c.stopChan)
 	c.wg.Wait()
 	c.consumer.Close()
-	for i := range c.partitionConsumers {
-		c.partitionConsumers[i].Close()
-	}
 }
