@@ -1,9 +1,8 @@
-[cassandra-idx]
-create_keyspace_cql_template = """
+schema_keyspace = """
 CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
 """
 
-create_keytable_cql_template = """
+schema_table = """
 CREATE TABLE IF NOT EXISTS %s.metric_idx (
     id text,
     orgid int,

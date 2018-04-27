@@ -15,16 +15,17 @@ import (
 )
 
 var (
-	dryRun            = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
-	logLevel          = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
-	srcCassAddr       = flag.String("src-cass-addr", "localhost", "Address of cassandra host to migrate from.")
-	dstCassAddr       = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
-	srcKeyspace       = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
-	dstKeyspace       = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
-	partitionScheme   = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
-	numPartitions     = flag.Int("num-partitions", 1, "number of partitions in cluster")
-	cassandraTemplate = flag.String("cassandra-idx-cql-template", "/etc/metrictank/idx-cassandra.toml", "Cassandra CQL toml template for keyspace/keytable IDX creation.")
-	wg                sync.WaitGroup
+	dryRun          = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
+	logLevel        = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	srcCassAddr     = flag.String("src-cass-addr", "localhost", "Address of cassandra host to migrate from.")
+	dstCassAddr     = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
+	srcKeyspace     = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
+	dstKeyspace     = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
+	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
+	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
+	schemaFile      = flag.String("schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
+
+	wg sync.WaitGroup
 )
 
 func main() {
@@ -63,11 +64,9 @@ func main() {
 		log.Fatal(4, "failed to create cql session for destination cassandra. %s", err)
 	}
 
-	// read key(space|table) information from templates
-	keytable_cql_template := util.ReadEntry(*cassandraTemplate, "cassandra-idx.create_keytable_cql_template").(string)
-
 	// ensure the dest table exists.
-	err = dstSession.Query(fmt.Sprintf(keytable_cql_template, *dstKeyspace)).Exec()
+	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
+	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace)).Exec()
 	if err != nil {
 		log.Fatal(4, "cassandra-idx failed to initialize cassandra table. %s", err)
 	}

@@ -19,14 +19,15 @@ VERSION=$(git describe --long --abbrev=7)
 BUILD=${BUILD_TMP}/sysvinit
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/metrictank
+mkdir -p ${BUILD}/usr/share/metrictank/examples
 PKG=${BUILD_PKG}/sysvinit
 mkdir -p ${PKG}
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
-cp ${BASE}/config/idx-scylladb.toml ${BUILD}/etc/metrictank/idx-scylladb.toml
-cp ${BASE}/config/idx-cassandra.toml ${BUILD}/etc/metrictank/idx-cassandra.toml
-cp ${BASE}/config/storage-scylladb.toml ${BUILD}/etc/metrictank/storage-scylladb.toml
-cp ${BASE}/config/storage-cassandra.toml ${BUILD}/etc/metrictank/storage-cassandra.toml
+cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-store-cassandra.toml
+cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
+cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
+cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
@@ -48,14 +49,15 @@ BUILD=${BUILD_TMP}/upstart
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/metrictank
+mkdir -p ${BUILD}/usr/share/metrictank/examples
 PKG=${BUILD_PKG}/upstart
 mkdir -p ${PKG}
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
-cp ${BASE}/config/idx-scylladb.toml ${BUILD}/etc/metrictank/idx-scylladb.toml
-cp ${BASE}/config/idx-cassandra.toml ${BUILD}/etc/metrictank/idx-cassandra.toml
-cp ${BASE}/config/storage-scylladb.toml ${BUILD}/etc/metrictank/storage-scylladb.toml
-cp ${BASE}/config/storage-cassandra.toml ${BUILD}/etc/metrictank/storage-cassandra.toml
+cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-store-cassandra.toml
+cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
+cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
+cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
@@ -76,15 +78,16 @@ BUILD=${BUILD_TMP}/systemd
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
+mkdir -p ${BUILD}/usr/share/metrictank/examples
 mkdir -p ${BUILD}/var/run/metrictank
 PKG=${BUILD_PKG}/systemd
 mkdir -p ${PKG}
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
-cp ${BASE}/config/idx-scylladb.toml ${BUILD}/etc/metrictank/idx-scylladb.toml
-cp ${BASE}/config/idx-cassandra.toml ${BUILD}/etc/metrictank/idx-cassandra.toml
-cp ${BASE}/config/storage-scylladb.toml ${BUILD}/etc/metrictank/storage-scylladb.toml
-cp ${BASE}/config/storage-cassandra.toml ${BUILD}/etc/metrictank/storage-cassandra.toml
+cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-store-cassandra.toml
+cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
+cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
+cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
@@ -104,15 +107,16 @@ BUILD=${BUILD_TMP}/systemd-centos7
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/lib/systemd/system/
 mkdir -p ${BUILD}/etc/metrictank
+mkdir -p ${BUILD}/usr/share/metrictank/examples
 mkdir -p ${BUILD}/var/run/metrictank
 PKG=${BUILD_PKG}/systemd-centos7
 mkdir -p ${PKG}
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
-cp ${BASE}/config/idx-scylladb.toml ${BUILD}/etc/metrictank/idx-scylladb.toml
-cp ${BASE}/config/idx-cassandra.toml ${BUILD}/etc/metrictank/idx-cassandra.toml
-cp ${BASE}/config/storage-scylladb.toml ${BUILD}/etc/metrictank/storage-scylladb.toml
-cp ${BASE}/config/storage-cassandra.toml ${BUILD}/etc/metrictank/storage-cassandra.toml
+cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-store-cassandra.toml
+cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
+cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
+cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
@@ -132,14 +136,15 @@ BUILD=${BUILD_TMP}/upstart-0.6.5
 mkdir -p ${BUILD}/usr/bin
 mkdir -p ${BUILD}/etc/init
 mkdir -p ${BUILD}/etc/metrictank
+mkdir -p ${BUILD}/usr/share/metrictank/examples
 PKG=${BUILD_PKG}/upstart-0.6.5
 mkdir -p ${PKG}
 
 cp ${BASE}/config/metrictank-package.ini ${BUILD}/etc/metrictank/metrictank.ini
-cp ${BASE}/config/idx-scylladb.toml ${BUILD}/etc/metrictank/idx-scylladb.toml
-cp ${BASE}/config/idx-cassandra.toml ${BUILD}/etc/metrictank/idx-cassandra.toml
-cp ${BASE}/config/storage-scylladb.toml ${BUILD}/etc/metrictank/storage-scylladb.toml
-cp ${BASE}/config/storage-cassandra.toml ${BUILD}/etc/metrictank/storage-cassandra.toml
+cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-store-cassandra.toml
+cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
+cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
+cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init

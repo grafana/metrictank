@@ -170,7 +170,7 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, cassandraTemplate string, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, schemaFile string, ttls []uint32) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -197,20 +197,20 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	if err != nil {
 		return nil, err
 	}
-	// read key(space|table) information from templates
-	keyspace_cql_template := util.ReadEntry(cassandraTemplate, "cassandra-store.create_keyspace_cql_template").(string)
-	keytable_cql_template := util.ReadEntry(cassandraTemplate, "cassandra-store.create_keytable_cql_template").(string)
+
+	schemaKeyspace := util.ReadEntry(schemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(schemaFile, "schema_table").(string)
 
 	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
 
 	// create or verify the metrictank keyspace
 	if createKeyspace {
-		err = tmpSession.Query(fmt.Sprintf(keyspace_cql_template, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, result := range ttlTables {
-			err := tmpSession.Query(fmt.Sprintf(keytable_cql_template, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+			err := tmpSession.Query(fmt.Sprintf(schemaTable, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
 			}

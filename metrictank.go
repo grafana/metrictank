@@ -88,7 +88,7 @@ var (
 	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
-	cassandraTemplate = flag.String("cassandra-cql-template", "/etc/metrictank/storage-cassandra.toml", "Cassandra CQL templates for keyspace/table creation")
+	cassandraSchemaFile = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
 
 	// Profiling, instrumentation and logging:
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
@@ -279,7 +279,7 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err = cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraTemplate, mdata.TTLs())
+	store, err = cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, mdata.TTLs())
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}

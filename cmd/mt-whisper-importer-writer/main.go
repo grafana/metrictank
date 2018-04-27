@@ -92,7 +92,7 @@ var (
 	cassandraUsername = globalFlags.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = globalFlags.String("cassandra-password", "cassandra", "password for authentication")
 
-	cassandraTemplate = flag.String("cassandra-cql-template", "/etc/metrictank/storage-cassandra.toml", "Cassandra CQL templates for keyspace/table creation")
+	cassandraSchemaFile = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
 
 	gitHash = "(none)"
 )
@@ -153,7 +153,7 @@ func main() {
 		log.SetLevel(log.InfoLevel)
 	}
 
-	store, err := cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraTemplate, nil)
+	store, err := cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
 	}

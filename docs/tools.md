@@ -90,8 +90,6 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
-  -cassandra-idx-cql-template string
-    	Cassandra CQL template for IDX keyspace creation (default "/etc/metrictank/idx-cassandra.toml")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
@@ -114,6 +112,8 @@ cass config flags:
     	cql protocol version to use (default 4)
   -prune-interval duration
     	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
   -timeout duration
@@ -154,8 +154,6 @@ or for resetting partition information when the number of partitions being used 
 
 Flags:
 
-  -cassandra-idx-cql-template string
-    	Cassandra CQL toml template for keyspace/keytable IDX creation. (default "/etc/metrictank/idx-cassandra.toml")
   -dry-run
     	run in dry-run mode. No changes will be made. (default true)
   -dst-cass-addr string
@@ -168,6 +166,8 @@ Flags:
     	number of partitions in cluster (default 1)
   -partition-scheme string
     	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -src-cass-addr string
     	Address of cassandra host to migrate from. (default "localhost")
   -src-keyspace string
@@ -275,8 +275,6 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
-  -cassandra-cql-template string
-    	Cassandra CQL templates for keyspace/table creation (default "/etc/metrictank/storage-cassandra.toml")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
@@ -289,6 +287,8 @@ Flags:
     	password for authentication (default "cassandra")
   -cassandra-retries int
     	how many times to retry a query before failing it
+  -cassandra-schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
@@ -333,8 +333,6 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
-  -cassandra-cql-template string
-    	Cassandra CQL templates for keyspace/table creation (default "/etc/metrictank/storage-cassandra.toml")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
   -cassandra-host-selection-policy string
@@ -353,6 +351,8 @@ Flags:
     	max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel. (default 200000)
   -cassandra-retries int
     	how many times to retry a query before failing it
+  -cassandra-schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
@@ -606,8 +606,6 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
-  -cassandra-idx-cql-template string
-    	Cassandra CQL template for IDX keyspace creation (default "/etc/metrictank/idx-cassandra.toml")
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
@@ -630,6 +628,8 @@ cass config flags:
     	cql protocol version to use (default 4)
   -prune-interval duration
     	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
   -timeout duration

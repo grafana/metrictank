@@ -48,27 +48,27 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
-	Enabled              bool
-	ssl                  bool
-	auth                 bool
-	hostverification     bool
-	createKeyspace       bool
-	cassandraIdxTemplate string
-	keyspace             string
-	hosts                string
-	capath               string
-	username             string
-	password             string
-	consistency          string
-	timeout              time.Duration
-	numConns             int
-	writeQueueSize       int
-	protoVer             int
-	maxStale             time.Duration
-	pruneInterval        time.Duration
-	updateCassIdx        bool
-	updateInterval       time.Duration
-	updateInterval32     uint32
+	Enabled          bool
+	ssl              bool
+	auth             bool
+	hostverification bool
+	createKeyspace   bool
+	schemaFile       string
+	keyspace         string
+	hosts            string
+	capath           string
+	username         string
+	password         string
+	consistency      string
+	timeout          time.Duration
+	numConns         int
+	writeQueueSize   int
+	protoVer         int
+	maxStale         time.Duration
+	pruneInterval    time.Duration
+	updateCassIdx    bool
+	updateInterval   time.Duration
+	updateInterval32 uint32
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -87,7 +87,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
-	casIdx.StringVar(&cassandraIdxTemplate, "cassandra-idx-cql-template", "/etc/metrictank/idx-cassandra.toml", "Cassandra CQL template for IDX keyspace creation")
+	casIdx.StringVar(&schemaFile, "schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
 
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
 	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
@@ -161,16 +161,16 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	// read templates
-	keyspace_cql_template := util.ReadEntry(cassandraIdxTemplate, "cassandra-idx.create_keyspace_cql_template").(string)
-	keytable_cql_template := util.ReadEntry(cassandraIdxTemplate, "cassandra-idx.create_keytable_cql_template").(string)
+	schemaKeyspace := util.ReadEntry(schemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(schemaFile, "schema_table").(string)
 
 	// create the keyspace or ensure it exists
 	if createKeyspace {
-		err = tmpSession.Query(fmt.Sprintf(keyspace_cql_template, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		err = tmpSession.Query(fmt.Sprintf(keytable_cql_template, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaTable, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}

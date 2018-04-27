@@ -1,9 +1,8 @@
-[cassandra-store]
-create_keyspace_cql_template = """
+schema_keyspace = """
 CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
 """
 
-create_keytable_cql_template = """
+schema_table = """
 CREATE TABLE IF NOT EXISTS %s.%s (
     key ascii,
     ts int,
@@ -11,6 +10,6 @@ CREATE TABLE IF NOT EXISTS %s.%s (
     PRIMARY KEY (key, ts)
 ) WITH CLUSTERING ORDER BY (ts DESC)
     AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d', 'tombstone_threshold': '0.2', 'tombstone_compaction_interval': '86400'}
-    AND compression = { 'class': 'LZ4Compressor' }
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
     AND gc_grace_seconds = %d
 """
