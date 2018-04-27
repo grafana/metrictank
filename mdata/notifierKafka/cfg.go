@@ -28,6 +28,7 @@ func init() {
 	fs.BoolVar(&Enabled, "enabled", false, "")
 	fs.DurationVar(&clientConf.LagCollectionInterval, "lag-collection-interval", time.Second*5, "Interval at which the lag is calculated and saved")
 	fs.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
+	fs.IntVar(&clientConf.ConsumerThreads, "consumer-threads", 4, "Number of threads consunming from Kafka")
 	fs.DurationVar(&clientConf.BufferMax, "metrics-buffer-max", time.Millisecond*100, "Delay to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	fs.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000000, "Maximum number of messages allowed on the producer queue")
 	fs.IntVar(&clientConf.FetchMin, "fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")

@@ -51,6 +51,7 @@ func ConfigSetup() {
 	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPoint messages without org-id, assume this org id")
 	inKafkaMdm.DurationVar(&clientConf.LagCollectionInterval, "lag-collection-interval", time.Second*5, "Interval at which the lag is calculated and saved")
 	inKafkaMdm.IntVar(&clientConf.BatchNumMessages, "batch-num-messages", 10000, "Maximum number of messages batched in one MessageSet")
+	inKafkaMdm.IntVar(&clientConf.ConsumerThreads, "consumer-threads", 4, "Number of threads consunming from Kafka")
 	inKafkaMdm.DurationVar(&clientConf.BufferMax, "metrics-buffer-max", time.Millisecond*100, "Delay in milliseconds to wait for messages in the producer queue to accumulate before constructing message batches (MessageSets) to transmit to brokers")
 	inKafkaMdm.IntVar(&clientConf.ChannelBufferSize, "channel-buffer-size", 1000, "Maximum number of messages allowed on the producer queue")
 	inKafkaMdm.IntVar(&clientConf.FetchMin, "fetch-min", 1, "Minimum number of bytes the broker responds with. If fetch.wait.max.ms expires the accumulated data will be sent to the client regardless of this setting")
