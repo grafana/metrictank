@@ -175,8 +175,15 @@ func (c *Consumer) InitLagMonitor(size int) {
 }
 
 func (c *Consumer) Start(processBacklog *sync.WaitGroup) error {
+	partitionChans := make(map[int32]chan *confluent.Message)
+
+	for _, i := range c.Partitions {
+		partitionChans[i] = make(chan *confluent.Message, 1000)
+		go c.consumePartition(i, partitionChans[i])
+	}
+
 	for range c.Partitions {
-		go c.consume()
+		go c.consume(partitionChans)
 	}
 
 	go c.monitorLag(processBacklog)
@@ -220,44 +227,58 @@ func (c *Consumer) StartAndAwaitBacklog(backlogProcessTimeout time.Duration) err
 	return nil
 }
 
-func (c *Consumer) consume() {
+func (c *Consumer) consumePartition(partition int32, partitionChan chan *confluent.Message) {
 	c.wg.Add(1)
 	defer c.wg.Done()
 
+	i := 0
+	j := 0
 	var offsetPtr *int64
 	var ok bool
 
+	for e := range partitionChan {
+		tp := e.TopicPartition
+		i++
+		if c.conf.Topics[0] == "metricpersist" {
+			fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
+		} else {
+			if i >= 10000 {
+				fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
+				i = 0
+				j++
+			}
+		}
+		c.conf.MessageHandler(e.Value, partition)
+		if offsetPtr, ok = c.currentOffsets[partition]; !ok || offsetPtr == nil {
+			log.Fatal(3, "kafka-consumer: Failed to get currentOffset for partition %d", partition)
+			continue
+		}
+		atomic.StoreInt64(offsetPtr, int64(e.TopicPartition.Offset))
+	}
+}
+
+func (c *Consumer) consume(partitionChans map[int32]chan *confluent.Message) {
+	c.wg.Add(1)
+	defer c.wg.Done()
+
 	log.Info("kafka-consumer: Consumer started for topics %+v", c.conf.Topics)
 	timeout := 1000
-	i := 0
-	j := 0
 	for {
 		ev := c.consumer.Poll(timeout)
 		switch e := ev.(type) {
-		case *confluent.AssignedPartitions:
-			c.consumer.Assign(e.Partitions)
-			log.Info("kafka-consumer: Assigned partitions: %+v", e)
-		case *confluent.RevokedPartitions:
-			c.consumer.Unassign()
-			log.Info("kafka-consumer: Revoked partitions: %+v", e)
 		case *confluent.Message:
 			tp := e.TopicPartition
-			c.conf.MessageHandler(e.Value, tp.Partition)
-			i++
-			if c.conf.Topics[0] == "metricpersist" {
-				fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
+			//c.conf.MessageHandler(e.Value, tp.Partition)
+			if partitionChan, ok := partitionChans[tp.Partition]; ok {
+				partitionChan <- e
 			} else {
-				if i >= 10000 {
-					fmt.Println(fmt.Sprintf("msg cnt for %+v: %d, partition: %d, offset: %d", c.conf.Topics, j*10000, tp.Partition, tp.Offset))
-					i = 0
-					j++
-				}
+				log.Error(3, "kafka-consumer: Received message on unexpected partition: %d", tp.Partition)
 			}
-			if offsetPtr, ok = c.currentOffsets[tp.Partition]; !ok || offsetPtr == nil {
+			/*if offsetPtr, ok = c.currentOffsets[tp.Partition]; !ok || offsetPtr == nil {
 				log.Fatal(3, "kafka-consumer: Failed to get currentOffset for partition %d", tp.Partition)
 				continue
 			}
-			atomic.StoreInt64(offsetPtr, int64(tp.Offset))
+			atomic.StoreInt64(offsetPtr, int64(tp.Offset))*/
 		case confluent.Error:
 			if e.Code() != confluent.ErrTimedOut {
 				log.Error(3, "kafka-consumer: Kafka consumer error: %s", e)
