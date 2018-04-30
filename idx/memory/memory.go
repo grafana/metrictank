@@ -837,8 +837,7 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 	defer m.RUnlock()
 
 	ids := m.idsByTagQuery(orgId, query)
-	res := make([]idx.Node, 0, len(ids))
-	seen := make(map[string]struct{})
+	nodesByPath := make(map[string]*idx.Node)
 	for id := range ids {
 		def, ok := m.defById[id]
 		if !ok {
@@ -847,28 +846,24 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 			continue
 		}
 
-		if _, ok := seen[def.NameWithTags()]; !ok {
-
-			defMap := m.defByTagSet.defs(orgId, def.NameWithTags())
-
-			defs := make([]idx.Archive, 0, len(defMap))
-
-			for d := range defMap {
-				if from != 0 && def.LastUpdate < from {
-					continue
-				}
-				defs = append(defs, *m.defById[d.Id])
-			}
-
-			res = append(res, idx.Node{
+		if existing, ok := nodesByPath[def.NameWithTags()]; !ok {
+			nodesByPath[def.NameWithTags()] = &idx.Node{
 				Path:        def.NameWithTags(),
 				Leaf:        true,
 				HasChildren: false,
-				Defs:        defs,
-			})
-			seen[def.NameWithTags()] = struct{}{}
+				Defs:        []idx.Archive{*def},
+			}
+		} else {
+			existing.Defs = append(existing.Defs, *def)
 		}
 	}
+
+	res := make([]idx.Node, 0, len(nodesByPath))
+
+	for _, v := range nodesByPath {
+		res = append(res, *v)
+	}
+
 	return res, nil
 }
 

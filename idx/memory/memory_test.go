@@ -130,12 +130,13 @@ func testGetAddKey(t *testing.T) {
 	if TagSupport {
 		Convey("When adding metricDefs with the same series name as existing metricDefs (tagged)", t, func() {
 			Convey("then findByTag", func() {
-				nodes, _ := ix.FindByTag(1, []string{"name!="}, 0)
+				nodes, err := ix.FindByTag(1, []string{"name!="}, 0)
+				So(err, ShouldBeNil)
 				defs := make([]idx.Archive, 0, len(nodes))
 				for i := range nodes {
 					defs = append(defs, nodes[i].Defs...)
 				}
-				So(defs, ShouldHaveLength, 10)
+				So(defs, ShouldHaveLength, 2*len(org1Series))
 			})
 		})
 	}
