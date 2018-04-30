@@ -57,27 +57,29 @@ func (r *request) decode(pd packetDecoder) (err error) {
 	return r.body.decode(pd, version)
 }
 
-func decodeRequest(r io.Reader) (req *request, err error) {
+func decodeRequest(r io.Reader) (req *request, bytesRead int, err error) {
 	lengthBytes := make([]byte, 4)
 	if _, err := io.ReadFull(r, lengthBytes); err != nil {
-		return nil, err
+		return nil, bytesRead, err
 	}
+	bytesRead += len(lengthBytes)
 
 	length := int32(binary.BigEndian.Uint32(lengthBytes))
 	if length <= 4 || length > MaxRequestSize {
-		return nil, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}
+		return nil, bytesRead, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}
 	}
 
 	encodedReq := make([]byte, length)
 	if _, err := io.ReadFull(r, encodedReq); err != nil {
-		return nil, err
+		return nil, bytesRead, err
 	}
+	bytesRead += len(encodedReq)
 
 	req = &request{}
 	if err := decode(encodedReq, req); err != nil {
-		return nil, err
+		return nil, bytesRead, err
 	}
-	return req, nil
+	return req, bytesRead, nil
 }
 
 func allocateBody(key, version int16) protocolBody {
@@ -87,7 +89,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 1:
 		return &FetchRequest{}
 	case 2:
-		return &OffsetRequest{}
+		return &OffsetRequest{Version: version}
 	case 3:
 		return &MetadataRequest{}
 	case 8:
@@ -112,6 +114,32 @@ func allocateBody(key, version int16) protocolBody {
 		return &SaslHandshakeRequest{}
 	case 18:
 		return &ApiVersionsRequest{}
+	case 19:
+		return &CreateTopicsRequest{}
+	case 20:
+		return &DeleteTopicsRequest{}
+	case 22:
+		return &InitProducerIDRequest{}
+	case 24:
+		return &AddPartitionsToTxnRequest{}
+	case 25:
+		return &AddOffsetsToTxnRequest{}
+	case 26:
+		return &EndTxnRequest{}
+	case 28:
+		return &TxnOffsetCommitRequest{}
+	case 29:
+		return &DescribeAclsRequest{}
+	case 30:
+		return &CreateAclsRequest{}
+	case 31:
+		return &DeleteAclsRequest{}
+	case 32:
+		return &DescribeConfigsRequest{}
+	case 33:
+		return &AlterConfigsRequest{}
+	case 37:
+		return &CreatePartitionsRequest{}
 	}
 	return nil
 }

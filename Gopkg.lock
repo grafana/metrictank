@@ -30,8 +30,8 @@
 [[projects]]
   name = "github.com/Shopify/sarama"
   packages = ["."]
-  revision = "bd61cae2be85fa6ff40eb23dcdd24567967ac2ae"
-  version = "v1.10.1"
+  revision = "f7be6aa2bc7b2e38edf816b08b582782194a1c02"
+  version = "v1.16.0"
 
 [[projects]]
   name = "github.com/Sirupsen/logrus"
