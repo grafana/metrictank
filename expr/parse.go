@@ -112,7 +112,7 @@ func Parse(e string) (*expr, string, error) {
 		return parseConst(e)
 	}
 
-	if val, wasBool := strToBool(e); wasBool {
+	if val, ok := strToBool(e); ok {
 		// 'false' is 5 chars, 'true' is 4
 		size := 5
 		if val {

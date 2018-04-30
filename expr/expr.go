@@ -154,7 +154,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			break
 		}
 		if got.etype == etString {
-			if val, wasBool := strToBool(got.str); wasBool {
+			if val, ok := strToBool(got.str); ok {
 				*v.val = val
 				break
 			}
@@ -283,7 +283,7 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 			break
 		}
 		if got.etype == etString {
-			if val, wasBool := strToBool(got.str); wasBool {
+			if val, ok := strToBool(got.str); ok {
 				*v.val = val
 				break
 			}
