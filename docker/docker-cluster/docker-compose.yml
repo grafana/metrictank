@@ -7,7 +7,6 @@ services:
     expose:
      - 6060
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
       - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
@@ -32,7 +31,6 @@ services:
     expose:
      - 6060
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
       - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
@@ -57,7 +55,6 @@ services:
     expose:
      - 6060
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
       - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
@@ -82,7 +79,6 @@ services:
     expose:
      - 6060
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
       - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf

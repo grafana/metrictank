@@ -7,7 +7,6 @@ services:
     ports:
      - "6060:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042
@@ -32,7 +31,6 @@ services:
     ports:
       - "6061:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
@@ -57,7 +55,6 @@ services:
     ports:
       - "6062:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
@@ -82,7 +79,6 @@ services:
     ports:
       - "6063:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
@@ -107,7 +103,6 @@ services:
     ports:
       - "6064:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060
@@ -132,7 +127,6 @@ services:
     ports:
       - "6065:6060"
     volumes:
-      - ../../build/metrictank:/usr/bin/metrictank
       - ./metrictank.ini:/etc/metrictank/metrictank.ini
     environment:
       WAIT_HOSTS: kafka:9092,cassandra:9042,metrictank0:6060

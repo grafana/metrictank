@@ -16,23 +16,32 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - build
             - build_docker
 
   test:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
       - image: circleci/golang:1.10
+    environment:
+      - TMP_DIR: /tmp/tmpdir
+      - PKG_CONFIG_PATH: /tmp/tmpdir/lib/pkgconfig
+      - LD_LIBRARY_PATH: /tmp/tmpdir/lib
     steps:
       - checkout
-      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
+      - run: scripts/build_deps.sh
+      - run: go test -v -race -tags static $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
       - image: circleci/golang:1.10
+    environment:
+      - TMP_DIR: /tmp/tmpdir
+      - PKG_CONFIG_PATH: /tmp/tmpdir/lib/pkgconfig
+      - LD_LIBRARY_PATH: /tmp/tmpdir/lib
     steps:
       - checkout
+      - run: scripts/build_deps.sh
       - run: scripts/qa/gofmt.sh
       - run: scripts/qa/go-generate.sh
       - run: scripts/qa/ineffassign.sh
@@ -43,12 +52,20 @@ jobs:
 
   qa-post-build:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
-    machine: true
+    machine:
+      image: true
+    environment:
+      - TMP_DIR: /tmp/tmpdir
+      - PKG_CONFIG_PATH: /tmp/tmpdir/lib/pkgconfig
+      - LD_LIBRARY_PATH: /tmp/tmpdir/lib
     steps:
       - checkout
+      - run: cd /usr/local; curl https://dl.google.com/go/go1.10.1.linux-amd64.tar.gz | sudo tar -xz 
+      - run: scripts/build_deps.sh
+      - run: scripts/build_tools.sh
+      - run: scripts/qa/docs.sh
       - attach_workspace:
           at: .
-      - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
       - run: go test -v ./stacktest/tests/end2end_carbon
 
@@ -59,13 +76,13 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - setup_remote_docker
       - run: scripts/depends.sh
       - run: scripts/build_packages.sh
       - store_artifacts:
           path: build
       - store_artifacts:
           path: build_pkg
-      - setup_remote_docker
       - deploy:
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
