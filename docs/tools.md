@@ -112,6 +112,8 @@ cass config flags:
     	cql protocol version to use (default 4)
   -prune-interval duration
     	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
   -timeout duration
@@ -164,6 +166,8 @@ Flags:
     	number of partitions in cluster (default 1)
   -partition-scheme string
     	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -src-cass-addr string
     	Address of cassandra host to migrate from. (default "localhost")
   -src-keyspace string
@@ -283,6 +287,8 @@ Flags:
     	password for authentication (default "cassandra")
   -cassandra-retries int
     	how many times to retry a query before failing it
+  -cassandra-schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
@@ -345,6 +351,8 @@ Flags:
     	max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel. (default 200000)
   -cassandra-retries int
     	how many times to retry a query before failing it
+  -cassandra-schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
@@ -620,6 +628,8 @@ cass config flags:
     	cql protocol version to use (default 4)
   -prune-interval duration
     	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
   -timeout duration

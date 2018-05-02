@@ -1,0 +1,20 @@
+schema_keyspace = """
+CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
+"""
+
+schema_table = """
+CREATE TABLE IF NOT EXISTS %s.metric_idx (
+    id text,
+    orgid int,
+    partition int,
+    name text,
+    metric text,
+    interval int,
+    unit text,
+    mtype text,
+    tags set<text>,
+    lastupdate int,
+    PRIMARY KEY (partition, id)
+) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+"""

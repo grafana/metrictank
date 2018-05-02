@@ -19,6 +19,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
+	"github.com/grafana/metrictank/util"
 	"github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
@@ -29,16 +30,6 @@ import (
 
 const Month_sec = 60 * 60 * 24 * 28
 
-const keyspace_schema = `CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true`
-const table_schema = `CREATE TABLE IF NOT EXISTS %s.%s (
-    key ascii,
-    ts int,
-    data blob,
-    PRIMARY KEY (key, ts)
-) WITH CLUSTERING ORDER BY (ts DESC)
-    AND compaction = { 'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '%d', 'tombstone_threshold': '0.2', 'tombstone_compaction_interval': '86400'}
-    AND compression = { 'class': 'LZ4Compressor' }
-    AND gc_grace_seconds = %d`
 const Table_name_format = `metric_%d`
 
 var (
@@ -179,7 +170,7 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, schemaFile string, ttls []uint32) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -207,16 +198,19 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		return nil, err
 	}
 
+	schemaKeyspace := util.ReadEntry(schemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(schemaFile, "schema_table").(string)
+
 	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
 
 	// create or verify the metrictank keyspace
 	if createKeyspace {
-		err = tmpSession.Query(fmt.Sprintf(keyspace_schema, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, result := range ttlTables {
-			err := tmpSession.Query(fmt.Sprintf(table_schema, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+			err := tmpSession.Query(fmt.Sprintf(schemaTable, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
 			}

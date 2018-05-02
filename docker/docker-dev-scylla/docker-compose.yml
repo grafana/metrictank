@@ -12,8 +12,8 @@ services:
       - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
-      - ../../scripts/config/schema-store-cassandra.toml:/etc/metrictank/schema-store-cassandra.toml
-      - ../../scripts/config/schema-idx-cassandra.toml:/etc/metrictank/schema-idx-cassandra.toml
+      - ../../scripts/config/schema-store-scylladb.toml:/etc/metrictank/schema-store-cassandra.toml
+      - ../../scripts/config/schema-idx-scylladb.toml:/etc/metrictank/schema-idx-cassandra.toml
 
     environment:
       WAIT_HOSTS: cassandra:9042
@@ -25,10 +25,7 @@ services:
 
   cassandra:
     hostname: cassandra
-    image: cassandra:3.9
-    environment:
-      MAX_HEAP_SIZE: 1G
-      HEAP_NEWSIZE: 256M
+    image: scylladb/scylla
     ports:
      - "9042:9042"
 

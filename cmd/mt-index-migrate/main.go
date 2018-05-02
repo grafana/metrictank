@@ -9,7 +9,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster/partitioner"
-	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/util"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -23,6 +23,7 @@ var (
 	dstKeyspace     = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
 	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
 	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
+	schemaFile      = flag.String("schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
 
 	wg sync.WaitGroup
 )
@@ -64,7 +65,8 @@ func main() {
 	}
 
 	// ensure the dest table exists.
-	err = dstSession.Query(fmt.Sprintf(cassandra.TableSchema, *dstKeyspace)).Exec()
+	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
+	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace)).Exec()
 	if err != nil {
 		log.Fatal(4, "cassandra-idx failed to initialize cassandra table. %s", err)
 	}
