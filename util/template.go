@@ -26,5 +26,5 @@ func ReadEntry(TomlFilename string, EntryName string) interface{} {
 	if val == nil {
 		log.Fatalf("Error %q does not exist in %q", EntryName, TomlFilename)
 	}
-	return tree.Get(EntryName)
+	return val
 }
