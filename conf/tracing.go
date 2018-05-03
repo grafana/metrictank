@@ -9,7 +9,9 @@ import (
 	jaegerlog "github.com/uber/jaeger-client-go/log"
 )
 
-func GetTracer(enabled bool, addr string) (opentracing.Tracer, io.Closer, error) {
+// GetTracer returns a jaeger tracer
+// any tags specified will be added as process/tracer-level tags
+func GetTracer(enabled bool, addr string, tags map[string]string) (opentracing.Tracer, io.Closer, error) {
 	// Sample configuration for testing. Use constant sampling to sample every trace
 	// and enable LogSpan to log every span via configured Logger.
 	cfg := jaegercfg.Configuration{
@@ -26,9 +28,16 @@ func GetTracer(enabled bool, addr string) (opentracing.Tracer, io.Closer, error)
 
 	jLogger := jaegerlog.StdLogger
 
+	options := []jaegercfg.Option{
+		jaegercfg.Logger(jLogger),
+	}
+	for k, v := range tags {
+		options = append(options, jaegercfg.Tag(k, v))
+	}
+
 	tracer, closer, err := cfg.New(
 		"metrictank",
-		jaegercfg.Logger(jLogger),
+		options...,
 	)
 	if err != nil {
 		return nil, nil, err
