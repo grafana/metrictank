@@ -126,6 +126,8 @@ log-level = 2
 tracing-enabled = false
 # address of the jaeger agent to send data to
 tracing-addr = localhost:6831
+# tracer/process-level tags to include, specified as comma-separated key:value pairs
+tracing-add-tags =
 ```
 
 ## Retention settings ##
