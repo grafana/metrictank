@@ -150,3 +150,7 @@
 [[override]]
   name = "golang.org/x/net"
   revision = "cbe0f9307d0156177f9dd5dc85da1a31abc5f2fb"
+
+[[constraint]]
+  name = "github.com/pierrec/lz4"
+  version = "1.1.0"
