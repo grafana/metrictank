@@ -253,9 +253,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 }
 
 func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string) {
-
-	keyItr := sourceSession.Query(fmt.Sprintf("SELECT distinct key FROM %s where token(key) >= %d AND token(key) <= %d", tableIn, *startToken, *endToken)).Iter()
-
+	// Kick off our threads
 	jobs := make(chan string, 10000)
 
 	var wg sync.WaitGroup
@@ -266,18 +264,26 @@ func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string)
 
 	timeStarted = time.Now()
 
-	var key string
-	for keyItr.Scan(&key) {
-		jobs <- key
+	lastToken := *startToken
+
+	// Retry loop
+	for {
+		keyItr := sourceSession.Query(fmt.Sprintf("SELECT distinct key, token(key) FROM %s where token(key) >= %d AND token(key) <= %d", tableIn, lastToken, *endToken)).Iter()
+
+		var key string
+		for keyItr.Scan(&key, &lastToken) {
+			jobs <- key
+		}
+
+		err := keyItr.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows\n", tableIn, err, doneKeys, doneRows)
+		} else {
+			break
+		}
 	}
 
 	close(jobs)
-	err := keyItr.Close()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows\n", tableIn, err, doneKeys, doneRows)
-		wg.Wait()
-		os.Exit(2)
-	}
 
 	wg.Wait()
 	log.Printf("DONE.  Processed %d keys, %d rows\n", doneKeys, doneRows)
