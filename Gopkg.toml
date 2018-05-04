@@ -154,3 +154,7 @@
 [[constraint]]
   name = "github.com/pierrec/lz4"
   version = "1.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/rcrowley/go-metrics"

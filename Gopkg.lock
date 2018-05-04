@@ -539,6 +539,12 @@
   revision = "f3ec558991f8d5e7b1efcc291fa36edef6c47123"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/rcrowley/go-metrics"
+  packages = ["."]
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
+
+[[projects]]
   name = "github.com/rs/cors"
   packages = ["."]
   revision = "a62a804a8a009876ca59105f7899938a1349f4b3"
@@ -756,6 +762,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4310514673bc8e3d2d703fd1762e333e3453c7e895cbf08fcc919822414ed31a"
+  inputs-digest = "62856fc73c8146f12324663da5c036fdaa30f12fea6f7d5b7be6c10e00cea951"
   solver-name = "gps-cdcl"
   solver-version = 1
