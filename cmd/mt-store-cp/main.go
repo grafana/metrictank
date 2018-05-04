@@ -27,6 +27,7 @@ var (
 	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	cassandraConcurrency         = flag.Int("cassandra-concurrency", 20, "max number of concurrent reads to cassandra.")
 	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
+	cassandraDisableHostLookup   = flag.Bool("cassandra-disable-host-lookup", false, "disable host lookup (useful if going through proxy)")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
 
 	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
@@ -44,7 +45,7 @@ var (
 	numThreads   = flag.Int("threads", 1, "number of workers to use to process data")
 	maxBatchSize = flag.Int("max-batch-size", 10, "max number of queries per batch")
 
-	progressRows = flag.Int("progress-rows", 100000, "number of rows between progress output")
+	progressRows = flag.Int("progress-rows", 1000000, "number of rows between progress output")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 
@@ -111,7 +112,7 @@ func NewCassandraStore(cassandraAddrs *string) (*gocql.Session, error) {
 			Password: *cassandraPassword,
 		}
 	}
-	cluster.DisableInitialHostLookup = true
+	cluster.DisableInitialHostLookup = *cassandraDisableHostLookup
 	cluster.Consistency = gocql.ParseConsistency(*cassandraConsistency)
 	cluster.Timeout = time.Duration(*cassandraTimeout) * time.Millisecond
 	cluster.NumConns = *cassandraConcurrency
@@ -174,7 +175,7 @@ func printProgress(id int, token int64, doneRowsSnap uint64) {
 	ratioLeft := (1 - completeness) / completeness
 	timeRemaining := time.Duration(float64(timeElapsed) * ratioLeft)
 	rowsPerSec := doneRowsSnap / (uint64(1) + uint64(timeElapsed/time.Second))
-	log.Printf("WORKING: id=%d processed %d keys, %d rows, token = %d. estimates: %.1f%% complete, elapsed=%v remaining=%v rows/s=%d",
+	log.Printf("WORKING: id=%d processed %d keys, %d rows, last token = %d, %.1f%% complete, elapsed=%v, remaining=%v, rows/s=%d",
 		id, doneKeysSnap, doneRowsSnap, token, completeness*100, roundToSeconds(timeElapsed), roundToSeconds(timeRemaining), rowsPerSec)
 }
 
