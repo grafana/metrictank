@@ -129,15 +129,6 @@
             {
               "alias": "/unknown/",
               "color": "#890F02"
-            },
-            {
-              "alias": "/pressure\\./",
-              "fill": 0,
-              "lines": true,
-              "linewidth": 1,
-              "nullPointMode": "connected",
-              "points": false,
-              "yaxis": 2
             }
           ],
           "span": 3,
@@ -171,14 +162,6 @@
             {
               "refId": "G",
               "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
-            },
-            {
-              "refId": "H",
-              "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.tank.counter32), 1e-9)), 6, 7)"
-            },
-            {
-              "refId": "I",
-              "target": "aliasByNode(averageSeries(scale(perSecond(metrictank.stats.$environment.$instance.input.*.pressure.idx.counter32), 1e-9)), 6, 7)"
             }
           ],
           "thresholds": [],

@@ -19,8 +19,8 @@ this will give instant insights in all the performance metrics of Metrictank.
 
 * process is running and listening on its http port (and carbon port, if you enabled it) (use your monitoring agent of choice for this)
 * `metrictank.stats.$environment.$instance.cluster.primary.gauge1`: assure you have exactly 1 primary node (saving to cassandra) or as many as you have shardgroups, for sharded setups.
+* `metrictank.stats.$environment.$instance.input.kafka-mdm.partition.*.lag.gauge64`: kafka lag, depending on your throughput you can always expect some lag, but it should be in the thousands not millions.
 * `metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.{min,max}.gauge32`: make sure the write queues are able to drain.  For primary nodes that are also used for qureies, assert the write queues don't reach capacity, otherwise ingest will block and data will lag behind in queries.
-* `metrictank.stats.$environment.$instance.input.*.pressure.idx.counter32`: index pressure as a ns counter, rise is between 0 and 10^9 each second. Alert if increase is more than 4x10^8 each second: this would signify the index can't keep up with indexing new data and is blocking ingestion pipeline.
 * `metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
 * `metrictank.stats.$environment.$instance.input.*.*.invalid.counter32`: counter of incoming data that could not be decoded.
 * `metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32`: counter of points that are too old and can't be added.
@@ -101,10 +101,9 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 
 1) [Indexing of metadata](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) puts backpressure on the ingest stream.   
    New metrics (including metrics with new settings such as interval, unit, or tags) need to get indexed into:
-   * an in-memory index (which seems to always be snappy and not exert any backpressure)
-   * Cassandra - if enabled - which may not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
-   See the `pressure.idx` metric in the 'metrics in' graph of the metrictank dashboard.
-   For more details, look at the various index stats further down the dashboard.
+   * the in-memory index (which generally should not exert backpressure)
+   * Cassandra (index) - if enabled - which may not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
+   Check the index stats on the dashboard.
 
 2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
