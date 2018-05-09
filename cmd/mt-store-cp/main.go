@@ -63,11 +63,8 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-store-cp [flags] table-in [table-out]")
 		fmt.Fprintln(os.Stderr)
-		// TODO - fix these docs
-		fmt.Fprintln(os.Stderr, "Adjusts the data in Cassandra to use a new TTL value. The TTL is applied counting from the timestamp of the data")
-		fmt.Fprintln(os.Stderr, "If table-out not specified or same as table-in, will update in place. Otherwise will not touch input table and store results in table-out")
-		fmt.Fprintln(os.Stderr, "In that case, it is up to you to assure table-out exists before running this tool")
-		fmt.Fprintln(os.Stderr, "Not supported yet: for the per-ttl tables as of 0.7, automatically putting data in the right table")
+		fmt.Fprintln(os.Stderr, "Copies data in Cassandra to use another table (and possibly another cluster).")
+		fmt.Fprintln(os.Stderr, "It is up to you to assure table-out exists before running this tool")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 		os.Exit(-1)
