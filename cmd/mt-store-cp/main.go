@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -45,24 +46,25 @@ var (
 	numThreads   = flag.Int("threads", 1, "number of workers to use to process data")
 	maxBatchSize = flag.Int("max-batch-size", 10, "max number of queries per batch")
 
+	idxTable   = flag.String("idx-table", "metric_idx", "idx table in cassandra")
+	partitions = flag.String("partitions", "*", "process ids for these partitions (comma separated list of partition numbers or '*' for all)")
+
 	progressRows = flag.Int("progress-rows", 1000000, "number of rows between progress output")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 
-	timeStarted time.Time
-	doneKeys    uint64
-	doneRows    uint64
+	timeStarted    time.Time
+	doneKeys       uint64
+	doneRows       uint64
+	partitionIdMap map[string]struct{}
 )
 
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-store-cp [flags] table-in [table-out]")
 		fmt.Fprintln(os.Stderr)
-		// TODO - fix these docs
-		fmt.Fprintln(os.Stderr, "Adjusts the data in Cassandra to use a new TTL value. The TTL is applied counting from the timestamp of the data")
-		fmt.Fprintln(os.Stderr, "If table-out not specified or same as table-in, will update in place. Otherwise will not touch input table and store results in table-out")
-		fmt.Fprintln(os.Stderr, "In that case, it is up to you to assure table-out exists before running this tool")
-		fmt.Fprintln(os.Stderr, "Not supported yet: for the per-ttl tables as of 0.7, automatically putting data in the right table")
+		fmt.Fprintln(os.Stderr, "Copies data in Cassandra to use another table (and possibly another cluster).")
+		fmt.Fprintln(os.Stderr, "It is up to you to assure table-out exists before running this tool")
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 		os.Exit(-1)
@@ -150,6 +152,49 @@ func NewCassandraStore(cassandraAddrs *string) (*gocql.Session, error) {
 	return cluster.CreateSession()
 }
 
+func fetchPartitionIds(sourceSession *gocql.Session) {
+	if *partitions == "*" {
+		return
+	}
+	log.Println("Fetching ids for partitions ", *partitions)
+	partitionIdMap = make(map[string]struct{})
+	partitionStrs := strings.Split(*partitions, ",")
+	selectQuery := fmt.Sprintf("SELECT id FROM %s where partition=?", *idxTable)
+	for _, p := range partitionStrs {
+		if *verbose {
+			log.Println("Fetching ids for partition ", p)
+		}
+		partition, err := strconv.Atoi(p)
+		if err != nil {
+			panic(fmt.Sprintf("Could not parse partition %q, error = %s", p, err))
+		}
+		keyItr := sourceSession.Query(selectQuery, partition).Iter()
+		var key string
+		for keyItr.Scan(&key) {
+			partitionIdMap[key] = struct{}{}
+			if len(partitionIdMap)%10000 == 0 {
+				log.Println("Loading...", len(partitionIdMap), " ids processed, processing partition ", p)
+			}
+		}
+		err = keyItr.Close()
+		if err != nil {
+			panic(fmt.Sprintf("Failed querying for partition key %q, error = %s", p, err))
+		}
+	}
+}
+
+func shouldProcessKey(key string) bool {
+	if *partitions == "*" {
+		return true
+	}
+	// Keys look like <org>.<id>_[rolluptype_rollupspan_]<epoch_month>
+	// e.g. 1.ecbf02491cb225b0d3070dca52592469_630
+	// or   1.ecbf02491cb225b0d3070dca52592469_max_3600_630
+	id := strings.Split(key, "_")[0]
+	_, ok := partitionIdMap[id]
+	return ok
+}
+
 // completenessEstimate estimates completess of this process (as a number between 0 and 1)
 // by inspecting a cassandra token. The data is ordered by token, so assuming a uniform distribution
 // across the token space, we can estimate process.
@@ -192,7 +237,7 @@ func publishBatchUntilSuccess(destSession *gocql.Session, batch *gocql.Batch) *g
 		fmt.Fprintf(os.Stderr, "ERROR: failed to publish batch, trying again. error = %q\n", err)
 	}
 
-	return gocql.NewBatch(gocql.UnloggedBatch)
+	return destSession.NewBatch(gocql.UnloggedBatch)
 }
 
 func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destSession *gocql.Session, startTime, endTime int, tableIn, tableOut string) {
@@ -202,17 +247,20 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 	var data []byte
 	var query string
 
-	const queriesPerBatch = 50
-
 	// Since we are operating on a single key at a time, all data should live in the same partition.
 	// This means batch inserts will reduce round trips without falling into the trap described here:
 	// https://docs.datastax.com/en/cql/3.1/cql/cql_using/useBatch.html
-	batch := gocql.NewBatch(gocql.UnloggedBatch)
+	batch := destSession.NewBatch(gocql.UnloggedBatch)
 
 	selectQuery := fmt.Sprintf("SELECT token(key), ts, data, TTL(data) FROM %s where key=? AND ts>=? AND ts<?", tableIn)
 	insertQuery := fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL ?", tableOut)
 
 	for key := range jobs {
+
+		if !shouldProcessKey(key) {
+			continue
+		}
+
 		rowsHandledLocally := uint64(0)
 		iter := sourceSession.Query(selectQuery, key, startTime, endTime).Iter()
 		for iter.Scan(&token, &ts, &data, &ttl) {
@@ -253,6 +301,9 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 }
 
 func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string) {
+	// Get the list of ids that we carry about
+	fetchPartitionIds(sourceSession)
+
 	// Kick off our threads
 	jobs := make(chan string, 10000)
 
@@ -266,7 +317,7 @@ func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string)
 
 	lastToken := *startToken
 
-	// Retry loop
+	// Key grab retry loop
 	for {
 		keyItr := sourceSession.Query(fmt.Sprintf("SELECT distinct key, token(key) FROM %s where token(key) >= %d AND token(key) <= %d", tableIn, lastToken, *endToken)).Iter()
 
