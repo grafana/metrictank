@@ -30,8 +30,8 @@
 [[projects]]
   name = "github.com/Shopify/sarama"
   packages = ["."]
-  revision = "bd61cae2be85fa6ff40eb23dcdd24567967ac2ae"
-  version = "v1.10.1"
+  revision = "f7be6aa2bc7b2e38edf816b08b582782194a1c02"
+  version = "v1.16.0"
 
 [[projects]]
   name = "github.com/Sirupsen/logrus"
@@ -417,6 +417,18 @@
   revision = "92647f2bd94a89b170c19e96e6456dd64ac37e1a"
 
 [[projects]]
+  name = "github.com/pierrec/lz4"
+  packages = ["."]
+  revision = "2fcda4cb7018ce05a25959d2fe08c83e3329f169"
+  version = "v1.1"
+
+[[projects]]
+  name = "github.com/pierrec/xxHash"
+  packages = ["xxHash32"]
+  revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
+  version = "v0.1.1"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
@@ -525,6 +537,12 @@
   name = "github.com/rakyll/globalconf"
   packages = ["."]
   revision = "f3ec558991f8d5e7b1efcc291fa36edef6c47123"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/rcrowley/go-metrics"
+  packages = ["."]
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   name = "github.com/rs/cors"

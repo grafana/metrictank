@@ -20,6 +20,10 @@ const (
 
 type requestHandlerFunc func(req *request) (res encoder)
 
+// RequestNotifierFunc is invoked when a mock broker processes a request successfully
+// and will provides the number of bytes read and written.
+type RequestNotifierFunc func(bytesRead, bytesWritten int)
+
 // MockBroker is a mock Kafka broker that is used in unit tests. It is exposed
 // to facilitate testing of higher level or specialized consumers and producers
 // built on top of Sarama. Note that it does not 'mimic' the Kafka API protocol,
@@ -54,6 +58,7 @@ type MockBroker struct {
 	t            TestReporter
 	latency      time.Duration
 	handler      requestHandlerFunc
+	notifier     RequestNotifierFunc
 	history      []RequestResponse
 	lock         sync.Mutex
 }
@@ -83,6 +88,14 @@ func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
 		}
 		return mockResponse.For(req.body)
 	})
+}
+
+// SetNotifier set a function that will get invoked whenever a request has been
+// processed successfully and will provide the number of bytes read and written
+func (b *MockBroker) SetNotifier(notifier RequestNotifierFunc) {
+	b.lock.Lock()
+	b.notifier = notifier
+	b.lock.Unlock()
 }
 
 // BrokerID returns broker ID assigned to the broker.
@@ -180,7 +193,7 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 
 	resHeader := make([]byte, 8)
 	for {
-		req, err := decodeRequest(conn)
+		req, bytesRead, err := decodeRequest(conn)
 		if err != nil {
 			Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(req))
 			b.serverError(err)
@@ -202,12 +215,17 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 		}
 		Logger.Printf("*** mockbroker/%d/%d: served %v -> %v", b.brokerID, idx, req, res)
 
-		encodedRes, err := encode(res)
+		encodedRes, err := encode(res, nil)
 		if err != nil {
 			b.serverError(err)
 			break
 		}
 		if len(encodedRes) == 0 {
+			b.lock.Lock()
+			if b.notifier != nil {
+				b.notifier(bytesRead, 0)
+			}
+			b.lock.Unlock()
 			continue
 		}
 
@@ -221,6 +239,12 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			b.serverError(err)
 			break
 		}
+
+		b.lock.Lock()
+		if b.notifier != nil {
+			b.notifier(bytesRead, len(resHeader)+len(encodedRes))
+		}
+		b.lock.Unlock()
 	}
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
@@ -264,6 +288,15 @@ func NewMockBroker(t TestReporter, brokerID int32) *MockBroker {
 // NewMockBrokerAddr behaves like newMockBroker but listens on the address you give
 // it rather than just some ephemeral port.
 func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewMockBrokerListener(t, brokerID, listener)
+}
+
+// NewMockBrokerListener behaves like newMockBrokerAddr but accepts connections on the listener specified.
+func NewMockBrokerListener(t TestReporter, brokerID int32, listener net.Listener) *MockBroker {
 	var err error
 
 	broker := &MockBroker{
@@ -272,13 +305,10 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 		t:            t,
 		brokerID:     brokerID,
 		expectations: make(chan encoder, 512),
+		listener:     listener,
 	}
 	broker.handler = broker.defaultRequestHandler
 
-	broker.listener, err = net.Listen("tcp", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
 	Logger.Printf("*** mockbroker/%d listening on %s\n", brokerID, broker.listener.Addr().String())
 	_, portStr, err := net.SplitHostPort(broker.listener.Addr().String())
 	if err != nil {

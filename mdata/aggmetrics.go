@@ -87,18 +87,35 @@ func (ms *AggMetrics) Get(key schema.MKey) (Metric, bool) {
 }
 
 func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metric {
-	ms.Lock()
+
+	// in the most common case, it's already there and an Rlock is all we need
+	ms.RLock()
 	m, ok := ms.Metrics[key]
-	if !ok {
-		k := schema.AMKey{
-			MKey: key,
-		}
-		agg := Aggregations.Get(aggId)
-		schema := Schemas.Get(schemaId)
-		m = NewAggMetric(ms.store, ms.cachePusher, k, schema.Retentions, schema.ReorderWindow, &agg, ms.dropFirstChunk)
-		ms.Metrics[key] = m
-		metricsActive.Set(len(ms.Metrics))
+	ms.RUnlock()
+	if ok {
+		return m
 	}
+
+	k := schema.AMKey{
+		MKey: key,
+	}
+
+	agg := Aggregations.Get(aggId)
+	schema := Schemas.Get(schemaId)
+
+	// if it wasn't there, get the write lock and prepare to add it
+	// but first we need to check again if someone has added it in
+	// the meantime (quite rare, but anyway)
+	ms.Lock()
+	m, ok = ms.Metrics[key]
+	if ok {
+		ms.Unlock()
+		return m
+	}
+	m = NewAggMetric(ms.store, ms.cachePusher, k, schema.Retentions, schema.ReorderWindow, &agg, ms.dropFirstChunk)
+	ms.Metrics[key] = m
+	active := len(ms.Metrics)
 	ms.Unlock()
+	metricsActive.Set(active)
 	return m
 }

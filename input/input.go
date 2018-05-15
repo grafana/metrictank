@@ -4,7 +4,6 @@ package input
 
 import (
 	"fmt"
-	"time"
 
 	"gopkg.in/raintank/schema.v1"
 	"gopkg.in/raintank/schema.v1/msg"
@@ -30,8 +29,6 @@ type DefaultHandler struct {
 	invalidMD    *stats.Counter32
 	invalidMP    *stats.Counter32
 	unknownMP    *stats.Counter32
-	pressureIdx  *stats.Counter32
-	pressureTank *stats.Counter32
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
@@ -45,8 +42,6 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		invalidMD:    stats.NewCounter32(fmt.Sprintf("input.%s.metricdata.invalid", input)),
 		invalidMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.invalid", input)),
 		unknownMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.unknown", input)),
-		pressureIdx:  stats.NewCounter32(fmt.Sprintf("input.%s.pressure.idx", input)),
-		pressureTank: stats.NewCounter32(fmt.Sprintf("input.%s.pressure.tank", input)),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,
@@ -67,20 +62,15 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 		return
 	}
 
-	pre := time.Now()
 	archive, _, ok := in.metricIndex.Update(point, partition)
-	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
 	if !ok {
 		in.unknownMP.Inc()
 		return
 	}
 
-	pre = time.Now()
 	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId)
 	m.Add(point.Time, point.Value)
-	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
-
 }
 
 // ProcessMetricData assures the data is stored and the metadata is in the index
@@ -105,12 +95,8 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		return
 	}
 
-	pre := time.Now()
 	archive, _, _ := in.metricIndex.AddOrUpdate(mkey, md, partition)
-	in.pressureIdx.Add(int(time.Since(pre).Nanoseconds()))
 
-	pre = time.Now()
 	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId)
 	m.Add(uint32(md.Time), md.Value)
-	in.pressureTank.Add(int(time.Since(pre).Nanoseconds()))
 }
