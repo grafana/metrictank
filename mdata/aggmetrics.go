@@ -96,23 +96,26 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metri
 		return m
 	}
 
+	k := schema.AMKey{
+		MKey: key,
+	}
+
+	agg := Aggregations.Get(aggId)
+	schema := Schemas.Get(schemaId)
+
 	// if it wasn't there, get the write lock and prepare to add it
 	// but first we need to check again if someone has added it in
-	// the meantime
+	// the meantime (quite rare, but anyway)
 	ms.Lock()
 	m, ok = ms.Metrics[key]
 	if ok {
 		ms.Unlock()
 		return m
 	}
-	k := schema.AMKey{
-		MKey: key,
-	}
-	agg := Aggregations.Get(aggId)
-	schema := Schemas.Get(schemaId)
 	m = NewAggMetric(ms.store, ms.cachePusher, k, schema.Retentions, schema.ReorderWindow, &agg, ms.dropFirstChunk)
 	ms.Metrics[key] = m
-	metricsActive.Set(len(ms.Metrics))
+	active := len(ms.Metrics)
 	ms.Unlock()
+	metricsActive.Set(active)
 	return m
 }
