@@ -924,8 +924,6 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 }
 
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64) ([]Series, error) {
-	seriesSet := make(map[string]Series)
-
 	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
 	if err != nil {
 		return nil, err
@@ -938,12 +936,14 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 	default:
 	}
 
+	var allSeries []Series
+
 	for _, series := range result {
-		seriesSet[series.Path] = Series{
+		allSeries = append(allSeries, Series{
 			Pattern: series.Path,
 			Node:    cluster.Manager.ThisNode(),
 			Series:  []idx.Node{series},
-		}
+		})
 	}
 
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
@@ -966,20 +966,15 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 			return nil, err
 		}
 		for _, series := range resp.Metrics {
-			seriesSet[series.Path] = Series{
+			allSeries = append(allSeries, Series{
 				Pattern: series.Path,
 				Node:    r.peer,
 				Series:  []idx.Node{series},
-			}
+			})
 		}
 	}
 
-	series := make([]Series, 0, len(seriesSet))
-	for _, s := range seriesSet {
-		series = append(series, s)
-	}
-
-	return series, nil
+	return allSeries, nil
 }
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {

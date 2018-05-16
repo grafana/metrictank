@@ -222,7 +222,10 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 		if LogLevel < 2 {
 			log.Debug("metricDef with id %v already in index", point.MKey)
 		}
-		existing.LastUpdate = int64(point.Time)
+
+		if existing.LastUpdate < int64(point.Time) {
+			existing.LastUpdate = int64(point.Time)
+		}
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
@@ -244,7 +247,9 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	if ok {
 		oldPart := existing.Partition
 		log.Debug("metricDef with id %s already in index.", mkey)
-		existing.LastUpdate = data.Time
+		if existing.LastUpdate < int64(data.Time) {
+			existing.LastUpdate = int64(data.Time)
+		}
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
@@ -831,8 +836,9 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 	m.RLock()
 	defer m.RUnlock()
 
+	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	ids := m.idsByTagQuery(orgId, query)
-	res := make([]idx.Node, 0, len(ids))
+	byPath := make(map[string]*idx.Node)
 	for id := range ids {
 		def, ok := m.defById[id]
 		if !ok {
@@ -841,14 +847,25 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 			continue
 		}
 
-		res = append(res, idx.Node{
-			Path:        def.NameWithTags(),
-			Leaf:        true,
-			HasChildren: false,
-			Defs:        []idx.Archive{*def},
-		})
+		if existing, ok := byPath[def.NameWithTags()]; !ok {
+			byPath[def.NameWithTags()] = &idx.Node{
+				Path:        def.NameWithTags(),
+				Leaf:        true,
+				HasChildren: false,
+				Defs:        []idx.Archive{*def},
+			}
+		} else {
+			existing.Defs = append(existing.Defs, *def)
+		}
 	}
-	return res, nil
+
+	results := make([]idx.Node, 0, len(byPath))
+
+	for _, v := range byPath {
+		results = append(results, *v)
+	}
+
+	return results, nil
 }
 
 func (m *MemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
@@ -877,11 +894,13 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 	}
 	log.Debug("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
 	results := make([]idx.Node, 0)
-	seen := make(map[string]struct{})
+	byPath := make(map[string]struct{})
+	// construct the output slice of idx.Node's such that there is only 1 idx.Node
+	// for each path, and it holds all defs that the Node refers too.
 	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
-		if _, ok := seen[n.Path]; !ok {
+		if _, ok := byPath[n.Path]; !ok {
 			idxNode := idx.Node{
 				Path:        n.Path,
 				Leaf:        n.Leaf(),
@@ -904,7 +923,7 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 				}
 			}
 			results = append(results, idxNode)
-			seen[n.Path] = struct{}{}
+			byPath[n.Path] = struct{}{}
 		} else {
 			log.Debug("memory-idx: path %s already seen", n.Path)
 		}
@@ -914,6 +933,7 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 	return results, nil
 }
 
+// find returns all Nodes matching the pattern for the given orgId
 func (m *MemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
 	tree, ok := m.tree[orgId]
 	if !ok {

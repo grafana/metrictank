@@ -170,7 +170,7 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 	if len(remoteReqs) > 0 {
 		wg.Add(1)
 		go func() {
-			// all errors returned returned are *response.Error.
+			// all errors returned are *response.Error.
 			series, err := s.getTargetsRemote(getCtx, remoteReqs)
 			if err != nil {
 				cancel()
