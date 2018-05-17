@@ -197,6 +197,7 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	}
 }
 
+// Search looks for the requested metric and returns a complete-as-possible CCSearchResult
 func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult {
 	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
 	defer span.Finish()
