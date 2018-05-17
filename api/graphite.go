@@ -149,6 +149,7 @@ func (s *Server) findSeriesLocal(ctx context.Context, orgId uint32, patterns []s
 	return result, nil
 }
 
+// findSeriesRemote calls findSeriesLocal on a peer via http rpc
 func (s *Server) findSeriesRemote(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, peer cluster.Node) ([]Series, error) {
 	log.Debug("HTTP Render querying %s/index/find for %d:%q", peer.GetName(), orgId, patterns)
 	data := models.IndexFind{

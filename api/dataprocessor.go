@@ -198,6 +198,8 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 	return out, nil
 }
 
+// getTargetsRemote issues the requests on other nodes
+// it's nothing more than a thin network wrapper around getTargetsLocal of a peer.
 func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 	responses := make(chan getTargetsResp, len(remoteReqs))
 	rCtx, cancel := context.WithCancel(ctx)
@@ -387,6 +389,9 @@ func logLoad(typ string, key schema.AMKey, from, to uint32) {
 	}
 }
 
+// getSeriesFixed gets the series and makes sure the output is quantized
+// (needed because the raw chunks don't contain quantized data)
+// TODO: we can probably forego Fix if archive > 0
 func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
 	select {
 	case <-ctx.Done():
@@ -413,6 +418,9 @@ func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidato
 	return Fix(res.Points, req.From, req.To, req.ArchInterval), nil
 }
 
+// getSeries returns points from mem (and store if needed), within the range from (inclusive) - to (exclusive)
+// it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
+// pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
 func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 	res, err := s.getSeriesAggMetrics(ctx)
 	if err != nil {
@@ -436,6 +444,7 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
+	// adds iters from both the cache and the store (if applicable)
 	until := util.Min(res.Oldest, ctx.To)
 	fromCache, err := s.getSeriesCachedStore(ctx, until)
 	if err != nil {
@@ -445,10 +454,8 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 	return res, nil
 }
 
-// getSeries returns points from mem (and cassandra if needed), within the range from (inclusive) - to (exclusive)
-// it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
-// pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
-// all data will also be quantized.
+// itersToPoints converts the iters to points if they are within the from/to range
+// TODO: just work on the result directly
 func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
 	pre := time.Now()
 
@@ -539,7 +546,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 	default:
 	}
 
-	// the request cannot completely be served from cache, it will require cassandra involvement
+	// the request cannot completely be served from cache, it will require store involvement
 	if !cacheRes.Complete {
 		if cacheRes.From != cacheRes.Until {
 			storeIterGens, err := s.BackendStore.Search(ctx.ctx, ctx.AMKey, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
@@ -559,11 +566,11 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
 					tracing.Failure(span)
-					tracing.Errorf(span, "itergen: error getting iter from cassandra slice %+v", err)
+					tracing.Errorf(span, "itergen: error getting iter from store slice %+v", err)
 					return iters, err
 				}
 				// it's important that the itgens get added in chronological order,
-				// currently we rely on cassandra returning results in order
+				// currently we rely on store returning results in order
 				s.Cache.Add(ctx.AMKey, prevts, itgen)
 				prevts = itgen.Ts
 				iters = append(iters, *it)
