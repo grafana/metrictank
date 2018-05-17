@@ -93,12 +93,13 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 		} else if p.Ts > t {
 			// point is too recent, append a null and reconsider same point for next slot
 			out[o] = schema.Point{Val: math.NaN(), Ts: t}
-		} else if p.Ts > t-interval && p.Ts < t {
-			// point is a bit older, so it's good enough, just quantize the ts, and move on to next point for next round
+		} else if p.Ts > t-interval {
+			// point is older but not by more than 1 interval, so it's good enough, just quantize the ts, and move on to next point for next round
 			out[o] = schema.Point{Val: p.Val, Ts: t}
 			i++
-		} else if p.Ts <= t-interval {
-			// point is too old. advance until we find a point that is recent enough, and then go through the considerations again,
+		} else {
+			// point is too old (older by 1 interval or more).
+			// advance until we find a point that is recent enough, and then go through the considerations again,
 			// if those considerations are any of the above ones.
 			// if the last point would end up in this branch again, discard it as well.
 			for p.Ts <= t-interval && i < len(in)-1 {
