@@ -682,7 +682,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// we can argue both ways, but the other thing is that if we apply the logic above, we end up with:
 	// from := 1
 	// to := 1
-	// which is a query not accepted by AggMetric, Ccache or store. (from must < to)
+	// which is a query not accepted by AggMetric, Ccache or store. (from must be less than to)
 	// the only way we can get acceptable queries is for from to be 1 and to to remain 36 (or become 60 or 61)
 	// such a fetch request would include the requested point
 	// but we know Fix() will later create the output according to these rules:

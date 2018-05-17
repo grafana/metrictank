@@ -16,7 +16,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-var ErrInvalidRange = errors.New("AggMetric: invalid range. from must < to")
+var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less than to")
 var ErrNilChunk = errors.New("AggMetric: unexpected nil chunk")
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
