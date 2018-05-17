@@ -34,7 +34,7 @@ const Table_name_format = `metric_%d`
 
 var (
 	errChunkTooSmall = errors.New("unpossibly small chunk in cassandra")
-	errInvalidRange  = errors.New("CassandraStore: invalid range. from must < to")
+	errInvalidRange  = errors.New("CassandraStore: invalid range: from must be less than to")
 	errReadQueueFull = errors.New("the read queue is full")
 	errReadTooOld    = errors.New("the read is too old")
 	errTableNotFound = errors.New("table for given TTL not found")
