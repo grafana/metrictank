@@ -567,6 +567,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				req.ArchInterval = 1
 				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 				iters, err := srv.getSeriesCachedStore(ctx, to)
+
+				// test invalid query; from must be less than to
+				if from == to {
+					if err == nil {
+						t.Fatalf("Pattern %s From=To %d: expected err, got nil", pattern, from)
+					}
+					continue
+				}
 				if err != nil {
 					t.Fatalf("Pattern %s From %d To %d: error %s", pattern, from, to, err)
 				}
@@ -593,18 +601,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 					}
 				}
 
-				if to-from > 0 {
-					if len(tsSlice) == 0 {
-						t.Fatalf("Pattern %s From %d To %d; Should have >0 results but got 0", pattern, from, to)
-					}
-					if tsSlice[0] != expectResFrom {
-						t.Fatalf("Pattern %s From %d To %d; Expected first to be %d but got %d", pattern, from, to, expectResFrom, tsSlice[0])
-					}
-					if tsSlice[len(tsSlice)-1] != expectResTo {
-						t.Fatalf("Pattern %s From %d To %d; Expected last to be %d but got %d", pattern, from, to, expectResTo, tsSlice[len(tsSlice)-1])
-					}
-				} else if len(tsSlice) > 0 {
-					t.Fatalf("Pattern %s From %d To %d; Expected results to have len 0 but got %d", pattern, from, to, len(tsSlice))
+				if len(tsSlice) == 0 {
+					t.Fatalf("Pattern %s From %d To %d; Should have >0 results but got 0", pattern, from, to)
+				}
+				if tsSlice[0] != expectResFrom {
+					t.Fatalf("Pattern %s From %d To %d; Expected first to be %d but got %d", pattern, from, to, expectResFrom, tsSlice[0])
+				}
+				if tsSlice[len(tsSlice)-1] != expectResTo {
+					t.Fatalf("Pattern %s From %d To %d; Expected last to be %d but got %d", pattern, from, to, expectResTo, tsSlice[len(tsSlice)-1])
 				}
 
 				expectedHits := uint32(0)
@@ -612,53 +616,49 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// because ranges are exclusive at the end we'll test for to - 1
 				exclTo := to - 1
 
-				// if from is equal to we always expect 0 hits
-				if from != to {
+				// seek hits from beginning of the searched ranged within the given pattern
+				for i := 0; i < len(pattern); i++ {
 
-					// seek hits from beginning of the searched ranged within the given pattern
-					for i := 0; i < len(pattern); i++ {
+					// if pattern index is lower than from's chunk we continue
+					if from-(from%span) > start+uint32(i)*span {
+						continue
+					}
 
-						// if pattern index is lower than from's chunk we continue
-						if from-(from%span) > start+uint32(i)*span {
+					// current pattern index is a cache hit, so we expect one more
+					if pattern[i] == 'c' || pattern[i] == 'b' {
+						expectedHits++
+					} else {
+						break
+					}
+
+					// if we've already seeked beyond to's pattern we break and mark the seek as complete
+					if exclTo-(exclTo%span) == start+uint32(i)*span {
+						complete = true
+						break
+					}
+				}
+
+				// only if the previous seek was not complete we launch one from the other end
+				if !complete {
+
+					// now the same from the other end (just like the cache searching does)
+					for i := len(pattern) - 1; i >= 0; i-- {
+
+						// if pattern index is above to's chunk we continue
+						if exclTo-(exclTo%span)+span <= start+uint32(i)*span {
 							continue
 						}
 
-						// current pattern index is a cache hit, so we expect one more
+						// current pattern index is a cache hit, so we expecte one more
 						if pattern[i] == 'c' || pattern[i] == 'b' {
 							expectedHits++
 						} else {
 							break
 						}
 
-						// if we've already seeked beyond to's pattern we break and mark the seek as complete
-						if exclTo-(exclTo%span) == start+uint32(i)*span {
-							complete = true
+						// if we've already seeked beyond from's pattern we break
+						if from-(from%span) == start+uint32(i)*span {
 							break
-						}
-					}
-
-					// only if the previous seek was not complete we launch one from the other end
-					if !complete {
-
-						// now the same from the other end (just like the cache searching does)
-						for i := len(pattern) - 1; i >= 0; i-- {
-
-							// if pattern index is above to's chunk we continue
-							if exclTo-(exclTo%span)+span <= start+uint32(i)*span {
-								continue
-							}
-
-							// current pattern index is a cache hit, so we expecte one more
-							if pattern[i] == 'c' || pattern[i] == 'b' {
-								expectedHits++
-							} else {
-								break
-							}
-
-							// if we've already seeked beyond from's pattern we break
-							if from-(from%span) == start+uint32(i)*span {
-								break
-							}
 						}
 					}
 				}

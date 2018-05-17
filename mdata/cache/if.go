@@ -11,7 +11,7 @@ type Cache interface {
 	Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	Stop()
-	Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult
+	Search(ctx context.Context, metric schema.AMKey, from, until uint32) (*CCSearchResult, error)
 	DelMetric(rawMetric schema.MKey) (int, int)
 	Reset() (int, int)
 }
