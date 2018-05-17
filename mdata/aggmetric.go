@@ -185,7 +185,10 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 
 // Get all data between the requested time ranges. From is inclusive, to is exclusive. from <= x < to
 // more data then what's requested may be included
-// also returns oldest point we have, so that if your query needs data before it, the caller knows when to query cassandra
+// specifically, returns:
+// * points from the ROB (if enabled)
+// * iters from matching chunks
+// * oldest point we have, so that if your query needs data before it, the caller knows when to query the store
 func (a *AggMetric) Get(from, to uint32) Result {
 	pre := time.Now()
 	if LogLevel < 2 {
