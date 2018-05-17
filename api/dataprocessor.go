@@ -395,6 +395,10 @@ func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidato
 	default:
 	}
 	rctx := newRequestContext(ctx, &req, consolidator)
+	// see newRequestContext for a detailed explanation of this.
+	if rctx.From == rctx.To {
+		return nil, nil
+	}
 	res, err := s.getSeries(rctx)
 	if err != nil {
 		return nil, err
@@ -660,8 +664,32 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// STORED DATA   0[----------60][---------120][---------180][---------240]  but data for 60 may be at 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
 	// to retrieve the stored data, we also use from inclusive and to exclusive,
 	// so to make sure that the data after quantization (Fix()) is correct, we have to make the following adjustment:
-	// `from`   1..60 needs data    1..60   -> always adjust `from` to previous boundary+1 (here 1)
-	// `to`  181..240 needs data 121..180   -> always adjust `to`   to previous boundary+1 (here 181)
+	// `from`   1..60 needs data    1..60   -> to assure we can read that data we adjust `from` to previous boundary+1 (here 1). (will be quantized to next boundary in this case 60)
+	// `to`  181..240 needs data 121..180   -> to avoid reading needless data  we adjust `to`   to previous boundary+1 (here 181), last ts returned must be 180
+
+	// except... there's a special case. let's say archinterval=60, and user requests:
+	// to=25, until=36
+	// we know that in the graphite model there will be no data in that timeframe:
+	// maybe the user submitted a point with ts=30 but it will be quantized to ts=60 so it is out of range.
+	// but wouldn't it be nice to include it anyway?
+	// we can argue both ways, but the other thing is that if we apply the logic above, we end up with:
+	// from := 1
+	// to := 1
+	// which is a query not accepted by AggMetric, Ccache or store. (from must < to)
+	// the only way we can get acceptable queries is for from to be 1 and to to remain 36 (or become 60 or 61)
+	// such a fetch request would include the requested point
+	// but we know Fix() will later create the output according to these rules:
+	// * first point should have the first timestamp >= from that divides by interval (that would be 60 in this case)
+	// * last point should have the last timestamp < to that divides by interval (because to is always exclusive) (that would be 0 in this case)
+	// which wouldn't make sense of course. one could argue it should output one point with ts=60,
+	// but to do that, we have to "broaden" the `to` requested by the user, covering a larger time frame they didn't actually request.
+	// and we deviate from the quantizing model.
+	// I think we should just stick to the quantizing model
+
+	// we can do the logic above backwards: if from and to are adjusted to the same value, such as 181, it means `from` was 181..240  and `to` was 181..240
+	// which is either a nonsensical request (from > to, from == to) or from < to but such that the requested timeframe falls in between two adjacent quantized
+	// timestamps and could not include either of them.
+	// so the caller can just compare rc.From and rc.To and if equal, immediately return [] to the client.
 
 	if consolidator == consolidation.None {
 		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
