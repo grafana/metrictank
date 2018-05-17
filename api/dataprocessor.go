@@ -482,7 +482,7 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) 
 	if ctx.Cons != consolidation.None {
 		return metric.GetAggregated(ctx.Cons, ctx.Req.ArchInterval, ctx.From, ctx.To)
 	} else {
-		return metric.Get(ctx.From, ctx.To), nil
+		return metric.Get(ctx.From, ctx.To)
 	}
 }
 
@@ -501,7 +501,10 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 	logLoad("cassan", ctx.AMKey, ctx.From, ctx.To)
 
 	log.Debug("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
-	cacheRes := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
+	cacheRes, err := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
+	if err != nil {
+		return iters, err
+	}
 	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
 	// check to see if the request has been canceled, if so abort now.

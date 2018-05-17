@@ -16,6 +16,9 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+var ErrInvalidRange = errors.New("AggMetric: invalid range. from must < to")
+var ErrNilChunk = errors.New("AggMetric: unexpected nil chunk")
+
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
 // it uses a circular buffer of chunks
 // each chunk starts at their respective t0
@@ -174,7 +177,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			if agg == nil {
 				return Result{}, fmt.Errorf("Consolidator %q not configured", consolidator)
 			}
-			return agg.Get(from, to), nil
+			return agg.Get(from, to)
 		}
 	}
 	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown aggSpan %d", aggSpan)
@@ -189,13 +192,13 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 // * points from the ROB (if enabled)
 // * iters from matching chunks
 // * oldest point we have, so that if your query needs data before it, the caller knows when to query the store
-func (a *AggMetric) Get(from, to uint32) Result {
+func (a *AggMetric) Get(from, to uint32) (Result, error) {
 	pre := time.Now()
 	if LogLevel < 2 {
 		log.Debug("AM %s Get(): %d - %d (%s - %s) span:%ds", a.Key, from, to, TS(from), TS(to), to-from-1)
 	}
 	if from >= to {
-		panic("invalid request. to must > from")
+		return Result{}, ErrInvalidRange
 	}
 	a.RLock()
 	defer a.RUnlock()
@@ -209,7 +212,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		if len(result.Points) > 0 {
 			result.Oldest = result.Points[0].Ts
 			if result.Oldest <= from {
-				return result
+				return result, nil
 			}
 		}
 	}
@@ -219,7 +222,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
-		return result
+		return result, nil
 	}
 
 	newestChunk := a.getChunk(a.CurrentChunkPos)
@@ -240,7 +243,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 			log.Debug("AM %s Get(): no data for requested range.", a.Key)
 		}
 		result.Oldest = from
-		return result
+		return result, nil
 	}
 
 	// get the oldest chunk we have.
@@ -261,8 +264,8 @@ func (a *AggMetric) Get(from, to uint32) Result {
 
 	oldestChunk := a.getChunk(oldestPos)
 	if oldestChunk == nil {
-		log.Error(3, "unexpected nil chunk.")
-		return result
+		log.Error(3, "%s", ErrNilChunk)
+		return result, ErrNilChunk
 	}
 
 	// The first chunk is likely only a partial chunk. If we are not the primary node
@@ -275,8 +278,8 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		}
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
-			log.Error(3, "unexpected nil chunk.")
-			return result
+			log.Error(3, "%s", ErrNilChunk)
+			return result, ErrNilChunk
 		}
 	}
 
@@ -286,7 +289,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
 		result.Oldest = oldestChunk.T0
-		return result
+		return result, nil
 	}
 
 	// Find the oldest Chunk that the "from" ts falls in.  If from extends before the oldest
@@ -298,9 +301,9 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		}
 		oldestChunk = a.getChunk(oldestPos)
 		if oldestChunk == nil {
-			log.Error(3, "unexpected nil chunk.")
 			result.Oldest = to
-			return result
+			log.Error(3, "%s", ErrNilChunk)
+			return result, ErrNilChunk
 		}
 	}
 
@@ -318,9 +321,9 @@ func (a *AggMetric) Get(from, to uint32) Result {
 		}
 		newestChunk = a.getChunk(newestPos)
 		if newestChunk == nil {
-			log.Error(3, "unexpected nil chunk.")
 			result.Oldest = to
-			return result
+			log.Error(3, "%s", ErrNilChunk)
+			return result, ErrNilChunk
 		}
 	}
 
@@ -341,7 +344,7 @@ func (a *AggMetric) Get(from, to uint32) Result {
 
 	memToIterDuration.Value(time.Now().Sub(pre))
 	result.Oldest = oldestChunk.T0
-	return result
+	return result, nil
 }
 
 // this function must only be called while holding the lock

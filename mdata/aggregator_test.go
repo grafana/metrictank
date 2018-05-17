@@ -45,7 +45,12 @@ func TestAggregator(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	compare := func(key string, metric Metric, expected []schema.Point) {
 		cluster.Manager.SetPrimary(true)
-		res := metric.Get(0, 1000)
+		res, err := metric.Get(0, 1000)
+
+		if err != nil {
+			t.Fatalf("expected err nil, got %v", err)
+		}
+
 		got := make([]schema.Point, 0, len(expected))
 		for _, iter := range res.Iters {
 			for iter.Next() {

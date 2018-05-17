@@ -33,12 +33,12 @@ const Month_sec = 60 * 60 * 24 * 28
 const Table_name_format = `metric_%d`
 
 var (
-	errChunkTooSmall  = errors.New("unpossibly small chunk in cassandra")
-	errStartBeforeEnd = errors.New("start must be before end.")
-	errReadQueueFull  = errors.New("the read queue is full")
-	errReadTooOld     = errors.New("the read is too old")
-	errTableNotFound  = errors.New("table for given TTL not found")
-	errCtxCanceled    = errors.New("context canceled")
+	errChunkTooSmall = errors.New("unpossibly small chunk in cassandra")
+	errInvalidRange  = errors.New("CassandraStore: invalid range. from must < to")
+	errReadQueueFull = errors.New("the read queue is full")
+	errReadTooOld    = errors.New("the read is too old")
+	errTableNotFound = errors.New("table for given TTL not found")
+	errCtxCanceled   = errors.New("context canceled")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -469,10 +469,10 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	tags.PeerService.Set(span, "cassandra")
 
 	itgens := make([]chunk.IterGen, 0)
-	if start > end {
+	if start >= end {
 		tracing.Failure(span)
-		tracing.Error(span, errStartBeforeEnd)
-		return itgens, errStartBeforeEnd
+		tracing.Error(span, errInvalidRange)
+		return itgens, errInvalidRange
 	}
 
 	pre := time.Now()
