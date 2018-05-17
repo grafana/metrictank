@@ -56,7 +56,7 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 			if z.Tags == nil && zb0003 > 0 {
 				z.Tags = make(map[string]string, zb0003)
 			} else if len(z.Tags) > 0 {
-				for key, _ := range z.Tags {
+				for key := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}
@@ -314,7 +314,7 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if z.Tags == nil && zb0003 > 0 {
 				z.Tags = make(map[string]string, zb0003)
 			} else if len(z.Tags) > 0 {
-				for key, _ := range z.Tags {
+				for key := range z.Tags {
 					delete(z.Tags, key)
 				}
 			}
