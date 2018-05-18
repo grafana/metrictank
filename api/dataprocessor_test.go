@@ -486,10 +486,9 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 //
 func TestGetSeriesCachedStore(t *testing.T) {
 	span := uint32(600)
-	// save some electrons by skipping steps that are no edge cases
-	steps := span / 10
 	start := span
 	// we want 10 chunks to serve the largest testcase
+	// they will have t0 600, 1200, ..., 5400, 6000
 	end := span * 11
 	chunks := generateChunks(span, start, end)
 
@@ -505,7 +504,10 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	var prevts uint32
 
 	type testcase struct {
-		// the pattern of chunks in store, cache or both
+		// the pattern of chunks
+		// c: in cache
+		// s: in store
+		// b: in both
 		Pattern string
 
 		// expected number of cache hits on query over all chunks
@@ -528,7 +530,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	for _, tc := range testcases {
 		pattern := tc.Pattern
 
-		// last ts is start ts plus the number of spans the pattern defines
+		// lastTs is the t0 of the first chunk that comes after the used range
 		lastTs := start + span*uint32(len(pattern))
 
 		// we want to query through various ranges, including:
@@ -536,11 +538,15 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		// - from first ts to last ts
 		// - from last ts to last ts
 		// and various ranges between
-		for from := start; from <= lastTs; from += steps {
-			for to := from; to <= lastTs; to += steps {
-				// reinstantiate the cache at the beginning of each run
+		// we increment from and to in tenths of a span,
+		// because incrementing by 1 would be needlessly expensive
+		step := span / 10
+		for from := start; from <= lastTs; from += step {
+			for to := from; to <= lastTs; to += step {
+				// use fresh store and cache
 				c = cache.NewCCache()
 				srv.BindCache(c)
+				store.Reset()
 
 				// populate cache and store according to pattern definition
 				prevts = 0
@@ -666,7 +672,6 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 				// stop cache go routines before reinstantiating it at the top of the loop
 				c.Stop()
-				store.Reset()
 			}
 		}
 	}
