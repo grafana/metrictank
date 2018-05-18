@@ -25,10 +25,11 @@ type Graphite struct {
 	prefix []byte
 	addr   string
 
+	timeout    time.Duration
 	toGraphite chan []byte
 }
 
-func NewGraphite(prefix, addr string, interval int, bufferSize int) {
+func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Duration) {
 	if len(prefix) != 0 && prefix[len(prefix)-1] != '.' {
 		prefix = prefix + "."
 	}
@@ -44,6 +45,7 @@ func NewGraphite(prefix, addr string, interval int, bufferSize int) {
 		prefix:     []byte(prefix),
 		addr:       addr,
 		toGraphite: make(chan []byte, bufferSize),
+		timeout:    timeout,
 	}
 	go g.writer()
 	go g.reporter(interval)
@@ -105,6 +107,7 @@ func (g *Graphite) writer() {
 		var ok bool
 		for !ok {
 			conn = assureConn()
+			conn.SetDeadline(time.Now().Add(g.timeout))
 			pre := time.Now()
 			_, err = conn.Write(buf)
 			if err == nil {
