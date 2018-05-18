@@ -20,6 +20,5 @@ func MustMKeyFromString(id string) schema.MKey {
 	if err != nil {
 		panic(err)
 	}
-	panic(err)
 	return mkey
 }
