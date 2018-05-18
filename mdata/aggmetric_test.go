@@ -64,7 +64,12 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	currentClusterStatus := cluster.Manager.IsPrimary()
 	sort.Sort(ByTs(c.points))
 	cluster.Manager.SetPrimary(primary)
-	res := c.agg.Get(from, to)
+	res, err := c.agg.Get(from, to)
+
+	if err != nil {
+		c.t.Fatalf("expected err nil, got %v", err)
+	}
+
 	// we don't do checking or fancy logic, it is assumed that the caller made sure first and last are ts of actual points
 	var pi int // index of first point we want
 	var pj int // index of last point we want

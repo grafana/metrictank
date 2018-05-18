@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"runtime"
 	"sync"
@@ -17,8 +18,9 @@ import (
 )
 
 var (
-	maxSize      uint64
-	searchFwdBug = stats.NewCounter32("recovered_errors.cache.metric.searchForwardBug")
+	maxSize         uint64
+	searchFwdBug    = stats.NewCounter32("recovered_errors.cache.metric.searchForwardBug")
+	ErrInvalidRange = errors.New("CCache: invalid range: from must be less than to")
 )
 
 func init() {
@@ -197,7 +199,9 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 	}
 }
 
-func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) *CCSearchResult {
+// Search looks for the requested metric and returns a complete-as-possible CCSearchResult
+// from is inclusive, until is exclusive
+func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) (*CCSearchResult, error) {
 	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
 	defer span.Finish()
 	var hit chunk.IterGen
@@ -208,8 +212,8 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 		Until: until,
 	}
 
-	if from == until {
-		return res
+	if from >= until {
+		return nil, ErrInvalidRange
 	}
 
 	c.RLock()
@@ -218,7 +222,7 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 	if cm, ok = c.metricCache[metric]; !ok {
 		span.SetTag("cache", "miss")
 		accnt.CacheMetricMiss.Inc()
-		return res
+		return res, nil
 	}
 
 	cm.Search(ctx, metric, res, from, until)
@@ -246,5 +250,5 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 		}
 	}
 
-	return res
+	return res, nil
 }

@@ -46,11 +46,11 @@ func (mc *MockCache) Stop() {
 	mc.StopCount++
 }
 
-func (mc *MockCache) Search(ctx context.Context, metric schema.AMKey, from uint32, until uint32) *CCSearchResult {
+func (mc *MockCache) Search(ctx context.Context, metric schema.AMKey, from uint32, until uint32) (*CCSearchResult, error) {
 	mc.Lock()
 	defer mc.Unlock()
 	mc.SearchCount++
-	return nil
+	return nil, nil
 }
 
 func (mc *MockCache) DelMetric(rawMetric schema.MKey) (int, int) {

@@ -447,16 +447,23 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 	var chunks []chunk.Chunk
 
 	c := chunk.New(start)
-	for i := start; i < end; i++ {
-		c.Push(i, float64((i-start)*2))
-		if (i+1)%span == 0 {
-			// Mark the chunk that just got finished as finished
+	for ts := start; ts < end; ts++ {
+		val := float64((ts - start) * 2)
+		c.Push(ts, val)
+		// handle the case of this being the last point for this chunk
+		if (ts+1)%span == 0 {
 			c.Finish()
 			chunks = append(chunks, *c)
-			if i < end {
-				c = chunk.New(i + 1)
+			// if there will be a next iteration, prepare the chunk
+			if ts+1 < end {
+				c = chunk.New(ts + 1)
 			}
 		}
+	}
+	// if end was not quantized we have to finish the last chunk
+	if !c.Closed {
+		c.Finish()
+		chunks = append(chunks, *c)
 	}
 	return chunks
 }
@@ -479,10 +486,9 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 //
 func TestGetSeriesCachedStore(t *testing.T) {
 	span := uint32(600)
-	// save some electrons by skipping steps that are no edge cases
-	steps := span / 10
 	start := span
 	// we want 10 chunks to serve the largest testcase
+	// they will have t0 600, 1200, ..., 5400, 6000
 	end := span * 11
 	chunks := generateChunks(span, start, end)
 
@@ -498,7 +504,10 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	var prevts uint32
 
 	type testcase struct {
-		// the pattern of chunks in store, cache or both
+		// the pattern of chunks
+		// c: in cache
+		// s: in store
+		// b: in both
 		Pattern string
 
 		// expected number of cache hits on query over all chunks
@@ -521,7 +530,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	for _, tc := range testcases {
 		pattern := tc.Pattern
 
-		// last ts is start ts plus the number of spans the pattern defines
+		// lastTs is the t0 of the first chunk that comes after the used range
 		lastTs := start + span*uint32(len(pattern))
 
 		// we want to query through various ranges, including:
@@ -529,11 +538,15 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		// - from first ts to last ts
 		// - from last ts to last ts
 		// and various ranges between
-		for from := start; from <= lastTs; from += steps {
-			for to := from; to <= lastTs; to += steps {
-				// reinstantiate the cache at the beginning of each run
+		// we increment from and to in tenths of a span,
+		// because incrementing by 1 would be needlessly expensive
+		step := span / 10
+		for from := start; from <= lastTs; from += step {
+			for to := from; to <= lastTs; to += step {
+				// use fresh store and cache
 				c = cache.NewCCache()
 				srv.BindCache(c)
+				store.Reset()
 
 				// populate cache and store according to pattern definition
 				prevts = 0
@@ -554,6 +567,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				req.ArchInterval = 1
 				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 				iters, err := srv.getSeriesCachedStore(ctx, to)
+
+				// test invalid query; from must be less than to
+				if from == to {
+					if err == nil {
+						t.Fatalf("Pattern %s From=To %d: expected err, got nil", pattern, from)
+					}
+					continue
+				}
 				if err != nil {
 					t.Fatalf("Pattern %s From %d To %d: error %s", pattern, from, to, err)
 				}
@@ -580,18 +601,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 					}
 				}
 
-				if to-from > 0 {
-					if len(tsSlice) == 0 {
-						t.Fatalf("Pattern %s From %d To %d; Should have >0 results but got 0", pattern, from, to)
-					}
-					if tsSlice[0] != expectResFrom {
-						t.Fatalf("Pattern %s From %d To %d; Expected first to be %d but got %d", pattern, from, to, expectResFrom, tsSlice[0])
-					}
-					if tsSlice[len(tsSlice)-1] != expectResTo {
-						t.Fatalf("Pattern %s From %d To %d; Expected last to be %d but got %d", pattern, from, to, expectResTo, tsSlice[len(tsSlice)-1])
-					}
-				} else if len(tsSlice) > 0 {
-					t.Fatalf("Pattern %s From %d To %d; Expected results to have len 0 but got %d", pattern, from, to, len(tsSlice))
+				if len(tsSlice) == 0 {
+					t.Fatalf("Pattern %s From %d To %d; Should have >0 results but got 0", pattern, from, to)
+				}
+				if tsSlice[0] != expectResFrom {
+					t.Fatalf("Pattern %s From %d To %d; Expected first to be %d but got %d", pattern, from, to, expectResFrom, tsSlice[0])
+				}
+				if tsSlice[len(tsSlice)-1] != expectResTo {
+					t.Fatalf("Pattern %s From %d To %d; Expected last to be %d but got %d", pattern, from, to, expectResTo, tsSlice[len(tsSlice)-1])
 				}
 
 				expectedHits := uint32(0)
@@ -599,53 +616,49 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// because ranges are exclusive at the end we'll test for to - 1
 				exclTo := to - 1
 
-				// if from is equal to we always expect 0 hits
-				if from != to {
+				// seek hits from beginning of the searched ranged within the given pattern
+				for i := 0; i < len(pattern); i++ {
 
-					// seek hits from beginning of the searched ranged within the given pattern
-					for i := 0; i < len(pattern); i++ {
+					// if pattern index is lower than from's chunk we continue
+					if from-(from%span) > start+uint32(i)*span {
+						continue
+					}
 
-						// if pattern index is lower than from's chunk we continue
-						if from-(from%span) > start+uint32(i)*span {
+					// current pattern index is a cache hit, so we expect one more
+					if pattern[i] == 'c' || pattern[i] == 'b' {
+						expectedHits++
+					} else {
+						break
+					}
+
+					// if we've already seeked beyond to's pattern we break and mark the seek as complete
+					if exclTo-(exclTo%span) == start+uint32(i)*span {
+						complete = true
+						break
+					}
+				}
+
+				// only if the previous seek was not complete we launch one from the other end
+				if !complete {
+
+					// now the same from the other end (just like the cache searching does)
+					for i := len(pattern) - 1; i >= 0; i-- {
+
+						// if pattern index is above to's chunk we continue
+						if exclTo-(exclTo%span)+span <= start+uint32(i)*span {
 							continue
 						}
 
-						// current pattern index is a cache hit, so we expect one more
+						// current pattern index is a cache hit, so we expecte one more
 						if pattern[i] == 'c' || pattern[i] == 'b' {
 							expectedHits++
 						} else {
 							break
 						}
 
-						// if we've already seeked beyond to's pattern we break and mark the seek as complete
-						if exclTo-(exclTo%span) == start+uint32(i)*span {
-							complete = true
+						// if we've already seeked beyond from's pattern we break
+						if from-(from%span) == start+uint32(i)*span {
 							break
-						}
-					}
-
-					// only if the previous seek was not complete we launch one from the other end
-					if !complete {
-
-						// now the same from the other end (just like the cache searching does)
-						for i := len(pattern) - 1; i >= 0; i-- {
-
-							// if pattern index is above to's chunk we continue
-							if exclTo-(exclTo%span)+span <= start+uint32(i)*span {
-								continue
-							}
-
-							// current pattern index is a cache hit, so we expecte one more
-							if pattern[i] == 'c' || pattern[i] == 'b' {
-								expectedHits++
-							} else {
-								break
-							}
-
-							// if we've already seeked beyond from's pattern we break
-							if from-(from%span) == start+uint32(i)*span {
-								break
-							}
 						}
 					}
 				}
@@ -659,7 +672,6 @@ func TestGetSeriesCachedStore(t *testing.T) {
 
 				// stop cache go routines before reinstantiating it at the top of the loop
 				c.Stop()
-				store.Reset()
 			}
 		}
 	}

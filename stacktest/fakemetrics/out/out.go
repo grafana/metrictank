@@ -7,11 +7,13 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+// Out submits metricdata to a destination
 type Out interface {
 	Close() error
 	Flush(metrics []*schema.MetricData) error
 }
 
+// OutStats tracks metrics related to an Output
 type OutStats struct {
 	FlushDuration     met.Timer // duration of Flush()
 	PublishQueued     met.Gauge // not every output uses this
@@ -23,6 +25,7 @@ type OutStats struct {
 	MessageMetrics    met.Meter // number of metrics per message
 }
 
+// NewStats creates a new OutStats
 func NewStats(stats met.Backend, output string) OutStats {
 	return OutStats{
 		FlushDuration: stats.NewTimer(fmt.Sprintf("metricpublisher.out.%s.flush_duration", output), 0),

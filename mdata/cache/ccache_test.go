@@ -222,7 +222,11 @@ func TestDisconnectedAdding(t *testing.T) {
 	cc.Add(metric, 0, itgen2)
 	cc.Add(metric, 0, itgen3)
 
-	res := cc.Search(test.NewContext(), metric, 900, 1015)
+	res, err := cc.Search(test.NewContext(), metric, 900, 1015)
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
@@ -256,7 +260,11 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	cc.Add(metric, 1000, itgen2)
 	cc.Add(metric, 0, itgen3)
 
-	res := cc.Search(test.NewContext(), metric, 900, 1015)
+	res, err := cc.Search(test.NewContext(), metric, 900, 1015)
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
@@ -292,7 +300,11 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 func TestSearchFromBeginningComplete(t *testing.T) {
 	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(test.NewContext(), metric, 1006, 1025)
+	res, err := cc.Search(test.NewContext(), metric, 1006, 1025)
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 
 	if !res.Complete {
 		t.Fatalf("complete is expected to be true")
@@ -310,7 +322,11 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(test.NewContext(), metric, 1006, 1030)
+	res, err := cc.Search(test.NewContext(), metric, 1006, 1030)
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 	if res.Complete {
 		t.Fatalf("complete is expected to be false")
 	}
@@ -327,7 +343,11 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 func TestSearchFromEnd(t *testing.T) {
 	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
-	res := cc.Search(test.NewContext(), metric, 500, 1025)
+	res, err := cc.Search(test.NewContext(), metric, 500, 1025)
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 
 	if res.Complete {
 		t.Fatalf("complete is expected to not be true")
@@ -363,8 +383,6 @@ func TestSearchDisconnectedStartEndNonSpanaware(t *testing.T) {
 }
 
 func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
-	var cc *CCache
-	var res *CCSearchResult
 	metric := test.GetAMKey(1)
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 
@@ -374,7 +392,7 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 	itgen4 := getItgen(t, values, 1030, spanaware)
 	itgen5 := getItgen(t, values, 1040, spanaware)
 	itgen6 := getItgen(t, values, 1050, spanaware)
-	cc = NewCCache()
+	cc := NewCCache()
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
@@ -397,7 +415,11 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 				cc.Add(metric, 0, itgen1)
 			}
 
-			res = cc.Search(test.NewContext(), metric, from, until)
+			res, err := cc.Search(test.NewContext(), metric, from, until)
+
+			if err != nil {
+				t.Fatalf("expected err nil, got %v", err)
+			}
 			if !res.Complete {
 				t.Fatalf("from %d, until %d: complete is expected to be true", from, until)
 			}
@@ -439,8 +461,6 @@ func TestSearchDisconnectedWithGapStartEndNonSpanaware(t *testing.T) {
 
 func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bool) {
 	metric := test.GetAMKey(1)
-	var cc *CCache
-	var res *CCSearchResult
 
 	values := []uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	itgen1 := getItgen(t, values, 1000, spanaware)
@@ -450,7 +470,7 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 	itgen4 := getItgen(t, values, 1040, spanaware)
 	itgen5 := getItgen(t, values, 1050, spanaware)
 	itgen6 := getItgen(t, values, 1060, spanaware)
-	cc = NewCCache()
+	cc := NewCCache()
 
 	for from := uint32(1000); from < 1010; from++ {
 		// the end of ranges is exclusive, so we go up to 1060
@@ -473,7 +493,11 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 				cc.Add(metric, 0, itgen1)
 			}
 
-			res = cc.Search(test.NewContext(), metric, from, until)
+			res, err := cc.Search(test.NewContext(), metric, from, until)
+
+			if err != nil {
+				t.Fatalf("expected err nil, got %v", err)
+			}
 			if res.Complete {
 				t.Fatalf("from %d, until %d: complete is expected to be false", from, until)
 			}
@@ -520,8 +544,6 @@ func TestMetricDelete(t *testing.T) {
 }
 
 func testMetricDelete(t *testing.T, cc *CCache) {
-	var res *CCSearchResult
-
 	rawMetric1 := test.GetAMKey(1)
 	metric1_1 := schema.GetAMKey(rawMetric1.MKey, schema.Cnt, 600)
 	metric1_2 := schema.GetAMKey(rawMetric1.MKey, schema.Sum, 600)
@@ -542,19 +564,33 @@ func testMetricDelete(t *testing.T, cc *CCache) {
 	}
 
 	// check if Search returns them all for metric1_1
-	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err := cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != itgenCount {
 		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
 	}
 
 	// check if Search returns them all for metric1_2
-	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
 	if len(res.Start) != itgenCount {
 		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
 	}
 
 	// check if Search returns them all for metric2_1
-	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != itgenCount {
 		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
 	}
@@ -572,19 +608,34 @@ func testMetricDelete(t *testing.T, cc *CCache) {
 	}
 
 	// check if metric1_1 returns no results anymore
-	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != 0 {
 		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
 	}
 
 	// check if metric1_2 returns no results anymore
-	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != 0 {
 		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
 	}
 
 	// but metric2_1 should still be there
-	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != itgenCount {
 		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
 	}
@@ -596,7 +647,12 @@ func testMetricDelete(t *testing.T, cc *CCache) {
 	}
 
 	// and check if it gets returned by Search again
-	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != itgenCount {
 		t.Fatalf("Expected to have %d values, got %d", itgenCount, len(res.Start))
 	}
@@ -614,19 +670,34 @@ func testMetricDelete(t *testing.T, cc *CCache) {
 	}
 
 	// check if metric1_1 returns no results anymore
-	res = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != 0 {
 		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
 	}
 
 	// check if metric1_1 returns no results anymore
-	res = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric1_2, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != 0 {
 		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
 	}
 
 	// check if metric2_1 returns no results anymore
-	res = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+	res, err = cc.Search(test.NewContext(), metric2_1, 1000, uint32(1000+itgenCount*len(values)))
+
+	if err != nil {
+		t.Fatalf("expected err nil, got %v", err)
+	}
+
 	if len(res.Start) != 0 {
 		t.Fatalf("Expected to have %d values, got %d", 0, len(res.Start))
 	}
