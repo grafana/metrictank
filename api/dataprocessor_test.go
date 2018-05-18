@@ -447,16 +447,23 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 	var chunks []chunk.Chunk
 
 	c := chunk.New(start)
-	for i := start; i < end; i++ {
-		c.Push(i, float64((i-start)*2))
-		if (i+1)%span == 0 {
-			// Mark the chunk that just got finished as finished
+	for ts := start; ts < end; ts++ {
+		val := float64((ts - start) * 2)
+		c.Push(ts, val)
+		// handle the case of this being the last point for this chunk
+		if (ts+1)%span == 0 {
 			c.Finish()
 			chunks = append(chunks, *c)
-			if i < end {
-				c = chunk.New(i + 1)
+			// if there will be a next iteration, prepare the chunk
+			if ts+1 < end {
+				c = chunk.New(ts + 1)
 			}
 		}
+	}
+	// if end was not quantized we have to finish the last chunk
+	if !c.Closed {
+		c.Finish()
+		chunks = append(chunks, *c)
 	}
 	return chunks
 }
