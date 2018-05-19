@@ -499,9 +499,6 @@ func TestGetSeriesCachedStore(t *testing.T) {
 	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv.BindMemoryStore(metrics)
 	metric := test.GetAMKey(1)
-	var c *cache.CCache
-	var itgen *chunk.IterGen
-	var prevts uint32
 
 	type testcase struct {
 		// the pattern of chunks
@@ -544,14 +541,14 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		for from := start; from <= lastTs; from += step {
 			for to := from; to <= lastTs; to += step {
 				// use fresh store and cache
-				c = cache.NewCCache()
+				c := cache.NewCCache()
 				srv.BindCache(c)
 				store.Reset()
 
 				// populate cache and store according to pattern definition
-				prevts = 0
+				var prevts uint32
 				for i := 0; i < len(tc.Pattern); i++ {
-					itgen = chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
+					itgen := chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
 					if pattern[i] == 'c' || pattern[i] == 'b' {
 						c.Add(metric, prevts, *itgen)
 					}
@@ -589,7 +586,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// we use the tsTracker to increase together with the iterators and compare at each step
 				tsTracker := expectResFrom
 
-				tsSlice := make([]uint32, 0)
+				var tsSlice []uint32
 				for i, it := range iters {
 					for it.Next() {
 						ts, _ := it.Values()
