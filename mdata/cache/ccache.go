@@ -204,22 +204,21 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) (*CCSearchResult, error) {
 	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
 	defer span.Finish()
-	var hit chunk.IterGen
-	var cm *CCacheMetric
-	var ok bool
-	res := &CCSearchResult{
-		From:  from,
-		Until: until,
-	}
 
 	if from >= until {
 		return nil, ErrInvalidRange
 	}
 
+	res := &CCSearchResult{
+		From:  from,
+		Until: until,
+	}
+
 	c.RLock()
 	defer c.RUnlock()
 
-	if cm, ok = c.metricCache[metric]; !ok {
+	cm, ok := c.metricCache[metric]
+	if !ok {
 		span.SetTag("cache", "miss")
 		accnt.CacheMetricMiss.Inc()
 		return res, nil
@@ -233,10 +232,10 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 
 		accnt.CacheChunkHit.Add(len(res.Start) + len(res.End))
 		go func() {
-			for _, hit = range res.Start {
+			for _, hit := range res.Start {
 				c.accnt.HitChunk(metric, hit.Ts)
 			}
-			for _, hit = range res.End {
+			for _, hit := range res.End {
 				c.accnt.HitChunk(metric, hit.Ts)
 			}
 		}()
