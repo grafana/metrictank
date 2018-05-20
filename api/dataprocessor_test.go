@@ -535,9 +535,9 @@ func TestGetSeriesCachedStore(t *testing.T) {
 		// - from first ts to last ts
 		// - from last ts to last ts
 		// and various ranges between
-		// we increment from and to in tenths of a span,
+		// we increment from and to in thirds of a span,
 		// because incrementing by 1 would be needlessly expensive
-		step := span / 10
+		step := span / 3
 		for from := start; from <= lastTs; from += step {
 			for to := from; to <= lastTs; to += step {
 				// use fresh store and cache
