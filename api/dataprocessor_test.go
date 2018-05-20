@@ -485,6 +485,11 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 // result:                            |-----|-----|
 //
 func TestGetSeriesCachedStore(t *testing.T) {
+	// reduce overhead of creating accounter over and over
+	old := accnt.EventQSize
+	accnt.EventQSize = 1000
+	defer func() { accnt.EventQSize = old }()
+
 	span := uint32(600)
 	start := span
 	// we want 10 chunks to serve the largest testcase

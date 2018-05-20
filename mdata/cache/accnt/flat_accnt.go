@@ -11,7 +11,7 @@ const evictQSize = 1000
 
 // it's easily possible for many events to happen in one request,
 // we never want this to fill up because otherwise events get dropped
-const eventQSize = 100000
+var EventQSize = 100000
 
 // FlatAccnt implements Flat accounting.
 // Keeps track of the chunk cache size and in which order the contained
@@ -89,7 +89,7 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 		maxSize: maxSize,
 		lru:     NewLRU(),
 		evictQ:  make(chan *EvictTarget, evictQSize),
-		eventQ:  make(chan FlatAccntEvent, eventQSize),
+		eventQ:  make(chan FlatAccntEvent, EventQSize),
 	}
 	cacheSizeMax.SetUint64(maxSize)
 
