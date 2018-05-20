@@ -17,13 +17,13 @@ type Metrics interface {
 
 type Metric interface {
 	Add(ts uint32, val float64)
-	Get(from, to uint32) Result
+	Get(from, to uint32) (Result, error)
 	GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (Result, error)
 }
 
 type Store interface {
 	Add(cwr *ChunkWriteRequest)
-	Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error)
+	Search(ctx context.Context, key schema.AMKey, ttl, from, to uint32) ([]chunk.IterGen, error)
 	Stop()
 	SetTracer(t opentracing.Tracer)
 }

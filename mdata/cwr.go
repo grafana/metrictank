@@ -7,6 +7,7 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
+// ChunkWriteRequest is a request to write a chunk into a store
 type ChunkWriteRequest struct {
 	Metric    *AggMetric
 	Key       schema.AMKey
@@ -16,6 +17,7 @@ type ChunkWriteRequest struct {
 	Span      uint32
 }
 
+// NewChunkWriteRequest creates a new ChunkWriteRequest
 func NewChunkWriteRequest(metric *AggMetric, key schema.AMKey, chunk *chunk.Chunk, ttl, span uint32, ts time.Time) ChunkWriteRequest {
 	return ChunkWriteRequest{metric, key, chunk, ttl, ts, span}
 }

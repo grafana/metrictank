@@ -16,10 +16,10 @@ import (
 type CCacheMetric struct {
 	sync.RWMutex
 
-	// points at cached data chunks, indexed by their according time stamp
+	// cached data chunks by timestamp
 	chunks map[uint32]*CCacheChunk
 
-	// the list of chunk time stamps in ascending order
+	// chunk time stamps in ascending order
 	keys []uint32
 
 	MKey schema.MKey
@@ -243,10 +243,10 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 	}
 }
 
-// Search searches for the given metric
+// Search searches the CCacheMetric's data and returns a complete-as-possible CCSearchResult
 //
-// the idea of this method is that we first look for the chunks where the
-// "from" and "until" ts are in. then we seek from the "from" towards "until"
+// we first look for the chunks where the "from" and "until" ts are in.
+// then we seek from the "from" towards "until"
 // and add as many cunks as possible to the result, if this did not result
 // in all chunks necessary to serve the request we do the same in the reverse
 // order from "until" to "from"
