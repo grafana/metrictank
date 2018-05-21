@@ -5,12 +5,14 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 )
 
+// Context describes a series timeframe and consolidator
 type Context struct {
 	from   uint32
 	to     uint32
 	consol consolidation.Consolidator // can be 0 to mean undefined
 }
 
+// GraphiteFunc defines a graphite processing function
 type GraphiteFunc interface {
 	// Signature declares input and output arguments (return values)
 	// input args can be optional in which case they can be specified positionally or via keys if you want to specify params that come after un-specified optional params
