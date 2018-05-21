@@ -26,8 +26,8 @@ type DefaultHandler struct {
 	receivedMD   *stats.Counter32
 	receivedMP   *stats.Counter32
 	receivedMPNO *stats.Counter32
-	invalidMD    *stats.Counter32
-	invalidMP    *stats.Counter32
+	invalidMD    *stats.CounterRate32
+	invalidMP    *stats.CounterRate32
 	unknownMP    *stats.Counter32
 
 	metrics     mdata.Metrics
@@ -39,8 +39,8 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		receivedMD:   stats.NewCounter32(fmt.Sprintf("input.%s.metricdata.received", input)),
 		receivedMP:   stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.received", input)),
 		receivedMPNO: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint_no_org.received", input)),
-		invalidMD:    stats.NewCounter32(fmt.Sprintf("input.%s.metricdata.invalid", input)),
-		invalidMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.invalid", input)),
+		invalidMD:    stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.invalid", input)),
+		invalidMP:    stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.invalid", input)),
 		unknownMP:    stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.unknown", input)),
 
 		metrics:     metrics,

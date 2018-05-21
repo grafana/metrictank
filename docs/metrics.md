@@ -170,10 +170,6 @@ the duration of the last GC STW pause in nanoseconds
 a counter of total number of bytes allocated during process lifetime
 * `memory.total_gc_cycles`:  
 a counter of the number of GC cycles since process start
-* `metric_invalid`:  
-a count of times a metric did not validate
-* `metrics_decode_err`:  
-a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
 * `plan.run`:
 the time spent running the plan for a request (function processing of all targets and runtime consolidation)
 * `store.cassandra.chunk_operations.save_fail`:  
@@ -241,9 +237,21 @@ how long it takes to persist a chunk (and chunks preceding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
+* `input.carbon.metrics_decode_err`:
+a count of times an input message failed to parse
+* `input.carbon.metricdata.invalid`:
+a count of times metricdata was invalid
+* `input.carbon.metricpoint.invalid`:
+a count of times a metricpoint was invalid
 * `input.kafka-mdm.partition.%d.offset`:   
 The current offset for the partition (%d) that we have consumed.
 * `input.kafka-mdm.partition.%d.log_size`:   
 The size of the kafka partition, aka the newest available offset.
 * `input.kafka-mdm.partition.%d.lag`:   
 How many messages (metrics) Kafaka has that we have not yet consumed.
+* `input.kafka-mdm.metrics_decode_err`:
+a count of times an input message failed to parse
+* `input.kafka-mdm.metricdata.invalid`:
+a count of times metricdata was invalid
+* `input.kafka-mdm.metricpoint.invalid`:
+a count of times a metricpoint was invalid

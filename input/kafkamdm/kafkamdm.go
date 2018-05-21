@@ -25,7 +25,7 @@ import (
 var metricsPerMessage = stats.NewMeter32("input.kafka-mdm.metrics_per_message", false)
 
 // metric input.kafka-mdm.metrics_decode_err is a count of times an input message failed to parse
-var metricsDecodeErr = stats.NewCounter32("input.kafka-mdm.metrics_decode_err")
+var metricsDecodeErr = stats.NewCounterRate32("input.kafka-mdm.metrics_decode_err")
 
 type KafkaMdm struct {
 	input.Handler
