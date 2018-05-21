@@ -30,13 +30,13 @@ var (
 
 	// metric tank.metrics_too_old is points that go back in time beyond the scope of the optional reorder window.
 	// these points will end up being dropped and lost.
-	metricsTooOld = stats.NewCounter32("tank.metrics_too_old")
+	metricsTooOld = stats.NewCounterRate32("tank.metrics_too_old")
 
 	// metric tank.add_to_closed_chunk is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
-	addToClosedChunk = stats.NewCounter32("tank.add_to_closed_chunk")
+	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
 
 	// metric mem.to_iter is how long it takes to transform in-memory chunks to iterators
 	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")

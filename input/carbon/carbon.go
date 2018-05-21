@@ -23,7 +23,7 @@ import (
 var metricsPerMessage = stats.NewMeter32("input.carbon.metrics_per_message", false)
 
 // metric input.carbon.metrics_decode_err is a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
-var metricsDecodeErr = stats.NewCounter32("input.carbon.metrics_decode_err")
+var metricsDecodeErr = stats.NewCounterRate32("input.carbon.metrics_decode_err")
 
 type Carbon struct {
 	input.Handler

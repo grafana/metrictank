@@ -5,13 +5,13 @@ import "github.com/grafana/metrictank/stats"
 var (
 
 	// metric cache.ops.metric.hit-full is how many metrics were hit fully (all needed chunks in cache)
-	CacheMetricHitFull = stats.NewCounter32("cache.ops.metric.hit-full")
+	CacheMetricHitFull = stats.NewCounterRate32("cache.ops.metric.hit-full")
 
 	// metric cache.ops.metric.hit-partial is how many metrics were hit partially (some of the needed chunks in cache, but not all)
-	CacheMetricHitPartial = stats.NewCounter32("cache.ops.metric.hit-partial")
+	CacheMetricHitPartial = stats.NewCounterRate32("cache.ops.metric.hit-partial")
 
 	// metric cache.ops.metric.miss is how many metrics were missed fully (no needed chunks in cache)
-	CacheMetricMiss = stats.NewCounter32("cache.ops.metric.miss")
+	CacheMetricMiss = stats.NewCounterRate32("cache.ops.metric.miss")
 
 	// metric cache.ops.metric.add is how many metrics were added to the cache
 	cacheMetricAdd = stats.NewCounter32("cache.ops.metric.add")
