@@ -13,6 +13,7 @@ var ErrInvalidAggFunc = errors.New("Invalid aggregation func")
 // Validator is a function to validate an input
 type Validator func(e *expr) error
 
+// IntPositive validates whether an int is positive (greater than zero)
 func IntPositive(e *expr) error {
 	if e.int < 1 {
 		return ErrIntPositive
