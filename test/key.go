@@ -1,6 +1,11 @@
 package test
 
-import schema "gopkg.in/raintank/schema.v1"
+import (
+	"fmt"
+	"reflect"
+
+	schema "gopkg.in/raintank/schema.v1"
+)
 
 func GetAMKey(suffix int) schema.AMKey {
 	return schema.AMKey{
@@ -20,6 +25,23 @@ func MustMKeyFromString(id string) schema.MKey {
 	if err != nil {
 		panic(err)
 	}
-	panic(err)
 	return mkey
+}
+
+func ContainsMKey(list []schema.MKey, subject schema.MKey) bool {
+	for _, v := range list {
+		if reflect.DeepEqual(v, subject) {
+			return true
+		}
+	}
+	return false
+}
+
+func ShouldContainMKey(actual interface{}, expected ...interface{}) string {
+	list := expected[0].([]schema.MKey)
+	subject := actual.(schema.MKey)
+	if !ContainsMKey(list, subject) {
+		return fmt.Sprintf("slice of MKey's did not contain %v", subject)
+	}
+	return ""
 }

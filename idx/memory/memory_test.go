@@ -530,8 +530,8 @@ func testMixedBranchLeafDelete(t *testing.T) {
 		for i, d := range defs {
 			deletedIds[i] = d.Id
 		}
-		So(test.MustMKeyFromString(series[0].Id), ShouldBeIn, deletedIds)
-		So(test.MustMKeyFromString(series[1].Id), ShouldBeIn, deletedIds)
+		So(test.MustMKeyFromString(series[0].Id), test.ShouldContainMKey, deletedIds)
+		So(test.MustMKeyFromString(series[1].Id), test.ShouldContainMKey, deletedIds)
 		Convey("series should not be present in the metricDef index", func() {
 			_, ok := ix.Get(mkeys[0])
 			So(ok, ShouldEqual, false)
