@@ -2,6 +2,7 @@ package stats
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"time"
 
@@ -82,7 +83,6 @@ func (g *Graphite) reporter(interval int) {
 }
 
 // writer connects to graphite and submits all pending data to it
-// TODO: conn.Write() returns no error for a while when the remote endpoint is down, the reconnect happens with a delay. this can also cause lost data for a second or two.
 func (g *Graphite) writer() {
 	var conn net.Conn
 	var err error
@@ -94,6 +94,7 @@ func (g *Graphite) writer() {
 			conn, err = net.Dial("tcp", g.addr)
 			if err == nil {
 				log.Info("stats now connected to %s", g.addr)
+				go g.checkEOF(conn)
 			} else {
 				log.Warn("stats dialing %s failed: %s. will retry", g.addr, err.Error())
 			}
@@ -118,6 +119,34 @@ func (g *Graphite) writer() {
 				conn.Close()
 				conn = nil
 			}
+		}
+	}
+}
+
+// normally the remote end should never write anything back
+// but we know when we get EOF that the other end closed the conn
+// if not for this, we can happily write and flush without getting errors (in Go) but getting RST tcp packets back (!)
+// props to Tv` for this trick.
+func (g *Graphite) checkEOF(conn net.Conn) {
+	b := make([]byte, 1024)
+	for {
+		num, err := conn.Read(b)
+		if err == io.EOF {
+			log.Info("checkEOF conn.Read returned EOF -> conn is closed. closing conn explicitly")
+			conn.Close()
+			return
+		}
+
+		// just in case i misunderstand something or the remote behaves badly
+		if num != 0 {
+			log.Info("checkEOF conn.Read data? did not expect that.  data: %s\n", b[:num])
+			continue
+		}
+
+		if err != io.EOF {
+			log.Warn("checkEOF conn.Read returned err != EOF, which is unexpected.  closing conn. error: %s\n", err)
+			conn.Close()
+			return
 		}
 	}
 }
