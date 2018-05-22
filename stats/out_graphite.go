@@ -132,19 +132,19 @@ func (g *Graphite) checkEOF(conn net.Conn) {
 	for {
 		num, err := conn.Read(b)
 		if err == io.EOF {
-			log.Info("checkEOF conn.Read returned EOF -> conn is closed. closing conn explicitly")
+			log.Info("Graphite.checkEOF: remote closed conn. closing conn")
 			conn.Close()
 			return
 		}
 
 		// just in case i misunderstand something or the remote behaves badly
 		if num != 0 {
-			log.Info("checkEOF conn.Read data? did not expect that.  data: %s\n", b[:num])
+			log.Warn("Graphite.checkEOF: read unexpected data from peer: %s\n", b[:num])
 			continue
 		}
 
 		if err != io.EOF {
-			log.Warn("checkEOF conn.Read returned err != EOF, which is unexpected.  closing conn. error: %s\n", err)
+			log.Warn("Graphite.checkEOF: %s\n", err)
 			conn.Close()
 			return
 		}
