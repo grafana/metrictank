@@ -108,7 +108,7 @@ func (g *Graphite) writer() {
 		var ok bool
 		for !ok {
 			conn = assureConn()
-			conn.SetDeadline(time.Now().Add(g.timeout))
+			conn.SetWriteDeadline(time.Now().Add(g.timeout))
 			pre := time.Now()
 			_, err = conn.Write(buf)
 			if err == nil {
