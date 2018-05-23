@@ -190,6 +190,8 @@ Flags:
     	template to render MetricData with (default "{{.Part}} {{.OrgId}} {{.Id}} {{.Name}} {{.Interval}} {{.Value}} {{.Time}} {{.Unit}} {{.Mtype}} {{.Tags}}")
   -format-point string
     	template to render MetricPoint data with (default "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}")
+  -invalid
+    	only show metrics that are invalid
   -prefix string
     	only show metrics that have this prefix
   -substr string
