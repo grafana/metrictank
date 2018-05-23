@@ -26,6 +26,7 @@ var (
 	formatP  = flag.String("format-point", "{{.Part}} {{.MKey}} {{.Value}} {{.Time}}", "template to render MetricPoint data with")
 	prefix   = flag.String("prefix", "", "only show metrics that have this prefix")
 	substr   = flag.String("substr", "", "only show metrics that have this substring")
+	invalid  = flag.Bool("invalid", false, "only show metrics that are invalid")
 
 	stdoutLock = sync.Mutex{}
 )
@@ -61,6 +62,12 @@ func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition in
 	if *substr != "" && !strings.Contains(metric.Name, *substr) {
 		return
 	}
+	if *invalid {
+		err := metric.Validate()
+		if err == nil && metric.Time != 0 {
+			return
+		}
+	}
 	stdoutLock.Lock()
 	err := ip.tplMd.Execute(os.Stdout, DataMd{
 		partition,
@@ -74,6 +81,11 @@ func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition in
 }
 
 func (ip inputPrinter) ProcessMetricPoint(point schema.MetricPoint, format msg.Format, partition int32) {
+
+	if *invalid && point.Valid() {
+		return
+	}
+
 	stdoutLock.Lock()
 	err := ip.tplP.Execute(os.Stdout, DataP{
 		partition,
