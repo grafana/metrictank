@@ -28,6 +28,7 @@ cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-sto
 cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
 cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
 cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
+cp ${BASE}/config/index-rules.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
@@ -58,6 +59,7 @@ cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-sto
 cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
 cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
 cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
+cp ${BASE}/config/index-rules.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
@@ -88,6 +90,7 @@ cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-sto
 cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
 cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
 cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
+cp ${BASE}/config/index-rules.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
@@ -117,6 +120,7 @@ cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-sto
 cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
 cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
 cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
+cp ${BASE}/config/index-rules.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/systemd/metrictank.service $BUILD/lib/systemd/system/
@@ -145,6 +149,7 @@ cp ${BASE}/config/schema-store-cassandra.toml ${BUILD}/etc/metrictank/schema-sto
 cp ${BASE}/config/schema-idx-cassandra.toml ${BUILD}/etc/metrictank/schema-idx-cassandra.toml
 cp ${BASE}/config/schema-store-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-store-scylladb.toml
 cp ${BASE}/config/schema-idx-scylladb.toml ${BUILD}/usr/share/metrictank/examples/schema-idx-scylladb.toml
+cp ${BASE}/config/index-rules.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-schemas.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/storage-aggregation.conf ${BUILD}/etc/metrictank/
 cp ${BASE}/config/upstart-0.6.5/metrictank.conf $BUILD/etc/init

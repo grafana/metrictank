@@ -3,6 +3,7 @@
 // see https://graphite.readthedocs.io/en/0.9.9/config-carbon.html#storage-schemas-conf
 // * storage-aggregation.conf
 // see http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-aggregation-conf
+// as well as our own file index-rules.conf
 //
 // it also adds defaults (the same ones as graphite),
 // so that even if nothing is matched in the user provided schemas or aggregations,

@@ -3,6 +3,7 @@
 Metrictank comes with an [example main config file](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini),
 a [storage-schemas.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-schemas.conf) and
 a [storage-aggregation.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-aggregation.conf)
+an [index-rules.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/index-rules.conf)
 
 The files themselves are well documented, but for your convenience, they are replicated below.  
 
@@ -443,8 +444,6 @@ timeout = 1s
 num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra
 write-queue-size = 100000
-#automatically clear series from the index if they have not been seen for this much time.
-max-stale = 0
 #Interval at which the index should be checked for stale series.
 prune-interval = 3h
 # synchronize index changes to cassandra. not all your nodes need to do this.
@@ -482,6 +481,8 @@ tag-support = false
 tag-query-workers = 50
 # size of regular expression cache in tag query evaluation
 match-cache-size = 1000
+# path to index-rules.conf file
+index-rules-conf = /etc/metrictank/index-rules.conf
 # maximum duration each second a prune job can lock the index.
 max-prune-lock-time = 100ms
 ```
@@ -513,6 +514,44 @@ max-stale = 0
 prune-interval = 3h
 # enable the creation of the table and column families
 create-cf = true
+```
+
+# index-rules.conf
+
+```
+# This config file controls when to prune metrics from the index
+# Note:
+# * This file is optional. If it is not present, we won't prune data
+# * Patterns are regexes matched on the metric name (including tags) and tried from top to bottom. First match wins.
+# * Anything not matched or resolving to max-stale=0 will not be pruned
+# * Patterns are unanchored regular expressions; add '^' or '$' to match the beginning or end of a pattern
+# * max-stale is a duration like 7d. if no new data has been seen for a metric during this time, it will be pruned
+# * Valid units are s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours, d/day/days, w/week/weeks, mon/month/months, y/year/years
+
+[default]
+pattern = 
+max-stale = 0
+
+# storage-aggregation.conf
+
+```
+# This config file controls which summaries are created (using which consolidation functions) for your lower-precision archives, as defined in storage-schemas.conf
+# It is an extension of http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-aggregation-conf
+# Note:
+# * This file is optional. If it is not present, we will use avg for everything
+# * Anything not matched also uses avg for everything
+# * xFilesFactor is not honored yet.  What it is in graphite is a floating point number between 0 and 1 specifying what fraction of the previous retention level's slots must have non-null values in order to aggregate to a non-null value. The default is 0.5.
+# * aggregationMethod specifies the functions used to aggregate values for the next retention level. Legal methods are avg/average, sum, min, max, and last. The default is average.
+# Unlike Graphite, you can specify multiple, as it is often handy to have different summaries available depending on what analysis you need to do.
+# When using multiple, the first one is used for reading.  In the future, we will add capabilities to select the different archives for reading.
+# * the settings configured when metrictank starts are what is applied. So you can enable or disable archives by restarting metrictank.
+#
+# see https://github.com/grafana/metrictank/blob/master/docs/consolidation.md for related info.
+
+[default]
+pattern = .*
+xFilesFactor = 0.1
+aggregationMethod = avg,min,max
 ```
 
 # storage-schemas.conf
@@ -574,28 +613,6 @@ create-cf = true
 pattern = .*
 retentions = 1s:35d:10min:7
 # reorderBuffer = 20
-```
-
-# storage-aggregation.conf
-
-```
-# This config file controls which summaries are created (using which consolidation functions) for your lower-precision archives, as defined in storage-schemas.conf
-# It is an extension of http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-aggregation-conf
-# Note:
-# * This file is optional. If it is not present, we will use avg for everything
-# * Anything not matched also uses avg for everything
-# * xFilesFactor is not honored yet.  What it is in graphite is a floating point number between 0 and 1 specifying what fraction of the previous retention level's slots must have non-null values in order to aggregate to a non-null value. The default is 0.5.
-# * aggregationMethod specifies the functions used to aggregate values for the next retention level. Legal methods are avg/average, sum, min, max, and last. The default is average.
-# Unlike Graphite, you can specify multiple, as it is often handy to have different summaries available depending on what analysis you need to do.
-# When using multiple, the first one is used for reading.  In the future, we will add capabilities to select the different archives for reading.
-# * the settings configured when metrictank starts are what is applied. So you can enable or disable archives by restarting metrictank.
-#
-# see https://github.com/grafana/metrictank/blob/master/docs/consolidation.md for related info.
-
-[default]
-pattern = .*
-xFilesFactor = 0.1
-aggregationMethod = avg,min,max
 ```
 
 This file is generated by [config-to-doc](https://github.com/grafana/metrictank/blob/master/scripts/dev/config-to-doc.sh)

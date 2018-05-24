@@ -59,6 +59,7 @@ cat << EOF
 Metrictank comes with an [example main config file](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini),
 a [storage-schemas.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-schemas.conf) and
 a [storage-aggregation.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-aggregation.conf)
+an [index-rules.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/index-rules.conf)
 
 The files themselves are well documented, but for your convenience, they are replicated below.  
 
@@ -83,6 +84,15 @@ MT_KAFKA_MDM_IN_DATA_DIR: /your/data/dir  # MT_<section_title>_<setting_name>
 EOF
 
 process metrictank-sample.ini
+
+cat << EOF
+
+# index-rules.conf
+
+\`\`\`
+EOF
+
+cat scripts/config/index-rules.conf
 
 cat << EOF
 
