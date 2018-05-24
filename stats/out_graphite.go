@@ -144,7 +144,7 @@ func (g *Graphite) checkEOF(conn net.Conn) {
 		}
 
 		if err != io.EOF {
-			log.Warn("Graphite.checkEOF: closing conn: %s\n", err)
+			log.Warn("Graphite.checkEOF: %s. closing conn\n", err)
 			conn.Close()
 			return
 		}
