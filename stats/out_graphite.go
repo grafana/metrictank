@@ -137,7 +137,7 @@ func (g *Graphite) checkEOF(conn net.Conn) {
 			return
 		}
 
-		// just in case i misunderstand something or the remote behaves badly
+		// in case the remote behaves badly (out of spec for carbon protocol)
 		if num != 0 {
 			log.Warn("Graphite.checkEOF: read unexpected data from peer: %s\n", b[:num])
 			continue
