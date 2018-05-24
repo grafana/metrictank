@@ -86,21 +86,22 @@ process metrictank-sample.ini
 
 cat << EOF
 
-# storage-schemas.conf
-
-\`\`\`
-EOF
-cat scripts/config/storage-schemas.conf
-
-cat << EOF
-\`\`\`
-
 # storage-aggregation.conf
 
 \`\`\`
 EOF
 
 cat scripts/config/storage-aggregation.conf
+
+cat << EOF
+\`\`\`
+
+# storage-schemas.conf
+
+\`\`\`
+EOF
+
+cat scripts/config/storage-schemas.conf
 
 cat << EOF
 \`\`\`
