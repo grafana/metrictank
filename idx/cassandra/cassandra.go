@@ -125,6 +125,7 @@ func New() *CasIdx {
 	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = timeout
+	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = numConns
 	cluster.ProtoVersion = protoVer
 	if ssl {

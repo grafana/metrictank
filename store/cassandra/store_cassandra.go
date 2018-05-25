@@ -190,6 +190,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	}
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = time.Duration(timeout) * time.Millisecond
+	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = writers
 	cluster.ProtoVersion = protoVer
 	var err error
