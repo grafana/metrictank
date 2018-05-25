@@ -170,7 +170,7 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, schemaFile string, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, schemaFile string, ttls []uint32, disableInitialHostLookup bool) (*CassandraStore, error) {
 
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
@@ -193,9 +193,11 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = writers
 	cluster.ProtoVersion = protoVer
+	cluster.DisableInitialHostLookup = disableInitialHostLookup
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
+		log.Error(3, "cassandra_store: failed to create cassandra session. %s", err.Error())
 		return nil, err
 	}
 
@@ -206,11 +208,13 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 
 	// create or verify the metrictank keyspace
 	if createKeyspace {
+		log.Info("cassandra_store: ensuring that keyspace %s exists.", keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, result := range ttlTables {
+			log.Info("cassandra_store: ensuring that table %s exists.", result.Table)
 			err := tmpSession.Query(fmt.Sprintf(schemaTable, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err

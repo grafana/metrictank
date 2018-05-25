@@ -94,6 +94,8 @@ cass config flags:
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
     	enable the creation of the index keyspace and tables, only one node needs this (default true)
+  -disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -enabled
     	 (default true)
   -host-verification
@@ -277,6 +279,8 @@ Flags:
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
+  -cassandra-disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
@@ -335,6 +339,8 @@ Flags:
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-create-keyspace
     	enable the creation of the metrictank keyspace (default true)
+  -cassandra-disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
@@ -455,6 +461,8 @@ Flags:
     	max number of concurrent reads to cassandra. (default 20)
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
@@ -610,6 +618,8 @@ cass config flags:
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
     	enable the creation of the index keyspace and tables, only one node needs this (default true)
+  -disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -enabled
     	 (default true)
   -host-verification

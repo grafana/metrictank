@@ -36,6 +36,8 @@ var (
 	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
 	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
 
+	cassandraDisableInitialHostLookup = flag.Bool("cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
+
 	startTs    = flag.Int("start-timestamp", 0, "timestamp at which to start, defaults to 0")
 	endTs      = flag.Int("end-timestamp", math.MaxInt32, "timestamp at which to stop, defaults to int max")
 	numThreads = flag.Int("threads", 1, "number of workers to use to process data")
@@ -100,6 +102,7 @@ func NewCassandraStore() (*gocql.Session, error) {
 	cluster.ProtoVersion = *cqlProtocolVersion
 	cluster.Keyspace = *cassandraKeyspace
 	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: *cassandraRetries}
+	cluster.DisableInitialHostLookup = *cassandraDisableInitialHostLookup
 
 	switch *cassandraHostSelectionPolicy {
 	case "roundrobin":
