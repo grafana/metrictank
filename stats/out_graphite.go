@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/raintank/worldping-api/pkg/log"
@@ -86,28 +87,29 @@ func (g *Graphite) reporter(interval int) {
 func (g *Graphite) writer() {
 	var conn net.Conn
 	var err error
+	var wg sync.WaitGroup
 
-	assureConn := func() net.Conn {
+	assureConn := func() {
 		connected.Set(conn != nil)
 		for conn == nil {
 			time.Sleep(time.Second)
 			conn, err = net.Dial("tcp", g.addr)
 			if err == nil {
 				log.Info("stats now connected to %s", g.addr)
-				go g.checkEOF(conn)
+				wg.Add(1)
+				go g.checkEOF(conn, &wg)
 			} else {
 				log.Warn("stats dialing %s failed: %s. will retry", g.addr, err.Error())
 			}
 			connected.Set(conn != nil)
 		}
-		return conn
 	}
 
 	for buf := range g.toGraphite {
 		queueItems.Value(len(g.toGraphite))
 		var ok bool
 		for !ok {
-			conn = assureConn()
+			assureConn()
 			conn.SetWriteDeadline(time.Now().Add(g.timeout))
 			pre := time.Now()
 			_, err = conn.Write(buf)
@@ -117,6 +119,7 @@ func (g *Graphite) writer() {
 			} else {
 				log.Warn("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
 				conn.Close()
+				wg.Wait()
 				conn = nil
 			}
 		}
@@ -127,7 +130,8 @@ func (g *Graphite) writer() {
 // but we know when we get EOF that the other end closed the conn
 // if not for this, we can happily write and flush without getting errors (in Go) but getting RST tcp packets back (!)
 // props to Tv` for this trick.
-func (g *Graphite) checkEOF(conn net.Conn) {
+func (g *Graphite) checkEOF(conn net.Conn, wg *sync.WaitGroup) {
+	defer wg.Done()
 	b := make([]byte, 1024)
 	for {
 		num, err := conn.Read(b)
