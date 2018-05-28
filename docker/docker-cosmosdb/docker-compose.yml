@@ -1,0 +1,78 @@
+version: '2'
+
+services:
+  metrictank:
+    hostname: metrictank
+    image: grafana/metrictank
+    ports:
+     - "6060:6060"
+     - "2003:2003"
+    volumes:
+      - ../../build/metrictank:/usr/bin/metrictank
+      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
+      - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+    environment:
+     WAIT_HOSTS: kafka:9092
+     WAIT_TIMEOUT: 60
+     MT_STATS_ADDR: graphite:2003
+     MT_CASSANDRA_ADDRS: <addr>
+     MT_CASSANDRA_TIMEOUT: 30000
+     MT_CASSANDRA_SSL: "true"
+     MT_CASSANDRA_CA_PATH: ""
+     MT_CASSANDRA_HOST_VERIFICATION: "false"
+     MT_CASSANDRA_DISABLE_INITIAL_HOST_LOOKUP: "true"
+     MT_CASSANDRA_AUTH: "true"
+     MT_CASSANDRA_USERNAME: <user>
+     MT_CASSANDRA_PASSWORD: <pass>
+     MT_CASSANDRA_IDX_HOSTS: <addr>
+     MT_CASSANDRA_IDX_TIMEOUT: "30s"
+     MT_CASSANDRA_IDX_DISABLE_INITIAL_HOST_LOOKUP: "true"
+     MT_CASSANDRA_IDX_NUM_CONNS: 1
+     MT_CASSANDRA_IDX_SSL: "true"
+     MT_CASSANDRA_IDX_CA_PATH: ""
+     MT_CASSANDRA_IDX_HOST_VERIFICATION: "false"
+     MT_CASSANDRA_IDX_AUTH: "true"
+     MT_CASSANDRA_IDX_USERNAME: <user>
+     MT_CASSANDRA_IDX_PASSWORD: <pass>
+    links:
+     - kafka
+
+  kafka:
+    hostname: kafka
+    image: raintank/kafka:latest
+    environment:
+      ADVERTISED_HOST: kafka
+      NUM_PARTITIONS: 8
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+      - "9999:9999"
+    volumes:
+      - /tmp/kafka-logs
+
+  graphite:
+    hostname: graphite
+    image: graphiteapp/graphite-statsd:latest
+    ports:
+     - "8080:80"
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
+  tsdb-gw:
+    hostname: tsdb-gw
+    image: raintank/tsdb-gw:latest
+    ports:
+      - "8081:80"
+    environment:
+      GW_GRAPHITE_URL: http://metrictank:6060
+      GW_METRICS_PUBLISH: "true"
+      GW_METRICS_KAFKA_COMP: snappy
+      GW_KAFKA_TCP_ADDR: kafka:9092
+      GW_STATS_ENABLED: "true"
+      GW_STATS_PREFIX: "tsdb-gw.stats.dev.tsdbgw_tsdb-gw_1"
+      GW_STATS_ADDR: "graphite:2003"

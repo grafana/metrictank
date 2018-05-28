@@ -3,6 +3,7 @@ package cassandra
 import (
 	"flag"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,27 +49,28 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
-	Enabled          bool
-	ssl              bool
-	auth             bool
-	hostverification bool
-	createKeyspace   bool
-	schemaFile       string
-	keyspace         string
-	hosts            string
-	capath           string
-	username         string
-	password         string
-	consistency      string
-	timeout          time.Duration
-	numConns         int
-	writeQueueSize   int
-	protoVer         int
-	maxStale         time.Duration
-	pruneInterval    time.Duration
-	updateCassIdx    bool
-	updateInterval   time.Duration
-	updateInterval32 uint32
+	Enabled                  bool
+	ssl                      bool
+	auth                     bool
+	hostverification         bool
+	createKeyspace           bool
+	schemaFile               string
+	keyspace                 string
+	hosts                    string
+	capath                   string
+	username                 string
+	password                 string
+	consistency              string
+	timeout                  time.Duration
+	numConns                 int
+	writeQueueSize           int
+	protoVer                 int
+	maxStale                 time.Duration
+	pruneInterval            time.Duration
+	updateCassIdx            bool
+	updateInterval           time.Duration
+	updateInterval32         uint32
+	disableInitialHostLookup bool
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -88,7 +90,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
 	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
 	casIdx.StringVar(&schemaFile, "schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-
+	casIdx.BoolVar(&disableInitialHostLookup, "disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
 	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
 	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
 	casIdx.BoolVar(&hostverification, "host-verification", true, "host (hostname and server cert) verification when using SSL")
@@ -125,8 +127,10 @@ func New() *CasIdx {
 	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(consistency)
 	cluster.Timeout = timeout
+	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = numConns
 	cluster.ProtoVersion = protoVer
+	cluster.DisableInitialHostLookup = disableInitialHostLookup
 	if ssl {
 		cluster.SslOpts = &gocql.SslOptions{
 			CaPath:                 capath,
@@ -166,10 +170,12 @@ func (c *CasIdx) InitBare() error {
 
 	// create the keyspace or ensure it exists
 	if createKeyspace {
+		log.Info("cassandra-idx: ensuring that keyspace %s exist.", keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
+		log.Info("cassandra-idx: ensuring that table metric_idx exist.")
 		err = tmpSession.Query(fmt.Sprintf(schemaTable, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
@@ -359,9 +365,8 @@ func (c *CasIdx) rebuildIndex() {
 	if maxStale != 0 {
 		staleTs = uint32(time.Now().Add(maxStale * -1).Unix())
 	}
-	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = c.LoadPartition(partition, defs, staleTs)
-	}
+	defs = c.LoadPartitions(cluster.Manager.GetPartitions(), defs, staleTs)
+
 	num := c.MemoryIdx.Load(defs)
 	log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
@@ -371,8 +376,13 @@ func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.Me
 	return c.load(defs, iter, cutoff)
 }
 
-func (c *CasIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
-	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx where partition=?", partition).Iter()
+func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
+	placeholders := make([]string, len(partitions))
+	for i, p := range partitions {
+		placeholders[i] = strconv.Itoa(int(p))
+	}
+	q := fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx where partition in (%s)", strings.Join(placeholders, ","))
+	iter := c.session.Query(q).Iter()
 	return c.load(defs, iter, cutoff)
 }
 
