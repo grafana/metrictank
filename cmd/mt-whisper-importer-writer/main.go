@@ -47,11 +47,6 @@ var (
 		"35d",
 		"list of ttl strings used by MT separated by ','",
 	)
-	windowFactor = globalFlags.Int(
-		"window-factor",
-		20,
-		"the window factor be used when creating the metric table schema",
-	)
 	partitionScheme = globalFlags.String(
 		"partition-scheme",
 		"bySeries",
@@ -73,29 +68,6 @@ var (
 		"If true existing chunks may be overwritten",
 	)
 
-	cassandraAddrs               = globalFlags.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	cassandraKeyspace            = globalFlags.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
-	cassandraConsistency         = globalFlags.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy = globalFlags.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout             = globalFlags.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	cassandraReadConcurrency     = globalFlags.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
-	cassandraReadQueueSize       = globalFlags.Int("cassandra-read-queue-size", 100, "max number of outstanding reads before blocking. value doesn't matter much")
-	cassandraRetries             = globalFlags.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cqlProtocolVersion           = globalFlags.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace      = globalFlags.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
-
-	cassandraSSL              = globalFlags.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = globalFlags.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	cassandraHostVerification = globalFlags.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
-
-	cassandraAuth     = globalFlags.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername = globalFlags.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword = globalFlags.String("cassandra-password", "cassandra", "password for authentication")
-
-	cassandraSchemaFile = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-
-	cassandraDisableInitialHostLookup = flag.Bool("cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-
 	gitHash = "(none)"
 )
 
@@ -108,6 +80,34 @@ type Server struct {
 }
 
 func main() {
+	storeConfig := cassandraStore.NewStoreConfig()
+	// we dont use the cassandraStore's writeQueue, so we hard code this to 0.
+	storeConfig.WriteQueueSize = 0
+
+	// flags from cassandra/config.go, Cassandra
+	globalFlags.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
+	globalFlags.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
+	globalFlags.StringVar(&storeConfig.Consistency, "cassandra-consistency", storeConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	globalFlags.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", storeConfig.HostSelectionPolicy, "")
+	globalFlags.IntVar(&storeConfig.Timeout, "cassandra-timeout", storeConfig.Timeout, "cassandra timeout in milliseconds")
+	globalFlags.IntVar(&storeConfig.ReadConcurrency, "cassandra-read-concurrency", storeConfig.ReadConcurrency, "max number of concurrent reads to cassandra.")
+	globalFlags.IntVar(&storeConfig.WriteConcurrency, "cassandra-write-concurrency", storeConfig.WriteConcurrency, "max number of concurrent writes to cassandra.")
+	globalFlags.IntVar(&storeConfig.ReadQueueSize, "cassandra-read-queue-size", storeConfig.ReadQueueSize, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
+	//flag.IntVar(&storeConfig.WriteQueueSize, "write-queue-size", storeConfig.WriteQueueSize, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
+	globalFlags.IntVar(&storeConfig.Retries, "cassandra-retries", storeConfig.Retries, "how many times to retry a query before failing it")
+	globalFlags.IntVar(&storeConfig.WindowFactor, "cassandra-window-factor", storeConfig.WindowFactor, "size of compaction window relative to TTL")
+	globalFlags.IntVar(&storeConfig.OmitReadTimeout, "cassandra-omit-read-timeout", storeConfig.OmitReadTimeout, "if a read is older than this, it will directly be omitted without executing")
+	globalFlags.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", storeConfig.CqlProtocolVersion, "cql protocol version to use")
+	globalFlags.BoolVar(&storeConfig.CreateKeyspace, "cassandra-create-keyspace", storeConfig.CreateKeyspace, "enable the creation of the mdata keyspace and tables, only one node needs this")
+	globalFlags.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", storeConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
+	globalFlags.BoolVar(&storeConfig.SSL, "cassandra-ssl", storeConfig.SSL, "enable SSL connection to cassandra")
+	globalFlags.StringVar(&storeConfig.CaPath, "cassandra-ca-path", storeConfig.CaPath, "cassandra CA certificate path when using SSL")
+	globalFlags.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", storeConfig.HostVerification, "host (hostname and server cert) verification when using SSL")
+	globalFlags.BoolVar(&storeConfig.Auth, "cassandra-auth", storeConfig.Auth, "enable cassandra authentication")
+	globalFlags.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
+	globalFlags.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
+	globalFlags.StringVar(&storeConfig.SchemaFile, "cassandra-schema-file", storeConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
+
 	cassFlags := cassandra.ConfigSetup()
 
 	flag.Usage = func() {
@@ -155,7 +155,7 @@ func main() {
 		log.SetLevel(log.InfoLevel)
 	}
 
-	store, err := cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, 60, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, nil, *cassandraDisableInitialHostLookup)
+	store, err := cassandraStore.NewCassandraStore(storeConfig, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
 	}
@@ -165,7 +165,7 @@ func main() {
 	for _, split := range splits {
 		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
 	}
-	ttlTables := cassandraStore.GetTTLTables(ttls, *windowFactor, cassandraStore.Table_name_format)
+	ttlTables := cassandraStore.GetTTLTables(ttls, storeConfig.WindowFactor, cassandraStore.Table_name_format)
 
 	p, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
