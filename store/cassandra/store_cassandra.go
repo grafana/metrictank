@@ -170,30 +170,29 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	}
 }
 
-func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password, hostSelectionPolicy string, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, windowFactor, omitReadTimeout int, ssl, auth, hostVerification bool, createKeyspace bool, schemaFile string, ttls []uint32, disableInitialHostLookup bool) (*CassandraStore, error) {
+func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
+	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
+	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)
 
-	stats.NewGauge32("store.cassandra.write_queue.size").Set(writeqsize)
-	stats.NewGauge32("store.cassandra.num_writers").Set(writers)
-
-	cluster := gocql.NewCluster(strings.Split(addrs, ",")...)
-	if ssl {
+	cluster := gocql.NewCluster(strings.Split(config.Addrs, ",")...)
+	if config.SSL {
 		cluster.SslOpts = &gocql.SslOptions{
-			CaPath:                 CaPath,
-			EnableHostVerification: hostVerification,
+			CaPath:                 config.CaPath,
+			EnableHostVerification: config.HostVerification,
 		}
 	}
-	if auth {
+	if config.Auth {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: Username,
-			Password: Password,
+			Username: config.Username,
+			Password: config.Password,
 		}
 	}
-	cluster.Consistency = gocql.ParseConsistency(consistency)
-	cluster.Timeout = time.Duration(timeout) * time.Millisecond
+	cluster.Consistency = gocql.ParseConsistency(config.Consistency)
+	cluster.Timeout = time.Duration(config.Timeout) * time.Millisecond
 	cluster.ConnectTimeout = cluster.Timeout
-	cluster.NumConns = writers
-	cluster.ProtoVersion = protoVer
-	cluster.DisableInitialHostLookup = disableInitialHostLookup
+	cluster.NumConns = config.WriteConcurrency
+	cluster.ProtoVersion = config.CqlProtocolVersion
+	cluster.DisableInitialHostLookup = config.DisableInitialHostLookup
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
@@ -201,21 +200,21 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		return nil, err
 	}
 
-	schemaKeyspace := util.ReadEntry(schemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(schemaFile, "schema_table").(string)
+	schemaKeyspace := util.ReadEntry(config.SchemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(config.SchemaFile, "schema_table").(string)
 
-	ttlTables := GetTTLTables(ttls, windowFactor, Table_name_format)
+	ttlTables := GetTTLTables(ttls, config.WindowFactor, Table_name_format)
 
 	// create or verify the metrictank keyspace
-	if createKeyspace {
-		log.Info("cassandra_store: ensuring that keyspace %s exists.", keyspace)
-		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
+	if config.CreateKeyspace {
+		log.Info("cassandra_store: ensuring that keyspace %s exists.", config.Keyspace)
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, config.Keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, result := range ttlTables {
 			log.Info("cassandra_store: ensuring that table %s exists.", result.Table)
-			err := tmpSession.Query(fmt.Sprintf(schemaTable, keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
 			}
@@ -229,7 +228,7 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 		// five attempts to verify the keyspace exists before returning an error
 	AttemptLoop:
 		for attempt := 1; attempt > 0; attempt++ {
-			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(config.Keyspace)
 			if err != nil {
 				log.Warn("cassandra keyspace not found; attempt: %v", attempt)
 				if attempt >= 5 {
@@ -253,10 +252,10 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 	}
 
 	tmpSession.Close()
-	cluster.Keyspace = keyspace
-	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: retries}
+	cluster.Keyspace = config.Keyspace
+	cluster.RetryPolicy = &gocql.SimpleRetryPolicy{NumRetries: config.Retries}
 
-	switch hostSelectionPolicy {
+	switch config.HostSelectionPolicy {
 	case "roundrobin":
 		cluster.PoolConfig.HostSelectionPolicy = gocql.RoundRobinHostPolicy()
 	case "hostpool-simple":
@@ -280,32 +279,32 @@ func NewCassandraStore(addrs, keyspace, consistency, CaPath, Username, Password,
 			),
 		)
 	default:
-		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", hostSelectionPolicy)
+		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", config.HostSelectionPolicy)
 	}
 
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("CS: created session to %s keysp %s cons %v with policy %s timeout %d readers %d writers %d readq %d writeq %d retries %d proto %d ssl %t auth %t hostverif %t", addrs, keyspace, consistency, hostSelectionPolicy, timeout, readers, writers, readqsize, writeqsize, retries, protoVer, ssl, auth, hostVerification)
+	log.Debug("CS: created session with config %+v", config)
 	c := &CassandraStore{
 		Session:          session,
-		writeQueues:      make([]chan *mdata.ChunkWriteRequest, writers),
-		writeQueueMeters: make([]*stats.Range32, writers),
-		readQueue:        make(chan *ChunkReadRequest, readqsize),
-		omitReadTimeout:  time.Duration(omitReadTimeout) * time.Second,
+		writeQueues:      make([]chan *mdata.ChunkWriteRequest, config.WriteConcurrency),
+		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
+		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
+		omitReadTimeout:  time.Duration(config.OmitReadTimeout) * time.Second,
 		ttlTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		timeout:          cluster.Timeout,
 	}
 
-	for i := 0; i < writers; i++ {
-		c.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, writeqsize)
+	for i := 0; i < config.WriteConcurrency; i++ {
+		c.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, config.WriteQueueSize)
 		c.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
 		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
 	}
 
-	for i := 0; i < readers; i++ {
+	for i := 0; i < config.ReadConcurrency; i++ {
 		go c.processReadQueue()
 	}
 
