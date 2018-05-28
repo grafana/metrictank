@@ -9,7 +9,7 @@ services:
      - "2003:2003"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/metrictank/metrictank.ini
+      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
       - ./storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
     environment:
@@ -17,14 +17,20 @@ services:
      WAIT_TIMEOUT: 60
      MT_STATS_ADDR: graphite:2003
      MT_CASSANDRA_ADDRS: <addr>
+     MT_CASSANDRA_TIMEOUT: 30000
      MT_CASSANDRA_SSL: "true"
+     MT_CASSANDRA_CA_PATH: ""
      MT_CASSANDRA_HOST_VERIFICATION: "false"
+     MT_CASSANDRA_DISABLE_INITIAL_HOST_LOOKUP: "true"
      MT_CASSANDRA_AUTH: "true"
      MT_CASSANDRA_USERNAME: <user>
      MT_CASSANDRA_PASSWORD: <pass>
      MT_CASSANDRA_IDX_HOSTS: <addr>
+     MT_CASSANDRA_IDX_TIMEOUT: "30s"
+     MT_CASSANDRA_IDX_DISABLE_INITIAL_HOST_LOOKUP: "true"
      MT_CASSANDRA_IDX_NUM_CONNS: 1
      MT_CASSANDRA_IDX_SSL: "true"
+     MT_CASSANDRA_IDX_CA_PATH: ""
      MT_CASSANDRA_IDX_HOST_VERIFICATION: "false"
      MT_CASSANDRA_IDX_AUTH: "true"
      MT_CASSANDRA_IDX_USERNAME: <user>
