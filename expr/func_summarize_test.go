@@ -665,6 +665,76 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 	testSummarize("AlignToFrom", input, outputMax[1], "45s", "max", true, t)
 }
 
+func TestSummarizeLargeIntervalTimestamps(t *testing.T) {
+
+	// This test is specifically testing the timestamp behavior, so we don't need real values.
+	// However, we do need a lot of datapoints to trigger the bug we are regression testing against.
+	inputInterval := uint32(10)
+	numTimestamps := uint32(89*24*60*60) / inputInterval
+	startTime := uint32(1464637518)
+	endTime := startTime + numTimestamps*inputInterval
+
+	inputDps := make([]schema.Point, 0, numTimestamps)
+
+	for i := uint32(0); i < numTimestamps; i++ {
+		inputDps = append(inputDps, schema.Point{Val: 0, Ts: startTime + i*inputInterval})
+	}
+
+	outputInterval := uint32(30 * 24 * 60 * 60)
+
+	// alignToFrom = false - starting timestamp is a multiple of `outputInterval`
+	unalignedStart := startTime - (startTime % outputInterval)
+	var unalignedExpected = []schema.Point{
+		{Val: 0, Ts: unalignedStart},
+		{Val: 0, Ts: unalignedStart + outputInterval},
+		{Val: 0, Ts: unalignedStart + 2*outputInterval},
+		{Val: 0, Ts: unalignedStart + 3*outputInterval},
+	}
+
+	// alignToFrom = true - starting timestamp is unchanged from input
+	var alignedExpected = []schema.Point{
+		{Val: 0, Ts: startTime},
+		{Val: 0, Ts: startTime + outputInterval},
+		{Val: 0, Ts: startTime + 2*outputInterval},
+	}
+
+	input := []models.Series{
+		{
+			Target:     "align",
+			QueryPatt:  "align",
+			QueryFrom:  startTime,
+			QueryTo:    endTime,
+			Interval:   inputInterval,
+			Datapoints: getCopy(inputDps),
+		},
+	}
+	outputSum := [][]models.Series{
+		{
+			{
+				Target:     "summarize(align, \"30d\", \"sum\")",
+				QueryPatt:  "summarize(align, \"30d\", \"sum\")",
+				QueryFrom:  startTime,
+				QueryTo:    endTime,
+				Interval:   outputInterval,
+				Datapoints: getCopy(unalignedExpected),
+			},
+		},
+		{
+			{
+				Target:     "summarize(align, \"30d\", \"sum\", true)",
+				QueryPatt:  "summarize(align, \"30d\", \"sum\", true)",
+				QueryFrom:  startTime,
+				QueryTo:    endTime,
+				Interval:   outputInterval,
+				Datapoints: getCopy(alignedExpected),
+			},
+		},
+	}
+
+	testSummarize("LongIntervals", input, outputSum[0], "30d", "sum", false, t)
+	testSummarize("LongIntervals", input, outputSum[1], "30d", "sum", true, t)
+}
+
 func testSummarize(name string, in []models.Series, out []models.Series, intervalString, fn string, alignToFrom bool, t *testing.T) {
 	f := NewSummarize()
 
@@ -689,7 +759,7 @@ func testSummarize(name string, in []models.Series, out []models.Series, interva
 			t.Fatalf("case %q (%q, %q, %t): expected target %q, got %q", name, intervalString, fn, alignToFrom, exp.Target, got.Target)
 		}
 		if len(got.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%q, %q, %t): len output expected %#v, got %#v", name, intervalString, fn, alignToFrom, (exp.Datapoints), (got.Datapoints))
+			t.Fatalf("case %q (%q, %q, %t): len output expected %v, got %v", name, intervalString, fn, alignToFrom, (exp.Datapoints), (got.Datapoints))
 		}
 		for j, p := range exp.Datapoints {
 			bothNaN := math.IsNaN(p.Val) && math.IsNaN(got.Datapoints[j].Val)
