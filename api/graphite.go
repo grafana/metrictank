@@ -207,7 +207,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Unix())
-	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	fromUnix, toUnix, err := GetFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -322,7 +322,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
 	now := time.Now()
 	var defaultFrom, defaultTo uint32
-	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	fromUnix, toUnix, err := GetFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -791,7 +791,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	return out, err
 }
 
-func getFromTo(ft models.FromTo, now time.Time, defaultFrom, defaultTo uint32) (uint32, uint32, error) {
+func GetFromTo(ft models.FromTo, now time.Time, defaultFrom, defaultTo uint32) (uint32, uint32, error) {
 	loc, err := getLocation(ft.Tz)
 	if err != nil {
 		return 0, 0, err
