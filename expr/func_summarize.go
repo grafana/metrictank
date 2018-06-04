@@ -7,7 +7,6 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/batch"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/util"
 	"github.com/raintank/dur"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -87,7 +86,7 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start, end uint32) []schema.Point {
 	out := pointSlicePool.Get().([]schema.Point)
 
-	numPoints := int(util.Min(uint32(len(serie.Datapoints)), (start-end)/interval))
+	numPoints := len(serie.Datapoints)
 
 	for ts, i := start, 0; i < numPoints && ts < end; ts += interval {
 		s := i
