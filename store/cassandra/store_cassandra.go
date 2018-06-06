@@ -53,8 +53,8 @@ var (
 	// reads that could not be pushed into the queue because it was full
 	cassReadQueueFull = stats.NewCounter32("store.cassandra.omit_read.queue_full")
 
-	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
-	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
+	// metric store.cassandra.chunks_per_response is how many chunks are retrieved per response in get queries
+	cassChunksPerResponse = stats.NewMeter32("store.cassandra.chunks_per_response", false)
 	// metric store.cassandra.rows_per_response is how many rows come per get response
 	cassRowsPerResponse = stats.NewMeter32("store.cassandra.rows_per_response", false)
 	// metric store.cassandra.get_chunks is the duration of how long it takes to get chunks
@@ -75,11 +75,10 @@ var (
 )
 
 type ChunkReadRequest struct {
-	sortKey   uint32
 	q         string
 	p         []interface{}
 	timestamp time.Time
-	out       chan outcome
+	out       chan readResult
 	ctx       context.Context
 }
 
@@ -411,16 +410,10 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 	return ret
 }
 
-type outcome struct {
-	sortKey uint32
-	i       *gocql.Iter
-	err     error
+type readResult struct {
+	i   *gocql.Iter
+	err error
 }
-type asc []outcome
-
-func (o asc) Len() int           { return len(o) }
-func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
-func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
@@ -428,7 +421,7 @@ func (c *CassandraStore) processReadQueue() {
 		select {
 		case <-crr.ctx.Done():
 			//request canceled
-			crr.out <- outcome{err: errCtxCanceled}
+			crr.out <- readResult{err: errCtxCanceled}
 			continue
 		default:
 		}
@@ -436,15 +429,14 @@ func (c *CassandraStore) processReadQueue() {
 		cassGetWaitDuration.Value(waitDuration)
 		if waitDuration > c.omitReadTimeout {
 			cassOmitOldRead.Inc()
-			crr.out <- outcome{err: errReadTooOld}
+			crr.out <- readResult{err: errReadTooOld}
 			continue
 		}
 
 		pre := time.Now()
-		iter := outcome{
-			sortKey: crr.sortKey,
-			i:       c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
-			err:     nil,
+		iter := readResult{
+			i:   c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
+			err: nil,
 		}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
@@ -469,7 +461,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "cassandra")
 
-	itgens := make([]chunk.IterGen, 0)
+	var itgens []chunk.IterGen
 	if start >= end {
 		tracing.Failure(span)
 		tracing.Error(span, errInvalidRange)
@@ -477,12 +469,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	}
 
 	pre := time.Now()
-
-	crrs := make([]*ChunkReadRequest, 0)
-
-	query := func(sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{sortKey, q, p, pre, nil, ctx})
-	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
 	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to include the last point we might need (end-1)
@@ -520,117 +506,92 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	// for start, the best we can do is search for t0 <= 5222000 in row 1
 	// note that this may include up to 4 weeks of unneeded data if start falls late within a month.  NOTE: we can set chunkspan "hints" via config
 
-	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
+	results := make(chan readResult, 1)
 
-	query(start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
-
-	if start_month == end_month {
-		// we need a selection of the row between startTs and endTs
-		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(start_month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", table), row_key, start, end)
-	} else {
-		// get row_keys for each row we need to query.
-		for month := start_month; month <= end_month; month += Month_sec {
-			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
-			if month == start_month {
-				// we want from startTs to the end of the row.
-				query(month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts >= ? ORDER BY ts ASC", table), row_key, start+1)
-			} else if month == end_month {
-				// we want from start of the row till the endTs.
-				query(month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts <= ? ORDER BY ts ASC", table), row_key, end-1)
-			} else {
-				// we want all columns
-				query(month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? ORDER BY ts ASC", table), row_key)
-			}
-		}
+	var rowKeys []string
+	for month := start_month; month <= end_month; month += Month_sec {
+		rowKeys = append(rowKeys, fmt.Sprintf("%s_%d", key, month/Month_sec))
 	}
-	numQueries := len(crrs)
-	results := make(chan outcome, numQueries)
-	for i := range crrs {
-		crrs[i].out = results
-		select {
-		case <-ctx.Done():
-			// request has been canceled, so no need to continue queuing reads.
-			// reads already queued will be aborted when read from the queue.
-			return nil, nil
-		case c.readQueue <- crrs[i]:
-		default:
-			cassReadQueueFull.Inc()
-			tracing.Failure(span)
-			tracing.Error(span, errReadQueueFull)
-			return nil, errReadQueueFull
-		}
+	// Cannot page queries with both ORDER BY and a IN restriction on the partition key; you must either remove the ORDER BY or the IN and sort client side, or disable paging for this query
+	crr := ChunkReadRequest{
+		q:         fmt.Sprintf("SELECT ts, data FROM %s WHERE key IN ? AND ts < ?", table),
+		p:         []interface{}{rowKeys, end},
+		timestamp: pre,
+		out:       results,
+		ctx:       ctx,
 	}
-	outcomes := make([]outcome, 0, numQueries)
 
-	seen := 0
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			// request has been canceled, so no need to continue processing results
-			return nil, nil
-		case o := <-results:
-			if o.err != nil {
-				if o.err == errCtxCanceled {
-					// context was canceled, return immediately.
-					return nil, nil
-				}
-				tracing.Failure(span)
-				tracing.Error(span, o.err)
-				return nil, o.err
-			}
-			seen += 1
-			outcomes = append(outcomes, o)
-			if seen == numQueries {
-				close(results)
-				break LOOP
-			}
-		}
+	select {
+	case <-ctx.Done():
+		// request has been canceled, so no need to continue queuing reads.
+		// reads already queued will be aborted when read from the queue.
+		return nil, nil
+	case c.readQueue <- &crr:
+	default:
+		cassReadQueueFull.Inc()
+		tracing.Failure(span)
+		tracing.Error(span, errReadQueueFull)
+		return nil, errReadQueueFull
 	}
-	cassGetChunksDuration.Value(time.Since(pre))
-	pre = time.Now()
-	// we have all of the results, but they could have arrived in any order.
-	sort.Sort(asc(outcomes))
 
-	var b []byte
-	var ts int
-	for _, outcome := range outcomes {
-		chunks := int64(0)
-		for outcome.i.Scan(&ts, &b) {
-			chunks += 1
-			chunkSizeAtLoad.Value(len(b))
-			if len(b) < 2 {
-				tracing.Failure(span)
-				tracing.Error(span, errChunkTooSmall)
-				return itgens, errChunkTooSmall
-			}
-			itgen, err := chunk.NewGen(b, uint32(ts))
-			if err != nil {
-				tracing.Failure(span)
-				tracing.Error(span, err)
-				return itgens, err
-			}
-			itgens = append(itgens, *itgen)
-		}
-		err := outcome.i.Close()
-		if err != nil {
-			if err == context.Canceled || err == context.DeadlineExceeded {
-				// query was aborted.
+	var res readResult
+	select {
+	case <-ctx.Done():
+		// request has been canceled, so no need to continue processing results
+		return nil, nil
+	case res = <-results:
+		if res.err != nil {
+			if res.err == errCtxCanceled {
+				// context was canceled, return immediately.
 				return nil, nil
 			}
 			tracing.Failure(span)
-			tracing.Error(span, err)
-			errmetrics.Inc(err)
-			return nil, err
-		} else {
-			cassChunksPerRow.Value(int(chunks))
+			tracing.Error(span, res.err)
+			return nil, res.err
 		}
+		close(results)
 	}
+
+	cassGetChunksDuration.Value(time.Since(pre))
+	pre = time.Now()
+
+	var b []byte
+	var ts int
+	for res.i.Scan(&ts, &b) {
+		chunkSizeAtLoad.Value(len(b))
+		if len(b) < 2 {
+			tracing.Failure(span)
+			tracing.Error(span, errChunkTooSmall)
+			return itgens, errChunkTooSmall
+		}
+		itgen, err := chunk.NewGen(b, uint32(ts))
+		if err != nil {
+			tracing.Failure(span)
+			tracing.Error(span, err)
+			return itgens, err
+		}
+		itgens = append(itgens, *itgen)
+	}
+
+	err := res.i.Close()
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			// query was aborted.
+			return nil, nil
+		}
+		tracing.Failure(span)
+		tracing.Error(span, err)
+		errmetrics.Inc(err)
+		return nil, err
+	}
+
+	sort.Sort(chunk.IterGensAsc(itgens))
+
 	cassToIterDuration.Value(time.Now().Sub(pre))
-	cassRowsPerResponse.Value(len(outcomes))
-	span.SetTag("outcomes", len(outcomes))
-	span.SetTag("itgens", len(itgens))
+	cassRowsPerResponse.Value(len(rowKeys))
+	cassChunksPerResponse.Value(len(itgens))
+	span.SetTag("rows", len(rowKeys))
+	span.SetTag("chunks", len(itgens))
 	return itgens, nil
 }
 

@@ -68,3 +68,10 @@ func (ig IterGen) Bytes() []byte {
 func (ig IterGen) EndTs() uint32 {
 	return ig.Ts + ig.Span
 }
+
+//msgp:ignore IterGensAsc
+type IterGensAsc []IterGen
+
+func (a IterGensAsc) Len() int           { return len(a) }
+func (a IterGensAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a IterGensAsc) Less(i, j int) bool { return a[i].Ts < a[j].Ts }
