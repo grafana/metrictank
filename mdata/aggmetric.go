@@ -358,6 +358,9 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 }
 
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
+	if a.cachePusher == nil {
+		return
+	}
 	// push into cache
 	go a.cachePusher.CacheIfHot(
 		a.Key,
