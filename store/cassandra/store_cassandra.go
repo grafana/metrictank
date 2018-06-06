@@ -75,7 +75,6 @@ var (
 )
 
 type ChunkReadRequest struct {
-	month     uint32
 	sortKey   uint32
 	q         string
 	p         []interface{}
@@ -413,7 +412,6 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 }
 
 type outcome struct {
-	month   uint32
 	sortKey uint32
 	i       *gocql.Iter
 	err     error
@@ -444,7 +442,6 @@ func (c *CassandraStore) processReadQueue() {
 
 		pre := time.Now()
 		iter := outcome{
-			month:   crr.month,
 			sortKey: crr.sortKey,
 			i:       c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
 			err:     nil,
@@ -483,8 +480,8 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	crrs := make([]*ChunkReadRequest, 0)
 
-	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil, ctx})
+	query := func(sortKey uint32, q string, p ...interface{}) {
+		crrs = append(crrs, &ChunkReadRequest{sortKey, q, p, pre, nil, ctx})
 	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -500,25 +497,25 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
-	query(start_month, start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
+	query(start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
 
 	if start_month == end_month {
 		// we need a selection of the row between startTs and endTs
 		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(start_month, start_month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", table), row_key, start, end)
+		query(start_month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", table), row_key, start, end)
 	} else {
 		// get row_keys for each row we need to query.
 		for month := start_month; month <= end_month; month += Month_sec {
 			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
 			if month == start_month {
 				// we want from startTs to the end of the row.
-				query(month, month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts >= ? ORDER BY ts ASC", table), row_key, start+1)
+				query(month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts >= ? ORDER BY ts ASC", table), row_key, start+1)
 			} else if month == end_month {
 				// we want from start of the row till the endTs.
-				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts <= ? ORDER BY ts ASC", table), row_key, end-1)
+				query(month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts <= ? ORDER BY ts ASC", table), row_key, end-1)
 			} else {
 				// we want all columns
-				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? ORDER BY ts ASC", table), row_key)
+				query(month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? ORDER BY ts ASC", table), row_key)
 			}
 		}
 	}
