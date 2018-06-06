@@ -399,3 +399,13 @@ func (k *KafkaMdm) MaintainPriority() {
 		}
 	}()
 }
+
+func (k *KafkaMdm) ExplainPriority() interface{} {
+	return struct {
+		Title       string
+		Explanation interface{}
+	}{
+		"kafka-mdm:",
+		k.lagMonitor.Explain(),
+	}
+}

@@ -18,6 +18,14 @@ import (
 
 var NotFoundErr = errors.New("not found")
 
+func (s *Server) explainPriority(ctx *middleware.Context) {
+	var data []interface{}
+	for _, p := range s.prioritySetters {
+		data = append(data, p.ExplainPriority())
+	}
+	response.Write(ctx, response.NewJson(200, data, ""))
+}
+
 func (s *Server) getNodeStatus(ctx *middleware.Context) {
 	response.Write(ctx, response.NewJson(200, cluster.Manager.ThisNode(), ""))
 }

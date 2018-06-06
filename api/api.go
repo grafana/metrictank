@@ -49,6 +49,7 @@ type Server struct {
 	Cache           cache.Cache
 	shutdown        chan struct{}
 	Tracer          opentracing.Tracer
+	prioritySetters []PrioritySetter
 }
 
 func (s *Server) BindMetricIndex(i idx.MetricIndex) {
@@ -71,6 +72,14 @@ func (s *Server) BindTracer(tracer opentracing.Tracer) {
 
 func (s *Server) BindPromQueryEngine() {
 	s.PromQueryEngine = promql.NewEngine(s, nil)
+}
+
+type PrioritySetter interface {
+	ExplainPriority() interface{}
+}
+
+func (s *Server) BindPrioritySetter(p PrioritySetter) {
+	s.prioritySetters = append(s.prioritySetters, p)
 }
 
 func NewServer() (*Server, error) {

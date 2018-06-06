@@ -27,6 +27,7 @@ func (s *Server) RegisterRoutes() {
 	r.Get("/", s.appStatus)
 	r.Get("/node", s.getNodeStatus)
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
+	r.Get("/priority", s.explainPriority)
 	r.Get("/debug/pprof/block", blockHandler)
 	r.Get("/debug/pprof/mutex", mutexHandler)
 

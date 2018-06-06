@@ -126,6 +126,10 @@ func (c *Carbon) MaintainPriority() {
 	cluster.Manager.SetPriority(0)
 }
 
+func (c *Carbon) ExplainPriority() interface{} {
+	return "carbon-in: priority=0 (always in sync)"
+}
+
 func (c *Carbon) accept() {
 	for {
 		conn, err := c.listener.AcceptTCP()

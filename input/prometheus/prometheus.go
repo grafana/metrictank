@@ -55,6 +55,10 @@ func (p *prometheusWriteHandler) MaintainPriority() {
 	cluster.Manager.SetPriority(0)
 }
 
+func (p *prometheusWriteHandler) ExplainPriority() interface{} {
+	return "prometheus-in: priority=0 (always in sync)"
+}
+
 func (p *prometheusWriteHandler) Stop() {
 	log.Info("prometheus-in: shutting down")
 }
