@@ -295,6 +295,8 @@ Flags:
     	cassandra timeout in milliseconds (default 1000)
   -cassandra-username string
     	username for authentication (default "cassandra")
+  -cql-protocol-version int
+    	cql protocol version to use (default 4)
 ```
 
 

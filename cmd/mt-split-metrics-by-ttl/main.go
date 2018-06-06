@@ -14,11 +14,9 @@ import (
 
 func main() {
 	storeConfig := cassandra.NewStoreConfig()
-	// hard coded to default because those have no effect in the case of this tool anyway
-	storeConfig.WindowFactor = 20
-	storeConfig.OmitReadTimeout = 60
-	storeConfig.ReadConcurrency = 20
-	storeConfig.ReadQueueSize = 100
+	// we dont need to allocate resources for reads as this tool does not read from the Store
+	storeConfig.ReadConcurrency = 1
+	storeConfig.ReadQueueSize = 0
 
 	// flags from cassandra/config.go
 	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
@@ -27,7 +25,7 @@ func main() {
 	flag.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
 	flag.IntVar(&storeConfig.Timeout, "cassandra-timeout", 1000, "cassandra timeout in milliseconds")
 	flag.IntVar(&storeConfig.Retries, "cassandra-retries", 0, "how many times to retry a query before failing it")
-
+	flag.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", 4, "cql protocol version to use")
 	flag.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
 	flag.BoolVar(&storeConfig.SSL, "cassandra-ssl", false, "enable SSL connection to cassandra")
 	flag.StringVar(&storeConfig.CaPath, "cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
