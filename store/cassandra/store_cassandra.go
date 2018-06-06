@@ -495,6 +495,31 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	// since we make sure that you can only use chunkSpans so that Month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
 	// as the one that has start_month.
 
+	// For example:
+	// Month_sec = 60 * 60 * 24 * 28 = 2419200 (28 days)
+	// Chunkspan = 60 * 60 * 24 * 7  = 604800  (7 days) this is much more than typical chunk size, but this allows us to be more compact in this example
+	// row chunk t0      st. end
+	// 0   0     2419200
+	//     1     3024000
+	//     2     3628800
+	//     3     4233600
+	// 1   4     4838400  /
+	//     5     5443200  \
+	//     6     6048000
+	//     7     6652800
+	// 2   8     7257600     /
+	//     9     7862400     \
+	//     ...   ...
+
+	// let's say query has start 5222000 and end 7555000
+	// so start is somewhere between 4-5, and end between 8-9
+	// start_month = 4838400 (row 1)
+	// end_month = 7257600 (row 2)
+	// how do we query for all the chunks we need and not many more? knowing that chunkspan is not known?
+	// for end, we can simply search for t0 < 7555000 in row 2, which gives us all chunks we need
+	// for start, the best we can do is search for t0 <= 5222000 in row 1
+	// note that this may include up to 4 weeks of unneeded data if start falls late within a month.  NOTE: we can set chunkspan "hints" via config
+
 	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
 
 	query(start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
