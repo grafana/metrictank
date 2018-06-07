@@ -81,7 +81,7 @@ type Server struct {
 
 func main() {
 	storeConfig := cassandraStore.NewStoreConfig()
-	// we dont use the cassandraStore's writeQueue, so we hard code this to 0.
+	// we don't use the cassandraStore's writeQueue, so we hard code this to 0.
 	storeConfig.WriteQueueSize = 0
 
 	// flags from cassandra/config.go, Cassandra
@@ -125,7 +125,7 @@ func main() {
 		cassFlags.PrintDefaults()
 		fmt.Println()
 		fmt.Println("EXAMPLES:")
-		fmt.Println("mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata")
+		fmt.Println("mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -cassandra-window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
