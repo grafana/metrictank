@@ -41,12 +41,8 @@ It supports min, max, sum, average.
 Metrictank uses a function called `alignRequests` which will:
 
 * look at all the requested timeseries and the time range
-* figure out the optimal input data (out of raw and rollups) and wether or not runtime consolidation is needed, and which settings to use if so
-* so that we can return all series in the same, optimal interval. Optimal meaning highest resolution but still <= maxDataPoints, using least system resources.
-
-Note:
-* this function ignores TTL values.  It is assumed you've configured sensible TTL's that are long enough to cover the timeframes during which the given bands will be chosen.
-* metrictank supports different raw intervals for different metrics, but aggregation (rollup) settings are currently global for all metrics.
+* figure out the optimal input data (out of raw and rollups) and whether or not runtime consolidation is needed, and which settings to use if so
+* so that we can return all series in the same, but as-high-resolution-as-possible interval (covering the timerange), subject to maxPointsPerReq{Hard,Soft} settings
 
 Terminology:
 
