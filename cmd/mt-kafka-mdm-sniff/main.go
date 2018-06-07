@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 	"text/template"
+	"time"
 
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
 	"github.com/grafana/metrictank/stats"
@@ -46,9 +47,24 @@ type inputPrinter struct {
 	tplP  template.Template
 }
 
+func dateInt64(ts int64) string {
+	return time.Unix(ts, 0).Format(time.RFC3339)
+}
+
+func dateUint32(ts uint32) string {
+	return dateInt64(int64(ts))
+}
+
 func newInputPrinter(formatMd, formatP string) inputPrinter {
-	tplMd := template.Must(template.New("format").Parse(formatMd + "\n"))
-	tplP := template.Must(template.New("format").Parse(formatP + "\n"))
+	funcsMd := map[string]interface{}{
+		"date": dateInt64,
+	}
+	funcsP := map[string]interface{}{
+		"date": dateUint32,
+	}
+
+	tplMd := template.Must(template.New("format").Funcs(funcsMd).Parse(formatMd + "\n"))
+	tplP := template.Must(template.New("format").Funcs(funcsP).Parse(formatP + "\n"))
 	return inputPrinter{
 		*tplMd,
 		*tplP,
@@ -104,6 +120,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Inspects what's flowing through kafka (in mdm format) and reports it to you")
 		fmt.Fprintf(os.Stderr, "\nFlags:\n\n")
 		flag.PrintDefaults()
+		fmt.Fprintln(os.Stderr, "you can also use functions in templates:")
+		fmt.Fprintln(os.Stderr, "date: formats a unix timestamp as a date")
+		fmt.Fprintln(os.Stderr, "example: mt-kafka-mdm-sniff -format-point '{{.Time | date}}'")
 	}
 	flag.Parse()
 	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, 2))

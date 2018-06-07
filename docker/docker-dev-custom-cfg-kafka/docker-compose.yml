@@ -67,6 +67,13 @@ services:
     volumes:
      - "../statsdaemon.ini:/etc/statsdaemon.ini"
 
+  jaeger:
+    hostname: jaeger
+    image:  jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+
   prometheus:
     image: prom/prometheus:v2.2.1
     container_name: prometheus
