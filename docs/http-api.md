@@ -160,6 +160,46 @@ Sets the primary status to this node to true or false.
 curl --data primary=true "http://localhost:6060/node"
 ```
 
+## Analyze instance priority
+
+```
+GET /priority
+```
+
+Gets all enabled plugins to declare how they compute their
+priority scores.
+
+#### Example
+
+```bash
+curl -s http://localhost:6060/priority | jsonpp
+[
+    "carbon-in: priority=0 (always in sync)",
+    {
+        "Title": "kafka-mdm:",
+        "Explanation": {
+            "Explanation": {
+                "Status": {
+                    "0": {
+                        "Lag": 1,
+                        "Rate": 26494,
+                        "Priority": 0
+                    },
+                    "1": {
+                        "Lag": 2,
+                        "Rate": 24989,
+                        "Priority": 0
+                    }
+                },
+                "Priority": 0,
+                "Updated": "2018-06-06T11:56:24.399840121Z"
+            },
+            "Now": "2018-06-06T11:56:25.016645631Z"
+        }
+    }
+]
+```
+
 ## Misc
 
 ### Tspec

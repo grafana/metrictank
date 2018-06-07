@@ -8,7 +8,6 @@ import (
 // lagLogger maintains a set of most recent lag measurements
 // and is able to provide the lowest value seen.
 type lagLogger struct {
-	sync.Mutex
 	pos          int
 	measurements []int
 }
@@ -30,8 +29,6 @@ func (l *lagLogger) Store(lag int) {
 	if lag < 0 {
 		return
 	}
-	l.Lock()
-	defer l.Unlock()
 	l.pos++
 	if len(l.measurements) < cap(l.measurements) {
 		l.measurements = append(l.measurements, lag)
@@ -48,8 +45,6 @@ func (l *lagLogger) Store(lag int) {
 // note: values may be slightly out of date if negative values were reported
 // (see Store())
 func (l *lagLogger) Min() int {
-	l.Lock()
-	defer l.Unlock()
 	if len(l.measurements) == 0 {
 		return -1
 	}
@@ -63,7 +58,6 @@ func (l *lagLogger) Min() int {
 }
 
 type rateLogger struct {
-	sync.Mutex
 	lastOffset int64
 	lastTs     time.Time
 	rate       int64
@@ -76,8 +70,6 @@ func newRateLogger() *rateLogger {
 // Store saves the current offset and updates the rate if it is confident
 // offset must be concrete values, not logical values like -2 (oldest) or -1 (newest)
 func (o *rateLogger) Store(offset int64, ts time.Time) {
-	o.Lock()
-	defer o.Unlock()
 	if o.lastTs.IsZero() {
 		// first measurement
 		o.lastOffset = offset
@@ -122,8 +114,6 @@ func (o *rateLogger) Store(offset int64, ts time.Time) {
 // * exceptionally, it's an old measurement (if you keep adjusting the system clock)
 // after startup, reported rate may be 0 if we haven't been up long enough to determine it yet.
 func (o *rateLogger) Rate() int64 {
-	o.Lock()
-	defer o.Unlock()
 	return o.rate
 }
 
@@ -133,8 +123,22 @@ func (o *rateLogger) Rate() int64 {
 // * ingest rate
 // We then combine this data into a score, see the Metric() method.
 type LagMonitor struct {
-	lag  map[int32]*lagLogger
-	rate map[int32]*rateLogger
+	sync.Mutex
+	lag         map[int32]*lagLogger
+	rate        map[int32]*rateLogger
+	explanation Explanation
+}
+
+type Explanation struct {
+	Status   map[int32]Status
+	Priority int
+	Updated  time.Time
+}
+
+type Status struct {
+	Lag      int
+	Rate     int
+	Priority int
 }
 
 func NewLagMonitor(size int, partitions []int32) *LagMonitor {
@@ -167,33 +171,61 @@ func NewLagMonitor(size int, partitions []int32) *LagMonitor {
 // - trouble querying the partition for latest offset
 // - consumePartition() has called StoreOffset() but the code hasn't advanced yet to StoreLag()
 func (l *LagMonitor) Metric() int {
+	l.Lock()
+	defer l.Unlock()
+	l.explanation = Explanation{
+		Status:  make(map[int32]Status),
+		Updated: time.Now(),
+	}
 	max := 0
 	for p, lag := range l.lag {
-		rate := l.rate[p]
-		l := lag.Min()   // accurate lag, -1 if unknown
-		r := rate.Rate() // accurate rate, or 0 if we're not sure.
-		if r == 0 {
-			r = 1
+		status := Status{
+			Lag:  lag.Min(),             // accurate lag, -1 if unknown
+			Rate: int(l.rate[p].Rate()), // accurate rate, or 0 if we're not sure
 		}
-		var val int
-		if l == -1 {
+		if status.Lag == -1 {
 			// if we have no lag measurements yet,
 			// just assign a priority of 10k for this partition
-			val = 10000
+			status.Priority = 10000
 		} else {
-			val = l / int(r)
+			// if we're not sure of rate, we don't want divide by zero
+			// instead assume rate is super low
+			if status.Rate == 0 {
+				status.Priority = status.Lag
+			} else {
+				status.Priority = status.Lag / status.Rate
+			}
 		}
-		if val > max {
-			max = val
+		if status.Priority > max {
+			max = status.Priority
 		}
+		l.explanation.Status[p] = status
 	}
+	l.explanation.Updated = time.Now()
+	l.explanation.Priority = max
 	return max
 }
 
+func (l *LagMonitor) Explain() interface{} {
+	l.Lock()
+	defer l.Unlock()
+	return struct {
+		Explanation Explanation
+		Now         time.Time
+	}{
+		Explanation: l.explanation,
+		Now:         time.Now(),
+	}
+}
+
 func (l *LagMonitor) StoreLag(partition int32, val int) {
+	l.Lock()
 	l.lag[partition].Store(val)
+	l.Unlock()
 }
 
 func (l *LagMonitor) StoreOffset(partition int32, offset int64, ts time.Time) {
+	l.Lock()
 	l.rate[partition].Store(offset, ts)
+	l.Unlock()
 }

@@ -421,6 +421,7 @@ func main() {
 			return
 		}
 		plugin.MaintainPriority()
+		apiServer.BindPrioritySetter(plugin)
 	}
 
 	// metric cluster.self.promotion_wait is how long a candidate (secondary node) has to wait until it can become a primary

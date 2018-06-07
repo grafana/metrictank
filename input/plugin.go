@@ -9,5 +9,6 @@ type Plugin interface {
 	// Note that upon fatal close, metrictank will call Stop() on all plugins, also the one that triggered it.
 	Start(handler Handler, fatal chan struct{}) error
 	MaintainPriority()
+	ExplainPriority() interface{}
 	Stop() // Should block until shutdown is complete.
 }
