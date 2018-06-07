@@ -198,6 +198,9 @@ Flags:
     	only show metrics that have this prefix
   -substr string
     	only show metrics that have this substring
+you can also use functions in templates:
+date: formats a unix timestamp as a date
+example: mt-kafka-mdm-sniff -format-point '{{.Time | date}}'
 ```
 
 
