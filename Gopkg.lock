@@ -628,12 +628,14 @@
     "utils"
   ]
   revision = "ff3efa227b65e419701a4f48985379ca106a89e7"
+  source = "https://github.com/jaegertracing/jaeger-client-go.git"
   version = "v2.11.0"
 
 [[projects]]
   name = "github.com/uber/jaeger-lib"
   packages = ["metrics"]
   revision = "c48167d9cae5887393dd5e61efd06a4a48b7fbb3"
+  source = "https://github.com/jaegertracing/jaeger-lib.git"
   version = "v1.2.1"
 
 [[projects]]
@@ -762,6 +764,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4310514673bc8e3d2d703fd1762e333e3453c7e895cbf08fcc919822414ed31a"
+  inputs-digest = "600fd0a5e3fcfefdd092618105d06142b5ce1aa8f384f0ac660a2da67fa6aba8"
   solver-name = "gps-cdcl"
   solver-version = 1
