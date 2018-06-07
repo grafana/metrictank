@@ -74,7 +74,7 @@ func ConfigSetup() *flag.FlagSet {
 	cas.IntVar(&CliConfig.WriteQueueSize, "write-queue-size", CliConfig.WriteQueueSize, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cas.IntVar(&CliConfig.Retries, "retries", CliConfig.Retries, "how many times to retry a query before failing it")
 	cas.IntVar(&CliConfig.WindowFactor, "window-factor", CliConfig.WindowFactor, "size of compaction window relative to TTL")
-	cas.IntVar(&CliConfig.OmitReadTimeout, "omit-read-timeout", CliConfig.OmitReadTimeout, "if a read is older than this, it will directly be omitted without executing")
+	cas.IntVar(&CliConfig.OmitReadTimeout, "omit-read-timeout", CliConfig.OmitReadTimeout, "if a read is older than this (in seconds), it will be omitted,  not executed")
 	cas.IntVar(&CliConfig.CqlProtocolVersion, "cql-protocol-version", CliConfig.CqlProtocolVersion, "cql protocol version to use")
 	cas.BoolVar(&CliConfig.CreateKeyspace, "create-keyspace", CliConfig.CreateKeyspace, "enable the creation of the mdata keyspace and tables, only one node needs this")
 	cas.BoolVar(&CliConfig.DisableInitialHostLookup, "disable-initial-host-lookup", CliConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")

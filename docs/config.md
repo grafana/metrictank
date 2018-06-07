@@ -86,7 +86,7 @@ tracing-add-tags =
 [cassandra]
 # see https://github.com/grafana/metrictank/blob/master/docs/cassandra.md for more details
 # comma-separated list of hostnames to connect to
-addrs =
+addrs = localhost
 # keyspace to use for storing the metric data table
 keyspace = metrictank
 # desired write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
@@ -111,6 +111,10 @@ read-queue-size = 200000
 write-queue-size = 100000
 # how many times to retry a query before failing it
 retries = 0
+# size of compaction window relative to TTL
+window-factor = 20
+# if a read is older than this (in seconds), it will be omitted,  not executed
+omit-read-timeout = 60
 # CQL protocol version. cassandra 3.x needs v3 or 4.
 cql-protocol-version = 4
 # enable the creation of the mdata keyspace and tables, only one node needs this
