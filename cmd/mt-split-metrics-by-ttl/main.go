@@ -14,25 +14,25 @@ import (
 
 func main() {
 	storeConfig := cassandra.NewStoreConfig()
-	// we dont need to allocate resources for reads as this tool does not read from the Store
+	// we don't need to allocate resources for reads as this tool does not read from the Store
 	storeConfig.ReadConcurrency = 1
 	storeConfig.ReadQueueSize = 0
 
 	// flags from cassandra/config.go
-	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	flag.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
-	flag.StringVar(&storeConfig.Consistency, "cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	flag.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	flag.IntVar(&storeConfig.Timeout, "cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	flag.IntVar(&storeConfig.Retries, "cassandra-retries", 0, "how many times to retry a query before failing it")
-	flag.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", 4, "cql protocol version to use")
-	flag.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-	flag.BoolVar(&storeConfig.SSL, "cassandra-ssl", false, "enable SSL connection to cassandra")
-	flag.StringVar(&storeConfig.CaPath, "cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	flag.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
-	flag.BoolVar(&storeConfig.Auth, "cassandra-auth", false, "enable cassandra authentication")
-	flag.StringVar(&storeConfig.Username, "cassandra-username", "cassandra", "username for authentication")
-	flag.StringVar(&storeConfig.Password, "cassandra-password", "cassandra", "password for authentication")
+	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
+	flag.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
+	flag.StringVar(&storeConfig.Consistency, "cassandra-consistency", storeConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	flag.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", storeConfig.HostSelectionPolicy, "")
+	flag.IntVar(&storeConfig.Timeout, "cassandra-timeout", storeConfig.Timeout, "cassandra timeout in milliseconds")
+	flag.IntVar(&storeConfig.Retries, "cassandra-retries", storeConfig.Retries, "how many times to retry a query before failing it")
+	flag.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", storeConfig.CqlProtocolVersion, "cql protocol version to use")
+	flag.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", storeConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
+	flag.BoolVar(&storeConfig.SSL, "cassandra-ssl", storeConfig.SSL, "enable SSL connection to cassandra")
+	flag.StringVar(&storeConfig.CaPath, "cassandra-ca-path", storeConfig.CaPath, "cassandra CA certificate path when using SSL")
+	flag.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", storeConfig.HostVerification, "host (hostname and server cert) verification when using SSL")
+	flag.BoolVar(&storeConfig.Auth, "cassandra-auth", storeConfig.Auth, "enable cassandra authentication")
+	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
+	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
 
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-split-metrics-by-ttl [flags] ttl [ttl...]")
