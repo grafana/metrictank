@@ -29,43 +29,41 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 
-	// flags from metrictank.go, Cassandra
-	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	cassandraKeyspace            = flag.String("cassandra-keyspace", "raintank", "cassandra keyspace to use for storing the metric data table")
-	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	cassandraReadConcurrency     = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
-	//cassandraWriteConcurrency    = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
-	cassandraReadQueueSize = flag.Int("cassandra-read-queue-size", 200000, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
-	//cassandraWriteQueueSize      = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	cassandraRetries        = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cqlProtocolVersion      = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
-	cassandraSchemaFile     = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-
-	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
-
-	cassandraAuth            = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername        = flag.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword        = flag.String("cassandra-password", "cassandra", "password for authentication")
-	cassandraOmitReadTimeout = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
-
-	cassandraDisableInitialHostLookup = flag.Bool("cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-
 	// our own flags
-	from         = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
-	to           = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
-	fix          = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
-	printTs      = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
-	groupTTL     = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
-	windowFactor = flag.Int("window-factor", 20, "the window factor be used when creating the metric table schema")
-	timeZoneStr  = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+	from        = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
+	to          = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
+	fix         = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
+	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
+	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
+	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 )
 
 func main() {
+	storeConfig := cassandra.NewStoreConfig()
+	// flags from cassandra/config.go, Cassandra
+	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
+	flag.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
+	flag.StringVar(&storeConfig.Consistency, "cassandra-consistency", storeConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	flag.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", storeConfig.HostSelectionPolicy, "")
+	flag.IntVar(&storeConfig.Timeout, "cassandra-timeout", storeConfig.Timeout, "cassandra timeout in milliseconds")
+	flag.IntVar(&storeConfig.ReadConcurrency, "cassandra-read-concurrency", storeConfig.ReadConcurrency, "max number of concurrent reads to cassandra.")
+	//flag.IntVar(&storeConfig.WriteConcurrency, "write-concurrency", storeConfig.WriteConcurrency, "max number of concurrent writes to cassandra.")
+	flag.IntVar(&storeConfig.ReadQueueSize, "cassandra-read-queue-size", storeConfig.ReadQueueSize, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
+	//flag.IntVar(&storeConfig.WriteQueueSize, "write-queue-size", storeConfig.WriteQueueSize, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
+	flag.IntVar(&storeConfig.Retries, "cassandra-retries", storeConfig.Retries, "how many times to retry a query before failing it")
+	flag.IntVar(&storeConfig.WindowFactor, "window-factor", storeConfig.WindowFactor, "size of compaction window relative to TTL")
+	flag.IntVar(&storeConfig.OmitReadTimeout, "cassandra-omit-read-timeout", storeConfig.OmitReadTimeout, "if a read is older than this, it will directly be omitted without executing")
+	flag.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", storeConfig.CqlProtocolVersion, "cql protocol version to use")
+	flag.BoolVar(&storeConfig.CreateKeyspace, "cassandra-create-keyspace", storeConfig.CreateKeyspace, "enable the creation of the mdata keyspace and tables, only one node needs this")
+	flag.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", storeConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
+	flag.BoolVar(&storeConfig.SSL, "cassandra-ssl", storeConfig.SSL, "enable SSL connection to cassandra")
+	flag.StringVar(&storeConfig.CaPath, "cassandra-ca-path", storeConfig.CaPath, "cassandra CA certificate path when using SSL")
+	flag.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", storeConfig.HostVerification, "host (hostname and server cert) verification when using SSL")
+	flag.BoolVar(&storeConfig.Auth, "cassandra-auth", storeConfig.Auth, "enable cassandra authentication")
+	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
+	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
+	flag.StringVar(&storeConfig.SchemaFile, "cassandra-schema-file", storeConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
+
 	flag.Usage = func() {
 		fmt.Println("mt-store-cat")
 		fmt.Println()
@@ -165,7 +163,7 @@ func main() {
 		}
 	}
 
-	store, err := cassandra.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraReadConcurrency, *cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, *windowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, nil, *cassandraDisableInitialHostLookup)
+	store, err := cassandra.NewCassandraStore(storeConfig, nil)
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
@@ -177,7 +175,7 @@ func main() {
 	store.SetTracer(tracer)
 
 	if tableSelector == "tables" {
-		tables, err := getTables(store, *cassandraKeyspace, "")
+		tables, err := getTables(store, storeConfig.Keyspace, "")
 		if err != nil {
 			log.Fatal(4, "%s", err)
 		}
@@ -186,7 +184,7 @@ func main() {
 		}
 		return
 	}
-	tables, err := getTables(store, *cassandraKeyspace, tableSelector)
+	tables, err := getTables(store, storeConfig.Keyspace, tableSelector)
 	if err != nil {
 		log.Fatal(4, "%s", err)
 	}
@@ -253,7 +251,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("# Keyspace %q:\n", *cassandraKeyspace)
+	fmt.Printf("# Keyspace %q:\n", storeConfig.Keyspace)
 
 	span := tracer.StartSpan("mt-store-cat " + format)
 	ctx := opentracing.ContextWithSpan(context.Background(), span)
@@ -264,6 +262,6 @@ func main() {
 	case "point-summary":
 		pointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
-		chunkSummary(ctx, store, tables, metrics, *cassandraKeyspace, *groupTTL)
+		chunkSummary(ctx, store, tables, metrics, storeConfig.Keyspace, *groupTTL)
 	}
 }

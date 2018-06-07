@@ -12,36 +12,28 @@ import (
 	"github.com/raintank/dur"
 )
 
-var (
-	// flags from metrictank.go, Cassandra
-	cassandraAddrs               = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	cassandraKeyspace            = flag.String("cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
-	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace      = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the metrictank keyspace")
-	cassandraSchemaFile          = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-
-	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
-
-	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
-
-	cassandraDisableInitialHostLookup = flag.Bool("cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-
-	// hard coded to default because those have no effect in the case of this tool anyway
-	windowFactor             = 20
-	cassandraOmitReadTimeout = 60
-	cassandraReadConcurrency = 20
-	cassandraReadQueueSize   = 100
-)
-
 func main() {
+	storeConfig := cassandra.NewStoreConfig()
+	// we don't need to allocate resources for reads as this tool does not read from the Store
+	storeConfig.ReadConcurrency = 1
+	storeConfig.ReadQueueSize = 0
+
+	// flags from cassandra/config.go
+	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
+	flag.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
+	flag.StringVar(&storeConfig.Consistency, "cassandra-consistency", storeConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
+	flag.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", storeConfig.HostSelectionPolicy, "")
+	flag.IntVar(&storeConfig.Timeout, "cassandra-timeout", storeConfig.Timeout, "cassandra timeout in milliseconds")
+	flag.IntVar(&storeConfig.Retries, "cassandra-retries", storeConfig.Retries, "how many times to retry a query before failing it")
+	flag.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", storeConfig.CqlProtocolVersion, "cql protocol version to use")
+	flag.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", storeConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
+	flag.BoolVar(&storeConfig.SSL, "cassandra-ssl", storeConfig.SSL, "enable SSL connection to cassandra")
+	flag.StringVar(&storeConfig.CaPath, "cassandra-ca-path", storeConfig.CaPath, "cassandra CA certificate path when using SSL")
+	flag.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", storeConfig.HostVerification, "host (hostname and server cert) verification when using SSL")
+	flag.BoolVar(&storeConfig.Auth, "cassandra-auth", storeConfig.Auth, "enable cassandra authentication")
+	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
+	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
+
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-split-metrics-by-ttl [flags] ttl [ttl...]")
 		fmt.Fprintln(os.Stderr)
@@ -62,7 +54,7 @@ func main() {
 		ttls = append(ttls, uint32(dur.MustParseNDuration("ttl", flag.Arg(i))))
 	}
 
-	tmpDir, err := ioutil.TempDir(os.TempDir(), *cassandraKeyspace)
+	tmpDir, err := ioutil.TempDir(os.TempDir(), storeConfig.Keyspace)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to get temp dir: %s", tmpDir))
 	}
@@ -72,20 +64,20 @@ func main() {
 		panic(fmt.Sprintf("Error creating directory: %s", err))
 	}
 
-	store, err := cassandra.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, cassandraReadConcurrency, cassandraReadConcurrency, cassandraReadQueueSize, 0, *cassandraRetries, *cqlProtocolVersion, windowFactor, cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, ttls, *cassandraDisableInitialHostLookup)
+	store, err := cassandra.NewCassandraStore(storeConfig, ttls)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}
 	tables := store.GetTableNames()
 
 	// create directory/link structure that we need to define the future table names
-	err = os.Mkdir(path.Join(tmpDir, *cassandraKeyspace), 0700)
+	err = os.Mkdir(path.Join(tmpDir, storeConfig.Keyspace), 0700)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create directory: %s", err))
 	}
 	namedTableLinks := make([]string, len(tables))
 	for i, table := range tables {
-		namedTableLinks[i] = path.Join(tmpDir, *cassandraKeyspace, table)
+		namedTableLinks[i] = path.Join(tmpDir, storeConfig.Keyspace, table)
 		err := os.Symlink(snapshotDir, namedTableLinks[i])
 		if err != nil {
 			panic(fmt.Sprintf("Error when creating symlink: %s", err))
@@ -97,12 +89,12 @@ func main() {
 	fmt.Println("- Recreate (or copy) this directory structure on each cassandra node:")
 	fmt.Printf("  %s\n", tmpDir)
 	fmt.Println("- Stop writes by stopping the metrictanks or set their cluster status to secondary")
-	fmt.Printf("- Use `nodetool snapshot --table metric %s` on all cluster nodes to create\n", *cassandraKeyspace)
+	fmt.Printf("- Use `nodetool snapshot --table metric %s` on all cluster nodes to create\n", storeConfig.Keyspace)
 	fmt.Println("  a snapshot of the metric table")
 	fmt.Println("  https://docs.datastax.com/en/cassandra/3.0/cassandra/tools/toolsSnapShot.html")
 	fmt.Println(fmt.Sprintf("- Move snapshot files to directory %s", snapshotDir))
 	fmt.Println("- Load the data by executing:")
 	for _, dir := range namedTableLinks {
-		fmt.Println(fmt.Sprintf("  sstableloader -d %s %s", *cassandraAddrs, dir))
+		fmt.Println(fmt.Sprintf("  sstableloader -d %s %s", storeConfig.Addrs, dir))
 	}
 }

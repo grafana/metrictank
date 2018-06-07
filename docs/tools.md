@@ -279,8 +279,6 @@ Flags:
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
-  -cassandra-create-keyspace
-    	enable the creation of the metrictank keyspace (default true)
   -cassandra-disable-initial-host-lookup
     	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
@@ -293,8 +291,6 @@ Flags:
     	password for authentication (default "cassandra")
   -cassandra-retries int
     	how many times to retry a query before failing it
-  -cassandra-schema-file string
-    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
@@ -340,7 +336,7 @@ Flags:
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-create-keyspace
-    	enable the creation of the metrictank keyspace (default true)
+    	enable the creation of the mdata keyspace and tables, only one node needs this (default true)
   -cassandra-disable-initial-host-lookup
     	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
@@ -348,7 +344,7 @@ Flags:
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
-    	cassandra keyspace to use for storing the metric data table (default "raintank")
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
   -cassandra-omit-read-timeout int
     	if a read is older than this, it will directly be omitted without executing (default 60)
   -cassandra-password string
@@ -432,7 +428,7 @@ Flags:
   -version
     	print version string
   -window-factor int
-    	the window factor be used when creating the metric table schema (default 20)
+    	size of compaction window relative to TTL (default 20)
 Notes:
  * Using `*` as metric-selector may bring down your cassandra. Especially chunk-summary ignores from/to and queries all data.
    With great power comes great responsibility
@@ -566,27 +562,37 @@ global config flags:
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-create-keyspace
-    	enable the creation of the metrictank keyspace (default true)
+    	enable the creation of the mdata keyspace and tables, only one node needs this (default true)
+  -cassandra-disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
   -cassandra-host-selection-policy string
     	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
-    	cassandra keyspace to use for storing the metric data table (default "raintank")
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+  -cassandra-omit-read-timeout int
+    	if a read is older than this, it will directly be omitted without executing (default 60)
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
     	max number of concurrent reads to cassandra. (default 20)
   -cassandra-read-queue-size int
-    	max number of outstanding reads before blocking. value doesn't matter much (default 100)
+    	max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel. (default 200000)
   -cassandra-retries int
     	how many times to retry a query before failing it
+  -cassandra-schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
   -cassandra-timeout int
     	cassandra timeout in milliseconds (default 1000)
   -cassandra-username string
     	username for authentication (default "cassandra")
+  -cassandra-window-factor int
+    	size of compaction window relative to TTL (default 20)
+  -cassandra-write-concurrency int
+    	max number of concurrent writes to cassandra. (default 10)
   -cql-protocol-version int
     	cql protocol version to use (default 4)
   -exit-on-error
@@ -605,8 +611,6 @@ global config flags:
     	the URI on which we expect chunks to get posted (default "/chunks")
   -verbose
     	More detailed logging
-  -window-factor int
-    	the window factor be used when creating the metric table schema (default 20)
 
 idxtype: only 'cass' supported for now
 
@@ -656,6 +660,6 @@ cass config flags:
     	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
 
 EXAMPLES:
-mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata
+mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -cassandra-window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata
 ```
 

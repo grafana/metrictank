@@ -64,33 +64,6 @@ var (
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
 	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
 
-	// Cassandra:
-	cassandraAddrs                    = flag.String("cassandra-addrs", "localhost", "cassandra host (may be given multiple times as comma-separated list)")
-	cassandraKeyspace                 = flag.String("cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
-	cassandraConsistency              = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	cassandraHostSelectionPolicy      = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout                  = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
-	cassandraReadConcurrency          = flag.Int("cassandra-read-concurrency", 20, "max number of concurrent reads to cassandra.")
-	cassandraWriteConcurrency         = flag.Int("cassandra-write-concurrency", 10, "max number of concurrent writes to cassandra.")
-	cassandraReadQueueSize            = flag.Int("cassandra-read-queue-size", 200000, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
-	cassandraWriteQueueSize           = flag.Int("cassandra-write-queue-size", 100000, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	cassandraRetries                  = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
-	cassandraWindowFactor             = flag.Int("cassandra-window-factor", 20, "size of compaction window relative to TTL")
-	cassandraOmitReadTimeout          = flag.Int("cassandra-omit-read-timeout", 60, "if a read is older than this, it will directly be omitted without executing")
-	cqlProtocolVersion                = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
-	cassandraCreateKeyspace           = flag.Bool("cassandra-create-keyspace", true, "enable the creation of the mdata keyspace and tables, only one node needs this")
-	cassandraDisableInitialHostLookup = flag.Bool("cassandra-disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-
-	cassandraSSL              = flag.Bool("cassandra-ssl", false, "enable SSL connection to cassandra")
-	cassandraCaPath           = flag.String("cassandra-ca-path", "/etc/metrictank/ca.pem", "cassandra CA certificate path when using SSL")
-	cassandraHostVerification = flag.Bool("cassandra-host-verification", true, "host (hostname and server cert) verification when using SSL")
-
-	cassandraAuth     = flag.Bool("cassandra-auth", false, "enable cassandra authentication")
-	cassandraUsername = flag.String("cassandra-username", "cassandra", "username for authentication")
-	cassandraPassword = flag.String("cassandra-password", "cassandra", "password for authentication")
-
-	cassandraSchemaFile = flag.String("cassandra-schema-file", "/etc/metrictank/schema-store-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-
 	// Profiling, instrumentation and logging:
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
@@ -164,6 +137,9 @@ func main() {
 
 	// storage-schemas, storage-aggregation files
 	mdata.ConfigSetup()
+
+	// cassandra Store
+	cassandraStore.ConfigSetup()
 
 	config.ParseAll()
 
@@ -294,7 +270,7 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err = cassandraStore.NewCassandraStore(*cassandraAddrs, *cassandraKeyspace, *cassandraConsistency, *cassandraCaPath, *cassandraUsername, *cassandraPassword, *cassandraHostSelectionPolicy, *cassandraTimeout, *cassandraReadConcurrency, *cassandraWriteConcurrency, *cassandraReadQueueSize, *cassandraWriteQueueSize, *cassandraRetries, *cqlProtocolVersion, *cassandraWindowFactor, *cassandraOmitReadTimeout, *cassandraSSL, *cassandraAuth, *cassandraHostVerification, *cassandraCreateKeyspace, *cassandraSchemaFile, mdata.TTLs(), *cassandraDisableInitialHostLookup)
+	store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
