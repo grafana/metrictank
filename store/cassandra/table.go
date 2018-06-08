@@ -5,21 +5,29 @@ import (
 	"math"
 )
 
-type TTLTables map[uint32]ttlTable
-type ttlTable struct {
-	Table      string
+const QueryFmtRead = "SELECT ts, data FROM %s WHERE key IN ? AND ts < ?"
+const QueryFmtWrite = "INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL ?"
+
+// TTLTables stores table definitions keyed by their TTL
+type TTLTables map[uint32]Table
+
+type Table struct {
+	Name       string
+	QueryRead  string
+	QueryWrite string
 	WindowSize uint32
+	TTL        uint32
 }
 
 func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables {
 	tables := make(TTLTables)
 	for _, ttl := range ttls {
-		tables[ttl] = GetTTLTable(ttl, windowFactor, nameFormat)
+		tables[ttl] = GetTable(ttl, windowFactor, nameFormat)
 	}
 	return tables
 }
 
-func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
+func GetTable(ttl uint32, windowFactor int, nameFormat string) Table {
 	/*
 	 * the purpose of this is to bucket metrics of similar TTLs.
 	 * we first calculate the largest power of 2 that's smaller than the TTL and then divide the result by
@@ -53,9 +61,12 @@ func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
 	// calculate the pre factor window by finding the largest power of 2 that's smaller than ttl
 	preFactorWindow := uint32(math.Exp2(math.Floor(math.Log2(ttlUnits(ttl)))))
 	tableName := fmt.Sprintf(nameFormat, preFactorWindow)
-	return ttlTable{
-		Table:      tableName,
+	return Table{
+		Name:       tableName,
+		QueryRead:  fmt.Sprintf(QueryFmtRead, tableName),
+		QueryWrite: fmt.Sprintf(QueryFmtWrite, tableName),
 		WindowSize: preFactorWindow/uint32(windowFactor) + 1,
+		TTL:        ttl,
 	}
 }
 

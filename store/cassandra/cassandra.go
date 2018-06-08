@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,7 +87,7 @@ type CassandraStore struct {
 	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
-	ttlTables        TTLTables
+	TTLTables        TTLTables
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
 	timeout          time.Duration
@@ -150,9 +151,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		if err != nil {
 			return nil, err
 		}
-		for _, result := range ttlTables {
-			log.Info("cassandra_store: ensuring that table %s exists.", result.Table)
-			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+		for _, table := range ttlTables {
+			log.Info("cassandra_store: ensuring that table %s exists.", table.Name)
+			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
 			}
@@ -174,9 +175,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 				}
 				time.Sleep(5 * time.Second)
 			} else {
-				for _, result := range ttlTables {
-					if _, ok := keyspaceMetadata.Tables[result.Table]; !ok {
-						log.Warn("cassandra table %s not found; attempt: %v", result.Table, attempt)
+				for _, table := range ttlTables {
+					if _, ok := keyspaceMetadata.Tables[table.Name]; !ok {
+						log.Warn("cassandra table %s not found; attempt: %v", table.Name, attempt)
 						if attempt >= 5 {
 							return nil, err
 						}
@@ -231,7 +232,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
 		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
 		omitReadTimeout:  time.Duration(config.OmitReadTimeout) * time.Second,
-		ttlTables:        ttlTables,
+		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		timeout:          cluster.Timeout,
 	}
@@ -247,6 +248,44 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	}
 
 	return c, err
+}
+
+// FindExistingTables set's the store's table definitions to what it can find
+// in the database.
+// WARNING:
+// * does not set windowFactor property, because we can't know what it was
+// * each table covers a range of TTL's. we set the TTL to the lower limit
+//   so remember the TTL might have been up to twice as much
+func (c *CassandraStore) FindExistingTables(keyspace string) error {
+
+	meta, err := c.Session.KeyspaceMetadata(keyspace)
+	if err != nil {
+		return err
+	}
+
+	c.TTLTables = make(TTLTables)
+
+	for _, table := range meta.Tables {
+		if table.Name == "metric_idx" || !strings.HasPrefix(table.Name, "metric_") {
+			continue
+		}
+		fields := strings.Split(table.Name, "_")
+		if len(fields) != 2 {
+			return fmt.Errorf("could not parse table %q", table.Name)
+		}
+
+		ttl, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return fmt.Errorf("could not parse table %q", table.Name)
+		}
+		c.TTLTables[uint32(ttl)] = Table{
+			Name:       table.Name,
+			QueryRead:  fmt.Sprintf(QueryFmtRead, table.Name),
+			QueryWrite: fmt.Sprintf(QueryFmtWrite, table.Name),
+			TTL:        uint32(ttl),
+		}
+	}
+	return nil
 }
 
 func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
@@ -308,22 +347,6 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 	}
 }
 
-func (c *CassandraStore) GetTableNames() []string {
-	names := make([]string, 0)
-	for _, table := range c.ttlTables {
-		names = append(names, table.Table)
-	}
-	return names
-}
-
-func (c *CassandraStore) getTable(ttl uint32) (string, error) {
-	entry, ok := c.ttlTables[ttl]
-	if !ok {
-		return "", errTableNotFound
-	}
-	return entry.Table, nil
-}
-
 // Insert Chunks into Cassandra.
 //
 // key: is the metric_id
@@ -335,16 +358,15 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 		return nil
 	}
 
-	table, err := c.getTable(ttl)
-	if err != nil {
-		return err
+	table, ok := c.TTLTables[ttl]
+	if !ok {
+		return errTableNotFound
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	ret := c.Session.Query(query, row_key, t0, data).WithContext(ctx).Exec()
+	ret := c.Session.Query(table.QueryWrite, row_key, t0, data, ttl).WithContext(ctx).Exec()
 	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
@@ -386,16 +408,16 @@ func (c *CassandraStore) processReadQueue() {
 // Basic search of cassandra in the table for given ttl
 // start inclusive, end exclusive
 func (c *CassandraStore) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
-	table, err := c.getTable(ttl)
-	if err != nil {
-		return nil, err
+	table, ok := c.TTLTables[ttl]
+	if !ok {
+		return nil, errTableNotFound
 	}
 	return c.SearchTable(ctx, key, table, start, end)
 }
 
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
-func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table string, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table Table, start, end uint32) ([]chunk.IterGen, error) {
 	_, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
 	defer span.Finish()
 	tags.SpanKindRPCClient.Set(span)
@@ -452,9 +474,8 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	for month := start_month; month <= end_month; month += Month_sec {
 		rowKeys = append(rowKeys, fmt.Sprintf("%s_%d", key, month/Month_sec))
 	}
-	// Cannot page queries with both ORDER BY and a IN restriction on the partition key; you must either remove the ORDER BY or the IN and sort client side, or disable paging for this query
 	crr := ChunkReadRequest{
-		q:         fmt.Sprintf("SELECT ts, data FROM %s WHERE key IN ? AND ts < ?", table),
+		q:         table.QueryRead,
 		p:         []interface{}{rowKeys, end},
 		timestamp: pre,
 		out:       results,

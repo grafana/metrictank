@@ -13,11 +13,11 @@ import (
 	"gopkg.in/raintank/schema.v1"
 )
 
-func points(ctx context.Context, store *cassandra.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
-			fmt.Println("### Table", table)
+			fmt.Println("### Table", table.Name)
 			if fix != 0 {
 				points := getSeries(ctx, store, table, metric.AMKey, fromUnix, toUnix, fix)
 				printPointsNormal(points, fromUnix, toUnix)
@@ -32,11 +32,11 @@ func points(ctx context.Context, store *cassandra.CassandraStore, tables []strin
 	}
 }
 
-func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables []string, metrics []Metric, fromUnix, toUnix, fix uint32) {
+func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
-			fmt.Println("### Table", table)
+			fmt.Println("### Table", table.Name)
 			if fix != 0 {
 				points := getSeries(ctx, store, table, metric.AMKey, fromUnix, toUnix, fix)
 				printPointsSummary(points, fromUnix, toUnix)
@@ -51,7 +51,7 @@ func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables [
 	}
 }
 
-func getSeries(ctx context.Context, store *cassandra.CassandraStore, table string, amkey schema.AMKey, fromUnix, toUnix, interval uint32) []schema.Point {
+func getSeries(ctx context.Context, store *cassandra.CassandraStore, table cassandra.Table, amkey schema.AMKey, fromUnix, toUnix, interval uint32) []schema.Point {
 	var points []schema.Point
 	itgens, err := store.SearchTable(ctx, amkey, table, fromUnix, toUnix)
 	if err != nil {
