@@ -470,9 +470,13 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	results := make(chan readResult, 1)
 
-	var rowKeys []string
-	for month := start_month; month <= end_month; month += Month_sec {
-		rowKeys = append(rowKeys, fmt.Sprintf("%s_%d", key, month/Month_sec))
+	startMonthNum := start_month / Month_sec
+	endMonthNum := end_month / Month_sec
+	rowKeys := make([]string, endMonthNum-startMonthNum+1)
+	i := 0
+	for num := startMonthNum; num <= endMonthNum; num += 1 {
+		rowKeys[i] = fmt.Sprintf("%s_%d", key, num)
+		i++
 	}
 	crr := ChunkReadRequest{
 		q:         table.QueryRead,
