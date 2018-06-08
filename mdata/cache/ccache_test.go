@@ -11,7 +11,7 @@ import (
 )
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values
-func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
+func getItgen(t testing.TB, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
 	if spanaware {

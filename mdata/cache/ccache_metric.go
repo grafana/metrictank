@@ -69,6 +69,66 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	return len(mc.chunks)
 }
 
+func (mc *CCacheMetric) AddSlice(prev uint32, itergens []chunk.IterGen) {
+	if len(itergens) == 0 {
+		return
+	}
+
+	mc.Lock()
+	defer mc.Unlock()
+
+	ts := itergens[0].Ts
+
+	// if previous chunk has not been passed we try to be smart and figure it out.
+	// this is common in a scenario where a metric continuously gets queried
+	// for a range that starts less than one chunkspan before now().
+	if prev == 0 {
+		res, ok := mc.seekDesc(ts - 1)
+		if ok {
+			prev = res
+		}
+	}
+
+	for _, itergen := range itergens {
+		ts = itergen.Ts
+
+		if _, ok := mc.chunks[ts]; ok {
+			// chunk is already present. no need to error on that, just ignore it
+			continue
+		}
+
+		mc.chunks[ts] = &CCacheChunk{
+			Ts:    ts,
+			Prev:  0,
+			Next:  0,
+			Itgen: itergen,
+		}
+
+		// if the previous chunk is cached, link in both directions
+		if _, ok := mc.chunks[prev]; ok {
+			mc.chunks[prev].Next = ts
+			mc.chunks[ts].Prev = prev
+		}
+		prev = ts
+	}
+
+	nextTs := mc.nextTs(ts)
+
+	// if nextTs() can't figure out the end date it returns ts
+	if nextTs > ts {
+		// if the next chunk is cached, link in both directions
+		if _, ok := mc.chunks[nextTs]; ok {
+			mc.chunks[nextTs].Prev = ts
+			mc.chunks[ts].Next = nextTs
+		}
+	}
+
+	// regenerate the list of sorted keys after adding a chunk
+	mc.generateKeys()
+
+	return
+}
+
 func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	ts := itergen.Ts
 
