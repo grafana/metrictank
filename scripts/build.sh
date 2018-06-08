@@ -2,7 +2,6 @@
 
 set -e
 
-
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/..
@@ -24,13 +23,23 @@ rm -rf $BUILDDIR/*
 # disable cgo
 export CGO_ENABLED=0
 
-OUTPUT=$BUILDDIR/metrictank
+function fail () {
+	echo "Aborting due to failure." >&2
+	exit 2
+}
 
-if [ "$1" == "-race" ]
-then
-  set -x
-  go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
-else
-  set -x
-  go build -ldflags "-X main.gitHash=$GITVERSION" -o $OUTPUT
-fi
+# Build binary
+cd cmd
+for bin in *; do
+  cd $bin
+  if [ "$1" == "-race" ]
+  then
+    set -x
+    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$bin || fail
+  else
+    set -x
+    go build -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$bin || fail
+  fi
+  set +x
+  cd ..
+done

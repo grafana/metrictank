@@ -7,8 +7,8 @@ file=../.gitignore
 # NOTE: known limitation: does not clean up stale gitignore rules
 
 declare -a missing
-for tool in *; do
-	rule="/cmd/$tool/$tool"
+for bin in *; do
+	rule="/cmd/$bin/$bin"
 	grep -q "^$rule$" $file || missing=("${missing[@]}" "$rule")
 done
 
@@ -20,4 +20,4 @@ if [ ${#missing[@]} -gt 0 ]; then
 	exit 2
 fi
 
-echo "gitignore rules for all tools found"
+echo "gitignore rules for all binaries found"

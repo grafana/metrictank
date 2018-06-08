@@ -7,7 +7,6 @@ jobs:
     steps:
       - checkout
       - run: scripts/build.sh
-      - run: scripts/build_tools.sh
       - setup_remote_docker
       - run: scripts/build_docker.sh
       - run: mkdir build_docker
@@ -37,7 +36,7 @@ jobs:
       - run: scripts/qa/go-generate.sh
       - run: scripts/qa/ineffassign.sh
       - run: scripts/qa/misspell.sh
-      - run: scripts/qa/tools_gitignore.sh
+      - run: scripts/qa/gitignore.sh
       - run: scripts/qa/unused.sh
       - run: scripts/qa/vendor.sh
 
