@@ -11,7 +11,7 @@ You will also need to install version >=1.6 of [docker-compose](https://docs.doc
 If you already have go installed, you can just: 
 
 ```
-go get github.com/grafana/metrictank
+go get github.com/grafana/metrictank/...
 cd $GOPATH/src/github.com/grafana/metrictank
 ```
 

@@ -22,7 +22,7 @@ You may want to make the `GOPATH` setting persistent, by putting that export lin
 ## Build metrictank
 
 ```
-go get github.com/grafana/metrictank
+go get github.com/grafana/metrictank/...
 ```
 
 Take the file from `go/src/github.com/grafana/metrictank/metrictank-sample.ini`, put it in `/etc/metrictank/metrictank.ini` and make any changes.
