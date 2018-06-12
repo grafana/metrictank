@@ -175,6 +175,41 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
 }
 
+func (c *CCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.IterGen) {
+	if c == nil || len(itergens) == 0 {
+		return
+	}
+	c.Lock()
+	defer c.Unlock()
+
+	ccm, ok := c.metricCache[metric]
+	if !ok {
+		ccm = NewCCacheMetric()
+		ccm.Init(metric.MKey, prev, itergens[0])
+		if len(itergens) > 1 {
+			ccm.AddRange(itergens[0].Ts, itergens[1:])
+		}
+		c.metricCache[metric] = ccm
+
+		// if we do not have this raw key yet, create the entry with the association
+		ccms, ok := c.metricRawKeys[metric.MKey]
+		if !ok {
+			c.metricRawKeys[metric.MKey] = map[schema.Archive]struct{}{
+				metric.Archive: {},
+			}
+		} else {
+			// otherwise, make sure the association exists
+			ccms[metric.Archive] = struct{}{}
+		}
+	} else {
+		ccm.AddRange(prev, itergens)
+	}
+
+	for _, itergen := range itergens {
+		c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+	}
+}
+
 func (cc *CCache) Reset() (int, int) {
 	if cc == nil {
 		return 0, 0

@@ -31,6 +31,12 @@ func (mc *MockCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen
 	mc.AddCount++
 }
 
+func (mc *MockCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.IterGen) {
+	mc.Lock()
+	defer mc.Unlock()
+	mc.AddCount += len(itergens)
+}
+
 func (mc *MockCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
