@@ -154,8 +154,8 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 
 	ccm, ok := c.metricCache[metric]
 	if !ok {
-		ccm = NewCCacheMetric()
-		ccm.Init(metric.MKey, prev, itergen)
+		ccm = NewCCacheMetric(metric.MKey)
+		ccm.Add(prev, itergen)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association
@@ -184,11 +184,8 @@ func (c *CCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.Ite
 
 	ccm, ok := c.metricCache[metric]
 	if !ok {
-		ccm = NewCCacheMetric()
-		ccm.Init(metric.MKey, prev, itergens[0])
-		if len(itergens) > 1 {
-			ccm.AddRange(itergens[0].Ts, itergens[1:])
-		}
+		ccm = NewCCacheMetric(metric.MKey)
+		ccm.AddRange(prev, itergens)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association

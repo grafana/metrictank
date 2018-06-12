@@ -26,15 +26,11 @@ type CCacheMetric struct {
 }
 
 // NewCCacheMetric creates a CCacheMetric
-func NewCCacheMetric() *CCacheMetric {
+func NewCCacheMetric(mkey schema.MKey) *CCacheMetric {
 	return &CCacheMetric{
+		MKey:   mkey,
 		chunks: make(map[uint32]*CCacheChunk),
 	}
-}
-
-func (mc *CCacheMetric) Init(MKey schema.MKey, prev uint32, itergen chunk.IterGen) {
-	mc.Add(prev, itergen)
-	mc.MKey = MKey
 }
 
 // Del deletes chunks for the given timestamp

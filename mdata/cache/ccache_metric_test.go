@@ -21,8 +21,7 @@ func generateChunks(b testing.TB, startAt, count, step uint32) []chunk.IterGen {
 
 func getCCM() (schema.AMKey, *CCacheMetric) {
 	amkey, _ := schema.AMKeyFromString("1.12345678901234567890123456789012")
-	ccm := NewCCacheMetric()
-	ccm.MKey = amkey.MKey
+	ccm := NewCCacheMetric(amkey.MKey)
 	return amkey, ccm
 }
 
