@@ -90,6 +90,8 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	itergen := itergens[0]
 	ts := itergen.Ts
 
+	addKeysDirect := len(mc.keys) == 0 || mc.keys[len(mc.keys)-1] < ts
+
 	// if previous chunk has not been passed we try to be smart and figure it out.
 	// this is common in a scenario where a metric continuously gets queried
 	// for a range that starts less than one chunkspan before now().
@@ -115,6 +117,9 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			Next:  itergens[1].Ts,
 			Itgen: itergen,
 		}
+		if addKeysDirect {
+			mc.keys = append(mc.keys, ts)
+		}
 	}
 
 	prev = ts
@@ -130,6 +135,9 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 				Prev:  prev,
 				Next:  itergens[i+1].Ts,
 				Itgen: itergen,
+			}
+			if addKeysDirect {
+				mc.keys = append(mc.keys, ts)
 			}
 		}
 		prev = ts
@@ -160,9 +168,15 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			Next:  next,
 			Itgen: itergen,
 		}
+		if addKeysDirect {
+			mc.keys = append(mc.keys, ts)
+		}
 	}
-	// regenerate the list of sorted keys after adding a chunk
-	mc.generateKeys()
+
+	if !addKeysDirect {
+		// regenerate the list of sorted keys
+		mc.generateKeys()
+	}
 
 	return
 }
@@ -215,10 +229,27 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 		}
 	}
 
-	// regenerate the list of sorted keys after adding a chunk
-	mc.generateKeys()
+	mc.addKey(ts)
 
 	return
+}
+
+func (mc *CCacheMetric) addKey(ts uint32) {
+
+	// if no keys yet, just add it and it's sorted
+	if len(mc.keys) == 0 {
+		mc.keys = append(mc.keys, ts)
+		return
+	}
+
+	// if ts is newer than any previous chunk, can just add to the back
+	if mc.keys[len(mc.keys)-1] < ts {
+		mc.keys = append(mc.keys, ts)
+		return
+	}
+
+	// we have to insert it in the middle, needs to be re-generated
+	mc.generateKeys()
 }
 
 // generateKeys generates sorted slice of all chunk timestamps
