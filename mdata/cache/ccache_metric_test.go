@@ -19,18 +19,15 @@ func generateChunks(b testing.TB, startAt, count, step uint32) []chunk.IterGen {
 	return res
 }
 
-func initMetric(b testing.TB, start, step uint32) (schema.MKey, *CCacheMetric) {
-	ccm := NewCCacheMetric()
+func getCCM() (schema.MKey, *CCacheMetric) {
 	mkey, _ := schema.MKeyFromString("1.12345678901234567890123456789012")
-	values := make([]uint32, step)
-	c := getItgen(b, values, start, true)
-	ccm.Init(mkey, 0, c)
+	ccm := NewCCacheMetric(mkey)
 	return mkey, ccm
 }
 
 func BenchmarkAddingManyChunksOneByOne(b *testing.B) {
-	_, ccm := initMetric(b, 10, 10)
-	chunks := generateChunks(b, 20, uint32(b.N), 10)
+	_, ccm := getCCM()
+	chunks := generateChunks(b, 10, uint32(b.N), 10)
 	prev := uint32(1)
 	b.ResetTimer()
 	for _, chunk := range chunks {
@@ -40,18 +37,18 @@ func BenchmarkAddingManyChunksOneByOne(b *testing.B) {
 }
 
 func BenchmarkAddingManyChunksAtOnce(b *testing.B) {
-	_, ccm := initMetric(b, 10, 10)
-	chunks := generateChunks(b, 20, uint32(b.N), 10)
+	_, ccm := getCCM()
+	chunks := generateChunks(b, 10, uint32(b.N), 10)
 	prev := uint32(1)
 	b.ResetTimer()
 	ccm.AddRange(prev, chunks)
 }
 
 func TestAddingChunksOneByOneAndQueryingThem(t *testing.T) {
-	mkey, ccm := initMetric(t, 10, 10)
+	mkey, ccm := getCCM()
 	amkey := schema.AMKey{MKey: mkey, Archive: 0}
-	chunks := generateChunks(t, 20, 5, 10)
-	prev := uint32(10)
+	chunks := generateChunks(t, 10, 6, 10)
+	prev := uint32(1)
 	for _, chunk := range chunks {
 		ccm.Add(prev, chunk)
 		prev = chunk.Ts
@@ -72,9 +69,9 @@ func TestAddingChunksOneByOneAndQueryingThem(t *testing.T) {
 	}
 }
 func TestAddingChunksAtOnceAndQueryingThem(t *testing.T) {
-	mkey, ccm := initMetric(t, 10, 10)
+	mkey, ccm := getCCM()
 	amkey := schema.AMKey{MKey: mkey, Archive: 0}
-	chunks := generateChunks(t, 20, 5, 10)
+	chunks := generateChunks(t, 10, 6, 10)
 	prev := uint32(10)
 	ccm.AddRange(prev, chunks)
 
