@@ -44,7 +44,7 @@ func BenchmarkAddingManyChunksAtOnce(b *testing.B) {
 	chunks := generateChunks(b, 20, uint32(b.N), 10)
 	prev := uint32(1)
 	b.ResetTimer()
-	ccm.AddSlice(prev, chunks)
+	ccm.AddRange(prev, chunks)
 }
 
 func TestAddingChunksOneByOneAndQueryingThem(t *testing.T) {
@@ -76,7 +76,7 @@ func TestAddingChunksAtOnceAndQueryingThem(t *testing.T) {
 	amkey := schema.AMKey{MKey: mkey, Archive: 0}
 	chunks := generateChunks(t, 20, 100, 10)
 	prev := uint32(10)
-	ccm.AddSlice(prev, chunks)
+	ccm.AddRange(prev, chunks)
 
 	res := CCSearchResult{}
 	ccm.Search(test.NewContext(), amkey, &res, 25, 45)

@@ -69,7 +69,11 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	return len(mc.chunks)
 }
 
-func (mc *CCacheMetric) AddSlice(prev uint32, itergens []chunk.IterGen) {
+// AddRange adds a range (sequence) of chunks.
+// Note the following requirements:
+// the sequence should be in ascending timestamp order
+// the sequence should be complete (no gaps)
+func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	if len(itergens) == 0 {
 		return
 	}
