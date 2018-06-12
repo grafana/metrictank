@@ -60,6 +60,8 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	delete(mc.chunks, ts)
 
 	// regenerate the list of sorted keys after deleting a chunk
+	// NOTE: we can improve perf by just taking out the ts (partially rewriting
+	// the slice in one go), can we also batch deletes?
 	mc.generateKeys()
 
 	return len(mc.chunks)
@@ -89,7 +91,9 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	itergen := itergens[0]
 	ts := itergen.Ts
 
-	addKeysDirect := len(mc.keys) == 0 || mc.keys[len(mc.keys)-1] < ts
+	// if we add data that is older than chunks already cached,
+	// we will have to sort the keys once we're done adding them
+	sortKeys := len(mc.keys) > 0 && mc.keys[len(mc.keys)-1] > ts
 
 	// if previous chunk has not been passed we try to be smart and figure it out.
 	// this is common in a scenario where a metric continuously gets queried
@@ -117,9 +121,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			Itgen: itergen,
 		})
 		mc.chunks[ts] = &chunks[len(chunks)-1]
-		if addKeysDirect {
-			mc.keys = append(mc.keys, ts)
-		}
+		mc.keys = append(mc.keys, ts)
 	}
 
 	prev = ts
@@ -137,9 +139,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 				Itgen: itergen,
 			})
 			mc.chunks[ts] = &chunks[len(chunks)-1]
-			if addKeysDirect {
-				mc.keys = append(mc.keys, ts)
-			}
+			mc.keys = append(mc.keys, ts)
 		}
 		prev = ts
 	}
@@ -170,14 +170,11 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			Itgen: itergen,
 		})
 		mc.chunks[ts] = &chunks[len(chunks)-1]
-		if addKeysDirect {
-			mc.keys = append(mc.keys, ts)
-		}
+		mc.keys = append(mc.keys, ts)
 	}
 
-	if !addKeysDirect {
-		// regenerate the list of sorted keys
-		mc.generateKeys()
+	if sortKeys {
+		sort.Sort(accnt.Uint32Asc(mc.keys))
 	}
 
 	return
@@ -244,14 +241,11 @@ func (mc *CCacheMetric) addKey(ts uint32) {
 		return
 	}
 
-	// if ts is newer than any previous chunk, can just add to the back
-	if mc.keys[len(mc.keys)-1] < ts {
-		mc.keys = append(mc.keys, ts)
-		return
+	// add the ts, and sort if necessary
+	mc.keys = append(mc.keys, ts)
+	if mc.keys[len(mc.keys)-1] < mc.keys[len(mc.keys)-2] {
+		sort.Sort(accnt.Uint32Asc(mc.keys))
 	}
-
-	// we have to insert it in the middle, needs to be re-generated
-	mc.generateKeys()
 }
 
 // generateKeys generates sorted slice of all chunk timestamps
