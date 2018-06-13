@@ -5,8 +5,8 @@ import (
 )
 
 type LRU struct {
-	list  *list.List
-	items map[interface{}]*list.Element
+	list  *list.List                    // the actual queue in which we move items around to represent their used time
+	items map[interface{}]*list.Element // to find entries within the LRU so we can move them to the front
 }
 
 func NewLRU() *LRU {
