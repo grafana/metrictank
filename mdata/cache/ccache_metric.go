@@ -128,8 +128,8 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 
 	// handle the 2nd until the last-but-one
 	for i := 1; i < len(itergens)-1; i++ {
-		itergen := itergens[i]
-		ts := itergen.Ts
+		itergen = itergens[i]
+		ts = itergen.Ts
 		// add chunk if we don't have it yet (most likely)
 		if _, ok := mc.chunks[ts]; !ok {
 			chunks = append(chunks, CCacheChunk{
