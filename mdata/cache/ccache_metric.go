@@ -95,25 +95,26 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	// we will have to sort the keys once we're done adding them
 	sortKeys := len(mc.keys) > 0 && mc.keys[len(mc.keys)-1] > ts
 
-	// if previous chunk has not been passed we try to be smart and figure it out.
-	// this is common in a scenario where a metric continuously gets queried
-	// for a range that starts less than one chunkspan before now().
-	if prev == 0 {
-		res, ok := mc.seekDesc(ts - 1)
-		if ok {
-			prev = res
-		}
-	}
-
-	// if the previous chunk is cached, link it
-	if _, ok := mc.chunks[prev]; ok {
-		mc.chunks[prev].Next = ts
-	} else {
-		prev = 0
-	}
-
 	// add chunk if we don't have it yet (most likely)
 	if _, ok := mc.chunks[ts]; !ok {
+
+		// if previous chunk has not been passed we try to be smart and figure it out.
+		// this is common in a scenario where a metric continuously gets queried
+		// for a range that starts less than one chunkspan before now().
+		if prev == 0 {
+			res, ok := mc.seekDesc(ts - 1)
+			if ok {
+				prev = res
+			}
+		}
+
+		// if the previous chunk is cached, link it
+		if _, ok := mc.chunks[prev]; ok {
+			mc.chunks[prev].Next = ts
+		} else {
+			prev = 0
+		}
+
 		chunks = append(chunks, CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
@@ -149,21 +150,22 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	itergen = itergens[len(itergens)-1]
 	ts = itergen.Ts
 
-	// if nextTs() can't figure out the end date it returns ts
-	next := mc.nextTsCore(itergen, ts, prev, 0)
-	if next == ts {
-		next = 0
-	} else {
-		// if the next chunk is cached, link in both directions
-		if _, ok := mc.chunks[next]; ok {
-			mc.chunks[next].Prev = ts
-		} else {
-			next = 0
-		}
-	}
-
 	// add chunk if we don't have it yet (most likely)
 	if _, ok := mc.chunks[ts]; !ok {
+
+		// if nextTs() can't figure out the end date it returns ts
+		next := mc.nextTsCore(itergen, ts, prev, 0)
+		if next == ts {
+			next = 0
+		} else {
+			// if the next chunk is cached, link in both directions
+			if _, ok := mc.chunks[next]; ok {
+				mc.chunks[next].Prev = ts
+			} else {
+				next = 0
+			}
+		}
+
 		chunks = append(chunks, CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
