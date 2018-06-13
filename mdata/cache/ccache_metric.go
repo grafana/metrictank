@@ -122,6 +122,8 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		})
 		mc.chunks[ts] = &chunks[len(chunks)-1]
 		mc.keys = append(mc.keys, ts)
+	} else {
+		mc.chunks[ts].Next = itergens[1].Ts
 	}
 
 	prev = ts
@@ -130,17 +132,16 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	for i := 1; i < len(itergens)-1; i++ {
 		itergen = itergens[i]
 		ts = itergen.Ts
-		// add chunk if we don't have it yet (most likely)
-		if _, ok := mc.chunks[ts]; !ok {
-			chunks = append(chunks, CCacheChunk{
-				Ts:    ts,
-				Prev:  prev,
-				Next:  itergens[i+1].Ts,
-				Itgen: itergen,
-			})
-			mc.chunks[ts] = &chunks[len(chunks)-1]
-			mc.keys = append(mc.keys, ts)
-		}
+		// add chunk, potentially overwriting pre-existing chunk (unlikely)
+		chunks = append(chunks, CCacheChunk{
+			Ts:    ts,
+			Prev:  prev,
+			Next:  itergens[i+1].Ts,
+			Itgen: itergen,
+		})
+		mc.chunks[ts] = &chunks[len(chunks)-1]
+		mc.keys = append(mc.keys, ts)
+
 		prev = ts
 	}
 
