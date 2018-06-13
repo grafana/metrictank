@@ -104,7 +104,7 @@ func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
 }
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
-func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	c.RLock()
 
 	var met *CCacheMetric
@@ -136,8 +136,8 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 
 	ccm, ok := c.metricCache[metric]
 	if !ok {
-		ccm = NewCCacheMetric()
-		ccm.Init(metric.MKey, prev, itergen)
+		ccm = NewCCacheMetric(metric.MKey)
+		ccm.Add(prev, itergen)
 		c.metricCache[metric] = ccm
 
 		// if we do not have this raw key yet, create the entry with the association
@@ -155,6 +155,38 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	}
 
 	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+}
+
+func (c *CCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.IterGen) {
+	if len(itergens) == 0 {
+		return
+	}
+	c.Lock()
+	defer c.Unlock()
+
+	ccm, ok := c.metricCache[metric]
+	if !ok {
+		ccm = NewCCacheMetric(metric.MKey)
+		ccm.AddRange(prev, itergens)
+		c.metricCache[metric] = ccm
+
+		// if we do not have this raw key yet, create the entry with the association
+		ccms, ok := c.metricRawKeys[metric.MKey]
+		if !ok {
+			c.metricRawKeys[metric.MKey] = map[schema.Archive]struct{}{
+				metric.Archive: {},
+			}
+		} else {
+			// otherwise, make sure the association exists
+			ccms[metric.Archive] = struct{}{}
+		}
+	} else {
+		ccm.AddRange(prev, itergens)
+	}
+
+	for _, itergen := range itergens {
+		c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+	}
 }
 
 func (cc *CCache) Reset() (int, int) {

@@ -26,15 +26,11 @@ type CCacheMetric struct {
 }
 
 // NewCCacheMetric creates a CCacheMetric
-func NewCCacheMetric() *CCacheMetric {
+func NewCCacheMetric(mkey schema.MKey) *CCacheMetric {
 	return &CCacheMetric{
+		MKey:   mkey,
 		chunks: make(map[uint32]*CCacheChunk),
 	}
-}
-
-func (mc *CCacheMetric) Init(MKey schema.MKey, prev uint32, itergen chunk.IterGen) {
-	mc.Add(prev, itergen)
-	mc.MKey = MKey
 }
 
 // Del deletes chunks for the given timestamp
@@ -64,11 +60,130 @@ func (mc *CCacheMetric) Del(ts uint32) int {
 	delete(mc.chunks, ts)
 
 	// regenerate the list of sorted keys after deleting a chunk
+	// NOTE: we can improve perf by just taking out the ts (partially rewriting
+	// the slice in one go), can we also batch deletes?
 	mc.generateKeys()
 
 	return len(mc.chunks)
 }
 
+// AddRange adds a range (sequence) of chunks.
+// Note the following requirements:
+// the sequence should be in ascending timestamp order
+// the sequence should be complete (no gaps)
+func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
+	if len(itergens) == 0 {
+		return
+	}
+
+	if len(itergens) == 1 {
+		mc.Add(prev, itergens[0])
+		return
+	}
+
+	mc.Lock()
+	defer mc.Unlock()
+
+	// pre-allocate 1 slice, cheaper than allocating one by one
+	chunks := make([]CCacheChunk, 0, len(itergens))
+
+	// handle the first one
+	itergen := itergens[0]
+	ts := itergen.Ts
+
+	// if we add data that is older than chunks already cached,
+	// we will have to sort the keys once we're done adding them
+	sortKeys := len(mc.keys) > 0 && mc.keys[len(mc.keys)-1] > ts
+
+	// add chunk if we don't have it yet (most likely)
+	if _, ok := mc.chunks[ts]; !ok {
+
+		// if previous chunk has not been passed we try to be smart and figure it out.
+		// this is common in a scenario where a metric continuously gets queried
+		// for a range that starts less than one chunkspan before now().
+		if prev == 0 {
+			res, ok := mc.seekDesc(ts - 1)
+			if ok {
+				prev = res
+			}
+		}
+
+		// if the previous chunk is cached, link it
+		if _, ok := mc.chunks[prev]; ok {
+			mc.chunks[prev].Next = ts
+		} else {
+			prev = 0
+		}
+
+		chunks = append(chunks, CCacheChunk{
+			Ts:    ts,
+			Prev:  prev,
+			Next:  itergens[1].Ts,
+			Itgen: itergen,
+		})
+		mc.chunks[ts] = &chunks[len(chunks)-1]
+		mc.keys = append(mc.keys, ts)
+	} else {
+		mc.chunks[ts].Next = itergens[1].Ts
+	}
+
+	prev = ts
+
+	// handle the 2nd until the last-but-one
+	for i := 1; i < len(itergens)-1; i++ {
+		itergen = itergens[i]
+		ts = itergen.Ts
+		// add chunk, potentially overwriting pre-existing chunk (unlikely)
+		chunks = append(chunks, CCacheChunk{
+			Ts:    ts,
+			Prev:  prev,
+			Next:  itergens[i+1].Ts,
+			Itgen: itergen,
+		})
+		mc.chunks[ts] = &chunks[len(chunks)-1]
+		mc.keys = append(mc.keys, ts)
+
+		prev = ts
+	}
+
+	// handle the last one
+	itergen = itergens[len(itergens)-1]
+	ts = itergen.Ts
+
+	// add chunk if we don't have it yet (most likely)
+	if _, ok := mc.chunks[ts]; !ok {
+
+		// if nextTs() can't figure out the end date it returns ts
+		next := mc.nextTsCore(itergen, ts, prev, 0)
+		if next == ts {
+			next = 0
+		} else {
+			// if the next chunk is cached, link in both directions
+			if _, ok := mc.chunks[next]; ok {
+				mc.chunks[next].Prev = ts
+			} else {
+				next = 0
+			}
+		}
+
+		chunks = append(chunks, CCacheChunk{
+			Ts:    ts,
+			Prev:  prev,
+			Next:  next,
+			Itgen: itergen,
+		})
+		mc.chunks[ts] = &chunks[len(chunks)-1]
+		mc.keys = append(mc.keys, ts)
+	}
+
+	if sortKeys {
+		sort.Sort(accnt.Uint32Asc(mc.keys))
+	}
+
+	return
+}
+
+// Add adds a chunk to the cache
 func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	ts := itergen.Ts
 
@@ -116,10 +231,24 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 		}
 	}
 
-	// regenerate the list of sorted keys after adding a chunk
-	mc.generateKeys()
+	mc.addKey(ts)
 
 	return
+}
+
+func (mc *CCacheMetric) addKey(ts uint32) {
+
+	// if no keys yet, just add it and it's sorted
+	if len(mc.keys) == 0 {
+		mc.keys = append(mc.keys, ts)
+		return
+	}
+
+	// add the ts, and sort if necessary
+	mc.keys = append(mc.keys, ts)
+	if mc.keys[len(mc.keys)-1] < mc.keys[len(mc.keys)-2] {
+		sort.Sort(accnt.Uint32Asc(mc.keys))
+	}
 }
 
 // generateKeys generates sorted slice of all chunk timestamps
@@ -137,24 +266,29 @@ func (mc *CCacheMetric) generateKeys() {
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	chunk := mc.chunks[ts]
-	span := chunk.Itgen.Span
+	return mc.nextTsCore(chunk.Itgen, chunk.Ts, chunk.Prev, chunk.Next)
+}
+
+// nextTsCore returns the ts of the next chunk, given a chunks key properties
+// (to the extent we know them). It guesses if necessary.
+// assumes we already have at least a read lock
+func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, ts, prev, next uint32) uint32 {
+	span := itgen.Span
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
-		return chunk.Ts + span
+		return ts + span
 	}
 
-	if chunk.Next == 0 {
-		if chunk.Prev == 0 {
-			// if a chunk has no next and no previous chunk we have to assume it's length is 0
-			return chunk.Ts
-		} else {
-			// if chunk has no next chunk, but has a previous one, we assume the length of this one is same as the previous one
-			return chunk.Ts + (chunk.Ts - chunk.Prev)
-		}
-	} else {
-		// if chunk has a next chunk, then that's the ts we need
-		return chunk.Next
+	// if chunk has a next chunk, then that's the ts we need
+	if next != 0 {
+		return next
 	}
+	// if chunk has no next chunk, but has a previous one, we assume the length of this one is same as the previous one
+	if prev != 0 {
+		return ts + (ts - prev)
+	}
+	// if a chunk has no next and no previous chunk we have to assume it's length is 0
+	return ts
 }
 
 // lastTs returns the last Ts of this metric cache

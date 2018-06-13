@@ -2,7 +2,7 @@
 default:
 	$(MAKE) all
 test:
-	CGO_ENABLED=1 go test -v -race $(shell go list ./... | grep -v /vendor/ | grep -v chaos)
+	CGO_ENABLED=1 go test -v -race $(shell go list ./... | grep -v /vendor/ | grep -v stacktest)
 check:
 	$(MAKE) test
 bin:
