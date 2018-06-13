@@ -11,8 +11,8 @@ import (
 type MockCache struct {
 	sync.Mutex
 	AddCount          int
-	CacheIfHotCount   int
-	CacheIfHotCb      func()
+	AddIfHotCount     int
+	AddIfHotCb        func()
 	StopCount         int
 	SearchCount       int
 	DelMetricArchives int
@@ -37,12 +37,12 @@ func (mc *MockCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk
 	mc.AddCount += len(itergens)
 }
 
-func (mc *MockCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (mc *MockCache) AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
-	mc.CacheIfHotCount++
-	if mc.CacheIfHotCb != nil {
-		mc.CacheIfHotCb()
+	mc.AddIfHotCount++
+	if mc.AddIfHotCb != nil {
+		mc.AddIfHotCb()
 	}
 }
 

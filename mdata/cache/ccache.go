@@ -116,7 +116,7 @@ func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
 }
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
-func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+func (c *CCache) AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	if c == nil {
 		return
 	}
