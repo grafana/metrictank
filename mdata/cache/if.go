@@ -9,8 +9,8 @@ import (
 
 type Cache interface {
 	Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	AddRange(metric schema.AMKey, prev uint32, itergens []chunk.IterGen)
-	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	Stop()
 	Search(ctx context.Context, metric schema.AMKey, from, until uint32) (*CCSearchResult, error)
 	DelMetric(rawMetric schema.MKey) (int, int)
@@ -18,7 +18,7 @@ type Cache interface {
 }
 
 type CachePusher interface {
-	CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 }
 
 type CCSearchResult struct {

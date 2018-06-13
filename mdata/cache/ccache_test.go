@@ -68,7 +68,7 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
-	cc.CacheIfHot(metric, 0, itgen3)
+	cc.AddIfHot(metric, 0, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -101,7 +101,7 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 
 	cc.Add(metric, 0, itgen1)
 
-	cc.CacheIfHot(metric, 0, itgen3)
+	cc.AddIfHot(metric, 0, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -128,7 +128,7 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
-	cc.CacheIfHot(metric, 1005, itgen3)
+	cc.AddIfHot(metric, 1005, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -161,7 +161,7 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 
 	cc.Add(metric, 0, itgen1)
 
-	cc.CacheIfHot(metric, 1005, itgen3)
+	cc.AddIfHot(metric, 1005, itgen3)
 
 	mc := cc.metricCache[metric]
 
