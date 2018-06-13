@@ -202,9 +202,7 @@ func (c *CCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.Ite
 		ccm.AddRange(prev, itergens)
 	}
 
-	for _, itergen := range itergens {
-		c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
-	}
+	c.accnt.AddChunks(metric, itergens)
 }
 
 func (cc *CCache) Reset() (int, int) {
@@ -293,12 +291,8 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 
 		accnt.CacheChunkHit.Add(len(res.Start) + len(res.End))
 		go func() {
-			for _, hit := range res.Start {
-				c.accnt.HitChunk(metric, hit.Ts)
-			}
-			for _, hit := range res.End {
-				c.accnt.HitChunk(metric, hit.Ts)
-			}
+			c.accnt.HitChunks(metric, res.Start)
+			c.accnt.HitChunks(metric, res.End)
 		}()
 
 		if res.Complete {
