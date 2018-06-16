@@ -26,7 +26,7 @@ var (
 func init() {
 	flags := flag.NewFlagSet("chunk-cache", flag.ExitOnError)
 	// (1024 ^ 3) * 4 = 4294967296 = 4G
-	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes")
+	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes. 0 disables cache")
 	globalconf.Register("chunk-cache", flags)
 }
 
@@ -49,7 +49,14 @@ type CCache struct {
 	tracer opentracing.Tracer
 }
 
+// NewCCache creates a new chunk cache.
+// When cache is disabled, this will return nil
+// but the caller doesn't have to worry about this and can call methods as usual on a nil cache
 func NewCCache() *CCache {
+	if maxSize == 0 {
+		return nil
+	}
+
 	cc := &CCache{
 		metricCache:   make(map[schema.AMKey]*CCacheMetric),
 		metricRawKeys: make(map[schema.MKey]map[schema.Archive]struct{}),
@@ -62,7 +69,9 @@ func NewCCache() *CCache {
 }
 
 func (c *CCache) SetTracer(t opentracing.Tracer) {
-	c.tracer = t
+	if c != nil {
+		c.tracer = t
+	}
 }
 
 func (c *CCache) evictLoop() {
@@ -79,6 +88,9 @@ func (c *CCache) evictLoop() {
 
 // takes a raw key and deletes all archives associated with it from cache
 func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
+	if c == nil {
+		return 0, 0
+	}
 	archives, series := 0, 0
 
 	c.Lock()
@@ -105,6 +117,9 @@ func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
 
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
 func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+	if c == nil {
+		return
+	}
 	c.RLock()
 
 	var met *CCacheMetric
@@ -131,6 +146,9 @@ func (c *CCache) CacheIfHot(metric schema.AMKey, prev uint32, itergen chunk.Iter
 }
 
 func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+	if c == nil {
+		return
+	}
 	c.Lock()
 	defer c.Unlock()
 
@@ -158,6 +176,9 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 }
 
 func (cc *CCache) Reset() (int, int) {
+	if cc == nil {
+		return 0, 0
+	}
 	cc.Lock()
 	cc.accnt.Reset()
 	series := len(cc.metricRawKeys)
@@ -169,6 +190,9 @@ func (cc *CCache) Reset() (int, int) {
 }
 
 func (c *CCache) Stop() {
+	if c == nil {
+		return
+	}
 	c.accnt.Stop()
 	c.stop <- nil
 }
@@ -202,9 +226,6 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 // Search looks for the requested metric and returns a complete-as-possible CCSearchResult
 // from is inclusive, until is exclusive
 func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until uint32) (*CCSearchResult, error) {
-	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
-	defer span.Finish()
-
 	if from >= until {
 		return nil, ErrInvalidRange
 	}
@@ -213,6 +234,14 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 		From:  from,
 		Until: until,
 	}
+
+	if c == nil {
+		accnt.CacheMetricMiss.Inc()
+		return res, nil
+	}
+
+	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
+	defer span.Finish()
 
 	c.RLock()
 	defer c.RUnlock()

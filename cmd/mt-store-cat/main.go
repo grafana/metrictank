@@ -174,17 +174,22 @@ func main() {
 	defer traceCloser.Close()
 	store.SetTracer(tracer)
 
+	err = store.FindExistingTables(storeConfig.Keyspace)
+	if err != nil {
+		log.Fatal(4, "failed to read tables from cassandra. %s", err)
+	}
+
 	if tableSelector == "tables" {
-		tables, err := getTables(store, storeConfig.Keyspace, "")
+		tables, err := getTables(store, "")
 		if err != nil {
 			log.Fatal(4, "%s", err)
 		}
-		for _, tbl := range tables {
-			fmt.Println(tbl)
+		for _, table := range tables {
+			fmt.Printf("%s (ttl %d hours)\n", table.Name, table.TTL)
 		}
 		return
 	}
-	tables, err := getTables(store, storeConfig.Keyspace, tableSelector)
+	tables, err := getTables(store, tableSelector)
 	if err != nil {
 		log.Fatal(4, "%s", err)
 	}
@@ -262,6 +267,6 @@ func main() {
 	case "point-summary":
 		pointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
-		chunkSummary(ctx, store, tables, metrics, storeConfig.Keyspace, *groupTTL)
+		chunkSummary(ctx, store, tables, metrics, *groupTTL)
 	}
 }

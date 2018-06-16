@@ -73,14 +73,14 @@ func display(schema conf.Schema) {
 	fmt.Printf("retentions:%10s %10s %10s %10s %10s %15s %10s\n", "interval", "retention", "chunkspan", "numchunks", "ready", "tablename", "windowsize")
 	for _, ret := range schema.Retentions {
 		retention := ret.MaxRetention()
-		table := cassandra.GetTTLTable(uint32(retention), *windowFactor, cassandra.Table_name_format)
+		table := cassandra.GetTable(uint32(retention), *windowFactor, cassandra.Table_name_format)
 		retStr := time.Duration(time.Duration(retention) * time.Second).String()
 		if retention%(3600*24) == 0 {
 			retStr = fmt.Sprintf("%dd", retention/3600/24)
 		}
 		chunkSpanStr := time.Duration(time.Duration(ret.ChunkSpan) * time.Second).String()
 		windowSizeStr := time.Duration(time.Duration(table.WindowSize) * time.Hour).String()
-		fmt.Printf("           %10d %10s %10s %10d %10t %15s %10s\n", ret.SecondsPerPoint, retStr, chunkSpanStr, ret.NumChunks, ret.Ready, table.Table, windowSizeStr)
+		fmt.Printf("           %10d %10s %10s %10d %10t %15s %10s\n", ret.SecondsPerPoint, retStr, chunkSpanStr, ret.NumChunks, ret.Ready, table.Name, windowSizeStr)
 	}
 	fmt.Println()
 }

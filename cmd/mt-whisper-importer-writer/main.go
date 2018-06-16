@@ -244,18 +244,16 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 			throwError(fmt.Sprintf("Failed to select table for ttl %d in %+v: %q", archiveTTL, s.TTLTables, err))
 			return
 		}
-		entry, ok := s.TTLTables[tableTTL]
+		table, ok := s.TTLTables[tableTTL]
 		if !ok {
 			throwError(fmt.Sprintf("Failed to get selected table %d in %+v", tableTTL, s.TTLTables))
 			return
 		}
-		tableName := entry.Table
-
 		log.Debugf(
 			"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
-			len(a.Chunks), archiveIdx, archiveTTL, tableName, tableTTL, a.RowKey,
+			len(a.Chunks), archiveIdx, archiveTTL, table.Name, tableTTL, a.RowKey,
 		)
-		s.insertChunks(tableName, a.RowKey, tableTTL, a.Chunks)
+		s.insertChunks(table.Name, a.RowKey, tableTTL, a.Chunks)
 	}
 }
 

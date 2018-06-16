@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,8 +53,8 @@ var (
 	// reads that could not be pushed into the queue because it was full
 	cassReadQueueFull = stats.NewCounter32("store.cassandra.omit_read.queue_full")
 
-	// metric store.cassandra.chunks_per_row is how many chunks are retrieved per row in get queries
-	cassChunksPerRow = stats.NewMeter32("store.cassandra.chunks_per_row", false)
+	// metric store.cassandra.chunks_per_response is how many chunks are retrieved per response in get queries
+	cassChunksPerResponse = stats.NewMeter32("store.cassandra.chunks_per_response", false)
 	// metric store.cassandra.rows_per_response is how many rows come per get response
 	cassRowsPerResponse = stats.NewMeter32("store.cassandra.rows_per_response", false)
 	// metric store.cassandra.get_chunks is the duration of how long it takes to get chunks
@@ -75,19 +75,11 @@ var (
 )
 
 type ChunkReadRequest struct {
-	month     uint32
-	sortKey   uint32
 	q         string
 	p         []interface{}
 	timestamp time.Time
-	out       chan outcome
+	out       chan readResult
 	ctx       context.Context
-}
-
-type TTLTables map[uint32]ttlTable
-type ttlTable struct {
-	Table      string
-	WindowSize uint32
 }
 
 type CassandraStore struct {
@@ -95,15 +87,10 @@ type CassandraStore struct {
 	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
-	ttlTables        TTLTables
+	TTLTables        TTLTables
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
 	timeout          time.Duration
-}
-
-func ttlUnits(ttl uint32) float64 {
-	// convert ttl to hours
-	return float64(ttl) / (60 * 60)
 }
 
 func PrepareChunkData(span uint32, data []byte) []byte {
@@ -120,54 +107,6 @@ func PrepareChunkData(span uint32, data []byte) []byte {
 	binary.Write(buf, binary.LittleEndian, spanCode)
 	buf.Write(data)
 	return buf.Bytes()
-}
-
-func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables {
-	tables := make(TTLTables)
-	for _, ttl := range ttls {
-		tables[ttl] = GetTTLTable(ttl, windowFactor, nameFormat)
-	}
-	return tables
-}
-
-func GetTTLTable(ttl uint32, windowFactor int, nameFormat string) ttlTable {
-	/*
-	 * the purpose of this is to bucket metrics of similar TTLs.
-	 * we first calculate the largest power of 2 that's smaller than the TTL and then divide the result by
-	 * the window factor. for example with a window factor of 20 we want to group the metrics like this:
-	 *
-	 * generated with: https://gist.github.com/replay/69ad7cfd523edfa552cd12851fa74c58
-	 *
-	 * +------------------------+---------------+---------------------+----------+
-	 * |              TTL hours |    table_name | window_size (hours) | sstables |
-	 * +------------------------+---------------+---------------------+----------+
-	 * |         0 <= hours < 1 |     metrics_0 |                   1 |    0 - 2 |
-	 * |         1 <= hours < 2 |     metrics_1 |                   1 |    1 - 3 |
-	 * |         2 <= hours < 4 |     metrics_2 |                   1 |    2 - 5 |
-	 * |         4 <= hours < 8 |     metrics_4 |                   1 |    4 - 9 |
-	 * |        8 <= hours < 16 |     metrics_8 |                   1 |   8 - 17 |
-	 * |       16 <= hours < 32 |    metrics_16 |                   1 |  16 - 33 |
-	 * |       32 <= hours < 64 |    metrics_32 |                   2 |  16 - 33 |
-	 * |      64 <= hours < 128 |    metrics_64 |                   4 |  16 - 33 |
-	 * |     128 <= hours < 256 |   metrics_128 |                   7 |  19 - 38 |
-	 * |     256 <= hours < 512 |   metrics_256 |                  13 |  20 - 41 |
-	 * |    512 <= hours < 1024 |   metrics_512 |                  26 |  20 - 41 |
-	 * |   1024 <= hours < 2048 |  metrics_1024 |                  52 |  20 - 41 |
-	 * |   2048 <= hours < 4096 |  metrics_2048 |                 103 |  20 - 41 |
-	 * |   4096 <= hours < 8192 |  metrics_4096 |                 205 |  20 - 41 |
-	 * |  8192 <= hours < 16384 |  metrics_8192 |                 410 |  20 - 41 |
-	 * | 16384 <= hours < 32768 | metrics_16384 |                 820 |  20 - 41 |
-	 * | 32768 <= hours < 65536 | metrics_32768 |                1639 |  20 - 41 |
-	 * +------------------------+---------------+---------------------+----------+
-	 */
-
-	// calculate the pre factor window by finding the largest power of 2 that's smaller than ttl
-	preFactorWindow := uint32(math.Exp2(math.Floor(math.Log2(ttlUnits(ttl)))))
-	tableName := fmt.Sprintf(nameFormat, preFactorWindow)
-	return ttlTable{
-		Table:      tableName,
-		WindowSize: preFactorWindow/uint32(windowFactor) + 1,
-	}
 }
 
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
@@ -212,9 +151,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		if err != nil {
 			return nil, err
 		}
-		for _, result := range ttlTables {
-			log.Info("cassandra_store: ensuring that table %s exists.", result.Table)
-			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, result.Table, result.WindowSize, result.WindowSize*60*60)).Exec()
+		for _, table := range ttlTables {
+			log.Info("cassandra_store: ensuring that table %s exists.", table.Name)
+			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
 			}
@@ -236,9 +175,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 				}
 				time.Sleep(5 * time.Second)
 			} else {
-				for _, result := range ttlTables {
-					if _, ok := keyspaceMetadata.Tables[result.Table]; !ok {
-						log.Warn("cassandra table %s not found; attempt: %v", result.Table, attempt)
+				for _, table := range ttlTables {
+					if _, ok := keyspaceMetadata.Tables[table.Name]; !ok {
+						log.Warn("cassandra table %s not found; attempt: %v", table.Name, attempt)
 						if attempt >= 5 {
 							return nil, err
 						}
@@ -293,7 +232,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
 		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
 		omitReadTimeout:  time.Duration(config.OmitReadTimeout) * time.Second,
-		ttlTables:        ttlTables,
+		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		timeout:          cluster.Timeout,
 	}
@@ -309,6 +248,44 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	}
 
 	return c, err
+}
+
+// FindExistingTables set's the store's table definitions to what it can find
+// in the database.
+// WARNING:
+// * does not set windowFactor property, because we can't know what it was
+// * each table covers a range of TTL's. we set the TTL to the lower limit
+//   so remember the TTL might have been up to twice as much
+func (c *CassandraStore) FindExistingTables(keyspace string) error {
+
+	meta, err := c.Session.KeyspaceMetadata(keyspace)
+	if err != nil {
+		return err
+	}
+
+	c.TTLTables = make(TTLTables)
+
+	for _, table := range meta.Tables {
+		if table.Name == "metric_idx" || !strings.HasPrefix(table.Name, "metric_") {
+			continue
+		}
+		fields := strings.Split(table.Name, "_")
+		if len(fields) != 2 {
+			return fmt.Errorf("could not parse table %q", table.Name)
+		}
+
+		ttl, err := strconv.Atoi(fields[1])
+		if err != nil {
+			return fmt.Errorf("could not parse table %q", table.Name)
+		}
+		c.TTLTables[uint32(ttl)] = Table{
+			Name:       table.Name,
+			QueryRead:  fmt.Sprintf(QueryFmtRead, table.Name),
+			QueryWrite: fmt.Sprintf(QueryFmtWrite, table.Name),
+			TTL:        uint32(ttl),
+		}
+	}
+	return nil
 }
 
 func (c *CassandraStore) SetTracer(t opentracing.Tracer) {
@@ -370,22 +347,6 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 	}
 }
 
-func (c *CassandraStore) GetTableNames() []string {
-	names := make([]string, 0)
-	for _, table := range c.ttlTables {
-		names = append(names, table.Table)
-	}
-	return names
-}
-
-func (c *CassandraStore) getTable(ttl uint32) (string, error) {
-	entry, ok := c.ttlTables[ttl]
-	if !ok {
-		return "", errTableNotFound
-	}
-	return entry.Table, nil
-}
-
 // Insert Chunks into Cassandra.
 //
 // key: is the metric_id
@@ -397,32 +358,24 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 		return nil
 	}
 
-	table, err := c.getTable(ttl)
-	if err != nil {
-		return err
+	table, ok := c.TTLTables[ttl]
+	if !ok {
+		return errTableNotFound
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL %d", table, ttl)
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	ret := c.Session.Query(query, row_key, t0, data).WithContext(ctx).Exec()
+	ret := c.Session.Query(table.QueryWrite, row_key, t0, data, ttl).WithContext(ctx).Exec()
 	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
 }
 
-type outcome struct {
-	month   uint32
-	sortKey uint32
-	i       *gocql.Iter
-	err     error
+type readResult struct {
+	i   *gocql.Iter
+	err error
 }
-type asc []outcome
-
-func (o asc) Len() int           { return len(o) }
-func (o asc) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
-func (o asc) Less(i, j int) bool { return o[i].sortKey < o[j].sortKey }
 
 func (c *CassandraStore) processReadQueue() {
 	for crr := range c.readQueue {
@@ -430,7 +383,7 @@ func (c *CassandraStore) processReadQueue() {
 		select {
 		case <-crr.ctx.Done():
 			//request canceled
-			crr.out <- outcome{err: errCtxCanceled}
+			crr.out <- readResult{err: errCtxCanceled}
 			continue
 		default:
 		}
@@ -438,16 +391,14 @@ func (c *CassandraStore) processReadQueue() {
 		cassGetWaitDuration.Value(waitDuration)
 		if waitDuration > c.omitReadTimeout {
 			cassOmitOldRead.Inc()
-			crr.out <- outcome{err: errReadTooOld}
+			crr.out <- readResult{err: errReadTooOld}
 			continue
 		}
 
 		pre := time.Now()
-		iter := outcome{
-			month:   crr.month,
-			sortKey: crr.sortKey,
-			i:       c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
-			err:     nil,
+		iter := readResult{
+			i:   c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
+			err: nil,
 		}
 		cassGetExecDuration.Value(time.Since(pre))
 		crr.out <- iter
@@ -457,22 +408,22 @@ func (c *CassandraStore) processReadQueue() {
 // Basic search of cassandra in the table for given ttl
 // start inclusive, end exclusive
 func (c *CassandraStore) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
-	table, err := c.getTable(ttl)
-	if err != nil {
-		return nil, err
+	table, ok := c.TTLTables[ttl]
+	if !ok {
+		return nil, errTableNotFound
 	}
 	return c.SearchTable(ctx, key, table, start, end)
 }
 
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
-func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table string, start, end uint32) ([]chunk.IterGen, error) {
+func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table Table, start, end uint32) ([]chunk.IterGen, error) {
 	_, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
 	defer span.Finish()
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "cassandra")
 
-	itgens := make([]chunk.IterGen, 0)
+	var itgens []chunk.IterGen
 	if start >= end {
 		tracing.Failure(span)
 		tracing.Error(span, errInvalidRange)
@@ -480,12 +431,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	}
 
 	pre := time.Now()
-
-	crrs := make([]*ChunkReadRequest, 0)
-
-	query := func(month, sortKey uint32, q string, p ...interface{}) {
-		crrs = append(crrs, &ChunkReadRequest{month, sortKey, q, p, pre, nil, ctx})
-	}
 
 	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
 	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to include the last point we might need (end-1)
@@ -498,117 +443,120 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	// since we make sure that you can only use chunkSpans so that Month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
 	// as the one that has start_month.
 
-	row_key := fmt.Sprintf("%s_%d", key, start_month/Month_sec)
+	// For example:
+	// Month_sec = 60 * 60 * 24 * 28 = 2419200 (28 days)
+	// Chunkspan = 60 * 60 * 24 * 7  = 604800  (7 days) this is much more than typical chunk size, but this allows us to be more compact in this example
+	// row chunk t0      st. end
+	// 0   0     2419200
+	//     1     3024000
+	//     2     3628800
+	//     3     4233600
+	// 1   4     4838400  /
+	//     5     5443200  \
+	//     6     6048000
+	//     7     6652800
+	// 2   8     7257600     /
+	//     9     7862400     \
+	//     ...   ...
 
-	query(start_month, start_month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key=? AND ts <= ? Limit 1", table), row_key, start)
+	// let's say query has start 5222000 and end 7555000
+	// so start is somewhere between 4-5, and end between 8-9
+	// start_month = 4838400 (row 1)
+	// end_month = 7257600 (row 2)
+	// how do we query for all the chunks we need and not many more? knowing that chunkspan is not known?
+	// for end, we can simply search for t0 < 7555000 in row 2, which gives us all chunks we need
+	// for start, the best we can do is search for t0 <= 5222000 in row 1
+	// note that this may include up to 4 weeks of unneeded data if start falls late within a month.  NOTE: we can set chunkspan "hints" via config
 
-	if start_month == end_month {
-		// we need a selection of the row between startTs and endTs
-		row_key = fmt.Sprintf("%s_%d", key, start_month/Month_sec)
-		query(start_month, start_month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts > ? AND ts < ? ORDER BY ts ASC", table), row_key, start, end)
-	} else {
-		// get row_keys for each row we need to query.
-		for month := start_month; month <= end_month; month += Month_sec {
-			row_key = fmt.Sprintf("%s_%d", key, month/Month_sec)
-			if month == start_month {
-				// we want from startTs to the end of the row.
-				query(month, month+1, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts >= ? ORDER BY ts ASC", table), row_key, start+1)
-			} else if month == end_month {
-				// we want from start of the row till the endTs.
-				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? AND ts <= ? ORDER BY ts ASC", table), row_key, end-1)
-			} else {
-				// we want all columns
-				query(month, month, fmt.Sprintf("SELECT ts, data FROM %s WHERE key = ? ORDER BY ts ASC", table), row_key)
-			}
-		}
+	results := make(chan readResult, 1)
+
+	startMonthNum := start_month / Month_sec
+	endMonthNum := end_month / Month_sec
+	rowKeys := make([]string, endMonthNum-startMonthNum+1)
+	i := 0
+	for num := startMonthNum; num <= endMonthNum; num += 1 {
+		rowKeys[i] = fmt.Sprintf("%s_%d", key, num)
+		i++
 	}
-	numQueries := len(crrs)
-	results := make(chan outcome, numQueries)
-	for i := range crrs {
-		crrs[i].out = results
-		select {
-		case <-ctx.Done():
-			// request has been canceled, so no need to continue queuing reads.
-			// reads already queued will be aborted when read from the queue.
-			return nil, nil
-		case c.readQueue <- crrs[i]:
-		default:
-			cassReadQueueFull.Inc()
-			tracing.Failure(span)
-			tracing.Error(span, errReadQueueFull)
-			return nil, errReadQueueFull
-		}
+	crr := ChunkReadRequest{
+		q:         table.QueryRead,
+		p:         []interface{}{rowKeys, end},
+		timestamp: pre,
+		out:       results,
+		ctx:       ctx,
 	}
-	outcomes := make([]outcome, 0, numQueries)
 
-	seen := 0
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			// request has been canceled, so no need to continue processing results
-			return nil, nil
-		case o := <-results:
-			if o.err != nil {
-				if o.err == errCtxCanceled {
-					// context was canceled, return immediately.
-					return nil, nil
-				}
-				tracing.Failure(span)
-				tracing.Error(span, o.err)
-				return nil, o.err
-			}
-			seen += 1
-			outcomes = append(outcomes, o)
-			if seen == numQueries {
-				close(results)
-				break LOOP
-			}
-		}
+	select {
+	case <-ctx.Done():
+		// request has been canceled, so no need to continue queuing reads.
+		// reads already queued will be aborted when read from the queue.
+		return nil, nil
+	case c.readQueue <- &crr:
+	default:
+		cassReadQueueFull.Inc()
+		tracing.Failure(span)
+		tracing.Error(span, errReadQueueFull)
+		return nil, errReadQueueFull
 	}
-	cassGetChunksDuration.Value(time.Since(pre))
-	pre = time.Now()
-	// we have all of the results, but they could have arrived in any order.
-	sort.Sort(asc(outcomes))
 
-	var b []byte
-	var ts int
-	for _, outcome := range outcomes {
-		chunks := int64(0)
-		for outcome.i.Scan(&ts, &b) {
-			chunks += 1
-			chunkSizeAtLoad.Value(len(b))
-			if len(b) < 2 {
-				tracing.Failure(span)
-				tracing.Error(span, errChunkTooSmall)
-				return itgens, errChunkTooSmall
-			}
-			itgen, err := chunk.NewGen(b, uint32(ts))
-			if err != nil {
-				tracing.Failure(span)
-				tracing.Error(span, err)
-				return itgens, err
-			}
-			itgens = append(itgens, *itgen)
-		}
-		err := outcome.i.Close()
-		if err != nil {
-			if err == context.Canceled || err == context.DeadlineExceeded {
-				// query was aborted.
+	var res readResult
+	select {
+	case <-ctx.Done():
+		// request has been canceled, so no need to continue processing results
+		return nil, nil
+	case res = <-results:
+		if res.err != nil {
+			if res.err == errCtxCanceled {
+				// context was canceled, return immediately.
 				return nil, nil
 			}
 			tracing.Failure(span)
-			tracing.Error(span, err)
-			errmetrics.Inc(err)
-			return nil, err
-		} else {
-			cassChunksPerRow.Value(int(chunks))
+			tracing.Error(span, res.err)
+			return nil, res.err
 		}
+		close(results)
 	}
+
+	cassGetChunksDuration.Value(time.Since(pre))
+	pre = time.Now()
+
+	var b []byte
+	var ts int
+	for res.i.Scan(&ts, &b) {
+		chunkSizeAtLoad.Value(len(b))
+		if len(b) < 2 {
+			tracing.Failure(span)
+			tracing.Error(span, errChunkTooSmall)
+			return itgens, errChunkTooSmall
+		}
+		itgen, err := chunk.NewGen(b, uint32(ts))
+		if err != nil {
+			tracing.Failure(span)
+			tracing.Error(span, err)
+			return itgens, err
+		}
+		itgens = append(itgens, *itgen)
+	}
+
+	err := res.i.Close()
+	if err != nil {
+		if err == context.Canceled || err == context.DeadlineExceeded {
+			// query was aborted.
+			return nil, nil
+		}
+		tracing.Failure(span)
+		tracing.Error(span, err)
+		errmetrics.Inc(err)
+		return nil, err
+	}
+
+	sort.Sort(chunk.IterGensAsc(itgens))
+
 	cassToIterDuration.Value(time.Now().Sub(pre))
-	cassRowsPerResponse.Value(len(outcomes))
-	span.SetTag("outcomes", len(outcomes))
-	span.SetTag("itgens", len(itgens))
+	cassRowsPerResponse.Value(len(rowKeys))
+	cassChunksPerResponse.Value(len(itgens))
+	span.SetTag("rows", len(rowKeys))
+	span.SetTag("chunks", len(itgens))
 	return itgens, nil
 }
 
