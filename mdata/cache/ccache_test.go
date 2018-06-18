@@ -11,14 +11,16 @@ import (
 )
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values
-func getItgen(t *testing.T, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
+// it assumes the data has step=1, deriving the span as len(values)
+func getItgen(t testing.TB, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
 	if spanaware {
 		binary.Write(buf, binary.LittleEndian, uint8(chunk.FormatStandardGoTszWithSpan))
-		spanCode, ok := chunk.RevChunkSpans[uint32(len(values))]
+		span := uint32(len(values))
+		spanCode, ok := chunk.RevChunkSpans[span]
 		if !ok {
-			t.Fatalf("invalid chunk span provided (%d)", len(values))
+			t.Fatalf("invalid chunk span provided (%d)", span)
 		}
 		binary.Write(buf, binary.LittleEndian, spanCode)
 	} else {
@@ -66,7 +68,7 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
-	cc.CacheIfHot(metric, 0, itgen3)
+	cc.AddIfHot(metric, 0, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -99,7 +101,7 @@ func TestAddIfHotWithoutPrevTsOnColdMetric(t *testing.T) {
 
 	cc.Add(metric, 0, itgen1)
 
-	cc.CacheIfHot(metric, 0, itgen3)
+	cc.AddIfHot(metric, 0, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -126,7 +128,7 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 	cc.Add(metric, 0, itgen1)
 	cc.Add(metric, 1000, itgen2)
 
-	cc.CacheIfHot(metric, 1005, itgen3)
+	cc.AddIfHot(metric, 1005, itgen3)
 
 	mc := cc.metricCache[metric]
 
@@ -159,7 +161,7 @@ func TestAddIfHotWithPrevTsOnColdMetric(t *testing.T) {
 
 	cc.Add(metric, 0, itgen1)
 
-	cc.CacheIfHot(metric, 1005, itgen3)
+	cc.AddIfHot(metric, 1005, itgen3)
 
 	mc := cc.metricCache[metric]
 

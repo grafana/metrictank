@@ -3,6 +3,7 @@ package accnt
 import (
 	"sort"
 
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/worldping-api/pkg/log"
 	"gopkg.in/raintank/schema.v1"
 )
@@ -47,18 +48,23 @@ type FlatAccntMet struct {
 	chunks map[uint32]uint64
 }
 
-// event types to be used in FlatAccntEvent
-const evnt_hit_chnk uint8 = 4
-const evnt_add_chnk uint8 = 5
-const evnt_del_met uint8 = 6
-const evnt_get_total uint8 = 7
-const evnt_stop uint8 = 100
-const evnt_reset uint8 = 101
-
 type FlatAccntEvent struct {
-	t  uint8       // event type
-	pl interface{} // payload
+	eType eventType
+	pl    interface{} // payload
 }
+
+type eventType uint8
+
+const (
+	evnt_hit_chnk eventType = iota
+	evnt_hit_chnks
+	evnt_add_chnk
+	evnt_add_chnks
+	evnt_del_met
+	evnt_get_total
+	evnt_stop
+	evnt_reset
+)
 
 // payload to be sent with an add event
 type AddPayload struct {
@@ -67,10 +73,22 @@ type AddPayload struct {
 	size   uint64
 }
 
+// payload to be sent with an add event
+type AddsPayload struct {
+	metric schema.AMKey
+	chunks []chunk.IterGen
+}
+
 // payload to be sent with a hit event
 type HitPayload struct {
 	metric schema.AMKey
 	ts     uint32
+}
+
+// payload to be sent with a hits event
+type HitsPayload struct {
+	metric schema.AMKey
+	chunks []chunk.IterGen
 }
 
 // payload to be sent with del metric event
@@ -111,8 +129,18 @@ func (a *FlatAccnt) AddChunk(metric schema.AMKey, ts uint32, size uint64) {
 	a.act(evnt_add_chnk, &AddPayload{metric, ts, size})
 }
 
+func (a *FlatAccnt) AddChunks(metric schema.AMKey, chunks []chunk.IterGen) {
+	a.act(evnt_add_chnks, &AddsPayload{metric, chunks})
+}
+
 func (a *FlatAccnt) HitChunk(metric schema.AMKey, ts uint32) {
 	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
+}
+func (a *FlatAccnt) HitChunks(metric schema.AMKey, chunks []chunk.IterGen) {
+	if len(chunks) == 0 {
+		return
+	}
+	a.act(evnt_hit_chnks, &HitsPayload{metric, chunks})
 }
 
 func (a *FlatAccnt) Stop() {
@@ -123,10 +151,10 @@ func (a *FlatAccnt) Reset() {
 	a.act(evnt_reset, nil)
 }
 
-func (a *FlatAccnt) act(t uint8, payload interface{}) {
+func (a *FlatAccnt) act(eType eventType, payload interface{}) {
 	event := FlatAccntEvent{
-		t:  t,
-		pl: payload,
+		eType: eType,
+		pl:    payload,
 	}
 
 	select {
@@ -141,7 +169,7 @@ func (a *FlatAccnt) eventLoop() {
 	for {
 		select {
 		case event := <-a.eventQ:
-			switch event.t {
+			switch event.eType {
 			case evnt_add_chnk:
 				payload := event.pl.(*AddPayload)
 				a.add(payload.metric, payload.ts, payload.size)
@@ -152,6 +180,18 @@ func (a *FlatAccnt) eventLoop() {
 						Ts:     payload.ts,
 					},
 				)
+			case evnt_add_chnks:
+				payload := event.pl.(*AddsPayload)
+				a.addRange(payload.metric, payload.chunks)
+				cacheChunkAdd.Add(len(payload.chunks))
+				for _, chunk := range payload.chunks {
+					a.lru.touch(
+						EvictTarget{
+							Metric: payload.metric,
+							Ts:     chunk.Ts,
+						},
+					)
+				}
 			case evnt_hit_chnk:
 				payload := event.pl.(*HitPayload)
 				a.lru.touch(
@@ -160,6 +200,16 @@ func (a *FlatAccnt) eventLoop() {
 						Ts:     payload.ts,
 					},
 				)
+			case evnt_hit_chnks:
+				payload := event.pl.(*HitsPayload)
+				for _, chunk := range payload.chunks {
+					a.lru.touch(
+						EvictTarget{
+							Metric: payload.metric,
+							Ts:     chunk.Ts,
+						},
+					)
+				}
 			case evnt_del_met:
 				payload := event.pl.(*DelMetPayload)
 				a.delMet(payload.metric)
@@ -226,6 +276,35 @@ func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 	met.chunks[ts] = size
 	met.total = met.total + size
 	cacheSizeUsed.AddUint64(size)
+}
+
+func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
+	var met *FlatAccntMet
+	var ok bool
+
+	if met, ok = a.metrics[metric]; !ok {
+		met = &FlatAccntMet{
+			total:  0,
+			chunks: make(map[uint32]uint64),
+		}
+		a.metrics[metric] = met
+		cacheMetricAdd.Inc()
+	}
+
+	var sizeDiff uint64
+
+	for _, chunk := range chunks {
+		if _, ok = met.chunks[chunk.Ts]; ok {
+			// we already have that chunk
+			continue
+		}
+		size := chunk.Size()
+		sizeDiff += size
+		met.chunks[chunk.Ts] = size
+	}
+
+	met.total = met.total + sizeDiff
+	cacheSizeUsed.AddUint64(sizeDiff)
 }
 
 func (a *FlatAccnt) evict() {

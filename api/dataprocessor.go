@@ -561,20 +561,23 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 			default:
 			}
 
-			for _, itgen := range storeIterGens {
+			for i, itgen := range storeIterGens {
 				it, err := itgen.Get()
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
 					tracing.Failure(span)
 					tracing.Errorf(span, "itergen: error getting iter from store slice %+v", err)
+					if i > 0 {
+						// add all the iterators that are in good shape
+						s.Cache.AddRange(ctx.AMKey, prevts, storeIterGens[:i])
+					}
 					return iters, err
 				}
-				// it's important that the itgens get added in chronological order,
-				// currently we rely on store returning results in order
-				s.Cache.Add(ctx.AMKey, prevts, itgen)
-				prevts = itgen.Ts
 				iters = append(iters, *it)
 			}
+			// it's important that the itgens get added in chronological order,
+			// currently we rely on store returning results in order
+			s.Cache.AddRange(ctx.AMKey, prevts, storeIterGens)
 		}
 
 		// the End slice is in reverse order

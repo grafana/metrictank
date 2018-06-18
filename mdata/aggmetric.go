@@ -362,7 +362,7 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 		return
 	}
 	// push into cache
-	go a.cachePusher.CacheIfHot(
+	go a.cachePusher.AddIfHot(
 		a.Key,
 		0,
 		*chunk.NewBareIterGen(
