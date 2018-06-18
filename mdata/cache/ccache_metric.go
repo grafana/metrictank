@@ -154,7 +154,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	if _, ok := mc.chunks[ts]; !ok {
 
 		// if nextTs() can't figure out the end date it returns ts
-		next := mc.nextTsCore(itergen, ts, prev, 0)
+		next := mc.nextTsCore(itergen, prev, 0)
 		if next == ts {
 			next = 0
 		} else {
@@ -231,12 +231,7 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 		}
 	}
 
-	mc.addKey(ts)
-
-	return
-}
-
-func (mc *CCacheMetric) addKey(ts uint32) {
+	// assure key is added to mc.keys
 
 	// if no keys yet, just add it and it's sorted
 	if len(mc.keys) == 0 {
@@ -266,17 +261,17 @@ func (mc *CCacheMetric) generateKeys() {
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 	chunk := mc.chunks[ts]
-	return mc.nextTsCore(chunk.Itgen, chunk.Ts, chunk.Prev, chunk.Next)
+	return mc.nextTsCore(chunk.Itgen, chunk.Prev, chunk.Next)
 }
 
 // nextTsCore returns the ts of the next chunk, given a chunks key properties
 // (to the extent we know them). It guesses if necessary.
 // assumes we already have at least a read lock
-func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, ts, prev, next uint32) uint32 {
+func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, prev, next uint32) uint32 {
 	span := itgen.Span
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
-		return ts + span
+		return itgen.Ts + span
 	}
 
 	// if chunk has a next chunk, then that's the ts we need
@@ -285,10 +280,10 @@ func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, ts, prev, next uint32) u
 	}
 	// if chunk has no next chunk, but has a previous one, we assume the length of this one is same as the previous one
 	if prev != 0 {
-		return ts + (ts - prev)
+		return itgen.Ts + (itgen.Ts - prev)
 	}
 	// if a chunk has no next and no previous chunk we have to assume it's length is 0
-	return ts
+	return itgen.Ts
 }
 
 // lastTs returns the last Ts of this metric cache

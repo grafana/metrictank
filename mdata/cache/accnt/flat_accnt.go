@@ -137,6 +137,9 @@ func (a *FlatAccnt) HitChunk(metric schema.AMKey, ts uint32) {
 	a.act(evnt_hit_chnk, &HitPayload{metric, ts})
 }
 func (a *FlatAccnt) HitChunks(metric schema.AMKey, chunks []chunk.IterGen) {
+	if len(chunks) == 0 {
+		return
+	}
 	a.act(evnt_hit_chnks, &HitsPayload{metric, chunks})
 }
 
