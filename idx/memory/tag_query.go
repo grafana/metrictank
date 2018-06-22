@@ -1006,5 +1006,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive)
 
 	// abort query execution and wait for all workers to end
 	close(stopCh)
+
+	q.wg.Wait()
 	return result
 }
