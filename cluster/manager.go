@@ -231,7 +231,10 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 	if member.Name == c.nodeName {
 		member.local = true
 	}
-	c.members[node.Name] = member
+	existing, ok := c.members[node.Name]
+	if !ok || member.Updated.After(existing.Updated) {
+		c.members[node.Name] = member
+	}
 	c.clusterStats()
 }
 
@@ -270,8 +273,11 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	if member.Name == c.nodeName {
 		member.local = true
 	}
-	c.members[node.Name] = member
-	log.Infof("CLU manager: HTTPNode %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
+	existing, ok := c.members[node.Name]
+	if !ok || member.Updated.After(existing.Updated) {
+		c.members[node.Name] = member
+		log.Infof("CLU manager: HTTPNode %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
+	}
 	c.clusterStats()
 }
 
@@ -353,6 +359,7 @@ func (c *MemberlistManager) SetState(state NodeState) {
 	node := c.members[c.nodeName]
 	node.State = state
 	node.Updated = time.Now()
+	node.StateChange = time.Now()
 	c.members[c.nodeName] = node
 	c.Unlock()
 	nodeReady.Set(state == NodeReady)
