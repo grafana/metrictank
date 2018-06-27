@@ -253,15 +253,10 @@ func (c *NotifierKafka) flush() {
 			log.Fatal(4, "kafka-cluster failed to marshal persistMessage to json.")
 		}
 		messagesSize.Value(buf.Len())
-		key := c.bPool.Get()
-		key, err = partitioner.GetPartitionKey(&def, key)
-		if err != nil {
-			log.Fatal(4, "Unable to get partitionKey for metricDef with id %s. %s", def.Id, err)
-		}
 		kafkaMsg := &sarama.ProducerMessage{
-			Topic: topic,
-			Value: sarama.ByteEncoder(buf.Bytes()),
-			Key:   sarama.ByteEncoder(key),
+			Topic:     topic,
+			Value:     sarama.ByteEncoder(buf.Bytes()),
+			Partition: def.Partition,
 		}
 		payload = append(payload, kafkaMsg)
 	}
@@ -283,7 +278,6 @@ func (c *NotifierKafka) flush() {
 		messagesPublished.Add(len(payload))
 		// put our buffers back in the bufferPool
 		for _, msg := range payload {
-			c.bPool.Put([]byte(msg.Key.(sarama.ByteEncoder)))
 			c.bPool.Put([]byte(msg.Value.(sarama.ByteEncoder)))
 		}
 	}()
