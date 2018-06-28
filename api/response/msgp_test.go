@@ -19,9 +19,11 @@ func BenchmarkHttpRespMsgpEmptySeries(b *testing.B) {
 	var resp *Msgp
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgp(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpEmptySeriesNeedsEscaping(b *testing.B) {
@@ -35,9 +37,11 @@ func BenchmarkHttpRespMsgpEmptySeriesNeedsEscaping(b *testing.B) {
 	var resp *Msgp
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgp(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpIntegers(b *testing.B) {
@@ -59,9 +63,11 @@ func BenchmarkHttpRespMsgpIntegers(b *testing.B) {
 	var resp *Msgp
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgp(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpFloats(b *testing.B) {
@@ -83,9 +89,11 @@ func BenchmarkHttpRespMsgpFloats(b *testing.B) {
 	var resp *Msgp
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgp(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpNulls(b *testing.B) {
@@ -107,7 +115,9 @@ func BenchmarkHttpRespMsgpNulls(b *testing.B) {
 	var resp *Msgp
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgp(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }

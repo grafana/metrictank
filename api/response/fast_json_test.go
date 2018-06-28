@@ -33,9 +33,11 @@ func BenchmarkHttpRespFastJsonEmptySeries(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespFastJsonEmptySeriesNeedsEscaping(b *testing.B) {
@@ -49,9 +51,11 @@ func BenchmarkHttpRespFastJsonEmptySeriesNeedsEscaping(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespFastJsonIntegers(b *testing.B) {
@@ -73,9 +77,11 @@ func BenchmarkHttpRespFastJsonIntegers(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 func BenchmarkHttpRespFastJsonFloats(b *testing.B) {
 	points := make([]schema.Point, 1000, 1000)
@@ -96,9 +102,11 @@ func BenchmarkHttpRespFastJsonFloats(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 func BenchmarkHttpRespFastJsonNulls(b *testing.B) {
 	points := make([]schema.Point, 1000, 1000)
@@ -119,9 +127,11 @@ func BenchmarkHttpRespFastJsonNulls(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespFastJson1MMetricNames(b *testing.B) {
@@ -133,9 +143,11 @@ func BenchmarkHttpRespFastJson1MMetricNames(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.MetricNames(series))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespFastJson1MMetricNamesNeedEscaping(b *testing.B) {
@@ -147,7 +159,9 @@ func BenchmarkHttpRespFastJson1MMetricNamesNeedEscaping(b *testing.B) {
 	var resp *FastJson
 	for n := 0; n < b.N; n++ {
 		resp = NewFastJson(200, models.MetricNames(series))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
