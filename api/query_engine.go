@@ -143,7 +143,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 		reqRenderChosenArchive.Value(req.Archive)
 	}
 
-	pointsReturn := uint32(len(reqs)) * tsRange / interval
+	pointsReturn := uint32(len(reqs)) * (tsRange / interval)
 	reqRenderPointsFetched.ValueUint32(pointsFetch)
 	reqRenderPointsReturned.ValueUint32(pointsReturn)
 
