@@ -7,16 +7,30 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/tinylib/msgp/msgp"
 )
 
 var NotFoundErr = errors.New("not found")
+
+var (
+
+	// metric api.cluster.speculative.requests is how many peer queries resulted in speculation
+	speculativeAttempts = stats.NewCounter32("api.cluster.speculative.attempts")
+
+	// metric api.cluster.speculative.requests is how many peer queries were improved due to speculation
+	speculativeWins = stats.NewCounter32("api.cluster.speculative.wins")
+
+	// metric api.cluster.speculative.requests is how many speculative http requests made to peers
+	speculativeRequests = stats.NewCounter32("api.cluster.speculative.requests")
+)
 
 func (s *Server) explainPriority(ctx *middleware.Context) {
 	var data []interface{}
@@ -283,6 +297,110 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 			return nil, err
 		}
 		result[resp.data.peer.GetName()] = resp.data
+	}
+
+	return result, nil
+}
+
+// peerQuerySpeculative takes a request and the path to request it on, then fans it out
+// across the cluster, except to the local peer. If any peer fails requests to
+// other peers are aborted. If 95% of peers have been heard from, and we are missing
+// the others, try to speculatively query ANOTHER member of the shard group.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
+	peerGroups, err := cluster.MembersForSpeculativeQuery()
+	if err != nil {
+		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+		return nil, err
+	}
+	log.Debug("HTTP %s across %d instances", name, len(peerGroups)-1)
+
+	reqCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	originalPeers := make(map[string]struct{}, len(peerGroups))
+	pendingResponses := make(map[int32]struct{}, len(peerGroups))
+	receivedResponses := make(map[int32]struct{}, len(peerGroups))
+
+	responses := make(chan struct {
+		shardGroup int32
+		data       PeerResponse
+		err        error
+	}, 1)
+
+	askPeer := func(shardGroup int32, peer cluster.Node) {
+		log.Debug("HTTP Render querying %s%s", peer.GetName(), path)
+		buf, err := peer.Post(reqCtx, name, path, data)
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Not canceled, continue
+		}
+
+		if err != nil {
+			cancel()
+			log.Error(4, "HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
+		}
+		responses <- struct {
+			shardGroup int32
+			data       PeerResponse
+			err        error
+		}{shardGroup, PeerResponse{peer, buf}, err}
+	}
+
+	for group, peers := range peerGroups {
+		peer := peers[0]
+		originalPeers[peer.GetName()] = struct{}{}
+		pendingResponses[group] = struct{}{}
+		go askPeer(group, peer)
+	}
+
+	result := make(map[string]PeerResponse)
+
+	specCheckTicker := time.NewTicker(5 * time.Millisecond)
+
+	for len(pendingResponses) > 0 {
+		select {
+		case resp := <-responses:
+			if _, ok := receivedResponses[resp.shardGroup]; ok {
+				// already received this response (possibly speculatively)
+				continue
+			}
+
+			if resp.err != nil {
+				return nil, err
+			}
+
+			result[resp.data.peer.GetName()] = resp.data
+			receivedResponses[resp.shardGroup] = struct{}{}
+			delete(pendingResponses, resp.shardGroup)
+			delete(originalPeers, resp.data.peer.GetName())
+
+		case <-specCheckTicker.C:
+			// Check if it's time to speculate!
+			percentReceived := 1 - (float64(len(pendingResponses)) / float64(len(peerGroups)))
+			if percentReceived > speculationThreshold {
+				// kick off speculative queries to other members now
+				specCheckTicker.Stop()
+				speculativeAttempts.Inc()
+				for shardGroup := range pendingResponses {
+					eligiblePeers := peerGroups[shardGroup][1:]
+					for _, peer := range eligiblePeers {
+						speculativeRequests.Inc()
+						go askPeer(shardGroup, peer)
+					}
+				}
+			}
+		}
+	}
+
+	if len(originalPeers) > 0 {
+		speculativeWins.Inc()
 	}
 
 	return result, nil
