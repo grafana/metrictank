@@ -864,22 +864,10 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 }
 
 func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filter string, from int64) (map[string]uint64, error) {
-	result, err := s.MetricIndex.TagDetails(orgId, tag, filter, from)
-	if err != nil {
-		return nil, err
-	}
-	if result == nil {
-		result = make(map[string]uint64)
-	}
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
+	result := make(map[string]uint64)
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterTagDetails", "/index/tag_details", false)
+	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +914,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 }
 
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64) ([]Series, error) {
-	result, err := s.MetricIndex.FindByTag(orgId, expressions, from)
+	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
+	resps, err := s.peerQuerySpeculative(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 	if err != nil {
 		return nil, err
 	}
@@ -939,27 +928,6 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 	}
 
 	var allSeries []Series
-
-	for _, series := range result {
-		allSeries = append(allSeries, Series{
-			Pattern: series.Path,
-			Node:    cluster.Manager.ThisNode(),
-			Series:  []idx.Node{series},
-		})
-	}
-
-	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterFindByTag", "/index/find_by_tag", false)
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
 
 	for _, r := range resps {
 		resp := models.IndexFindByTagResp{}
@@ -1003,24 +971,8 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 }
 
 func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, from int64) ([]string, error) {
-	result, err := s.MetricIndex.Tags(orgId, filter, from)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
-
-	tagSet := make(map[string]struct{}, len(result))
-	for _, tag := range result {
-		tagSet[tag] = struct{}{}
-	}
-
 	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
-	resps, err := s.peerQuery(ctx, data, "clusterTags", "/index/tags", false)
+	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
 	}
@@ -1032,6 +984,7 @@ func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, f
 	default:
 	}
 
+	tagSet := make(map[string]struct{})
 	resp := models.IndexTagsResp{}
 	for _, r := range resps {
 		_, err = resp.UnmarshalMsg(r.buf)
@@ -1066,18 +1019,10 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 }
 
 func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.FindTags(orgId, prefix, expressions, from, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	tagSet := make(map[string]struct{}, len(result))
-	for _, tag := range result {
-		tagSet[tag] = struct{}{}
-	}
+	tagSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags", false)
+	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
 	}
@@ -1121,18 +1066,10 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 }
 
 func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	result, err := s.MetricIndex.FindTagValues(orgId, tag, prefix, expressions, from, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	valSet := make(map[string]struct{}, len(result))
-	for _, val := range result {
-		valSet[val] = struct{}{}
-	}
+	valSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
-	responses, err := s.peerQuery(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values", false)
+	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err
 	}
