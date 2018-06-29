@@ -304,8 +304,9 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 
 // peerQuerySpeculative takes a request and the path to request it on, then fans it out
 // across the cluster, except to the local peer. If any peer fails requests to
-// other peers are aborted. If 95% of peers have been heard from, and we are missing
-// the others, try to speculatively query ANOTHER member of the shard group.
+// other peers are aborted. If enough peers have been heard from (based on
+// speculation-threshold configuration), and we are missing the others, try to
+// speculatively query other members of the shard group.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
