@@ -22,10 +22,10 @@ var NotFoundErr = errors.New("not found")
 
 var (
 
-	// metric api.cluster.speculative.requests is how many peer queries resulted in speculation
+	// metric api.cluster.speculative.attempts is how many peer queries resulted in speculation
 	speculativeAttempts = stats.NewCounter32("api.cluster.speculative.attempts")
 
-	// metric api.cluster.speculative.requests is how many peer queries were improved due to speculation
+	// metric api.cluster.speculative.wins is how many peer queries were improved due to speculation
 	speculativeWins = stats.NewCounter32("api.cluster.speculative.wins")
 
 	// metric api.cluster.speculative.requests is how many speculative http requests made to peers
