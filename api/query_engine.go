@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
@@ -24,7 +25,7 @@ var (
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
-// note: it is assumed that all requests have the same from & to.
+// note: it is assumed that all requests have the same maxDataPoints, from & to.
 // also takes a "now" value which we compare the TTL against
 func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint32, uint32, error) {
 	tsRange := to - from
@@ -143,7 +144,13 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 		reqRenderChosenArchive.Value(req.Archive)
 	}
 
-	pointsReturn := uint32(len(reqs)) * (tsRange / interval)
+	pointsPerSerie := tsRange / interval
+	if reqs[0].MaxPoints > 0 && pointsPerSerie > reqs[0].MaxPoints {
+		aggNum := consolidation.AggEvery(pointsPerSerie, reqs[0].MaxPoints)
+		pointsPerSerie = pointsPerSerie / aggNum
+	}
+
+	pointsReturn := uint32(len(reqs)) * pointsPerSerie
 	reqRenderPointsFetched.ValueUint32(pointsFetch)
 	reqRenderPointsReturned.ValueUint32(pointsReturn)
 
