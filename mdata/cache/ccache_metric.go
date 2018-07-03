@@ -401,15 +401,23 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 	}
 
 	if !res.Complete && res.From > res.Until {
-		log.Debug("CCacheMetric Search: Found from > until (%d/%d), printing chunks\n", res.From, res.Until)
-		mc.debugMetric()
+		log.Warn("CCacheMetric Search: Found from > until (%d/%d), printing chunks\n", res.From, res.Until)
+		log.Warn("Bad res = %v", *res)
+		mc.debugMetric(from, until)
+		res.Complete = false
+		res.Start = res.Start[:0]
+		res.End = res.End[:0]
+		res.From = from
+		res.Until = until
 	}
 }
 
-func (mc *CCacheMetric) debugMetric() {
-	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
+func (mc *CCacheMetric) debugMetric(from, until uint32) {
+	log.Warn("CCacheMetric debugMetric: --- debugging metric between %d and %d ---\n", from, until)
 	for _, key := range mc.keys {
-		log.Debug("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+		if key >= from && key <= until {
+			log.Warn("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+		}
 	}
-	log.Debug("CCacheMetric debugMetric: ------------------------\n")
+	log.Warn("CCacheMetric debugMetric: ------------------------\n")
 }
