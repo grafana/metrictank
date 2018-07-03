@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"sort"
 	"time"
 )
 
@@ -84,6 +85,8 @@ func (c *MockClusterManager) GetPartitions() []int32 {
 }
 
 func (c *MockClusterManager) SetPartitions(partitions []int32) {
+	sort.Slice(partitions, func(i, j int) bool { return partitions[i] < partitions[j] })
+
 	c.partitions = partitions
 }
 

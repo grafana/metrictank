@@ -380,6 +380,7 @@ func (c *MemberlistManager) SetPrimary(p bool) {
 
 // set the partitions that this node is handling.
 func (c *MemberlistManager) SetPartitions(part []int32) {
+	sort.Slice(part, func(i, j int) bool { return part[i] < part[j] })
 	c.Lock()
 	node := c.members[c.nodeName]
 	node.Partitions = part
@@ -495,6 +496,7 @@ func (m *SingleNodeManager) Join(peers []string) (int, error) {
 
 // set the partitions that this node is handling.
 func (m *SingleNodeManager) SetPartitions(part []int32) {
+	sort.Slice(part, func(i, j int) bool { return part[i] < part[j] })
 	m.Lock()
 	defer m.Unlock()
 	m.node.Partitions = part
