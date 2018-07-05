@@ -40,6 +40,7 @@ divideSeriesLists(dividends, divisors) seriesList     |              | Stable
 exclude(seriesList, pattern) seriesList               |              | Stable
 grep(seriesList, pattern) seriesList                  |              | Stable
 groupByTags(seriesList, func, tagList) seriesList     |              | Stable
+isNonNull(seriesList) seriesList                      |              | Stable
 maxSeries(seriesList) series                          | max          | Stable
 minSeries(seriesList) series                          | min          | Stable
 multiplySeries(seriesList) series                     |              | Stable
