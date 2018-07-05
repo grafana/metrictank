@@ -55,64 +55,39 @@ type Series struct {
 }
 
 func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
-	peers, err := cluster.MembersForQuery()
+	data := models.IndexFind{
+		Patterns: patterns,
+		OrgId:    orgId,
+		From:     seenAfter,
+	}
+
+	resps, err := s.peerQuerySpeculative(ctx, data, "findSeriesRemote", "/index/find")
 	if err != nil {
-		log.Error(3, "HTTP findSeries unable to get peers, %s", err)
 		return nil, err
 	}
-	log.Debug("HTTP findSeries for %v across %d instances", patterns, len(peers))
-	var wg sync.WaitGroup
-
-	responses := make(chan struct {
-		series []Series
-		err    error
-	}, 1)
-	findCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for _, peer := range peers {
-		log.Debug("HTTP findSeries getting results from %s", peer.GetName())
-		wg.Add(1)
-		if peer.IsLocal() {
-			go func() {
-				result, err := s.findSeriesLocal(findCtx, orgId, patterns, seenAfter)
-				if err != nil {
-					// cancel requests on all other peers.
-					cancel()
-				}
-				responses <- struct {
-					series []Series
-					err    error
-				}{result, err}
-				wg.Done()
-			}()
-		} else {
-			go func(peer cluster.Node) {
-				result, err := s.findSeriesRemote(findCtx, orgId, patterns, seenAfter, peer)
-				if err != nil {
-					// cancel requests on all other peers.
-					cancel()
-				}
-				responses <- struct {
-					series []Series
-					err    error
-				}{result, err}
-				wg.Done()
-			}(peer)
-		}
+	select {
+	case <-ctx.Done():
+		//request canceled
+		return nil, nil
+	default:
 	}
 
-	// wait for all findSeries goroutines to end, then close our responses channel
-	go func() {
-		wg.Wait()
-		close(responses)
-	}()
-
 	series := make([]Series, 0)
-	for resp := range responses {
-		if resp.err != nil {
+	resp := models.IndexFindResp{}
+	for _, r := range resps {
+		_, err = resp.UnmarshalMsg(r.buf)
+		if err != nil {
 			return nil, err
 		}
-		series = append(series, resp.series...)
+
+		for pattern, nodes := range resp.Nodes {
+			series = append(series, Series{
+				Pattern: pattern,
+				Node:    r.peer,
+				Series:  nodes,
+			})
+			log.Debug("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, r.peer.GetName())
+		}
 	}
 
 	return series, nil
