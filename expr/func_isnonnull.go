@@ -36,7 +36,7 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		transformed := models.Series{
 			Target:       fmt.Sprintf("isNonNull(%s)", serie.Target),
 			QueryPatt:    fmt.Sprintf("isNonNull(%s)", serie.QueryPatt),
-			Tags:         make(map[string]string),
+			Tags:         make(map[string]string, len(serie.Tags)+1),
 			Datapoints:   pointSlicePool.Get().([]schema.Point),
 			Interval:     serie.Interval,
 			Consolidator: serie.Consolidator,
