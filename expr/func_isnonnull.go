@@ -31,7 +31,7 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return nil, err
 	}
 
-	var out []models.Series
+	out := make([]models.Series, 0, len(series))
 	for _, serie := range series {
 		transformed := models.Series{
 			Target:       fmt.Sprintf("isNonNull(%s)", serie.Target),
@@ -42,7 +42,7 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			Consolidator: serie.Consolidator,
 			QueryCons:    serie.QueryCons,
 		}
-		serie.Tags["isNonNull"] = "1"
+		transformed.Tags["isNonNull"] = "1"
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = 0

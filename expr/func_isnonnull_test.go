@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -145,8 +144,7 @@ func testIsNonNull(name string, in []models.Series, out []models.Series, t *test
 			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
 		}
 		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
+			if (p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
 				continue
 			}
 			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
@@ -216,5 +214,4 @@ func benchmarkIsNonNull(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 		}
 		results = got
 	}
-	b.SetBytes(int64(numSeries * len(input[0].Datapoints) * 12))
 }
