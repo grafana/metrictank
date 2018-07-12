@@ -1203,7 +1203,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 }
 
 // showPlan attempts to create a Plan given a /render target query.
-// If the Plan creation is succesful it returns 200, JSON marshaling of Plan.
+// If the Plan creation is successful it returns 200, JSON marshaling of Plan.
 // Otherwise, it returns 400, error details.
 // This is needed to determine if a query cannot be resolved in localOnly mode.
 func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender) {
