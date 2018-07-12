@@ -1240,11 +1240,7 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 
     stable := request.Process == "stable"
     mdp := request.MaxDataPoints
-    if request.NoProxy {
-        // if this request is coming from graphite, we should not do runtime consolidation
-        // as graphite needs high-res data to perform its processing.
-        mdp = 0
-    }
+
     plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
     if err != nil {
         response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
