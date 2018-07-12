@@ -1,6 +1,9 @@
 package accnt
 
-import "gopkg.in/raintank/schema.v1"
+import (
+	"github.com/grafana/metrictank/mdata/chunk"
+	"gopkg.in/raintank/schema.v1"
+)
 
 // Accnt represents an instance of cache accounting.
 // Currently there is only one implementation called `FlatAccnt`,
@@ -9,7 +12,9 @@ import "gopkg.in/raintank/schema.v1"
 type Accnt interface {
 	GetEvictQ() chan *EvictTarget
 	AddChunk(metric schema.AMKey, ts uint32, size uint64)
+	AddChunks(metric schema.AMKey, chunks []chunk.IterGen)
 	HitChunk(metric schema.AMKey, ts uint32)
+	HitChunks(metric schema.AMKey, chunks []chunk.IterGen)
 	DelMetric(metric schema.AMKey)
 	Stop()
 	Reset()

@@ -68,23 +68,26 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}
-	tables := store.GetTableNames()
 
 	// create directory/link structure that we need to define the future table names
 	err = os.Mkdir(path.Join(tmpDir, storeConfig.Keyspace), 0700)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create directory: %s", err))
 	}
-	namedTableLinks := make([]string, len(tables))
-	for i, table := range tables {
-		namedTableLinks[i] = path.Join(tmpDir, storeConfig.Keyspace, table)
+	namedTableLinks := make([]string, len(store.TTLTables))
+	tableNames := make([]string, len(store.TTLTables))
+	i := 0
+	for _, table := range store.TTLTables {
+		tableNames[i] = table.Name
+		namedTableLinks[i] = path.Join(tmpDir, storeConfig.Keyspace, table.Name)
 		err := os.Symlink(snapshotDir, namedTableLinks[i])
 		if err != nil {
 			panic(fmt.Sprintf("Error when creating symlink: %s", err))
 		}
+		i++
 	}
 
-	fmt.Printf("The following tables have been created: %s\n", strings.Join(tables, ", "))
+	fmt.Printf("The following tables have been created: %s\n", strings.Join(tableNames, ", "))
 	fmt.Println("Now continue with the following steps on your cassandra node(s):")
 	fmt.Println("- Recreate (or copy) this directory structure on each cassandra node:")
 	fmt.Printf("  %s\n", tmpDir)

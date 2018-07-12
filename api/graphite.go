@@ -754,6 +754,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		return nil, err
 	}
 	span := opentracing.SpanFromContext(ctx)
+	span.SetTag("num_reqs", len(reqs))
 	span.SetTag("points_fetch", pointsFetch)
 	span.SetTag("points_return", pointsReturn)
 

@@ -126,7 +126,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	calledCb := make(chan bool)
 
 	mockCache := cache.MockCache{}
-	mockCache.CacheIfHotCb = func() { calledCb <- true }
+	mockCache.AddIfHotCb = func() { calledCb <- true }
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
