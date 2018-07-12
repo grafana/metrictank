@@ -1207,46 +1207,46 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 // Otherwise, it returns 400, error details.
 // This is needed to determine if a query cannot be resolved in localOnly mode.
 func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender) {
-    // note: the model is already validated to assure at least one of them has len >0
-    if len(request.Targets) == 0 {
-        request.Targets = request.TargetsRails
-    }
+	// note: the model is already validated to assure at least one of them has len >0
+	if len(request.Targets) == 0 {
+		request.Targets = request.TargetsRails
+	}
 
-    now := time.Now()
-    defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
-    defaultTo := uint32(now.Unix())
-    fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
-    if err != nil {
-        response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-        return
-    }
-    if fromUnix >= toUnix {
-        response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
-        return
-    }
+	now := time.Now()
+	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
+	defaultTo := uint32(now.Unix())
+	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	if fromUnix >= toUnix {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, InvalidTimeRangeErr.Error()))
+		return
+	}
 
-    // render API is modeled after graphite, so from exclusive, to inclusive.
-    // in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
-    // so we must adjust
-    fromUnix += 1
-    toUnix += 1
+	// render API is modeled after graphite, so from exclusive, to inclusive.
+	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
+	// so we must adjust
+	fromUnix += 1
+	toUnix += 1
 
-    exprs, err := expr.ParseMany(request.Targets)
-    if err != nil {
-        response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-        return
-    }
+	exprs, err := expr.ParseMany(request.Targets)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
 
-    reqRenderTargetCount.Value(len(request.Targets))
+	reqRenderTargetCount.Value(len(request.Targets))
 
-    stable := request.Process == "stable"
-    mdp := request.MaxDataPoints
+	stable := request.Process == "stable"
+	mdp := request.MaxDataPoints
 
-    plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
-    if err != nil {
-        response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-        return
-    }
-    response.Write(ctx, response.NewJson(200, plan, ""))
-    plan.Clean()
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	response.Write(ctx, response.NewJson(200, plan, ""))
+	plan.Clean()
 }
