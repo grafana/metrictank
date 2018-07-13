@@ -112,7 +112,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		}
 
 		// if the previous chunk is cached, link it
-		if (ts - prev) != (itergens[1].Ts - ts) {
+		if prev != 0 && (ts-prev) != (itergens[1].Ts-ts) {
 			log.Warn("CCacheMetric AddRange: Bad prev begin used: key = %s, prev = %d, itergens[0].Ts = %d, itergens[1].Ts = %d",
 				mc.MKey.String(), prev, itergens[0].Ts, itergens[1].Ts)
 			prev = 0
