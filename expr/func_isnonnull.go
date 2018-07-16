@@ -33,7 +33,7 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	out := make([]models.Series, len(series))
 	for i, serie := range series {
-		transformed := &(out[i])
+		transformed := &out[i]
 		transformed.Target = fmt.Sprintf("isNonNull(%s)", serie.Target)
 		transformed.QueryPatt = fmt.Sprintf("isNonNull(%s)", serie.QueryPatt)
 		transformed.Tags = make(map[string]string, len(serie.Tags)+1)
