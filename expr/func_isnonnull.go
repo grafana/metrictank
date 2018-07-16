@@ -31,17 +31,17 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return nil, err
 	}
 
-	out := make([]models.Series, 0, len(series))
-	for _, serie := range series {
-		transformed := models.Series{
-			Target:       fmt.Sprintf("isNonNull(%s)", serie.Target),
-			QueryPatt:    fmt.Sprintf("isNonNull(%s)", serie.QueryPatt),
-			Tags:         make(map[string]string, len(serie.Tags)+1),
-			Datapoints:   pointSlicePool.Get().([]schema.Point),
-			Interval:     serie.Interval,
-			Consolidator: serie.Consolidator,
-			QueryCons:    serie.QueryCons,
-		}
+	out := make([]models.Series, len(series))
+	for i, serie := range series {
+		transformed := &(out[i])
+		transformed.Target = fmt.Sprintf("isNonNull(%s)", serie.Target)
+		transformed.QueryPatt = fmt.Sprintf("isNonNull(%s)", serie.QueryPatt)
+		transformed.Tags = make(map[string]string, len(serie.Tags)+1)
+		transformed.Datapoints = pointSlicePool.Get().([]schema.Point)
+		transformed.Interval = serie.Interval
+		transformed.Consolidator = serie.Consolidator
+		transformed.QueryCons = serie.QueryCons
+
 		for k, v := range serie.Tags {
 			transformed.Tags[k] = v
 		}
@@ -54,8 +54,7 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			}
 			transformed.Datapoints = append(transformed.Datapoints, p)
 		}
-		out = append(out, transformed)
-		cache[Req{}] = append(cache[Req{}], transformed)
+		cache[Req{}] = append(cache[Req{}], *transformed)
 	}
 
 	return out, nil
