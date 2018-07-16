@@ -15,6 +15,16 @@ type Arg interface {
 	Optional() bool
 }
 
+// ArgIn is a special type that allows one of multiple arguments
+type ArgIn struct {
+	key  string
+	opt  bool
+	args []Arg
+}
+
+func (a ArgIn) Key() string    { return a.key }
+func (a ArgIn) Optional() bool { return a.opt }
+
 // ArgSeries is a single series argument
 // not generally used as input since graphite functions typically take multiple series as input
 // but is useful to describe output

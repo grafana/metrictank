@@ -12,19 +12,27 @@ import (
 )
 
 type FuncAsPercent struct {
-	in    GraphiteFunc
-	total GraphiteFunc
-	nodes []expr
+	in          GraphiteFunc
+	totalFloat  float64
+	totalSeries GraphiteFunc
+	nodes       []expr
 }
 
 func NewAsPercent() GraphiteFunc {
-	return &FuncAsPercent{}
+	return &FuncAsPercent{totalFloat: math.NaN()}
 }
 
 func (s *FuncAsPercent) Signature() ([]Arg, []Arg) {
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgSeriesList{val: &s.total, opt: true, key: "total"},
+		ArgIn{
+			key: "total",
+			opt: true,
+			args: []Arg{
+				ArgFloat{val: &s.totalFloat},
+				ArgSeriesList{val: &s.totalSeries},
+			},
+		},
 		ArgStringsOrInts{val: &s.nodes, opt: true, key: "nodes"},
 	}, []Arg{ArgSeriesList{}}
 }
@@ -50,12 +58,12 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		var totalSeries map[string]models.Series
 
 		// calculate the sum
-		if s.total == nil {
+		if s.totalFloat == math.NaN() && s.totalSeries == nil {
 			totalSeries = getTotalSeries(metaSeries)
 			//TODO check if serieslist
 			// calculate sum of totals series
-		} else if s.total != nil {
-			total, err := s.total.Exec(cache)
+		} else if s.totalSeries != nil {
+			total, err := s.totalSeries.Exec(cache)
 			if err != nil {
 				return nil, err
 			}
@@ -113,10 +121,10 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	var totalsSerie models.Series
-	if s.total == nil {
+	if math.IsNaN(s.totalFloat) && s.totalSeries == nil {
 		totalsSerie = sumSeries(series)
-	} else if s.total != nil {
-		total, err := s.total.Exec(cache)
+	} else if s.totalSeries != nil {
+		total, err := s.totalSeries.Exec(cache)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +153,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			return nil, errors.New("asPercent second argument must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 		}
 	} else {
-		// TODO Handle if total is number
+		totalsSerie.QueryPatt = fmt.Sprint(s.totalFloat)
 	}
 
 	for _, serie := range series {
@@ -153,17 +161,32 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.QueryPatt)
 		serie.Tags = map[string]string{"name": serie.Target}
 		for i := range serie.Datapoints {
-			if totalsSerie.Datapoints[i].Val == 0 {
-				serie.Datapoints[i].Val = math.NaN()
+			var total float64
+			if len(totalsSerie.Datapoints) > i {
+				total = totalsSerie.Datapoints[i].Val
 			} else {
-				serie.Datapoints[i].Val = serie.Datapoints[i].Val / totalsSerie.Datapoints[i].Val * 100
+				total = s.totalFloat
 			}
+			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, total)
 		}
 		outSeries = append(outSeries, serie)
 		cache[Req{}] = append(cache[Req{}], serie)
 	}
 
 	return outSeries, nil
+}
+
+func computeAsPercent(in, total float64) float64 {
+	if math.IsNaN(in) || math.IsNaN(total) {
+		return math.NaN()
+	}
+	if total == 0 {
+		if in == 0 {
+			return math.NaN()
+		}
+		return math.MaxFloat64
+	}
+	return 100 * in / total
 }
 
 func groupSeriesByKey(series []models.Series, nodes []expr, keys *[]string) map[string][]models.Series {
