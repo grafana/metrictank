@@ -88,7 +88,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		for _, a := range v.args {
 			expStr = append(expStr, fmt.Sprintf("%T", a))
 		}
-		return 0, ErrBadArgumentStr{strings.Join(expStr, ","), string(got.etype)}
+		return 0, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 	case ArgInt:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", got.etype.String()}
@@ -209,6 +209,25 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	var err error
 	var fn GraphiteFunc
 	switch v := exp.(type) {
+	case ArgIn:
+		if e.args[pos].etype == etName || e.args[pos].etype == etFunc {
+			for _, a := range v.args {
+				switch v := a.(type) {
+				case ArgSeries, ArgSeriesList, ArgSeriesLists:
+					p, reqs, err := e.consumeSeriesArg(pos, v, context, stable, reqs)
+					if err != nil {
+						return 0, nil, err
+					}
+					return p, reqs, err
+				}
+			}
+			expStr := []string{}
+			for _, a := range v.args {
+				expStr = append(expStr, fmt.Sprintf("%T", a))
+			}
+			return 0, nil, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
+		}
+
 	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
@@ -282,7 +301,7 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		for _, a := range v.args {
 			expStr = append(expStr, fmt.Sprintf("%T", a))
 		}
-		return ErrBadArgumentStr{strings.Join(expStr, ","), string(got.etype)}
+		return ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 	case ArgInt:
 		if got.etype != etInt {
 			return ErrBadKwarg{key, exp, got.etype}
