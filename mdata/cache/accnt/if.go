@@ -11,7 +11,7 @@ import (
 // in the future if they just implement this interface.
 type Accnt interface {
 	GetEvictQ() chan *EvictTarget
-	AddChunk(metric schema.AMKey, ts uint32, size uint64)
+	AddChunk(metric schema.AMKey, ts uint32, len, cap uint64)
 	AddChunks(metric schema.AMKey, chunks []chunk.IterGen)
 	HitChunk(metric schema.AMKey, ts uint32)
 	HitChunks(metric schema.AMKey, chunks []chunk.IterGen)

@@ -33,4 +33,5 @@ var (
 
 	cacheSizeMax  = stats.NewGauge64("cache.size.max")
 	cacheSizeUsed = stats.NewGauge64("cache.size.used")
+	cacheCapUsed  = stats.NewGauge64("cache.cap.used")
 )
