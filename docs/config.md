@@ -206,6 +206,8 @@ time-zone = local
 get-targets-concurrency = 20
 # default limit for tagdb query results, can be overridden with query parameter "limit"
 tagdb-default-limit = 100
+# ratio of peer responses after which speculation is used. Set to 1 to disable.
+speculation-threshold = 1
 ```
 
 ## metric data inputs ##
