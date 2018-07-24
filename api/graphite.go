@@ -1237,8 +1237,6 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 		return
 	}
 
-	reqRenderTargetCount.Value(len(request.Targets))
-
 	stable := request.Process == "stable"
 	mdp := request.MaxDataPoints
 
@@ -1247,6 +1245,11 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
-	response.Write(ctx, response.NewJson(200, plan, ""))
+	switch request.Format {
+	case "json":
+		response.Write(ctx, response.NewJson(200, plan, ""))
+	default:
+		response.Write(ctx, response.NewError(http.StatusBadRequest, "Unsupported response format requested: "+request.Format))
+	}
 	plan.Clean()
 }
