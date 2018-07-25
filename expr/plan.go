@@ -199,7 +199,7 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	// that are series
 	pos = 0
 	for _, argExp = range argsExp {
-		if pos >= cutoff && pos >= len(e.args) {
+		if pos >= len(e.args) {
 			break // no more args specified. we're done.
 		}
 		switch argExp.(type) {

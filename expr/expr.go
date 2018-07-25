@@ -290,8 +290,9 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	switch v := exp.(type) {
 	case ArgIn:
 		for _, a := range v.args {
-			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn, not for every individual sub-arg
-			// so to make sure we pass the key matching requirement, we just call consumeKwarg with whatever the key is set to (typically "")
+			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn,
+			// not for every individual sub-arg so to make sure we pass the key matching requirement,
+			// we just call consumeKwarg with whatever the key is set to (typically "")
 			err := e.consumeKwarg(a.Key(), []Arg{a})
 			if err == nil {
 				return err

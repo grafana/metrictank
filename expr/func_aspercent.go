@@ -60,8 +60,8 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if s.nodes != nil {
-		// List of keys
-		var keys []string
+		// List of keys (implemented as map for speed improvement)
+		keys := make(map[string]struct{})
 		// Series grouped by key
 		metaSeries := groupSeriesByKey(series, s.nodes, &keys)
 		// The totals series for each key
@@ -78,8 +78,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			return nil, errors.New("total must be None or a seriesList")
 		}
 
-		for _, key := range keys {
-			fmt.Printf("Key: %v", key)
+		for key, _ := range keys {
 			// No series for total series
 			if _, ok := metaSeries[key]; !ok {
 				serie2 := totalSeries[key]
@@ -131,8 +130,12 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if len(totals) == 1 {
 			totalsSerie = totals[0]
 		} else if len(totals) == len(series) {
-			sort.Sort(sortByTarget(series))
-			sort.Sort(sortByTarget(totals))
+			sort.Slice(series, func(i, j int) bool {
+				return series[i].Target < series[j].Target
+			})
+			sort.Slice(totals, func(i, j int) bool {
+				return totals[i].Target < totals[j].Target
+			})
 			for i, serie1 := range series {
 				serie2 := totals[i]
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
@@ -182,19 +185,13 @@ func computeAsPercent(in, total float64) float64 {
 	return in / total * 100
 }
 
-func groupSeriesByKey(series []models.Series, nodes []expr, keys *[]string) map[string][]models.Series {
+func groupSeriesByKey(series []models.Series, nodes []expr, keys *map[string]struct{}) map[string][]models.Series {
 	keyedSeries := make(map[string][]models.Series)
-Loop:
 	for _, serie := range series {
 		key := aggKey(serie, nodes)
 		if _, ok := keyedSeries[key]; !ok {
 			keyedSeries[key] = []models.Series{serie}
-			for _, k := range *keys {
-				if k == key {
-					continue Loop
-				}
-			}
-			*keys = append(*keys, key)
+			(*keys)[key] = struct{}{}
 		} else {
 			keyedSeries[key] = append(keyedSeries[key], serie)
 		}
@@ -213,73 +210,32 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]mode
 
 // Sums seriesList
 func sumSeries(series []models.Series) models.Series {
-	var summedSerie models.Series
 	if len(series) == 1 {
-		summedSerie = series[0]
-	} else {
-		out := pointSlicePool.Get().([]schema.Point)
-		crossSeriesSum(series, &out)
-		var queryPatts []string
-
-	Loop:
-		for _, v := range series {
-			// avoid duplicates
-			for _, qp := range queryPatts {
-				if qp == v.QueryPatt {
-					continue Loop
-				}
-			}
-			queryPatts = append(queryPatts, v.QueryPatt)
-		}
-		name := fmt.Sprintf("sumSeries(%s)", strings.Join(queryPatts, ","))
-		cons, queryCons := summarizeCons(series)
-		summedSerie = models.Series{
-			Target:       name,
-			QueryPatt:    name,
-			Datapoints:   out,
-			Interval:     series[0].Interval,
-			Consolidator: cons,
-			QueryCons:    queryCons,
-			Tags:         map[string]string{"name": name},
-		}
+		return series[0]
 	}
-	return summedSerie
-}
+	out := pointSlicePool.Get().([]schema.Point)
+	crossSeriesSum(series, &out)
+	var queryPatts []string
 
-func aggKey(serie models.Series, nodes []expr) string {
-	metric := extractMetric(serie.Target)
-	if len(metric) == 0 {
-		metric = serie.Tags["name"]
-	}
-	// Trim off tags (if they are there) and split on '.'
-	parts := strings.Split(strings.SplitN(metric, ";", 2)[0], ".")
-	var name []string
-	for _, n := range nodes {
-		if n.etype == etInt {
-			idx := int(n.int)
-			if idx < 0 {
-				idx += len(parts)
+Loop:
+	for _, v := range series {
+		// avoid duplicates
+		for _, qp := range queryPatts {
+			if qp == v.QueryPatt {
+				continue Loop
 			}
-			if idx >= len(parts) || idx < 0 {
-				continue
-			}
-			name = append(name, parts[idx])
-		} else if n.etype == etString {
-			s := n.str
-			name = append(name, serie.Tags[s])
 		}
+		queryPatts = append(queryPatts, v.QueryPatt)
 	}
-	return strings.Join(name, ".")
-}
-
-type sortByTarget []models.Series
-
-func (s sortByTarget) Len() int {
-	return len(s)
-}
-func (s sortByTarget) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-func (s sortByTarget) Less(i, j int) bool {
-	return s[i].Target < s[j].Target
+	name := fmt.Sprintf("sumSeries(%s)", strings.Join(queryPatts, ","))
+	cons, queryCons := summarizeCons(series)
+	return models.Series{
+		Target:       name,
+		QueryPatt:    name,
+		Datapoints:   out,
+		Interval:     series[0].Interval,
+		Consolidator: cons,
+		QueryCons:    queryCons,
+		Tags:         map[string]string{"name": name},
+	}
 }

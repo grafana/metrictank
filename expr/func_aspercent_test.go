@@ -25,16 +25,16 @@ func TestAsPercentSingleNoArg(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "a;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "a;tag=something;tag2=anything",
 				Datapoints: getCopy(a),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
-				Target:     "asPercent(a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=anything)))",
+				Target:     "asPercent(a;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=anything)))",
 				Datapoints: out,
 			},
 		},
@@ -68,28 +68,28 @@ func TestAsPercentMultipleNoArg(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "a;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "a;tag=something;tag2=anything",
 				Datapoints: getCopy(a),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "b;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "b;tag=something;tag2=anything",
 				Datapoints: getCopy(b),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
-				Target:     "asPercent(a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=anything)))",
+				Target:     "asPercent(a;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=anything)))",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
-				Target:     "asPercent(b;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=anything)))",
+				Target:     "asPercent(b;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=anything)))",
 				Datapoints: out2,
 			},
 		},
@@ -116,16 +116,16 @@ func TestAsPercentTotalFloat(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(a;tag='something';tag2='anything')",
-				Target:     "a;tag='something';tag2='anything'",
+				QueryPatt:  "func(a;tag=something;tag2=anything)",
+				Target:     "a;tag=something;tag2=anything",
 				Datapoints: getCopy(a),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(a;tag='something';tag2='anything'),123.456)",
-				Target:     "asPercent(a;tag='something';tag2='anything',123.456)",
+				QueryPatt:  "asPercent(func(a;tag=something;tag2=anything),123.456)",
+				Target:     "asPercent(a;tag=something;tag2=anything,123.456)",
 				Datapoints: out,
 			},
 		},
@@ -159,28 +159,28 @@ func TestAsPercentTotalSerie(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "b;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "b;tag=something;tag2=anything",
 				Datapoints: getCopy(b),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "d;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "d;tag=something;tag2=anything",
 				Datapoints: getCopy(d),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='some';tag2='totalSerie'))",
-				Target:     "asPercent(b;tag='something';tag2='anything',func(tag='some';tag2='totalSerie'))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(b;tag=something;tag2=anything,func(tag=some;tag2=totalSerie))",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='some';tag2='totalSerie'))",
-				Target:     "asPercent(d;tag='something';tag2='anything',func(tag='some';tag2='totalSerie'))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(d;tag=something;tag2=anything,func(tag=some;tag2=totalSerie))",
 				Datapoints: out2,
 			},
 		},
@@ -189,8 +189,8 @@ func TestAsPercentTotalSerie(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='some';tag2='totalSerie')",
-				Target:     "a;tag='some';tag2='totalSerie'",
+				QueryPatt:  "func(tag=some;tag2=totalSerie)",
+				Target:     "a;tag=some;tag2=totalSerie",
 				Datapoints: getCopy(a),
 			},
 		},
@@ -221,28 +221,28 @@ func TestAsPercentTotalSeries(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "b;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "b;tag=something;tag2=anything",
 				Datapoints: getCopy(b),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "d;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "d;tag=something;tag2=anything",
 				Datapoints: getCopy(d),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='some';tag2='totalSerie'))",
-				Target:     "asPercent(b;tag='something';tag2='anything',b;tag='some';tag2='totalSerie')",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(b;tag=something;tag2=anything,b;tag=some;tag2=totalSerie)",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='some';tag2='totalSerie'))",
-				Target:     "asPercent(d;tag='something';tag2='anything',c;tag='some';tag2='totalSerie')",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(d;tag=something;tag2=anything,c;tag=some;tag2=totalSerie)",
 				Datapoints: out2,
 			},
 		},
@@ -251,14 +251,14 @@ func TestAsPercentTotalSeries(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='some';tag2='totalSerie')",
-				Target:     "c;tag='some';tag2='totalSerie'",
+				QueryPatt:  "func(tag=some;tag2=totalSerie)",
+				Target:     "c;tag=some;tag2=totalSerie",
 				Datapoints: getCopy(c),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='some';tag2='totalSerie')",
-				Target:     "b;tag='some';tag2='totalSerie'",
+				QueryPatt:  "func(tag=some;tag2=totalSerie)",
+				Target:     "b;tag=some;tag2=totalSerie",
 				Datapoints: getCopy(a),
 			},
 		},
@@ -297,40 +297,40 @@ func TestAsPercentNoArgNodes(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.that.a;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.that.a;tag=something;tag2=anything",
 				Datapoints: getCopy(a),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.that.b;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.that.b;tag=something;tag2=anything",
 				Datapoints: getCopy(b),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.this.c;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.this.c;tag=something;tag2=anything",
 				Datapoints: getCopy(c),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
-				Target:     "asPercent(this.that.a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=anything)))",
+				Target:     "asPercent(this.that.a;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=anything)))",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
-				Target:     "asPercent(this.that.b;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=anything)))",
+				Target:     "asPercent(this.that.b;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=anything)))",
 				Datapoints: out2,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='something';tag2='anything'))",
-				Target:     "asPercent(this.this.c;tag='something';tag2='anything',this.this.c;tag='something';tag2='anything')",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=something;tag2=anything))",
+				Target:     "asPercent(this.this.c;tag=something;tag2=anything,this.this.c;tag=something;tag2=anything)",
 				Datapoints: out3,
 			},
 		},
@@ -338,6 +338,81 @@ func TestAsPercentNoArgNodes(t *testing.T) {
 		math.NaN(),
 		nil,
 		[]expr{expr{etype: etFloat, float: 0}, expr{etype: etInt, int: 1}},
+		"None",
+	)
+}
+
+func TestAsPercentNoArgTagNodes(t *testing.T) {
+	out1 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 0, Ts: 20},
+		{Val: 5.5 / (math.MaxFloat64 - 14.5) * 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 50},
+		{Val: 100, Ts: 60},
+	}
+	out2 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 100, Ts: 20},
+		{Val: (math.MaxFloat64 - 20) / (math.MaxFloat64 - 14.5) * 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: 100, Ts: 50},
+		{Val: math.NaN(), Ts: 60},
+	}
+	out3 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: math.NaN(), Ts: 20},
+		{Val: 100, Ts: 30},
+		{Val: 100, Ts: 40},
+		{Val: 100, Ts: 50},
+		{Val: 100, Ts: 60},
+	}
+	testAsPercent(
+		"multi-seriebynode",
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag=something1;tag2=anything)",
+				Target:     "this.that.a;tag=something1;tag2=anything",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag=something1;tag2=anything)",
+				Target:     "this.those.b;tag=something1;tag2=anything",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag=something2;tag2=anything)",
+				Target:     "this.this.c;tag=something2;tag2=anything",
+				Datapoints: getCopy(c),
+			},
+		},
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag=something1;tag2=anything),sumSeries(func(tag=something1;tag2=anything)))",
+				Target:     "asPercent(this.that.a;tag=something1;tag2=anything,sumSeries(func(tag=something1;tag2=anything)))",
+				Datapoints: out1,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag=something1;tag2=anything),sumSeries(func(tag=something1;tag2=anything)))",
+				Target:     "asPercent(this.those.b;tag=something1;tag2=anything,sumSeries(func(tag=something1;tag2=anything)))",
+				Datapoints: out2,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag=something2;tag2=anything),func(tag=something2;tag2=anything))",
+				Target:     "asPercent(this.this.c;tag=something2;tag2=anything,this.this.c;tag=something2;tag2=anything)",
+				Datapoints: out3,
+			},
+		},
+		t,
+		math.NaN(),
+		nil,
+		[]expr{expr{etype: etString, str: "tag"}},
 		"None",
 	)
 }
@@ -372,46 +447,46 @@ func TestAsPercentSeriesByNodes(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.that.a;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.that.a;tag=something;tag2=anything",
 				Datapoints: getCopy(a),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.that.b;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.that.b;tag=something;tag2=anything",
 				Datapoints: getCopy(b),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='anything')",
-				Target:     "this.this.c;tag='something';tag2='anything'",
+				QueryPatt:  "func(tag=something;tag2=anything)",
+				Target:     "this.this.c;tag=something;tag2=anything",
 				Datapoints: getCopy(c),
 			},
 		},
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='totalSerie')))",
-				Target:     "asPercent(this.that.a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='totalSerie')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=totalSerie)))",
+				Target:     "asPercent(this.that.a;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=totalSerie)))",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='totalSerie')))",
-				Target:     "asPercent(this.that.b;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='totalSerie')))",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),sumSeries(func(tag=something;tag2=totalSerie)))",
+				Target:     "asPercent(this.that.b;tag=something;tag2=anything,sumSeries(func(tag=something;tag2=totalSerie)))",
 				Datapoints: out2,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),MISSING)",
-				Target:     "asPercent(this.this.c;tag='something';tag2='anything',MISSING)",
+				QueryPatt:  "asPercent(func(tag=something;tag2=anything),MISSING)",
+				Target:     "asPercent(this.this.c;tag=something;tag2=anything,MISSING)",
 				Datapoints: allNaN,
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "asPercent(MISSING,func(tag='something';tag2='totalSerie'))",
-				Target:     "asPercent(MISSING,this.those.ab;tag='something';tag2='totalSerie')",
+				QueryPatt:  "asPercent(MISSING,func(tag=something;tag2=totalSerie))",
+				Target:     "asPercent(MISSING,this.those.ab;tag=something;tag2=totalSerie)",
 				Datapoints: allNaN,
 			},
 		},
@@ -420,20 +495,20 @@ func TestAsPercentSeriesByNodes(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='totalSerie')",
-				Target:     "this.those.ab;tag='something';tag2='totalSerie'",
+				QueryPatt:  "func(tag=something;tag2=totalSerie)",
+				Target:     "this.those.ab;tag=something;tag2=totalSerie",
 				Datapoints: getCopy(sumab),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='totalSerie')",
-				Target:     "this.that.abc;tag='something';tag2='totalSerie'",
+				QueryPatt:  "func(tag=something;tag2=totalSerie)",
+				Target:     "this.that.abc;tag=something;tag2=totalSerie",
 				Datapoints: getCopy(sumabc),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "func(tag='something';tag2='totalSerie')",
-				Target:     "this.that.cd;tag='something';tag2='totalSerie'",
+				QueryPatt:  "func(tag=something;tag2=totalSerie)",
+				Target:     "this.that.cd;tag=something;tag2=totalSerie",
 				Datapoints: getCopy(sumcd),
 			},
 		},
