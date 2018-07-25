@@ -2,7 +2,9 @@ package cluster
 
 import (
 	"errors"
+	"math/rand"
 	"net/http"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -154,4 +156,51 @@ LOOP:
 	}
 
 	return answer, nil
+}
+
+// MembersForSpeculativeQuery returns a prioritized list of nodes for each shard group
+// TODO - this assumes that the partition set for each node is perfectly aligned
+func MembersForSpeculativeQuery() (map[int32][]Node, error) {
+	thisNode := Manager.ThisNode()
+	allNodes := Manager.MemberList()
+	membersMap := make(map[int32][]Node)
+
+	// If we are running in single mode, just return thisNode
+	if Mode == ModeSingle {
+		membersMap[0] = []Node{thisNode}
+		return membersMap, nil
+	}
+
+	peerPartitions := 0
+
+	// store the available nodes for each partition group
+	for _, member := range allNodes {
+		if !member.IsReady() {
+			continue
+		}
+		memberStartPartition := member.GetPartitions()[0]
+
+		if _, ok := membersMap[memberStartPartition]; !ok {
+			peerPartitions += len(member.GetPartitions())
+		}
+
+		membersMap[memberStartPartition] = append(membersMap[memberStartPartition], member)
+	}
+
+	if peerPartitions < minAvailableShards {
+		return nil, InsufficientShardsAvailable
+	}
+
+	for _, shard := range membersMap {
+		// Shuffle to avoid always choosing the same peer firsts
+		for i := len(shard) - 1; i > 0; i-- {
+			j := rand.Intn(i + 1)
+			shard[i], shard[j] = shard[j], shard[i]
+		}
+		sort.Slice(shard, func(i, j int) bool {
+			return shard[i].GetPriority() < shard[j].GetPriority()
+		})
+	}
+
+	return membersMap, nil
 }
