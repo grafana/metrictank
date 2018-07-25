@@ -60,7 +60,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if s.nodes != nil {
-		// List of keys (implemented as map for speed improvement)
+		// Set of keys
 		keys := make(map[string]struct{})
 		// Series grouped by key
 		metaSeries := groupSeriesByKey(series, s.nodes, &keys)
