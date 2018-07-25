@@ -217,7 +217,7 @@ func TestAsPercentTotalSeries(t *testing.T) {
 		{Val: float64(250) / 4 * 100, Ts: 60},
 	}
 	testAsPercent(
-		"multi-serietotal",
+		"multi-seriestotal",
 		[]models.Series{
 			{
 				Interval:   10,
@@ -263,7 +263,182 @@ func TestAsPercentTotalSeries(t *testing.T) {
 			},
 		},
 		nil,
-		"serie",
+		"series",
+	)
+}
+
+func TestAsPercentNoArgNodes(t *testing.T) {
+	out1 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 0, Ts: 20},
+		{Val: 5.5 / (math.MaxFloat64 - 14.5) * 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 50},
+		{Val: 100, Ts: 60},
+	}
+	out2 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 100, Ts: 20},
+		{Val: (math.MaxFloat64 - 20) / (math.MaxFloat64 - 14.5) * 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: 100, Ts: 50},
+		{Val: math.NaN(), Ts: 60},
+	}
+	out3 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: math.NaN(), Ts: 20},
+		{Val: 100, Ts: 30},
+		{Val: 100, Ts: 40},
+		{Val: 100, Ts: 50},
+		{Val: 100, Ts: 60},
+	}
+	testAsPercent(
+		"multi-seriebynode",
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.that.a;tag='something';tag2='anything'",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.that.b;tag='something';tag2='anything'",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.this.c;tag='something';tag2='anything'",
+				Datapoints: getCopy(c),
+			},
+		},
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
+				Target:     "asPercent(this.that.a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				Datapoints: out1,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='anything')))",
+				Target:     "asPercent(this.that.b;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='anything')))",
+				Datapoints: out2,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),func(tag='something';tag2='anything'))",
+				Target:     "asPercent(this.this.c;tag='something';tag2='anything',this.this.c;tag='something';tag2='anything')",
+				Datapoints: out3,
+			},
+		},
+		t,
+		math.NaN(),
+		nil,
+		[]expr{expr{etype: etFloat, float: 0}, expr{etype: etInt, int: 1}},
+		"None",
+	)
+}
+
+func TestAsPercentSeriesByNodes(t *testing.T) {
+	out1 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 0, Ts: 20},
+		{Val: 5.5 / (math.MaxFloat64) * 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 50},
+		{Val: 1234567890.0 / 1234568148 * 100, Ts: 60},
+	}
+	out2 := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: 100, Ts: 20},
+		{Val: 100, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: 1234567890.0 / 1234567976 * 100, Ts: 50},
+		{Val: math.NaN(), Ts: 60},
+	}
+	allNaN := []schema.Point{
+		{Val: math.NaN(), Ts: 10},
+		{Val: math.NaN(), Ts: 20},
+		{Val: math.NaN(), Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 50},
+		{Val: math.NaN(), Ts: 60},
+	}
+	testAsPercent(
+		"multi-seriebynodeandseries",
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.that.a;tag='something';tag2='anything'",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.that.b;tag='something';tag2='anything'",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='anything')",
+				Target:     "this.this.c;tag='something';tag2='anything'",
+				Datapoints: getCopy(c),
+			},
+		},
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='totalSerie')))",
+				Target:     "asPercent(this.that.a;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='totalSerie')))",
+				Datapoints: out1,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),sumSeries(func(tag='something';tag2='totalSerie')))",
+				Target:     "asPercent(this.that.b;tag='something';tag2='anything',sumSeries(func(tag='something';tag2='totalSerie')))",
+				Datapoints: out2,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(func(tag='something';tag2='anything'),MISSING)",
+				Target:     "asPercent(this.this.c;tag='something';tag2='anything',MISSING)",
+				Datapoints: allNaN,
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "asPercent(MISSING,func(tag='something';tag2='totalSerie'))",
+				Target:     "asPercent(MISSING,this.those.ab;tag='something';tag2='totalSerie')",
+				Datapoints: allNaN,
+			},
+		},
+		t,
+		math.NaN(),
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='totalSerie')",
+				Target:     "this.those.ab;tag='something';tag2='totalSerie'",
+				Datapoints: getCopy(sumab),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='totalSerie')",
+				Target:     "this.that.abc;tag='something';tag2='totalSerie'",
+				Datapoints: getCopy(sumabc),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "func(tag='something';tag2='totalSerie')",
+				Target:     "this.that.cd;tag='something';tag2='totalSerie'",
+				Datapoints: getCopy(sumcd),
+			},
+		},
+		[]expr{expr{etype: etFloat, float: 0}, expr{etype: etInt, int: 1}},
+		"series",
 	)
 }
 
