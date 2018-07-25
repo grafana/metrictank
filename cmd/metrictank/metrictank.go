@@ -305,7 +305,7 @@ func main() {
 	}
 
 	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
-		log.Warn("It is not recommended to run a mulitnode cluster with more than 1 input plugin.")
+		log.Warn("It is not recommended to run a multi-node cluster with more than 1 input plugin.")
 	}
 
 	/***********************************

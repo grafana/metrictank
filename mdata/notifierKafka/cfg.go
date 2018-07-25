@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	part "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -26,8 +25,6 @@ var offsetDuration time.Duration
 var offsetCommitInterval time.Duration
 var partitionStr string
 var partitions []int32
-var partitioner *part.Kafka
-var partitionScheme string
 var bootTimeOffsets map[int32]int64
 var backlogProcessTimeout time.Duration
 var backlogProcessTimeoutStr string
@@ -47,7 +44,6 @@ func init() {
 	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
-	fs.StringVar(&partitionScheme, "partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
 	fs.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	fs.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
 	fs.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
@@ -79,6 +75,7 @@ func ConfigProcess(instance string) {
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
 	config.Producer.Compression = sarama.CompressionSnappy
 	config.Producer.Return.Successes = true
+	config.Producer.Partitioner = sarama.NewManualPartitioner
 	err = config.Validate()
 	if err != nil {
 		log.Fatal(2, "kafka-cluster invalid consumer config: %s", err)
@@ -87,11 +84,6 @@ func ConfigProcess(instance string) {
 	backlogProcessTimeout, err = time.ParseDuration(backlogProcessTimeoutStr)
 	if err != nil {
 		log.Fatal(4, "kafka-cluster: unable to parse backlog-process-timeout. %s", err)
-	}
-
-	partitioner, err = part.NewKafka(partitionScheme)
-	if err != nil {
-		log.Fatal(4, "kafka-cluster: failed to initialize partitioner. %s", err)
 	}
 
 	if partitionStr != "*" {
