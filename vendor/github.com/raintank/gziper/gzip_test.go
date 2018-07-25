@@ -162,3 +162,24 @@ func Test_GzipPanic(t *testing.T) {
 		So(before, ShouldBeTrue)
 	})
 }
+
+func BenchmarkGzip(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	m := macaron.New()
+	m.Use(Gziper())
+	m.Get("/", func() string { return "hello world!" })
+
+	for n := 0; n < b.N; n++ {
+		resp := httptest.NewRecorder()
+		req, err := http.NewRequest("GET", "/", nil)
+		if err != nil {
+			b.Error("Unexpected error = ", err)
+		}
+
+		resp = httptest.NewRecorder()
+		req.Header.Set(_HEADER_ACCEPT_ENCODING, "gzip")
+		m.ServeHTTP(resp, req)
+	}
+}

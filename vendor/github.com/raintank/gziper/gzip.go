@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/klauspost/compress/gzip"
 	"gopkg.in/macaron.v1"
@@ -41,6 +42,32 @@ type nopCloser struct {
 }
 
 func (nopCloser) Close() error { return nil }
+
+type WriterPool struct {
+	pool sync.Pool
+}
+
+func NewWriterPool() *WriterPool {
+	return &WriterPool{pool: sync.Pool{
+		New: func() interface{} { return nil },
+	}}
+}
+
+func (wp *WriterPool) Get(rw macaron.ResponseWriter) *gzip.Writer {
+	ret := wp.pool.Get()
+	if ret == nil {
+		ret = gzip.NewWriter(rw)
+	} else {
+		ret.(*gzip.Writer).Reset(rw)
+	}
+	return ret.(*gzip.Writer)
+}
+
+func (wp *WriterPool) Put(w *gzip.Writer) {
+	wp.pool.Put(w)
+}
+
+var writerPool WriterPool
 
 /*
   Gzip middleware inspired by https://github.com/go-macaron/gzip
@@ -97,7 +124,7 @@ func (grw *gzipResponseWriter) setup() {
 		headers := grw.Header()
 		headers.Set(_HEADER_CONTENT_ENCODING, "gzip")
 		headers.Set(_HEADER_VARY, _HEADER_ACCEPT_ENCODING)
-		grw.w = gzip.NewWriter(grw.ResponseWriter)
+		grw.w = writerPool.Get(grw.ResponseWriter)
 	}
 }
 
@@ -107,6 +134,12 @@ func (grw *gzipResponseWriter) close() {
 		return
 	}
 	grw.w.Close()
+
+	if poolWriter, ok := grw.w.(*gzip.Writer); ok {
+		writerPool.Put(poolWriter)
+	}
+
+	grw.w = nil
 }
 
 func (grw *gzipResponseWriter) Write(p []byte) (int, error) {

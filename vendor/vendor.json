@@ -1,0 +1,14 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "W6HeV9rqgCJthUlbvB0iGFk/AtY=",
+			"origin": "github.com/grafana/metrictank/vendor/github.com/raintank/gziper",
+			"path": "github.com/raintank/gziper",
+			"revision": "d663e3d2bfa150ad47e48104b21d12c7b8b768c3",
+			"revisionTime": "2018-07-16T15:00:47Z"
+		}
+	],
+	"rootPath": "github.com/grafana/metrictank"
+}
