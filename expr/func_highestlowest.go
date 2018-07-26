@@ -57,7 +57,7 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 		if s.highest {
 			return si > sj
 		}
-		return sj < si
+		return si < sj
 	}
 	sort.Slice(series, seriesLess)
 
