@@ -40,7 +40,14 @@ Here are the currently included functions:
 | exclude(seriesList, pattern) seriesList               |             | Stable     |
 | grep(seriesList, pattern) seriesList                  |             | Stable     |
 | groupByTags(seriesList, func, tagList) seriesList     |             | Stable     |
+| highest(seriesList, n, func) seriesList               |             | Stable     |
+| highestAverage(seriesList, n, func) seriesList        |             | Stable     |
+| highestCurrent(seriesList, n, func) seriesList        |             | Stable     |
+| highestMax(seriesList, n, func) seriesList            |             | Stable     |
 | isNonNull(seriesList) seriesList                      |             | Stable     |
+| lowest(seriesList, n, func) seriesList                |             | Stable     |
+| lowestAverage(seriesList, n, func) seriesList         |             | Stable     |
+| lowestCurrent(seriesList, n, func) seriesList         |             | Stable     |
 | maxSeries(seriesList) series                          | max         | Stable     |
 | minSeries(seriesList) series                          | min         | Stable     |
 | multiplySeries(seriesList) series                     |             | Stable     |

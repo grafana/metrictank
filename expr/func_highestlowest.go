@@ -25,13 +25,13 @@ func (s *FuncHighestLowest) Signature() ([]Arg, []Arg) {
 	if s.fn != "" {
 		return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgInt{val: &s.n},
+			ArgInt{key: "n", val: &s.n},
 		}, []Arg{ArgSeriesList{}}
 	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgInt{val: &s.n},
-		ArgString{val: &s.fn, validator: []Validator{IsConsolFunc}},
+		ArgInt{key: "n", val: &s.n},
+		ArgString{key: "func", val: &s.fn, validator: []Validator{IsConsolFunc}},
 	}, []Arg{ArgSeriesList{}}
 }
 
@@ -60,6 +60,10 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 		return si < sj
 	}
 	sort.Slice(series, seriesLess)
+
+	if s.n > int64(len(series)) {
+		s.n = int64(len(series))
+	}
 
 	return series[:s.n], nil
 }

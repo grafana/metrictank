@@ -107,7 +107,7 @@ func FromConsolidateBy(c string) Consolidator {
 		return Avg
 	case "cnt":
 		return Cnt // bonus. not supported by graphite
-	case "lst", "last":
+	case "lst", "last", "current":
 		return Lst // bonus. not supported by graphite
 	case "min":
 		return Min
@@ -121,9 +121,9 @@ func FromConsolidateBy(c string) Consolidator {
 		return Diff
 	case "stddev":
 		return StdDev
-	case "range":
+	case "range", "rangeOf":
 		return Range
-	case "sum":
+	case "sum", "total":
 		return Sum
 	}
 	return None
@@ -160,17 +160,17 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 }
 
 func Validate(fn string) error {
-	if fn == "avg" ||
-		fn == "average" ||
-		fn == "count" || fn == "last" || // bonus
+	if fn == "avg" || fn == "average" ||
+		fn == "count" ||
+		fn == "last" || fn == "current" || // bonus
 		fn == "min" ||
 		fn == "max" ||
 		fn == "mult" || fn == "multiply" ||
 		fn == "med" || fn == "median" ||
 		fn == "diff" ||
 		fn == "stddev" ||
-		fn == "range" ||
-		fn == "sum" {
+		fn == "range" || fn == "rangeOf" ||
+		fn == "sum" || fn == "total" {
 		return nil
 	}
 	return errUnknownConsolidationFunction
