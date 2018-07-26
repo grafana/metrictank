@@ -1,9 +1,11 @@
 package expr
 
 import (
+	"math"
 	"sort"
 
 	"github.com/grafana/metrictank/consolidation"
+	schema "gopkg.in/raintank/schema.v1"
 
 	"github.com/grafana/metrictank/api/models"
 )
@@ -51,19 +53,20 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 
-	consolidationVals := make([]float64, len(series))
+	consolidationVals := make(map[*schema.Point]float64, len(series))
 
-	for i, serie := range series {
-		consolidationVals[i] = consolidationFunc(serie.Datapoints)
+	for _, serie := range series {
+		consolidationVals[&serie.Datapoints[0]] = consolidationFunc(serie.Datapoints)
 	}
-
 	seriesLess := func(i, j int) bool {
+		iVal := consolidationVals[&series[i].Datapoints[0]]
+		jVal := consolidationVals[&series[j].Datapoints[0]]
 		if s.highest {
-			return consolidationVals[i] > consolidationVals[j]
+			return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal > jVal
 		}
-		return consolidationVals[i] < consolidationVals[j]
+		return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal < jVal
 	}
-	sort.Slice(series, seriesLess)
+	sort.SliceStable(series, seriesLess)
 
 	if s.n > int64(len(series)) {
 		s.n = int64(len(series))

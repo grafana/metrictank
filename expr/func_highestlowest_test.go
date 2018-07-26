@@ -87,8 +87,28 @@ func TestHighestCurrent(t *testing.T) {
 			},
 			{
 				Interval:   10,
+				QueryPatt:  "b",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "b",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "b",
+				Datapoints: getCopy(b),
+			},
+			{
+				Interval:   10,
 				QueryPatt:  "sum4a2b",
 				Datapoints: getCopy(sum4a2b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "b",
+				Datapoints: getCopy(b),
 			},
 			{
 				Interval:   10,
@@ -179,6 +199,70 @@ func TestHighestMax(t *testing.T) {
 				Interval:   10,
 				QueryPatt:  "avg4a2b",
 				Datapoints: getCopy(avg4a2b),
+			},
+		},
+		t,
+	)
+}
+
+func TestHighestLong(t *testing.T) {
+	testHighestLowest(
+		"highest(current,5)",
+		"current",
+		5,
+		true,
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "c",
+				Datapoints: getCopy(c),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "d",
+				Datapoints: getCopy(d),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "sumabc",
+				Datapoints: getCopy(sumabc),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "sum4a2b",
+				Datapoints: getCopy(sum4a2b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "a",
+				Datapoints: getCopy(a),
+			},
+		},
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "sum4a2b",
+				Datapoints: getCopy(sum4a2b),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "sumabc",
+				Datapoints: getCopy(sumabc),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "a",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "d",
+				Datapoints: getCopy(d),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "c",
+				Datapoints: getCopy(c),
 			},
 		},
 		t,
@@ -295,6 +379,7 @@ func benchmarkHighestLowest(b *testing.B, numSeries int, fn0, fn1 func() []schem
 		input = append(input, series)
 	}
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		f := NewHighestLowestConstructor("average", true)()
 		f.(*FuncHighestLowest).in = NewMock(input)
