@@ -2,6 +2,7 @@ package expr
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -337,7 +338,7 @@ func TestAsPercentNoArgNodes(t *testing.T) {
 		t,
 		math.NaN(),
 		nil,
-		[]expr{expr{etype: etFloat, float: 0}, expr{etype: etInt, int: 1}},
+		[]expr{{etype: etFloat, float: 0}, {etype: etInt, int: 1}},
 		"None",
 	)
 }
@@ -412,7 +413,7 @@ func TestAsPercentNoArgTagNodes(t *testing.T) {
 		t,
 		math.NaN(),
 		nil,
-		[]expr{expr{etype: etString, str: "tag"}},
+		[]expr{{etype: etString, str: "tag"}},
 		"None",
 	)
 }
@@ -512,7 +513,7 @@ func TestAsPercentSeriesByNodes(t *testing.T) {
 				Datapoints: getCopy(sumcd),
 			},
 		},
-		[]expr{expr{etype: etFloat, float: 0}, expr{etype: etInt, int: 1}},
+		[]expr{{etype: etFloat, float: 0}, {etype: etInt, int: 1}},
 		"series",
 	)
 }
@@ -529,6 +530,8 @@ func testAsPercent(name string, in []models.Series, out []models.Series, t *test
 	if err != nil {
 		t.Fatalf("case %q (%q, %v): err should be nil. got %q", name, total, nodes, err)
 	}
+	sort.Slice(gots, func(i, j int) bool { return gots[i].Target < gots[j].Target })
+	sort.Slice(out, func(i, j int) bool { return out[i].Target < out[j].Target })
 	if len(gots) != len(out) {
 		t.Fatalf("case %q (%q, %v): asPercent len output expected %d, got %d", name, total, nodes, len(out), len(gots))
 	}
