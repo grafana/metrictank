@@ -78,7 +78,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			return nil, errors.New("total must be None or a seriesList")
 		}
 
-		for key, _ := range keys {
+		for key := range keys {
 			// No series for total series
 			if _, ok := metaSeries[key]; !ok {
 				serie2 := totalSeries[key]
