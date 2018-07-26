@@ -71,6 +71,7 @@ func init() {
 		"perSecond":         {NewPerSecond, true},
 		"rangeOfSeries":     {NewAggregateConstructor("rangeOf", crossSeriesRange), true},
 		"scale":             {NewScale, true},
+		"scaleToSeconds":    {NewScaleToSeconds, true},
 		"smartSummarize":    {NewSmartSummarize, false},
 		"sortByName":        {NewSortByName, true},
 		"stddevSeries":      {NewAggregateConstructor("stddev", crossSeriesStddev), true},
