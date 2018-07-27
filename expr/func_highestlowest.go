@@ -51,13 +51,17 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 
+	consolidationVals := make([]float64, len(series))
+
+	for i, serie := range series {
+		consolidationVals[i] = consolidationFunc(serie.Datapoints)
+	}
+
 	seriesLess := func(i, j int) bool {
-		si := consolidationFunc(series[i].Datapoints)
-		sj := consolidationFunc(series[j].Datapoints)
 		if s.highest {
-			return si > sj
+			return consolidationVals[i] > consolidationVals[j]
 		}
-		return si < sj
+		return consolidationVals[i] < consolidationVals[j]
 	}
 	sort.Slice(series, seriesLess)
 
