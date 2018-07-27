@@ -48,6 +48,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	var outSeries []models.Series
+	defer func() { cache[Req{}] = append(cache[Req{}], outSeries...) }()
 	var totals []models.Series
 	if s.totalSeries != nil {
 		totals, err = s.totalSeries.Exec(cache)
@@ -89,12 +90,12 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 					serie2.Datapoints[i].Val = math.NaN()
 				}
 				outSeries = append(outSeries, serie2)
-				cache[Req{}] = append(cache[Req{}], serie2)
 				continue
 			}
 
 			for _, serie1 := range metaSeries[key] {
 				// no total
+				copyDatapoints(&serie1)
 				if _, ok := totalSeries[key]; !ok {
 					serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
 					serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
@@ -112,7 +113,6 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 					}
 				}
 				outSeries = append(outSeries, serie1)
-				cache[Req{}] = append(cache[Req{}], serie1)
 			}
 		}
 		return outSeries, nil
@@ -130,6 +130,8 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if len(totals) == 1 {
 			totalsSerie = totals[0]
 		} else if len(totals) == len(series) {
+			// Sorted to match the input series with the total series based on Target.
+			// Mimicks Graphite's implementation
 			sort.Slice(series, func(i, j int) bool {
 				return series[i].Target < series[j].Target
 			})
@@ -141,11 +143,11 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
+				copyDatapoints(&serie1)
 				for i := range serie1.Datapoints {
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
 				outSeries = append(outSeries, serie1)
-				cache[Req{}] = append(cache[Req{}], serie1)
 			}
 			return outSeries, nil
 		} else {
@@ -159,6 +161,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.QueryPatt)
 		serie.Tags = map[string]string{"name": serie.Target}
+		copyDatapoints(&serie)
 		for i := range serie.Datapoints {
 			var totalVal float64
 			if len(totalsSerie.Datapoints) > i {
@@ -169,7 +172,6 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalVal)
 		}
 		outSeries = append(outSeries, serie)
-		cache[Req{}] = append(cache[Req{}], serie)
 	}
 
 	return outSeries, nil
@@ -209,8 +211,10 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]mode
 }
 
 // Sums seriesList
+// Datapoints are always a copy
 func sumSeries(series []models.Series) models.Series {
 	if len(series) == 1 {
+		copyDatapoints(&series[0])
 		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
@@ -238,4 +242,12 @@ Loop:
 		QueryCons:    queryCons,
 		Tags:         map[string]string{"name": name},
 	}
+}
+
+func copyDatapoints(serie *models.Series) {
+	out := pointSlicePool.Get().([]schema.Point)
+	for _, p := range serie.Datapoints {
+		out = append(out, p)
+	}
+	serie.Datapoints = out
 }

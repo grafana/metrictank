@@ -526,6 +526,14 @@ func testAsPercent(name string, in []models.Series, out []models.Series, t *test
 	}
 	f.(*FuncAsPercent).totalFloat = totalFloat
 	f.(*FuncAsPercent).nodes = nodes
+
+	originalSeries := make([]models.Series, len(in))
+	for i, serie := range in {
+		originalSeries[i].Interval = serie.Interval
+		originalSeries[i].QueryPatt = serie.QueryPatt
+		originalSeries[i].Target = serie.Target
+		originalSeries[i].Datapoints = getCopy(serie.Datapoints)
+	}
 	gots, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q (%q, %v): err should be nil. got %q", name, total, nodes, err)
@@ -553,6 +561,28 @@ func testAsPercent(name string, in []models.Series, out []models.Series, t *test
 			}
 
 			t.Fatalf("case %q (%q, %v): output point %d - expected %v got %v", name, total, nodes, j, p, g.Datapoints[j])
+		}
+	}
+
+	// Test if original series was modified
+	for i, orig := range originalSeries {
+		inSerie := in[i]
+		if orig.Target != inSerie.Target {
+			t.Fatalf("case %q (%q, %v): put in target %q, ended with %q", name, total, nodes, orig.Target, inSerie.Target)
+		}
+		if orig.QueryPatt != inSerie.QueryPatt {
+			t.Fatalf("case %q (%q, %v),: put in querypatt %q, ended with %q", name, total, nodes, orig.Target, inSerie.Target)
+		}
+		if len(orig.Datapoints) != len(inSerie.Datapoints) {
+			t.Fatalf("case %q (%q, %v): put in len %d, ended with %d", name, total, nodes, len(inSerie.Datapoints), len(orig.Datapoints))
+		}
+		for j, p := range inSerie.Datapoints {
+			bothNaN := math.IsNaN(p.Val) && math.IsNaN(orig.Datapoints[j].Val)
+			if (bothNaN || p.Val == orig.Datapoints[j].Val) && p.Ts == orig.Datapoints[j].Ts {
+				continue
+			}
+
+			t.Fatalf("case %q (%q, %v): output point %d - put in %v ended with %v", name, total, nodes, j, p, orig.Datapoints[j])
 		}
 	}
 }
