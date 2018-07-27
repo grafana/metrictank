@@ -529,9 +529,7 @@ func testAsPercent(name string, in []models.Series, out []models.Series, t *test
 
 	originalSeries := make([]models.Series, len(in))
 	for i, serie := range in {
-		originalSeries[i].Interval = serie.Interval
-		originalSeries[i].QueryPatt = serie.QueryPatt
-		originalSeries[i].Target = serie.Target
+		originalSeries[i] = serie
 		originalSeries[i].Datapoints = getCopy(serie.Datapoints)
 	}
 	gots, err := f.Exec(make(map[Req][]models.Series))

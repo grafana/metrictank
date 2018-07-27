@@ -95,7 +95,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 			for _, serie1 := range metaSeries[key] {
 				// no total
-				copyDatapoints(&serie1)
+				deepCopySerieElements(&serie1)
 				if _, ok := totalSeries[key]; !ok {
 					serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
 					serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
@@ -143,7 +143,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
-				copyDatapoints(&serie1)
+				deepCopySerieElements(&serie1)
 				for i := range serie1.Datapoints {
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
@@ -161,7 +161,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.QueryPatt)
 		serie.Tags = map[string]string{"name": serie.Target}
-		copyDatapoints(&serie)
+		deepCopySerieElements(&serie)
 		for i := range serie.Datapoints {
 			var totalVal float64
 			if len(totalsSerie.Datapoints) > i {
@@ -214,7 +214,7 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]mode
 // Datapoints are always a copy
 func sumSeries(series []models.Series) models.Series {
 	if len(series) == 1 {
-		copyDatapoints(&series[0])
+		deepCopySerieElements(&series[0])
 		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
@@ -244,10 +244,15 @@ Loop:
 	}
 }
 
-func copyDatapoints(serie *models.Series) {
+func deepCopySerieElements(serie *models.Series) {
 	out := pointSlicePool.Get().([]schema.Point)
 	for _, p := range serie.Datapoints {
 		out = append(out, p)
 	}
 	serie.Datapoints = out
+	newTags := make(map[string]string, len(serie.Tags))
+	for k, v := range serie.Tags {
+		newTags[k] = v
+	}
+	serie.Tags = newTags
 }
