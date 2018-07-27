@@ -54,12 +54,13 @@ func (s *FuncScaleToSeconds) Exec(cache map[Req][]models.Series) ([]models.Serie
 		factor := float64(s.seconds) / float64(serie.Interval)
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
-				p.Val = math.Round(p.Val*factor*1000000) / 1000000 // round to 6 decimal places
+				// round to 6 decimal places to mimic graphite
+				roundingFactor := math.Pow(10, 6)
+				p.Val = math.Round(p.Val*factor*roundingFactor) / roundingFactor
 			}
 			transformed.Datapoints = append(transformed.Datapoints, p)
 		}
-		cache[Req{}] = append(cache[Req{}], *transformed)
 	}
-
+	cache[Req{}] = append(cache[Req{}], out...)
 	return out, nil
 }
