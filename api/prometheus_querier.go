@@ -64,7 +64,7 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		}
 	}
 
-	series, err := q.clusterFindByTag(q.ctx, q.OrgID, expressions, 0)
+	series, err := q.clusterFindByTag(q.ctx, q.OrgID, expressions, 0, maxSeriesPerReq)
 	if err != nil {
 		return nil, err
 	}

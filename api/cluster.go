@@ -294,7 +294,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	result := make(map[string]PeerResponse)
 	for resp := range responses {
 		if resp.err != nil {
-			return nil, err
+			return nil, resp.err
 		}
 		result[resp.data.peer.GetName()] = resp.data
 	}
@@ -312,10 +312,41 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 // name:         name to be used in logging & tracing
 // path:         path to request on
 func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
+	result := make(map[string]PeerResponse)
+	responseChan := make(chan PeerResponse)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var err error
+	go func() {
+		err = s.peerQuerySpeculativeChan(ctx, data, name, path, responseChan)
+		wg.Done()
+	}()
+
+	for resp := range responseChan {
+		result[resp.peer.GetName()] = resp
+	}
+
+	wg.Wait()
+	return result, err
+}
+
+// peerQuerySpeculativeChan takes a request and the path to request it on, then fans it out
+// across the cluster. If any peer fails requests to other peers are aborted. If enough
+// peers have been heard from (based on speculation-threshold configuration), and we
+// are missing the others, try to speculatively query other members of the shard group.
+// ctx:          request context
+// data:         request to be submitted
+// name:         name to be used in logging & tracing
+// path:         path to request on
+// resultChan:   channel to put responses on as they come in
+func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Traceable, name, path string, resultChan chan PeerResponse) error {
+	defer close(resultChan)
+
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
 	if err != nil {
 		log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
-		return nil, err
+		return err
 	}
 	log.Debugf("HTTP %s across %d instances", name, len(peerGroups)-1)
 
@@ -359,8 +390,6 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 		go askPeer(group, peer)
 	}
 
-	result := make(map[string]PeerResponse)
-
 	var ticker *time.Ticker
 	var tickChan <-chan time.Time
 	if speculationThreshold != 1 {
@@ -378,10 +407,10 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 			}
 
 			if resp.err != nil {
-				return nil, err
+				return resp.err
 			}
 
-			result[resp.data.peer.GetName()] = resp.data
+			resultChan <- resp.data
 			receivedResponses[resp.shardGroup] = struct{}{}
 			delete(originalPeers, resp.data.peer.GetName())
 
@@ -410,5 +439,5 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 		speculativeWins.Inc()
 	}
 
-	return result, nil
+	return nil
 }
