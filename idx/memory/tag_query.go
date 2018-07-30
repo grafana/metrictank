@@ -657,7 +657,7 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 
 // testByFrom filters a given metric by its LastUpdate time
 func (q *TagQuery) testByFrom(def *idx.Archive) bool {
-	return q.from <= def.LastUpdate
+	return q.from <= atomic.LoadInt64(&def.LastUpdate)
 }
 
 // testByPrefix filters a given metric by matching prefixes against the values
