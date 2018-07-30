@@ -35,7 +35,7 @@ See also:
 
 
 | Function name and signature                                    | Alias        | Metrictank |
-| -------------------------------------------------------------- | -----------  | ---------- |
+| -------------------------------------------------------------- | ------------ | ---------- |
 | absolute                                                       |              | No         |
 | aggregate                                                      |              | No         |
 | aggregateLine                                                  |              | No         |
@@ -96,7 +96,7 @@ See also:
 | interpolate                                                    |              | No         |
 | invert                                                         |              | No         |
 | isNonNull(seriesList) seriesList                               |              | Stable     |
-| keepLastValue                                                  |              | No         |
+| keepLastValue(seriesList, limit) seriesList                    |              | Stable     |
 | legendValue                                                    |              | No         |
 | limit                                                          |              | No         |
 | linearRegression                                               |              | No         |
