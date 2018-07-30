@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/errors"
@@ -15,7 +16,7 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/raintank/schema.v1"
+	schema "gopkg.in/raintank/schema.v1"
 )
 
 var (
@@ -213,8 +214,8 @@ func (m *MemoryIdx) Stop() {
 func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 
 	existing, ok := m.defById[point.MKey]
 	if ok {
@@ -223,10 +224,10 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 			log.Debug("metricDef with id %v already in index", point.MKey)
 		}
 
-		if existing.LastUpdate < int64(point.Time) {
-			existing.LastUpdate = int64(point.Time)
+		if atomic.LoadInt64(existing.LastUpdate) < int64(point.Time) {
+			atomic.SwapInt64(&existing.LastUpdate, int64(point.Time))
 		}
-		existing.Partition = partition
+		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
 		return *existing, oldPart, true
@@ -240,21 +241,27 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 // if was new        -> adds new MetricDefinition to index
 func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
-	m.Lock()
-	defer m.Unlock()
+
+	// Optimistically read lock
+	m.RLock()
 
 	existing, ok := m.defById[mkey]
 	if ok {
 		oldPart := existing.Partition
 		log.Debug("metricDef with id %s already in index.", mkey)
-		if existing.LastUpdate < int64(data.Time) {
-			existing.LastUpdate = int64(data.Time)
+		if atomic.LoadInt64(&existing.LastUpdate) < int64(data.Time) {
+			atomic.SwapInt64(&existing.LastUpdate, int64(data.Time))
 		}
 		existing.Partition = partition
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
+		m.RUnlock()
 		return *existing, oldPart, ok
 	}
+
+	m.RUnlock()
+	m.Lock()
+	defer m.Unlock()
 
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
@@ -541,7 +548,7 @@ func (m *MemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (ma
 					continue
 				}
 
-				if def.LastUpdate < from {
+				if atomic.LoadInt64(&def.LastUpdate) < from {
 					continue
 				}
 
@@ -814,7 +821,7 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 
 			// as soon as we found one metric definition with LastUpdate >= from
 			// we can return true
-			if def.LastUpdate >= from {
+			if atomic.LoadInt64(&def.LastUpdate) >= from {
 				return true
 			}
 		}
@@ -910,9 +917,9 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
 				for _, id := range n.Defs {
 					def := m.defById[id]
-					if from != 0 && def.LastUpdate < from {
+					if from != 0 && atomic.LoadInt64(&def.LastUpdate) < from {
 						statFiltered.Inc()
-						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, def.LastUpdate)
+						log.Debug("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
 						continue
 					}
 					log.Debug("memory-idx Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.LastSave)
@@ -1253,7 +1260,7 @@ func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	m.RLock()
 DEFS:
 	for _, def := range m.defById {
-		if def.LastUpdate >= oldestUnix {
+		if atomic.LoadInt64(&def.LastUpdate) >= oldestUnix {
 			continue DEFS
 		}
 
@@ -1269,7 +1276,7 @@ DEFS:
 			}
 
 			for _, id := range n.Defs {
-				if m.defById[id].LastUpdate >= oldestUnix {
+				if atomic.LoadInt64(&m.defById[id].LastUpdate) >= oldestUnix {
 					continue DEFS
 				}
 			}
@@ -1280,7 +1287,7 @@ DEFS:
 			// if any other MetricDef with the same tag set is not expired yet,
 			// then we do not want to prune any of them
 			for def := range defs {
-				if def.LastUpdate >= oldestUnix {
+				if atomic.LoadInt64(&def.LastUpdate) >= oldestUnix {
 					continue DEFS
 				}
 			}
