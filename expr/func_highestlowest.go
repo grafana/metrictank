@@ -53,11 +53,14 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 
+	// Calculates the consolidated value for each series and stores it in a map
+	// where the key is a pointer to the first datapoint
 	consolidationVals := make(map[*schema.Point]float64, len(series))
-
 	for _, serie := range series {
 		consolidationVals[&serie.Datapoints[0]] = consolidationFunc(serie.Datapoints)
 	}
+
+	// Compares two series based on value in consolidationVals
 	seriesLess := func(i, j int) bool {
 		iVal := consolidationVals[&series[i].Datapoints[0]]
 		jVal := consolidationVals[&series[j].Datapoints[0]]
