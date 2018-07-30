@@ -219,12 +219,11 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 
 	existing, ok := m.defById[point.MKey]
 	if ok {
-		oldPart := existing.Partition
 		if LogLevel < 2 {
 			log.Debug("memory-idx: metricDef with id %v already in index", point.MKey)
 		}
 
-		if atomic.LoadInt64(existing.LastUpdate) < int64(point.Time) {
+		if atomic.LoadInt64(&existing.LastUpdate) < int64(point.Time) {
 			atomic.SwapInt64(&existing.LastUpdate, int64(point.Time))
 		}
 		oldPart := atomic.SwapInt32(&existing.Partition, partition)
@@ -247,12 +246,11 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 
 	existing, ok := m.defById[mkey]
 	if ok {
-		oldPart := existing.Partition
 		log.Debug("memory-idx: metricDef with id %s already in index.", mkey)
 		if atomic.LoadInt64(&existing.LastUpdate) < int64(data.Time) {
 			atomic.SwapInt64(&existing.LastUpdate, int64(data.Time))
 		}
-		existing.Partition = partition
+		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
 		m.RUnlock()
