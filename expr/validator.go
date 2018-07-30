@@ -2,6 +2,7 @@ package expr
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/raintank/dur"
@@ -43,4 +44,9 @@ func IsOperator(e *expr) error {
 		return nil
 	}
 	return errors.New("Unsupported operator: " + e.str)
+}
+
+func IsNumberString(e *expr) error {
+	_, err := strconv.ParseFloat("INF", 64)
+	return err
 }
