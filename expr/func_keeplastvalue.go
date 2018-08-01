@@ -3,16 +3,14 @@ package expr
 import (
 	"fmt"
 	"math"
-	"strconv"
 
 	"github.com/grafana/metrictank/api/models"
 	schema "gopkg.in/raintank/schema.v1"
 )
 
 type FuncKeepLastValue struct {
-	in     GraphiteFunc
-	limit  int64
-	slimit string
+	in    GraphiteFunc
+	limit int64
 }
 
 func NewKeepLastValue() GraphiteFunc {
@@ -26,7 +24,7 @@ func (s *FuncKeepLastValue) Signature() ([]Arg, []Arg) {
 				opt: true,
 				args: []Arg{
 					ArgInt{val: &s.limit},
-					ArgString{val: &s.slimit, validator: []Validator{IsNumberString}},
+					ArgString{}, // Allow user to specify 'INF' as value. if so, will fall back to maxInt
 				},
 			},
 		},
@@ -43,12 +41,6 @@ func (s *FuncKeepLastValue) Exec(cache map[Req][]models.Series) ([]models.Series
 		return nil, err
 	}
 	limit := int(s.limit)
-	if s.slimit != "" {
-		limitf, _ := strconv.ParseFloat(s.slimit, 64)
-		if !math.IsInf(limitf, 0) {
-			limit = int(limitf)
-		}
-	}
 	outSeries := make([]models.Series, len(series))
 	for i, serie := range series {
 		serie.Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
