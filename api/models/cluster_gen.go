@@ -295,7 +295,7 @@ func (z *IndexFindResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
-			if z.Nodes == nil && zb0002 > 0 {
+			if z.Nodes == nil {
 				z.Nodes = make(map[string][]idx.Node, zb0002)
 			} else if len(z.Nodes) > 0 {
 				for key := range z.Nodes {
@@ -411,7 +411,7 @@ func (z *IndexFindResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
-			if z.Nodes == nil && zb0002 > 0 {
+			if z.Nodes == nil {
 				z.Nodes = make(map[string][]idx.Node, zb0002)
 			} else if len(z.Nodes) > 0 {
 				for key := range z.Nodes {
@@ -586,7 +586,7 @@ func (z *IndexTagDetailsResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
-			if z.Values == nil && zb0002 > 0 {
+			if z.Values == nil {
 				z.Values = make(map[string]uint64, zb0002)
 			} else if len(z.Values) > 0 {
 				for key := range z.Values {
@@ -678,7 +678,7 @@ func (z *IndexTagDetailsResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if err != nil {
 				return
 			}
-			if z.Values == nil && zb0002 > 0 {
+			if z.Values == nil {
 				z.Values = make(map[string]uint64, zb0002)
 			} else if len(z.Values) > 0 {
 				for key := range z.Values {

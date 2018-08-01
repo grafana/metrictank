@@ -186,7 +186,7 @@ func (z *GraphiteTagDelSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 			if err != nil {
 				return
 			}
-			if z.Peers == nil && zb0002 > 0 {
+			if z.Peers == nil {
 				z.Peers = make(map[string]int, zb0002)
 			} else if len(z.Peers) > 0 {
 				for key := range z.Peers {
@@ -295,7 +295,7 @@ func (z *GraphiteTagDelSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error
 			if err != nil {
 				return
 			}
-			if z.Peers == nil && zb0002 > 0 {
+			if z.Peers == nil {
 				z.Peers = make(map[string]int, zb0002)
 			} else if len(z.Peers) > 0 {
 				for key := range z.Peers {
