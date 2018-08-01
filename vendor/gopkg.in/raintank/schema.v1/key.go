@@ -102,7 +102,7 @@ func AMKeyFromString(s string) (AMKey, error) {
 			return amk, err
 		}
 		span, err := strconv.ParseInt(splits[2], 10, 32)
-		if err == nil {
+		if err != nil {
 			return amk, err
 		}
 		if !IsSpanValid(uint32(span)) {
