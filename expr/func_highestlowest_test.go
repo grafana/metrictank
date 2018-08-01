@@ -1,7 +1,9 @@
 package expr
 
 import (
+	"fmt"
 	"math"
+	"math/rand"
 	"strconv"
 	"testing"
 
@@ -263,6 +265,169 @@ func TestHighestLong(t *testing.T) {
 				Interval:   10,
 				QueryPatt:  "c",
 				Datapoints: getCopy(c),
+			},
+		},
+		t,
+	)
+}
+
+func TestHighestExtraLong(t *testing.T) {
+	highAvg := []schema.Point{
+		{Val: math.MaxFloat64, Ts: 10},
+		{Val: math.MaxFloat64, Ts: 20},
+		{Val: math.MaxFloat64, Ts: 30},
+		{Val: math.MaxFloat64, Ts: 40},
+		{Val: math.MaxFloat64, Ts: 50},
+		{Val: math.MaxFloat64, Ts: 60},
+	}
+	series := []models.Series{
+		{
+			Interval:  10,
+			QueryPatt: "a",
+			Datapoints: []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 0, Ts: 30},
+				{Val: 0, Ts: 40},
+				{Val: 0, Ts: 50},
+				{Val: 0, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "b",
+			Datapoints: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 1, Ts: 20},
+				{Val: 1, Ts: 30},
+				{Val: 1, Ts: 40},
+				{Val: 1, Ts: 50},
+				{Val: 1, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "avg4a2b",
+			Datapoints: []schema.Point{
+				{Val: 2, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 2, Ts: 30},
+				{Val: 2, Ts: 40},
+				{Val: 2, Ts: 50},
+				{Val: 2, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "sum4a2b",
+			Datapoints: []schema.Point{
+				{Val: 3, Ts: 10},
+				{Val: 3, Ts: 20},
+				{Val: 3, Ts: 30},
+				{Val: 3, Ts: 40},
+				{Val: 3, Ts: 50},
+				{Val: 3, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "c",
+			Datapoints: []schema.Point{
+				{Val: 4, Ts: 10},
+				{Val: 4, Ts: 20},
+				{Val: 4, Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: 4, Ts: 50},
+				{Val: 4, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "d",
+			Datapoints: []schema.Point{
+				{Val: 5, Ts: 10},
+				{Val: 5, Ts: 20},
+				{Val: 5, Ts: 30},
+				{Val: 5, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 5, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "sumab",
+			Datapoints: []schema.Point{
+				{Val: 6, Ts: 10},
+				{Val: 6, Ts: 20},
+				{Val: 6, Ts: 30},
+				{Val: 6, Ts: 40},
+				{Val: 6, Ts: 50},
+				{Val: 6, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "sumabc",
+			Datapoints: []schema.Point{
+				{Val: 7, Ts: 10},
+				{Val: 7, Ts: 20},
+				{Val: 7, Ts: 30},
+				{Val: 7, Ts: 40},
+				{Val: 7, Ts: 50},
+				{Val: 7, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "sumcd",
+			Datapoints: []schema.Point{
+				{Val: 8, Ts: 10},
+				{Val: 8, Ts: 20},
+				{Val: 8, Ts: 30},
+				{Val: 8, Ts: 40},
+				{Val: 8, Ts: 50},
+				{Val: 8, Ts: 60},
+			},
+		},
+		{
+			Interval:  10,
+			QueryPatt: "avgab",
+			Datapoints: []schema.Point{
+				{Val: 9, Ts: 10},
+				{Val: 9, Ts: 20},
+				{Val: 9, Ts: 30},
+				{Val: 9, Ts: 40},
+				{Val: 9, Ts: 50},
+				{Val: 9, Ts: 60},
+			},
+		},
+	}
+	for i := 0; i < 10; i++ {
+		for _, serie := range series {
+			serie.Datapoints = getCopy(serie.Datapoints)
+			series = append(series, serie)
+		}
+	}
+	series = append(series, models.Series{
+		Interval:   10,
+		QueryPatt:  "highAvg",
+		Datapoints: getCopy(highAvg),
+	})
+	rand.Shuffle(len(series), func(i, j int) {
+		series[i], series[j] = series[j], series[i]
+	})
+	fmt.Println(len(series))
+	testHighestLowest(
+		"highest(average,1)",
+		"average",
+		1,
+		true,
+		series,
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "highAvg",
+				Datapoints: getCopy(highAvg),
 			},
 		},
 		t,
