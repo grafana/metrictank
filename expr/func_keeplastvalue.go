@@ -18,13 +18,14 @@ func NewKeepLastValue() GraphiteFunc {
 }
 
 func (s *FuncKeepLastValue) Signature() ([]Arg, []Arg) {
+	var stub string
 	return []Arg{
 			ArgSeriesList{val: &s.in},
 			ArgIn{key: "limit",
 				opt: true,
 				args: []Arg{
 					ArgInt{val: &s.limit},
-					ArgString{}, // Allow user to specify 'INF' as value. if so, will fall back to maxInt
+					ArgString{val: &stub}, // Allow user to specify 'INF' as value. if so, will fall back to maxInt
 				},
 			},
 		},
