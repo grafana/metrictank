@@ -286,33 +286,33 @@ func TestFilterSeriesMoreThanOrEqual(t *testing.T) {
 	)
 }
 
-func testFilterSeries(name string, fn string, operator string, threshhold float64, in []models.Series, out []models.Series, t *testing.T) {
+func testFilterSeries(name string, fn string, operator string, threshold float64, in []models.Series, out []models.Series, t *testing.T) {
 	f := NewFilterSeries()
 	f.(*FuncFilterSeries).in = NewMock(in)
 	f.(*FuncFilterSeries).fn = fn
 	f.(*FuncFilterSeries).operator = operator
-	f.(*FuncFilterSeries).threshhold = threshhold
+	f.(*FuncFilterSeries).threshold = threshold
 	gots, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
-		t.Fatalf("case %q (%s, %s, %f): err should be nil. got %q", name, fn, operator, threshhold, err)
+		t.Fatalf("case %q (%s, %s, %f): err should be nil. got %q", name, fn, operator, threshold, err)
 	}
 	if len(gots) != len(out) {
-		t.Fatalf("case %q (%s, %s, %f): isNonNull len output expected %d, got %d", name, fn, operator, threshhold, len(out), len(gots))
+		t.Fatalf("case %q (%s, %s, %f): isNonNull len output expected %d, got %d", name, fn, operator, threshold, len(out), len(gots))
 	}
 	for i, g := range gots {
 		exp := out[i]
 		if g.Target != exp.Target {
-			t.Fatalf("case %q (%s, %s, %f): expected target %q, got %q", name, fn, operator, threshhold, exp.Target, g.Target)
+			t.Fatalf("case %q (%s, %s, %f): expected target %q, got %q", name, fn, operator, threshold, exp.Target, g.Target)
 		}
 		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%s, %s, %f) len output expected %d, got %d", name, fn, operator, threshhold, len(exp.Datapoints), len(g.Datapoints))
+			t.Fatalf("case %q (%s, %s, %f) len output expected %d, got %d", name, fn, operator, threshold, len(exp.Datapoints), len(g.Datapoints))
 		}
 		for j, p := range g.Datapoints {
 			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
 			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
 				continue
 			}
-			t.Fatalf("case %q (%s, %s, %f): output point %d - expected %v got %v", name, fn, operator, threshhold, j, exp.Datapoints[j], p)
+			t.Fatalf("case %q (%s, %s, %f): output point %d - expected %v got %v", name, fn, operator, threshold, j, exp.Datapoints[j], p)
 		}
 	}
 }
@@ -375,7 +375,7 @@ func benchmarkFilterSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema
 		f.(*FuncFilterSeries).in = NewMock(input)
 		f.(*FuncFilterSeries).fn = "sum"
 		f.(*FuncFilterSeries).operator = ">"
-		f.(*FuncFilterSeries).threshhold = rand.Float64()
+		f.(*FuncFilterSeries).threshold = rand.Float64()
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
