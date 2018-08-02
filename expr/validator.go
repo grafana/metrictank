@@ -36,3 +36,11 @@ func IsIntervalString(e *expr) error {
 	_, err := dur.ParseDuration(e.str)
 	return err
 }
+
+func IsOperator(e *expr) error {
+	switch e.str {
+	case "=", "!=", ">", ">=", "<", "<=":
+		return nil
+	}
+	return errors.New("Unsupported operator: " + e.str)
+}

@@ -61,6 +61,7 @@ func init() {
 		"exclude":           {NewExclude, true},
 		"grep":              {NewGrep, true},
 		"groupByTags":       {NewGroupByTags, true},
+		"filterSeries":      {NewFilterSeries, true},
 		"isNonNull":         {NewIsNonNull, true},
 		"max":               {NewAggregateConstructor("max", crossSeriesMax), true},
 		"maxSeries":         {NewAggregateConstructor("max", crossSeriesMax), true},
