@@ -306,7 +306,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 // across the cluster, except to the local peer. If any peer fails requests to
 // other peers are aborted. If enough peers have been heard from (based on
 // speculation-threshold configuration), and we are missing the others, try to
-// speculatively query other members of the shard group.
+// speculatively query each other member of each shard group.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
