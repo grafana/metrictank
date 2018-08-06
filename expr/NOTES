@@ -1,13 +1,23 @@
-## regarding when to allocate models.Series (or more precisely, their []schema.Point attribute)
+## Management of point slices
+
+The `models.Series` attribute `Datapoints []schema.Point` needs special atention:
+
+many processing functions will transform some of the points in datapoint slices. logically speaking, some output values are different than their input values,
+while some may remain the same. they need a place to store their output.
+
+Goals:
+* processing functions should not modify data in slices if those slices need to remain original (e.g. because they're re-used later)
+* minimize allocations of new slices foremost and data copying (if point in= point out) as a smaller concern
+* simple code
 
 there's 2 main choices:
 
 1) copy-on-write:
-- each function does not modify data in their inputs, they allocate new slices (or better: get from pool) etc to save output computations
-- storing data into new slice can be done in same pass as processing the data
-- potentially many of these steps in a sequence if you have lots of processing steps in a row
+- each function does not modify data in their inputs, they allocate new slices (or better: get from pool) in which they should store their output point values 
+- storing output data into new slice can typically be done in same pass as processing the input data
+- if you have lots of processing steps (graphite function calls) in a row, we will be creating more slices and copy data (for unmodified points) than strictly necessary.
 - getting a slice from the pool may cause a stall if it's not large enough and runtime needs to re-allocate and copy
-- allows us to pass the same data into multiple processing steps
+- allows us to pass the same data into multiple processing steps (reuse input data)
 
 2)copy in advance:
 - give each processing step a copied slice in which they can do whatever they want (e.g. modify in place)
@@ -16,7 +26,7 @@ there's 2 main choices:
 - often copying may be unnessary, but we can't know that in advance (unless we expand the expr tree to mark whether it'll do a write)
 
 
-I'm going to assume that multi-steps in a row is not that common, and COW seems more commonly the best approach
+for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
@@ -33,7 +43,8 @@ another processing step may require the same input data.
 
 function implementations:
 * must not modify existing slices
-* should use the pool to get new slices in which to store their new/modified data. and add the new slice into the cache so it can later be cleaned
+* should use the pool to get new slices in which to store their new/modified data.
+* should add said new slices into the cache so it can later be cleaned
 
 ## consolidateBy
 
