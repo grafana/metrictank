@@ -64,6 +64,7 @@ func TestStartup(t *testing.T) {
 	matchers := []track.Matcher{
 		{Str: "metrictank.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank.*carbon-in: listening on.*2003"},
+		{Str: "grafana.*HTTP Server Listen.*:3000"},
 	}
 	select {
 	case <-tracker.Match(matchers):
