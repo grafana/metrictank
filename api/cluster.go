@@ -363,7 +363,12 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 
 	result := make(map[string]PeerResponse)
 
-	specCheckTicker := time.NewTicker(5 * time.Millisecond)
+	var ticker *time.Ticker
+	var tickChan <-chan time.Time
+	if speculationThreshold != 1 {
+		ticker = time.NewTicker(5 * time.Millisecond)
+		tickChan = ticker.C
+	}
 
 	for len(pendingResponses) > 0 {
 		select {
@@ -382,12 +387,12 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 			delete(pendingResponses, resp.shardGroup)
 			delete(originalPeers, resp.data.peer.GetName())
 
-		case <-specCheckTicker.C:
+		case <-tickChan:
 			// Check if it's time to speculate!
 			percentReceived := 1 - (float64(len(pendingResponses)) / float64(len(peerGroups)))
-			if percentReceived > speculationThreshold {
+			if percentReceived >= speculationThreshold {
 				// kick off speculative queries to other members now
-				specCheckTicker.Stop()
+				ticker.Stop()
 				speculativeAttempts.Inc()
 				for shardGroup := range pendingResponses {
 					eligiblePeers := peerGroups[shardGroup][1:]
