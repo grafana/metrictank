@@ -49,7 +49,7 @@ Here are the currently included functions:
 | rangeOfSeries(seriesList) series                      |             | Stable     |
 | removeAboveValue(seriesList, n) seriesList            |             | Stable     |
 | removeBelowValue(seriesList, n) seriesList            |             | Stable     |
-| scale(seriesLists, num) series                        |             | Stable     |
+| scale(seriesList, num) series                         |             | Stable     |
 | scaleToSeconds(seriesList, seconds) series            |             | Stable     |
 | stddevSeries(seriesList) series                       |             | Stable     |
 | sumSeries(seriesLists) series                         | sum         | Stable     |
