@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"errors"
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
@@ -31,37 +32,37 @@ func (s *FuncFilterSeries) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncFilterSeries) getOperatorFunc() func(float64) bool {
-	switch s.operator {
+func getOperatorFunc(operator string) (func(float64, float64) bool, error) {
+	switch operator {
 	case "=":
-		return func(val float64) bool {
-			return val == s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return val == threshold
+		}, nil
 
 	case "!=":
-		return func(val float64) bool {
-			return val != s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return val != threshold
+		}, nil
 
 	case ">":
-		return func(val float64) bool {
-			return val > s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return val > threshold
+		}, nil
 	case ">=":
-		return func(val float64) bool {
-			return val >= s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return val >= threshold
+		}, nil
 
 	case "<":
-		return func(val float64) bool {
-			return math.IsNaN(val) || val < s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return math.IsNaN(val) || val < threshold
+		}, nil
 	case "<=":
-		return func(val float64) bool {
-			return math.IsNaN(val) || val <= s.threshold
-		}
+		return func(val, threshold float64) bool {
+			return math.IsNaN(val) || val <= threshold
+		}, nil
 	}
-	return func(val float64) bool { return false } // should never happen
+	return func(v1, v2 float64) bool { return false }, errors.New("Unsupported operator: " + operator)
 }
 
 func (s *FuncFilterSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
@@ -71,11 +72,14 @@ func (s *FuncFilterSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 	}
 
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
-	operatorFunc := s.getOperatorFunc()
+	operatorFunc, err := getOperatorFunc(s.operator)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		if operatorFunc(consolidationFunc(serie.Datapoints)) {
+		if operatorFunc(consolidationFunc(serie.Datapoints), s.threshold) {
 			out = append(out, serie)
 		}
 	}
