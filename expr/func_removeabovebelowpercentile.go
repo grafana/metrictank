@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -38,6 +39,10 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 	series, err := s.in.Exec(cache)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.n <= 0 {
+		return nil, errors.New("The requested percent is required to be greater than 0")
 	}
 
 	var output []models.Series
