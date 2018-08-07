@@ -323,7 +323,6 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	defer cancel()
 
 	originalPeers := make(map[string]struct{}, len(peerGroups))
-	pendingResponses := make(map[int32]struct{}, len(peerGroups))
 	receivedResponses := make(map[int32]struct{}, len(peerGroups))
 
 	responses := make(chan struct {
@@ -357,7 +356,6 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	for group, peers := range peerGroups {
 		peer := peers[0]
 		originalPeers[peer.GetName()] = struct{}{}
-		pendingResponses[group] = struct{}{}
 		go askPeer(group, peer)
 	}
 
@@ -371,7 +369,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 		defer ticker.Stop()
 	}
 
-	for len(pendingResponses) > 0 {
+	for len(receivedResponses) < len(peerGroups) {
 		select {
 		case resp := <-responses:
 			if _, ok := receivedResponses[resp.shardGroup]; ok {
@@ -385,7 +383,6 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 
 			result[resp.data.peer.GetName()] = resp.data
 			receivedResponses[resp.shardGroup] = struct{}{}
-			delete(pendingResponses, resp.shardGroup)
 			delete(originalPeers, resp.data.peer.GetName())
 
 		case <-tickChan:
@@ -395,8 +392,11 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 				// kick off speculative queries to other members now
 				ticker.Stop()
 				speculativeAttempts.Inc()
-				for shardGroup := range pendingResponses {
-					eligiblePeers := peerGroups[shardGroup][1:]
+				for shardGroup, peers := range peerGroups {
+					if _, ok := receivedResponses[shardGroup]; ok {
+						continue
+					}
+					eligiblePeers := peers[1:]
 					for _, peer := range eligiblePeers {
 						speculativeRequests.Inc()
 						go askPeer(shardGroup, peer)
