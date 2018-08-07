@@ -15,7 +15,7 @@ func TestRemoveAbovePercentileSingleAllNonNull(t *testing.T) {
 	testRemoveAboveBelowPercentile(
 		"removeAbovePercentile",
 		true,
-		199,
+		60,
 		[]models.Series{
 			{
 				Interval:   10,
@@ -100,7 +100,7 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 	testRemoveAboveBelowPercentile(
 		"removeBelowPercentile",
 		false,
-		199,
+		50,
 		[]models.Series{
 			{
 				Interval:   10,
@@ -262,7 +262,7 @@ func benchmarkRemoveAboveBelowPercentile(b *testing.B, numSeries int, fn0, fn1 f
 	for i := 0; i < b.N; i++ {
 		f := NewRemoveAboveBelowPercentileConstructor(rand.Int()%2 == 0)()
 		f.(*FuncRemoveAboveBelowPercentile).in = NewMock(input)
-		f.(*FuncRemoveAboveBelowPercentile).n = rand.Float64()
+		f.(*FuncRemoveAboveBelowPercentile).n = float64(rand.Int()%100 + 1)
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
