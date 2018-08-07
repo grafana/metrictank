@@ -1163,5 +1163,4 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 	default:
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "Unsupported response format requested: "+request.Format))
 	}
-	plan.Clean()
 }
