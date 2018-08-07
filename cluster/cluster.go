@@ -71,7 +71,7 @@ type partitionCandidates struct {
 	nodes    []Node
 }
 
-// return the list of nodes to broadcast requests to
+// MembersForQuery returns the list of nodes to broadcast requests to
 // If partitions are assinged to nodes in groups
 // (a[0,1], b[0,1], c[2,3], d[2,3] as opposed to a[0,1], b[0,2], c[1,3], d[2,3]),
 // only 1 member per partition is returned.
@@ -133,7 +133,10 @@ func MembersForQuery() ([]Node, error) {
 	count := int(atomic.AddUint32(&counter, 1))
 
 LOOP:
+	// for every partition...
 	for _, candidates := range membersMap {
+
+		// prefer the local node if it serves this partition
 		if candidates.nodes[0].GetName() == thisNode.GetName() {
 			if _, ok := selectedMembers[thisNode.GetName()]; !ok {
 				selectedMembers[thisNode.GetName()] = struct{}{}
@@ -142,14 +145,18 @@ LOOP:
 			continue LOOP
 		}
 
+		// for remote nodes, try to pick one we've already included
+
 		for _, n := range candidates.nodes {
 			if _, ok := selectedMembers[n.GetName()]; ok {
 				continue LOOP
 			}
 		}
+
 		// if no nodes have been selected yet then grab a node from
 		// the set of available nodes in such a way that nodes are
 		// weighted fairly across MembersForQuery calls
+
 		selected := candidates.nodes[count%len(candidates.nodes)]
 		selectedMembers[selected.GetName()] = struct{}{}
 		answer = append(answer, selected)
@@ -159,7 +166,7 @@ LOOP:
 }
 
 // MembersForSpeculativeQuery returns a prioritized list of nodes for each shard group
-// TODO - this assumes that the partition set for each node is perfectly aligned
+// keyed by the first (lowest) partition of their shard group
 func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 	thisNode := Manager.ThisNode()
 	allNodes := Manager.MemberList()
@@ -192,7 +199,7 @@ func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 	}
 
 	for _, shard := range membersMap {
-		// Shuffle to avoid always choosing the same peer firsts
+		// Shuffle to avoid always choosing the same peer first
 		for i := len(shard) - 1; i > 0; i-- {
 			j := rand.Intn(i + 1)
 			shard[i], shard[j] = shard[j], shard[i]

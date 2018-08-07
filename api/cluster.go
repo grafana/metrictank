@@ -306,7 +306,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 // across the cluster, except to the local peer. If any peer fails requests to
 // other peers are aborted. If enough peers have been heard from (based on
 // speculation-threshold configuration), and we are missing the others, try to
-// speculatively query other members of the shard group.
+// speculatively query each other member of each shard group.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
@@ -323,7 +323,6 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	defer cancel()
 
 	originalPeers := make(map[string]struct{}, len(peerGroups))
-	pendingResponses := make(map[int32]struct{}, len(peerGroups))
 	receivedResponses := make(map[int32]struct{}, len(peerGroups))
 
 	responses := make(chan struct {
@@ -357,15 +356,20 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	for group, peers := range peerGroups {
 		peer := peers[0]
 		originalPeers[peer.GetName()] = struct{}{}
-		pendingResponses[group] = struct{}{}
 		go askPeer(group, peer)
 	}
 
 	result := make(map[string]PeerResponse)
 
-	specCheckTicker := time.NewTicker(5 * time.Millisecond)
+	var ticker *time.Ticker
+	var tickChan <-chan time.Time
+	if speculationThreshold != 1 {
+		ticker = time.NewTicker(5 * time.Millisecond)
+		tickChan = ticker.C
+		defer ticker.Stop()
+	}
 
-	for len(pendingResponses) > 0 {
+	for len(receivedResponses) < len(peerGroups) {
 		select {
 		case resp := <-responses:
 			if _, ok := receivedResponses[resp.shardGroup]; ok {
@@ -379,18 +383,20 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 
 			result[resp.data.peer.GetName()] = resp.data
 			receivedResponses[resp.shardGroup] = struct{}{}
-			delete(pendingResponses, resp.shardGroup)
 			delete(originalPeers, resp.data.peer.GetName())
 
-		case <-specCheckTicker.C:
+		case <-tickChan:
 			// Check if it's time to speculate!
-			percentReceived := 1 - (float64(len(pendingResponses)) / float64(len(peerGroups)))
-			if percentReceived > speculationThreshold {
+			percentReceived := float64(len(receivedResponses)) / float64(len(peerGroups))
+			if percentReceived >= speculationThreshold {
 				// kick off speculative queries to other members now
-				specCheckTicker.Stop()
+				ticker.Stop()
 				speculativeAttempts.Inc()
-				for shardGroup := range pendingResponses {
-					eligiblePeers := peerGroups[shardGroup][1:]
+				for shardGroup, peers := range peerGroups {
+					if _, ok := receivedResponses[shardGroup]; ok {
+						continue
+					}
+					eligiblePeers := peers[1:]
 					for _, peer := range eligiblePeers {
 						speculativeRequests.Inc()
 						go askPeer(shardGroup, peer)
