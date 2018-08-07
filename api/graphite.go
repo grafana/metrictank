@@ -821,28 +821,13 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64, maxSeries int) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	responseChan := make(chan PeerResponse)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	var queryErr, err error
-	go func() {
-		queryErr = s.peerQuerySpeculativeChan(ctx, data, "clusterFindByTag", "/index/find_by_tag", responseChan)
-		wg.Done()
-	}()
+	responseChan, errorChan := s.peerQuerySpeculativeChan(ctx, data, "clusterFindByTag", "/index/find_by_tag")
 
 	var allSeries []Series
 
 	for r := range responseChan {
-		select {
-		case <-ctx.Done():
-			//request canceled
-			return nil, nil
-		default:
-		}
-
 		resp := models.IndexFindByTagResp{}
-		_, err = resp.UnmarshalMsg(r.buf)
+		_, err := resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
@@ -862,8 +847,13 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		}
 	}
 
-	wg.Wait()
-	return allSeries, queryErr
+	select {
+	case err := <-errorChan:
+		return nil, err
+	default: // no error
+	}
+
+	return allSeries, nil
 }
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
