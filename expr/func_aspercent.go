@@ -55,9 +55,6 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if err != nil {
 			return nil, err
 		}
-		if len(totals) == 0 {
-			totals = nil
-		}
 	}
 
 	if s.nodes != nil {
@@ -68,7 +65,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	return outSeries, err
 }
 
-func (s *FuncAsPercent) execWithNodes(series []models.Series, totals []models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.Series, error) {
 	var outSeries []models.Series
 	// Set of keys
 	keys := make(map[string]struct{})
@@ -89,7 +86,7 @@ func (s *FuncAsPercent) execWithNodes(series []models.Series, totals []models.Se
 	}
 
 	for key := range keys {
-		// No series for total series
+		// No input series for a corresponding total series
 		if _, ok := metaSeries[key]; !ok {
 			serie2 := totalSeries[key]
 			serie2.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", serie2.QueryPatt)
@@ -103,8 +100,8 @@ func (s *FuncAsPercent) execWithNodes(series []models.Series, totals []models.Se
 		}
 
 		for _, serie1 := range metaSeries[key] {
-			// no total
-			deepCopySerieElements(&serie1)
+			serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
+			// No total series for a corresponding input series
 			if _, ok := totalSeries[key]; !ok {
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
@@ -127,7 +124,7 @@ func (s *FuncAsPercent) execWithNodes(series []models.Series, totals []models.Se
 	return outSeries, nil
 }
 
-func (s *FuncAsPercent) execWithoutNodes(series []models.Series, totals []models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]models.Series, error) {
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
@@ -151,10 +148,10 @@ func (s *FuncAsPercent) execWithoutNodes(series []models.Series, totals []models
 			})
 			for i, serie1 := range series {
 				serie2 := totals[i]
+				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
-				deepCopySerieElements(&serie1)
 				for i := range serie1.Datapoints {
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
@@ -169,10 +166,10 @@ func (s *FuncAsPercent) execWithoutNodes(series []models.Series, totals []models
 	}
 
 	for _, serie := range series {
+		serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.QueryPatt)
 		serie.Tags = map[string]string{"name": serie.Target}
-		deepCopySerieElements(&serie)
 		for i := range serie.Datapoints {
 			var totalVal float64
 			if len(totalsSerie.Datapoints) > i {
@@ -224,8 +221,7 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]mode
 // Datapoints are always a copy
 func sumSeries(series []models.Series) models.Series {
 	if len(series) == 1 {
-		deepCopySerieElements(&series[0])
-		return series[0]
+		return series[0].Copy(pointSlicePool.Get().([]schema.Point))
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	crossSeriesSum(series, &out)
@@ -252,17 +248,4 @@ Loop:
 		QueryCons:    queryCons,
 		Tags:         map[string]string{"name": name},
 	}
-}
-
-func deepCopySerieElements(serie *models.Series) {
-	out := pointSlicePool.Get().([]schema.Point)
-	for _, p := range serie.Datapoints {
-		out = append(out, p)
-	}
-	serie.Datapoints = out
-	newTags := make(map[string]string, len(serie.Tags))
-	for k, v := range serie.Tags {
-		newTags[k] = v
-	}
-	serie.Tags = newTags
 }

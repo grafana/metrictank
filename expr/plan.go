@@ -179,12 +179,12 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 
 	// for any provided keyword args, verify that they are what the function stipulated
 	// and that they have not already been specified via their position
-	for key := range e.namedArgs {
+	for key, got := range e.namedArgs {
 		_, ok := seenKwargs[key]
 		if ok {
 			return nil, ErrKwargSpecifiedTwice{key}
 		}
-		err = e.consumeKwarg(key, argsExp[cutoff:])
+		err = e.consumeKwarg(key, argsExp[cutoff:], got)
 		if err != nil {
 			return nil, err
 		}
