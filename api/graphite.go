@@ -847,13 +847,8 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		}
 	}
 
-	select {
-	case err := <-errorChan:
-		return nil, err
-	default: // no error
-	}
-
-	return allSeries, nil
+	err := <-errorChan
+	return allSeries, err
 }
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {

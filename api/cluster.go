@@ -320,13 +320,8 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 		result[resp.peer.GetName()] = resp
 	}
 
-	select {
-	case err := <-errorChan:
-		return nil, err
-	default: // no error
-	}
-
-	return result, nil
+	err := <-errorChan
+	return result, err
 }
 
 // peerQuerySpeculativeChan takes a request and the path to request it on, then fans it out
