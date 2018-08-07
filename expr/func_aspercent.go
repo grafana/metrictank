@@ -61,63 +61,74 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if s.nodes != nil {
-		// Set of keys
-		keys := make(map[string]struct{})
-		// Series grouped by key
-		metaSeries := groupSeriesByKey(series, s.nodes, &keys)
-		// The totals series for each key
-		var totalSeries map[string]models.Series
+		outSeries, err = s.execWithNodes(series, totals)
+	} else {
+		outSeries, err = s.execWithoutNodes(series, totals)
+	}
+	return outSeries, err
+}
 
-		// calculate the sum
-		if math.IsNaN(s.totalFloat) && totals == nil {
-			totalSeries = getTotalSeries(metaSeries)
-			// calculate sum of totals series
-		} else if totals != nil {
-			totalSeriesLists := groupSeriesByKey(totals, s.nodes, &keys)
-			totalSeries = getTotalSeries(totalSeriesLists)
-		} else {
-			return nil, errors.New("total must be None or a seriesList")
-		}
+func (s *FuncAsPercent) execWithNodes(series []models.Series, totals []models.Series) ([]models.Series, error) {
+	var outSeries []models.Series
+	// Set of keys
+	keys := make(map[string]struct{})
+	// Series grouped by key
+	metaSeries := groupSeriesByKey(series, s.nodes, &keys)
+	// The totals series for each key
+	var totalSeries map[string]models.Series
 
-		for key := range keys {
-			// No series for total series
-			if _, ok := metaSeries[key]; !ok {
-				serie2 := totalSeries[key]
-				serie2.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", serie2.QueryPatt)
-				serie2.Target = fmt.Sprintf("asPercent(MISSING,%s)", serie2.Target)
-				serie2.Tags = map[string]string{"name": serie2.Target}
-				for i := range serie2.Datapoints {
-					serie2.Datapoints[i].Val = math.NaN()
-				}
-				outSeries = append(outSeries, serie2)
-				continue
-			}
-
-			for _, serie1 := range metaSeries[key] {
-				// no total
-				deepCopySerieElements(&serie1)
-				if _, ok := totalSeries[key]; !ok {
-					serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
-					serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
-					serie1.Tags = map[string]string{"name": serie1.Target}
-					for i := range serie1.Datapoints {
-						serie1.Datapoints[i].Val = math.NaN()
-					}
-				} else {
-					serie2 := totalSeries[key]
-					serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
-					serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
-					serie1.Tags = map[string]string{"name": serie1.Target}
-					for i := range serie1.Datapoints {
-						serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
-					}
-				}
-				outSeries = append(outSeries, serie1)
-			}
-		}
-		return outSeries, nil
+	// calculate the sum
+	if math.IsNaN(s.totalFloat) && totals == nil {
+		totalSeries = getTotalSeries(metaSeries)
+		// calculate sum of totals series
+	} else if totals != nil {
+		totalSeriesLists := groupSeriesByKey(totals, s.nodes, &keys)
+		totalSeries = getTotalSeries(totalSeriesLists)
+	} else {
+		return nil, errors.New("total must be None or a seriesList")
 	}
 
+	for key := range keys {
+		// No series for total series
+		if _, ok := metaSeries[key]; !ok {
+			serie2 := totalSeries[key]
+			serie2.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", serie2.QueryPatt)
+			serie2.Target = fmt.Sprintf("asPercent(MISSING,%s)", serie2.Target)
+			serie2.Tags = map[string]string{"name": serie2.Target}
+			for i := range serie2.Datapoints {
+				serie2.Datapoints[i].Val = math.NaN()
+			}
+			outSeries = append(outSeries, serie2)
+			continue
+		}
+
+		for _, serie1 := range metaSeries[key] {
+			// no total
+			deepCopySerieElements(&serie1)
+			if _, ok := totalSeries[key]; !ok {
+				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
+				serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
+				serie1.Tags = map[string]string{"name": serie1.Target}
+				for i := range serie1.Datapoints {
+					serie1.Datapoints[i].Val = math.NaN()
+				}
+			} else {
+				serie2 := totalSeries[key]
+				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
+				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
+				serie1.Tags = map[string]string{"name": serie1.Target}
+				for i := range serie1.Datapoints {
+					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
+				}
+			}
+			outSeries = append(outSeries, serie1)
+		}
+	}
+	return outSeries, nil
+}
+
+func (s *FuncAsPercent) execWithoutNodes(series []models.Series, totals []models.Series) ([]models.Series, error) {
+	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
 		totalsSerie = sumSeries(series)
@@ -173,7 +184,6 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		}
 		outSeries = append(outSeries, serie)
 	}
-
 	return outSeries, nil
 }
 
