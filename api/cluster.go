@@ -368,6 +368,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	if speculationThreshold != 1 {
 		ticker = time.NewTicker(5 * time.Millisecond)
 		tickChan = ticker.C
+		defer ticker.Stop()
 	}
 
 	for len(pendingResponses) > 0 {
