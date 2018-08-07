@@ -390,7 +390,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 
 		case <-tickChan:
 			// Check if it's time to speculate!
-			percentReceived := 1 - (float64(len(pendingResponses)) / float64(len(peerGroups)))
+			percentReceived := float64(len(receivedResponses)) / float64(len(peerGroups))
 			if percentReceived >= speculationThreshold {
 				// kick off speculative queries to other members now
 				ticker.Stop()
