@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -202,7 +203,8 @@ func (n HTTPNode) GetName() string {
 func handleResp(rsp *http.Response) ([]byte, error) {
 	defer rsp.Body.Close()
 	if rsp.StatusCode != 200 {
-		ioutil.ReadAll(rsp.Body)
+		// Read in body so that the connection can be reused
+		io.Copy(ioutil.Discard, rsp.Body)
 		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
 	}
 	return ioutil.ReadAll(rsp.Body)
