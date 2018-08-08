@@ -337,10 +337,10 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 	resultChan := make(chan PeerResponse)
 	errorChan := make(chan error, 1)
 
-	defer close(errorChan)
-	defer close(resultChan)
-
 	go func() {
+		defer close(errorChan)
+		defer close(resultChan)
+
 		peerGroups, err := cluster.MembersForSpeculativeQuery()
 		if err != nil {
 			log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
