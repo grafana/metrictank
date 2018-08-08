@@ -45,7 +45,7 @@ func TestRemoveAbovePercentileSingleAllNonNull(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
-				QueryPatt: "removeAbovePercentile(a, 199)",
+				QueryPatt: "removeAbovePercentile(a, 60)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: 0, Ts: 20},
@@ -57,31 +57,31 @@ func TestRemoveAbovePercentileSingleAllNonNull(t *testing.T) {
 			},
 			{
 				Interval:  10,
-				QueryPatt: "removeAbovePercentile(b, 199)",
+				QueryPatt: "removeAbovePercentile(b, 60)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: math.NaN(), Ts: 30},
+					{Val: math.MaxFloat64, Ts: 20},
+					{Val: math.MaxFloat64 - 20, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890, Ts: 50},
 					{Val: math.NaN(), Ts: 60},
 				},
 			},
 			{
 				Interval:  10,
-				QueryPatt: "removeAbovePercentile(c, 199)",
+				QueryPatt: "removeAbovePercentile(c, 60)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 1, Ts: 30},
 					{Val: 2, Ts: 40},
 					{Val: 3, Ts: 50},
-					{Val: 4, Ts: 60},
+					{Val: math.NaN(), Ts: 60},
 				},
 			},
 			{
 				Interval:  10,
-				QueryPatt: "removeAbovePercentile(d, 199)",
+				QueryPatt: "removeAbovePercentile(d, 60)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: 33, Ts: 20},
@@ -130,11 +130,11 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
-				QueryPatt: "removeBelowPercentile(a, 199)",
+				QueryPatt: "removeBelowPercentile(a, 50)",
 				Datapoints: []schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.NaN(), Ts: 20},
-					{Val: math.NaN(), Ts: 30},
+					{Val: 5.5, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
 					{Val: 1234567890, Ts: 60},
@@ -142,37 +142,37 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 			},
 			{
 				Interval:  10,
-				QueryPatt: "removeBelowPercentile(b, 199)",
+				QueryPatt: "removeBelowPercentile(b, 50)",
 				Datapoints: []schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.MaxFloat64, Ts: 20},
 					{Val: math.MaxFloat64 - 20, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
-					{Val: 1234567890, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(c, 199)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: math.NaN(), Ts: 30},
-					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
 					{Val: math.NaN(), Ts: 60},
 				},
 			},
 			{
 				Interval:  10,
-				QueryPatt: "removeBelowPercentile(d, 199)",
+				QueryPatt: "removeBelowPercentile(c, 50)",
+				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 10},
+					{Val: math.NaN(), Ts: 20},
+					{Val: math.NaN(), Ts: 30},
+					{Val: 2, Ts: 40},
+					{Val: 3, Ts: 50},
+					{Val: 4, Ts: 60},
+				},
+			},
+			{
+				Interval:  10,
+				QueryPatt: "removeBelowPercentile(d, 50)",
 				Datapoints: []schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.NaN(), Ts: 20},
 					{Val: 199, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
+					{Val: 80, Ts: 50},
 					{Val: 250, Ts: 60},
 				},
 			},
