@@ -88,7 +88,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.
 	for key := range keys {
 		// No input series for a corresponding total series
 		if _, ok := metaSeries[key]; !ok {
-			serie2 := totalSeries[key]
+			serie2 := totalSeries[key].Copy(pointSlicePool.Get().([]schema.Point))
 			serie2.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", serie2.QueryPatt)
 			serie2.Target = fmt.Sprintf("asPercent(MISSING,%s)", serie2.Target)
 			serie2.Tags = map[string]string{"name": serie2.Target}
@@ -221,7 +221,7 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]mode
 // Datapoints are always a copy
 func sumSeries(series []models.Series) models.Series {
 	if len(series) == 1 {
-		return series[0].Copy(pointSlicePool.Get().([]schema.Point))
+		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	crossSeriesSum(series, &out)

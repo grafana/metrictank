@@ -529,8 +529,7 @@ func testAsPercent(name string, in []models.Series, out []models.Series, t *test
 
 	originalSeries := make([]models.Series, len(in))
 	for i, serie := range in {
-		originalSeries[i] = serie
-		originalSeries[i].Datapoints = getCopy(serie.Datapoints)
+		originalSeries[i] = serie.Copy(make([]schema.Point, 0, len(serie.Datapoints)))
 	}
 	gots, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
