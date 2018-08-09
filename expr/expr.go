@@ -64,6 +64,9 @@ func (e expr) Print(indent int) string {
 // the returned pos is always the index where the next argument should be.
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	got := e.args[pos]
+	if got.etype == etName && got.str == "None" && !exp.Optional() {
+		return 0, ErrMissingArg
+	}
 	switch v := exp.(type) {
 	case ArgSeries, ArgSeriesList:
 		if got.etype != etName && got.etype != etFunc {
@@ -208,13 +211,13 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	got := e.args[pos]
 	var err error
 	var fn GraphiteFunc
-	if e.args[pos].etype == etName && e.args[pos].str == "None" {
+	if got.etype == etName && got.str == "None" {
 		pos++
 		return pos, reqs, nil
 	}
 	switch v := exp.(type) {
 	case ArgIn:
-		if e.args[pos].etype == etName || e.args[pos].etype == etFunc {
+		if got.etype == etName || got.etype == etFunc {
 			for _, a := range v.args {
 				switch v := a.(type) {
 				case ArgSeries, ArgSeriesList, ArgSeriesLists:
