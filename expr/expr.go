@@ -73,18 +73,18 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 	}
 	switch v := exp.(type) {
-	case ArgSeries, ArgSeriesList:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+	case ArgBool:
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
 		}
-	case ArgSeriesLists:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		if got.etype == etString {
+			if val, ok := strToBool(got.str); ok {
+				*v.val = val
+				break
+			}
 		}
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos++
-		}
+		return 0, ErrBadArgumentStr{"boolean", got.etype.String()}
 	case ArgIn:
 		for _, a := range v.args {
 
@@ -134,6 +134,32 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		} else {
 			*v.val = got.float
 		}
+	case ArgRegex:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, generateValidatorError(v.key, err)
+			}
+		}
+		re, err := regexp.Compile(got.str)
+		if err != nil {
+			return 0, err
+		}
+		*v.val = re
+	case ArgSeries, ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		}
+	case ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+			pos++
+		}
 	case ArgString:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", got.etype.String()}
@@ -155,32 +181,6 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			*v.val = append(*v.val, e.args[pos].str)
 		}
 		return pos, nil
-	case ArgRegex:
-		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, generateValidatorError(v.key, err)
-			}
-		}
-		re, err := regexp.Compile(got.str)
-		if err != nil {
-			return 0, err
-		}
-		*v.val = re
-	case ArgBool:
-		if got.etype == etBool {
-			*v.val = got.bool
-			break
-		}
-		if got.etype == etString {
-			if val, ok := strToBool(got.str); ok {
-				*v.val = val
-				break
-			}
-		}
-		return 0, ErrBadArgumentStr{"boolean", got.etype.String()}
 	case ArgStringsOrInts:
 		// consume all args (if any) in args that will yield a string or int
 		for ; len(e.args) > pos && (e.args[pos].etype == etString || e.args[pos].etype == etInt); pos++ {
@@ -240,7 +240,6 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 			}
 			return 0, nil, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 		}
-
 	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
@@ -301,6 +300,18 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	}
 	got := e.namedArgs[key]
 	switch v := exp.(type) {
+	case ArgBool:
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
+		}
+		if got.etype == etString {
+			if val, ok := strToBool(got.str); ok {
+				*v.val = val
+				break
+			}
+		}
+		return ErrBadKwarg{key, exp, got.etype}
 	case ArgIn:
 		for _, a := range v.args {
 			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn,
@@ -335,28 +346,16 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		default:
 			return ErrBadKwarg{key, exp, got.etype}
 		}
-	case ArgString:
-		if got.etype != etString {
-			return ErrBadKwarg{key, exp, got.etype}
-		}
-		*v.val = got.str
-	case ArgBool:
-		if got.etype == etBool {
-			*v.val = got.bool
-			break
-		}
-		if got.etype == etString {
-			if val, ok := strToBool(got.str); ok {
-				*v.val = val
-				break
-			}
-		}
-		return ErrBadKwarg{key, exp, got.etype}
 	case ArgSeries, ArgSeriesList, ArgSeriesLists:
 		if got.etype != etName && got.etype != etFunc {
 			return ErrBadArgumentStr{"func or name", got.etype.String()}
 		}
 		// TODO consume series arg
+	case ArgString:
+		if got.etype != etString {
+			return ErrBadKwarg{key, exp, got.etype}
+		}
+		*v.val = got.str
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}
