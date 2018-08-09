@@ -63,19 +63,6 @@ var b1AsPercentOfa1b1 = []schema.Point{
 	{Val: 100 * (math.MaxFloat64 / 1000) / (1234567890 + math.MaxFloat64/1000), Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
-var a1AsPercentOfa1b1b1 = []schema.Point{
-	{Val: 0, Ts: 10},
-	{Val: 50.6 / (50.6 - 25.8 - 25.8) * 100, Ts: 20},
-	{Val: 1234567890 / (float64(1234567890) + math.MaxFloat64/500) * 100, Ts: 30},
-	{Val: math.NaN(), Ts: 40},
-}
-var b1AsPercentOfa1b1b1 = []schema.Point{
-	{Val: 50, Ts: 10},
-	{Val: -100 * 25.8 / (50.6 - 25.8 - 25.8), Ts: 20},
-	{Val: (100 * math.MaxFloat64 / 1000) / (1234567890 + math.MaxFloat64/500), Ts: 30},
-	{Val: math.NaN(), Ts: 40},
-}
-
 var b1AsPercentOfa1 = []schema.Point{
 	{Val: math.NaN(), Ts: 10},
 	{Val: float64(-25.8) / 50.6 * 100, Ts: 20},
