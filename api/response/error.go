@@ -26,6 +26,11 @@ func WrapError(e error) *ErrorResp {
 		resp.code = e.(Error).Code()
 	}
 
+	// 599 is max HTTP status code
+	if resp.code > 599 {
+		resp.code = 500
+	}
+
 	return resp
 }
 
@@ -52,7 +57,7 @@ func WrapErrorForTagDB(e error) *ErrorResp {
 		resp.code = e.(Error).Code()
 	}
 
-	// 599 is max HTTP status code (but 512-599 are unassigned at the time of this writing)
+	// 599 is max HTTP status code
 	if resp.code > 599 {
 		resp.code = 500
 	}
