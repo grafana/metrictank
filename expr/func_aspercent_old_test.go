@@ -28,7 +28,7 @@ var a1 = []schema.Point{
 var b1 = []schema.Point{
 	{Val: 10, Ts: 10},
 	{Val: -25.8, Ts: 20},
-	{Val: math.MaxFloat64 / 1000, Ts: 30},
+	{Val: float64(math.MaxFloat64 / 1000), Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
 var a2 = []schema.Point{
@@ -53,8 +53,8 @@ var a1AsPercentOfa1 = []schema.Point{
 }
 var a1AsPercentOfa1b1 = []schema.Point{
 	{Val: 0, Ts: 10}, // 100 * 0 / (0+10)
-	{Val: 100 * float64(50.6) / float64(50.6-25.8), Ts: 20},
-	{Val: 100 * float64(1234567890) / (float64(1234567890) + math.MaxFloat64/1000), Ts: 30},
+	{Val: float64(50.6) / float64(50.6-25.8) * 100, Ts: 20},
+	{Val: float64(1234567890) / (float64(1234567890) + math.MaxFloat64/1000) * 100, Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
 var b1AsPercentOfa1b1 = []schema.Point{
@@ -65,8 +65,8 @@ var b1AsPercentOfa1b1 = []schema.Point{
 }
 var a1AsPercentOfa1b1b1 = []schema.Point{
 	{Val: 0, Ts: 10},
-	{Val: 100 * 50.6 / (50.6 - 25.8 - 25.8), Ts: 20},
-	{Val: 100 * 1234567890 / (float64(1234567890) + math.MaxFloat64/500), Ts: 30},
+	{Val: 50.6 / (50.6 - 25.8 - 25.8) * 100, Ts: 20},
+	{Val: 1234567890 / (float64(1234567890) + math.MaxFloat64/500) * 100, Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
 var b1AsPercentOfa1b1b1 = []schema.Point{
@@ -77,9 +77,9 @@ var b1AsPercentOfa1b1b1 = []schema.Point{
 }
 
 var b1AsPercentOfa1 = []schema.Point{
-	{Val: math.MaxFloat64, Ts: 10},
-	{Val: 100 * (-25.8) / 50.6, Ts: 20},
-	{Val: 100 * (math.MaxFloat64 / float64(1000)) / float64(1234567890), Ts: 30},
+	{Val: math.NaN(), Ts: 10},
+	{Val: float64(-25.8) / 50.6 * 100, Ts: 20},
+	{Val: float64(math.MaxFloat64/1000.0) / 1234567890 * 100, Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
 
@@ -98,7 +98,7 @@ var b1AsPercentOfb2 = []schema.Point{
 
 var a1AsPercentOfFloat10 = []schema.Point{
 	{Val: 0, Ts: 10},
-	{Val: 506, Ts: 20},
+	{Val: float64(50.6) / 10.0 * 100, Ts: 20},
 	{Val: 12345678900, Ts: 30},
 	{Val: math.NaN(), Ts: 40},
 }
@@ -119,8 +119,8 @@ func TestAsPercentSingleInputUsingSelf(t *testing.T) {
 	out := []models.Series{
 		{
 			Interval:   10,
-			QueryPatt:  "asPercent(a)",
-			Target:     "asPercent(a)",
+			QueryPatt:  "asPercent(a,sumSeries(a))",
+			Target:     "asPercent(a,sumSeries(a))",
 			Datapoints: getCopy(a1AsPercentOfa1),
 		},
 	}
@@ -149,14 +149,14 @@ func TestAsPercentDoubleInputUsingSelf(t *testing.T) {
 	out := []models.Series{
 		{
 			Interval:   10,
-			QueryPatt:  "asPercent(a.*)",
-			Target:     "asPercent(a.a)",
+			QueryPatt:  "asPercent(a.*,sumSeries(a.*))",
+			Target:     "asPercent(a.a,sumSeries(a.*))",
 			Datapoints: getCopy(a1AsPercentOfa1b1),
 		},
 		{
 			Interval:   10,
-			QueryPatt:  "asPercent(a.*)",
-			Target:     "asPercent(a.b)",
+			QueryPatt:  "asPercent(a.*,sumSeries(a.*))",
+			Target:     "asPercent(a.b,sumSeries(a.*))",
 			Datapoints: getCopy(b1AsPercentOfa1b1),
 		},
 	}

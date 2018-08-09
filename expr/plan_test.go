@@ -241,6 +241,30 @@ func TestArgInSeriesPositional(t *testing.T) {
 	}
 }
 
+func TestArgInSeriesPositionalNone(t *testing.T) {
+	fn := NewAsPercent()
+	e := &expr{
+		etype: etFunc,
+		str:   "perSecond",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+			{etype: etName, str: "None"},
+		},
+		namedArgs: nil,
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ap := fn.(*FuncAsPercent)
+	if !math.IsNaN(ap.totalFloat) {
+		t.Fatalf("totalFloat should be unset. got %f", ap.totalFloat)
+	}
+	if ap.totalSeries != nil {
+		t.Fatalf("totalSeries must be nil. got %v", ap.totalSeries)
+	}
+}
+
 func TestArgInIntPositional(t *testing.T) {
 	fn := NewAsPercent()
 	e := &expr{

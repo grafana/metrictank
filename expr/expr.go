@@ -208,6 +208,10 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	got := e.args[pos]
 	var err error
 	var fn GraphiteFunc
+	if e.args[pos].etype == etName && e.args[pos].str == "None" {
+		pos++
+		return pos, reqs, nil
+	}
 	switch v := exp.(type) {
 	case ArgIn:
 		if e.args[pos].etype == etName || e.args[pos].etype == etFunc {

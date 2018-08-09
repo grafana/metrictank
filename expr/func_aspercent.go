@@ -58,8 +58,14 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	if s.nodes != nil {
+		if !math.IsNaN(s.totalFloat) {
+			return nil, errors.New("total must be None or a seriesList")
+		}
 		outSeries, err = s.execWithNodes(series, totals)
 	} else {
+		if totals != nil && len(totals) != 1 && len(totals) != len(series) {
+			return nil, errors.New("asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
+		}
 		outSeries, err = s.execWithoutNodes(series, totals)
 	}
 	return outSeries, err
@@ -81,8 +87,6 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.
 	} else if totals != nil {
 		totalSeriesLists := groupSeriesByKey(totals, s.nodes, &keys)
 		totalSeries = getTotalSeries(totalSeriesLists)
-	} else {
-		return nil, errors.New("total must be None or a seriesList")
 	}
 
 	for key := range keys {
@@ -130,7 +134,7 @@ func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]mode
 	if math.IsNaN(s.totalFloat) && totals == nil {
 		totalsSerie = sumSeries(series)
 		if len(series) == 1 {
-			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.Target)
+			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.Tags = map[string]string{"name": totalsSerie.Target}
 		}
@@ -158,17 +162,16 @@ func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]mode
 				outSeries = append(outSeries, serie1)
 			}
 			return outSeries, nil
-		} else {
-			return nil, errors.New("asPercent second argument must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 		}
 	} else {
 		totalsSerie.QueryPatt = fmt.Sprint(s.totalFloat)
+		totalsSerie.Target = fmt.Sprint(s.totalFloat)
 	}
 
 	for _, serie := range series {
 		serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
-		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.QueryPatt)
+		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.Target)
 		serie.Tags = map[string]string{"name": serie.Target}
 		for i := range serie.Datapoints {
 			var totalVal float64

@@ -175,13 +175,13 @@ func TestAsPercentTotalSerie(t *testing.T) {
 			{
 				Interval:   10,
 				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
-				Target:     "asPercent(b;tag=something;tag2=anything,func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(b;tag=something;tag2=anything,a;tag=some;tag2=totalSerie)",
 				Datapoints: out1,
 			},
 			{
 				Interval:   10,
 				QueryPatt:  "asPercent(func(tag=something;tag2=anything),func(tag=some;tag2=totalSerie))",
-				Target:     "asPercent(d;tag=something;tag2=anything,func(tag=some;tag2=totalSerie))",
+				Target:     "asPercent(d;tag=something;tag2=anything,a;tag=some;tag2=totalSerie)",
 				Datapoints: out2,
 			},
 		},
