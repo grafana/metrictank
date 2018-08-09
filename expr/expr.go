@@ -287,7 +287,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 // consumeKwarg consumes the kwarg (by key k) and verifies it
 // if the specified argument is valid, it is saved in exp.val
 // where exp is the arg specified by the function that has the given key
-func (e expr) consumeKwarg(key string, optArgs []Arg, got *expr) error {
+func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	var found bool
 	var exp Arg
 	for _, exp = range optArgs {
@@ -299,13 +299,18 @@ func (e expr) consumeKwarg(key string, optArgs []Arg, got *expr) error {
 	if !found {
 		return ErrUnknownKwarg{key}
 	}
+	got := e.namedArgs[key]
 	switch v := exp.(type) {
 	case ArgIn:
 		for _, a := range v.args {
 			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn,
 			// not for every individual sub-arg so to make sure we pass the key matching requirement,
 			// we just call consumeKwarg with whatever the key is set to (typically "")
-			err := e.consumeKwarg(a.Key(), []Arg{a}, got)
+			// and set up optArgs and namedArgs such that it will work
+			subE := expr{
+				namedArgs: map[string]*expr{a.Key(): got},
+			}
+			err := subE.consumeKwarg(a.Key(), []Arg{a})
 			if err == nil {
 				return err
 			}
