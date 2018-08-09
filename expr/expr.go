@@ -64,8 +64,13 @@ func (e expr) Print(indent int) string {
 // the returned pos is always the index where the next argument should be.
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	got := e.args[pos]
-	if got.etype == etName && got.str == "None" && !exp.Optional() {
-		return 0, ErrMissingArg
+	if got.etype == etName && got.str == "None" {
+		if !exp.Optional() {
+			return 0, ErrMissingArg
+		} else {
+			pos++
+			return pos, nil
+		}
 	}
 	switch v := exp.(type) {
 	case ArgSeries, ArgSeriesList:
@@ -82,6 +87,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 	case ArgIn:
 		for _, a := range v.args {
+
 			p, err := e.consumeBasicArg(pos, a)
 			if err == nil {
 				return p, err
