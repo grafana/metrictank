@@ -19,7 +19,7 @@ func equalOutput(exp, got []models.Series, expErr, gotErr error) error {
 	if len(got) != len(exp) {
 		return fmt.Errorf("perSecond len output expected %d, got %d", len(exp), len(got))
 	}
-	for i, _ := range got {
+	for i := range got {
 		if err := equalSeries(exp[i], got[i]); err != nil {
 			return fmt.Errorf("series %d: %s", i, err)
 		}
