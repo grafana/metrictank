@@ -45,7 +45,12 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 		return nil, errors.New("The requested percent is required to be greater than 0")
 	}
 
+	if len(series) == 0 {
+		return series, nil
+	}
+
 	var output []models.Series
+	sortedDatapointVals := make([]float64, 0, len(series[0].Datapoints)) //reuse float64 slice
 	for _, serie := range series {
 		if s.above {
 			serie.Target = fmt.Sprintf("removeAbovePercentile(%s, %g)", serie.Target, s.n)
@@ -61,7 +66,7 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 		newTags["nPercentile"] = fmt.Sprintf("%g", s.n)
 		serie.Tags = newTags
 
-		percentile := getPercentileValue(serie.Datapoints, s.n)
+		percentile := getPercentileValue(serie.Datapoints, s.n, sortedDatapointVals)
 
 		out := pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
@@ -85,19 +90,17 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 	return output, nil
 }
 
-func getPercentileValue(datapoints []schema.Point, n float64) float64 {
-	sortedDatapoints := make([]schema.Point, 0, len(datapoints))
+func getPercentileValue(datapoints []schema.Point, n float64, sortedDatapointVals []float64) float64 {
+	sortedDatapointVals = sortedDatapointVals[:0]
 	for _, p := range datapoints {
 		if !math.IsNaN(p.Val) {
-			sortedDatapoints = append(sortedDatapoints, p)
+			sortedDatapointVals = append(sortedDatapointVals, p.Val)
 		}
 	}
 
-	sort.Slice(sortedDatapoints, func(i, j int) bool {
-		return sortedDatapoints[i].Val < sortedDatapoints[j].Val
-	})
+	sort.Float64s(sortedDatapointVals)
 
-	index := math.Min(math.Ceil(n/100.0*float64(len(sortedDatapoints)+1)), float64(len(sortedDatapoints))) - 1
+	index := math.Min(math.Ceil(n/100.0*float64(len(sortedDatapointVals)+1)), float64(len(sortedDatapointVals))) - 1
 
-	return sortedDatapoints[int(index)].Val
+	return sortedDatapointVals[int(index)]
 }
