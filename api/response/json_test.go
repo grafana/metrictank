@@ -33,9 +33,11 @@ func BenchmarkHttpRespJsonEmptySeries(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJsonEmptySeriesNeedsEscaping(b *testing.B) {
@@ -49,9 +51,11 @@ func BenchmarkHttpRespJsonEmptySeriesNeedsEscaping(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJsonIntegers(b *testing.B) {
@@ -73,9 +77,11 @@ func BenchmarkHttpRespJsonIntegers(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJsonFloats(b *testing.B) {
@@ -97,9 +103,11 @@ func BenchmarkHttpRespJsonFloats(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJsonNulls(b *testing.B) {
@@ -121,9 +129,11 @@ func BenchmarkHttpRespJsonNulls(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.SeriesByTarget(data), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJson1MMetricNames(b *testing.B) {
@@ -136,9 +146,11 @@ func BenchmarkHttpRespJson1MMetricNames(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.MetricNames(series), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespJson1MMetricNamesNeedEscaping(b *testing.B) {
@@ -150,7 +162,9 @@ func BenchmarkHttpRespJson1MMetricNamesNeedEscaping(b *testing.B) {
 	var resp *Json
 	for n := 0; n < b.N; n++ {
 		resp = NewJson(200, models.MetricNames(series), "")
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
