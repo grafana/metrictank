@@ -108,7 +108,7 @@ func FromConsolidateBy(c string) Consolidator {
 	case "cnt":
 		return Cnt // bonus. not supported by graphite
 	case "lst", "last", "current":
-		return Lst // bonus. not supported by graphite
+		return Lst
 	case "min":
 		return Min
 	case "max":
@@ -162,7 +162,7 @@ func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 func Validate(fn string) error {
 	if fn == "avg" || fn == "average" ||
 		fn == "count" ||
-		fn == "last" || fn == "current" || // bonus
+		fn == "last" || fn == "current" ||
 		fn == "min" ||
 		fn == "max" ||
 		fn == "mult" || fn == "multiply" ||
