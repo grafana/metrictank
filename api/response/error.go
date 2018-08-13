@@ -2,6 +2,9 @@ package response
 
 import (
 	"encoding/json"
+	"runtime/debug"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type Error interface {
@@ -15,8 +18,9 @@ type ErrorResp struct {
 }
 
 func WrapError(e error) *ErrorResp {
-	if _, ok := e.(*ErrorResp); ok {
-		return e.(*ErrorResp)
+	if err, ok := e.(*ErrorResp); ok {
+		err.ValidateAndFixCode()
+		return err
 	}
 	resp := &ErrorResp{
 		err:  e.Error(),
@@ -26,11 +30,7 @@ func WrapError(e error) *ErrorResp {
 		resp.code = e.(Error).Code()
 	}
 
-	// 599 is max HTTP status code
-	if resp.code > 599 {
-		resp.code = 500
-	}
-
+	resp.ValidateAndFixCode()
 	return resp
 }
 
@@ -57,11 +57,7 @@ func WrapErrorForTagDB(e error) *ErrorResp {
 		resp.code = e.(Error).Code()
 	}
 
-	// 599 is max HTTP status code
-	if resp.code > 599 {
-		resp.code = 500
-	}
-
+	resp.ValidateAndFixCode()
 	return resp
 }
 
@@ -91,6 +87,15 @@ func (r *ErrorResp) Body() ([]byte, error) {
 func (r *ErrorResp) Headers() (headers map[string]string) {
 	headers = map[string]string{"content-type": "text/plain"}
 	return headers
+}
+
+func (r *ErrorResp) ValidateAndFixCode() {
+	// 599 is max HTTP status code
+	if r.code > 599 {
+		log.Warn("Encountered invalid HTTP status code %d, printing stack", r.code)
+		debug.PrintStack()
+		r.code = 500
+	}
 }
 
 var RequestCanceledErr = NewError(499, "request canceled")
