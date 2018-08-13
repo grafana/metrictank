@@ -34,6 +34,7 @@ Here are the currently included functions:
 | aliasSub(seriesList, pattern, replacement) seriesList |             | Stable     |
 | averageSeries(seriesLists) series                     | avg         | Stable     |
 | consolidateBy(seriesList, func) seriesList            |             | Stable     |
+| countSeries(seriesLists) series                       |             | Stable     |
 | diffSeries(seriesLists) series                        |             | Stable     |
 | divideSeries(dividend, divisor) seriesList            |             | Stable     |
 | divideSeriesLists(dividends, divisors) seriesList     |             | Stable     |
