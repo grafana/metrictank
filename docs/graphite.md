@@ -55,6 +55,7 @@ Here are the currently included functions:
 | minSeries(seriesList) series                                   | min         | Stable     |
 | multiplySeries(seriesList) series                              |             | Stable     |
 | movingAverage(seriesLists, windowSize) seriesList              |             | Unstable   |
+| nonNegatievDerivative(seriesList, maxValue) seriesList         |             | Stable     |
 | perSecond(seriesLists) seriesList                              |             | Stable     |
 | rangeOfSeries(seriesList) series                               |             | Stable     |
 | removeAboveValue(seriesList, n) seriesList                     |             | Stable     |
