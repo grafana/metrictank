@@ -94,7 +94,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 	for key := range keys {
 		// No input series for a corresponding total series
 		if _, ok := metaSeries[key]; !ok {
-			var nonesSerie models.Series
+			nonesSerie := totalSeries[key]
 			nonesSerie.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", totalSeries[key].QueryPatt)
 			nonesSerie.Target = fmt.Sprintf("asPercent(MISSING,%s)", totalSeries[key].Target)
 			nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
@@ -115,7 +115,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 		for _, serie1 := range metaSeries[key] {
 			// No total series for a corresponding input series
 			if _, ok := totalSeries[key]; !ok {
-				var nonesSerie models.Series
+				nonesSerie := serie1
 				nonesSerie.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
 				nonesSerie.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
 				nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
