@@ -72,6 +72,8 @@ func init() {
 		"movingAverage":     {NewMovingAverage, false},
 		"perSecond":         {NewPerSecond, true},
 		"rangeOfSeries":     {NewAggregateConstructor("rangeOf", crossSeriesRange), true},
+		"removeAboveValue":  {NewRemoveAboveBelowValueConstructor(true), true},
+		"removeBelowValue":  {NewRemoveAboveBelowValueConstructor(false), true},
 		"scale":             {NewScale, true},
 		"scaleToSeconds":    {NewScaleToSeconds, true},
 		"smartSummarize":    {NewSmartSummarize, false},

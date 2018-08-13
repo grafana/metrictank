@@ -50,6 +50,8 @@ Here are the currently included functions:
 | movingAverage(seriesLists, windowSize) seriesList              |             | Unstable   |
 | perSecond(seriesLists) seriesList                              |             | Stable     |
 | rangeOfSeries(seriesList) series                               |             | Stable     |
+| removeAboveValue(seriesList, n) seriesList                     |             | Stable     |
+| removeBelowValue(seriesList, n) seriesList                     |             | Stable     |
 | scale(seriesList, num) series                                  |             | Stable     |
 | scaleToSeconds(seriesList, seconds) series                     |             | Stable     |
 | stddevSeries(seriesList) series                                |             | Stable     |
