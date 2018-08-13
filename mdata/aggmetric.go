@@ -38,11 +38,11 @@ type AggMetric struct {
 	Chunks          []*chunk.Chunk
 	aggregators     []*Aggregator
 	dropFirstChunk  bool
-	firstChunkT0    uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
 	lastWrite       uint32
+	firstTs         uint32
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -268,27 +268,16 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		return result, ErrNilChunk
 	}
 
-	// The first chunk is likely only a partial chunk. If we are not the primary node
-	// we should not serve data from this chunk, and should instead get the chunk from cassandra.
-	// if we are the primary node, then there is likely no data in Cassandra anyway.
-	if !cluster.Manager.IsPrimary() && oldestChunk.T0 == a.firstChunkT0 {
-		oldestPos++
-		if oldestPos >= len(a.Chunks) {
-			oldestPos = 0
-		}
-		oldestChunk = a.getChunk(oldestPos)
-		if oldestChunk == nil {
-			log.Error(3, "%s", ErrNilChunk)
-			return result, ErrNilChunk
-		}
-	}
-
 	if to <= oldestChunk.T0 {
 		// the requested time range ends before any data we have.
 		if LogLevel < 2 {
 			log.Debug("AM %s Get(): no data for requested range", a.Key)
 		}
-		result.Oldest = oldestChunk.T0
+		if oldestChunk.First {
+			result.Oldest = a.firstTs
+		} else {
+			result.Oldest = oldestChunk.T0
+		}
 		return result, nil
 	}
 
@@ -342,8 +331,13 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		}
 	}
 
+	if oldestChunk.First {
+		result.Oldest = a.firstTs
+	} else {
+		result.Oldest = oldestChunk.T0
+	}
+
 	memToIterDuration.Value(time.Now().Sub(pre))
-	result.Oldest = oldestChunk.T0
 	return result, nil
 }
 
@@ -483,12 +477,11 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 	if len(a.Chunks) == 0 {
 		chunkCreate.Inc()
-		// no data has been added to this metric at all.
-		a.Chunks = append(a.Chunks, chunk.New(t0))
-
-		// The first chunk is typically going to be a partial chunk
-		// so we keep a record of it.
-		a.firstChunkT0 = t0
+		// no data has been added to this AggMetric yet.
+		// note that we may not be aware of prior data that belongs into this chunk
+		// so we should track this cutoff point
+		a.Chunks = append(a.Chunks, chunk.NewFirst(t0))
+		a.firstTs = ts
 
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
