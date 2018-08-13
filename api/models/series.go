@@ -54,9 +54,8 @@ func (s Series) Copy(emptyDatapoints []schema.Point) Series {
 		Consolidator: s.Consolidator,
 	}
 
-	for _, p := range s.Datapoints {
-		newSeries.Datapoints = append(newSeries.Datapoints, p)
-	}
+	newSeries.Datapoints = append(newSeries.Datapoints, s.Datapoints...)
+
 	for k, v := range s.Tags {
 		newSeries.Tags[k] = v
 	}

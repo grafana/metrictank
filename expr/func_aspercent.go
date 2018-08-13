@@ -48,7 +48,6 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	var outSeries []models.Series
-	defer func() { cache[Req{}] = append(cache[Req{}], outSeries...) }()
 	var totals []models.Series
 	if s.totalSeries != nil {
 		totals, err = s.totalSeries.Exec(cache)
@@ -61,17 +60,18 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if !math.IsNaN(s.totalFloat) {
 			return nil, errors.New("total must be None or a seriesList")
 		}
-		outSeries, err = s.execWithNodes(series, totals)
+		outSeries, err = s.execWithNodes(series, totals, cache)
 	} else {
 		if totals != nil && len(totals) != 1 && len(totals) != len(series) {
 			return nil, errors.New("asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 		}
 		outSeries, err = s.execWithoutNodes(series, totals)
+		cache[Req{}] = append(cache[Req{}], outSeries...)
 	}
 	return outSeries, err
 }
 
-func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[Req][]models.Series) ([]models.Series, error) {
 	var outSeries []models.Series
 	// Set of keys
 	keys := make(map[string]struct{})
@@ -89,31 +89,49 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.
 		totalSeries = getTotalSeries(totalSeriesLists)
 	}
 
+	var nones []schema.Point
+
 	for key := range keys {
 		// No input series for a corresponding total series
 		if _, ok := metaSeries[key]; !ok {
-			serie2 := totalSeries[key].Copy(pointSlicePool.Get().([]schema.Point))
-			serie2.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", serie2.QueryPatt)
-			serie2.Target = fmt.Sprintf("asPercent(MISSING,%s)", serie2.Target)
-			serie2.Tags = map[string]string{"name": serie2.Target}
-			for i := range serie2.Datapoints {
-				serie2.Datapoints[i].Val = math.NaN()
+			var nonesSerie models.Series
+			nonesSerie.QueryPatt = fmt.Sprintf("asPercent(MISSING,%s)", totalSeries[key].QueryPatt)
+			nonesSerie.Target = fmt.Sprintf("asPercent(MISSING,%s)", totalSeries[key].Target)
+			nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
+
+			if nones == nil {
+				for _, p := range totalSeries[key].Datapoints {
+					p.Val = math.NaN()
+					nones = append(nones, p)
+				}
+				cache[Req{}] = append(cache[Req{}], nonesSerie)
 			}
-			outSeries = append(outSeries, serie2)
+
+			nonesSerie.Datapoints = nones
+			outSeries = append(outSeries, nonesSerie)
 			continue
 		}
 
 		for _, serie1 := range metaSeries[key] {
-			serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 			// No total series for a corresponding input series
 			if _, ok := totalSeries[key]; !ok {
-				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
-				serie1.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
-				serie1.Tags = map[string]string{"name": serie1.Target}
-				for i := range serie1.Datapoints {
-					serie1.Datapoints[i].Val = math.NaN()
+				var nonesSerie models.Series
+				nonesSerie.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
+				nonesSerie.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
+				nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
+
+				if nones == nil {
+					for _, p := range serie1.Datapoints {
+						p.Val = math.NaN()
+						nones = append(nones, p)
+					}
+					cache[Req{}] = append(cache[Req{}], nonesSerie)
 				}
+
+				nonesSerie.Datapoints = nones
+				outSeries = append(outSeries, nonesSerie)
 			} else {
+				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 				serie2 := totalSeries[key]
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
@@ -121,8 +139,10 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series) ([]models.
 				for i := range serie1.Datapoints {
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
+				outSeries = append(outSeries, serie1)
+				cache[Req{}] = append(cache[Req{}], serie1)
 			}
-			outSeries = append(outSeries, serie1)
+
 		}
 	}
 	return outSeries, nil
@@ -143,39 +163,30 @@ func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]mode
 			totalsSerie = totals[0]
 		} else if len(totals) == len(series) {
 			// Sorted to match the input series with the total series based on Target.
-			// Mimicks Graphite's implementation
+			// Mimics Graphite's implementation
 			sort.Slice(series, func(i, j int) bool {
 				return series[i].Target < series[j].Target
 			})
 			sort.Slice(totals, func(i, j int) bool {
 				return totals[i].Target < totals[j].Target
 			})
-			for i, serie1 := range series {
-				serie2 := totals[i]
-				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
-				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
-				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
-				serie1.Tags = map[string]string{"name": serie1.Target}
-				for i := range serie1.Datapoints {
-					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
-				}
-				outSeries = append(outSeries, serie1)
-			}
-			return outSeries, nil
 		}
 	} else {
 		totalsSerie.QueryPatt = fmt.Sprint(s.totalFloat)
 		totalsSerie.Target = fmt.Sprint(s.totalFloat)
 	}
 
-	for _, serie := range series {
+	for i, serie := range series {
+		if len(totals) == len(series) {
+			totalsSerie = totals[i]
+		}
 		serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.Target)
 		serie.Tags = map[string]string{"name": serie.Target}
 		for i := range serie.Datapoints {
 			var totalVal float64
-			if len(totalsSerie.Datapoints) > i {
+			if len(totalsSerie.Datapoints) > 0 {
 				totalVal = totalsSerie.Datapoints[i].Val
 			} else {
 				totalVal = s.totalFloat
