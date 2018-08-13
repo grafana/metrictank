@@ -27,6 +27,7 @@ See also:
 
 Here are the currently included functions:
 
+
 | Function name and signature                                    | Alias       | Metrictank |
 | -------------------------------------------------------------- | ----------- | ---------- |
 | alias(seriesList, alias) seriesList                            |             | Stable     |
@@ -34,6 +35,7 @@ Here are the currently included functions:
 | aliasSub(seriesList, pattern, replacement) seriesList          |             | Stable     |
 | averageSeries(seriesLists) series                              | avg         | Stable     |
 | consolidateBy(seriesList, func) seriesList                     |             | Stable     |
+| countSeries(seriesLists) series                                |             | Stable     |
 | diffSeries(seriesLists) series                                 |             | Stable     |
 | divideSeries(dividend, divisor) seriesList                     |             | Stable     |
 | divideSeriesLists(dividends, divisors) seriesList              |             | Stable     |
@@ -54,3 +56,4 @@ Here are the currently included functions:
 | sumSeries(seriesLists) series                                  | sum         | Stable     |
 | summarize(seriesList) seriesList                               |             | Stable     |
 | transformNull(seriesList, default=0) seriesList                |             | Stable     |
+
