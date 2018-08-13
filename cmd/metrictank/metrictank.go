@@ -85,14 +85,6 @@ func init() {
 func main() {
 	startupTime = time.Now()
 
-	/***********************************
-		Initialize Logger
-	***********************************/
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
-
-	/***********************************
-		Initialize Configuration
-	***********************************/
 	flag.Parse()
 
 	// if the user just wants the version, give it and exit
@@ -111,7 +103,7 @@ func main() {
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
-		log.Fatal(4, "error with configuration file: %s", err)
+		fmt.Fprintf(os.Stderr, "FATAL: configuration file error: %s", err)
 		os.Exit(1)
 	}
 	// load config for metric ingestors
@@ -144,8 +136,11 @@ func main() {
 	config.ParseAll()
 
 	/***********************************
-		Set logging levels
+		Set up Logger
 	***********************************/
+
+	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+
 	mdata.LogLevel = logLevel
 	memory.LogLevel = logLevel
 	inKafkaMdm.LogLevel = logLevel
