@@ -37,7 +37,7 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 	}
 
 	outSeries := make([]models.Series, len(series))
-	for _, serie := range series {
+	for i, serie := range series {
 		serie.Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
 		serie.QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
 		out := pointSlicePool.Get().([]schema.Point)
@@ -56,7 +56,8 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 			p.Val = delta
 			out = append(out, p)
 		}
-
+		serie.Datapoints = out
+		outSeries[i] = serie
 	}
 	cache[Req{}] = append(cache[Req{}], outSeries...)
 	return outSeries, nil
