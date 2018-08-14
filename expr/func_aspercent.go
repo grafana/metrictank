@@ -65,8 +65,7 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if totals != nil && len(totals) != 1 && len(totals) != len(series) {
 			return nil, errors.New("asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 		}
-		outSeries, err = s.execWithoutNodes(series, totals)
-		cache[Req{}] = append(cache[Req{}], outSeries...)
+		outSeries, err = s.execWithoutNodes(series, totals, cache)
 	}
 	return outSeries, err
 }
@@ -82,11 +81,11 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 
 	// calculate the sum
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalSeries = getTotalSeries(metaSeries)
+		totalSeries = getTotalSeries(metaSeries, cache)
 		// calculate sum of totals series
 	} else if totals != nil {
 		totalSeriesLists := groupSeriesByKey(totals, s.nodes, &keys)
-		totalSeries = getTotalSeries(totalSeriesLists)
+		totalSeries = getTotalSeries(totalSeriesLists, cache)
 	}
 
 	var nones []schema.Point
@@ -148,11 +147,11 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 	return outSeries, nil
 }
 
-func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series, cache map[Req][]models.Series) ([]models.Series, error) {
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalsSerie = sumSeries(series)
+		totalsSerie = sumSeries(series, cache)
 		if len(series) == 1 {
 			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
@@ -194,6 +193,7 @@ func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series) ([]mode
 			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalVal)
 		}
 		outSeries = append(outSeries, serie)
+		cache[Req{}] = append(cache[Req{}], serie)
 	}
 	return outSeries, nil
 }
@@ -223,17 +223,17 @@ func groupSeriesByKey(series []models.Series, nodes []expr, keys *map[string]str
 }
 
 // Sums each seriesList in map of seriesLists
-func getTotalSeries(totalSeriesLists map[string][]models.Series) map[string]models.Series {
+func getTotalSeries(totalSeriesLists map[string][]models.Series, cache map[Req][]models.Series) map[string]models.Series {
 	totalSeries := make(map[string]models.Series, len(totalSeriesLists))
 	for key := range totalSeriesLists {
-		totalSeries[key] = sumSeries(totalSeriesLists[key])
+		totalSeries[key] = sumSeries(totalSeriesLists[key], cache)
 	}
 	return totalSeries
 }
 
 // Sums seriesList
 // Datapoints are always a copy
-func sumSeries(series []models.Series) models.Series {
+func sumSeries(series []models.Series, cache map[Req][]models.Series) models.Series {
 	if len(series) == 1 {
 		return series[0]
 	}
@@ -253,7 +253,7 @@ Loop:
 	}
 	name := fmt.Sprintf("sumSeries(%s)", strings.Join(queryPatts, ","))
 	cons, queryCons := summarizeCons(series)
-	return models.Series{
+	sum := models.Series{
 		Target:       name,
 		QueryPatt:    name,
 		Datapoints:   out,
@@ -262,4 +262,6 @@ Loop:
 		QueryCons:    queryCons,
 		Tags:         map[string]string{"name": name},
 	}
+	cache[Req{}] = append(cache[Req{}], sum)
+	return sum
 }
