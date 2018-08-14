@@ -32,7 +32,7 @@ Here are the currently included functions:
 | alias(seriesList, alias) seriesList                            |             | Stable     |
 | aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags | Stable     |
 | aliasSub(seriesList, pattern, replacement) seriesList          |             | Stable     |
-| asPercent(seriesList, seriesList, nodeList) seriesList |             | Stable     |
+| asPercent(seriesList, seriesList, nodeList) seriesList         |             | Stable     |
 | averageSeries(seriesLists) series                              | avg         | Stable     |
 | consolidateBy(seriesList, func) seriesList                     |             | Stable     |
 | countSeries(seriesLists) series                                |             | Stable     |
@@ -60,7 +60,11 @@ Here are the currently included functions:
 | removeAboveValue(seriesList, n) seriesList                     |             | Stable     |
 | removeBelowValue(seriesList, n) seriesList                     |             | Stable     |
 | scale(seriesList, num) series                                  |             | Stable     |
-| scaleToSeconds(seriesList, seconds) series                     |             | Stable     |
+| scaleToSeconds(seriesList, seconds) seriesList                 |             | Stable     |
+| sortBy(seriesList, func, reverse) seriesList                   |             | Stable     |
+| sortByMaxima(seriesList) seriesList                            |             | Stable     |
+| sortByName(seriesList, natural, reverse) seriesList            |             | Stable     |
+| sortByTotal(seriesList) seriesList                             |             | Stable     |
 | stddevSeries(seriesList) series                                |             | Stable     |
 | sumSeries(seriesLists) series                                  | sum         | Stable     |
 | summarize(seriesList) seriesList                               |             | Stable     |
