@@ -172,7 +172,7 @@ func (c *CCache) Add(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 		ccm.Add(prev, itergen)
 	}
 
-	c.accnt.AddChunk(metric, itergen.Ts, itergen.Size())
+	c.accnt.AddChunk(metric, itergen.Ts, uint64(len(itergen.B)), uint64(cap(itergen.B)))
 }
 
 func (c *CCache) AddRange(metric schema.AMKey, prev uint32, itergens []chunk.IterGen) {

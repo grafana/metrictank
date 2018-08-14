@@ -270,7 +270,7 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 		success := false
 		attempts := 0
 		for !success {
-			err := s.Session.Query(query, rowKey, ig.Ts, cassandraStore.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
+			err := s.Session.Query(query, rowKey, ig.Ts, cassandraStore.PrepareChunkData(ig.Span, ig.B)).Exec()
 			if err != nil {
 				if (attempts % 20) == 0 {
 					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)

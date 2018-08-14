@@ -56,14 +56,6 @@ func (ig *IterGen) Get() (*Iter, error) {
 	return &Iter{it}, nil
 }
 
-func (ig *IterGen) Size() uint64 {
-	return uint64(len(ig.B))
-}
-
-func (ig IterGen) Bytes() []byte {
-	return ig.B
-}
-
 // end of itergen (exclusive)
 func (ig IterGen) EndTs() uint32 {
 	return ig.Ts + ig.Span

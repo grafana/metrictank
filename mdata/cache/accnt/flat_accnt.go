@@ -43,9 +43,15 @@ type FlatAccnt struct {
 	eventQ chan FlatAccntEvent
 }
 
+type chunkSize struct {
+	len uint64
+	cap uint64
+}
+
 type FlatAccntMet struct {
-	total  uint64
-	chunks map[uint32]uint64
+	totalLen uint64
+	totalCap uint64
+	chunks   map[uint32]chunkSize
 }
 
 type FlatAccntEvent struct {
@@ -70,7 +76,7 @@ const (
 type AddPayload struct {
 	metric schema.AMKey
 	ts     uint32
-	size   uint64
+	size   chunkSize
 }
 
 // payload to be sent with an add event
@@ -125,8 +131,8 @@ func (a *FlatAccnt) GetTotal() uint64 {
 	return <-res_chan
 }
 
-func (a *FlatAccnt) AddChunk(metric schema.AMKey, ts uint32, size uint64) {
-	a.act(evnt_add_chnk, &AddPayload{metric, ts, size})
+func (a *FlatAccnt) AddChunk(metric schema.AMKey, ts uint32, len, cap uint64) {
+	a.act(evnt_add_chnk, &AddPayload{metric, ts, chunkSize{len: len, cap: cap}})
 }
 
 func (a *FlatAccnt) AddChunks(metric schema.AMKey, chunks []chunk.IterGen) {
@@ -222,6 +228,7 @@ func (a *FlatAccnt) eventLoop() {
 				a.metrics = make(map[schema.AMKey]*FlatAccntMet)
 				a.lru.reset()
 				cacheSizeUsed.SetUint64(0)
+				cacheCapUsed.SetUint64(0)
 			}
 
 			// evict until we're below the max
@@ -251,31 +258,35 @@ func (a *FlatAccnt) delMet(metric schema.AMKey) {
 		)
 	}
 
-	cacheSizeUsed.DecUint64(met.total)
+	cacheSizeUsed.DecUint64(met.totalLen)
+	cacheCapUsed.DecUint64(met.totalCap)
 	delete(a.metrics, metric)
 }
 
-func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
+func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size chunkSize) {
 	var met *FlatAccntMet
 	var ok bool
 
 	if met, ok = a.metrics[metric]; !ok {
 		met = &FlatAccntMet{
-			total:  0,
-			chunks: make(map[uint32]uint64),
+			totalLen: 0,
+			totalCap: 0,
+			chunks:   make(map[uint32]chunkSize),
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
-	}
-
-	if _, ok = met.chunks[ts]; ok {
-		// we already have that chunk
-		return
+	} else {
+		if _, ok = met.chunks[ts]; ok {
+			// we already have that chunk
+			return
+		}
 	}
 
 	met.chunks[ts] = size
-	met.total = met.total + size
-	cacheSizeUsed.AddUint64(size)
+	met.totalLen = met.totalLen + size.len
+	met.totalCap = met.totalCap + size.cap
+	cacheSizeUsed.AddUint64(size.len)
+	cacheCapUsed.AddUint64(size.cap)
 }
 
 func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
@@ -284,34 +295,39 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 
 	if met, ok = a.metrics[metric]; !ok {
 		met = &FlatAccntMet{
-			total:  0,
-			chunks: make(map[uint32]uint64),
+			totalLen: 0,
+			totalCap: 0,
+			chunks:   make(map[uint32]chunkSize),
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
 	}
 
-	var sizeDiff uint64
+	var lenDiff uint64
+	var capDiff uint64
 
 	for _, chunk := range chunks {
 		if _, ok = met.chunks[chunk.Ts]; ok {
 			// we already have that chunk
 			continue
 		}
-		size := chunk.Size()
-		sizeDiff += size
+		size := chunkSize{len: uint64(len(chunk.B)), cap: uint64(cap(chunk.B))}
+		lenDiff += size.len
+		capDiff += size.cap
 		met.chunks[chunk.Ts] = size
 	}
 
-	met.total = met.total + sizeDiff
-	cacheSizeUsed.AddUint64(sizeDiff)
+	met.totalLen = met.totalLen + lenDiff
+	met.totalCap = met.totalCap + capDiff
+	cacheSizeUsed.AddUint64(lenDiff)
+	cacheCapUsed.AddUint64(capDiff)
 }
 
 func (a *FlatAccnt) evict() {
 	var met *FlatAccntMet
 	var targets []uint32
 	var ts uint32
-	var size uint64
+	var size chunkSize
 	var ok bool
 	var e interface{}
 	var target EvictTarget
@@ -342,8 +358,10 @@ func (a *FlatAccnt) evict() {
 
 	for _, ts = range targets {
 		size = met.chunks[ts]
-		met.total = met.total - size
-		cacheSizeUsed.DecUint64(size)
+		met.totalLen = met.totalLen - size.len
+		met.totalCap = met.totalCap - size.cap
+		cacheSizeUsed.DecUint64(size.len)
+		cacheCapUsed.DecUint64(size.cap)
 		cacheChunkEvict.Inc()
 		a.evictQ <- &EvictTarget{
 			Metric: target.Metric,
@@ -352,7 +370,7 @@ func (a *FlatAccnt) evict() {
 		delete(met.chunks, ts)
 	}
 
-	if met.total <= 0 {
+	if met.totalLen <= 0 {
 		cacheMetricEvict.Inc()
 		delete(a.metrics, target.Metric)
 	}
