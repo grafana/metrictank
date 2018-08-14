@@ -71,7 +71,7 @@ func SortSeriesWithConsolidator(series []models.Series, c consolidation.Consolid
 		if reverse {
 			return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal > jVal
 		}
-		return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal < jVal
+		return math.IsNaN(iVal) && !math.IsNaN(jVal) || iVal < jVal
 	})
 
 	for i := range scored {
