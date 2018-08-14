@@ -27,30 +27,41 @@ See also:
 
 Here are the currently included functions:
 
-| Function name and signature                            | Alias       | Metrictank |
-| ------------------------------------------------------ | ----------- | ---------- |
-| alias(seriesList, alias) seriesList                    |             | Stable     |
-| aliasByNode(seriesList, nodeList) seriesList           | aliasByTags | Stable     |
-| aliasSub(seriesList, pattern, replacement) seriesList  |             | Stable     |
+| Function name and signature                                    | Alias       | Metrictank |
+| -------------------------------------------------------------- | ----------- | ---------- |
+| alias(seriesList, alias) seriesList                            |             | Stable     |
+| aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags | Stable     |
+| aliasSub(seriesList, pattern, replacement) seriesList          |             | Stable     |
 | asPercent(seriesList, seriesList, nodeList) seriesList |             | Stable     |
-| averageSeries(seriesLists) series                      | avg         | Stable     |
-| consolidateBy(seriesList, func) seriesList             |             | Stable     |
-| diffSeries(seriesLists) series                         |             | Stable     |
-| divideSeries(dividend, divisor) seriesList             |             | Stable     |
-| divideSeriesLists(dividends, divisors) seriesList      |             | Stable     |
-| exclude(seriesList, pattern) seriesList                |             | Stable     |
-| grep(seriesList, pattern) seriesList                   |             | Stable     |
-| groupByTags(seriesList, func, tagList) seriesList      |             | Stable     |
-| isNonNull(seriesList) seriesList                       |             | Stable     |
-| maxSeries(seriesList) series                           | max         | Stable     |
-| minSeries(seriesList) series                           | min         | Stable     |
-| multiplySeries(seriesList) series                      |             | Stable     |
-| movingAverage(seriesLists, windowSize) seriesList      |             | Unstable   |
-| perSecond(seriesLists) seriesList                      |             | Stable     |
-| rangeOfSeries(seriesList) series                       |             | Stable     |
-| scale(seriesList, num) series                          |             | Stable     |
-| scaleToSeconds(seriesList, seconds) series             |             | Stable     |
-| stddevSeries(seriesList) series                        |             | Stable     |
-| sumSeries(seriesLists) series                          | sum         | Stable     |
-| summarize(seriesList) seriesList                       |             | Stable     |
-| transformNull(seriesList, default=0) seriesList        |             | Stable     |
+| averageSeries(seriesLists) series                              | avg         | Stable     |
+| consolidateBy(seriesList, func) seriesList                     |             | Stable     |
+| countSeries(seriesLists) series                                |             | Stable     |
+| diffSeries(seriesLists) series                                 |             | Stable     |
+| divideSeries(dividend, divisor) seriesList                     |             | Stable     |
+| divideSeriesLists(dividends, divisors) seriesList              |             | Stable     |
+| exclude(seriesList, pattern) seriesList                        |             | Stable     |
+| filterSeries(seriesList, func, operator, threshold) seriesList |             | Stable     |
+| grep(seriesList, pattern) seriesList                           |             | Stable     |
+| groupByTags(seriesList, func, tagList) seriesList              |             | Stable     |
+| highest(seriesList, n, func) seriesList                        |             | Stable     |
+| highestAverage(seriesList, n, func) seriesList                 |             | Stable     |
+| highestCurrent(seriesList, n, func) seriesList                 |             | Stable     |
+| highestMax(seriesList, n, func) seriesList                     |             | Stable     |
+| isNonNull(seriesList) seriesList                               |             | Stable     |
+| lowest(seriesList, n, func) seriesList                         |             | Stable     |
+| lowestAverage(seriesList, n, func) seriesList                  |             | Stable     |
+| lowestCurrent(seriesList, n, func) seriesList                  |             | Stable     |
+| maxSeries(seriesList) series                                   | max         | Stable     |
+| minSeries(seriesList) series                                   | min         | Stable     |
+| multiplySeries(seriesList) series                              |             | Stable     |
+| movingAverage(seriesLists, windowSize) seriesList              |             | Unstable   |
+| perSecond(seriesLists) seriesList                              |             | Stable     |
+| rangeOfSeries(seriesList) series                               |             | Stable     |
+| removeAboveValue(seriesList, n) seriesList                     |             | Stable     |
+| removeBelowValue(seriesList, n) seriesList                     |             | Stable     |
+| scale(seriesList, num) series                                  |             | Stable     |
+| scaleToSeconds(seriesList, seconds) series                     |             | Stable     |
+| stddevSeries(seriesList) series                                |             | Stable     |
+| sumSeries(seriesLists) series                                  | sum         | Stable     |
+| summarize(seriesList) seriesList                               |             | Stable     |
+| transformNull(seriesList, default=0) seriesList                |             | Stable     |

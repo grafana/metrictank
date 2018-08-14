@@ -19,9 +19,11 @@ func BenchmarkHttpRespMsgpackEmptySeries(b *testing.B) {
 	var resp *Msgpack
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgpack(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpackEmptySeriesNeedsEscaping(b *testing.B) {
@@ -35,9 +37,11 @@ func BenchmarkHttpRespMsgpackEmptySeriesNeedsEscaping(b *testing.B) {
 	var resp *Msgpack
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgpack(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpackIntegers(b *testing.B) {
@@ -59,9 +63,11 @@ func BenchmarkHttpRespMsgpackIntegers(b *testing.B) {
 	var resp *Msgpack
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgpack(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpackFloats(b *testing.B) {
@@ -83,9 +89,11 @@ func BenchmarkHttpRespMsgpackFloats(b *testing.B) {
 	var resp *Msgpack
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgpack(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespMsgpackNulls(b *testing.B) {
@@ -107,7 +115,9 @@ func BenchmarkHttpRespMsgpackNulls(b *testing.B) {
 	var resp *Msgpack
 	for n := 0; n < b.N; n++ {
 		resp = NewMsgpack(200, models.SeriesByTarget(data))
-		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }

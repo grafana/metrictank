@@ -20,8 +20,11 @@ func BenchmarkHttpRespPickleEmptySeries(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		resp = NewPickle(200, models.SeriesByTarget(data))
 		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespPickleEmptySeriesNeedsEscaping(b *testing.B) {
@@ -36,8 +39,11 @@ func BenchmarkHttpRespPickleEmptySeriesNeedsEscaping(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		resp = NewPickle(200, models.SeriesByTarget(data))
 		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespPickleIntegers(b *testing.B) {
@@ -60,8 +66,11 @@ func BenchmarkHttpRespPickleIntegers(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		resp = NewPickle(200, models.SeriesByTarget(data))
 		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespPickleFloats(b *testing.B) {
@@ -84,8 +93,11 @@ func BenchmarkHttpRespPickleFloats(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		resp = NewPickle(200, models.SeriesByTarget(data))
 		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
 
 func BenchmarkHttpRespPickleNulls(b *testing.B) {
@@ -108,6 +120,9 @@ func BenchmarkHttpRespPickleNulls(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		resp = NewPickle(200, models.SeriesByTarget(data))
 		resp.Body()
+		body, _ := resp.Body()
+		size = len(body)
 		resp.Close()
 	}
+	b.Log("body size", size)
 }
