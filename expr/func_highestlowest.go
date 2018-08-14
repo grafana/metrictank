@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/grafana/metrictank/consolidation"
-	schema "gopkg.in/raintank/schema.v1"
 
 	"github.com/grafana/metrictank/api/models"
 )
@@ -41,6 +40,11 @@ func (s *FuncHighestLowest) Context(context Context) Context {
 	return context
 }
 
+type ScoredSeries struct {
+	score float64
+	serie models.Series
+}
+
 func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	series, err := s.in.Exec(cache)
 	if err != nil {
@@ -53,26 +57,30 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 
-	// Calculates the consolidated value for each series and stores it in a map
-	// where the key is a pointer to the first datapoint
-	consolidationVals := make(map[*schema.Point]float64, len(series))
-	for _, serie := range series {
-		consolidationVals[&serie.Datapoints[0]] = consolidationFunc(serie.Datapoints)
+	// score series by their consolidated value
+	scored := make([]ScoredSeries, len(series))
+	for i, serie := range series {
+		scored[i] = ScoredSeries{
+			score: consolidationFunc(serie.Datapoints),
+			serie: serie,
+		}
 	}
 
-	// Compares two series based on value in consolidationVals
-	seriesLess := func(i, j int) bool {
-		iVal := consolidationVals[&series[i].Datapoints[0]]
-		jVal := consolidationVals[&series[j].Datapoints[0]]
+	sort.SliceStable(scored, func(i, j int) bool {
+		iVal := scored[i].score
+		jVal := scored[j].score
 		if s.highest {
 			return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal > jVal
 		}
 		return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal < jVal
-	}
-	sort.SliceStable(series, seriesLess)
+	})
 
 	if s.n > int64(len(series)) {
 		s.n = int64(len(series))
+	}
+
+	for i := 0; i < int(s.n); i++ {
+		series[i] = scored[i].serie
 	}
 
 	return series[:s.n], nil
