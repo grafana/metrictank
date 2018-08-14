@@ -27,12 +27,12 @@ See also:
 
 Here are the currently included functions:
 
-
 | Function name and signature                                    | Alias       | Metrictank |
 | -------------------------------------------------------------- | ----------- | ---------- |
 | alias(seriesList, alias) seriesList                            |             | Stable     |
 | aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags | Stable     |
 | aliasSub(seriesList, pattern, replacement) seriesList          |             | Stable     |
+| asPercent(seriesList, seriesList, nodeList) seriesList |             | Stable     |
 | averageSeries(seriesLists) series                              | avg         | Stable     |
 | consolidateBy(seriesList, func) seriesList                     |             | Stable     |
 | countSeries(seriesLists) series                                |             | Stable     |

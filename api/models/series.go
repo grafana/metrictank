@@ -41,6 +41,28 @@ func (s *Series) SetTags() {
 	s.Tags["name"] = tagSplits[0]
 }
 
+func (s Series) Copy(emptyDatapoints []schema.Point) Series {
+	newSeries := Series{
+		Target:       s.Target,
+		Datapoints:   emptyDatapoints,
+		Tags:         make(map[string]string, len(s.Tags)),
+		Interval:     s.Interval,
+		QueryPatt:    s.QueryPatt,
+		QueryFrom:    s.QueryFrom,
+		QueryTo:      s.QueryTo,
+		QueryCons:    s.QueryCons,
+		Consolidator: s.Consolidator,
+	}
+
+	newSeries.Datapoints = append(newSeries.Datapoints, s.Datapoints...)
+
+	for k, v := range s.Tags {
+		newSeries.Tags[k] = v
+	}
+
+	return newSeries
+}
+
 type SeriesByTarget []Series
 
 func (g SeriesByTarget) Len() int           { return len(g) }

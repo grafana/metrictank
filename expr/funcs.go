@@ -52,6 +52,7 @@ func init() {
 		"aliasByTags":       {NewAliasByNode, true},
 		"aliasByNode":       {NewAliasByNode, true},
 		"aliasSub":          {NewAliasSub, true},
+		"asPercent":         {NewAsPercent, true},
 		"avg":               {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"averageSeries":     {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"consolidateBy":     {NewConsolidateBy, true},

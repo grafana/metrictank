@@ -64,19 +64,40 @@ func (e expr) Print(indent int) string {
 // the returned pos is always the index where the next argument should be.
 func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 	got := e.args[pos]
+	if got.etype == etName && got.str == "None" {
+		if !exp.Optional() {
+			return 0, ErrMissingArg
+		} else {
+			pos++
+			return pos, nil
+		}
+	}
 	switch v := exp.(type) {
-	case ArgSeries, ArgSeriesList:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+	case ArgBool:
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
 		}
-	case ArgSeriesLists:
-		if got.etype != etName && got.etype != etFunc {
-			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		if got.etype == etString {
+			if val, ok := strToBool(got.str); ok {
+				*v.val = val
+				break
+			}
 		}
-		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
-		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos += 1
+		return 0, ErrBadArgumentStr{"boolean", got.etype.String()}
+	case ArgIn:
+		for _, a := range v.args {
+
+			p, err := e.consumeBasicArg(pos, a)
+			if err == nil {
+				return p, err
+			}
 		}
+		expStr := []string{}
+		for _, a := range v.args {
+			expStr = append(expStr, fmt.Sprintf("%T", a))
+		}
+		return 0, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 	case ArgInt:
 		if got.etype != etInt {
 			return 0, ErrBadArgumentStr{"int", got.etype.String()}
@@ -113,6 +134,32 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		} else {
 			*v.val = got.float
 		}
+	case ArgRegex:
+		if got.etype != etString {
+			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, generateValidatorError(v.key, err)
+			}
+		}
+		re, err := regexp.Compile(got.str)
+		if err != nil {
+			return 0, err
+		}
+		*v.val = re
+	case ArgSeries, ArgSeriesList:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		}
+	case ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return 0, ErrBadArgumentStr{"func or name", got.etype.String()}
+		}
+		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
+		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
+			pos++
+		}
 	case ArgString:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string", got.etype.String()}
@@ -134,32 +181,6 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			*v.val = append(*v.val, e.args[pos].str)
 		}
 		return pos, nil
-	case ArgRegex:
-		if got.etype != etString {
-			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}
-		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, generateValidatorError(v.key, err)
-			}
-		}
-		re, err := regexp.Compile(got.str)
-		if err != nil {
-			return 0, err
-		}
-		*v.val = re
-	case ArgBool:
-		if got.etype == etBool {
-			*v.val = got.bool
-			break
-		}
-		if got.etype == etString {
-			if val, ok := strToBool(got.str); ok {
-				*v.val = val
-				break
-			}
-		}
-		return 0, ErrBadArgumentStr{"boolean", got.etype.String()}
 	case ArgStringsOrInts:
 		// consume all args (if any) in args that will yield a string or int
 		for ; len(e.args) > pos && (e.args[pos].etype == etString || e.args[pos].etype == etInt); pos++ {
@@ -196,7 +217,29 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	got := e.args[pos]
 	var err error
 	var fn GraphiteFunc
+	if got.etype == etName && got.str == "None" {
+		pos++
+		return pos, reqs, nil
+	}
 	switch v := exp.(type) {
+	case ArgIn:
+		if got.etype == etName || got.etype == etFunc {
+			for _, a := range v.args {
+				switch v := a.(type) {
+				case ArgSeries, ArgSeriesList, ArgSeriesLists:
+					p, reqs, err := e.consumeSeriesArg(pos, v, context, stable, reqs)
+					if err != nil {
+						return 0, nil, err
+					}
+					return p, reqs, err
+				}
+			}
+			expStr := []string{}
+			for _, a := range v.args {
+				expStr = append(expStr, fmt.Sprintf("%T", a))
+			}
+			return 0, nil, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
+		}
 	case ArgSeries:
 		if got.etype != etName && got.etype != etFunc {
 			return 0, nil, ErrBadArgumentStr{"func or name", got.etype.String()}
@@ -226,7 +269,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 		*v.val = append(*v.val, fn)
 		// special case! consume all subsequent args (if any) in args that will also yield a seriesList
 		for len(e.args) > pos+1 && (e.args[pos+1].etype == etName || e.args[pos+1].etype == etFunc) {
-			pos += 1
+			pos++
 			fn, reqs, err = newplan(e.args[pos], context, stable, reqs)
 			if err != nil {
 				return 0, nil, err
@@ -236,7 +279,7 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 	default:
 		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
 	}
-	pos += 1
+	pos++
 	return pos, reqs, nil
 }
 
@@ -257,6 +300,37 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 	}
 	got := e.namedArgs[key]
 	switch v := exp.(type) {
+	case ArgBool:
+		if got.etype == etBool {
+			*v.val = got.bool
+			break
+		}
+		if got.etype == etString {
+			if val, ok := strToBool(got.str); ok {
+				*v.val = val
+				break
+			}
+		}
+		return ErrBadKwarg{key, exp, got.etype}
+	case ArgIn:
+		for _, a := range v.args {
+			// interesting little trick here.. when using ArgIn you only have to set the key on ArgIn,
+			// not for every individual sub-arg so to make sure we pass the key matching requirement,
+			// we just call consumeKwarg with whatever the key is set to (typically "")
+			// and set up optArgs and namedArgs such that it will work
+			subE := expr{
+				namedArgs: map[string]*expr{a.Key(): got},
+			}
+			err := subE.consumeKwarg(a.Key(), []Arg{a})
+			if err == nil {
+				return err
+			}
+		}
+		expStr := []string{}
+		for _, a := range v.args {
+			expStr = append(expStr, fmt.Sprintf("%T", a))
+		}
+		return ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 	case ArgInt:
 		if got.etype != etInt {
 			return ErrBadKwarg{key, exp, got.etype}
@@ -272,23 +346,16 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		default:
 			return ErrBadKwarg{key, exp, got.etype}
 		}
+	case ArgSeries, ArgSeriesList, ArgSeriesLists:
+		if got.etype != etName && got.etype != etFunc {
+			return ErrBadArgumentStr{"func or name", got.etype.String()}
+		}
+		// TODO consume series arg
 	case ArgString:
 		if got.etype != etString {
 			return ErrBadKwarg{key, exp, got.etype}
 		}
 		*v.val = got.str
-	case ArgBool:
-		if got.etype == etBool {
-			*v.val = got.bool
-			break
-		}
-		if got.etype == etString {
-			if val, ok := strToBool(got.str); ok {
-				*v.val = val
-				break
-			}
-		}
-		return ErrBadKwarg{key, exp, got.etype}
 	default:
 		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
 	}
