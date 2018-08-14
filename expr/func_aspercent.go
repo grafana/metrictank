@@ -99,6 +99,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 			nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
 
 			if nones == nil {
+				nones := pointSlicePool.Get().([]schema.Point)
 				for _, p := range totalSeries[key].Datapoints {
 					p.Val = math.NaN()
 					nones = append(nones, p)
@@ -120,6 +121,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 				nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
 
 				if nones == nil {
+					nones := pointSlicePool.Get().([]schema.Point)
 					for _, p := range serie1.Datapoints {
 						p.Val = math.NaN()
 						nones = append(nones, p)
