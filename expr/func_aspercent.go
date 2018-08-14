@@ -81,11 +81,11 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 
 	// calculate the sum
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalSeries = getTotalSeries(metaSeries, cache)
+		totalSeries = getTotalSeries(metaSeries, metaSeries, cache)
 		// calculate sum of totals series
 	} else if totals != nil {
 		totalSeriesLists := groupSeriesByKey(totals, s.nodes, &keys)
-		totalSeries = getTotalSeries(totalSeriesLists, cache)
+		totalSeries = getTotalSeries(totalSeriesLists, metaSeries, cache)
 	}
 
 	var nones []schema.Point
@@ -226,10 +226,15 @@ func groupSeriesByKey(series []models.Series, nodes []expr, keys *map[string]str
 }
 
 // Sums each seriesList in map of seriesLists
-func getTotalSeries(totalSeriesLists map[string][]models.Series, cache map[Req][]models.Series) map[string]models.Series {
+func getTotalSeries(totalSeriesLists, include map[string][]models.Series, cache map[Req][]models.Series) map[string]models.Series {
 	totalSeries := make(map[string]models.Series, len(totalSeriesLists))
 	for key := range totalSeriesLists {
-		totalSeries[key] = sumSeries(totalSeriesLists[key], cache)
+		if _, ok := include[key]; ok {
+			totalSeries[key] = sumSeries(totalSeriesLists[key], cache)
+		} else {
+			totalSeries[key] = totalSeriesLists[key][0]
+		}
+
 	}
 	return totalSeries
 }
