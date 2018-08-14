@@ -132,6 +132,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 				nonesSerie.Datapoints = nones
 				outSeries = append(outSeries, nonesSerie)
 			} else {
+				// key found in both metaSeries and totalSeries
 				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 				serie2 := totalSeries[key]
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
@@ -233,8 +234,7 @@ func getTotalSeries(totalSeriesLists map[string][]models.Series, cache map[Req][
 	return totalSeries
 }
 
-// Sums seriesList
-// Datapoints are always a copy
+// sumSeries returns a copy-on-write series that is the sum of the inputs
 func sumSeries(series []models.Series, cache map[Req][]models.Series) models.Series {
 	if len(series) == 1 {
 		return series[0]
