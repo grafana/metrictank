@@ -25,7 +25,9 @@ func (s *FuncKeepLastValue) Signature() ([]Arg, []Arg) {
 				opt: true,
 				args: []Arg{
 					ArgInt{val: &s.limit},
-					ArgString{val: &stub}, // Allow user to specify 'INF' as value. if so, will fall back to maxInt
+					// Allow user to specify 'INF' as value. if so, will fall back to maxInt
+					// Ignores any other strings (just like Graphite)
+					ArgString{val: &stub},
 				},
 			},
 		},
