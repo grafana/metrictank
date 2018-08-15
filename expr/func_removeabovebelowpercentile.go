@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -27,7 +26,7 @@ func (s *FuncRemoveAboveBelowPercentile) Signature() ([]Arg, []Arg) {
 
 	return []Arg{
 		ArgSeriesList{val: &s.in},
-		ArgFloat{key: "n", val: &s.n},
+		ArgFloat{key: "n", val: &s.n, validator: []Validator{NonNegativePercent}},
 	}, []Arg{ArgSeriesList{}}
 }
 
@@ -41,16 +40,14 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 		return nil, err
 	}
 
-	if s.n <= 0 {
-		return nil, errors.New("The requested percent is required to be greater than 0")
-	}
-
 	if len(series) == 0 {
 		return series, nil
 	}
 
 	var output []models.Series
-	sortedDatapointVals := make([]float64, 0, len(series[0].Datapoints)) //reuse float64 slice
+
+	// will be reused for each getPercentileValue call
+	sortedDatapointVals := make([]float64, 0, len(series[0].Datapoints))
 	for _, serie := range series {
 		if s.above {
 			serie.Target = fmt.Sprintf("removeAbovePercentile(%s, %g)", serie.Target, s.n)
@@ -90,6 +87,8 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 	return output, nil
 }
 
+// sortedDatapointVals is an empty slice to be used for sorting datapoints.
+// n must be > 0. if n > 100, the largest value is returned.
 func getPercentileValue(datapoints []schema.Point, n float64, sortedDatapointVals []float64) float64 {
 	sortedDatapointVals = sortedDatapointVals[:0]
 	for _, p := range datapoints {
