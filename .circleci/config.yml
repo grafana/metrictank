@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.10.3
     steps:
       - checkout
       - run: scripts/build.sh

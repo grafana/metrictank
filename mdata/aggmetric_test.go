@@ -77,7 +77,7 @@ func (c *Checker) Verify(primary bool, from, to, first, last uint32) {
 	}
 	for pj = pi; c.points[pj].ts != last; pj++ {
 	}
-	c.t.Logf("verifying AggMetric.Get(%d,%d) =?= %d <= ts <= %d", from, to, first, last)
+	c.t.Logf("verifying AggMetric.Get(%d,%d) -> range is %d - %d ?", from, to, first, last)
 	index := pi - 1
 	for _, iter := range res.Iters {
 		for iter.Next() {
@@ -182,9 +182,7 @@ func TestAggMetric(t *testing.T) {
 	c.Add(200, 200)
 	c.Add(315, 315)
 	c.Verify(true, 100, 399, 101, 315)
-
-	// verify as secondary node. Data from the first chunk should not be returned.
-	c.Verify(false, 100, 399, 200, 315)
+	c.Verify(false, 100, 399, 101, 315)
 
 	// get subranges
 	c.Verify(true, 120, 299, 101, 200)
