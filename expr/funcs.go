@@ -70,6 +70,7 @@ func init() {
 		"highestCurrent":        {NewHighestLowestConstructor("current", true), true},
 		"highestMax":            {NewHighestLowestConstructor("max", true), true},
 		"isNonNull":             {NewIsNonNull, true},
+		"keepLastValue":         {NewKeepLastValue, true},
 		"lowest":                {NewHighestLowestConstructor("", false), true},
 		"lowestAverage":         {NewHighestLowestConstructor("average", false), true},
 		"lowestCurrent":         {NewHighestLowestConstructor("current", false), true},
