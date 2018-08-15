@@ -1,9 +1,6 @@
 package expr
 
 import (
-	"math"
-	"sort"
-
 	"github.com/grafana/metrictank/consolidation"
 
 	"github.com/grafana/metrictank/api/models"
@@ -40,11 +37,6 @@ func (s *FuncHighestLowest) Context(context Context) Context {
 	return context
 }
 
-type ScoredSeries struct {
-	score float64
-	serie models.Series
-}
-
 func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	series, err := s.in.Exec(cache)
 	if err != nil {
@@ -55,32 +47,10 @@ func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series
 		return series, nil
 	}
 
-	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
-
-	// score series by their consolidated value
-	scored := make([]ScoredSeries, len(series))
-	for i, serie := range series {
-		scored[i] = ScoredSeries{
-			score: consolidationFunc(serie.Datapoints),
-			serie: serie,
-		}
-	}
-
-	sort.SliceStable(scored, func(i, j int) bool {
-		iVal := scored[i].score
-		jVal := scored[j].score
-		if s.highest {
-			return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal > jVal
-		}
-		return math.IsNaN(jVal) && !math.IsNaN(iVal) || iVal < jVal
-	})
+	SortSeriesWithConsolidator(series, consolidation.FromConsolidateBy(s.fn), s.highest)
 
 	if s.n > int64(len(series)) {
 		s.n = int64(len(series))
-	}
-
-	for i := 0; i < int(s.n); i++ {
-		series[i] = scored[i].serie
 	}
 
 	return series[:s.n], nil
