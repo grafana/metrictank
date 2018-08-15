@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -185,8 +186,8 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 		rsp := resp.r
 		if err != nil {
 			tags.Error.Set(span, true)
-			log.Error(3, "CLU HTTPNode: %s unreachable. %s", n.Name, err.Error())
-			return nil, NewError(http.StatusServiceUnavailable, fmt.Errorf("cluster node unavailable"))
+			log.Error(3, "CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
+			return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
 		}
 		return handleResp(rsp)
 	}
