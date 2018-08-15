@@ -220,7 +220,7 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 	if ok {
 		oldPart := existing.Partition
 		if LogLevel < 2 {
-			log.Debug("metricDef with id %v already in index", point.MKey)
+			log.Debug("memory-idx: metricDef with id %v already in index", point.MKey)
 		}
 
 		if existing.LastUpdate < int64(point.Time) {
@@ -246,7 +246,7 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	existing, ok := m.defById[mkey]
 	if ok {
 		oldPart := existing.Partition
-		log.Debug("metricDef with id %s already in index.", mkey)
+		log.Debug("memory-idx: metricDef with id %s already in index.", mkey)
 		if existing.LastUpdate < int64(data.Time) {
 			existing.LastUpdate = int64(data.Time)
 		}
