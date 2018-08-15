@@ -48,12 +48,11 @@ func NewMockNode(isLocal bool, name string, postResponse []byte) *MockNode {
 }
 
 type MockClusterManager struct {
-	Peers           []*MockNode
-	membersForQuery []*MockNode
-	thisNode        int
-	isPrimary       bool
-	isReady         bool
-	partitions      []int32
+	Peers      []*MockNode
+	thisNode   int
+	isPrimary  bool
+	isReady    bool
+	partitions []int32
 }
 
 func (c *MockClusterManager) MemberList() []Node {
