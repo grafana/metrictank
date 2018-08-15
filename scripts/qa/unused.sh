@@ -17,12 +17,12 @@ r=$?
 [ $r -gt $ret ] && ret=$r
 
 echo "## running varcheck"
-varcheck
+varcheck ./...
 r=$?
 [ $r -gt $ret ] && ret=$r
 
 echo "## running structcheck"
-structcheck
+structcheck ./...
 r=$?
 [ $r -gt $ret ] && ret=$r
 
