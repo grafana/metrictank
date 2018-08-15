@@ -84,11 +84,6 @@ func ConfigProcess() {
 
 	Mode = ModeType(mode)
 
-	// all further stuff is only relevant in multi mode
-	if mode != ModeMulti {
-		return
-	}
-
 	if httpTimeout == 0 {
 		log.Fatal(4, "CLU Config: http-timeout must be a non-zero duration string like 60s")
 	}
@@ -105,6 +100,11 @@ func ConfigProcess() {
 	client = http.Client{
 		Transport: transport,
 		Timeout:   httpTimeout,
+	}
+
+	// all further stuff is only relevant in multi mode
+	if mode != ModeMulti {
+		return
 	}
 
 	// check settings in swim section
