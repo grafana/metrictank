@@ -87,7 +87,7 @@ func init() {
 		"scale":                 {NewScale, true},
 		"scaleToSeconds":        {NewScaleToSeconds, true},
 		"smartSummarize":        {NewSmartSummarize, false},
-    "sortBy":                {NewSortByConstructor("", false), true},
+		"sortBy":                {NewSortByConstructor("", false), true},
 		"sortByMaxima":          {NewSortByConstructor("max", true), true},
 		"sortByName":            {NewSortByName, true},
 		"sortByTotal":           {NewSortByConstructor("sum", true), true},
