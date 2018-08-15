@@ -35,7 +35,7 @@ See also:
 
 
 | Function name and signature                                    | Alias        | Metrictank |
-| -------------------------------------------------------------- | -----------  | ---------- |
+| -------------------------------------------------------------- | ------------ | ---------- |
 | absolute                                                       |              | No         |
 | aggregate                                                      |              | No         |
 | aggregateLine                                                  |              | No         |
@@ -136,9 +136,9 @@ See also:
 | randomWalkFunction                                             | randomWalk   | No         |
 | rangeOfSeries(seriesList) series                               |              | Stable     |
 | reduceSeries                                                   | reduce       | No         |
-| removeAbovePercentile                                          |              | No         |
+| removeAbovePercentile(seriesList, n) seriesList                |              | No         |
 | removeAboveValue(seriesList, n) seriesList                     |              | Stable     |
-| removeBelowPercentile                                          |              | No         |
+| removeBelowPercentile(seriesList, n) seriesList                |              | No         |
 | removeBelowValue(seriesList, n) seriesList                     |              | Stable     |
 | removeBetweenPercentile                                        |              | No         |
 | removeEmptySeries                                              |              | No         |
