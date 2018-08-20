@@ -26,9 +26,11 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/Dieterbe/artisanalhistogram"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/Dieterbe/profiletrigger"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/Shopify/sarama"
@@ -39,11 +41,12 @@ unused-packages = true
   version = "0.7.3"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/alyu/configparser"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/bitly/go-hostpool"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/davecgh/go-spew"
@@ -51,74 +54,83 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/dgryski/go-linlog"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/dgryski/go-tsz"
+  revision = "5f4c484a9e838989c201ff437b3cab59cfdc46c8"
 
 [[constraint]]
   name = "github.com/docker/docker"
+  version = "v1.13.1"
 
 [[constraint]]
   name = "github.com/go-macaron/binding"
+  revision = "a453235199f8898e01647db8820f937a184fbd09"
 
 [[constraint]]
   name = "github.com/gocql/gocql"
   revision = "d9815cdf0ff24e2efa9b8062f4f94a6dd347ae51"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/golang/snappy"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/hailocab/go-hostpool"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/hashicorp/memberlist"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/kisielk/og-rek"
+  version = "v1.0.0"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/kisielk/whisper-go"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/metrics20/go-metrics20"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/mitchellh/go-homedir"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/nsqio/go-nsq"
+  revision = "642a3f9935f12cb3b747294318d730f56f4c34b4"
 
 [[constraint]]
   name = "github.com/opentracing/opentracing-go"
+  branch = "master"
 
 [[constraint]]
-  branch = "v2"
   name = "github.com/raintank/dur"
+  branch = "v2"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/raintank/gziper"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/raintank/met"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/raintank/misc"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/raintank/worldping-api"
+  revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
 
 [[constraint]]
   name = "github.com/rakyll/globalconf"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/rs/cors"
@@ -126,12 +138,15 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/sergi/go-diff"
+  version = "v1.0.0"
 
 [[constraint]]
   name = "github.com/smartystreets/goconvey"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/syndtr/goleveldb"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/tinylib/msgp"
@@ -151,6 +166,7 @@ unused-packages = true
 
 [[constraint]]
   name = "gopkg.in/raintank/schema.v1"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/prometheus/prometheus"
