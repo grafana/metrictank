@@ -747,7 +747,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:8996c7eeb8280a5be90bf9b8e673238d5a0e6541d6cde6e169724fc9a750b999"
+  digest = "1:1f0b284a6858827de4c27c66b49b2b25df3e16b031c2b57b7892273131e7dd2b"
   name = "github.com/smartystreets/assertions"
   packages = [
     ".",
@@ -755,7 +755,8 @@
     "internal/oglematchers",
   ]
   pruneopts = "NUT"
-  revision = "443d812296a84445c202c085f19e18fc238f8250"
+  revision = "7678a5452ebea5b7090a6b163f844c133f523da2"
+  version = "1.8.3"
 
 [[projects]]
   branch = "master"
