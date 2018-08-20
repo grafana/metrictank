@@ -170,7 +170,8 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/prometheus/prometheus"
-  version = "2.1.0"
+  source = "https://github.com/Dieterbe/prometheus.git"
+  branch = "v2.1.0-tom-fix-testing-flags"
 
 [[override]]
   name = "golang.org/x/net"

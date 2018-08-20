@@ -609,7 +609,8 @@
   revision = "75f2d6163c7a100bed6e971044ea3de30ee3a678"
 
 [[projects]]
-  digest = "1:a9627fe34876958cb2df2c9572a7ee4e21add894d116c5c528dfbc701d7635af"
+  branch = "v2.1.0-tom-fix-testing-flags"
+  digest = "1:33fa5dec0d85ad2e80c280a1ec7cb6da054ef732b2bcaede70c09091ebf4e0a7"
   name = "github.com/prometheus/prometheus"
   packages = [
     "pkg/labels",
@@ -625,8 +626,8 @@
     "util/testutil",
   ]
   pruneopts = "NUT"
-  revision = "85f23d82a045d103ea7f3c89a91fba4a93e6367a"
-  version = "v2.1.0"
+  revision = "74fa41334a571bd78e941aae802f422fa88b4e7f"
+  source = "https://github.com/Dieterbe/prometheus.git"
 
 [[projects]]
   branch = "master"
