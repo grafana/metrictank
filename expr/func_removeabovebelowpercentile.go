@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/api/models"
 )

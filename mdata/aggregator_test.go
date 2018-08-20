@@ -8,7 +8,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/test"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type testcase struct {

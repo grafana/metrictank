@@ -8,7 +8,7 @@ import (
 	"github.com/grafana/metrictank/batch"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/raintank/dur"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type FuncSummarize struct {

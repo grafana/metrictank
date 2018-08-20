@@ -13,8 +13,8 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/test"
+	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // getSeriesNames returns a count-length slice of random strings comprised of the prefix and count nodes.like.this

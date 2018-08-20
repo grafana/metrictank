@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"

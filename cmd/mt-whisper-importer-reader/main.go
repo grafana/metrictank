@@ -23,7 +23,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	"github.com/kisielk/whisper-go/whisper"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var (

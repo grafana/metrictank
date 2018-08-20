@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/raintank/met"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // Out submits metricdata to a destination

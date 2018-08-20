@@ -10,8 +10,8 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/util"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 var (

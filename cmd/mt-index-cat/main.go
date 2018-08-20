@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/raintank/dur"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func perror(err error) {

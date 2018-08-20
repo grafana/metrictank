@@ -3,7 +3,7 @@ package expr
 import (
 	"sync"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func init() {

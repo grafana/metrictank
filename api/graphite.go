@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/raintank/schema"
 	macaron "gopkg.in/macaron.v1"
-	schema "gopkg.in/raintank/schema.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/dur"

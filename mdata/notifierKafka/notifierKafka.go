@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/idx"

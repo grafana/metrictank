@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"

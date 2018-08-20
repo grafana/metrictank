@@ -3,7 +3,7 @@ package consolidation
 import (
 	"context"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // ConsolidateContext wraps a Consolidate() call with a context.Context condition

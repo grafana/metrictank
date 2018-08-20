@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
-	"gopkg.in/raintank/schema.v1/msg"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 
 	"github.com/Shopify/sarama"
 	"github.com/raintank/worldping-api/pkg/log"

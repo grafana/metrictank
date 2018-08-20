@@ -3,7 +3,7 @@ package expr
 import (
 	"math"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var a = []schema.Point{

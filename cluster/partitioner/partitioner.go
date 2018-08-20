@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Shopify/sarama"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type Partitioner interface {

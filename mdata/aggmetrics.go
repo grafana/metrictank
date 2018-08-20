@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // AggMetrics is an in-memory store of AggMetric objects

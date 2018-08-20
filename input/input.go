@@ -5,8 +5,8 @@ package input
 import (
 	"fmt"
 
-	"gopkg.in/raintank/schema.v1"
-	"gopkg.in/raintank/schema.v1/msg"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"

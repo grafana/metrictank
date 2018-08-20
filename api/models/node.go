@@ -3,7 +3,7 @@ package models
 import (
 	"github.com/grafana/metrictank/cluster"
 	opentracing "github.com/opentracing/opentracing-go"
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type NodeStatus struct {

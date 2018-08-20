@@ -6,6 +6,10 @@ http://pvk.ca/Blog/2015/06/27/linear-log-bucketing-fast-versatile-simple/
 */
 package linlog
 
+import (
+	"math/bits"
+)
+
 // BinOf rounds size as appropriate, and returns the rounded size and bucket number.
 func BinOf(size uint64, linear, subbin uint64) (rounded uint64, bucket uint64) {
 	nBits := lb(size | (1 << uint(linear)))
@@ -55,4 +59,8 @@ func Bins(max uint64, linear, subbin uint64) []uint64 {
 	}
 
 	return buckets
+}
+
+func lb(x uint64) uint64 {
+	return uint64(63 - bits.LeadingZeros64(x))
 }

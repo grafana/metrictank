@@ -3,7 +3,7 @@ package mdata
 import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // AggBoundary returns ts if it is a boundary, or the next boundary otherwise.

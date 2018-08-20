@@ -10,7 +10,7 @@ import (
 	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/store/cassandra"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {

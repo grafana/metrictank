@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"

@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type FuncDivideSeriesLists struct {

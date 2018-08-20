@@ -8,8 +8,8 @@ import (
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // CCacheMetric caches data chunks

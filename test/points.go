@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // these serve as a "cache" of clean point slices - grouped by size -

@@ -12,8 +12,8 @@ import (
 	p "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 type KafkaMdm struct {

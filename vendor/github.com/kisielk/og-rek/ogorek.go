@@ -80,6 +80,7 @@ const (
 
 	// Protocol 4
 	opShortBinUnicode = '\x8c' // push short string; UTF-8 length < 256 bytes
+	opStackGlobal     = '\x93' // same as OpGlobal but using names on the stacks
 	opMemoize         = '\x94' // store top of the stack in memo
 	opFrame           = '\x95' // indicate the beginning of a new frame
 )
@@ -89,6 +90,7 @@ var ErrInvalidPickleVersion = errors.New("invalid pickle version")
 var errNoMarker = errors.New("no marker in stack")
 var errStackUnderflow = errors.New("pickle: stack underflow")
 
+// OpcodeError is the error that Decode returns when it sees unknown pickle opcode.
 type OpcodeError struct {
 	Key byte
 	Pos int
@@ -242,6 +244,8 @@ loop:
 			err = d.loadFrame()
 		case opShortBinUnicode:
 			err = d.loadShortBinUnicode()
+		case opStackGlobal:
+			err = d.stackGlobal()
 		case opMemoize:
 			err = d.loadMemoize()
 		case opProto:
@@ -465,16 +469,43 @@ func (d *Decoder) loadNone() error {
 	return nil
 }
 
+
+// Ref represents Python's persistent reference.
+//
+// Such references are used when one pickle somehow references another pickle
+// in e.g. a database.
+//
+// See https://docs.python.org/3/library/pickle.html#pickle-persistent for details.
+type Ref struct {
+	// persistent ID of referenced object.
+	//
+	// used to be string for protocol 0, but "upgraded" to be arbitrary
+	// object for later protocols.
+	Pid interface{}
+}
+
 // Push a persistent object id
 func (d *Decoder) loadPersid() error {
-	return errNotImplemented
+	pid, err := d.readLine()
+	if err != nil {
+		return err
+	}
+
+	d.push(Ref{Pid: string(pid)})
+	return nil
 }
 
 // Push a persistent object id from items on the stack
 func (d *Decoder) loadBinPersid() error {
-	return errNotImplemented
+	pid, err := d.pop()
+	if err != nil {
+		return err
+	}
+	d.push(Ref{Pid: pid})
+	return nil
 }
 
+// Call represents Python's call.
 type Call struct {
 	Callable Class
 	Args     Tuple
@@ -642,6 +673,7 @@ func (d *Decoder) build() error {
 	return errNotImplemented
 }
 
+// Class represents a Python class.
 type Class struct {
 	Module, Name string
 }
@@ -941,6 +973,26 @@ func (d *Decoder) loadShortBinUnicode() error {
 		return err
 	}
 	d.push(d.buf.String())
+	return nil
+}
+
+func (d *Decoder) stackGlobal() error {
+	if len(d.stack) < 2 {
+		return errStackUnderflow
+	}
+	xname := d.xpop()
+	xmodule := d.xpop()
+
+	name, ok := xname.(string)
+	if !ok {
+		return fmt.Errorf("pickle: stackGlobal: invalid name: %T", xname)
+	}
+	module, ok := xmodule.(string)
+	if !ok {
+		return fmt.Errorf("pickle: stackGlobal: invalid module: %T", xmodule)
+	}
+
+	d.stack = append(d.stack, Class{Module: module, Name: name})
 	return nil
 }
 
