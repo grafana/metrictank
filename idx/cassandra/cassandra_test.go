@@ -11,8 +11,8 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/test"
+	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/raintank/schema.v1"
 )
 
 type testIterator struct {

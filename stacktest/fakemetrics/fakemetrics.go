@@ -11,7 +11,7 @@ import (
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func generateMetrics(num int) []*schema.MetricData {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/test"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var ids []schema.MKey

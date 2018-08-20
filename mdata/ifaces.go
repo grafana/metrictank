@@ -3,7 +3,7 @@ package mdata
 import (
 	"context"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/chunk"

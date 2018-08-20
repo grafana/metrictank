@@ -14,9 +14,9 @@ import (
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // metric input.carbon.metrics_per_message is how many metrics per message were seen. in carbon's case this is always 1.

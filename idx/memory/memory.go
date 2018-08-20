@@ -13,9 +13,9 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/raintank/schema.v1"
 )
 
 var (

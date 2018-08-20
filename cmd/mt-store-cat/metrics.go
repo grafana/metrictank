@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/store/cassandra"
 )

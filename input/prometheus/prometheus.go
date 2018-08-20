@@ -12,9 +12,9 @@ import (
 	"github.com/grafana/metrictank/input"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
-	schema "gopkg.in/raintank/schema.v1"
 )
 
 var (

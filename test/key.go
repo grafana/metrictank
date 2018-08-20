@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func GetAMKey(suffix int) schema.AMKey {

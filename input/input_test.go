@@ -11,7 +11,7 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	backendStore "github.com/grafana/metrictank/store"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {

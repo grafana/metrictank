@@ -4,8 +4,8 @@ import (
 	"sort"
 
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 const evictQSize = 1000

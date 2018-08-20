@@ -528,6 +528,16 @@
   revision = "cb73203311ae2489b845469f622678f24ff98a16"
 
 [[projects]]
+  digest = "1:f286503468c7db6e1854a2ab16801ff7c41bb62bd830e0bfed78c32df97ddf14"
+  name = "github.com/raintank/schema"
+  packages = [
+    ".",
+    "msg",
+  ]
+  revision = "78381f04d5c0d113b4dc28ac30d6a8a34d4bc1dc"
+
+[[projects]]
+  digest = "1:5ffe14cc7010d0914c408d73dba661eca1fb8b4608725ea533727c9372c5adf7"
   name = "github.com/raintank/worldping-api"
   packages = ["pkg/log"]
   revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
@@ -752,14 +762,6 @@
   revision = "4974334b10dbb6f5c0e17f4c10555ff050a16329"
   version = "v1.1.8"
 
-[[projects]]
-  name = "gopkg.in/raintank/schema.v1"
-  packages = [
-    ".",
-    "msg"
-  ]
-  revision = "c068e0c9c054af19c858b2d947741180c09ea6b1"
-  version = "v1.6"
 
 [solve-meta]
   analyzer-name = "dep"

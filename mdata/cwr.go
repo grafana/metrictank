@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // ChunkWriteRequest is a request to write a chunk into a store

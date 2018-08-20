@@ -8,7 +8,7 @@ import (
 
 	"github.com/grafana/metrictank/consolidation"
 	pickle "github.com/kisielk/og-rek"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 //go:generate msgp

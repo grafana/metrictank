@@ -10,7 +10,7 @@ import (
 
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var errClosed = errors.New("output is closed")

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var OrgIdPublic = uint32(0)

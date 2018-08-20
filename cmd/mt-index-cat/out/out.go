@@ -9,7 +9,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var QueryTime int64

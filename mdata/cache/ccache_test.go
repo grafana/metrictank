@@ -7,7 +7,7 @@ import (
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/test"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values

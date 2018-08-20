@@ -12,8 +12,8 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less than to")

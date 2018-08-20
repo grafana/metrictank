@@ -12,9 +12,9 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
-	"gopkg.in/raintank/schema.v1"
 )
 
 var (

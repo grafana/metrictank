@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"github.com/grafana/metrictank/api/models"
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 type seriesAggregator struct {

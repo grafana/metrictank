@@ -17,8 +17,8 @@ import (
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
+	"github.com/raintank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
-	"gopkg.in/raintank/schema.v1"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.

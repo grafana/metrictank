@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"

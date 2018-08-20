@@ -1,0 +1,5 @@
+observed problems:
+1) testisolate output shows that mt4 returns all series, but some of them have up to 4 NaN oldest points
+2) querying http 6061 manually shows sometimes not all series returned (though that was from=-1s)
+   curl -v http://localhost:6061/render\?target\=some.id.of.a.metric.\*\&from\=-2s | jsonpp | r target
+

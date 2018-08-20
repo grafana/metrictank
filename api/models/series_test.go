@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func TestJsonMarshal(t *testing.T) {

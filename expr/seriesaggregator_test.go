@@ -7,7 +7,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/test"
-	schema "gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 func TestSeriesAggregatorsIdentity(t *testing.T) {

@@ -1,7 +1,7 @@
 package mdata
 
 import (
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.

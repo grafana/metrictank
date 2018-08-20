@@ -125,6 +125,10 @@ unused-packages = true
   branch = "master"
 
 [[constraint]]
+  name = "github.com/raintank/schema"
+  revision = "78381f04d5c0d113b4dc28ac30d6a8a34d4bc1dc"
+
+[[constraint]]
   name = "github.com/raintank/worldping-api"
   revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
 
@@ -163,10 +167,6 @@ unused-packages = true
 [[constraint]]
   name = "gopkg.in/macaron.v1"
   version = "1.1.8"
-
-[[constraint]]
-  name = "gopkg.in/raintank/schema.v1"
-  branch = "master"
 
 [[constraint]]
   name = "github.com/prometheus/prometheus"
