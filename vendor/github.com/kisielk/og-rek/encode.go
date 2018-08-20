@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"strings"
 )
 
 type TypeError struct {
@@ -290,6 +291,30 @@ func (e *Encoder) encodeCall(v *Call) error {
 	return err
 }
 
+func (e *Encoder) encodeClass(v *Class) error {
+	_, err := fmt.Fprintf(e.w, "%c'%s'\n%c'%s'\n", opString, v.Module, opString, v.Name)
+	if err != nil {
+		return err
+	}
+	_, err = e.w.Write([]byte{opStackGlobal})
+	return err
+}
+
+func (e *Encoder) encodeRef(v *Ref) error {
+	if pids, ok := v.Pid.(string); ok && !strings.Contains(pids, "\n") {
+		_, err := fmt.Fprintf(e.w, "%c%s\n", opPersid, pids)
+		return err
+	} else {
+		// XXX we can use opBinpersid only if .protocol >= 1
+		err := e.encode(reflectValueOf(v.Pid))
+		if err != nil {
+			return err
+		}
+		_, err = e.w.Write([]byte{opBinpersid})
+		return err
+	}
+}
+
 func (e *Encoder) encodeStruct(st reflect.Value) error {
 
 	typ := st.Type()
@@ -301,6 +326,10 @@ func (e *Encoder) encodeStruct(st reflect.Value) error {
 		return err
 	case Call:
 		return e.encodeCall(&v)
+	case Class:
+		return e.encodeClass(&v)
+	case Ref:
+		return e.encodeRef(&v)
 	case big.Int:
 		return e.encodeLong(&v)
 	}
