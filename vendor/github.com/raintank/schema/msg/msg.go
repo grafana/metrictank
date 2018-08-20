@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/raintank/schema.v1"
+	"github.com/raintank/schema"
 )
 
 var errTooSmall = errors.New("too small")

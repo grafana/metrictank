@@ -126,7 +126,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/schema"
-  revision = "78381f04d5c0d113b4dc28ac30d6a8a34d4bc1dc"
+  branch = "deprecate-gopkg-in"
 
 [[constraint]]
   name = "github.com/raintank/worldping-api"
