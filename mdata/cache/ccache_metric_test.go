@@ -3,8 +3,10 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
@@ -201,6 +203,57 @@ func TestCorruptionCase1(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func getRandomNumber(min, max int) int {
+	return rand.Intn(max-min) + min
+}
+
+func getRandomRange(min, max int) (int, int) {
+	start := getRandomNumber(min, max)
+	var end int
+	for end = min - 1; end < start; end = getRandomNumber(min, max) {
+	}
+
+	return start, end
+}
+
+func TestCorruptionCase2(t *testing.T) {
+	rand.Seed(time.Now().Unix())
+	_, ccm := getCCM()
+	iterations := 100000000
+	chunks := generateChunks(t, 10, 100, 10)
+	adds, addRanges, dels := 0, 0, 0
+
+	for i := 0; i < iterations; i++ {
+		// 0 = Add
+		// 1 = AddRange
+		// 2 = Del
+		action := getRandomNumber(0, 3)
+		switch action {
+		case 0:
+			chunk := getRandomNumber(0, 100)
+			//fmt.Println(fmt.Sprintf("adding chunk %d", chunk))
+			ccm.Add(0, chunks[chunk])
+			adds++
+		case 1:
+			from, to := getRandomRange(0, 100)
+			//fmt.Println(fmt.Sprintf("adding range %d-%d", from, to))
+			ccm.AddRange(0, chunks[from:to])
+			addRanges++
+		case 2:
+			chunk := getRandomNumber(0, 100)
+			//fmt.Println(fmt.Sprintf("deleting chunk %d", chunk))
+			ccm.Del(chunks[chunk].Ts)
+			dels++
+		}
+
+		if err := verifyCcm(ccm); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fmt.Println(fmt.Sprintf("adds: %d addRanges: %d dels:%d", adds, addRanges, dels))
 }
 
 // verifyCcm verifies the integrity of a CCacheMetric
