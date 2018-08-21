@@ -185,6 +185,8 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		})
 		mc.chunks[ts] = &chunks[len(chunks)-1]
 		mc.keys = append(mc.keys, ts)
+	} else {
+		mc.chunks[ts].Prev = prev
 	}
 
 	if sortKeys {
