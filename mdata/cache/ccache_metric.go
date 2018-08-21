@@ -101,15 +101,22 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		// if previous chunk has not been passed we try to be smart and figure it out.
 		// this is common in a scenario where a metric continuously gets queried
 		// for a range that starts less than one chunkspan before now().
-		if prev == 0 {
-			res, ok := mc.seekDesc(ts - 1)
-			if ok {
+		res, ok := mc.seekDesc(ts - 1)
+		if ok {
+			if prev == 0 {
 				prev = res
+			} else if prev != res {
+				log.Warn("CCacheMetric AddRange: 'prev' param disagrees with seek: key = %s, prev = %d, seek = %d",
+					mc.MKey.String(), prev, res)
 			}
 		}
 
 		// if the previous chunk is cached, link it
-		if _, ok := mc.chunks[prev]; ok {
+		if prev != 0 && (ts-prev) != (itergens[1].Ts-ts) {
+			log.Warn("CCacheMetric AddRange: Bad prev begin used: key = %s, prev = %d, itergens[0].Ts = %d, itergens[1].Ts = %d",
+				mc.MKey.String(), prev, itergens[0].Ts, itergens[1].Ts)
+			prev = 0
+		} else if _, ok := mc.chunks[prev]; ok {
 			mc.chunks[prev].Next = ts
 		} else {
 			prev = 0
@@ -133,6 +140,11 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	for i := 1; i < len(itergens)-1; i++ {
 		itergen = itergens[i]
 		ts = itergen.Ts
+		// Only append key if we didn't have this chunk already
+		if _, ok := mc.chunks[ts]; !ok {
+			mc.keys = append(mc.keys, ts)
+		}
+
 		// add chunk, potentially overwriting pre-existing chunk (unlikely)
 		chunks = append(chunks, CCacheChunk{
 			Ts:    ts,
@@ -141,7 +153,6 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			Itgen: itergen,
 		})
 		mc.chunks[ts] = &chunks[len(chunks)-1]
-		mc.keys = append(mc.keys, ts)
 
 		prev = ts
 	}
@@ -209,10 +220,13 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 	// if previous chunk has not been passed we try to be smart and figure it out.
 	// this is common in a scenario where a metric continuously gets queried
 	// for a range that starts less than one chunkspan before now().
-	if prev == 0 {
-		res, ok := mc.seekDesc(ts - 1)
-		if ok {
+	res, ok := mc.seekDesc(ts - 1)
+	if ok {
+		if prev == 0 {
 			prev = res
+		} else if prev != res {
+			log.Warn("CCacheMetric Add: 'prev' param disagrees with seek: key = %s, prev = %d, seek = %d",
+				mc.MKey.String(), prev, res)
 		}
 	}
 
@@ -401,15 +415,22 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 	}
 
 	if !res.Complete && res.From > res.Until {
-		log.Debug("CCacheMetric Search: Found from > until (%d/%d), printing chunks\n", res.From, res.Until)
-		mc.debugMetric()
+		log.Warn("CCacheMetric Search: Found from > until (%d/%d), key = %s, printing chunks\n", res.From, res.Until, mc.MKey.String())
+		mc.debugMetric(from-7200, until+7200)
+		res.Complete = false
+		res.Start = res.Start[:0]
+		res.End = res.End[:0]
+		res.From = from
+		res.Until = until
 	}
 }
 
-func (mc *CCacheMetric) debugMetric() {
-	log.Debug("CCacheMetric debugMetric: --- debugging metric ---\n")
+func (mc *CCacheMetric) debugMetric(from, until uint32) {
+	log.Warn("CCacheMetric debugMetric: --- debugging metric between %d and %d ---\n", from, until)
 	for _, key := range mc.keys {
-		log.Debug("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+		if key >= from && key <= until {
+			log.Warn("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+		}
 	}
-	log.Debug("CCacheMetric debugMetric: ------------------------\n")
+	log.Warn("CCacheMetric debugMetric: ------------------------\n")
 }
