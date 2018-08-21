@@ -551,7 +551,6 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 		if cacheRes.From != cacheRes.Until {
 			storeIterGens, err := s.BackendStore.Search(ctx.ctx, ctx.AMKey, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				log.Warn("Failed to retrieve data for key = %s", ctx.AMKey.String())
 				return iters, err
 			}
 			// check to see if the request has been canceled, if so abort now.
