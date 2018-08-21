@@ -1,7 +1,8 @@
 # Cassandra and scyllaDB
 
-We run what is currently the latest version of Cassandra, 3.0.8.
-It also works with 2.2 (we ran on 2.2.3 for a while), with some schema and compaction tweaks, see below.
+We run what is currently the latest version of Cassandra, 3.11
+Other well tested versions are 3.0.8
+It should still work with 2.2 (we used to run on 2.2.3 for a while), with some schema and compaction tweaks, see below.
 People have reported success running [scylladb](https://www.scylladb.com/) as Cassandra alternative and we provide schemas for that as well.
 
 Note that we have a Cassandra data storage plugin, and a Cassandra index (metadata) plugin. Each has their own config section, metrics, etc and can be used independently.
