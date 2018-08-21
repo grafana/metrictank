@@ -31,6 +31,7 @@ var (
 	// metric cache.ops.chunk.evict is how many chunks were evicted from the cache
 	cacheChunkEvict = stats.NewCounter32("cache.ops.chunk.evict")
 
-	cacheSizeMax  = stats.NewGauge64("cache.size.max")
-	cacheSizeUsed = stats.NewGauge64("cache.size.used")
+	cacheSizeMax         = stats.NewGauge64("cache.size.max")
+	cacheSizeUsed        = stats.NewGauge64("cache.size.used")
+	AccntEventSubmission = stats.NewLatencyHistogram15s32("cache.accounting.submission")
 )

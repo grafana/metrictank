@@ -2,10 +2,10 @@ package accnt
 
 import (
 	"sort"
+	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 )
 
 const evictQSize = 1000
@@ -157,12 +157,9 @@ func (a *FlatAccnt) act(eType eventType, payload interface{}) {
 		pl:    payload,
 	}
 
-	select {
-	// we never want to block for accounting, rather just let it miss some events and print an error
-	case a.eventQ <- event:
-	default:
-		log.Error(3, "Failed to submit event to accounting, channel was blocked")
-	}
+	pre := time.Now()
+	a.eventQ <- event
+	AccntEventSubmission.Value(time.Now().Sub(pre))
 }
 
 func (a *FlatAccnt) eventLoop() {
