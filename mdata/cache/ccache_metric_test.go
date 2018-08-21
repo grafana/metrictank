@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/grafana/metrictank/mdata/chunk"
@@ -188,39 +190,51 @@ func BenchmarkAddRangeDesc64(b *testing.B) {
 	}
 }
 
-// this method assumes that all itergens are span-aware
-func verifyCcm(t *testing.T, ccm *CCacheMetric) {
+func TestCorruptionCase1(t *testing.T) {
+	testRun(t, func(ccm *CCacheMetric) {
+		chunks := generateChunks(t, 10, 6, 10)
+		ccm.AddRange(0, chunks[3:6])
+		ccm.AddRange(0, chunks[0:4])
+		if err := verifyCcm(ccm); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+// verifyCcm verifies the integrity of a CCacheMetric
+// it assumes that all itergens are span-aware
+func verifyCcm(ccm *CCacheMetric) error {
 	var chunk *CCacheChunk
 	var ok bool
 
 	if len(ccm.chunks) != len(ccm.keys) {
-		t.Fatalf("Length of ccm.chunks does not match ccm.keys")
+		return errors.New("Length of ccm.chunks does not match ccm.keys")
 	}
 
 	for i, ts := range ccm.keys {
 		if chunk, ok = ccm.chunks[ts]; !ok {
-			t.Fatalf("Ts %d is in ccm.keys but not in ccm.chunks", ts)
+			return fmt.Errorf("Ts %d is in ccm.keys but not in ccm.chunks", ts)
 		}
 
 		if i == 0 {
 			if chunk.Prev != 0 {
-				t.Fatalf("First chunk has Prev != 0")
+				return errors.New("First chunk has Prev != 0")
 			}
 		} else {
 			if chunk.Prev == 0 {
 				if ccm.chunks[ccm.keys[i-1]].Ts == chunk.Ts-chunk.Itgen.Span {
-					t.Fatalf("Chunk of ts %d has Prev == 0, but the previous chunk is present", ts)
+					return fmt.Errorf("Chunk of ts %d has Prev == 0, but the previous chunk is present", ts)
 				}
 			} else {
 				if ccm.chunks[ccm.keys[i-1]].Ts != chunk.Prev {
-					t.Fatalf("Chunk of ts %d has Prev set to wrong ts %d but should be %d", ts, chunk.Prev, ccm.chunks[ccm.keys[i-1]].Ts)
+					return fmt.Errorf("Chunk of ts %d has Prev set to wrong ts %d but should be %d", ts, chunk.Prev, ccm.chunks[ccm.keys[i-1]].Ts)
 				}
 			}
 		}
 
 		if i == len(ccm.keys)-1 {
 			if chunk.Next != 0 {
-				t.Fatalf("Next of last chunk should be 0, but it's %d", chunk.Next)
+				return fmt.Errorf("Next of last chunk should be 0, but it's %d", chunk.Next)
 			}
 
 			// all checks completed
@@ -229,26 +243,18 @@ func verifyCcm(t *testing.T, ccm *CCacheMetric) {
 
 		var nextChunk *CCacheChunk
 		if nextChunk, ok = ccm.chunks[ccm.keys[i+1]]; !ok {
-			t.Fatalf("Ts %d is in ccm.keys but not in ccm.chunks", ccm.keys[i+1])
+			return fmt.Errorf("Ts %d is in ccm.keys but not in ccm.chunks", ccm.keys[i+1])
 		}
 
 		if chunk.Next == 0 {
 			if chunk.Ts+chunk.Itgen.Span == nextChunk.Ts {
-				t.Fatalf("Next of chunk at ts %d is set to 0, but the next chunk is present", ts)
+				return fmt.Errorf("Next of chunk at ts %d is set to 0, but the next chunk is present", ts)
 			}
 		} else {
 			if chunk.Next != nextChunk.Ts {
-				t.Fatalf("Next of chunk at ts %d is set to %d, but it should be %d", ts, chunk.Next, nextChunk.Ts)
+				return fmt.Errorf("Next of chunk at ts %d is set to %d, but it should be %d", ts, chunk.Next, nextChunk.Ts)
 			}
 		}
 	}
-}
-
-func TestCorruptionCase1(t *testing.T) {
-	testRun(t, func(ccm *CCacheMetric) {
-		chunks := generateChunks(t, 10, 6, 10)
-		ccm.AddRange(0, chunks[3:6])
-		ccm.AddRange(0, chunks[0:4])
-		verifyCcm(t, ccm)
-	})
+	return nil
 }
