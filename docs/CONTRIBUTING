@@ -1,6 +1,12 @@
 Thanks for your interest in contributing to metrictank!
 
-When contributing PR's:
+# Tooling
+
+* [dep](https://github.com/golang/dep) for managing vendored dependencies
+* `make` to build binaries and docker image.
+* [metrics2docs](https://github.com/Dieterbe/metrics2docs) generates the metrics documentation for the [metrics page](https://github.com/grafana/metrictank/blob/master/docs/metrics.md) though it is a bit buggy and often manual intervention is needed.
+
+# When contributing PR's
 
 1. functions, methods, types should be clearly understandable, either through an obvious name, or documentation when needed.
 2. all documentation must conform to [golang best practices](https://blog.golang.org/godoc-documenting-go-code)

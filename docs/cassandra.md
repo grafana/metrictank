@@ -1,84 +1,43 @@
-# Cassandra version
+# Cassandra and scyllaDB
 
-We run what is currently the latest version, 3.0.8, and recommend you do the same.
-It also works with 2.2 (we ran on 2.2.3 for a while), with some schema and compaction tweaks, see below.
+We run what is currently the latest version of Cassandra, 3.11
+Other well tested versions are 3.0.8
+It should still work with 2.2 (we used to run on 2.2.3 for a while), with some schema and compaction tweaks, see below.
+People have reported success running [scylladb](https://www.scylladb.com/) as Cassandra alternative and we provide schemas for that as well.
+
+Note that we have a Cassandra data storage plugin, and a Cassandra index (metadata) plugin. Each has their own config section, metrics, etc and can be used independently.
 
 ## Configuration
 
-The default Cassandra configuration is fine, especially for test/development setups.
+[Cassandra storage configuration](https://github.com/grafana/metrictank/blob/master/docs/config.md#metric-data-storage-in-cassandra)
+[Cassandra index configuration](https://github.com/grafana/metrictank/blob/master/docs/config.md#in-memory-cassandra-backed)
+
+The defaults are fine, especially for test/development setups.
 
 Here are some settings that are worth elaborating on:
 
-* `cassandra-retries`: turning up this value will allow the data persistence layer to transparantly retry queries, should they error or time out.  The consequence of this is that
+* `retries`: turning up this value will allow the data persistence layer to transparantly retry queries, should they error or time out.  The consequence of this is that
   cassandra gets may take longer then what the timeout value is set to.  Note that queries may still be aborted due to an error or timeout without retrying as many times as the
   configuration allows.  This is because based on your host-selection-policy, hosts may be marked offline if they timeout.  See [gocql/812](https://github.com/gocql/gocql/issues/812).
   So just be aware of this as you configure your host selection policy.
 
 ## Schema
 
-By default, metrictank will initialize Cassandra with the following keyspace and table schema.  The keyspace to use can be set in the configuration using the "cassandra-keyspace" option, the default is "metrictank":
+Metrictank comes with these schema files out of the box:
 
-```
-CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}  AND durable_writes = true
+* [/etc/metrictank/schema-store-cassandra.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-store-cassandra.toml)
+* [/etc/metrictank/schema-idx-cassandra.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-idx-cassandra.toml)
+* [/usr/share/metrictank/examples/schema-store-scylladb.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-store-scylladb.toml)
+* [/usr/share/metrictank/examples/schema-idx-scylladb.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-idx-scylladb.toml)
 
-CREATE TABLE IF NOT EXISTS metrictank.metric (
-    key ascii,
-    ts int,
-    data blob,
-    PRIMARY KEY (key, ts)
-) WITH CLUSTERING ORDER BY (ts DESC)
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-```
+These files initialize the database with the keyspace and table schema. For the store and index plugins respectively.
+By default it will use the the files in /etc/metrictank.
+The keyspace to use can be set in the configuration using the "cassandra-keyspace" option, the default is "metrictank":
 
-If you are using the [cassandra-idx](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) (Cassandra backed storage for the MetricDefinitions index), the following table will also be created.
-
-```
-CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
-    id text,
-    partition int,
-    name text,
-    metric text,
-    interval int,
-    unit text,
-    mtype text,
-    tags set<text>,
-    lastupdate int,
-    PRIMARY KEY (partition, id)
-) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-```
-
-These settings are good for development and geared towards Cassandra 3.0
-
-For clustered scenarios, you may want to initialize Cassandra yourself with a schema like:
+For clustered scenarios, you may want to tweak the schema:
 
 ```
 CREATE KEYSPACE IF NOT EXISTS metrictank WITH replication = {'class': 'NetworkTopologyStrategy', 'DC1': '3'}  AND durable_writes = true;
-
-CREATE TABLE IF NOT EXISTS metrictank.metric (
-    key ascii,
-    ts int,
-    data blob,
-    PRIMARY KEY (key, ts)
-) WITH CLUSTERING ORDER BY (ts DESC)
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
-
-CREATE TABLE IF NOT EXISTS metrictank.metric_idx (
-    id text,
-    orgid int,
-    partition int,
-    name text,
-    metric text,
-    interval int,
-    unit text,
-    mtype text,
-    tags set<text>,
-    lastupdate int,
-    PRIMARY KEY (partition, id)
-) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
-    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 ```
 
 If you need to run Cassandra 2.2, the backported [TimeWindowCompactionStrategy](https://github.com/jeffjirsa/twcs) is probably your best bet.
