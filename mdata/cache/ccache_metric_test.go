@@ -3,8 +3,10 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"testing"
 
+	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
@@ -209,6 +211,10 @@ func verifyCcm(ccm *CCacheMetric) error {
 
 	if len(ccm.chunks) != len(ccm.keys) {
 		return errors.New("Length of ccm.chunks does not match ccm.keys")
+	}
+
+	if !sort.IsSorted(accnt.Uint32Asc(ccm.keys)) {
+		return errors.New("keys are not sorted")
 	}
 
 	for i, ts := range ccm.keys {
