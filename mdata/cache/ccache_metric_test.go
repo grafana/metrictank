@@ -221,6 +221,8 @@ func TestCorruptionCase2(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	_, ccm := getCCM()
 	iterations := 100000
+
+	// 100 chunks, first t0=t10, last is t0=1000
 	chunks := generateChunks(t, 10, 100, 10)
 	adds, addRanges, dels := 0, 0, 0
 
@@ -243,7 +245,7 @@ func TestCorruptionCase2(t *testing.T) {
 		case 2:
 			chunk := getRandomNumber(0, 100)
 			t.Logf("deleting chunk %d", chunk)
-			ccm.Del(chunks[chunk].Ts)
+			ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
 			dels++
 		}
 
