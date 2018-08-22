@@ -212,9 +212,13 @@ func getRandomNumber(min, max int) int {
 // getRandomRange returns a range start-end so that
 // end >= start and both numbers drawn from [min, max)
 func getRandomRange(min, max int) (int, int) {
-	start := getRandomNumber(min, max)
-	end := getRandomNumber(start, max)
-	return start, end
+	number1 := getRandomNumber(min, max)
+	number2 := getRandomNumber(min, max)
+	if number1 > number2 {
+		return number2, number1
+	} else {
+		return number1, number2
+	}
 }
 
 func TestCorruptionCase2(t *testing.T) {
@@ -232,7 +236,7 @@ func TestCorruptionCase2(t *testing.T) {
 		// 0 = Add
 		// 1 = AddRange
 		// 2 = Del
-		// 2 = Del range (via multi del cals)
+		// 3 = Del range (via multi del cals)
 		action := getRandomNumber(0, 4)
 		switch action {
 		case 0:
@@ -255,8 +259,8 @@ func TestCorruptionCase2(t *testing.T) {
 			dels++
 		case 3:
 			from, to := getRandomRange(0, 100)
+			t.Logf("deleting range %d-%d", from, to)
 			for chunk := from; chunk < to; chunk++ {
-				t.Logf("deleting chunk %d", chunk)
 				ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
 			}
 			opDelRange++
