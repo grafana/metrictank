@@ -33,5 +33,5 @@ var (
 
 	cacheSizeMax         = stats.NewGauge64("cache.size.max")
 	cacheSizeUsed        = stats.NewGauge64("cache.size.used")
-	AccntEventSubmission = stats.NewLatencyHistogram15s32("cache.accounting.submission")
+	accntEventSubmission = stats.NewLatencyHistogram15s32("cache.accounting.submission")
 )
