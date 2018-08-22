@@ -26,6 +26,7 @@ func main() {
 	var addr string
 	var prefix string
 	var substr string
+	var suffix string
 	var tags string
 	var from string
 	var maxAge string
@@ -36,6 +37,7 @@ func main() {
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
+	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
@@ -173,6 +175,9 @@ func main() {
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
 		if !strings.HasPrefix(d.Name, prefix) {
+			continue
+		}
+		if !strings.HasSuffix(d.Name, suffix) {
 			continue
 		}
 		if !strings.Contains(d.Name, substr) {
