@@ -221,7 +221,7 @@ func getRandomRange(min, max int) (int, int) {
 func TestCorruptionCase2(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	_, ccm := getCCM()
-	iterations := 100000000
+	iterations := 100000
 	chunks := generateChunks(t, 10, 100, 10)
 	adds, addRanges, dels := 0, 0, 0
 
