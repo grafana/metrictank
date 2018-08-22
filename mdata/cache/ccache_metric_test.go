@@ -233,17 +233,17 @@ func TestCorruptionCase2(t *testing.T) {
 		switch action {
 		case 0:
 			chunk := getRandomNumber(0, 100)
-			//fmt.Println(fmt.Sprintf("adding chunk %d", chunk))
+			t.Logf("adding chunk %d", chunk)
 			ccm.Add(0, chunks[chunk])
 			adds++
 		case 1:
 			from, to := getRandomRange(0, 100)
-			//fmt.Println(fmt.Sprintf("adding range %d-%d", from, to))
+			t.Logf("adding range %d-%d", from, to)
 			ccm.AddRange(0, chunks[from:to])
 			addRanges++
 		case 2:
 			chunk := getRandomNumber(0, 100)
-			//fmt.Println(fmt.Sprintf("deleting chunk %d", chunk))
+			t.Logf("deleting chunk %d", chunk)
 			ccm.Del(chunks[chunk].Ts)
 			dels++
 		}
