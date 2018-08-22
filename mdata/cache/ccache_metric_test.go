@@ -224,29 +224,43 @@ func TestCorruptionCase2(t *testing.T) {
 
 	// 100 chunks, first t0=t10, last is t0=1000
 	chunks := generateChunks(t, 10, 100, 10)
-	adds, addRanges, dels := 0, 0, 0
+
+	var opAdd, opAddRange, opDel, opDelRange int
+	var adds, dels int
 
 	for i := 0; i < iterations; i++ {
 		// 0 = Add
 		// 1 = AddRange
 		// 2 = Del
-		action := getRandomNumber(0, 3)
+		// 2 = Del range (via multi del cals)
+		action := getRandomNumber(0, 4)
 		switch action {
 		case 0:
 			chunk := getRandomNumber(0, 100)
 			t.Logf("adding chunk %d", chunk)
 			ccm.Add(0, chunks[chunk])
+			opAdd++
 			adds++
 		case 1:
 			from, to := getRandomRange(0, 100)
 			t.Logf("adding range %d-%d", from, to)
 			ccm.AddRange(0, chunks[from:to])
-			addRanges++
+			adds += (to - from)
+			opAddRange++
 		case 2:
 			chunk := getRandomNumber(0, 100)
 			t.Logf("deleting chunk %d", chunk)
 			ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+			opDel++
 			dels++
+		case 3:
+			from, to := getRandomRange(0, 100)
+			for chunk := from; chunk < to; chunk++ {
+				t.Logf("deleting chunk %d", chunk)
+				ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+			}
+			opDelRange++
+			dels += (to - from)
 		}
 
 		if err := verifyCcm(ccm); err != nil {
@@ -254,7 +268,8 @@ func TestCorruptionCase2(t *testing.T) {
 		}
 	}
 
-	fmt.Println(fmt.Sprintf("adds: %d addRanges: %d dels:%d", adds, addRanges, dels))
+	fmt.Printf("operations: add %d - addRange %d - del %d - delRange %d\n", opAdd, opAddRange, opDel, opDelRange)
+	fmt.Printf("total chunk adds %d - total chunk deletes %d\n", adds, dels)
 }
 
 // verifyCcm verifies the integrity of a CCacheMetric
