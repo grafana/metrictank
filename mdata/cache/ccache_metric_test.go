@@ -209,12 +209,11 @@ func getRandomNumber(min, max int) int {
 	return rand.Intn(max-min) + min
 }
 
+// getRandomRange returns a range start-end so that
+// end >= start and both numbers drawn from [min, max)
 func getRandomRange(min, max int) (int, int) {
 	start := getRandomNumber(min, max)
-	var end int
-	for end = min - 1; end < start; end = getRandomNumber(min, max) {
-	}
-
+	end := getRandomNumber(start, max)
 	return start, end
 }
 
