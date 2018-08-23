@@ -3,7 +3,9 @@ package cassandra
 import (
 	"crypto/rand"
 	"fmt"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -575,44 +577,48 @@ func TestPruneStaleOnLoad(t *testing.T) {
 		id:         test.GetMKey(1).String(),
 		name:       "longtermrecentenough",
 		interval:   1,
-		lastUpdate: now.Add(350 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-350 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(2).String(),
 		name:       "longtermtooold",
 		interval:   1,
-		lastUpdate: now.Add(380 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-380 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(3).String(),
 		name:       "foobarrecentenough",
 		interval:   3,
-		lastUpdate: now.Add(5 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-5 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
 		name:       "foobartooold",
 		interval:   3,
-		lastUpdate: now.Add(9 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-9 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(5).String(),
 		name:       "default-super-old-but-never-pruned",
 		interval:   1,
-		lastUpdate: now.Add(2 * 365 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-2 * 365 * 24 * time.Hour).Unix(),
 	})
 
 	idx := &CasIdx{}
-	var defs []schema.MetricDefinition
-	defs = idx.load(defs, &iter, now)
+	defs := idx.load(nil, &iter, now)
 
-	expectedLen := 3
-	if len(defs) != expectedLen {
-		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	exp := []schema.MKey{
+		test.GetMKey(1),
+		test.GetMKey(3),
+		test.GetMKey(5),
 	}
-
-	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(3) || defs[2].Id != test.GetMKey(5) {
-		t.Fatalf("Expected IDs 1, 3 and 5, but got %s, %s & %s", defs[0].Id, defs[1].Id, defs[2].Id)
+	var got []schema.MKey
+	for _, def := range defs {
+		got = append(got, def.Id)
+	}
+	sort.Sort(MKeyAsc(got))
+	if !reflect.DeepEqual(got, exp) {
+		t.Fatalf("Expected defs %v, got %v", exp, got)
 	}
 }
 
@@ -646,7 +652,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		partition:  1,
 		name:       "met1",
 		interval:   1,
-		lastUpdate: now.Add(380 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-380 * 24 * time.Hour).Unix(),
 		tags:       []string{"tag1=val1"},
 	})
 	// because this one has been recently updated, the one before that is not pruned either
@@ -656,7 +662,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		partition:  1,
 		name:       "met1",
 		interval:   2,
-		lastUpdate: now.Add(350 * 24 * time.Hour).Unix(),
+		lastUpdate: now.Add(-350 * 24 * time.Hour).Unix(),
 		tags:       []string{"tag1=val1"},
 	})
 	// next 2 are to show that tag matching works
@@ -666,7 +672,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		partition:  1,
 		name:       "met1",
 		interval:   3,
-		lastUpdate: now.Add(8 * 24 * time.Hour).Unix(), // this one will expire
+		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one will expire
 		tags:       []string{"tag1=val1;foo=bar"},
 	})
 	iter.rows = append(iter.rows, cassRow{
@@ -675,20 +681,37 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		partition:  1,
 		name:       "met1",
 		interval:   4,
-		lastUpdate: now.Add(8 * 24 * time.Hour).Unix(), // this one won't because it doesn't match the tag
+		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one won't because it doesn't match the tag
 		tags:       []string{"tag1=val1;foo=baz"},
 	})
 
 	idx := &CasIdx{}
-	var defs []schema.MetricDefinition
-	defs = idx.load(defs, &iter, now)
-
-	expectedLen := 2
-	if len(defs) != expectedLen {
-		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	defs := idx.load(nil, &iter, now)
+	exp := []schema.MKey{
+		test.GetMKey(1),
+		test.GetMKey(2),
+		test.GetMKey(4),
 	}
-
-	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(2) {
-		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
+	var got []schema.MKey
+	for _, def := range defs {
+		got = append(got, def.Id)
 	}
+	sort.Sort(MKeyAsc(got))
+	if !reflect.DeepEqual(got, exp) {
+		t.Fatalf("Expected defs %v, got %v", exp, got)
+	}
+}
+
+type MKeyAsc []schema.MKey
+
+func (m MKeyAsc) Len() int      { return len(m) }
+func (m MKeyAsc) Swap(i, j int) { m[i], m[j] = m[j], m[i] }
+func (m MKeyAsc) Less(i, j int) bool {
+	for pos, vi := range m[i].Key {
+		vj := m[j].Key[pos]
+		if vi < vj {
+			return true
+		}
+	}
+	return false
 }
