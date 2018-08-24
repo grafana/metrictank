@@ -9,29 +9,38 @@ import (
 
 func TestLagLogger(t *testing.T) {
 	logger := newLagLogger(5)
+	now := time.Now()
+
 	Convey("with 0 measurements", t, func() {
 		So(logger.Min(), ShouldEqual, -1)
 	})
 	Convey("with 1 measurements", t, func() {
-		logger.Store(10)
+		logger.Store(0, 10, now.Add(time.Second*time.Duration(1)))
 		So(logger.Min(), ShouldEqual, 10)
+		So(logger.Rate(), ShouldEqual, 0)
 	})
 	Convey("with 2 measurements", t, func() {
-		logger.Store(5)
+		logger.Store(10, 15, now.Add(time.Second*time.Duration(2)))
 		So(logger.Min(), ShouldEqual, 5)
+		So(logger.Rate(), ShouldEqual, 5)
 	})
 	Convey("with a negative measurement", t, func() {
-		logger.Store(-5)
+		logger.Store(10, 5, now.Add(time.Second*time.Duration(3)))
+
+		// Negative measuremnets are discarded, should be same as last time.
 		So(logger.Min(), ShouldEqual, 5)
+		So(logger.Rate(), ShouldEqual, 5)
 	})
 	Convey("with lots of measurements", t, func() {
 		for i := 0; i < 100; i++ {
-			logger.Store(i)
+			logger.Store(int64(10+i), int64(15+2*i), now.Add(time.Second*time.Duration(3+i)))
 		}
-		So(logger.Min(), ShouldEqual, 95)
+		So(logger.Min(), ShouldEqual, 100)
+		So(logger.Rate(), ShouldEqual, 2)
 	})
 }
 
+/*
 func TestRateLogger(t *testing.T) {
 	logger := newRateLogger()
 	now := time.Now()
@@ -104,6 +113,7 @@ func TestRateLoggerSmallIncrements(t *testing.T) {
 		So(logger.Rate(), ShouldEqual, 160-60)
 	})
 }
+*/
 
 // TestLagMonitor tests LagMonitor priorities based on various scenarios.
 // the overall priority is obviously simply the max priority of any of the partitions,
@@ -115,8 +125,7 @@ func TestLagMonitor(t *testing.T) {
 	// advance records a state change (newest and current offsets) for the given timestamp
 	advance := func(sec int, newest, offset int64) {
 		ts := start.Add(time.Second * time.Duration(sec))
-		mon.StoreLag(0, int(newest-offset))
-		mon.StoreOffset(0, offset, ts)
+		mon.StoreOffsets(0, offset, newest, ts)
 	}
 
 	Convey("with 0 measurements, priority should be 10k", t, func() {
@@ -165,5 +174,21 @@ func TestLagMonitor(t *testing.T) {
 				// TODO: test what happens during recovery
 			})
 		})
+	})
+	Convey("with lots of measurements", t, func() {
+		now := time.Now()
+		for part := range mon.monitors {
+			for i := 0; i < 100; i++ {
+				mon.StoreOffsets(part, int64(i), int64(2*i), now.Add(time.Second*time.Duration(i)))
+			}
+		}
+		So(mon.Metric(), ShouldEqual, 90)
+	})
+	Convey("metric should be worst partition", t, func() {
+		now := time.Now()
+		for part := range mon.monitors {
+			mon.StoreOffsets(part, int64(part), int64(2*part+10), now.Add(time.Second*time.Duration(part)))
+		}
+		So(mon.Metric(), ShouldEqual, 13)
 	})
 }
