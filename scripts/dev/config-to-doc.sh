@@ -95,6 +95,7 @@ EOF
 cat scripts/config/index-rules.conf
 
 cat << EOF
+\`\`\`
 
 # storage-aggregation.conf
 

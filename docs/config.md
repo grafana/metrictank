@@ -531,6 +531,7 @@ create-cf = true
 [default]
 pattern = 
 max-stale = 0
+```
 
 # storage-aggregation.conf
 
