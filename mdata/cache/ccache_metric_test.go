@@ -3,8 +3,11 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
@@ -197,15 +200,101 @@ func TestCorruptionCase1(t *testing.T) {
 		chunks := generateChunks(t, 10, 6, 10)
 		ccm.AddRange(0, chunks[3:6])
 		ccm.AddRange(0, chunks[0:4])
-		if err := verifyCcm(ccm); err != nil {
+		if err := verifyCcm(ccm, []uint32{10, 20, 30, 40, 50, 60}); err != nil {
 			t.Fatal(err)
 		}
 	})
 }
 
+func getRandomNumber(min, max int) int {
+	return rand.Intn(max-min) + min
+}
+
+// getRandomRange returns a range start-end so that
+// end >= start and both numbers drawn from [min, max)
+func getRandomRange(min, max int) (int, int) {
+	number1 := getRandomNumber(min, max)
+	number2 := getRandomNumber(min, max)
+	if number1 > number2 {
+		return number2, number1
+	} else {
+		return number1, number2
+	}
+}
+
+func TestCorruptionCase2(t *testing.T) {
+	rand.Seed(time.Now().Unix())
+	_, ccm := getCCM()
+	iterations := 100000
+	var cached [100]bool // tracks which chunks should be cached
+	var expKeys []uint32 // tracks which keys should be in the CCM
+
+	// 100 chunks, first t0=10, last is t0=1000
+	chunks := generateChunks(t, 10, 100, 10)
+
+	var opAdd, opAddRange, opDel, opDelRange int
+	var adds, dels int
+
+	for i := 0; i < iterations; i++ {
+		// 0 = Add
+		// 1 = AddRange
+		// 2 = Del
+		// 3 = Del range (via multi del cals)
+		action := getRandomNumber(0, 4)
+		switch action {
+		case 0:
+			chunk := getRandomNumber(0, 100)
+			t.Logf("adding chunk %d", chunk)
+			ccm.Add(0, chunks[chunk])
+			cached[chunk] = true
+			opAdd++
+			adds++
+		case 1:
+			from, to := getRandomRange(0, 100)
+			t.Logf("adding range %d-%d", from, to)
+			ccm.AddRange(0, chunks[from:to])
+			for chunk := from; chunk < to; chunk++ {
+				cached[chunk] = true
+			}
+			adds += (to - from)
+			opAddRange++
+		case 2:
+			chunk := getRandomNumber(0, 100)
+			t.Logf("deleting chunk %d", chunk)
+			ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+			cached[chunk] = false
+			opDel++
+			dels++
+		case 3:
+			from, to := getRandomRange(0, 100)
+			t.Logf("deleting range %d-%d", from, to)
+			for chunk := from; chunk < to; chunk++ {
+				ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+				cached[chunk] = false
+			}
+			opDelRange++
+			dels += (to - from)
+		}
+
+		expKeys = expKeys[:0]
+		for i, c := range cached {
+			if c {
+				expKeys = append(expKeys, uint32((i+1)*10))
+			}
+		}
+
+		if err := verifyCcm(ccm, expKeys); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fmt.Printf("operations: add %d - addRange %d - del %d - delRange %d\n", opAdd, opAddRange, opDel, opDelRange)
+	fmt.Printf("total chunk adds %d - total chunk deletes %d\n", adds, dels)
+}
+
 // verifyCcm verifies the integrity of a CCacheMetric
 // it assumes that all itergens are span-aware
-func verifyCcm(ccm *CCacheMetric) error {
+func verifyCcm(ccm *CCacheMetric, expKeys []uint32) error {
 	var chunk *CCacheChunk
 	var ok bool
 
@@ -215,6 +304,10 @@ func verifyCcm(ccm *CCacheMetric) error {
 
 	if !sort.IsSorted(accnt.Uint32Asc(ccm.keys)) {
 		return errors.New("keys are not sorted")
+	}
+
+	if !reflect.DeepEqual(ccm.keys, expKeys) {
+		return fmt.Errorf("keys mismatch. expected %v, got %v", expKeys, ccm.keys)
 	}
 
 	for i, ts := range ccm.keys {
