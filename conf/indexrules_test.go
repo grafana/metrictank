@@ -2,6 +2,7 @@ package conf
 
 import (
 	"io/ioutil"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -68,11 +69,19 @@ max-stale = 7d
 		},
 	}
 	for i, c := range cases {
-		err := ioutil.WriteFile("/tmp/indexrules-test-readindexrules", []byte(c.in), 0644)
+		tmpfile, err := ioutil.TempFile("", "indexrules-test-readindexrules")
 		if err != nil {
 			panic(err)
 		}
-		rules, err := ReadIndexRules("/tmp/indexrules-test-readindexrules")
+
+		if _, err := tmpfile.Write([]byte(c.in)); err != nil {
+			panic(err)
+		}
+		if err := tmpfile.Close(); err != nil {
+			panic(err)
+		}
+
+		rules, err := ReadIndexRules(tmpfile.Name())
 		if (err != nil) != c.expErr {
 			t.Fatalf("case %d, exp err %t, got err %v", i, c.expErr, err)
 		}
@@ -92,6 +101,8 @@ max-stale = 7d
 				t.Fatalf("case %d, exp rules %v, got %v", i, c.expRules, rules)
 			}
 		}
+
+		os.Remove(tmpfile.Name())
 	}
 }
 func TestIndexRulesMatch(t *testing.T) {
