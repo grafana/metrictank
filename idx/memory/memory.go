@@ -1268,8 +1268,8 @@ func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChil
 
 // Prune prunes series from the index if they have become stale per their index-rule
 func (m *MemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
+	log.Info("memory-idx: start pruning of series across all orgs")
 	orgs := make(map[uint32]struct{})
-	log.Info("memory-idx: pruning stale metricDefs across all orgs")
 	m.RLock()
 	for org := range m.tree {
 		orgs[org] = struct{}{}
@@ -1393,9 +1393,10 @@ ORGS:
 
 	statMetricsActive.Add(-1 * len(pruned))
 
-	log.Infof("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
+	duration := time.Since(pre)
+	log.Infof("memory-idx: finished pruning of %d series in %s", len(pruned), duration)
 
-	statPruneDuration.Value(time.Since(pre))
+	statPruneDuration.Value(duration)
 	return pruned, nil
 }
 

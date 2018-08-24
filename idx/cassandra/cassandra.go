@@ -541,18 +541,21 @@ func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
 }
 
 func (c *CasIdx) Prune(now time.Time) ([]idx.Archive, error) {
+	log.Info("cassandra-idx: start pruning of series")
 	pruned, err := c.MemoryIdx.Prune(now)
-	statPruneDuration.Value(time.Since(now))
+	duration := time.Since(now)
+	if err != nil {
+		log.Errorf("cassandra-idx: pruning error: %s", err)
+	} else {
+		statPruneDuration.Value(duration)
+		log.Infof("cassandra-idx: finished pruning of %d series in %s", len(pruned), duration)
+	}
 	return pruned, err
 }
 
 func (c *CasIdx) prune() {
 	ticker := time.NewTicker(pruneInterval)
 	for now := range ticker.C {
-		log.Debugf("cassandra-idx: pruning items")
-		_, err := c.Prune(now)
-		if err != nil {
-			log.Errorf("cassandra-idx: prune error. %s", err)
-		}
+		c.Prune(now)
 	}
 }
