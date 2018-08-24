@@ -7,101 +7,88 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+type OffsetAdjuster struct {
+	readOffset, highWaterMark int64
+	ts                        time.Time
+	lag                       *lagLogger
+}
+
+func (o *OffsetAdjuster) add(msgsProcessed, msgsAdded int64, secondsPassed int) {
+	o.ts = o.ts.Add(time.Second * time.Duration(secondsPassed))
+	o.readOffset += msgsProcessed
+	o.highWaterMark += msgsAdded
+	o.lag.Store(o.readOffset, o.highWaterMark, o.ts)
+}
+
 func TestLagLogger(t *testing.T) {
 	logger := newLagLogger(5)
+
 	Convey("with 0 measurements", t, func() {
 		So(logger.Min(), ShouldEqual, -1)
 	})
+
+	adjuster := OffsetAdjuster{
+		readOffset:    10 * 1000 * 1000,
+		highWaterMark: 10 * 1000 * 1000,
+		ts:            time.Now(),
+		lag:           logger,
+	}
 	Convey("with 1 measurements", t, func() {
-		logger.Store(10)
+		adjuster.add(0, 10, 1)
 		So(logger.Min(), ShouldEqual, 10)
+		So(logger.Rate(), ShouldEqual, 0)
 	})
 	Convey("with 2 measurements", t, func() {
-		logger.Store(5)
+		adjuster.add(10, 5, 1)
 		So(logger.Min(), ShouldEqual, 5)
+		So(logger.Rate(), ShouldEqual, 5)
 	})
 	Convey("with a negative measurement", t, func() {
-		logger.Store(-5)
+		// Negative measurements are discarded, should be same as last time.
+		// Add directly to not mess with the adjusters offsets
+		logger.Store(adjuster.readOffset, adjuster.highWaterMark-100, adjuster.ts)
 		So(logger.Min(), ShouldEqual, 5)
+		So(logger.Rate(), ShouldEqual, 5)
 	})
 	Convey("with lots of measurements", t, func() {
+		// fall behind by 1 each step (we started behind by 5)
 		for i := 0; i < 100; i++ {
-			logger.Store(i)
+			adjuster.add(19, 20, 1)
 		}
-		So(logger.Min(), ShouldEqual, 95)
+		So(logger.Min(), ShouldEqual, 101)
+		So(logger.Rate(), ShouldEqual, 20)
 	})
 }
 
-func TestRateLogger(t *testing.T) {
-	logger := newRateLogger()
-	now := time.Now()
-	Convey("with 0 measurements", t, func() {
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("after 1st measurements", t, func() {
-		logger.Store(10, now)
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("with 2nd measurements", t, func() {
-		logger.Store(15, now.Add(time.Second))
-		So(logger.Rate(), ShouldEqual, 5)
-	})
-	Convey("with old ts", t, func() {
-		logger.Store(25, now)
-		So(logger.Rate(), ShouldEqual, 5)
-	})
-	Convey("with less then 1per second", t, func() {
-		logger.Store(30, now.Add(time.Second*10))
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-}
+func TestLagWithShortProcessingPause(t *testing.T) {
+	logger := newLagLogger(5)
 
-func TestRateLoggerSmallIncrements(t *testing.T) {
-	logger := newRateLogger()
-	now := time.Now()
-	Convey("after 1st measurements", t, func() {
-		logger.Store(10, now)
-		So(logger.Rate(), ShouldEqual, 0)
+	adjuster := OffsetAdjuster{
+		readOffset:    10 * 1000 * 1000,
+		highWaterMark: 10 * 1000 * 1000,
+		ts:            time.Now(),
+		lag:           logger,
+	}
+
+	// start with 50 lag
+	adjuster.highWaterMark += 50
+
+	// Simulate being almost in sync
+	for i := 0; i < 100; i++ {
+		adjuster.add(5000, 5000, 5)
+	}
+
+	Convey("should be almost in sync", t, func() {
+		So(logger.Min(), ShouldEqual, 50)
+		So(logger.Rate(), ShouldEqual, 1000)
 	})
-	Convey("with 2nd measurements", t, func() {
-		logger.Store(20, now.Add(200*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("with 3rd measurements", t, func() {
-		logger.Store(30, now.Add(400*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("with 4th measurements", t, func() {
-		logger.Store(40, now.Add(600*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("with 5th measurements", t, func() {
-		logger.Store(50, now.Add(800*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 0)
-	})
-	Convey("with 6th measurements", t, func() {
-		logger.Store(60, now.Add(1000*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 60-10)
-	})
-	Convey("with 7th measurements", t, func() {
-		logger.Store(80, now.Add(1200*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 60-10)
-	})
-	Convey("with 8th measurements", t, func() {
-		logger.Store(100, now.Add(1400*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 60-10)
-	})
-	Convey("with 9th measurements", t, func() {
-		logger.Store(120, now.Add(1600*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 60-10)
-	})
-	Convey("with 10th measurements", t, func() {
-		logger.Store(140, now.Add(1800*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 60-10)
-	})
-	Convey("with 11th measurements", t, func() {
-		logger.Store(160, now.Add(2000*time.Millisecond))
-		So(logger.Rate(), ShouldEqual, 160-60)
+
+	// Short pause with no msgs processed
+	adjuster.add(0, 5*1000, 5)
+
+	Convey("Short pause should not cause large lag estimate", t, func() {
+		So(logger.Min(), ShouldEqual, 50)
+		So(logger.Rate(), ShouldEqual, 1000)
 	})
 }
 
@@ -115,8 +102,7 @@ func TestLagMonitor(t *testing.T) {
 	// advance records a state change (newest and current offsets) for the given timestamp
 	advance := func(sec int, newest, offset int64) {
 		ts := start.Add(time.Second * time.Duration(sec))
-		mon.StoreLag(0, int(newest-offset))
-		mon.StoreOffset(0, offset, ts)
+		mon.StoreOffsets(0, offset, newest, ts)
 	}
 
 	Convey("with 0 measurements, priority should be 10k", t, func() {
@@ -132,7 +118,7 @@ func TestLagMonitor(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				advance(i, int64(i*2), int64(i))
 			}
-			So(mon.Metric(), ShouldEqual, 98) // min-lag(98) / rate (1) = 98
+			So(mon.Metric(), ShouldEqual, 49) // min-lag(98) / input rate (2) = 49
 		})
 		Convey("rate of production is 100k and lag is 1000", func() {
 			advance(1, 100000, 99000)
@@ -151,18 +137,22 @@ func TestLagMonitor(t *testing.T) {
 			Convey("rate of production goes up to 200k but we can only keep up with the rate of 100k so lag starts growing", func() {
 				advance(3, 400000, 299000)
 				advance(4, 600000, 399000)
-				So(mon.Metric(), ShouldEqual, 1) // (400000-299000)/100000 = 1
+				So(mon.Metric(), ShouldEqual, 0) // (400000-299000)/200000 = 0
 				advance(5, 800000, 499000)       // note: we're now where the producer was at +- t=3.5, so 1.5s behind
-				So(mon.Metric(), ShouldEqual, 2) // (600000-399000)/100000 = 2
+				So(mon.Metric(), ShouldEqual, 1) // (600000-399000)/200000 = 1
 				advance(6, 1000000, 599000)      // note: we're now at where the producer was at +- t=4, so 2 seconds behind
-				So(mon.Metric(), ShouldEqual, 3) // (800000-499000)/100000 = 3
+				So(mon.Metric(), ShouldEqual, 1) // (800000-499000)/200000 = 1
+				advance(15, 2800000, 1499000)
+				advance(16, 3000000, 1599000)    // Jump forward 10 seconds, where the producer was at +- t=9, so 7 seconds behind
+				So(mon.Metric(), ShouldEqual, 6) // (2800000-1499000)/200000 = 6
 			})
 			Convey("a GC pause is causing us to not be able to consume during a few seconds", func() {
 				advance(3, 300000, 199000)
 				advance(4, 400000, 199000)
-				// TODO: this punishes really hard for short GC pauses
-				So(mon.Metric(), ShouldEqual, 101000) // ~(300000-199000)/0 -> 101000
-				// TODO: test what happens during recovery
+				So(mon.Metric(), ShouldEqual, 1) // ~(300000-199000)/100000 = 1
+				// test what happens during recovery
+				advance(5, 500000, 499000)
+				So(mon.Metric(), ShouldEqual, 0) // ~(500000-499000)/100000 = 0
 			})
 		})
 	})
