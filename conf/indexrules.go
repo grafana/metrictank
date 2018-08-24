@@ -100,23 +100,21 @@ func (a IndexRules) Prunable() bool {
 	return (a.Default.MaxStale > 0)
 }
 
-type IndexCheck struct {
-	Keep   bool
-	Cutoff int64
-}
-
-// Checks returns a set of checks corresponding to a given timestamp and the set of all rules
-func (a IndexRules) Checks(now time.Time) []IndexCheck {
-	out := make([]IndexCheck, len(a.Rules)+1)
-	for i, r := range a.Rules {
-		out[i] = IndexCheck{
-			Keep:   r.MaxStale == 0,
-			Cutoff: int64(now.Add(r.MaxStale * -1).Unix()),
+// Cutoffs returns a set of cutoffs corresponding to a given timestamp and the set of all rules
+func (a IndexRules) Cutoffs(now time.Time) []int64 {
+	out := make([]int64, len(a.Rules)+1)
+	for i := 0; i <= len(a.Rules); i++ {
+		var rule IndexRule
+		if i < len(a.Rules) {
+			rule = a.Rules[i]
+		} else {
+			rule = a.Default
 		}
-	}
-	out[len(a.Rules)] = IndexCheck{
-		Keep:   a.Default.MaxStale == 0,
-		Cutoff: int64(now.Add(a.Default.MaxStale * -1).Unix()),
+		if rule.MaxStale == 0 {
+			out[i] = 0
+		} else {
+			out[i] = int64(now.Add(rule.MaxStale * -1).Unix())
+		}
 	}
 	return out
 }

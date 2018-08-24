@@ -419,14 +419,15 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time
 		log.Fatalf("Could not close iterator: %s", err.Error())
 	}
 
-	indexChecks := memory.IndexRules.Checks(now)
+	// getting all cutoffs once saves having to recompute everytime we have a match
+	cutoffs := memory.IndexRules.Cutoffs(now)
 
 NAMES:
 	for name, defsByName := range defsByNames {
 		irId, _ := memory.IndexRules.Match(name)
-		check := indexChecks[irId]
+		cutoff := cutoffs[irId]
 		for _, def := range defsByName {
-			if check.Keep || def.LastUpdate >= check.Cutoff {
+			if def.LastUpdate >= cutoff {
 				// if one of the defs in a name is not stale, then we'll need to add
 				// all the associated MDs to the defs slice
 				for _, defToAdd := range defsByNames[name] {
