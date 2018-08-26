@@ -1,0 +1,3 @@
+GET http://localhost:6061/render?target=some.id.of.a.metric.1*;id=*;some=tag&from=-30s
+GET http://localhost:6061/render?target=some.id.of.a.metric.22*;id=*;some=tag&from=-60s
+GET http://localhost:6061/render?target=some.id.of.a.metric.33*;id=*;some=tag&from=-1h
