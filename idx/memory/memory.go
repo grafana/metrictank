@@ -209,6 +209,20 @@ func (m *MemoryIdx) Stop() {
 	return
 }
 
+// bumpLastUpdate increases lastUpdate.
+// note:
+// * received point may be older than a previously received point, in which case the previous value was correct
+// * someone else may have just concurrently updated lastUpdate to a higher value than what we have, which we should restore
+// * by the time we look at the previous value and try to restore it, someone else may have updated it to a higher value
+// all these scenarios are unlikely but we should accomodate them anyway.
+func bumpLastUpdate(loc *int64, newVal int64) {
+	prev := atomic.SwapInt64(loc, newVal)
+	for prev > newVal {
+		newVal = prev
+		prev = atomic.SwapInt64(loc, newVal)
+	}
+}
+
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
 func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
@@ -223,9 +237,8 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 			log.Debug("memory-idx: metricDef with id %v already in index", point.MKey)
 		}
 
-		if atomic.LoadInt64(&existing.LastUpdate) < int64(point.Time) {
-			atomic.SwapInt64(&existing.LastUpdate, int64(point.Time))
-		}
+		bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
+
 		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
@@ -247,9 +260,7 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	existing, ok := m.defById[mkey]
 	if ok {
 		log.Debug("memory-idx: metricDef with id %s already in index.", mkey)
-		if atomic.LoadInt64(&existing.LastUpdate) < int64(data.Time) {
-			atomic.SwapInt64(&existing.LastUpdate, int64(data.Time))
-		}
+		bumpLastUpdate(&existing.LastUpdate, data.Time)
 		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
