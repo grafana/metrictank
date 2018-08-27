@@ -214,7 +214,7 @@ func (m *MemoryIdx) Stop() {
 // * received point may be older than a previously received point, in which case the previous value was correct
 // * someone else may have just concurrently updated lastUpdate to a higher value than what we have, which we should restore
 // * by the time we look at the previous value and try to restore it, someone else may have updated it to a higher value
-// all these scenarios are unlikely but we should accomodate them anyway.
+// all these scenarios are unlikely but we should accommodate them anyway.
 func bumpLastUpdate(loc *int64, newVal int64) {
 	prev := atomic.SwapInt64(loc, newVal)
 	for prev > newVal {
