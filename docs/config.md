@@ -99,8 +99,8 @@ consistency = one
 # tokenaware,hostpool-simple         : prefer host that has the needed data, fallback to hostpool-simple.
 # tokenaware,hostpool-epsilon-greedy : prefer host that has the needed data, fallback to hostpool-epsilon-greedy.
 host-selection-policy = tokenaware,hostpool-epsilon-greedy
-# cassandra timeout in milliseconds
-timeout = 1000
+# cassandra timeout
+timeout = 1s
 # max number of concurrent reads to cassandra
 read-concurrency = 20
 # max number of concurrent writes to cassandra

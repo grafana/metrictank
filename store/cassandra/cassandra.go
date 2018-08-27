@@ -127,7 +127,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		}
 	}
 	cluster.Consistency = gocql.ParseConsistency(config.Consistency)
-	cluster.Timeout = time.Duration(config.Timeout) * time.Millisecond
+	cluster.Timeout = config.Timeout
 	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = config.WriteConcurrency
 	cluster.ProtoVersion = config.CqlProtocolVersion
