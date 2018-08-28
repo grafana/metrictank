@@ -160,6 +160,7 @@ func (a *FlatAccnt) act(eType eventType, payload interface{}) {
 	pre := time.Now()
 	a.eventQ <- event
 	accntEventSubmission.Value(time.Now().Sub(pre))
+	accntEventQueueSize.Value(len(a.eventQ))
 }
 
 func (a *FlatAccnt) eventLoop() {
