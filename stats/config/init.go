@@ -42,6 +42,10 @@ func Start() {
 		if err != nil {
 			log.Fatal(2, "stats: could not initalize memory reporter: %v", err)
 		}
+		_, err = stats.NewProcessReporter()
+		if err != nil {
+			log.Fatal(2, "stats: could not initalize process reporter: %v", err)
+		}
 		stats.NewGraphite(prefix, addr, interval, bufferSize, timeout)
 	} else {
 		stats.NewDevnull()
