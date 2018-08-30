@@ -25,7 +25,16 @@ func NewProcessReporter() (*ProcessReporter, error) {
 
 func (m *ProcessReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	stat, err := m.proc.NewStat()
+
 	if err == nil {
+		vsz := uint64(stat.VirtualMemory())
+		rss := uint64(stat.ResidentMemory())
+
+		// metric process.virtual_memory_bytes.gauge64 is a gauge of the process VSZ from /proc/pid/stat
+		buf = WriteUint64(buf, prefix, []byte("virtual_memory_bytes.gauge64"), vsz, now)
+
+		// metric process.resident_memory_bytes.gauge64 is a gauge of the process RSS from /proc/pid/stat
+		buf = WriteUint64(buf, prefix, []byte("resident_memory_bytes.gauge64"), rss, now)
 		// metric process.minor_page_faults.counter64 is the number of minor faults the process has made which have not required loading a memory page from disk
 		buf = WriteUint64(buf, prefix, []byte("minor_page_faults.counter64"), uint64(stat.MinFlt), now)
 

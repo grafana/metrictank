@@ -817,13 +817,13 @@
           "hide": true,
           "refCount": 0,
           "refId": "D",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.process.virtual_memory_bytes.gauge64), 'vsz')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.process.virtual_memory_bytes.gauge64), 'vsz')"
         },
         {
           "hide": false,
           "refCount": 0,
           "refId": "E",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.process.resident_memory_bytes.gauge64), 'rss')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.process.resident_memory_bytes.gauge64), 'rss')"
         },
         {
           "refCount": 0,
