@@ -173,7 +173,7 @@ services:
 
   grafana:
     hostname: grafana
-    image: grafana/grafana:latest
+    image: grafana/grafana
     ports:
       - "3000:3000"
 
