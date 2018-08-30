@@ -110,6 +110,7 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 		eventQ:  make(chan FlatAccntEvent, EventQSize),
 	}
 	cacheSizeMax.SetUint64(maxSize)
+	accntEventQueueMax.SetUint64(uint64(EventQSize))
 
 	go accnt.eventLoop()
 	return &accnt
@@ -159,8 +160,8 @@ func (a *FlatAccnt) act(eType eventType, payload interface{}) {
 
 	pre := time.Now()
 	a.eventQ <- event
-	accntEventSubmission.Value(time.Now().Sub(pre))
-	accntEventQueueSize.Value(len(a.eventQ))
+	accntEventAddDuration.Value(time.Now().Sub(pre))
+	accntEventQueueUsed.Value(len(a.eventQ))
 }
 
 func (a *FlatAccnt) eventLoop() {
