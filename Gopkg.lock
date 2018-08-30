@@ -568,12 +568,16 @@
   version = "v0.8.0"
 
 [[projects]]
-  digest = "1:3e5fd795ebf6a9e13e67d644da76130af7a6003286531f9573f8074c228b66a3"
+  branch = "master"
+  digest = "1:41d1e93e43e7e941b970ebc720cc428a2a74fcc13eff306c44a42883cd99f433"
   name = "github.com/prometheus/client_golang"
-  packages = ["prometheus"]
+  packages = [
+    "prometheus",
+    "prometheus/promauto",
+    "prometheus/promhttp",
+  ]
   pruneopts = "NUT"
-  revision = "c5b7fccd204277076155f10851dad72b76a49317"
-  version = "v0.8.0"
+  revision = "676eaf6b948046fcd9dbbcf5cc9ff5077921aa81"
 
 [[projects]]
   branch = "master"
@@ -996,6 +1000,9 @@
     "github.com/opentracing/opentracing-go/ext",
     "github.com/opentracing/opentracing-go/log",
     "github.com/pelletier/go-toml",
+    "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promauto",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/common/model",
     "github.com/prometheus/procfs",
     "github.com/prometheus/prometheus/pkg/labels",
