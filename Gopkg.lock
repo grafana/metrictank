@@ -596,7 +596,6 @@
   revision = "89604d197083d4781071d3c65855d24ecfb0a563"
 
 [[projects]]
-  branch = "master"
   digest = "1:b4dde177cd2fe6939cd64265ab7e24f9751080ab10b9d62257e97d767ff47af9"
   name = "github.com/prometheus/procfs"
   packages = [
@@ -998,6 +997,7 @@
     "github.com/opentracing/opentracing-go/log",
     "github.com/pelletier/go-toml",
     "github.com/prometheus/common/model",
+    "github.com/prometheus/procfs",
     "github.com/prometheus/prometheus/pkg/labels",
     "github.com/prometheus/prometheus/prompb",
     "github.com/prometheus/prometheus/promql",

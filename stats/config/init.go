@@ -39,6 +39,11 @@ func ConfigProcess(instance string) {
 func Start() {
 	if enabled {
 		stats.NewMemoryReporter()
+
+		_, err := stats.NewProcessReporter()
+		if err != nil {
+			log.Fatal(2, "stats: could not initialize process reporter: %v", err)
+		}
 		stats.NewGraphite(prefix, addr, interval, bufferSize, timeout)
 	} else {
 		stats.NewDevnull()

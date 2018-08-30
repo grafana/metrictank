@@ -173,6 +173,10 @@ unused-packages = true
   source = "https://github.com/Dieterbe/prometheus.git"
   branch = "v2.1.0-tom-fix-testing-flags"
 
+[[constraint]]
+  name = "github.com/prometheus/procfs"
+  revision = "75f2d6163c7a100bed6e971044ea3de30ee3a678"
+
 [[override]]
   name = "golang.org/x/net"
   revision = "cbe0f9307d0156177f9dd5dc85da1a31abc5f2fb"
