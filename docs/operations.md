@@ -34,7 +34,8 @@ If you expect consistent or predictable load, you may also want to monitor:
 
 * `metrictank.stats.$environment.$instance.store.cassandra.chunk_operations.save_ok.counter32`: number of saved chunks (based on your chunkspan settings)
 * `metrictank.stats.$environment.$instance.api.request_handle.values.rate32` : rate per second of render requests
-* `metrictank.stats.$environment.$instance.input.*.*.received.counter32`: input counter (derive with perSecond(
+* `metrictank.stats.$environment.$instance.input.*.*.received.counter32`: input counter (derive with perSecond)
+* `metrictank.stats.$environment.$instance.cache.accounting.queue.size.used.max.gauge32`: accounting queue size, if this queue fills up, it will slow down requests (compare to size.max)
 
 
 ## Crash

@@ -2,10 +2,10 @@ package accnt
 
 import (
 	"sort"
+	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 )
 
 const evictQSize = 1000
@@ -110,6 +110,7 @@ func NewFlatAccnt(maxSize uint64) *FlatAccnt {
 		eventQ:  make(chan FlatAccntEvent, EventQSize),
 	}
 	cacheSizeMax.SetUint64(maxSize)
+	accntEventQueueMax.SetUint64(uint64(EventQSize))
 
 	go accnt.eventLoop()
 	return &accnt
@@ -157,12 +158,10 @@ func (a *FlatAccnt) act(eType eventType, payload interface{}) {
 		pl:    payload,
 	}
 
-	select {
-	// we never want to block for accounting, rather just let it miss some events and print an error
-	case a.eventQ <- event:
-	default:
-		log.Error(3, "Failed to submit event to accounting, channel was blocked")
-	}
+	pre := time.Now()
+	a.eventQ <- event
+	accntEventAddDuration.Value(time.Now().Sub(pre))
+	accntEventQueueUsed.Value(len(a.eventQ))
 }
 
 func (a *FlatAccnt) eventLoop() {
