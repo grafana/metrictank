@@ -36,7 +36,7 @@
   "gnetId": null,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1535620386602,
+  "iteration": 1535621129449,
   "links": [],
   "panels": [
     {
@@ -622,11 +622,17 @@
               "min": null,
               "show": true
             }
-          ]
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         },
         {
           "aliasColors": {},
           "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "$datasource",
           "fill": 0,
           "gridPos": {
@@ -655,6 +661,7 @@
           "points": true,
           "renderer": "flot",
           "seriesOverrides": [],
+          "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
           "targets": [
@@ -674,6 +681,7 @@
           },
           "type": "graph",
           "xaxis": {
+            "buckets": null,
             "mode": "time",
             "name": null,
             "show": true,
@@ -696,7 +704,11 @@
               "min": null,
               "show": true
             }
-          ]
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "repeat": null,
@@ -720,7 +732,10 @@
     {
       "aliasColors": {
         "GC cpu fraction - promille": "#BF1B00",
-        "alloc speed": "#C15C17"
+        "alloc speed": "#C15C17",
+        "major_page_faults": "#bf1b00",
+        "minor_page_faults": "#0a437c",
+        "rss": "#ba43a9"
       },
       "bars": false,
       "dashLength": 10,
@@ -731,7 +746,7 @@
       "fill": 0,
       "grid": {},
       "gridPos": {
-        "h": 7,
+        "h": 9,
         "w": 8,
         "x": 0,
         "y": 9
@@ -756,18 +771,24 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "total_points",
-          "yaxis": 2
-        },
-        {
           "alias": "bytes_per_point",
           "linewidth": 1,
           "yaxis": 1
         },
         {
-          "alias": "GC cpu fraction - promille",
-          "linewidth": 1,
+          "alias": "major_page_faults",
           "yaxis": 2
+        },
+        {
+          "alias": "minor_page_faults",
+          "fill": 5,
+          "linewidth": 0,
+          "yaxis": 2
+        },
+        {
+          "alias": "rss",
+          "fill": 2,
+          "linewidth": 0
         }
       ],
       "spaceLength": 10,
@@ -776,39 +797,43 @@
       "targets": [
         {
           "hide": false,
+          "refCount": 0,
           "refId": "A",
           "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_bytes_allocated.counter64)), 'alloc rate')"
         },
         {
           "hide": false,
+          "refCount": 0,
           "refId": "B",
           "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.bytes.allocated_in_heap.gauge64), 'allocated in heap')"
         },
         {
-          "hide": false,
+          "hide": true,
+          "refCount": 0,
           "refId": "C",
           "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.bytes.obtained_from_sys.gauge64), 'bytes_sys')"
         },
         {
           "hide": true,
+          "refCount": 0,
           "refId": "D",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.tank.metrics_active.gauge32), 'metrics_active')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.process.virtual_memory_bytes.gauge64), 'vsz')"
         },
         {
-          "hide": true,
+          "hide": false,
+          "refCount": 0,
           "refId": "E",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.tank.total_points.gauge64), 'total_points')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.memory.process.resident_memory_bytes.gauge64), 'rss')"
         },
         {
-          "hide": false,
-          "refId": "F",
-          "target": "alias(divideSeries(#B, #E), 'bytes_per_point')",
-          "textEditor": false
+          "refCount": 0,
+          "refId": "G",
+          "target": "aliasByNode(sumSeries(perSecond(metrictank.stats.$environment.$instance.process.minor_page_faults.counter64)), 5)"
         },
         {
-          "hide": false,
-          "refId": "H",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.cpu_fraction.gauge32), 'GC cpu fraction - promille')"
+          "refCount": 0,
+          "refId": "I",
+          "target": "aliasByNode(sumSeries(perSecond(metrictank.stats.$environment.$instance.process.major_page_faults.counter64)), 5)"
         }
       ],
       "thresholds": [],
@@ -852,22 +877,29 @@
       }
     },
     {
-      "aliasColors": {},
+      "aliasColors": {
+        "CPU usage": "#6d1f62",
+        "GC cpu fraction - promille": "#BF1B00",
+        "alloc speed": "#C15C17",
+        "major_page_faults": "#bf1b00",
+        "minor_page_faults": "#0a437c",
+        "rss": "#ba43a9"
+      },
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "$datasource",
       "editable": true,
       "error": false,
-      "fill": 1,
+      "fill": 0,
       "grid": {},
       "gridPos": {
-        "h": 7,
+        "h": 4,
         "w": 8,
         "x": 8,
         "y": 9
       },
-      "id": 13,
+      "id": 49,
       "legend": {
         "avg": false,
         "current": false,
@@ -877,21 +909,23 @@
         "total": false,
         "values": false
       },
-      "lines": false,
-      "linewidth": 2,
+      "lines": true,
+      "linewidth": 3,
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pointradius": 1,
-      "points": true,
+      "pointradius": 5,
+      "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "duration",
-          "lines": false,
-          "pointradius": 1,
-          "points": true,
+          "alias": "GC cpu fraction - promille",
           "yaxis": 2
+        },
+        {
+          "alias": "CPU usage",
+          "fill": 10,
+          "linewidth": 0
         }
       ],
       "spaceLength": 10,
@@ -899,20 +933,23 @@
       "steppedLine": false,
       "targets": [
         {
-          "refId": "A",
-          "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+          "hide": false,
+          "refCount": 0,
+          "refId": "H",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.cpu_fraction.gauge32), 'GC cpu fraction - promille')"
         },
         {
-          "refId": "B",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+          "refCount": 0,
+          "refId": "F",
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.process.cpu_seconds_total.counter64)), 'CPU usage')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Golang GC",
+      "title": "CPU",
       "tooltip": {
-        "msResolution": false,
+        "msResolution": true,
         "shared": true,
         "sort": 0,
         "value_type": "cumulative"
@@ -927,14 +964,15 @@
       },
       "yaxes": [
         {
-          "format": "hertz",
+          "format": "percentunit",
+          "label": "allocation",
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": 0,
           "show": true
         },
         {
-          "format": "ns",
+          "format": "none",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -962,7 +1000,7 @@
       "fill": 1,
       "grid": {},
       "gridPos": {
-        "h": 7,
+        "h": 9,
         "w": 8,
         "x": 16,
         "y": 9
@@ -1066,12 +1104,107 @@
       }
     },
     {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "grid": {},
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 13
+      },
+      "id": 13,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": false,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 1,
+      "points": true,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "duration",
+          "lines": false,
+          "pointradius": 1,
+          "points": true,
+          "yaxis": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+        },
+        {
+          "refId": "B",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Golang GC",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "hertz",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "ns",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 18
       },
       "id": 40,
       "panels": [],
@@ -1090,7 +1223,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 17
+        "y": 19
       },
       "id": 35,
       "legend": {
@@ -1179,7 +1312,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 17
+        "y": 19
       },
       "id": 33,
       "legend": {
@@ -1280,7 +1413,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 17
+        "y": 19
       },
       "id": 34,
       "legend": {
@@ -1360,7 +1493,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 26
       },
       "id": 41,
       "panels": [],
@@ -1391,7 +1524,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 25
+        "y": 27
       },
       "id": 4,
       "legend": {
@@ -1519,7 +1652,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 25
+        "y": 27
       },
       "id": 10,
       "legend": {
@@ -1614,7 +1747,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 25
+        "y": 27
       },
       "id": 16,
       "legend": {
@@ -1719,7 +1852,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 33
       },
       "id": 42,
       "panels": [],
@@ -1744,7 +1877,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 32
+        "y": 34
       },
       "id": 14,
       "legend": {
@@ -1862,7 +1995,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 32
+        "y": 34
       },
       "id": 18,
       "legend": {
@@ -1991,7 +2124,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 32
+        "y": 34
       },
       "id": 21,
       "legend": {
@@ -2086,7 +2219,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 41
       },
       "id": 43,
       "panels": [],
@@ -2115,7 +2248,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 42
       },
       "id": 6,
       "legend": {
@@ -2226,7 +2359,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 42
       },
       "id": 3,
       "legend": {
@@ -2323,7 +2456,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 40
+        "y": 42
       },
       "id": 11,
       "legend": {
@@ -2410,7 +2543,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 49
       },
       "id": 44,
       "panels": [],
@@ -2439,7 +2572,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 48
+        "y": 50
       },
       "id": 7,
       "legend": {
@@ -2560,7 +2693,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 48
+        "y": 50
       },
       "id": 23,
       "legend": {
@@ -2653,7 +2786,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 48
+        "y": 50
       },
       "id": 8,
       "legend": {
@@ -2728,7 +2861,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 57
       },
       "id": 45,
       "panels": [],
@@ -2747,7 +2880,7 @@
         "h": 7,
         "w": 2,
         "x": 0,
-        "y": 56
+        "y": 58
       },
       "id": 30,
       "legend": {
@@ -2838,7 +2971,7 @@
         "h": 7,
         "w": 10,
         "x": 2,
-        "y": 56
+        "y": 58
       },
       "id": 12,
       "legend": {
@@ -2961,7 +3094,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 56
+        "y": 58
       },
       "id": 20,
       "legend": {
@@ -3079,7 +3212,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 56
+        "y": 58
       },
       "id": 22,
       "legend": {
@@ -3164,7 +3297,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 65
       },
       "id": 46,
       "panels": [],
@@ -3186,7 +3319,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 64
+        "y": 66
       },
       "id": 24,
       "legend": {
@@ -3274,7 +3407,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 64
+        "y": 66
       },
       "id": 25,
       "legend": {
@@ -3377,7 +3510,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 64
+        "y": 66
       },
       "id": 26,
       "legend": {
@@ -3458,7 +3591,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 73
       },
       "id": 47,
       "panels": [],
@@ -3483,7 +3616,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 72
+        "y": 74
       },
       "id": 27,
       "legend": {
@@ -3601,7 +3734,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 72
+        "y": 74
       },
       "id": 28,
       "legend": {
@@ -3711,7 +3844,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 81
       },
       "id": 48,
       "panels": [],
@@ -3738,7 +3871,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 80
+        "y": 82
       },
       "id": 32,
       "legend": {
@@ -3860,7 +3993,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 80
+        "y": 82
       },
       "id": 15,
       "legend": {
