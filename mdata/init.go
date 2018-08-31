@@ -70,8 +70,8 @@ var (
 
 	promActiveSeries = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "metrictank",
-		Name:      "series_active",
-		Help:      "Current # of active series",
+		Name:      "metrics_active",
+		Help:      "Current # of active metrics",
 	})
 )
 
