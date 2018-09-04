@@ -72,6 +72,7 @@ func (ms *AggMetrics) GC() {
 				ms.Lock()
 				delete(ms.Metrics, key)
 				metricsActive.Set(len(ms.Metrics))
+				promActiveMetrics.Set(float64(len(ms.Metrics)))
 				ms.Unlock()
 			}
 		}
@@ -117,5 +118,6 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metri
 	active := len(ms.Metrics)
 	ms.Unlock()
 	metricsActive.Set(active)
+	promActiveMetrics.Set(float64(active))
 	return m
 }

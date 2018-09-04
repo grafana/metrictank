@@ -9,6 +9,8 @@ import (
 
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/stats"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
 )
@@ -65,6 +67,12 @@ var (
 
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
+
+	promActiveMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: "metrictank",
+		Name:      "metrics_active",
+		Help:      "Current # of active metrics",
+	})
 )
 
 func ConfigSetup() {
