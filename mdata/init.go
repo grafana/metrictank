@@ -68,7 +68,7 @@ var (
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
 
-	promActiveSeries = promauto.NewGauge(prometheus.GaugeOpts{
+	promActiveMetrics = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: "metrictank",
 		Name:      "metrics_active",
 		Help:      "Current # of active metrics",
