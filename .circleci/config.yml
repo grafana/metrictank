@@ -39,6 +39,7 @@ jobs:
       - run: scripts/qa/gitignore.sh
       - run: scripts/qa/unused.sh
       - run: scripts/qa/vendor.sh
+      - run: scripts/qa/vet-high-confidence.sh
 
   qa-post-build:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank

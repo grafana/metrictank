@@ -21,6 +21,7 @@ qa: bin
 	scripts/qa/gitignore.sh
 	scripts/qa/unused.sh
 	scripts/qa/vendor.sh
+	scripts/qa/vet-high-confidence.sh
 	# qa-post-build steps minus stack tests
 	scripts/qa/docs.sh
 all:
