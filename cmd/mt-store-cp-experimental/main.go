@@ -304,7 +304,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 }
 
 func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string) {
-	// Get the list of ids that we carry about
+	// Get the list of ids that we care about
 	fetchPartitionIds(sourceSession)
 
 	// Kick off our threads
