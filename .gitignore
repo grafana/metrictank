@@ -12,6 +12,7 @@ build/
 /cmd/mt-schemas-explain/mt-schemas-explain
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat
+/cmd/mt-store-cp-experimental/mt-store-cp-experimental
 /cmd/mt-update-ttl/mt-update-ttl
 /cmd/mt-view-boundaries/mt-view-boundaries
 /cmd/mt-whisper-importer-reader/mt-whisper-importer-reader

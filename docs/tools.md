@@ -398,6 +398,72 @@ Notes:
 ```
 
 
+## mt-store-cp-experimental
+
+```
+mt-store-cp [flags] table-in [table-out]
+
+Copies data in Cassandra to use another table (and possibly another cluster).
+It is up to you to assure table-out exists before running this tool
+This tool is EXPERIMENTAL and needs doublechecking whether data is successfully written to Cassandra
+see https://github.com/grafana/metrictank/pull/909 for details
+Please report good or bad experiences in the above ticket or in a new one
+Flags:
+  -cassandra-auth
+    	enable cassandra authentication
+  -cassandra-ca-path string
+    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
+  -cassandra-concurrency int
+    	max number of concurrent reads to cassandra. (default 20)
+  -cassandra-consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -cassandra-disable-host-lookup
+    	disable host lookup (useful if going through proxy)
+  -cassandra-host-selection-policy string
+    	 (default "tokenaware,hostpool-epsilon-greedy")
+  -cassandra-host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
+  -cassandra-keyspace string
+    	cassandra keyspace to use for storing the metric data table (default "metrictank")
+  -cassandra-password string
+    	password for authentication (default "cassandra")
+  -cassandra-retries int
+    	how many times to retry a query before failing it
+  -cassandra-ssl
+    	enable SSL connection to cassandra
+  -cassandra-timeout int
+    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-username string
+    	username for authentication (default "cassandra")
+  -cql-protocol-version int
+    	cql protocol version to use (default 4)
+  -dest-cassandra-addrs string
+    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -end-timestamp int
+    	timestamp at which to stop, defaults to int max (default 2147483647)
+  -end-token int
+    	token to stop at (inclusive), defaults to math.MaxInt64 (default 9223372036854775807)
+  -idx-table string
+    	idx table in cassandra (default "metric_idx")
+  -max-batch-size int
+    	max number of queries per batch (default 10)
+  -partitions string
+    	process ids for these partitions (comma separated list of partition numbers or '*' for all) (default "*")
+  -progress-rows int
+    	number of rows between progress output (default 1000000)
+  -source-cassandra-addrs string
+    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
+  -start-timestamp int
+    	timestamp at which to start, defaults to 0
+  -start-token int
+    	token to start at (inclusive), defaults to math.MinInt64 (default -9223372036854775808)
+  -threads int
+    	number of workers to use to process data (default 1)
+  -verbose
+    	show every record being processed
+```
+
+
 ## mt-update-ttl
 
 ```
