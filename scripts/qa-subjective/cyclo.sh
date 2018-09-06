@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# finds highly complex (cyclomatic complexity) functions
+
 # find the dir we exist within...
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir

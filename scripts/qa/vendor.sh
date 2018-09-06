@@ -1,8 +1,8 @@
 #!/bin/bash
 
-if ! which dep >/dev/null; then
-	go get -u github.com/golang/dep/cmd/dep || exit 1
-fi
+# checks whether vendor directory is healthy
+
+go get -u github.com/golang/dep/cmd/dep
 
 dep version
 dep status
