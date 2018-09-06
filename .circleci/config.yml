@@ -33,7 +33,7 @@ jobs:
     steps:
       - checkout
       - run: scripts/qa/gofmt.sh
-      - run: scripts/qa/go-generate.sh
+      - run: scripts/qa/go-generate.sh --force
       - run: scripts/qa/ineffassign.sh
       - run: scripts/qa/misspell.sh
       - run: scripts/qa/gitignore.sh
