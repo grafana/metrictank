@@ -1,10 +1,13 @@
 #!/bin/bash
+
+# this script checks whether we have gitignore rules for all binaries we compile
+# NOTE: known limitation: does not clean up stale gitignore rules
+
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd $DIR/../../cmd
 file=../.gitignore
 
-# NOTE: known limitation: does not clean up stale gitignore rules
 
 declare -a missing
 for bin in *; do
