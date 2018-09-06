@@ -1,6 +1,6 @@
 .*.sw?
 .notouch
-build/
+/build
 /cmd/metrictank/metrictank
 /cmd/mt-aggs-explain/mt-aggs-explain
 /cmd/mt-explain/mt-explain
