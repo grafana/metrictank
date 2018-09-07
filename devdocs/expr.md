@@ -26,7 +26,7 @@ there's 2 main choices:
 - often copying may be unnessary, but we can't know that in advance (unless we expand the expr tree to mark whether it'll do a write)
 
 
-for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach
+for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose COW.
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
