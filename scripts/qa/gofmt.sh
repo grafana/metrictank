@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# this script checks whether all files (except vendorred and generated files)
+# are properly formatted and simplified with gofmt.
+
 # find the dir we exist within...
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir

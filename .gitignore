@@ -1,6 +1,6 @@
 .*.sw?
 .notouch
-build/
+/build
 /cmd/metrictank/metrictank
 /cmd/mt-aggs-explain/mt-aggs-explain
 /cmd/mt-explain/mt-explain
@@ -8,7 +8,6 @@ build/
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-kafka-mdm-sniff-out-of-order/mt-kafka-mdm-sniff-out-of-order
 /cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
-/cmd/mt-replicator-via-tsdb/mt-replicator-via-tsdb
 /cmd/mt-schemas-explain/mt-schemas-explain
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat

@@ -6,6 +6,15 @@ Thanks for your interest in contributing to metrictank!
 * `make` to build binaries and docker image.
 * [metrics2docs](https://github.com/Dieterbe/metrics2docs) generates the metrics documentation for the [metrics page](https://github.com/grafana/metrictank/blob/master/docs/metrics.md) though it is a bit buggy and often manual intervention is needed.
 
+# Building
+
+* `make bin`: for building all binaries.
+* `make docker`: for building docker image (after building binaries)
+* `make test`: unit tests
+* `make qa`: run all QA (code quality) tests
+
+see the [Makefile](../Makefile) for more targets
+
 # When contributing PR's
 
 1. functions, methods, types should be clearly understandable, either through an obvious name, or documentation when needed.

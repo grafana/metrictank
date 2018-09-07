@@ -1,4 +1,6 @@
 #!/bin/bash
+# this script checks whether doc files that are auto-generated
+# have been updated
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/../..
