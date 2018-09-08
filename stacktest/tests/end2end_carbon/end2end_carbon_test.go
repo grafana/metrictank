@@ -25,9 +25,18 @@ const metricsPerSecond = 1000
 
 func TestMain(m *testing.M) {
 	log.Println("launching docker-dev stack...")
-	cmd := exec.Command("docker-compose", "up", "--force-recreate", "-V")
+	version := exec.Command("docker-compose", "version")
+	output, err := version.CombinedOutput()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	log.Println(string(output))
+
+	// TODO: should probably use -V flag here.
+	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
+	// but circleCI machine image still stuck with 1.14.0
+	cmd := exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = docker.Path("docker/docker-dev")
-	var err error
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
