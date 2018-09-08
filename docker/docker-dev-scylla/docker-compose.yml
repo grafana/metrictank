@@ -54,4 +54,4 @@ services:
     ports:
      - "8125:8125/udp"
     volumes:
-     - "../statsdaemon.ini:/etc/statsdaemon.ini"
+     - "../cfg/statsdaemon.ini:/etc/statsdaemon.ini"
