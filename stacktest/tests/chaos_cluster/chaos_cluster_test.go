@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	}
 
 	fmt.Println("launching docker-chaos stack...")
-	cmd = exec.CommandContext(ctx, docker.Path("docker/launch.sh"), "docker-chaos")
+	cmd = exec.CommandContext(ctx, "docker-compose", "up", "--force-recreate", "-V")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
