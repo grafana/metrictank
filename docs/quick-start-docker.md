@@ -78,21 +78,6 @@ $ curl http://localhost:6060/node
 
 In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
 If grafana prompts to change the password, you can skip it, since it doesn't matter for a local test setup.  
-In the upper left Grafana menu, go to configuration (cog wheel), and choose `Data Sources`. On the next page, click the `Add data source` button.  
-Add a new data source with with these settings:
-
-* Name: `metrictank`
-* Default: `yes`
-* Type: `Graphite`
-* Url: `http://metrictank:6060`
-* Access: `Server (Default)`
-
-When you hit "save and test", Grafana should succeed in talking to the data source.
-
-![Add data source screenshot](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/add-datasource-docker.png)
-
--Note: it also works with `Browser` access mode but then you have to enter `http://localhost:6060` as url.
-
 
 Now let's see some data.  In the "+" (Create) menu, hit `Dashboard`.  
 This opens the dashboard editor and has a selector open to add a new panel.  Hit "Graph" for graph panel.  

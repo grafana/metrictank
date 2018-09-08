@@ -1,7 +1,0 @@
-{
-  "name":"monitoring",
-  "type":"graphite",
-  "url":"http://graphitemon",
-  "access":"proxy",
-  "isDefault":false
-}
