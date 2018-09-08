@@ -265,7 +265,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAPHITE}",
+      "datasource": "$datasource",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -368,7 +368,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAPHITE}",
+      "datasource": "$datasource",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -481,7 +481,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAPHITE}",
+      "datasource": "$datasource",
       "fill": 1,
       "gridPos": {
         "h": 7,
@@ -567,7 +567,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_GRAPHITE}",
+      "datasource": "$datasource",
       "fill": 1,
       "gridPos": {
         "h": 7,
@@ -669,7 +669,7 @@
       {
         "allValue": null,
         "current": {},
-        "datasource": "${DS_GRAPHITE}",
+        "datasource": "$datasource",
         "hide": 0,
         "includeAll": true,
         "label": null,
@@ -689,7 +689,7 @@
       {
         "allValue": null,
         "current": {},
-        "datasource": "${DS_GRAPHITE}",
+        "datasource": "$datasource",
         "hide": 0,
         "includeAll": true,
         "label": null,

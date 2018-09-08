@@ -351,7 +351,7 @@
             "points_returned.p90": "#EF843C"
           },
           "bars": false,
-          "datasource": "${DS_RAINTANKPOC}",
+          "datasource": "$datasource",
           "fill": 1,
           "id": 35,
           "legend": {
