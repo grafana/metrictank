@@ -79,14 +79,16 @@ $ curl http://localhost:6060/node
 In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
 If grafana prompts to change the password, you can skip it, since it doesn't matter for a local test setup.  
 
-Now let's see some data.  In the "+" (Create) menu, hit `Dashboard`.  
+### Sending and visualizing data
+
+In the "+" (Create) menu, hit `Dashboard`.  
 This opens the dashboard editor and has a selector open to add a new panel.  Hit "Graph" for graph panel.  
 The panel will appear but not contain data yet.  ([Grafana documentation for graph panel](http://docs.grafana.org/features/panels/graph/))
 Click on the title of the panel and hit 'edit'.
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
 * `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* `metrictank.stats`: internal stats reported by metrictank
+* `metrictank`: internal stats reported by metrictank
 * `stats`: metrics aggregated by statsdaemon and sent into metrictank every second. Will only show up if something actually sends
   metrics into statsdaemon (e.g. if graphite receives requests directly, you send stats to statsdaemon, etc)
 
@@ -108,19 +110,21 @@ echo "hits:1|c" | nc -w 1 -u localhost 8125
 
 You can then visualize these metrics in the panel by selecting them.  Note: if you only send single points, you should change the draw mode to point (Display tab)
 
+### Using pre-made dashboards
 
-Now for something neat!  
 There is an extensive [dashboard on grafana.net](https://grafana.net/dashboards/279) that displays all vital metrictank stats.
+This dashboard originates from the metrictank repository, and in fact, is also automatically imported into the stack when you spin it up.
+Go to the dashboard selector up on top and select "Metrictank". You should see something like the below.
+(if no data shows up, you may have opened it too soon after starting the stack. Usually data starts showing a minute after grafana has started. Refresh the page if needed)
 
 ![Dashboard screenshot](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/dashboard-screenshot.png)
 
-So go to the dashboard dropdown -> import dashboard -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
+
+You can also import dashboards from [grafana.com](http://grafana.com/dashboards/)
+For example the [statsdaemon dashboard](https://grafana.net/dashboards/297) which shows you metrics about the metrics received by statsdaemon.  Very meta.
+To import, go to the dashboard dropdown -> import dashboard -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
 If it asks which datasource to use, enter `metrictank`.
 
-You should now have a functioning dashboard showing all metrictank's internal metrics which it reports into itself.
-
-Another dashboard you can import for instant gratification is the [statsdaemon](https://grafana.net/dashboards/297) dashboard, which shows you
-metrics about the metrics.  Very meta.
 
 Now you can send in more data [using the plaintext protocol](http://graphite.readthedocs.io/en/latest/feeding-carbon.html) or using any
 of the plethora of [tools that can send data in carbon format](http://graphite.readthedocs.io/en/latest/tools.html)

@@ -41,6 +41,8 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana-datasources:/etc/grafana/provisioning/datasources
+      - ../cfg/grafana-dashboards-main:/etc/grafana/provisioning/dashboards
+      - ../../dashboards:/var/lib/grafana/dashboards
 
   statsdaemon:
     hostname: statsdaemon
