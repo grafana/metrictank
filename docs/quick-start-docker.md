@@ -152,3 +152,7 @@ To clean up all data so you can start fresh, run this after you stopped the stac
 docker rm -v $(docker ps -a -q -f status=exited)
 ```
 This will remove the stopped containers and their data volumes.
+
+## Other docker stacks
+
+The metrictank repository holds other stack configurations as well (for clustering, benchmarking, etc). See [devdocs/docker](../devdocs/docker.md) for more info.
