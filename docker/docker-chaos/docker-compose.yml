@@ -176,6 +176,10 @@ services:
     image: grafana/grafana
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana-datasources:/etc/grafana/provisioning/datasources
+      - ../cfg/grafana-dashboards-main-extra:/etc/grafana/provisioning/dashboards
+      - ../../dashboards:/var/lib/grafana/dashboards
 
   kafka:
     hostname: kafka

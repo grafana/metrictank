@@ -1,0 +1,19 @@
+apiVersion: 1
+
+providers:
+- name: 'main'
+  orgId: 1
+  folder: ''
+  type: file
+  disableDeletion: true
+  updateIntervalSeconds: 3
+  options:
+    path: /var/lib/grafana/dashboards/main
+- name: 'extra'
+  orgId: 1
+  folder: ''
+  type: file
+  disableDeletion: true
+  updateIntervalSeconds: 3
+  options:
+    path: /var/lib/grafana/dashboards/extra

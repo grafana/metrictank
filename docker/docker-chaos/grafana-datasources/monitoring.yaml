@@ -1,0 +1,12 @@
+apiVersion: 1
+datasources:
+- name: monitoring
+  type: graphite
+  access: proxy
+  orgId: 1
+  url: http://graphitemon
+  isDefault: false
+  jsonData:
+     graphiteVersion: "1.1"
+  version: 1
+  editable: true

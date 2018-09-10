@@ -1,7 +1,0 @@
-{
-  "name":"metrictank2",
-  "type":"graphite",
-  "url":"http://caddy:6062",
-  "access":"proxy",
-  "isDefault":false
-}

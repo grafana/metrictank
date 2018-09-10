@@ -39,6 +39,10 @@ services:
     image: grafana/grafana
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana-datasources:/etc/grafana/provisioning/datasources
+      - ../cfg/grafana-dashboards-main:/etc/grafana/provisioning/dashboards
+      - ../../dashboards:/var/lib/grafana/dashboards
 
   statsdaemon:
     hostname: statsdaemon
@@ -46,4 +50,4 @@ services:
     ports:
      - "8125:8125/udp"
     volumes:
-     - "../statsdaemon.ini:/etc/statsdaemon.ini"
+     - "../cfg/statsdaemon.ini:/etc/statsdaemon.ini"
