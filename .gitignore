@@ -1,7 +1,6 @@
 .*.sw?
 .notouch
 /build
-/scripts/build
 /cmd/metrictank/metrictank
 /cmd/mt-aggs-explain/mt-aggs-explain
 /cmd/mt-explain/mt-explain
@@ -17,3 +16,4 @@
 /cmd/mt-view-boundaries/mt-view-boundaries
 /cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
 /cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
+/scripts/build
