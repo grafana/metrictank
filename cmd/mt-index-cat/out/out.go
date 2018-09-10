@@ -36,6 +36,7 @@ func GetVegetaRenderPattern(addr, from string) func(d schema.MetricDefinition) {
 func Template(format string) func(d schema.MetricDefinition) {
 	funcs := make(map[string]interface{})
 	funcs["pattern"] = pattern
+	funcs["patternCustom"] = patternCustom
 	funcs["age"] = age
 	funcs["roundDuration"] = roundDuration
 

@@ -87,6 +87,13 @@ func main() {
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
 		fmt.Println("         an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")
+		fmt.Println("patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:")
+		fmt.Println("         patternCustom <chance> <operation> [,<chance> <operation>, ...]")
+		fmt.Println("         the chances need to add up to 100")
+		fmt.Println("         operation is one of:")
+		fmt.Println("         pass         (passthrough)")
+		fmt.Println("         <number>rcnw (replace number random consecutive nodes with wildcards")
+		fmt.Println("         <number>rccw (replace number random consecutive characters with wildcards")
 		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
 		fmt.Println("roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
 		fmt.Println("EXAMPLES:")
@@ -94,6 +101,7 @@ func main() {
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\\nX-Org-Id: 1\\n\\n'")
 		fmt.Println("mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\\n' | sort | uniq -c")
+		fmt.Println("mt-index-cat cass -hosts localhost:9042 -schema-file ../../scripts/config/schema-idx-cassandra.toml '{{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n'")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
