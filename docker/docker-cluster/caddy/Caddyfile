@@ -14,6 +14,15 @@
     tls off
 }
 
+:6063 {
+    proxy / metrictank0:6060 metrictank1:6060 metrictank2:6060 metrictank3:6060 {
+            header_upstream x-org-id 1
+        }
+    errors stderr
+    tls off
+}
+
+
 :8081 {
     proxy / graphite {
             header_upstream x-org-id 1
