@@ -86,6 +86,7 @@ func main() {
 		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
+		fmt.Println("         an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")
 		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
 		fmt.Println("roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
 		fmt.Println("EXAMPLES:")
