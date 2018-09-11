@@ -131,8 +131,12 @@ func ConfigProcess(instance string) {
 			log.Fatal(4, "kakfa-cluster: failed to get newest offset for topic %s part %d: %s", topic, part, err)
 		}
 		bootTimeOffsets[part] = offset
+		// metric cluster.notifier.kafka.partition.%d.offset is the current offset for the partition (%d) that we have consumed
 		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
+		// metric cluster.notifier.kafka.partition.%d.log_size is the size of the kafka partition (%d), aka the newest available offset.
 		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.log_size", part))
+		// metric cluster.notifier.kafka.partition.%d.lag is how many messages (mechunkWriteRequestsrics) there are in the kafka
+		// partition (%d) that we have not yet consumed.
 		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.lag", part))
 	}
 	log.Info("kafka-cluster: consuming from partitions %v", partitions)

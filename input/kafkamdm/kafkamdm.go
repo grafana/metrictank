@@ -174,8 +174,11 @@ func ConfigProcess(instance string) {
 	partitionLogSize = make(map[int32]*stats.Gauge64)
 	partitionLag = make(map[int32]*stats.Gauge64)
 	for _, part := range partitions {
+		// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
 		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part))
+		// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
 		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part))
+		// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
 		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part))
 	}
 }

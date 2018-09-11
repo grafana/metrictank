@@ -1,29 +1,35 @@
 # Overview of metrics
 (only shows metrics that are documented. generated with [metrics2docs](github.com/Dieterbe/metrics2docs))
 
+* `api.cluster.speculative.attempts`:  
+how many peer queries resulted in speculation
+* `api.cluster.speculative.requests`:  
+how many speculative http requests made to peers
+* `api.cluster.speculative.wins`:  
+how many peer queries were improved due to speculation
 * `api.get_target`:  
 how long it takes to get a target
 * `api.iters_to_points`:  
 how long it takes to decode points from a chunk iterator
-* `api.request.render.targets`:  
-the number of targets a /render request is handling
-* `api.request.render.series`:  
-the number of series a /render request is handling.  This is the number
-of metrics after all of the targets in the request have been expanded by searching the index.
-* `api.request.render.points_fetched`:  
-the number of points that need to be fetched for a /render request. This includes null values.
-* `api.request.render.points_returned`:  
-the number of points that will be returned for a /render request. This includes null values. This
-should only vary from points_fetched if runtime consolidation is performed.
-* `api.request.render.chosen_archive`:  
-the archive chosen for the request. 0 means original data, 1 means first agg level, 2 means 2nd
-* `api.request.%s.status.%d`:  
-count of the number of responses for each request path, status code combination.
-eg. `api.requests.metrics_find.200` and `api.request.render.503`
-* `api.request.%s.latency`:  
+* `api.request.%s`:  
 the latency of each request by request path.
 * `api.request.%s.size`:  
 the size of each response by request path
+* `api.request.%s.status.%d`:  
+the count of the number of responses for each request path, status code combination.
+eg. `api.requests.metrics_find.status.200` and `api.request.render.status.503`
+* `api.request.render.chosen_archive`:  
+the archive chosen for the request.
+0 means original data, 1 means first agg level, 2 means 2nd
+* `api.request.render.points_fetched`:  
+the number of points that need to be fetched for a /render request.
+* `api.request.render.points_returned`:  
+the number of points the request will return.
+* `api.request.render.series`:  
+the number of series a /render request is handling.  This is the number
+of metrics after all of the targets in the request have expanded by searching the index.
+* `api.request.render.targets`:  
+the number of targets a /render request is handling.
 * `api.requests_span.mem`:  
 the timerange of requests hitting only the ringbuffer
 * `api.requests_span.mem_and_cassandra`:  
@@ -34,6 +40,8 @@ how many chunks were added to the cache
 how many chunks were evicted from the cache
 * `cache.ops.chunk.hit`:  
 how many chunks were hit
+* `cache.ops.chunk.push-hot`:  
+how many chunks have been pushed into the cache because their metric is hot
 * `cache.ops.metric.add`:  
 how many metrics were added to the cache
 * `cache.ops.metric.evict`:  
@@ -43,23 +51,7 @@ how many metrics were hit fully (all needed chunks in cache)
 * `cache.ops.metric.hit-partial`:  
 how many metrics were hit partially (some of the needed chunks in cache, but not all)
 * `cache.ops.metric.miss`:  
-how many metrics were missed completely (none of the needed chunks in cache)
-* `cluster.notifier.kafka.message_size`:  
-the sizes seen of messages through the kafka cluster notifier
-* `cluster.notifier.kafka.messages-published`:  
-a counter of messages published to the kafka cluster notifier
-* `cluster.notifier.kafka.partition.%d.offset`:   
-The current offset for the partition (%d) that we have consumed.
-* `cluster.notifier.kafka.partition.%d.log_size`:   
-The size of the kafka partition, aka the newest available offset.
-* `cluster.notifier.kafka.partition.%d.lag`:   
-How many messages (chunkWriteRequests) Kafaka has that we have not yet consumed.
-* `cluster.notifier.nsq.message_size`:  
-the sizes seen of messages through the nsq cluster notifier
-* `cluster.notifier.nsq.messages-published`:  
-a counter of messages published to the nsq cluster notifier
-* `cluster.notifier.all.messages-received`:  
-a counter of messages received from cluster notifiers
+how many metrics were missed fully (no needed chunks in cache)
 * `cluster.decode_err.join`:  
 a counter of json unmarshal errors
 * `cluster.decode_err.update`:  
@@ -70,16 +62,32 @@ how many node join events were received
 how many node leave events were received
 * `cluster.events.update`:  
 how many node update events were received
+* `cluster.notifier.all.messages-received`:  
+a counter of messages received from cluster notifiers
+* `cluster.notifier.kafka.message_size`:  
+the sizes seen of messages through the kafka cluster notifier
+* `cluster.notifier.kafka.messages-published`:  
+a counter of messages published to the kafka cluster notifier
+* `cluster.notifier.kafka.partition.%d.lag`:  
+how many messages (mechunkWriteRequestsrics) there are in the kafka
+partition (%d) that we have not yet consumed.
+* `cluster.notifier.kafka.partition.%d.log_size`:  
+the size of the kafka partition (%d), aka the newest available offset.
+* `cluster.notifier.kafka.partition.%d.offset`:  
+the current offset for the partition (%d) that we have consumed
+* `cluster.notifier.nsq.message_size`:  
+the sizes seen of messages through the nsq cluster notifier
+* `cluster.notifier.nsq.messages-published`:  
+a counter of messages published to the nsq cluster notifier
 * `cluster.self.partitions`:  
 the number of partitions this instance consumes
+* `cluster.self.priority`:  
+the priority of the node. A lower number gives higher priority
 * `cluster.self.promotion_wait`:  
 how long a candidate (secondary node) has to wait until it can become a primary
 When the timer becomes 0 it means the in-memory buffer has been able to fully populate so that if you stop a primary
 and it was able to save its complete chunks, this node will be able to take over without dataloss.
 You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
-* `cluster.self.priority`:   
-The priority of the node. A lower number gives higher priority.  When using the kafkamdm input plugin this will be set to the number of seconds
-the node is lagging by.
 * `cluster.self.state.primary`:  
 whether this instance is a primary
 * `cluster.self.state.ready`:  
@@ -128,32 +136,58 @@ time spent executing inserts (possibly repeatedly until success)
 how many insert queries for a metric failed (triggered by an add or an update)
 * `idx.cassandra.query-insert.wait`:  
 time inserts spent in queue before being executed
-* `idx.cassandra.update`:  
-the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
 * `idx.cassandra.save.skipped`:  
 how many saves have been skipped due to the writeQueue being full
+* `idx.cassandra.update`:  
+the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
 * `idx.memory.add`:  
-the duration of an add of a metric to the memory idx
-* `idx.memory.ops.add`:  
-the number of additions to the memory idx
+the duration of a (successful) add of a metric to the memory idx
 * `idx.memory.delete`:  
 the duration of a delete of one or more metrics from the memory idx
+* `idx.memory.filtered`:  
+number of series that have been excluded from responses due to their lastUpdate property
 * `idx.memory.find`:  
 the duration of memory idx find
 * `idx.memory.get`:  
 the duration of a get of one metric in the memory idx
 * `idx.memory.list`:  
 the duration of memory idx listings
+* `idx.memory.ops.add`:  
+the number of additions to the memory idx
+* `idx.memory.ops.update`:  
+the number of updates to the memory idx
 * `idx.memory.prune`:  
 the duration of successful memory idx prunes
 * `idx.memory.update`:  
 the duration of (successful) update of a metric to the memory idx
-* `idx.memory.update`:  
-the number of updates to the memory idx
 * `idx.metrics_active`:  
 the number of currently known metrics in the index
-* `idx.memory.filtered`:  
-number of series that have been excluded from responses due to their lastUpdate property
+* `input.%s.metricdata.invalid`:  
+a count of times a metricdata was invalid by input plugin
+* `input.%s.metricdata.received`:  
+the count of metricdata datapoints received by input plugin
+* `input.%s.metricpoint.invalid`:  
+a count of times a metricpoint was invalid by input plugin
+* `input.%s.metricpoint.received`:  
+the count of metricpoint datapoints received by input plugin
+* `input.%s.metricpoint.unknown`:  
+the count of times the ID of a received metricpoint was not in the index, by input plugin
+* `input.%s.metricpoint_no_org.received`:  
+the count of metricpoint_no_org datapoints received by input plugin
+* `input.carbon.metrics_decode_err`:  
+a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
+* `input.carbon.metrics_per_message`:  
+how many metrics per message were seen. in carbon's case this is always 1.
+* `input.kafka-mdm.metrics_decode_err`:  
+a count of times an input message failed to parse
+* `input.kafka-mdm.metrics_per_message`:  
+how many metrics per message were seen.
+* `input.kafka-mdm.partition.%d.lag`:  
+how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
+* `input.kafka-mdm.partition.%d.log_size`:  
+the current size of the kafka partition (%d), aka the newest available offset.
+* `input.kafka-mdm.partition.%d.offset`:  
+the current offset for the partition (%d) that we have consumed.
 * `mem.to_iter`:  
 how long it takes to transform in-memory chunks to iterators
 * `memory.bytes.obtained_from_sys`:  
@@ -170,8 +204,32 @@ the duration of the last GC STW pause in nanoseconds
 a counter of total number of bytes allocated during process lifetime
 * `memory.total_gc_cycles`:  
 a counter of the number of GC cycles since process start
-* `plan.run`:
+* `plan.run`:  
 the time spent running the plan for a request (function processing of all targets and runtime consolidation)
+* `process.major_page_faults.counter64`:  
+the number of major faults the process has made which have required loading a memory page from disk
+* `process.minor_page_faults.counter64`:  
+the number of minor faults the process has made which have not required loading a memory page from disk
+* `process.resident_memory_bytes.gauge64`:  
+a gauge of the process RSS from /proc/pid/stat
+* `process.virtual_memory_bytes.gauge64`:  
+a gauge of the process VSZ from /proc/pid/stat
+* `recovered_errors.aggmetric.getaggregated.bad-aggspan`:  
+how many times we detected an GetAggregated call
+with an incorrect aggspan specified
+* `recovered_errors.aggmetric.getaggregated.bad-consolidator`:  
+how many times we detected an GetAggregated call
+with an incorrect consolidator specified
+* `recovered_errors.idx.memory.corrupt-index`:  
+how many times
+a corruption has been detected in one of the internal index structures
+each time this happens, an error is logged with more details.
+* `recovered_errors.idx.memory.invalid-tag`:  
+how many times
+an invalid tag for a metric is encountered.
+each time this happens, an error is logged with more details.
+* `stats.generate_message`:  
+how long it takes to generate the stats
 * `store.cassandra.chunk_operations.save_fail`:  
 counter of failed saves
 * `store.cassandra.chunk_operations.save_ok`:  
@@ -180,8 +238,8 @@ counter of successful saves
 the sizes of chunks seen when loading them
 * `store.cassandra.chunk_size.at_save`:  
 the sizes of chunks seen when saving them
-* `store.cassandra.chunks_per_row`:  
-how many chunks are retrieved per row in get queries
+* `store.cassandra.chunks_per_response`:  
+how many chunks are retrieved per response in get queries
 * `store.cassandra.error.cannot-achieve-consistency`:  
 a counter of the cassandra store not being able to achieve consistency for a given query
 * `store.cassandra.error.conn-closed`:  
@@ -210,10 +268,10 @@ the duration of a put in the wait queue
 how many rows come per get response
 * `store.cassandra.to_iter`:  
 the duration of converting chunks to iterators
-* `tank.add_to_closed_chunk`:    
-points received for the most recent chunk when that chunk is already being "closed",
-ie the end-of-stream marker has been written to the chunk.
-This indicates that your GC is actively sealing chunks and saving them before you have the chance to send
+* `tank.add_to_closed_chunk`:  
+points received for the most recent chunk
+when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
+this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 * `tank.chunk_operations.clear`:  
 a counter of how many chunks are cleared (replaced by new chunks)
@@ -223,35 +281,18 @@ a counter of how many chunks are created
 the number of times the metrics GC is about to inspect a metric (series)
 * `tank.metrics_active`:  
 the number of currently known metrics (excl rollup series), measured every second
-* `tank.metrics_reordered`:
+* `tank.metrics_reordered`:  
 the number of points received that are going back in time, but are still
 within the reorder window. in such a case they will be inserted in the correct order.
 E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
 ts is not older than the 60th datapoint counting from the newest.
 * `tank.metrics_too_old`:  
-points that go back in time.
-E.g. for any given series, when a point has a timestamp
-that is not higher than the timestamp of the last written timestamp for that series.
+points that go back in time beyond the scope of the optional reorder window.
+these points will end up being dropped and lost.
 * `tank.persist`:  
 how long it takes to persist a chunk (and chunks preceding it)
 this is subject to backpressure from the store when the store's queue runs full
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
-* `input.carbon.metrics_decode_err`:
-a count of times an input message failed to parse
-* `input.carbon.metricdata.invalid`:
-a count of times metricdata was invalid
-* `input.carbon.metricpoint.invalid`:
-a count of times a metricpoint was invalid
-* `input.kafka-mdm.partition.%d.offset`:   
-The current offset for the partition (%d) that we have consumed.
-* `input.kafka-mdm.partition.%d.log_size`:   
-The size of the kafka partition, aka the newest available offset.
-* `input.kafka-mdm.partition.%d.lag`:   
-How many messages (metrics) Kafaka has that we have not yet consumed.
-* `input.kafka-mdm.metrics_decode_err`:
-a count of times an input message failed to parse
-* `input.kafka-mdm.metricdata.invalid`:
-a count of times metricdata was invalid
-* `input.kafka-mdm.metricpoint.invalid`:
-a count of times a metricpoint was invalid
+* `version.%s`:  
+the version of metrictank running.  The metric value is always 1

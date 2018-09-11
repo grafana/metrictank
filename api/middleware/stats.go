@@ -27,6 +27,8 @@ func (r *requestStats) PathStatusCount(path string, status int) {
 	}
 	c, ok := p[status]
 	if !ok {
+		// metric api.request.%s.status.%d is the count of the number of responses for each request path, status code combination.
+		// eg. `api.requests.metrics_find.status.200` and `api.request.render.status.503`
 		c = stats.NewCounter32(fmt.Sprintf("api.request.%s.status.%d", path, status))
 		p[status] = c
 	}
@@ -38,6 +40,7 @@ func (r *requestStats) PathLatency(path string, dur time.Duration) {
 	r.Lock()
 	p, ok := r.latencyHistograms[path]
 	if !ok {
+		// metric api.request.%s is the latency of each request by request path.
 		p = stats.NewLatencyHistogram15s32(fmt.Sprintf("api.request.%s", path))
 		r.latencyHistograms[path] = p
 	}
@@ -49,6 +52,7 @@ func (r *requestStats) PathSize(path string, size int) {
 	r.Lock()
 	p, ok := r.sizeMeters[path]
 	if !ok {
+		// metric api.request.%s.size is the size of each response by request path
 		p = stats.NewMeter32(fmt.Sprintf("api.request.%s.size", path), false)
 		r.sizeMeters[path] = p
 	}

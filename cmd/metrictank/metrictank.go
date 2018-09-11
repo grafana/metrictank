@@ -237,6 +237,7 @@ func main() {
 		Report Version
 	***********************************/
 	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
+	// metric version.%s is the version of metrictank running.  The metric value is always 1
 	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
 	mtVersion.Set(true)
 

@@ -41,7 +41,7 @@ var (
 	// of metrics after all of the targets in the request have expanded by searching the index.
 	reqRenderSeriesCount = stats.NewMeter32("api.request.render.series", false)
 
-	// metric api.request.render.series is the number of targets a /render request is handling.
+	// metric api.request.render.targets is the number of targets a /render request is handling.
 	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", false)
 
 	// metric plan.run is the time spent running the plan for a request (function processing of all targets and runtime consolidation)
