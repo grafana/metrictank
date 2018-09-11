@@ -171,7 +171,8 @@ func main() {
 	}
 
 	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
-
+	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
+	mtVersion.Set(true)
 	/***********************************
 		Initialize our Cluster
 	***********************************/
