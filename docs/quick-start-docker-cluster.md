@@ -1,52 +1,70 @@
-# Quick start using Docker
+# Quick start for docker-cluster
 
-This quick start is for setting up the **docker-standard** image, if you would prefer to try a cluster please follow the [docker-cluster quick start](quick-start-docker-cluster.md)
+The docker-cluster image is similar to docker-standard, but with the following changes and features:
+
+* Cluster of 4 metrictanks (with 2x replication)
+* Separate Graphite monitoring server
+* The metrictank binary is **not** baked in
+* Loads custom configurations and scripts
+* Supports tags
+* More dashboards are available
+* Kafka input and clustering backend
+* Short chunkspan & numchunks (benefits: easy to trigger mem and mem_and_cass requests, frequent cass saves, notifier messages etc)
+* Prometheus monitoring
+* Jaeger tracing
+* caddy-proxied endpooints/datasources to check with different org-id auth headers
+* tsdb-gw
 
 
-[Docker](https://www.docker.com) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
+The following programs are required to build and run the docker-cluster image:
 
-
-This tutorial will help you run metrictank, its dependencies, and grafana for dashboarding, with minimal hassle.
-
-## Install Docker
-
-[Docker installation instructions](https://docs.docker.com/install/)  
-You will also need to install version >=1.6 of [docker-compose](https://docs.docker.com/compose/)
-
-## Optional: install Go (required to run images other than **docker-standard**)
-
-The metrictank binary is included in the docker-standard image, but if you would like to try the other images you will need to build metrictank.
-[GO](https://golang.org/) is required to build metrictank
-[GO installation instructions](https://golang.org/doc/install)
+* [Docker](https://docs.docker.com/install/)
+* [docker-compose](https://docs.docker.com/compose) >= version 1.6
+* [Go](https://golang.org/doc/install) (needed to build metrictank)
 
 ## Getting the repository
 
-If you already have Go installed, you can just: 
+Pull down the repository and its dependencies: 
 
 ```
 go get github.com/grafana/metrictank/...
 cd $GOPATH/src/github.com/grafana/metrictank
 ```
 
-If you don't, you can just use git:
+## Build metrictank
 
+Build metrictank and the docker images:
 ```
-git clone https://github.com/grafana/metrictank.git
-cd metrictank
+make
 ```
 
-If you have neither, just [download the zip](https://github.com/grafana/metrictank/archive/master.zip), extract it somewhere and cd into the metrictank directory.
+`make` creates the folder `$GOPATH/src/github.com/grafana/metrictank/build`. If you experience a permissions error during `make` it is probably related to this. Try either changing ownership (`chown`) or permissions (`chmod`) on the folder to something your current user is able to read and write, then run `make` again.
 
-## Bring up the stack (docker-standard)
+You may receive a few build errors at the end relating to QA, ignore them. Ensure the binary `$GOPATH/src/github.com/grafana/metrictank/build/metrictank` was built.
+
+## Bring up the stack
 
 The stack will listen on the following ports:
 
-* 2003 tcp (metrictank's carbon input)
-* 3000 tcp (grafana's http port)
-* 6060 tcp (metrictank's internal endpoint)
-* 8080 tcp (the graphite query endpoint)
-* 8125 udp (statsd endpoint)
-* 9042 tcp (cassandra)
+* 80    tcp (carbon)
+* 2003  tcp (metrictank's carbon input)
+* 2181  tcp (kafka)
+* 3000  tcp (grafana's http port)
+* 6060  tcp (metrictank's internal endpoint)
+* 6061  tcp (caddy)
+* 6062  tcp (caddy)
+* 6063  tcp (caddy)
+* 6831  udp (jaeger)
+* 8080  tcp (the graphite query endpoint)
+* 8081  tcp (caddy)
+* 8082  tcp (caddy)
+* 8125  udp (statsd endpoint)
+* 9042  tcp (cassandra)
+* 9090  tcp (prometheus)
+* 9092  tcp (kafka)
+* 9100  tcp (prometheus node exporter)
+* 9999  tcp (kafka)
+* 16686 tcp (jaeger)
 
 If you already have something else listening on those ports (such as a carbon or grafana server), shut it down, as it will conflict.
 
@@ -54,41 +72,14 @@ If you already have something else listening on those ports (such as a carbon or
 Inside your copy of the repository, you can bring up the stack like so:
 
 ```
-cd docker/docker-standard
+cd docker/docker-cluster
 docker-compose up
 ```
 
 If this gives you the error `service 'version' doesn't have any configuration options`,
 your version of `docker-compose` is too old and you need to update to >=1.6.
 
-A bunch of text will whiz past on your screen, including temporary errors like:
-
-```
-metrictank_1     | waiting for cassandra:9042 to become up...
-statsdaemon_1    | 2016/12/04 15:30:21 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused. will retry
-metrictank_1     | waiting for cassandra:9042 to become up...
-statsdaemon_1    | 2016/12/04 15:30:22 ERROR: dialing metrictank:2003 failed - dial tcp 172.18.0.5:2003: getsockopt: connection refused
-```
-
-And a little bit later you should see that metrictank starts its listener and statsdaemon connects to metrictank:
-
-```
-metrictank_1    | 2016/12/04 15:30:34 [I] metricIndex initialized in 326.379951ms. starting data consumption
-metrictank_1    | 2016/12/04 15:30:34 [I] carbon-in: listening on :2003/tcp
-metrictank_1    | 2016/12/04 15:30:34 [I] API Listening on: http://:6060/
-statsdaemon_1   | 2016/12/04 15:30:35 now connected to metrictank:2003
-```
-
-Once the stack is up, metrictank should be running on port 6060 and you can query it with curl.  
-If you're running Docker engine natively, you can connect using `localhost`. If you're using Docker Toolbox (which runs containers inside a VirtualBox VM), the host will be the IP address returned by `docker-machine ip`.
-
-```
-$ curl http://localhost:6060/node
-```
-Output will be similar to the following:
-```
-{"name":"default","version":"0.9.0-342-g9c5a12c","primary":true,"primaryChange":"2018-09-07T19:29:10.200078519Z","state":"NodeReady","priority":0,"started":"2018-09-07T19:29:10.196587689Z","stateChange":"2018-09-07T19:29:10.200078795Z","partitions":[0],"apiPort":6060,"apiScheme":"http","updated":"2018-09-07T19:29:11.26049517Z","remoteAddr":""}
-```
+Wait until the stack is up.
 
 ## Working with Grafana and metrictank
 
@@ -147,7 +138,7 @@ of the plethora of [tools that can send data in carbon format](http://graphite.r
 , create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
 
 [fakemetrics](https://github.com/raintank/fakemetrics) is a handy tool to generate a data stream.
-E.g. run `fakemetrics feed  --carbon-addr localhost:2003` and the stats will show up under `some.id.of.a.metric.*`
+E.g. run `fakemetrics feed --carbon-addr localhost:2003` and the stats will show up under `some.id.of.a.metric.*`
 
 If anything doesn't work, please let us know via a ticket on github or reach out on slack. See
 [Community](https://github.com/grafana/metrictank/blob/master/docs/community.md)
@@ -171,4 +162,4 @@ This will remove the stopped containers and their data volumes.
 
 ## Other docker stacks
 
-The metrictank repository holds other stack configurations as well (for clustering, benchmarking, etc). See [devdocs/docker](../devdocs/docker.md) for more info.
+The metrictank repository holds other stack configurations as well (for testing, benchmarking, etc). See [devdocs/docker](../devdocs/docker.md) for more info.
