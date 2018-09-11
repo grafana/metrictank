@@ -22,9 +22,9 @@ import (
 var (
 	LogLevel int
 
-	// metric idx.memory.update is the number of updates to the memory idx
+	// metric idx.memory.ops.update is the number of updates to the memory idx
 	statUpdate = stats.NewCounter32("idx.memory.ops.update")
-	// metric idx.memory.add is the number of additions to the memory idx
+	// metric idx.memory.ops.add is the number of additions to the memory idx
 	statAdd = stats.NewCounter32("idx.memory.ops.add")
 	// metric idx.memory.add is the duration of a (successful) add of a metric to the memory idx
 	statAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")

@@ -170,8 +170,6 @@ func main() {
 		log.Fatal(4, "instance can't be empty")
 	}
 
-	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
-
 	/***********************************
 		Initialize our Cluster
 	***********************************/
@@ -234,6 +232,14 @@ func main() {
 	************************************/
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	/***********************************
+		Report Version
+	***********************************/
+	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
+	// metric version.%s is the version of metrictank running.  The metric value is always 1
+	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
+	mtVersion.Set(true)
 
 	/***********************************
 		collect stats
