@@ -2,7 +2,6 @@ package cassandra
 
 import (
 	"flag"
-	"time"
 
 	"github.com/rakyll/globalconf"
 )
@@ -12,7 +11,7 @@ type StoreConfig struct {
 	Keyspace                 string
 	Consistency              string
 	HostSelectionPolicy      string
-	Timeout                  time.Duration
+	Timeout                  string
 	ReadConcurrency          int
 	WriteConcurrency         int
 	ReadQueueSize            int
@@ -39,7 +38,7 @@ func NewStoreConfig() *StoreConfig {
 		Keyspace:                 "metrictank",
 		Consistency:              "one",
 		HostSelectionPolicy:      "tokenaware,hostpool-epsilon-greedy",
-		Timeout:                  time.Second,
+		Timeout:                  "1s",
 		ReadConcurrency:          20,
 		WriteConcurrency:         10,
 		ReadQueueSize:            200000,
@@ -68,7 +67,7 @@ func ConfigSetup() *flag.FlagSet {
 	cas.StringVar(&CliConfig.Keyspace, "keyspace", CliConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
 	cas.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cas.StringVar(&CliConfig.HostSelectionPolicy, "host-selection-policy", CliConfig.HostSelectionPolicy, "")
-	cas.DurationVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra timeout")
+	cas.StringVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra timeout")
 	cas.IntVar(&CliConfig.ReadConcurrency, "read-concurrency", CliConfig.ReadConcurrency, "max number of concurrent reads to cassandra.")
 	cas.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "max number of concurrent writes to cassandra.")
 	cas.IntVar(&CliConfig.ReadQueueSize, "read-queue-size", CliConfig.ReadQueueSize, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")

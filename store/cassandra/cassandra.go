@@ -109,6 +109,22 @@ func PrepareChunkData(span uint32, data []byte) []byte {
 	return buf.Bytes()
 }
 
+// the timeout value used to be an integer specifying the number of milliseconds
+// we want to convert it to a duration string, but we need to stay backwards-compatible for now
+func ConvertTimeout(timeout string) time.Duration {
+	if timeoutI, err := strconv.Atoi(timeout); err == nil {
+		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
+		return time.Duration(timeoutI) * time.Millisecond
+	} else {
+		timeoutD, err := time.ParseDuration(timeout)
+		if err == nil {
+			return timeoutD
+		}
+		log.Warn("cassandra_store: invalid duration value %s, assuming default (1s)", timeout)
+		return time.Second
+	}
+}
+
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)
@@ -126,8 +142,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 			Password: config.Password,
 		}
 	}
+
+	cluster.Timeout = ConvertTimeout(config.Timeout)
 	cluster.Consistency = gocql.ParseConsistency(config.Consistency)
-	cluster.Timeout = config.Timeout
 	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = config.WriteConcurrency
 	cluster.ProtoVersion = config.CqlProtocolVersion

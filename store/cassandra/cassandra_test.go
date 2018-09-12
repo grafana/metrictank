@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 )
 
 type testCase struct {
@@ -59,4 +60,18 @@ func TestGetTTLTables(t *testing.T) {
 			t.Fatalf("%s expected window size %d, got %d", logPrefix, tc.expectedWindowSize, result[tc.ttl].WindowSize)
 		}
 	}
+}
+
+func TestBackwardsCompatibleTimeout(t *testing.T) {
+	checkTimeout := func(input string, expected time.Duration) {
+		timeoutD := ConvertTimeout(input)
+		if timeoutD != expected {
+			t.Fatalf("expected time %s but got %s from input %s", expected.String(), timeoutD.String(), input)
+		}
+	}
+
+	checkTimeout("3500", time.Duration(3500)*time.Millisecond)
+	checkTimeout("3500ms", time.Duration(3500)*time.Millisecond)
+	checkTimeout("3.5s", time.Duration(3500)*time.Millisecond)
+	checkTimeout("nonsense", time.Second)
 }
