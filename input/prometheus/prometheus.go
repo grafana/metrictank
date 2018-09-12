@@ -124,7 +124,7 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 			}
 		}
 		if err != nil {
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
 			return
 		}

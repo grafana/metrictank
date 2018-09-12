@@ -69,7 +69,7 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		}
 		if status >= 400 {
 			tracing.Error(span, errors.New(string(rw.errBody)))
-			if status >= 500 {
+			if status >= http.StatusInternalServerError {
 				tracing.Failure(span)
 			}
 		}

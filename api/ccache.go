@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"sync"
 
 	"github.com/grafana/metrictank/api/middleware"
@@ -15,13 +16,13 @@ import (
 
 func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) {
 	res := models.CCacheDeleteResp{}
-	code := 200
+	code := http.StatusOK
 
 	if req.Propagate {
 		res.Peers = s.ccacheDeletePropagate(ctx.Req.Context(), &req)
 		for _, peer := range res.Peers {
 			if peer.Errors > 0 {
-				code = 500
+				code = http.StatusInternalServerError
 			}
 		}
 	}
@@ -47,7 +48,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 						res.FirstError = err.Error()
 					}
 					res.Errors += 1
-					code = 500
+					code = http.StatusInternalServerError
 				} else {
 					toClear = append(toClear, nodes...)
 				}
@@ -61,7 +62,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 					res.FirstError = err.Error()
 				}
 				res.Errors += 1
-				code = 500
+				code = http.StatusInternalServerError
 			} else {
 				toClear = append(toClear, nodes...)
 			}
