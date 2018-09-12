@@ -1,6 +1,6 @@
 # Quick start using Docker
 
-This quick start is for setting up the **docker-standard** image, if you would prefer to try a cluster please follow the [docker-cluster quick start](quick-start-docker-cluster.md)
+This quick start covers a minimal setup without clustering, if you would prefer to use a cluster please follow the [docker-cluster quick start](quick-start-docker-cluster.md)
 
 
 [Docker](https://www.docker.com) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
@@ -13,11 +13,10 @@ This tutorial will help you run metrictank, its dependencies, and grafana for da
 [Docker installation instructions](https://docs.docker.com/install/)  
 You will also need to install version >=1.6 of [docker-compose](https://docs.docker.com/compose/)
 
-## Optional: install Go (required to run images other than **docker-standard**)
+## Optional: install Go
 
-The metrictank binary is included in the docker-standard image, but if you would like to try the other images you will need to build metrictank.
-[GO](https://golang.org/) is required to build metrictank
 [GO installation instructions](https://golang.org/doc/install)
+Ensure that `$GOPATH/bin` is added to your `$PATH`
 
 ## Getting the repository
 

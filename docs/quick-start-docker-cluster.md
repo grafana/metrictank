@@ -4,7 +4,7 @@ The docker-cluster image is similar to docker-standard, but with the following c
 
 * Cluster of 4 metrictanks (with 2x replication)
 * Separate Graphite monitoring server
-* The metrictank binary is **not** baked in
+* The metrictank binary is mounted from `build`, so `make bin` must be run before spinning up the stack (benefits: speeds up development and testing)
 * Loads custom configurations and scripts
 * Supports tags
 * More dashboards are available
@@ -21,6 +21,7 @@ The following programs are required to build and run the docker-cluster image:
 * [Docker](https://docs.docker.com/install/)
 * [docker-compose](https://docs.docker.com/compose) >= version 1.6
 * [Go](https://golang.org/doc/install) (needed to build metrictank)
+   * Ensure that `$GOPATH/bin` is added to your `$PATH`
 
 ## Getting the repository
 
@@ -38,9 +39,7 @@ Build metrictank and the docker images:
 make
 ```
 
-`make` creates the folder `$GOPATH/src/github.com/grafana/metrictank/build`. If you experience a permissions error during `make` it is probably related to this. Try either changing ownership (`chown`) or permissions (`chmod`) on the folder to something your current user is able to read and write, then run `make` again.
-
-You may receive a few build errors at the end relating to QA, ignore them. Ensure the binary `$GOPATH/src/github.com/grafana/metrictank/build/metrictank` was built.
+`make` uses/creates the directory `$GOPATH/src/github.com/grafana/metrictank/build`. If you tried to spin up the stack prior to building metrictank then docker already created this directory, as root, and it will need to be deleted (then run `make` again).
 
 ## Bring up the stack
 
