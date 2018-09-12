@@ -2,6 +2,7 @@ package response
 
 import (
 	"encoding/json"
+	"net/http"
 	"runtime/debug"
 
 	"github.com/raintank/worldping-api/pkg/log"
@@ -24,7 +25,7 @@ func WrapError(e error) *ErrorResp {
 	}
 	resp := &ErrorResp{
 		err:  e.Error(),
-		code: 500,
+		code: http.StatusInternalServerError,
 	}
 	if _, ok := e.(Error); ok {
 		resp.code = e.(Error).Code()
@@ -44,13 +45,13 @@ func WrapErrorForTagDB(e error) *ErrorResp {
 	if err != nil {
 		return &ErrorResp{
 			err:  "{\"error\": \"failed to encode error message\"}",
-			code: 500,
+			code: http.StatusInternalServerError,
 		}
 	}
 
 	resp := &ErrorResp{
 		err:  string(b),
-		code: 500,
+		code: http.StatusInternalServerError,
 	}
 
 	if _, ok := e.(Error); ok {
@@ -94,7 +95,7 @@ func (r *ErrorResp) ValidateAndFixCode() {
 	if r.code > 599 {
 		log.Warn("Encountered invalid HTTP status code %d, printing stack", r.code)
 		debug.PrintStack()
-		r.code = 500
+		r.code = http.StatusInternalServerError
 	}
 }
 

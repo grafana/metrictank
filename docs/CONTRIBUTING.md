@@ -40,6 +40,7 @@ see the [Makefile](../Makefile) for more targets
     * first the high-level function, then any other function that it calls (unless it belongs in a different file or package of course)
     * first a structure, then its constructor, and then its methods
 13. Documentation in the [docs](../docs) folder should be kept in sync with current state of affairs
+14. HTTP status codes: use the [named codes defined in the standard library](https://golang.org/pkg/net/http/#pkg-constants) for easy searchability
 
 # Documentation
 
