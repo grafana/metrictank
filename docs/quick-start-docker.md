@@ -16,6 +16,7 @@ You will also need to install version >=1.6 of [docker-compose](https://docs.doc
 ## Optional: install Go
 
 [GO installation instructions](https://golang.org/doc/install)
+
 Ensure that `$GOPATH/bin` is added to your `$PATH`
 
 ## Getting the repository
@@ -91,7 +92,7 @@ Output will be similar to the following:
 
 ## Working with Grafana and metrictank
 
-In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
+In your browser, open Grafana at http://localhost:3000 (or your docker-machine address) and log in as `admin:admin`.  
 If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.  
 
 ### Sending and visualizing data

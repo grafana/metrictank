@@ -4,7 +4,7 @@ The docker-cluster image is similar to docker-standard, but with the following c
 
 * Cluster of 4 metrictanks (with 2x replication)
 * Separate Graphite monitoring server
-* The metrictank binary is mounted from `build`, so `make bin` must be run before spinning up the stack (benefits: speeds up development and testing)
+* The metrictank binary is mounted from `metrictank/build`, so `make bin` must be run before spinning up the stack (benefits: speeds up development and testing)
 * Loads custom configurations and scripts
 * Supports tags
 * More dashboards are available
@@ -82,62 +82,19 @@ Wait until the stack is up.
 
 ## Working with Grafana and metrictank
 
-In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
-If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.  
+In your browser, open Grafana at http://localhost:3000 (or your docker-machine address) and log in as `admin:admin`.  
+If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.
 
-### Sending and visualizing data
+### Working with the cluster
 
-In the "+" (Create) menu, hit `Dashboard`.  
-This opens the dashboard editor and has a selector open to add a new panel.  Hit "Graph" for graph panel.  
-The panel will appear but not contain data yet.  ([Grafana documentation for graph panel](http://docs.grafana.org/features/panels/graph/)).
-Click on the title of the panel and hit 'edit'.
-In the metrics tab you should see a bunch of metrics already in the root hierarchy:
-
-* `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* `metrictank`: internal stats reported by metrictank
-* `stats`: metrics aggregated by statsdaemon and sent into metrictank every second. Will only show up if something actually sends
-  metrics into statsdaemon (e.g. if graphite receives requests directly, you send stats to statsdaemon, etc)
-
-
-Note that metrictank is setup to track every metric on a 1-second granularity.  If you wish to use it for less frequent metrics,
-you have to modify the storage-schemas.conf, just like with graphite.
-
-You can also send your own data into metrictank using the carbon input, like so:
-
-```
-echo "example.metric 123 $(date +%s)" | nc localhost 2003
-```
-
-Or into statsdaemon - which will compute statistical summaries - like so:
-
-```
-echo "hits:1|c" | nc -w 1 -u localhost 8125
-```
-
-You can then visualize these metrics in the panel by selecting them.  Note: if you only send single points, you should change the draw mode to point (Display tab)
-
-### Using pre-made dashboards
-
-There is an extensive [dashboard on grafana.net](https://grafana.net/dashboards/279) that displays all vital metrictank stats.
-This dashboard originates from the metrictank repository, and in fact, is also automatically imported into the stack when you spin it up.
-Go to the dashboard selector up on top and select "Metrictank". You should see something like the below.
-(if no data shows up, you may have opened it too soon after starting the stack. Usually data starts showing a minute after grafana has started. Refresh the page if needed)
-
-![Dashboard screenshot](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/dashboard-screenshot.png)
-
-
-You can also import dashboards from [grafana.com](http://grafana.com/dashboards/)
-For example the [statsdaemon dashboard](https://grafana.net/dashboards/297) which shows you metrics about the metrics received by statsdaemon.  Very meta.
-To import, go to the dashboard dropdown -> import dashboard -> and paste in `https://grafana.net/dashboards/279` into the Grafana.net url field.
-If it asks which datasource to use, enter `metrictank`.
-
-
-Now you can send in more data [using the plaintext protocol](http://graphite.readthedocs.io/en/latest/feeding-carbon.html) or using any
-of the plethora of [tools that can send data in carbon format](http://graphite.readthedocs.io/en/latest/tools.html)
-, create dashboards (or import them from [grafana.net](https://grafana.net)), etc.
-
-[fakemetrics](https://github.com/raintank/fakemetrics) is a handy tool to generate a data stream.
-E.g. run `fakemetrics feed --carbon-addr localhost:2003` and the stats will show up under `some.id.of.a.metric.*`
+This stack has some unique properties not found in the standard stack, such as multiple data sources to choose from including, but not limited to:
+* monitoring and prometheus for data about the stack
+* metrictank to see data in metrictank
+* graphite to see data in metrictank via graphite
+  
+When using [fakemetrics](https://github.com/raintank/fakemetrics) to generate data you should now use kafka
+* `fakemetrics feed --kafka-mdm-addr localhost:9092`
+* stats will still show up under `some.id.of.a.metric.*`
 
 If anything doesn't work, please let us know via a ticket on github or reach out on slack. See
 [Community](https://github.com/grafana/metrictank/blob/master/docs/community.md)
@@ -158,7 +115,3 @@ To clean up all data so you can start fresh, run this after you stopped the stac
 docker rm -v $(docker ps -a -q -f status=exited)
 ```
 This will remove the stopped containers and their data volumes.
-
-## Other docker stacks
-
-The metrictank repository holds other stack configurations as well (for testing, benchmarking, etc). See [devdocs/docker](../devdocs/docker.md) for more info.
