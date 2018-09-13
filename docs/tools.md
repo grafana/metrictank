@@ -350,8 +350,8 @@ Flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
     	cassandra keyspace to use for storing the metric data table (default "metrictank")
-  -cassandra-omit-read-timeout int
-    	if a read is older than this, it will directly be omitted without executing (default 60)
+  -cassandra-omit-read-timeout string
+    	if a read is older than this, it will directly be omitted without executing (default "60s")
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
@@ -596,8 +596,8 @@ global config flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
     	cassandra keyspace to use for storing the metric data table (default "metrictank")
-  -cassandra-omit-read-timeout int
-    	if a read is older than this, it will directly be omitted without executing (default 60)
+  -cassandra-omit-read-timeout string
+    	if a read is older than this, it will directly be omitted without executing (default "60s")
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
