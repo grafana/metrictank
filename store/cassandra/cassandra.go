@@ -111,10 +111,10 @@ func PrepareChunkData(span uint32, data []byte) []byte {
 
 // the timeout value used to be an integer specifying the number of milliseconds
 // we want to convert it to a duration string, but we need to stay backwards-compatible for now
-func ConvertTimeout(timeout string) time.Duration {
+func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	if timeoutI, err := strconv.Atoi(timeout); err == nil {
 		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
-		return time.Duration(timeoutI) * time.Millisecond
+		return time.Duration(timeoutI) * defaultUnit
 	} else {
 		timeoutD, err := time.ParseDuration(timeout)
 		if err != nil {
@@ -142,7 +142,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		}
 	}
 
-	cluster.Timeout = ConvertTimeout(config.Timeout)
+	cluster.Timeout = ConvertTimeout(config.Timeout, time.Millisecond)
 	cluster.Consistency = gocql.ParseConsistency(config.Consistency)
 	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = config.WriteConcurrency
@@ -247,7 +247,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		writeQueues:      make([]chan *mdata.ChunkWriteRequest, config.WriteConcurrency),
 		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
 		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
-		omitReadTimeout:  time.Duration(config.OmitReadTimeout) * time.Second,
+		omitReadTimeout:  ConvertTimeout(config.OmitReadTimeout, time.Second),
 		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		timeout:          cluster.Timeout,

@@ -69,16 +69,17 @@ func TestGetTTLTables(t *testing.T) {
 }
 
 func TestBackwardsCompatibleTimeout(t *testing.T) {
-	checkTimeout := func(input string, expected time.Duration) {
-		timeoutD := ConvertTimeout(input)
+	checkTimeout := func(input string, expected, defaultUnit time.Duration) {
+		timeoutD := ConvertTimeout(input, defaultUnit)
 		if timeoutD != expected {
 			t.Fatalf("expected time %s but got %s from input %s", expected.String(), timeoutD.String(), input)
 		}
 	}
 
-	checkTimeout("3500", time.Duration(3500)*time.Millisecond)
-	checkTimeout("3500ms", time.Duration(3500)*time.Millisecond)
-	checkTimeout("3.5s", time.Duration(3500)*time.Millisecond)
+	checkTimeout("3500", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("3500ms", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("3.5s", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("35", time.Duration(35)*time.Hour, time.Hour)
 }
 
 // copied from https://blog.antoine-augusti.fr/2015/12/testing-an-os-exit-scenario-in-golang/
@@ -86,7 +87,7 @@ func TestBackwardsCompatibleTimeoutFatalIfInvalid(t *testing.T) {
 	if os.Getenv("CONVERT_INVALID_TIMEOUT") == "1" {
 		log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, log.DEBUG))
 		defer log.Close()
-		ConvertTimeout("invalid")
+		ConvertTimeout("invalid", time.Millisecond)
 		return
 	}
 

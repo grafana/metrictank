@@ -98,7 +98,7 @@ func NewCassandraStore() (*gocql.Session, error) {
 		}
 	}
 	cluster.Consistency = gocql.ParseConsistency(*cassandraConsistency)
-	cluster.Timeout = cassandra.ConvertTimeout(*cassandraTimeout)
+	cluster.Timeout = cassandra.ConvertTimeout(*cassandraTimeout, time.Millisecond)
 	cluster.NumConns = *cassandraConcurrency
 	cluster.ProtoVersion = *cqlProtocolVersion
 	cluster.Keyspace = *cassandraKeyspace
