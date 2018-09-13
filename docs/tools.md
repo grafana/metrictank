@@ -72,6 +72,8 @@ global config flags:
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
     	only show metrics that have this prefix
+  -regex string
+    	only show metrics that match this regex
   -substr string
     	only show metrics that have this substring
   -suffix string
