@@ -1,6 +1,7 @@
 package out
 
 import (
+	"log"
 	"math/rand"
 	"strings"
 )
@@ -18,6 +19,9 @@ func pattern(in string) string {
 		// note that in 1/5 cases, nothing happens
 		// and otherwise, sometimes valid patterns are produced,
 		// but it's also possible to produce patterns that won't match anything (if '.' was taken out)
+		if len(in) < 5 {
+			log.Fatalf("metric %q too short for pattern replacement", in)
+		}
 		chars := rand.Intn(5)
 		pos := rand.Intn(len(in) - chars)
 		return in[0:pos] + "*" + in[pos+chars:]

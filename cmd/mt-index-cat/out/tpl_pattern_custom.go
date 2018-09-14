@@ -2,6 +2,7 @@ package out
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"strings"
@@ -99,6 +100,9 @@ func Passthrough(in string) string {
 func ReplaceRandomConsecutiveNodesWildcard(num int) func(in string) string {
 	return func(in string) string {
 		parts := strings.Split(in, ".")
+		if len(parts) < num {
+			log.Fatalf("metric %q has not enough nodes to replace %d nodes", in, num)
+		}
 		pos := rand.Intn(len(parts) - num + 1)
 		for i := pos; i < pos+num; i++ {
 			parts[pos] = "*"
@@ -119,6 +123,9 @@ func ReplaceRandomConsecutiveCharsWildcard(num int) func(in string) string {
 		// let's say it's 12, so:
 		//             ^
 		// abcd.fghi.kl + ** + .qrs.uvwx.z
+		if len(in) < num {
+			log.Fatalf("metric %q not long enough to replace %d characters", in, num)
+		}
 		pos := rand.Intn(len(in) - num + 1)
 		return in[0:pos] + strings.Repeat("*", num) + in[pos+num:]
 	}
