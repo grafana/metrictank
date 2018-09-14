@@ -109,20 +109,18 @@ func PrepareChunkData(span uint32, data []byte) []byte {
 	return buf.Bytes()
 }
 
-// the Timeout value used to be an integer specifying the number of milliseconds
-// same for the OmitReadTimeout, but it used to be specified in seconds
-// we want to convert them to a duration string, but we need to stay backwards-compatible for now
+// ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
+// while also allowing them to be specified as durations.
 func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	if timeoutI, err := strconv.Atoi(timeout); err == nil {
 		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
 		return time.Duration(timeoutI) * defaultUnit
-	} else {
-		timeoutD, err := time.ParseDuration(timeout)
-		if err != nil {
-			log.Fatal(1, "cassandra_store: invalid duration value \"%s\"", timeout)
-		}
-		return timeoutD
 	}
+	timeoutD, err := time.ParseDuration(timeout)
+	if err != nil {
+		log.Fatal(1, "cassandra_store: invalid duration value \"%s\"", timeout)
+	}
+	return timeoutD
 }
 
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
