@@ -55,6 +55,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 
 * [Overview](https://github.com/grafana/metrictank/blob/master/docs/overview.md)
 * [Quick start using docker](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker.md)
+  ([other docker stacks](docs/docker.md))
 * [Installation guides](https://github.com/grafana/metrictank/blob/master/docs/installation.md)
 * [Configuration](https://github.com/grafana/metrictank/blob/master/docs/config.md)
 * [Memory server](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md)

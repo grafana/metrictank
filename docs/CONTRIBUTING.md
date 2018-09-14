@@ -44,6 +44,6 @@ see the [Makefile](../Makefile) for more targets
 
 # Documentation
 
-* [docs](../docs) for users and operators
-* [devdocs](../devdocs) for MT developers
+* [docs](../docs) for users, operators and basic development instructions
+* [devdocs](../devdocs) in-depth implementation details for developers
 

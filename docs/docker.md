@@ -17,6 +17,8 @@ plain, basic environment.
 uses metrictank docker image (with baked in binaries and configs), statsdaemon.
 Comes with 1 dashboard: the metrictank dashboard
 
+[see our quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker.md)
+
 ### docker-dev
 
 Similar to docker-standard, but custom metrictank build is loaded, custom configs from scripts/config
@@ -44,6 +46,8 @@ Similar to docker-dev-custom-cfg-kafka
 
 * uses a cluster of 4 MT's (with 2x replication)
 * separate graphite monitoring server
+
+[see our docker-cluster quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker-cluster.md)
 
 ### docker-chaos
 
