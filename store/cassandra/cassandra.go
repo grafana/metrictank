@@ -109,6 +109,20 @@ func PrepareChunkData(span uint32, data []byte) []byte {
 	return buf.Bytes()
 }
 
+// ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
+// while also allowing them to be specified as durations.
+func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
+	if timeoutI, err := strconv.Atoi(timeout); err == nil {
+		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
+		return time.Duration(timeoutI) * defaultUnit
+	}
+	timeoutD, err := time.ParseDuration(timeout)
+	if err != nil {
+		log.Fatal(1, "cassandra_store: invalid duration value %q", timeout)
+	}
+	return timeoutD
+}
+
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)
@@ -126,8 +140,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 			Password: config.Password,
 		}
 	}
+
+	cluster.Timeout = ConvertTimeout(config.Timeout, time.Millisecond)
 	cluster.Consistency = gocql.ParseConsistency(config.Consistency)
-	cluster.Timeout = time.Duration(config.Timeout) * time.Millisecond
 	cluster.ConnectTimeout = cluster.Timeout
 	cluster.NumConns = config.WriteConcurrency
 	cluster.ProtoVersion = config.CqlProtocolVersion
@@ -231,7 +246,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		writeQueues:      make([]chan *mdata.ChunkWriteRequest, config.WriteConcurrency),
 		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
 		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
-		omitReadTimeout:  time.Duration(config.OmitReadTimeout) * time.Second,
+		omitReadTimeout:  ConvertTimeout(config.OmitReadTimeout, time.Second),
 		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		timeout:          cluster.Timeout,

@@ -298,8 +298,8 @@ Flags:
     	how many times to retry a query before failing it
   -cassandra-ssl
     	enable SSL connection to cassandra
-  -cassandra-timeout int
-    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-timeout string
+    	cassandra timeout (default "1s")
   -cassandra-username string
     	username for authentication (default "cassandra")
   -cql-protocol-version int
@@ -350,8 +350,8 @@ Flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
     	cassandra keyspace to use for storing the metric data table (default "metrictank")
-  -cassandra-omit-read-timeout int
-    	if a read is older than this, it will directly be omitted without executing (default 60)
+  -cassandra-omit-read-timeout string
+    	if a read is older than this, it will directly be omitted without executing (default "60s")
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
@@ -364,8 +364,8 @@ Flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
-  -cassandra-timeout int
-    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-timeout string
+    	cassandra timeout (default "1s")
   -cassandra-username string
     	username for authentication (default "cassandra")
   -config string
@@ -431,8 +431,8 @@ Flags:
     	how many times to retry a query before failing it
   -cassandra-ssl
     	enable SSL connection to cassandra
-  -cassandra-timeout int
-    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-timeout string
+    	cassandra timeout (default "1s")
   -cassandra-username string
     	username for authentication (default "cassandra")
   -cql-protocol-version int
@@ -498,8 +498,8 @@ Flags:
     	how many times to retry a query before failing it
   -cassandra-ssl
     	enable SSL connection to cassandra
-  -cassandra-timeout int
-    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-timeout string
+    	cassandra timeout (default "1s")
   -cassandra-username string
     	username for authentication (default "cassandra")
   -cql-protocol-version int
@@ -596,8 +596,8 @@ global config flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
     	cassandra keyspace to use for storing the metric data table (default "metrictank")
-  -cassandra-omit-read-timeout int
-    	if a read is older than this, it will directly be omitted without executing (default 60)
+  -cassandra-omit-read-timeout string
+    	if a read is older than this, it will directly be omitted without executing (default "60s")
   -cassandra-password string
     	password for authentication (default "cassandra")
   -cassandra-read-concurrency int
@@ -610,8 +610,8 @@ global config flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -cassandra-ssl
     	enable SSL connection to cassandra
-  -cassandra-timeout int
-    	cassandra timeout in milliseconds (default 1000)
+  -cassandra-timeout string
+    	cassandra timeout (default "1s")
   -cassandra-username string
     	username for authentication (default "cassandra")
   -cassandra-window-factor int

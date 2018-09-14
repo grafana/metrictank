@@ -2,8 +2,15 @@ package cassandra
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/raintank/worldping-api/pkg/log"
 )
 
 type testCase struct {
@@ -58,5 +65,48 @@ func TestGetTTLTables(t *testing.T) {
 		if result[tc.ttl].WindowSize != tc.expectedWindowSize {
 			t.Fatalf("%s expected window size %d, got %d", logPrefix, tc.expectedWindowSize, result[tc.ttl].WindowSize)
 		}
+	}
+}
+
+func TestBackwardsCompatibleTimeout(t *testing.T) {
+	checkTimeout := func(input string, expected, defaultUnit time.Duration) {
+		timeoutD := ConvertTimeout(input, defaultUnit)
+		if timeoutD != expected {
+			t.Fatalf("expected time %s but got %s from input %s", expected.String(), timeoutD.String(), input)
+		}
+	}
+
+	checkTimeout("3500", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("3500ms", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("3.5s", time.Duration(3500)*time.Millisecond, time.Millisecond)
+	checkTimeout("35", time.Duration(35)*time.Hour, time.Hour)
+}
+
+// copied from https://blog.antoine-augusti.fr/2015/12/testing-an-os-exit-scenario-in-golang/
+func TestBackwardsCompatibleTimeoutFatalIfInvalid(t *testing.T) {
+	if os.Getenv("CONVERT_INVALID_TIMEOUT") == "1" {
+		log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, log.DEBUG))
+		defer log.Close()
+		ConvertTimeout("invalid", time.Millisecond)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestBackwardsCompatibleTimeoutFatalIfInvalid")
+	cmd.Env = append(os.Environ(), "CONVERT_INVALID_TIMEOUT=1")
+	stdout, _ := cmd.StderrPipe()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	gotBytes, _ := ioutil.ReadAll(stdout)
+	got := string(gotBytes)
+	expected := "cassandra_store: invalid duration value \"invalid\""
+	if !strings.HasSuffix(got[:len(got)-1], expected) {
+		t.Fatalf("Unexpected log message. Expected message to contain \"%s\" but got \"%s\"", expected, got)
+	}
+
+	err := cmd.Wait()
+	if e, ok := err.(*exec.ExitError); !ok || e.Success() {
+		t.Fatalf("Process ran with err %v, want exit status 1", err)
 	}
 }

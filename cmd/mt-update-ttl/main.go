@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
 	"github.com/raintank/dur"
 )
@@ -23,7 +24,7 @@ var (
 	cassandraKeyspace            = flag.String("cassandra-keyspace", "metrictank", "cassandra keyspace to use for storing the metric data table")
 	cassandraConsistency         = flag.String("cassandra-consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cassandraHostSelectionPolicy = flag.String("cassandra-host-selection-policy", "tokenaware,hostpool-epsilon-greedy", "")
-	cassandraTimeout             = flag.Int("cassandra-timeout", 1000, "cassandra timeout in milliseconds")
+	cassandraTimeout             = flag.String("cassandra-timeout", "1s", "cassandra timeout")
 	cassandraConcurrency         = flag.Int("cassandra-concurrency", 20, "max number of concurrent reads to cassandra.")
 	cassandraRetries             = flag.Int("cassandra-retries", 0, "how many times to retry a query before failing it")
 	cqlProtocolVersion           = flag.Int("cql-protocol-version", 4, "cql protocol version to use")
@@ -97,7 +98,7 @@ func NewCassandraStore() (*gocql.Session, error) {
 		}
 	}
 	cluster.Consistency = gocql.ParseConsistency(*cassandraConsistency)
-	cluster.Timeout = time.Duration(*cassandraTimeout) * time.Millisecond
+	cluster.Timeout = cassandra.ConvertTimeout(*cassandraTimeout, time.Millisecond)
 	cluster.NumConns = *cassandraConcurrency
 	cluster.ProtoVersion = *cqlProtocolVersion
 	cluster.Keyspace = *cassandraKeyspace

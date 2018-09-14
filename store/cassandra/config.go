@@ -11,14 +11,14 @@ type StoreConfig struct {
 	Keyspace                 string
 	Consistency              string
 	HostSelectionPolicy      string
-	Timeout                  int
+	Timeout                  string
 	ReadConcurrency          int
 	WriteConcurrency         int
 	ReadQueueSize            int
 	WriteQueueSize           int
 	Retries                  int
 	WindowFactor             int
-	OmitReadTimeout          int
+	OmitReadTimeout          string
 	CqlProtocolVersion       int
 	CreateKeyspace           bool
 	DisableInitialHostLookup bool
@@ -38,14 +38,14 @@ func NewStoreConfig() *StoreConfig {
 		Keyspace:                 "metrictank",
 		Consistency:              "one",
 		HostSelectionPolicy:      "tokenaware,hostpool-epsilon-greedy",
-		Timeout:                  1000,
+		Timeout:                  "1s",
 		ReadConcurrency:          20,
 		WriteConcurrency:         10,
 		ReadQueueSize:            200000,
 		WriteQueueSize:           100000,
 		Retries:                  0,
 		WindowFactor:             20,
-		OmitReadTimeout:          60,
+		OmitReadTimeout:          "60s",
 		CqlProtocolVersion:       4,
 		CreateKeyspace:           true,
 		DisableInitialHostLookup: false,
@@ -67,14 +67,14 @@ func ConfigSetup() *flag.FlagSet {
 	cas.StringVar(&CliConfig.Keyspace, "keyspace", CliConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
 	cas.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	cas.StringVar(&CliConfig.HostSelectionPolicy, "host-selection-policy", CliConfig.HostSelectionPolicy, "")
-	cas.IntVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra timeout in milliseconds")
+	cas.StringVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra timeout")
 	cas.IntVar(&CliConfig.ReadConcurrency, "read-concurrency", CliConfig.ReadConcurrency, "max number of concurrent reads to cassandra.")
 	cas.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "max number of concurrent writes to cassandra.")
 	cas.IntVar(&CliConfig.ReadQueueSize, "read-queue-size", CliConfig.ReadQueueSize, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
 	cas.IntVar(&CliConfig.WriteQueueSize, "write-queue-size", CliConfig.WriteQueueSize, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
 	cas.IntVar(&CliConfig.Retries, "retries", CliConfig.Retries, "how many times to retry a query before failing it")
 	cas.IntVar(&CliConfig.WindowFactor, "window-factor", CliConfig.WindowFactor, "size of compaction window relative to TTL")
-	cas.IntVar(&CliConfig.OmitReadTimeout, "omit-read-timeout", CliConfig.OmitReadTimeout, "if a read is older than this (in seconds), it will be omitted,  not executed")
+	cas.StringVar(&CliConfig.OmitReadTimeout, "omit-read-timeout", CliConfig.OmitReadTimeout, "if a read is older than this, it will be omitted,  not executed")
 	cas.IntVar(&CliConfig.CqlProtocolVersion, "cql-protocol-version", CliConfig.CqlProtocolVersion, "cql protocol version to use")
 	cas.BoolVar(&CliConfig.CreateKeyspace, "create-keyspace", CliConfig.CreateKeyspace, "enable the creation of the mdata keyspace and tables, only one node needs this")
 	cas.BoolVar(&CliConfig.DisableInitialHostLookup, "disable-initial-host-lookup", CliConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
