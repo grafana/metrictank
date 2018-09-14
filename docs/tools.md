@@ -149,8 +149,8 @@ patternCustom: transforms a graphite.style.metric.name into a pattern with wildc
          the chances need to add up to 100
          operation is one of:
          pass         (passthrough)
-         <number>rcnw (replace number random consecutive nodes with wildcards
-         <number>rccw (replace number random consecutive characters with wildcards
+         <number>rcnw (replace <number> random consecutive nodes with wildcards
+         <number>rccw (replace <number> random consecutive characters with wildcards
 age: subtracts the passed integer (typically .LastUpdate) from the query time
 roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 EXAMPLES:
