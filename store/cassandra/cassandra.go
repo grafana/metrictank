@@ -118,7 +118,7 @@ func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	}
 	timeoutD, err := time.ParseDuration(timeout)
 	if err != nil {
-		log.Fatal(1, "cassandra_store: invalid duration value \"%s\"", timeout)
+		log.Fatal(1, "cassandra_store: invalid duration value %q", timeout)
 	}
 	return timeoutD
 }
