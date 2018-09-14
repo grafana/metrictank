@@ -28,7 +28,7 @@ func patternCustom(in ...interface{}) string {
 		os.Exit(-1)
 	}
 
-	// we one or more of "<chance> <operation>" followed by an input string at the end.
+	// one or more of "<chance> <operation>" followed by an input string at the end.
 	if len(in) < 3 || len(in)%2 != 1 {
 		usage()
 	}
