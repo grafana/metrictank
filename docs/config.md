@@ -113,8 +113,8 @@ write-queue-size = 100000
 retries = 0
 # size of compaction window relative to TTL
 window-factor = 20
-# if a read is older than this (in seconds), it will be omitted,  not executed
-omit-read-timeout = 60
+# if a read is older than this, it will be omitted, not executed
+omit-read-timeout = 60s
 # CQL protocol version. cassandra 3.x needs v3 or 4.
 cql-protocol-version = 4
 # enable the creation of the mdata keyspace and tables, only one node needs this
