@@ -1,5 +1,9 @@
 # Quick start for docker-cluster
 
+The metrictank repository holds various stack configurations. See [docker](docker.md) for more info.
+If you're not familiar with Grafana dashboarding and datasources, you should first follow
+[our standard quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker.md) which goes further in depth on that.
+
 The docker-cluster image is similar to docker-standard, but with the following changes and features:
 
 * Cluster of 4 metrictanks (with 2x replication)

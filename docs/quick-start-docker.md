@@ -171,4 +171,4 @@ This will remove the stopped containers and their data volumes.
 
 ## Other docker stacks
 
-The metrictank repository holds other stack configurations as well (for clustering, benchmarking, etc). See [devdocs/docker](../devdocs/docker.md) for more info.
+The metrictank repository holds other stack configurations as well (for clustering, benchmarking, etc). See [docker](docker.md) for more info.
