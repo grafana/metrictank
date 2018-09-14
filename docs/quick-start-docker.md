@@ -1,14 +1,27 @@
 # Quick start using Docker
 
-[Docker](docker.io) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
+This quick start covers a minimal setup without clustering, if you would prefer to use a cluster please follow the [docker-cluster quick start](quick-start-docker-cluster.md)
+
+
+[Docker](https://www.docker.com) is a toolkit and a daemon which makes running foreign applications convenient, via containers.
+
+
 This tutorial will help you run metrictank, its dependencies, and grafana for dashboarding, with minimal hassle.
 
-[docker installation instructions](https://www.docker.com/products/overview)  
+## Install Docker
+
+[Docker installation instructions](https://docs.docker.com/install/)  
 You will also need to install version >=1.6 of [docker-compose](https://docs.docker.com/compose/)
+
+## Optional: install Go
+
+[GO installation instructions](https://golang.org/doc/install)
+
+Ensure that `$GOPATH/bin` is added to your `$PATH`
 
 ## Getting the repository
 
-If you already have go installed, you can just: 
+If you already have Go installed, you can just: 
 
 ```
 go get github.com/grafana/metrictank/...
@@ -24,7 +37,7 @@ cd metrictank
 
 If you have neither, just [download the zip](https://github.com/grafana/metrictank/archive/master.zip), extract it somewhere and cd into the metrictank directory.
 
-## Bring up the stack
+## Bring up the stack (docker-standard)
 
 The stack will listen on the following ports:
 
@@ -35,7 +48,7 @@ The stack will listen on the following ports:
 * 8125 udp (statsd endpoint)
 * 9042 tcp (cassandra)
 
-If you already have something else listen to that port (such as a carbon or grafana server), shut it down, as it will conflict.
+If you already have something else listening on those ports (such as a carbon or grafana server), shut it down, as it will conflict.
 
 
 Inside your copy of the repository, you can bring up the stack like so:
@@ -71,19 +84,22 @@ If you're running Docker engine natively, you can connect using `localhost`. If 
 
 ```
 $ curl http://localhost:6060/node
+```
+Output will be similar to the following:
+```
 {"name":"default","version":"0.9.0-342-g9c5a12c","primary":true,"primaryChange":"2018-09-07T19:29:10.200078519Z","state":"NodeReady","priority":0,"started":"2018-09-07T19:29:10.196587689Z","stateChange":"2018-09-07T19:29:10.200078795Z","partitions":[0],"apiPort":6060,"apiScheme":"http","updated":"2018-09-07T19:29:11.26049517Z","remoteAddr":""}
 ```
 
 ## Working with Grafana and metrictank
 
-In your browser, open Grafana at `http://localhost:3000` (or your docker-machine address) and log in as `admin:admin`.  
-If grafana prompts to change the password, you can skip it, since it doesn't matter for a local test setup.  
+In your browser, open Grafana at http://localhost:3000 (or your docker-machine address) and log in as `admin:admin`.  
+If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.  
 
 ### Sending and visualizing data
 
 In the "+" (Create) menu, hit `Dashboard`.  
 This opens the dashboard editor and has a selector open to add a new panel.  Hit "Graph" for graph panel.  
-The panel will appear but not contain data yet.  ([Grafana documentation for graph panel](http://docs.grafana.org/features/panels/graph/))
+The panel will appear but not contain data yet.  ([Grafana documentation for graph panel](http://docs.grafana.org/features/panels/graph/)).
 Click on the title of the panel and hit 'edit'.
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
