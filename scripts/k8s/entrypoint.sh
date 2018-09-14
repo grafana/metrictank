@@ -11,9 +11,9 @@ fi
 
 # set any GO environment variables (which we allow to be passed in as MT_GO<foo>
 
-while read var val; do
-	export $var=$val
-done < <(env | sed -n '/^MT_GO/s/=/ /p' | sed 's/MT_//')
+for line in $(env | sed -n '/^MT_GO/s/MT_//p'); do
+	export $line
+done
 
 # set offsets
 if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xauto" ]; then
