@@ -9,6 +9,12 @@ if ! mkdir -p $MT_PROFTRIGGER_PATH; then
 	exit 1
 fi
 
+# set any GO environment variables (which we allow to be passed in as MT_GO<foo>
+
+while read var val; do
+	export $var=$val
+done < <(env | sed -n '/^MT_GO/s/=/ /p' | sed 's/MT_//')
+
 # set offsets
 if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xauto" ]; then
   export MT_KAFKA_MDM_IN_OFFSET=$(/getOffset.py $MT_KAFKA_MDM_IN_TOPICS)
