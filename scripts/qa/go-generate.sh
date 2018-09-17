@@ -18,7 +18,7 @@ fi
 
 go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp
 
-go generate $(go list ./... | grep -v /vendor/)
+go generate ./...
 out=$(git status --short)
 [ -z "$out" ] && echo "all good" && exit 0
 
@@ -31,5 +31,5 @@ git --no-pager diff
 
 echo "You should probably run:"
 echo "go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp"
-echo 'go generate $(go list ./... | grep -v /vendor/)'
+echo 'go generate ./...'
 exit 2
