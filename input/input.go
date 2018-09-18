@@ -11,7 +11,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 type Handler interface {
@@ -64,7 +64,9 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 	}
 	if !point.Valid() {
 		in.invalidMP.Inc()
-		log.Debug("in: Invalid metric %v", point)
+		log.WithFields(log.Fields{
+			"point": point,
+		}).Debug("in: invalid metric")
 		return
 	}
 
@@ -86,18 +88,26 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	err := md.Validate()
 	if err != nil {
 		in.invalidMD.Inc()
-		log.Debug("in: Invalid metric %v: %s", md, err)
+		log.WithFields(log.Fields{
+			"metric.data": md,
+			"error":       err.Error(),
+		}).Debug("in: invalid metric")
 		return
 	}
 	if md.Time == 0 {
 		in.invalidMD.Inc()
-		log.Warn("in: invalid metric. metric.Time is 0. %s", md.Id)
+		log.WithFields(log.Fields{
+			"id": md.Id,
+		}).Warn("in: invalid metric, metric.Time is 0")
 		return
 	}
 
 	mkey, err := schema.MKeyFromString(md.Id)
 	if err != nil {
-		log.Error(3, "in: Invalid metric %v: could not parse ID: %s", md, err)
+		log.WithFields(log.Fields{
+			"metric.data": md,
+			"error":       err.Error(),
+		}).Error("in: invalid metric, could not parse id")
 		return
 	}
 

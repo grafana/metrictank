@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/util"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 type NotifierKafka struct {
@@ -38,22 +38,30 @@ type NotifierKafka struct {
 func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster failed to start client: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafka-cluster: failed to start client")
 	}
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster failed to initialize consumer: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafka-cluster: failed to initialize consumer")
 	}
-	log.Info("kafka-cluster consumer initialized without error")
+	log.Info("kafka-cluster: consumer initialized without error")
 
 	producer, err := sarama.NewSyncProducerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster failed to initialize producer: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafka-cluster: failed to intialize producer")
 	}
 
 	offsetMgr, err := kafka.NewOffsetMgr(dataDir)
 	if err != nil {
-		log.Fatal(2, "kafka-cluster couldnt create offsetMgr. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafka-cluster: couldn't create offset manager")
 	}
 
 	c := NotifierKafka{
@@ -90,13 +98,21 @@ func (c *NotifierKafka) start() {
 		case "last":
 			offset, err = c.offsetMgr.Last(topic, partition)
 			if err != nil {
-				log.Fatal(4, "kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+				log.WithFields(log.Fields{
+					"offset":    offsetStr,
+					"topic":     topic,
+					"partition": partition,
+					"error":     err.Error(),
+				}).Fatal("kafka-cluster: failed to get offset duration")
 			}
 		default:
 			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 			if err != nil {
 				offset = sarama.OffsetOldest
-				log.Warn("kafka-cluster failed to get offset %s: %s -> will use oldest instead", offsetDuration, err)
+				log.WithFields(log.Fields{
+					"offset.duration": offsetDuration,
+					"error":           err.Error(),
+				}).Warn("kafka-cluster: failed to get offset, will use oldest instead")
 			}
 		}
 		partitionLogSize[partition].Set(int(bootTimeOffsets[partition]))
@@ -120,9 +136,13 @@ func (c *NotifierKafka) start() {
 
 	select {
 	case <-time.After(backlogProcessTimeout):
-		log.Warn("kafka-cluster: Processing metricPersist backlog has taken too long, giving up lock after %s.", backlogProcessTimeout)
+		log.WithFields(log.Fields{
+			"backlog.timeout": backlogProcessTimeout,
+		}).Warn("kafka-cluster: processing metricPersist backlog has taken too long, giving up lock")
 	case <-backlogProcessed:
-		log.Info("kafka-cluster: metricPersist backlog processed in %s.", time.Since(pre))
+		log.WithFields(log.Fields{
+			"time.taken": time.Since(pre),
+		}).Info("kafka-cluster: metricPersist backlog processed")
 	}
 
 }
@@ -133,9 +153,17 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 
 	pc, err := c.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
-		log.Fatal(4, "kafka-cluster: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+		log.WithFields(log.Fields{
+			"topic":     topic,
+			"partition": partition,
+			"error":     err.Error(),
+		}).Fatal("kafka-cluster: failed to start partitionConsumer")
 	}
-	log.Info("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, currentOffset)
+	log.WithFields(log.Fields{
+		"topic":     topic,
+		"partition": partition,
+		"offset":    currentOffset,
+	}).Info("kafka-cluster: consuming from offset")
 
 	messages := pc.Messages()
 	ticker := time.NewTicker(offsetCommitInterval)
@@ -149,14 +177,21 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 	for {
 		select {
 		case msg := <-messages:
-			if mdata.LogLevel < 2 {
-				log.Debug("kafka-cluster received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-			}
+			log.WithFields(log.Fields{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+				"key":       msg.Key,
+			}).Debug("kafka-cluster: received message")
 			mdata.Handle(c.metrics, msg.Value, c.idx)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+					"error":     err.Error(),
+				}).Error("kafka-cluster: failed to commit offset")
 			}
 			if startingUp && currentOffset >= bootTimeOffset {
 				processBacklog.Done()
@@ -164,7 +199,11 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			}
 			offset, err := c.client.GetOffset(topic, partition, sarama.OffsetNewest)
 			if err != nil {
-				log.Error(3, "kafka-mdm failed to get log-size of partition %s:%d. %s", topic, partition, err)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+					"error":     err.Error(),
+				}).Error("kafkamdm: failed to get log-size of partition")
 			} else {
 				partitionLogSizeMetric.Set(int(offset))
 			}
@@ -179,9 +218,16 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 		case <-c.stopConsuming:
 			pc.Close()
 			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-cluster failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+					"err":       err.Error(),
+				}).Error("kafka-cluster: failed to commit offset")
 			}
-			log.Info("kafka-cluster consumer for %s:%d ended.", topic, partition)
+			log.WithFields(log.Fields{
+				"topic":     topic,
+				"partition": partition,
+			}).Info("kafka-cluster: consumer ended")
 			return
 		}
 	}
@@ -235,13 +281,17 @@ func (c *NotifierKafka) flush() {
 	for i, msg := range c.buf {
 		amkey, err := schema.AMKeyFromString(msg.Key)
 		if err != nil {
-			log.Error(3, "kafka-cluster: failed to parse key %q", msg.Key)
+			log.WithFields(log.Fields{
+				"key": msg.Key,
+			}).Error("kafka-cluster: failed to parse key")
 			continue
 		}
 
 		def, ok := c.idx.Get(amkey.MKey)
 		if !ok {
-			log.Error(3, "kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
+			log.WithFields(log.Fields{
+				"key": msg.Key,
+			}).Error("kafka-cluster: failed to lookup metricDef")
 			continue
 		}
 		buf := bytes.NewBuffer(c.bPool.Get())
@@ -250,7 +300,7 @@ func (c *NotifierKafka) flush() {
 		pMsg = mdata.PersistMessageBatch{Instance: c.instance, SavedChunks: c.buf[i : i+1]}
 		err = encoder.Encode(&pMsg)
 		if err != nil {
-			log.Fatal(4, "kafka-cluster failed to marshal persistMessage to json.")
+			log.Fatal("kafka-cluster: failed to marshal persistMessage to json.")
 		}
 		messagesSize.Value(buf.Len())
 		kafkaMsg := &sarama.ProducerMessage{
@@ -264,12 +314,16 @@ func (c *NotifierKafka) flush() {
 	c.buf = nil
 
 	go func() {
-		log.Debug("kafka-cluster sending %d batch metricPersist messages", len(payload))
+		log.WithFields(log.Fields{
+			"num.messages": len(payload),
+		}).Debug("kafka-cluster: sending batch metricPersist messages")
 		sent := false
 		for !sent {
 			err := c.producer.SendMessages(payload)
 			if err != nil {
-				log.Warn("kafka-cluster publisher %s", err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Warn("kafka-cluster: publisher")
 			} else {
 				sent = true
 			}

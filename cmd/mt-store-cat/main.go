@@ -11,9 +11,10 @@ import (
 
 	"github.com/raintank/schema"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	opentracing "github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
@@ -63,6 +64,13 @@ func main() {
 	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
 	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
 	flag.StringVar(&storeConfig.SchemaFile, "cassandra-schema-file", storeConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
 
 	flag.Usage = func() {
 		fmt.Println("mt-store-cat")
@@ -135,14 +143,16 @@ func main() {
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
-		log.Fatal(4, "error with configuration file: %s", err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("error with configuration file")
 		os.Exit(1)
 	}
 
 	config.ParseAll()
 
 	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
-		log.Fatal(4, "groupTTL must be one of s/m/h/d")
+		log.Fatal("groupTTL must be one of s/m/h/d")
 		os.Exit(1)
 	}
 
@@ -159,30 +169,41 @@ func main() {
 		var err error
 		loc, err = time.LoadLocation(*timeZoneStr)
 		if err != nil {
-			log.Fatal(err)
+			log.WithFields(log.Fields{
+				"error":     err.Error(),
+				"time.zone": *timeZoneStr,
+			}).Fatal("failed to load time zone")
 		}
 	}
 
 	store, err := cassandra.NewCassandraStore(storeConfig, nil)
 	if err != nil {
-		log.Fatal(4, "failed to initialize cassandra. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to initialize cassandra")
 	}
 	tracer, traceCloser, err := conf.GetTracer(false, "", nil)
 	if err != nil {
-		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to initialize jaeger tracer")
 	}
 	defer traceCloser.Close()
 	store.SetTracer(tracer)
 
 	err = store.FindExistingTables(storeConfig.Keyspace)
 	if err != nil {
-		log.Fatal(4, "failed to read tables from cassandra. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to read tables from cassandra")
 	}
 
 	if tableSelector == "tables" {
 		tables, err := getTables(store, "")
 		if err != nil {
-			log.Fatal(4, "%s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("failed to get tables from cassandra")
 		}
 		for _, table := range tables {
 			fmt.Printf("%s (ttl %d hours)\n", table.Name, table.TTL)
@@ -191,7 +212,10 @@ func main() {
 	}
 	tables, err := getTables(store, tableSelector)
 	if err != nil {
-		log.Fatal(4, "%s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+			"table": tableSelector,
+		}).Fatal("failed to get table from cassandra")
 	}
 
 	var fromUnix, toUnix uint32
@@ -203,12 +227,16 @@ func main() {
 
 		fromUnix, err = dur.ParseDateTime(*from, loc, now, defaultFrom)
 		if err != nil {
-			log.Fatal(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("failed to parse date time")
 		}
 
 		toUnix, err = dur.ParseDateTime(*to, loc, now, defaultTo)
 		if err != nil {
-			log.Fatal(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("failed to parse date time")
 		}
 	}
 	var metrics []Metric
@@ -219,7 +247,9 @@ func main() {
 		if format == "points" || format == "point-summary" {
 			metrics, err = getMetrics(store, "")
 			if err != nil {
-				log.Error(3, "cassandra query error. %s", err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Error("cassandra query error")
 				return
 			}
 		}
@@ -227,7 +257,9 @@ func main() {
 		fmt.Println("# Looking for these metrics:")
 		metrics, err = getMetrics(store, strings.Replace(metricSelector, "prefix:", "", 1))
 		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("cassandra query error")
 			return
 		}
 		for _, m := range metrics {
@@ -236,7 +268,9 @@ func main() {
 	} else {
 		amkey, err := schema.AMKeyFromString(metricSelector)
 		if err != nil {
-			log.Error(3, "can't parse metric selector as AMKey: %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("can't parse metric selector as AMKey")
 			return
 		}
 
@@ -244,7 +278,9 @@ func main() {
 
 		metrics, err = getMetric(store, amkey)
 		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("cassandra query error")
 			return
 		}
 		if len(metrics) == 0 {

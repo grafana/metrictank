@@ -10,6 +10,7 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -690,7 +691,9 @@ func ixFind(b *testing.B, org uint32, q int) {
 	b.Helper()
 	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("error")
 	}
 	if len(nodes) != queries[q].ExpectedResults {
 		for _, n := range nodes {
@@ -764,7 +767,9 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 func ixFindByTag(b *testing.B, org uint32, q int) {
 	series, err := ix.FindByTag(org, tagQueries[q].Expressions, 0)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("error")
 	}
 	if len(series) != tagQueries[q].ExpectedResults {
 		for _, s := range series {

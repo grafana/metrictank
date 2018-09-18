@@ -12,8 +12,8 @@ import (
 	"github.com/raintank/schema/msg"
 
 	"github.com/Shopify/sarama"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
@@ -94,13 +94,13 @@ func ConfigProcess(instance string) {
 	}
 
 	if offsetCommitInterval == 0 {
-		log.Fatal(4, "kafkamdm: offset-commit-interval must be greater then 0")
+		log.Fatal("kafkamdm: offset-commit-interval must be greater then 0")
 	}
 	if consumerMaxWaitTime == 0 {
-		log.Fatal(4, "kafkamdm: consumer-max-wait-time must be greater then 0")
+		log.Fatal("kafkamdm: consumer-max-wait-time must be greater then 0")
 	}
 	if consumerMaxProcessingTime == 0 {
-		log.Fatal(4, "kafkamdm: consumer-max-processing-time must be greater then 0")
+		log.Fatal("kafkamdm: consumer-max-processing-time must be greater then 0")
 	}
 	var err error
 	switch offsetStr {
@@ -110,13 +110,17 @@ func ConfigProcess(instance string) {
 	default:
 		offsetDuration, err = time.ParseDuration(offsetStr)
 		if err != nil {
-			log.Fatal(4, "kafkamdm: invalid offest format. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("kafkamdm: invalid offset format")
 		}
 	}
 
 	offsetMgr, err = kafka.NewOffsetMgr(DataDir)
 	if err != nil {
-		log.Fatal(4, "kafka-mdm couldnt create offsetMgr. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: couldn't create offsetMgr")
 	}
 	brokers = strings.Split(brokerStr, ",")
 	topics = strings.Split(topicStr, ",")
@@ -133,20 +137,28 @@ func ConfigProcess(instance string) {
 	config.Version = sarama.V0_10_0_0
 	err = config.Validate()
 	if err != nil {
-		log.Fatal(2, "kafka-mdm invalid config: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: invalid config")
 	}
 	// validate our partitions
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
-		log.Fatal(4, "kafka-mdm failed to create client. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: failed to create client")
 	}
 	defer client.Close()
 
 	availParts, err := kafka.GetPartitions(client, topics)
 	if err != nil {
-		log.Fatal(4, "kafka-mdm: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: GetPartitions error")
 	}
-	log.Info("kafka-mdm: available partitions %v", availParts)
+	log.WithFields(log.Fields{
+		"available.partitions": availParts,
+	}).Info("kafkamdm: partitions available")
 	if partitionStr == "*" {
 		partitions = availParts
 	} else {
@@ -154,13 +166,17 @@ func ConfigProcess(instance string) {
 		for _, part := range parts {
 			i, err := strconv.Atoi(part)
 			if err != nil {
-				log.Fatal(4, "could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
+				log.WithFields(log.Fields{
+					"partition": part,
+				}).Fatal("kafkamdm: could not parse partition, partitions must be '*' or a comma separated list of id's")
 			}
 			partitions = append(partitions, int32(i))
 		}
 		missing := kafka.DiffPartitions(partitions, availParts)
 		if len(missing) > 0 {
-			log.Fatal(4, "kafka-mdm: configured partitions not in list of available partitions. missing %v", missing)
+			log.WithFields(log.Fields{
+				"missing.partitions": missing,
+			}).Fatal("kafkamdm: configured partitions not in list of available partitions")
 		}
 	}
 	// record our partitions so others (MetricIdx) can use the partitioning information.
@@ -186,13 +202,17 @@ func ConfigProcess(instance string) {
 func New() *KafkaMdm {
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
-		log.Fatal(4, "kafka-mdm failed to create client. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: failed to create client")
 	}
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
-		log.Fatal(2, "kafka-mdm failed to create consumer: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("kafkamdm: failed to create consumer")
 	}
-	log.Info("kafka-mdm consumer created without error")
+	log.Info("kafkamdm: consumer created without error")
 	k := KafkaMdm{
 		consumer:      consumer,
 		client:        client,
@@ -218,14 +238,22 @@ func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) error {
 			case "last":
 				offset, err = offsetMgr.Last(topic, partition)
 				if err != nil {
-					log.Error(4, "kafka-mdm: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
+					log.WithFields(log.Fields{
+						"offset":    offsetStr,
+						"topic":     topic,
+						"partition": partition,
+						"error":     err.Error(),
+					}).Error("kafkamdm: failed to get duration offset")
 					return err
 				}
 			default:
 				offset, err = k.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 				if err != nil {
 					offset = sarama.OffsetOldest
-					log.Warn("kafka-mdm failed to get offset %s: %s -> will use oldest instead", offsetDuration, err)
+					log.WithFields(log.Fields{
+						"offset.duration": offsetDuration,
+						"error":           err.Error(),
+					}).Warn("kafkamdm: failed to get offset, will use oldest instead")
 				}
 			}
 			k.wg.Add(1)
@@ -263,7 +291,9 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 		if attempt == attempts {
 			break
 		}
-		log.Warn("kafka-mdm %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Warn("kafkamdm: error")
 		attempt += 1
 		time.Sleep(sleep)
 	}
@@ -281,7 +311,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	// determine the pos of the topic and the initial offset of our consumer
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
 	if err != nil {
-		log.Error(3, "kafka-mdm %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("kafkamdm: failed to get offset")
 		close(k.fatal)
 		return
 	}
@@ -290,7 +322,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	} else if currentOffset == sarama.OffsetOldest {
 		currentOffset, err = k.tryGetOffset(topic, partition, sarama.OffsetOldest, 7, time.Second*10)
 		if err != nil {
-			log.Error(3, "kafka-mdm %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("kafkamdm: failed to get offset")
 			close(k.fatal)
 			return
 		}
@@ -300,10 +334,18 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	partitionLogSizeMetric.Set(int(newest))
 	partitionLagMetric.Set(int(newest - currentOffset))
 
-	log.Info("kafka-mdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
+	log.WithFields(log.Fields{
+		"topic":          topic,
+		"partition":      partition,
+		"current.offset": currentOffset,
+	}).Info("kafkamdm: consuming")
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
-		log.Error(4, "kafka-mdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
+		log.WithFields(log.Fields{
+			"topic":     topic,
+			"partition": partition,
+			"error":     err.Error(),
+		}).Error("kafkamdm: failed to start partitionConsumer")
 		close(k.fatal)
 		return
 	}
@@ -314,26 +356,42 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		case msg, ok := <-messages:
 			// https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions#why-am-i-getting-a-nil-message-from-the-sarama-consumer
 			if !ok {
-				log.Error(3, "kafka-mdm: kafka consumer for %s:%d has shutdown. stop consuming", topic, partition)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+				}).Error("kafkamdm: kafka consumer has shutdown, stop consuming")
 				if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-					log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+					log.WithFields(log.Fields{
+						"topic":     topic,
+						"partition": partition,
+						"error":     err.Error(),
+					}).Error("kafkamdm: failed to commit offset")
 				}
 				close(k.fatal)
 				return
 			}
-			if LogLevel < 2 {
-				log.Debug("kafka-mdm received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-			}
+			log.WithFields(log.Fields{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+				"key":       msg.Key,
+			}).Debug("kafkamdm: received message")
 			k.handleMsg(msg.Value, partition)
 			currentOffset = msg.Offset
 		case ts := <-ticker.C:
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+					"error":     err.Error(),
+				}).Error("kafkamdm: failed to commit offset")
 			}
 			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
 			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
 			if err != nil {
-				log.Error(3, "kafka-mdm %s", err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Error("kafkamdm: failed to get offset")
 			} else {
 				partitionLogSizeMetric.Set(int(newest))
 			}
@@ -347,9 +405,16 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		case <-k.stopConsuming:
 			pc.Close()
 			if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Error(3, "kafka-mdm failed to commit offset for %s:%d, %s", topic, partition, err)
+				log.WithFields(log.Fields{
+					"topic":     topic,
+					"partition": partition,
+					"error":     err.Error(),
+				}).Error("kafkamdm: failed to commit offset")
 			}
-			log.Info("kafka-mdm consumer for %s:%d ended.", topic, partition)
+			log.WithFields(log.Fields{
+				"topic":     topic,
+				"partition": partition,
+			}).Info("kafkamdm: consumer ended")
 			return
 		}
 	}
@@ -361,7 +426,9 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 		_, point, err := msg.ReadPointMsg(data, uint32(orgId))
 		if err != nil {
 			metricsDecodeErr.Inc()
-			log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("kafkamdm: decode error, skipping message")
 			return
 		}
 		k.Handler.ProcessMetricPoint(point, format, partition)
@@ -372,7 +439,9 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
 		metricsDecodeErr.Inc()
-		log.Error(3, "kafka-mdm decode error, skipping message. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("kafkamdm: decode error, skipping message")
 		return
 	}
 	metricsPerMessage.ValueUint32(1)

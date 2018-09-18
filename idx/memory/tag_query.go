@@ -12,7 +12,7 @@ import (
 	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/idx"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -626,7 +626,10 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 		equal := strings.Index(tag, "=")
 		if equal < 0 {
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q has tag %q in index without '=' sign", def.Id, tag)
+			log.WithFields(log.Fields{
+				"id":  def.Id,
+				"tag": tag,
+			}).Error("memory-idx: id has tag in index without '=' sign")
 			continue
 		}
 		key := tag[:equal]
@@ -733,7 +736,9 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
+			log.WithFields(log.Fields{
+				"id": id,
+			}).Error("memory-idx: id is in tag index but not in the byId lookup table")
 			continue
 		}
 
@@ -852,7 +857,9 @@ IDS:
 			// should never happen because every ID in the tag index
 			// must be present in the byId lookup table
 			corruptIndex.Inc()
-			log.Error(3, "memory-idx: ID %q is in tag index but not in the byId lookup table", id)
+			log.WithFields(log.Fields{
+				"id": id,
+			}).Error("memory-idx: id is in tag index but not in the byId lookup table")
 			continue
 		}
 
@@ -863,7 +870,10 @@ IDS:
 			equal := strings.Index(tag, "=")
 			if equal < 0 {
 				corruptIndex.Inc()
-				log.Error(3, "memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
+				log.WithFields(log.Fields{
+					"id":  id,
+					"tag": tag,
+				}).Error("memory-idx: id has tag in index without '=' sign")
 				continue
 			}
 

@@ -1,12 +1,13 @@
 package end2end_carbon
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"syscall"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/stacktest/docker"
@@ -24,13 +25,17 @@ var fm *fakemetrics.FakeMetrics
 const metricsPerSecond = 1000
 
 func TestMain(m *testing.M) {
-	log.Println("launching docker-dev stack...")
+	log.Info("launching docker-dev stack...")
 	version := exec.Command("docker-compose", "version")
 	output, err := version.CombinedOutput()
 	if err != nil {
-		log.Fatal(err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to CombinedOutput() from version")
 	}
-	log.Println(string(output))
+	log.WithFields(log.Fields{
+		"output": output,
+	}).Info("version CombinedOutput()")
 
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
@@ -40,18 +45,22 @@ func TestMain(m *testing.M) {
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to create new tracker")
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("docker-compose up failed")
 	}
 
 	retcode := m.Run()
 	fm.Close()
 
-	log.Println("stopping docker-compose stack...")
+	log.Info("stopping docker-compose stack...")
 	cmd.Process.Signal(syscall.SIGINT)
 	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
 	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
@@ -61,10 +70,12 @@ func TestMain(m *testing.M) {
 
 	// 130 means ctrl-C (interrupt) which is what we want
 	if err != nil && err.Error() != "exit status 130" {
-		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("could not cleanly shutdown running docker-compose command")
 		retcode = 1
 	} else {
-		log.Println("docker-compose stack is shut down")
+		log.Info("docker-compose stack is shut down")
 	}
 
 	os.Exit(retcode)
@@ -77,8 +88,8 @@ func TestStartup(t *testing.T) {
 	}
 	select {
 	case <-tracker.Match(matchers):
-		log.Println("stack now running.")
-		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
+		log.Info("stack now running.")
+		log.Info("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 70):
 		grafana.PostAnnotation("TestStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
@@ -97,7 +108,11 @@ func TestBaseIngestWorkload(t *testing.T) {
 		a := graphite.ValidateTargets(exp)(resp)
 		b := graphite.ValidatorLenNulls(1, 8)(resp)
 		c := graphite.ValidatorAvgWindowed(8, graphite.Ge(metricsPerSecond))(resp)
-		log.Printf("condition target names %t - condition len & nulls %t - condition avg value %t", a, b, c)
+		log.WithFields(log.Fields{
+			"condition.target.names":  a,
+			"condition.len.nulls":     b,
+			"condition.average.value": c,
+		}).Info("conditions")
 		return a && b && c
 	})
 	if !suc6 {

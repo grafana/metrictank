@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -79,13 +79,13 @@ func ConfigProcess() {
 
 	// check settings in cluster section
 	if !validMode(mode) {
-		log.Fatal(4, "CLU Config: invalid cluster operating mode")
+		log.Fatal("CLU Config: invalid cluster operating mode")
 	}
 
 	Mode = ModeType(mode)
 
 	if httpTimeout == 0 {
-		log.Fatal(4, "CLU Config: http-timeout must be a non-zero duration string like 60s")
+		log.Fatal("CLU Config: http-timeout must be a non-zero duration string, i.e. 60s")
 	}
 
 	transport = &http.Transport{
@@ -109,14 +109,16 @@ func ConfigProcess() {
 
 	// check settings in swim section
 	if swimUseConfig != "manual" && swimUseConfig != "default-lan" && swimUseConfig != "default-local" && swimUseConfig != "default-wan" {
-		log.Fatal(4, "CLU Config: invalid swim-use-config setting")
+		log.Fatal("CLU Config: invalid swim-use-config setting")
 	}
 
 	if swimUseConfig == "manual" {
 		var err error
 		swimBindAddr, err = net.ResolveTCPAddr("tcp", swimBindAddrStr)
 		if err != nil {
-			log.Fatal(4, "CLU Config: swim-bind-addr is not a valid TCP address: %s", err.Error())
+			log.WithFields(log.Fields{
+				"swim.bind.addr": err.Error(),
+			}).Fatal("CLU Config: swim-bind-addr is not a valid TCP address")
 		}
 	}
 }

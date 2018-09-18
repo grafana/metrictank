@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/metrictank/mdata/notifierNsq/instrumented_nsq"
 	"github.com/grafana/metrictank/stats"
 	"github.com/nsqio/go-nsq"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -40,7 +40,9 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 	for _, addr := range nsqdAdds {
 		producer, err := nsq.NewProducer(addr, pCfg)
 		if err != nil {
-			log.Fatal(4, "nsq-cluster failed creating producer %s", err.Error())
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("nsq-cluster: failed creating producer")
 		}
 		producers[addr] = producer
 	}
@@ -48,7 +50,9 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 	// consumers
 	consumer, err := insq.NewConsumer(topic, channel, cCfg, "cluster.notifier.nsq.metric_persist.%s")
 	if err != nil {
-		log.Fatal(4, "nsq-cluster failed to create NSQ consumer. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("nsq-cluster: failed to create nsq consumer")
 	}
 	c := &NotifierNSQ{
 		instance: instance,
@@ -60,13 +64,17 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierN
 
 	err = consumer.ConnectToNSQDs(nsqdAdds)
 	if err != nil {
-		log.Fatal(4, "nsq-cluster failed to connect to NSQDs. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("nsq-cluster: failed to connect to nsqd")
 	}
-	log.Info("nsq-cluster persist consumer connected to nsqd")
+	log.Info("nsq-cluster: persist consumer connected to nsqd")
 
 	err = consumer.ConnectToNSQLookupds(lookupdAdds)
 	if err != nil {
-		log.Fatal(4, "nsq-cluster failed to connect to NSQLookupds. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("nsq-cluster: failed to connec to NSQLookupds")
 	}
 	go c.run()
 	return c
@@ -107,11 +115,13 @@ func (c *NotifierNSQ) flush() {
 	c.buf = nil
 
 	go func() {
-		log.Debug("CLU nsq-cluster sending %d batch metricPersist messages", len(msg.SavedChunks))
+		log.WithFields(log.Fields{
+			"num.messages": len(msg.SavedChunks),
+		}).Debug("CLU nsq-cluster: sending batch metricPersist messages")
 
 		data, err := json.Marshal(&msg)
 		if err != nil {
-			log.Fatal(4, "CLU nsq-cluster failed to marshal persistMessage to json.")
+			log.Fatal("CLU nsq-cluster: failed to marshal persistMessage to json.")
 		}
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, uint8(mdata.PersistMessageBatchV1))
@@ -130,7 +140,10 @@ func (c *NotifierNSQ) flush() {
 			// successfully, then sending a nil error will mark the host as alive again.
 			hostPoolResponse.Mark(err)
 			if err != nil {
-				log.Warn("CLU nsq-cluster publisher marking host %s as faulty due to %s", hostPoolResponse.Host(), err)
+				log.WithFields(log.Fields{
+					"host":  hostPoolResponse.Host(),
+					"error": err.Error(),
+				}).Warn("CLU nsq-cluster: publisher marking host as faulty")
 			} else {
 				sent = true
 			}

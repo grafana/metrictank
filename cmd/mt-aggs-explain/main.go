@@ -6,9 +6,10 @@ import (
 	"os"
 	"runtime"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/logger"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,6 +19,13 @@ var (
 )
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Println("mt-aggs-explain")
 		fmt.Println()
@@ -45,7 +53,10 @@ func main() {
 	}
 	aggs, err := conf.ReadAggregations(aggsFile)
 	if err != nil {
-		log.Fatalf("can't read aggregations file %q: %s", aggsFile, err.Error())
+		log.WithFields(log.Fields{
+			"file":  aggsFile,
+			"error": err.Error(),
+		}).Fatal("can't read aggregations file")
 	}
 
 	if *metric != "" {

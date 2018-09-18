@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"runtime"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
@@ -39,6 +41,13 @@ func display(span int64, boundaryType string) {
 }
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Println("mt-view-boundaries")
 		fmt.Println()
@@ -60,7 +69,9 @@ func main() {
 		span := dur.MustParseNDuration("span", *spanStr)
 		_, ok := chunk.RevChunkSpans[span]
 		if !ok {
-			log.Fatal(4, "chunkSpan %s is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)", *spanStr)
+			log.WithFields(log.Fields{
+				"span": *spanStr,
+			}).Fatal("chunkSpan is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/data-knobs.md#valid-chunk-spans)")
 		}
 		fmt.Println()
 		display(int64(span), "specified span")

@@ -37,10 +37,6 @@ unused-packages = true
   version = "1.10.1"
 
 [[constraint]]
-  name = "github.com/Sirupsen/logrus"
-  version = "0.7.3"
-
-[[constraint]]
   name = "github.com/alyu/configparser"
   branch = "master"
 
@@ -143,6 +139,10 @@ unused-packages = true
 [[constraint]]
   name = "github.com/sergi/go-diff"
   version = "v1.0.0"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "1.0.6"
 
 [[constraint]]
   name = "github.com/smartystreets/goconvey"

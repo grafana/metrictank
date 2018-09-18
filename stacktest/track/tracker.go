@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"regexp"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Tracker allows to track stdout and stderr of running commands
@@ -116,7 +118,9 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			}
 			matcherCtx = tmp
 		case err := <-t.errChan:
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("received error")
 		}
 		if doneStdout && doneStderr {
 			t.wg.Done()

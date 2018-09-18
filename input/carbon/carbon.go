@@ -15,8 +15,8 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 // metric input.carbon.metrics_per_message is how many metrics per message were seen. in carbon's case this is always 1.
@@ -93,7 +93,9 @@ func ConfigProcess() {
 func New() *Carbon {
 	addrT, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		log.Fatal(4, "carbon-in: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("carbon-in: error")
 	}
 	return &Carbon{
 		addrStr:   addr,
@@ -110,11 +112,15 @@ func (c *Carbon) Start(handler input.Handler, fatal chan struct{}) error {
 	c.Handler = handler
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {
-		log.Error(4, "carbon-in: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("carbon-in: error")
 		return err
 	}
 	c.listener = l
-	log.Info("carbon-in: listening on %v/tcp", c.addr)
+	log.WithFields(log.Fields{
+		"tcp.addr": c.addr.String(),
+	}).Info("carbon-in: listening on tcp address")
 	c.quit = make(chan struct{})
 	go c.accept()
 	return nil
@@ -140,7 +146,9 @@ func (c *Carbon) accept() {
 				return
 			default:
 			}
-			log.Error(4, "carbon-in: Accept Error: %s", err.Error())
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("carbon-in: Accept Error")
 			return
 		}
 		c.handlerWaitGroup.Add(1)
@@ -150,7 +158,7 @@ func (c *Carbon) accept() {
 }
 
 func (c *Carbon) Stop() {
-	log.Info("carbon-in: shutting down.")
+	log.Info("carbon-in: shutting down")
 	close(c.quit)
 	c.listener.Close()
 	c.connTrack.CloseAll()
@@ -176,7 +184,9 @@ func (c *Carbon) handle(conn net.Conn) {
 			default:
 			}
 			if io.EOF != err {
-				log.Error(4, "carbon-in: Recv error: %s", err.Error())
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Error("carbon-in: Recv error")
 			}
 			break
 		}
@@ -185,7 +195,9 @@ func (c *Carbon) handle(conn net.Conn) {
 		key, val, ts, err := carbon20.ValidatePacket(buf, carbon20.MediumLegacy, carbon20.NoneM20)
 		if err != nil {
 			metricsDecodeErr.Inc()
-			log.Error(4, "carbon-in: invalid metric: %s", err.Error())
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("carbon-in: invalid metric")
 			continue
 		}
 		nameSplits := strings.Split(string(key), ";")

@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -17,6 +18,13 @@ func main() {
 	to := flag.String("to", "now", "get data until (exclusive)")
 	mdp := flag.Int("mdp", 800, "max data points to return")
 	timeZoneStr := flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
 
 	flag.Usage = func() {
 		fmt.Println("mt-explain")
@@ -32,7 +40,6 @@ func main() {
 	flag.Parse()
 	if flag.NArg() == 0 {
 		log.Fatal("no target specified")
-		os.Exit(-1)
 	}
 	targets := flag.Args()
 
@@ -44,7 +51,10 @@ func main() {
 		var err error
 		loc, err = time.LoadLocation(*timeZoneStr)
 		if err != nil {
-			log.Fatal(err)
+			log.WithFields(log.Fields{
+				"error":     err.Error(),
+				"time.zone": *timeZoneStr,
+			}).Fatal("failed to load time zone")
 		}
 	}
 
@@ -54,28 +64,38 @@ func main() {
 
 	fromUnix, err := dur.ParseDateTime(*from, loc, now, defaultFrom)
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to parse date and time")
 	}
 
 	toUnix, err := dur.ParseDateTime(*to, loc, now, defaultTo)
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to parse date and time")
 	}
 
 	exps, err := expr.ParseMany(targets)
 	if err != nil {
-		fmt.Println("Error while parsing:", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("error while parsing")
 		return
 	}
 
 	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, nil)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
-			fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))
+			log.WithFields(log.Fields{
+				"function": string(fun),
+			}).Info("unsupported function, must defer query to graphite")
 			plan.Dump(os.Stdout)
 			return
 		}
-		fmt.Println("Error while planning", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("error while planning")
 		return
 	}
 	plan.Dump(os.Stdout)

@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func GetAMKey(suffix int) schema.AMKey {
@@ -23,7 +24,9 @@ func GetMKey(suffix int) schema.MKey {
 func MustMKeyFromString(id string) schema.MKey {
 	mkey, err := schema.MKeyFromString(id)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to get mkey from id")
 	}
 	return mkey
 }

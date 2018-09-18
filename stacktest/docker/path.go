@@ -4,8 +4,10 @@ import (
 	"os"
 	"strings"
 
-	homedir "github.com/mitchellh/go-homedir"
 	p "path"
+
+	homedir "github.com/mitchellh/go-homedir"
+	log "github.com/sirupsen/logrus"
 )
 
 // path takes a relative path within the metrictank repository and returns the full absolute filepath,
@@ -16,7 +18,10 @@ func Path(dst string) string {
 		var err error
 		gopath, err = homedir.Expand("~/go")
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error":  err.Error(),
+				"gopath": gopath,
+			}).Panic("failed to get path")
 		}
 	}
 	firstPath := strings.Split(gopath, ":")[0]

@@ -12,16 +12,17 @@ import (
 
 	"github.com/raintank/schema"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -110,6 +111,13 @@ func main() {
 
 	cassFlags := cassandra.ConfigSetup()
 
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Println("mt-whisper-importer-writer")
 		fmt.Println()
@@ -157,7 +165,9 @@ func main() {
 
 	store, err := cassandraStore.NewCassandraStore(storeConfig, nil)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to initialize cassandra")
 	}
 
 	splits := strings.Split(*ttlsStr, ",")
@@ -169,7 +179,9 @@ func main() {
 
 	p, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to instantiate partitioner")
 	}
 
 	cluster.Init("mt-whisper-importer-writer", gitHash, time.Now(), "http", int(80))
@@ -189,10 +201,14 @@ func main() {
 	http.HandleFunc(*uriPath, server.chunksHandler)
 	http.HandleFunc("/healthz", server.healthzHandler)
 
-	log.Infof("Listening on %q", *httpEndpoint)
+	log.WithFields(log.Fields{
+		"http.endpoint": *httpEndpoint,
+	}).Info("listening")
 	err = http.ListenAndServe(*httpEndpoint, nil)
 	if err != nil {
-		panic(fmt.Sprintf("Error creating listener: %q", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("error creating listener")
 	}
 }
 
@@ -217,9 +233,13 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Debugf(
-		"Receiving Id:%s OrgId:%d Name:%s AggMeth:%d ArchCnt:%d",
-		metric.MetricData.Id, metric.MetricData.OrgId, metric.MetricData.Name, metric.AggregationMethod, len(metric.Archives))
+	log.WithFields(log.Fields{
+		"id":                 metric.MetricData.Id,
+		"org.id":             metric.MetricData.OrgId,
+		"name":               metric.MetricData.Name,
+		"aggregation.method": metric.AggregationMethod,
+		"num.archive":        len(metric.Archives),
+	}).Debug("receiving")
 
 	if len(metric.Archives) == 0 {
 		throwError("Metric has no archives")
@@ -249,10 +269,14 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 			throwError(fmt.Sprintf("Failed to get selected table %d in %+v", tableTTL, s.TTLTables))
 			return
 		}
-		log.Debugf(
-			"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
-			len(a.Chunks), archiveIdx, archiveTTL, table.Name, tableTTL, a.RowKey,
-		)
+		log.WithFields(log.Fields{
+			"num.chunks":    len(a.Chunks),
+			"archive.index": archiveIdx,
+			"archive.ttl":   archiveTTL,
+			"table.name":    table.Name,
+			"table.ttl":     tableTTL,
+			"key":           a.RowKey,
+		}).Panic("inserting chunks")
 		s.insertChunks(table.Name, a.RowKey, tableTTL, a.Chunks)
 	}
 }
@@ -264,7 +288,9 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 	} else {
 		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) IF NOT EXISTS USING TTL %d", table, ttl)
 	}
-	log.Debug(query)
+	log.WithFields(log.Fields{
+		"query": query,
+	}).Debug("insertChunks query")
 	for _, ig := range itergens {
 		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/cassandraStore.Month_sec)
 		success := false
@@ -273,7 +299,10 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 			err := s.Session.Query(query, rowKey, ig.Ts, cassandraStore.PrepareChunkData(ig.Span, ig.Bytes())).Exec()
 			if err != nil {
 				if (attempts % 20) == 0 {
-					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)
+					log.WithFields(log.Fields{
+						"attempts": attempts + 1,
+						"error":    err,
+					}).Warn("CS: failed to save chunk to cassandra")
 				}
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {

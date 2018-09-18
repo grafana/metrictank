@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -11,8 +10,10 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func perror(err error) {
@@ -47,6 +48,13 @@ func main() {
 	cassFlags := cassandra.ConfigSetup()
 
 	outputs := []string{"dump", "list", "vegeta-render", "vegeta-render-patterns"}
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
 
 	flag.Usage = func() {
 		fmt.Println("mt-index-cat")
@@ -106,7 +114,9 @@ func main() {
 		}
 	}
 	if !found {
-		log.Printf("invalid output %q", format)
+		log.WithFields(log.Fields{
+			"format": format,
+		}).Print("invalid output")
 		flag.Usage()
 		os.Exit(-1)
 	}
@@ -117,13 +127,13 @@ func main() {
 		}
 	}
 	if cassI == 0 {
-		log.Println("only indextype 'cass' supported")
+		log.Info("only index type 'cass' supported")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if tags != "" && tags != "valid" && tags != "invalid" && tags != "some" && tags != "none" {
-		log.Println("invalid tags filter")
+		log.Info("invalid tags filter")
 		flag.Usage()
 		os.Exit(1)
 	}

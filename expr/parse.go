@@ -9,7 +9,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/util"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -174,7 +174,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	)
 
 	if e[0] != '(' {
-		panic("arg list should start with paren. calling code should have asserted this")
+		log.Panic("arg list should start with paren. calling code should have asserted this")
 	}
 
 	ArgString := e[1:]
@@ -330,7 +330,7 @@ FOR:
 func parseString(s string) (string, string, error) {
 
 	if s[0] != '\'' && s[0] != '"' {
-		panic("string should start with open quote. calling code should have asserted this")
+		log.Panic("string should start with open quote. calling code should have asserted this")
 	}
 
 	match := s[0]
@@ -393,7 +393,9 @@ func extractMetric(m string) string {
 	}
 
 	if quoteChar != 0 {
-		log.Warn("extractMetric: encountered unterminated string literal in %s", m)
+		log.WithFields(log.Fields{
+			"string": m,
+		}).Warn("extractMetric: encountered unterminated string literal")
 		return ""
 	}
 

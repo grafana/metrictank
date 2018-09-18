@@ -3,9 +3,10 @@ package grafana
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var grafanaClient *http.Client
@@ -31,21 +32,29 @@ func PostAnnotation(msg string) {
 		}
 		b, err := json.Marshal(a)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("failed to marshal data")
 		}
 		var reader *bytes.Reader
 		reader = bytes.NewReader(b)
 		req, err := http.NewRequest("POST", "http://admin:admin@localhost:3000/api/annotations", reader)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("request failed")
 		}
 		req.Header.Add("Content-Type", "application/json")
 		resp, err := grafanaClient.Do(req)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("response failed")
 		}
 		if resp.StatusCode != 200 {
-			panic(fmt.Sprintf("grafana annotation post response %s", resp.Status))
+			log.WithFields(log.Fields{
+				"response": resp.Status,
+			}).Panic("grafana annotation post response")
 		}
 	}()
 }

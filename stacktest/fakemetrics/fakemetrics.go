@@ -2,8 +2,9 @@ package fakemetrics
 
 import (
 	"fmt"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
@@ -55,7 +56,9 @@ func NewKafka(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
 	if err != nil {
-		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to create kafka-mdm output")
 	}
 	return NewFakeMetrics(generateMetrics(num), out, stats)
 }
@@ -64,7 +67,9 @@ func NewCarbon(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := carbon.New("localhost:2003", stats)
 	if err != nil {
-		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to create kafka-mdm output")
 	}
 	return NewFakeMetrics(generateMetrics(num), out, stats)
 }
@@ -94,7 +99,9 @@ func (f *FakeMetrics) run() {
 			}
 			err := f.o.Flush(f.metrics)
 			if err != nil {
-				panic(fmt.Sprintf("failed to send data to output: %s", err))
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Panic("failed to send data to output")
 			}
 		}
 	}

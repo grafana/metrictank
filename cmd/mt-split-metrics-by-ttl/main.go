@@ -8,8 +8,10 @@ import (
 	"path"
 	"strings"
 
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -34,6 +36,13 @@ func main() {
 	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
 	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
 
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-split-metrics-by-ttl [flags] ttl [ttl...]")
 		fmt.Fprintln(os.Stderr)
@@ -56,23 +65,31 @@ func main() {
 
 	tmpDir, err := ioutil.TempDir(os.TempDir(), storeConfig.Keyspace)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get temp dir: %s", tmpDir))
+		log.WithFields(log.Fields{
+			"directory": tmpDir,
+		}).Panic("failed to get temporary directory")
 	}
 	snapshotDir := path.Join(tmpDir, "snapshot")
 	err = os.Mkdir(snapshotDir, 0700)
 	if err != nil {
-		panic(fmt.Sprintf("Error creating directory: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to create snapshot directory")
 	}
 
 	store, err := cassandra.NewCassandraStore(storeConfig, ttls)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to instantiate cassandra")
 	}
 
 	// create directory/link structure that we need to define the future table names
 	err = os.Mkdir(path.Join(tmpDir, storeConfig.Keyspace), 0700)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create directory: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to create directory")
 	}
 	namedTableLinks := make([]string, len(store.TTLTables))
 	tableNames := make([]string, len(store.TTLTables))
@@ -82,7 +99,9 @@ func main() {
 		namedTableLinks[i] = path.Join(tmpDir, storeConfig.Keyspace, table.Name)
 		err := os.Symlink(snapshotDir, namedTableLinks[i])
 		if err != nil {
-			panic(fmt.Sprintf("Error when creating symlink: %s", err))
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("failed to create symlink")
 		}
 		i++
 	}

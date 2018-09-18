@@ -4,6 +4,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 // AggBoundary returns ts if it is a boundary, or the next boundary otherwise.
@@ -31,7 +32,7 @@ type Aggregator struct {
 
 func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
-		panic("NewAggregator called without aggregations. this should never happen")
+		log.Panic("NewAggregator called without aggregations. this should never happen")
 	}
 	span := uint32(ret.SecondsPerPoint)
 	aggregator := &Aggregator{
@@ -112,7 +113,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 		agg.currentBoundary = boundary
 		agg.agg.Add(val)
 	} else {
-		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
+		log.Panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
 }
 

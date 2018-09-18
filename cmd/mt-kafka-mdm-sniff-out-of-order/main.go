@@ -14,11 +14,12 @@ import (
 	"time"
 
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -76,7 +77,10 @@ func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition
 	}
 	mkey, err := schema.MKeyFromString(metric.Id)
 	if err != nil {
-		log.Error(0, "could not parse id %q: %s", metric.Id, err)
+		log.WithFields(log.Fields{
+			"id":    metric.Id,
+			"error": err,
+		}).Error("could not parse id")
 		return
 	}
 
@@ -104,7 +108,9 @@ func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition
 			tracker.DeltaSeen = uint32(now.Seen.Unix()) - uint32(tracker.Head.Seen.Unix())
 			err := ip.tpl.Execute(os.Stdout, tracker)
 			if err != nil {
-				log.Error(0, "executing template: %s", err)
+				log.WithFields(log.Fields{
+					"error": err,
+				}).Error("executing template")
 			}
 			ip.data[mkey] = tracker
 		}
@@ -140,7 +146,9 @@ func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, format msg.F
 			tracker.DeltaSeen = uint32(now.Seen.Unix()) - uint32(tracker.Head.Seen.Unix())
 			err := ip.tpl.Execute(os.Stdout, tracker)
 			if err != nil {
-				log.Error(0, "executing template: %s", err)
+				log.WithFields(log.Fields{
+					"error": err,
+				}).Error("executing template")
 			}
 			ip.data[mp.MKey] = tracker
 		}
@@ -149,6 +157,13 @@ func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, format msg.F
 }
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-kafka-mdm-sniff-out-of-order")
 		fmt.Fprintln(os.Stderr)
@@ -178,7 +193,6 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, 2))
 	instance := "mt-kafka-mdm-sniff-out-of-order" + strconv.Itoa(rand.Int())
 
 	// Only try and parse the conf file if it exists
@@ -191,7 +205,9 @@ func main() {
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
-		log.Fatal(4, "error with configuration file: %s", err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Fatal("error with configuration file")
 		os.Exit(1)
 	}
 	inKafkaMdm.ConfigSetup()
@@ -213,7 +229,9 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case sig := <-sigChan:
-		log.Info("Received signal %q. Shutting down", sig)
+		log.WithFields(log.Fields{
+			"signal": sig,
+		}).Info("Received signal. Shutting down")
 	case <-pluginFatal:
 		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
 	}

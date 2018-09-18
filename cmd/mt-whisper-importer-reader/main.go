@@ -18,12 +18,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -106,6 +107,11 @@ var (
 func main() {
 	var err error
 	flag.Parse()
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+	log.SetFormatter(formatter)
 	if *verbose {
 		log.SetLevel(log.DebugLevel)
 	} else {
@@ -115,14 +121,18 @@ func main() {
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
 	schemas, err = conf.ReadSchemas(*dstSchemas)
 	if err != nil {
-		panic(fmt.Sprintf("Error when parsing schemas file: %q", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("error when parsing schemas file")
 	}
 
 	var pos *posTracker
 	if len(*positionFile) > 0 {
 		pos, err = NewPositionTracker(*positionFile)
 		if err != nil {
-			log.Fatalf("Error instantiating position tracker: %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Fatal("error instantiating position tracker")
 		}
 		defer pos.Close()
 	}
@@ -148,12 +158,18 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+				"file":  file,
+			}).Error("failed to open whisper file")
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+				"file":  file,
+			}).Error("failed to open whisper file")
 			continue
 		}
 
@@ -161,7 +177,9 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 		log.Debugf("Processing file %s (%s)", file, name)
 		met, err := getMetric(w, file, name)
 		if err != nil {
-			log.Errorf("Failed to get metric: %q", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("failed to get metric")
 			continue
 		}
 
@@ -170,14 +188,19 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 		for !success {
 			b, err := met.MarshalCompressed()
 			if err != nil {
-				log.Errorf("Failed to encode metric: %q", err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Error("failed to get metric")
 				continue
 			}
 			size := b.Len()
 
 			req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 			if err != nil {
-				log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+				log.WithFields(log.Fields{
+					"http.endpoint": *httpEndpoint,
+					"error":         err.Error(),
+				}).Fatal("cannot construct request to http endpoint")
 			}
 
 			req.Header.Set("Content-Type", "application/json")
@@ -192,15 +215,35 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 			passed := time.Now().Sub(pre).Seconds()
 			if err != nil || resp.StatusCode >= 300 {
 				if err != nil {
-					log.Warningf("Error posting %s (%d bytes), to endpoint %q (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, attempts, passed, err)
+					log.WithFields(log.Fields{
+						"name":                 name,
+						"size.bytes":           size,
+						"http.endpoint":        *httpEndpoint,
+						"attempts":             attempts,
+						"time.elapsed.seconds": passed,
+						"error":                err.Error(),
+					}).Warn("error posting to endpoint, retrying")
 					attempts++
 					continue
 				} else {
-					log.Warningf("Error posting %s (%d bytes) to endpoint %q status %d (attempt %d/%fs, retrying)", name, size, *httpEndpoint, resp.StatusCode, attempts, passed)
+					log.WithFields(log.Fields{
+						"name":                 name,
+						"size.bytes":           size,
+						"http.endpoint":        *httpEndpoint,
+						"resp.status.code":     resp.StatusCode,
+						"attempts":             attempts,
+						"time.elapsed.seconds": passed,
+						"error":                err.Error(),
+					}).Warn("error posting to endpoint, retrying")
 				}
 				attempts++
 			} else {
-				log.Debugf("Posted %s (%d bytes) to endpoint %q in %f seconds", name, size, *httpEndpoint, passed)
+				log.WithFields(log.Fields{
+					"name":                 name,
+					"size.bytes":           size,
+					"http.endpoint":        *httpEndpoint,
+					"time.elapsed.seconds": passed,
+				}).Debug("posted to endpoint")
 				success = true
 			}
 			io.Copy(ioutil.Discard, resp.Body)
@@ -213,7 +256,10 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 		processed := atomic.AddUint32(&processedCount, 1)
 		if processed%100 == 0 {
 			skipped := atomic.LoadUint32(&skippedCount)
-			log.Infof("Processed %d files, %d skipped", processed, skipped)
+			log.WithFields(log.Fields{
+				"files.processed": processed,
+				"files.skipped":   skipped,
+			}).Info("processed files")
 		}
 	}
 	wg.Done()
@@ -305,11 +351,19 @@ func getMetric(w *whisper.Whisper, file, name string) (archive.Metric, error) {
 			}
 			mkey, err := schema.MKeyFromString(md.Id)
 			if err != nil {
-				panic(err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Panic("failed to retrieve mkey from id")
 			}
 			rowKey := getRowKey(retIdx, mkey, m, retention.SecondsPerPoint)
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
-			log.Debugf("Archive %d Method %s got %d points = %d chunks at a span of %d", retIdx, m, len(p), len(encodedChunks), retention.ChunkSpan)
+			log.WithFields(log.Fields{
+				"archive":    retIdx,
+				"method":     m,
+				"num.points": len(p),
+				"num.chunks": len(encodedChunks),
+				"span":       retention.ChunkSpan,
+			}).Info("archive operation")
 			res.Archives = append(res.Archives, archive.Archive{
 				SecondsPerPoint: uint32(retention.SecondsPerPoint),
 				Points:          uint32(retention.NumberOfPoints),
@@ -365,7 +419,10 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 
 		err := c.Push(point.Timestamp, point.Value)
 		if err != nil {
-			panic(fmt.Sprintf("ERROR: Failed to push value into chunk at t0 %d: %q", t0, err))
+			log.WithFields(log.Fields{
+				"t0.chunk": t0,
+				"error":    err.Error(),
+			}).Panic("failed to push value into chunk at t0")
 		}
 	}
 
@@ -389,7 +446,10 @@ func getFileListIntoChan(pos *posTracker, fileChan chan string) {
 			}
 			name := getMetricName(path)
 			if !nameFilter.Match([]byte(getMetricName(name))) {
-				log.Debugf("Skipping file %s with name %s", path, name)
+				log.WithFields(log.Fields{
+					"path": path,
+					"file": name,
+				}).Panic("skipping file")
 				atomic.AddUint32(&skippedCount, 1)
 				return nil
 			}
@@ -397,7 +457,9 @@ func getFileListIntoChan(pos *posTracker, fileChan chan string) {
 				return nil
 			}
 			if pos != nil && pos.IsDone(path) {
-				log.Debugf("Skipping file %s because it was listed as already done", path)
+				log.WithFields(log.Fields{
+					"file": path,
+				}).Panic("skipping file because it was listed as already done")
 				return nil
 			}
 

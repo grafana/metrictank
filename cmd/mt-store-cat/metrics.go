@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/store/cassandra"
+	log "github.com/sirupsen/logrus"
 )
 
 type Metric struct {
@@ -35,7 +35,10 @@ func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error
 		if strings.HasPrefix(m.name, prefix) {
 			mkey, err := schema.MKeyFromString(idString)
 			if err != nil {
-				panic(err)
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+					"id":    idString,
+				}).Panic("failed to get mkey from id")
 			}
 			m.AMKey = schema.AMKey{
 				MKey: mkey,
@@ -60,7 +63,10 @@ func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, e
 	for iter.Scan(idString, &m.name) {
 		mkey, err := schema.MKeyFromString(idString)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+				"id":    idString,
+			}).Panic("failed to get mkey from id")
 		}
 		m.AMKey = schema.AMKey{
 			MKey:    mkey,
@@ -69,7 +75,10 @@ func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, e
 		metrics = append(metrics, m)
 	}
 	if len(metrics) > 1 {
-		panic(fmt.Sprintf("wtf. found more than one entry for id %v: %v", amkey, metrics))
+		log.WithFields(log.Fields{
+			"id":      amkey,
+			"metrics": metrics,
+		}).Panic("found more than one entry for id")
 	}
 	err := iter.Close()
 	if err != nil {

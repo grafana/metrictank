@@ -3,15 +3,18 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
 	"github.com/raintank/dur"
@@ -50,6 +53,13 @@ var (
 )
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-update-ttl [flags] ttl table-in [table-out]")
 		fmt.Fprintln(os.Stderr)
@@ -77,7 +87,9 @@ func main() {
 	session, err := NewCassandraStore()
 
 	if err != nil {
-		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to instantiate cassandra")
 	}
 
 	update(session, ttl, tableIn, tableOut)
@@ -174,26 +186,52 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, session *gocql.Sessi
 				query = fmt.Sprintf("INSERT INTO %s (data, key, ts) values(?,?,?) USING TTL %d", tableOut, newTTL)
 			}
 			if *verbose {
-				log.Printf("id=%d processing rownum=%d table=%q key=%q ts=%d query=%q data='%x'\n", id, atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, query, data)
+				log.WithFields(log.Fields{
+					"id":    id,
+					"row":   atomic.LoadUint64(&doneRows),
+					"table": tableIn,
+					"key":   key,
+					"ts":    ts,
+					"query": query,
+					"data":  data,
+				}).Info("processing")
 			}
 
 			err := session.Query(query, data, key, ts).Exec()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "ERROR: id=%d failed updating %s %s %d: %q", id, tableOut, key, ts, err)
+				log.WithFields(log.Fields{
+					"id":    id,
+					"table": tableOut,
+					"key":   key,
+					"ts":    ts,
+					"error": err,
+				}).Error("failed updating")
 			}
 
 			doneRowsSnap := atomic.AddUint64(&doneRows, 1)
 			if doneRowsSnap%10000 == 0 {
 				doneKeysSnap := atomic.LoadUint64(&doneKeys)
 				completeness := completenessEstimate(token)
-				log.Printf("WORKING: id=%d processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", id, doneKeysSnap, doneRowsSnap, token, completeness*100)
+				log.WithFields(log.Fields{
+					"id":             id,
+					"keys.processed": doneKeysSnap,
+					"rows.processed": doneRowsSnap,
+					"last.token":     token,
+					"completed":      strconv.FormatFloat((completeness*100), 'f', 1, 64) + "%",
+				}).Info("working")
 			}
 		}
 		err := iter.Close()
 		if err != nil {
 			doneKeysSnap := atomic.LoadUint64(&doneKeys)
 			doneRowsSnap := atomic.LoadUint64(&doneRows)
-			fmt.Fprintf(os.Stderr, "ERROR: id=%d failed querying %s: %q. processed %d keys, %d rows", id, tableIn, err, doneKeysSnap, doneRowsSnap)
+			log.WithFields(log.Fields{
+				"id":             id,
+				"table":          tableIn,
+				"error":          err,
+				"keys.processed": doneKeysSnap,
+				"rows.processed": doneRowsSnap,
+			}).Error("failed querying")
 		}
 		atomic.AddUint64(&doneKeys, 1)
 	}
@@ -219,11 +257,19 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	close(jobs)
 	err := keyItr.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeys, doneRows)
+		log.WithFields(log.Fields{
+			"table":          tableIn,
+			"error":          err,
+			"keys.processed": doneKeys,
+			"rows.processed": doneRows,
+		}).Error("failed querying")
 		wg.Wait()
 		os.Exit(2)
 	}
 
 	wg.Wait()
-	log.Printf("DONE.  Processed %d keys, %d rows", doneKeys, doneRows)
+	log.WithFields(log.Fields{
+		"keys.processed": doneKeys,
+		"rows.processed": doneRows,
+	}).Info("done")
 }

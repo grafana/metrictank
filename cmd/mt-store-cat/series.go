@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
@@ -24,7 +25,9 @@ func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassa
 			} else {
 				igens, err := store.SearchTable(ctx, metric.AMKey, table, fromUnix, toUnix)
 				if err != nil {
-					panic(err)
+					log.WithFields(log.Fields{
+						"error": err.Error(),
+					}).Panic("failed to retrieve data from table")
 				}
 				printNormal(igens, fromUnix, toUnix)
 			}
@@ -43,7 +46,9 @@ func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables [
 			} else {
 				igens, err := store.SearchTable(ctx, metric.AMKey, table, fromUnix, toUnix)
 				if err != nil {
-					panic(err)
+					log.WithFields(log.Fields{
+						"error": err.Error(),
+					}).Panic("failed to retrieve data from table")
 				}
 				printSummary(igens, fromUnix, toUnix)
 			}
@@ -55,7 +60,9 @@ func getSeries(ctx context.Context, store *cassandra.CassandraStore, table cassa
 	var points []schema.Point
 	itgens, err := store.SearchTable(ctx, amkey, table, fromUnix, toUnix)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to retrieve data from table")
 	}
 
 	for i, itgen := range itgens {

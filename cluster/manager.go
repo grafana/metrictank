@@ -10,7 +10,7 @@ import (
 
 	"github.com/grafana/metrictank/stats"
 	"github.com/hashicorp/memberlist"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -106,7 +106,7 @@ func NewMemberlistManager(thisNode HTTPNode) *MemberlistManager {
 	case "default-wan":
 		mgr.cfg = memberlist.DefaultWANConfig()
 	default:
-		panic("invalid swimUseConfig. should already have been validated")
+		log.Panic("invalid swimUseConfig. should already have been validated")
 	}
 	mgr.cfg.Events = mgr
 	mgr.cfg.Delegate = mgr
@@ -118,10 +118,15 @@ func NewMemberlistManager(thisNode HTTPNode) *MemberlistManager {
 }
 
 func (c *MemberlistManager) Start() {
-	log.Info("CLU Start: Starting cluster on %s:%d", c.cfg.BindAddr, c.cfg.BindPort)
+	log.WithFields(log.Fields{
+		"bind.addr": c.cfg.BindAddr,
+		"bind.port": c.cfg.BindPort,
+	}).Info("CLU Start: Starting cluster")
 	list, err := memberlist.Create(c.cfg)
 	if err != nil {
-		log.Fatal(4, "CLU Start: Failed to create memberlist: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("CLU Start: Failed to create memberlist")
 	}
 	c.setList(list)
 
@@ -130,9 +135,13 @@ func (c *MemberlistManager) Start() {
 	}
 	n, err := list.Join(strings.Split(peersStr, ","))
 	if err != nil {
-		log.Fatal(4, "CLU Start: Failed to join cluster: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("CLU Start: Failed to join cluster")
 	}
-	log.Info("CLU Start: joined to %d nodes in cluster", n)
+	log.WithFields(log.Fields{
+		"num.nodes": n,
+	}).Info("CLU Start: joined to nodes in cluster")
 }
 
 func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
@@ -214,11 +223,17 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 	if len(node.Meta) == 0 {
 		return
 	}
-	log.Info("CLU manager: HTTPNode %s with address %s has joined the cluster", node.Name, node.Addr.String())
+	log.WithFields(log.Fields{
+		"node.name": node.Name,
+		"http.addr": node.Addr.String(),
+	}).Info("CLU manager: HTTPNode has joined the cluster")
 	member := HTTPNode{}
 	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
-		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
+		log.WithFields(log.Fields{
+			"node.name": node.Name,
+			"error":     err.Error(),
+		}).Error("CLU manager: Failed to decode node meta")
 		unmarshalErrJoin.Inc()
 		return
 	}
@@ -234,7 +249,9 @@ func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
 	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
-	log.Info("CLU manager: HTTPNode %s has left the cluster", node.Name)
+	log.WithFields(log.Fields{
+		"node.name": node.Name,
+	}).Info("CLU manager: HTTPNode has left the cluster")
 	delete(c.members, node.Name)
 	c.clusterStats()
 }
@@ -249,7 +266,10 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	member := HTTPNode{}
 	err := json.Unmarshal(node.Meta, &member)
 	if err != nil {
-		log.Error(3, "CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
+		log.WithFields(log.Fields{
+			"node.name": node.Name,
+			"error":     err.Error(),
+		}).Error("CLU manager: Failed to decode node meta")
 		unmarshalErrUpdate.Inc()
 		// if the node is known, lets mark it as notReady until it starts sending valid data again.
 		if p, ok := c.members[node.Name]; ok {
@@ -266,7 +286,11 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 		member.local = true
 	}
 	c.members[node.Name] = member
-	log.Info("CLU manager: HTTPNode %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
+	log.WithFields(log.Fields{
+		"node.name": node.Name,
+		"node.addr": node.Addr.String(),
+		"node.meta": node.Meta,
+	}).Info("CLU manager: HTTPNode has been updated")
 	c.clusterStats()
 }
 
@@ -286,7 +310,9 @@ func (c *MemberlistManager) NodeMeta(limit int) []byte {
 	meta, err := json.Marshal(c.members[c.nodeName])
 	c.RUnlock()
 	if err != nil {
-		log.Fatal(4, "CLU manager: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("CLU manager")
 	}
 	return meta
 }
