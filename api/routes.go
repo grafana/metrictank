@@ -24,9 +24,10 @@ func (s *Server) RegisterRoutes() {
 	withOrg := middleware.RequireOrg()
 	cBody := middleware.CaptureBody
 	ready := middleware.NodeReady()
+	noTrace := middleware.DisableTracing
 
-	r.Get("/", s.appStatus)
-	r.Get("/node", s.getNodeStatus)
+	r.Get("/", noTrace, s.appStatus)
+	r.Get("/node", noTrace, s.getNodeStatus)
 	r.Post("/node", bind(models.NodeStatus{}), s.setNodeStatus)
 	r.Get("/priority", s.explainPriority)
 	r.Get("/debug/pprof/block", blockHandler)
