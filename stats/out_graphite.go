@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -56,7 +56,7 @@ func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Dur
 func (g *Graphite) reporter(interval int) {
 	ticker := tick(time.Duration(interval) * time.Second)
 	for now := range ticker {
-		log.Debug("stats flushing for", now, "to graphite")
+		log.Debugf("stats flushing for %s to graphite", now)
 		queueItems.Value(len(g.toGraphite))
 		if cap(g.toGraphite) != 0 && len(g.toGraphite) == cap(g.toGraphite) {
 			// no space in buffer, no use in doing any work
@@ -95,11 +95,11 @@ func (g *Graphite) writer() {
 			time.Sleep(time.Second)
 			conn, err = net.Dial("tcp", g.addr)
 			if err == nil {
-				log.Info("stats now connected to %s", g.addr)
+				log.Infof("stats now connected to %s", g.addr)
 				wg.Add(1)
 				go g.checkEOF(conn, &wg)
 			} else {
-				log.Warn("stats dialing %s failed: %s. will retry", g.addr, err.Error())
+				log.Warnf("stats dialing %s failed: %s. will retry", g.addr, err.Error())
 			}
 			connected.Set(conn != nil)
 		}
@@ -117,7 +117,7 @@ func (g *Graphite) writer() {
 				ok = true
 				flushDuration.Value(time.Since(pre))
 			} else {
-				log.Warn("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
+				log.Warnf("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
 				conn.Close()
 				wg.Wait()
 				conn = nil
@@ -143,12 +143,12 @@ func (g *Graphite) checkEOF(conn net.Conn, wg *sync.WaitGroup) {
 
 		// in case the remote behaves badly (out of spec for carbon protocol)
 		if num != 0 {
-			log.Warn("Graphite.checkEOF: read unexpected data from peer: %s\n", b[:num])
+			log.Warnf("Graphite.checkEOF: read unexpected data from peer: %s\n", b[:num])
 			continue
 		}
 
 		if err != io.EOF {
-			log.Warn("Graphite.checkEOF: %s. closing conn\n", err)
+			log.Warnf("Graphite.checkEOF: %s. closing conn\n", err)
 			conn.Close()
 			return
 		}

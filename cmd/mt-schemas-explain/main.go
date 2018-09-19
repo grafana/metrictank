@@ -7,9 +7,10 @@ import (
 	"runtime"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -19,6 +20,14 @@ var (
 	metric       = flag.String("metric", "", "specify a metric name to see which schema it matches")
 	interval     = flag.Int("int", 0, "specify an interval to apply interval-based matching in addition to metric matching (e.g. to simulate kafka-mdm input)")
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-schemas-explain"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	flag.Usage = func() {

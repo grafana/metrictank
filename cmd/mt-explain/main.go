@@ -3,13 +3,22 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-explain"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	stable := flag.Bool("stable", true, "whether to use only functionality marked as stable")
@@ -44,7 +53,7 @@ func main() {
 		var err error
 		loc, err = time.LoadLocation(*timeZoneStr)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 	}
 
@@ -54,12 +63,12 @@ func main() {
 
 	fromUnix, err := dur.ParseDateTime(*from, loc, now, defaultFrom)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	toUnix, err := dur.ParseDateTime(*to, loc, now, defaultTo)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	exps, err := expr.ParseMany(targets)

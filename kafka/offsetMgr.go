@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/storage"
@@ -65,7 +65,7 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 			return nil, err
 		}
 	}
-	log.Info("Opened %s", dbFile)
+	log.Infof("Opened %s", dbFile)
 	mgr := &OffsetMgr{
 		path:  dbFile,
 		db:    db,
@@ -106,7 +106,7 @@ func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
 	if err := binary.Write(data, binary.LittleEndian, offset); err != nil {
 		return err
 	}
-	log.Debug("committing offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
+	log.Debugf("committing offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
 	return o.db.Put(key.Bytes(), data.Bytes(), &opt.WriteOptions{Sync: true})
 }
 
@@ -116,7 +116,7 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	data, err := o.db.Get(key.Bytes(), nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			log.Debug("no offset recorded for %s:%d", topic, partition)
+			log.Debugf("no offset recorded for %s:%d", topic, partition)
 			return -1, nil
 		}
 		return 0, err
@@ -126,6 +126,6 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Debug("found saved offset %d for %s:%d", offset, topic, partition)
+	log.Debugf("found saved offset %d for %s:%d", offset, topic, partition)
 	return offset, nil
 }

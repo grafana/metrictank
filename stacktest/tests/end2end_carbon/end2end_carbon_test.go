@@ -1,7 +1,6 @@
 package end2end_carbon
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -9,11 +8,13 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
+	log "github.com/sirupsen/logrus"
 )
 
 // TODO: cleanup when ctrl-C go test (teardown all containers)
@@ -23,6 +24,13 @@ var fm *fakemetrics.FakeMetrics
 
 const metricsPerSecond = 1000
 
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "end2end_carbon_test"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 func TestMain(m *testing.M) {
 	log.Println("launching docker-dev stack...")
 	version := exec.Command("docker-compose", "version")
@@ -40,12 +48,12 @@ func TestMain(m *testing.M) {
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	retcode := m.Run()

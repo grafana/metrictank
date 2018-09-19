@@ -45,14 +45,6 @@
   version = "v1.16.0"
 
 [[projects]]
-  digest = "1:e38e4b563c03b533cc4f41bafbc97de9dd5aeb81263ef84ceab9b9589a0b7390"
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "55eb11d21d2a31a3cc93838241d04800f52e823d"
-  version = "v0.7.3"
-
-[[projects]]
   digest = "1:a1b2cc5ad53b08fbfb4dfe962a2e145325acb4b874ea44beb02d4b5b158c2079"
   name = "github.com/Unknwon/com"
   packages = ["."]
@@ -696,13 +688,6 @@
   revision = "0e21f36ce70d0edcae3af09c851534c46f7a18cc"
 
 [[projects]]
-  digest = "1:1158ac9d990e9c34d577bc2bac6f0a07e104a3d28594fa9095f5447d1e4615d1"
-  name = "github.com/raintank/worldping-api"
-  packages = ["pkg/log"]
-  pruneopts = "NUT"
-  revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
-
-[[projects]]
   branch = "master"
   digest = "1:56e1fe0cbca1744fa51e946af6fcbecee6df3d57fd77647dd48e0ca2da049ada"
   name = "github.com/rakyll/globalconf"
@@ -749,6 +734,14 @@
   pruneopts = "NUT"
   revision = "1744e2970ca51c86172c8190fadad617561ed6e7"
   version = "v1.0.0"
+
+[[projects]]
+  digest = "1:b2339e83ce9b5c4f79405f949429a7f68a9a904fed903c672aac1e7ceb7f5f02"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
+  version = "v1.0.6"
 
 [[projects]]
   digest = "1:1f0b284a6858827de4c27c66b49b2b25df3e16b031c2b57b7892273131e7dd2b"
@@ -834,6 +827,14 @@
   revision = "c48167d9cae5887393dd5e61efd06a4a48b7fbb3"
   source = "https://github.com/jaegertracing/jaeger-lib.git"
   version = "v1.2.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
+  name = "golang.org/x/crypto"
+  packages = ["ssh/terminal"]
+  pruneopts = "NUT"
+  revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
 [[projects]]
   digest = "1:e182379b28b5ab095534a23a80a2020d082da6d4421102ea5ed950499790baf2"
@@ -977,7 +978,6 @@
     "github.com/Dieterbe/artisanalhistogram/hist15s",
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
-    "github.com/Sirupsen/logrus",
     "github.com/alyu/configparser",
     "github.com/bitly/go-hostpool",
     "github.com/davecgh/go-spew/spew",
@@ -1016,10 +1016,10 @@
     "github.com/raintank/misc/app",
     "github.com/raintank/schema",
     "github.com/raintank/schema/msg",
-    "github.com/raintank/worldping-api/pkg/log",
     "github.com/rakyll/globalconf",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",
+    "github.com/sirupsen/logrus",
     "github.com/smartystreets/goconvey/convey",
     "github.com/syndtr/goleveldb/leveldb",
     "github.com/syndtr/goleveldb/leveldb/opt",

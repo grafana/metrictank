@@ -18,7 +18,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -194,7 +194,7 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		}
 		out = append(out, resp.series...)
 	}
-	log.Debug("DP getTargets: %d series found on cluster", len(out))
+	log.Debugf("DP getTargets: %d series found on cluster", len(out))
 	return out, nil
 }
 
@@ -207,7 +207,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
 	for _, nodeReqs := range remoteReqs {
-		log.Debug("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.GetName())
+		log.Debugf("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.GetName())
 		go func(reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
@@ -221,11 +221,11 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 			_, err = resp.UnmarshalMsg(buf)
 			if err != nil {
 				cancel()
-				log.Error(3, "DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err)
+				log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
 				responses <- getTargetsResp{nil, err}
 				return
 			}
-			log.Debug("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
+			log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
 			responses <- getTargetsResp{resp.Series, nil}
 		}(nodeReqs)
 	}
@@ -243,13 +243,13 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 		}
 		out = append(out, resp.series...)
 	}
-	log.Debug("DP getTargetsRemote: total of %d series found on peers", len(out))
+	log.Debugf("DP getTargetsRemote: total of %d series found on peers", len(out))
 	return out, nil
 }
 
 // error is the error of the first failing target request
 func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]models.Series, error) {
-	log.Debug("DP getTargetsLocal: handling %d reqs locally", len(reqs))
+	log.Debugf("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	responses := make(chan getTargetsResp, len(reqs))
 
 	var wg sync.WaitGroup
@@ -309,7 +309,7 @@ LOOP:
 		}
 		out = append(out, resp.series...)
 	}
-	log.Debug("DP getTargetsLocal: %d series found locally", len(out))
+	log.Debugf("DP getTargetsLocal: %d series found locally", len(out))
 	return out, nil
 
 }
@@ -321,12 +321,10 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 	// normalize is runtime consolidation but only for the purpose of bringing high-res
 	// series to the same resolution of lower res series.
 
-	if LogLevel < 2 {
-		if normalize {
-			log.Debug("DP getTarget() %s normalize:true", req.DebugString())
-		} else {
-			log.Debug("DP getTarget() %s normalize:false", req.DebugString())
-		}
+	if normalize {
+		log.Debugf("DP getTarget() %s normalize:true", req.DebugString())
+	} else {
+		log.Debugf("DP getTarget() %s normalize:false", req.DebugString())
 	}
 
 	if !readRollup && !normalize {
@@ -384,9 +382,7 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 }
 
 func logLoad(typ string, key schema.AMKey, from, to uint32) {
-	if LogLevel < 2 {
-		log.Debug("DP load from %-6s %20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
-	}
+	log.Debugf("DP load from %-6s %20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 }
 
 // getSeriesFixed gets the series and makes sure the output is quantized
@@ -433,7 +429,7 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 	default:
 	}
 
-	log.Debug("oldest from aggmetrics is %d", res.Oldest)
+	log.Debugf("oldest from aggmetrics is %d", res.Oldest)
 	span := opentracing.SpanFromContext(ctx.ctx)
 	span.SetTag("oldest_in_ring", res.Oldest)
 
@@ -471,9 +467,7 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
-		if LogLevel < 2 {
-			log.Debug("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
-		}
+		log.Debugf("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
 	return points
@@ -511,12 +505,12 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
 	logLoad("cassan", ctx.AMKey, ctx.From, ctx.To)
 
-	log.Debug("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
+	log.Debugf("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
 	cacheRes, err := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
 	if err != nil {
 		return iters, err
 	}
-	log.Debug("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+	log.Debugf("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
 	// check to see if the request has been canceled, if so abort now.
 	select {
@@ -585,7 +579,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 			it, err := cacheRes.End[i].Get()
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt
-				log.Error(3, "itergen: error getting iter from cache result end slice %+v", err)
+				log.Errorf("itergen: error getting iter from cache result end slice %+v", err.Error())
 				return iters, err
 			}
 			iters = append(iters, *it)
@@ -624,7 +618,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			//we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
-			log.Debug("DP mergeSeries: %s has multiple series.", series[0].Target)
+			log.Debugf("DP mergeSeries: %s has multiple series.", series[0].Target)
 			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
 					if !math.IsNaN(series[j].Datapoints[i].Val) {

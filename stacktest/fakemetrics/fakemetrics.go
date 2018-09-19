@@ -2,17 +2,26 @@ package fakemetrics
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/grafana/metrictank/clock"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/carbon"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "fakemetrics"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func generateMetrics(num int) []*schema.MetricData {
 	metrics := make([]*schema.MetricData, num)
@@ -55,7 +64,7 @@ func NewKafka(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
 	if err != nil {
-		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
+		log.Fatalf("failed to create kafka-mdm output. %s", err.Error())
 	}
 	return NewFakeMetrics(generateMetrics(num), out, stats)
 }
@@ -64,7 +73,7 @@ func NewCarbon(num int) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
 	out, err := carbon.New("localhost:2003", stats)
 	if err != nil {
-		log.Fatal(4, "failed to create kafka-mdm output. %s", err)
+		log.Fatalf("failed to create kafka-mdm output. %s", err.Error())
 	}
 	return NewFakeMetrics(generateMetrics(num), out, stats)
 }

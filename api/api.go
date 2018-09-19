@@ -16,7 +16,7 @@ import (
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/stats"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/macaron.v1"
 )
 
@@ -113,12 +113,12 @@ func (s *Server) Run() {
 	if s.SSL {
 		proto = "https"
 	}
-	log.Info("API Listening on: %v://%s/", proto, s.Addr)
+	log.Infof("API Listening on: %v://%s/", proto, s.Addr)
 
 	// define our own listner so we can call Close on it
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
-		log.Fatal(4, "API failed to listen on %s, %s", s.Addr, err.Error())
+		log.Fatalf("API failed to listen on %s, %s", s.Addr, err.Error())
 	}
 	go s.handleShutdown(l)
 	srv := http.Server{
@@ -129,7 +129,7 @@ func (s *Server) Run() {
 		var cert tls.Certificate
 		cert, err = tls.LoadX509KeyPair(s.certFile, s.keyFile)
 		if err != nil {
-			log.Fatal(4, "API Failed to start server: %v", err)
+			log.Fatalf("API Failed to start server: %v", err)
 		}
 		srv.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
@@ -142,7 +142,7 @@ func (s *Server) Run() {
 	}
 
 	if err != nil {
-		log.Info("API %s", err.Error())
+		log.Infof("API %s", err.Error())
 	}
 }
 
@@ -152,7 +152,7 @@ func (s *Server) Stop() {
 
 func (s *Server) handleShutdown(l net.Listener) {
 	<-s.shutdown
-	log.Info("API shutdown started.")
+	log.Infof("API shutdown started.")
 	l.Close()
 }
 

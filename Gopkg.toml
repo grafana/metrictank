@@ -37,8 +37,8 @@ unused-packages = true
   version = "1.10.1"
 
 [[constraint]]
-  name = "github.com/Sirupsen/logrus"
-  version = "0.7.3"
+  name = "github.com/sirupsen/logrus"
+  version = "1.0.6"
 
 [[constraint]]
   name = "github.com/alyu/configparser"
@@ -127,10 +127,6 @@ unused-packages = true
 [[constraint]]
   name = "github.com/raintank/schema"
   branch = "deprecate-gopkg-in"
-
-[[constraint]]
-  name = "github.com/raintank/worldping-api"
-  revision = "66b28f1160d1e0d7d236b5bd96a5d8eee627357c"
 
 [[constraint]]
   name = "github.com/rakyll/globalconf"

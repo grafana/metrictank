@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -210,7 +210,7 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 	if err != nil {
 		// the only errors returned are from us catching panics, so we should treat them
 		// all as internalServerErrors
-		log.Error(3, "HTTP getData() %s", err.Error())
+		log.Errorf("HTTP getData() %s", err.Error())
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
@@ -252,11 +252,11 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	} else {
 		peers, err = cluster.MembersForQuery()
 		if err != nil {
-			log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
 			return nil, err
 		}
 	}
-	log.Debug("HTTP %s across %d instances", name, len(peers)-1)
+	log.Debugf("HTTP %s across %d instances", name, len(peers)-1)
 
 	reqCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -273,11 +273,11 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 		wg.Add(1)
 		go func(peer cluster.Node) {
 			defer wg.Done()
-			log.Debug("HTTP Render querying %s%s", peer.GetName(), path)
+			log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 			buf, err := peer.Post(reqCtx, name, path, data)
 			if err != nil {
 				cancel()
-				log.Error(4, "HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
+				log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err.Error())
 			}
 			responses <- struct {
 				data PeerResponse
@@ -314,10 +314,10 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
 	if err != nil {
-		log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+		log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
 		return nil, err
 	}
-	log.Debug("HTTP %s across %d instances", name, len(peerGroups)-1)
+	log.Debugf("HTTP %s across %d instances", name, len(peerGroups)-1)
 
 	reqCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -332,7 +332,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 	}, 1)
 
 	askPeer := func(shardGroup int32, peer cluster.Node) {
-		log.Debug("HTTP Render querying %s%s", peer.GetName(), path)
+		log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 		buf, err := peer.Post(reqCtx, name, path, data)
 
 		select {
@@ -344,7 +344,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 
 		if err != nil {
 			cancel()
-			log.Error(4, "HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
+			log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err.Error())
 		}
 		responses <- struct {
 			shardGroup int32

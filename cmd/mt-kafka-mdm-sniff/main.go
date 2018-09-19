@@ -14,11 +14,12 @@ import (
 	"time"
 
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -92,7 +93,7 @@ func (ip inputPrinter) ProcessMetricData(metric *schema.MetricData, partition in
 
 	stdoutLock.Unlock()
 	if err != nil {
-		log.Error(0, "executing template: %s", err)
+		log.Errorf("executing template: %s", err.Error())
 	}
 }
 
@@ -109,7 +110,7 @@ func (ip inputPrinter) ProcessMetricPoint(point schema.MetricPoint, format msg.F
 	})
 	stdoutLock.Unlock()
 	if err != nil {
-		log.Error(0, "executing template: %s", err)
+		log.Errorf("executing template: %s", err.Error())
 	}
 }
 
@@ -125,7 +126,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "example: mt-kafka-mdm-sniff -format-point '{{.Time | date}}'")
 	}
 	flag.Parse()
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, 2))
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-kafka-mdm-sniff"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
 	instance := "mt-kafka-mdm-sniff" + strconv.Itoa(rand.Int())
 
 	// Only try and parse the conf file if it exists
@@ -138,7 +143,7 @@ func main() {
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
-		log.Fatal(4, "error with configuration file: %s", err)
+		log.Fatalf("error with configuration file: %s", err.Error())
 		os.Exit(1)
 	}
 	inKafkaMdm.ConfigSetup()
@@ -160,7 +165,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case sig := <-sigChan:
-		log.Info("Received signal %q. Shutting down", sig)
+		log.Infof("Received signal %q. Shutting down", sig)
 	case <-pluginFatal:
 		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
 	}

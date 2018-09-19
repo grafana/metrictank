@@ -9,14 +9,15 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	dryRun          = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
-	logLevel        = flag.Int("log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	logLevel        = flag.Int("log-level", 4, "log level. 0=PANIC|1=FATAL|2=ERROR|3=WARN|4=INFO|5=DEBUG")
 	srcCassAddr     = flag.String("src-cass-addr", "localhost", "Address of cassandra host to migrate from.")
 	dstCassAddr     = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
 	srcKeyspace     = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
@@ -39,7 +40,17 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, *logLevel))
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-index-migrate"
+	log.SetFormatter(formatter)
+
+	if *logLevel < 0 || *logLevel > 5 {
+		log.SetLevel(log.InfoLevel)
+	} else {
+		log.SetLevel(log.AllLevels[*logLevel])
+	}
 
 	defsChan := make(chan *schema.MetricDefinition, 100)
 
@@ -51,7 +62,7 @@ func main() {
 	srcCluster.Keyspace = *srcKeyspace
 	srcSession, err := srcCluster.CreateSession()
 	if err != nil {
-		log.Fatal(4, "failed to create cql session for source cassandra. %s", err)
+		log.Fatalf("failed to create cql session for source cassandra. %s", err.Error())
 	}
 	dstCluster := gocql.NewCluster(*dstCassAddr)
 	dstCluster.Consistency = gocql.ParseConsistency("one")
@@ -61,14 +72,14 @@ func main() {
 	dstCluster.Keyspace = *dstKeyspace
 	dstSession, err := dstCluster.CreateSession()
 	if err != nil {
-		log.Fatal(4, "failed to create cql session for destination cassandra. %s", err)
+		log.Fatalf("failed to create cql session for destination cassandra. %s", err.Error())
 	}
 
 	// ensure the dest table exists.
 	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
 	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace)).Exec()
 	if err != nil {
-		log.Fatal(4, "cassandra-idx failed to initialize cassandra table. %s", err)
+		log.Fatalf("cassandra-idx failed to initialize cassandra table. %s", err.Error())
 	}
 
 	wg.Add(1)
@@ -117,7 +128,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 				def.LastUpdate).Exec(); err != nil {
 
 				if (attempts % 20) == 0 {
-					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
+					log.Warnf("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
 				}
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -127,12 +138,12 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 				attempts++
 			} else {
 				success = true
-				log.Debug("cassandra-idx metricDef saved to cassandra. %s", def.Id)
+				log.Debugf("cassandra-idx metricDef saved to cassandra. %s", def.Id)
 				counter++
 			}
 		}
 	}
-	log.Info("Inserted %d metricDefs in %s", counter, time.Since(pre).String())
+	log.Infof("Inserted %d metricDefs in %s", counter, time.Since(pre).String())
 }
 
 func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
@@ -141,7 +152,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	defer close(defsChan)
 	partitioner, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
-		log.Fatal(4, "failed to initialize partitioner. %s", err)
+		log.Fatalf("failed to initialize partitioner. %s", err.Error())
 	}
 	iter := session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 
@@ -153,7 +164,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	for iter.Scan(&id, &orgId, &partition, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mkey, err := schema.MKeyFromString(id)
 		if err != nil {
-			log.Error(3, "could not parse ID %q: %s -> skipping", id, err)
+			log.Errorf("could not parse ID %q: %s -> skipping", id, err.Error())
 			continue
 		}
 		mdef := schema.MetricDefinition{
@@ -167,13 +178,13 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 			Tags:       tags,
 			LastUpdate: lastupdate,
 		}
-		log.Debug("retrieved %s from old index.", mdef.Id)
+		log.Debugf("retrieved %s from old index.", mdef.Id)
 		if *numPartitions == 1 {
 			mdef.Partition = 0
 		} else {
 			p, err := partitioner.Partition(&mdef, int32(*numPartitions))
 			if err != nil {
-				log.Fatal(4, "failed to get partition id of metric. %s", err)
+				log.Fatalf("failed to get partition id of metric. %s", err.Error())
 			} else {
 				mdef.Partition = p
 			}

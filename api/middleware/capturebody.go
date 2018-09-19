@@ -5,13 +5,13 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 func CaptureBody(c *Context) {
 	body, err := ioutil.ReadAll(c.Req.Request.Body)
 	if err != nil {
-		log.Error(3, "HTTP internal error: failed to read request body for proxying: %s", err)
+		log.Errorf("HTTP internal error: failed to read request body for proxying: %s", err.Error())
 		c.PlainText(http.StatusInternalServerError, []byte("internal error: failed to read request body for proxying"))
 	}
 	c.Req.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body))

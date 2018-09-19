@@ -8,13 +8,13 @@ package notifierNsq
 
 import (
 	"flag"
-	"log"
 	"strings"
 
 	"github.com/grafana/metrictank/stats"
 	"github.com/nsqio/go-nsq"
 	"github.com/raintank/misc/app"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -52,7 +52,7 @@ func ConfigProcess() {
 		return
 	}
 	if topic == "" {
-		log.Fatal(4, "topic for nsq-cluster cannot be empty")
+		log.Fatal("topic for nsq-cluster cannot be empty")
 	}
 
 	nsqdAdds = strings.Split(nsqdTCPAddrs, ",")
@@ -70,7 +70,7 @@ func ConfigProcess() {
 	pCfg.UserAgent = "metrictank-cluster"
 	err := app.ParseOpts(pCfg, producerOpts)
 	if err != nil {
-		log.Fatal(4, "nsq-cluster: failed to parse nsq producer options. %s", err)
+		log.Fatalf("nsq-cluster: failed to parse nsq producer options. %s", err)
 	}
 
 	// consumer
@@ -78,7 +78,7 @@ func ConfigProcess() {
 	cCfg.UserAgent = "metrictank-cluster"
 	err = app.ParseOpts(cCfg, consumerOpts)
 	if err != nil {
-		log.Fatal(4, "nsq-cluster: failed to parse nsq consumer options. %s", err)
+		log.Fatalf("nsq-cluster: failed to parse nsq consumer options. %s", err)
 	}
 	cCfg.MaxInFlight = maxInFlight
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // write aggregated data to cassandra.
@@ -118,7 +118,7 @@ func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	}
 	timeoutD, err := time.ParseDuration(timeout)
 	if err != nil {
-		log.Fatal(1, "cassandra_store: invalid duration value %q", timeout)
+		log.Fatalf("cassandra_store: invalid duration value %q", timeout)
 	}
 	return timeoutD
 }
@@ -150,7 +150,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
-		log.Error(3, "cassandra_store: failed to create cassandra session. %s", err.Error())
+		log.Errorf("cassandra_store: failed to create cassandra session. %s", err.Error())
 		return nil, err
 	}
 
@@ -161,13 +161,13 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 
 	// create or verify the metrictank keyspace
 	if config.CreateKeyspace {
-		log.Info("cassandra_store: ensuring that keyspace %s exists.", config.Keyspace)
+		log.Infof("cassandra_store: ensuring that keyspace %s exists.", config.Keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, config.Keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, table := range ttlTables {
-			log.Info("cassandra_store: ensuring that table %s exists.", table.Name)
+			log.Infof("cassandra_store: ensuring that table %s exists.", table.Name)
 			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
@@ -184,7 +184,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		for attempt := 1; attempt > 0; attempt++ {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(config.Keyspace)
 			if err != nil {
-				log.Warn("cassandra keyspace not found; attempt: %v", attempt)
+				log.Warnf("cassandra keyspace not found; attempt: %v", attempt)
 				if attempt >= 5 {
 					return nil, err
 				}
@@ -192,7 +192,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 			} else {
 				for _, table := range ttlTables {
 					if _, ok := keyspaceMetadata.Tables[table.Name]; !ok {
-						log.Warn("cassandra table %s not found; attempt: %v", table.Name, attempt)
+						log.Warnf("cassandra table %s not found; attempt: %v", table.Name, attempt)
 						if attempt >= 5 {
 							return nil, err
 						}
@@ -240,7 +240,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("CS: created session with config %+v", config)
+	log.Debugf("CS: created session with config %+v", config)
 	c := &CassandraStore{
 		Session:          session,
 		writeQueues:      make([]chan *mdata.ChunkWriteRequest, config.WriteConcurrency),
@@ -327,7 +327,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
-			log.Debug("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
+			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
@@ -342,12 +342,12 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 					success = true
 					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
 					mdata.SendPersistMessage(keyStr, cwr.Chunk.T0)
-					log.Debug("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.T0, cwr.Chunk)
+					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
 					if (attempts % 20) == 0 {
-						log.Warn("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Chunk, err)
+						log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Chunk, err)
 					}
 					chunkSaveFail.Inc()
 					sleepTime := 100 * attempts

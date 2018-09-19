@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 type Error interface {
@@ -93,7 +93,7 @@ func (r *ErrorResp) Headers() (headers map[string]string) {
 func (r *ErrorResp) ValidateAndFixCode() {
 	// 599 is max HTTP status code
 	if r.code > 599 {
-		log.Warn("Encountered invalid HTTP status code %d, printing stack", r.code)
+		log.Warnf("Encountered invalid HTTP status code %d, printing stack", r.code)
 		debug.PrintStack()
 		r.code = http.StatusInternalServerError
 	}

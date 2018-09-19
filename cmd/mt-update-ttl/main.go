@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"strings"
@@ -12,9 +11,11 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
 
 const maxToken = math.MaxInt64 // 9223372036854775807
@@ -48,6 +49,14 @@ var (
 	doneKeys uint64
 	doneRows uint64
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-update-ttl"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	flag.Usage = func() {

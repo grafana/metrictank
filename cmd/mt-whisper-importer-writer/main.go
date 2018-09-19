@@ -12,16 +12,17 @@ import (
 
 	"github.com/raintank/schema"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -77,6 +78,14 @@ type Server struct {
 	Partitioner partitioner.Partitioner
 	Index       idx.MetricIndex
 	HTTPServer  *http.Server
+}
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "mt-whisper-importer-writer"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
 }
 
 func main() {

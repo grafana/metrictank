@@ -13,8 +13,8 @@ import (
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -240,7 +240,7 @@ func (c *CCache) evict(target *accnt.EvictTarget) {
 		return
 	}
 
-	log.Debug("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
+	log.Debugf("CCache evict: evicting chunk %d on metric %s\n", target.Ts, target.Metric)
 	length := c.metricCache[target.Metric].Del(target.Ts)
 	if length == 0 {
 		delete(c.metricCache, target.Metric)

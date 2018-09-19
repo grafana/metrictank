@@ -3,7 +3,6 @@ package chaos_cluster
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"reflect"
@@ -11,11 +10,13 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
+	log "github.com/sirupsen/logrus"
 )
 
 // TODO: cleanup when ctrl-C go test (teardown all containers)
@@ -25,6 +26,13 @@ const numPartitions = 12
 var tracker *track.Tracker
 var fm *fakemetrics.FakeMetrics
 
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.ModuleName = "chaos_cluster_test"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 func TestMain(m *testing.M) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -33,7 +41,7 @@ func TestMain(m *testing.M) {
 	cmd.Dir = docker.Path("docker/docker-chaos")
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	fmt.Println("launching docker-chaos stack...")
@@ -42,12 +50,12 @@ func TestMain(m *testing.M) {
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	retcode := m.Run()
