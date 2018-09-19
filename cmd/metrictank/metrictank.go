@@ -72,10 +72,6 @@ var (
 	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
 	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
-
-	tracingEnabled = flag.Bool("tracing-enabled", false, "enable/disable distributed opentracing via jaeger")
-	tracingAddr    = flag.String("tracing-addr", "localhost:6831", "address of the jaeger agent to send data to")
-	tracingAddTags = flag.String("tracing-add-tags", "", "tracer/process-level tags to include, specified as comma-separated key:value pairs")
 )
 
 func init() {
@@ -249,20 +245,7 @@ func main() {
 	/***********************************
 		Initialize tracer
 	***********************************/
-	*tracingAddTags = strings.TrimSpace(*tracingAddTags)
-	var tags map[string]string
-	if len(*tracingAddTags) > 0 {
-		tagSpecs := strings.Split(*tracingAddTags, ",")
-		tags = make(map[string]string)
-		for _, tagSpec := range tagSpecs {
-			split := strings.Split(tagSpec, ":")
-			if len(split) != 2 {
-				log.Fatal(4, "cannot parse tracing-add-tags value %q", tagSpec)
-			}
-			tags[split[0]] = split[1]
-		}
-	}
-	tracer, traceCloser, err := conf.GetTracer(*tracingEnabled, *tracingAddr, tags)
+	tracer, traceCloser, err := conf.GetTracer()
 	if err != nil {
 		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
 	}

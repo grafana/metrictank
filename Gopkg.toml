@@ -105,10 +105,6 @@ unused-packages = true
   revision = "642a3f9935f12cb3b747294318d730f56f4c34b4"
 
 [[constraint]]
-  name = "github.com/opentracing/opentracing-go"
-  branch = "master"
-
-[[constraint]]
   name = "github.com/raintank/dur"
   branch = "v2"
 
@@ -159,6 +155,8 @@ unused-packages = true
 [[constraint]]
   name = "github.com/uber/jaeger-client-go"
   source = "https://github.com/jaegertracing/jaeger-client-go.git"
+  version = "2.14.0"
+
 
 [[override]]
   name = "github.com/uber/jaeger-lib"

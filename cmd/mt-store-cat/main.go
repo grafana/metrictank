@@ -167,7 +167,7 @@ func main() {
 	if err != nil {
 		log.Fatal(4, "failed to initialize cassandra. %s", err)
 	}
-	tracer, traceCloser, err := conf.GetTracer(false, "", nil)
+	tracer, traceCloser, err := conf.GetTracer()
 	if err != nil {
 		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
 	}
