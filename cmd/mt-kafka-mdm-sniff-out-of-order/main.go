@@ -181,7 +181,6 @@ func main() {
 	flag.Parse()
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
-	formatter.ModuleName = "mt-kafka-mdm-sniff-out-of-order"
 	log.SetFormatter(formatter)
 	log.SetLevel(log.InfoLevel)
 	instance := "mt-kafka-mdm-sniff-out-of-order" + strconv.Itoa(rand.Int())

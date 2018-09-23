@@ -16,8 +16,8 @@ import (
 )
 
 var (
+	logLevel        = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 	dryRun          = flag.Bool("dry-run", true, "run in dry-run mode. No changes will be made.")
-	logLevel        = flag.Int("log-level", 4, "log level. 0=PANIC|1=FATAL|2=ERROR|3=WARN|4=INFO|5=DEBUG")
 	srcCassAddr     = flag.String("src-cass-addr", "localhost", "Address of cassandra host to migrate from.")
 	dstCassAddr     = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
 	srcKeyspace     = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
@@ -43,13 +43,14 @@ func main() {
 
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
-	formatter.ModuleName = "mt-index-migrate"
 	log.SetFormatter(formatter)
-
-	if *logLevel < 0 || *logLevel > 5 {
+	lvl, err := log.ParseLevel(*logLevel)
+	if err != nil {
 		log.SetLevel(log.InfoLevel)
+		log.Errorf("failed to parse log-level, setting logging level to 'info', err: %s", err.Error())
 	} else {
-		log.SetLevel(log.AllLevels[*logLevel])
+		log.SetLevel(lvl)
+		log.Infof("logging level set to '%s'", *logLevel)
 	}
 
 	defsChan := make(chan *schema.MetricDefinition, 100)

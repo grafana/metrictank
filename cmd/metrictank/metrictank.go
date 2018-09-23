@@ -41,7 +41,6 @@ import (
 )
 
 var (
-	logLevel     int
 	warmupPeriod time.Duration
 	startupTime  time.Time
 	gitHash      = "(none)"
@@ -51,6 +50,9 @@ var (
 	apiServer   *api.Server
 	inputs      []input.Plugin
 	store       mdata.Store
+
+	// Logging:
+	logLevel = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
@@ -78,10 +80,6 @@ var (
 	tracingAddr    = flag.String("tracing-addr", "localhost:6831", "address of the jaeger agent to send data to")
 	tracingAddTags = flag.String("tracing-add-tags", "", "tracer/process-level tags to include, specified as comma-separated key:value pairs")
 )
-
-func init() {
-	flag.IntVar(&logLevel, "log-level", 4, "log level. 0=PANIC|1=FATAL|2=ERROR|3=WARN|4=INFO|5=DEBUG")
-}
 
 func main() {
 	startupTime = time.Now()
@@ -142,29 +140,14 @@ func main() {
 
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
-	formatter.ModuleName = "metrictank"
 	log.SetFormatter(formatter)
-
-	mdata.LogLevel = logLevel
-	memory.LogLevel = logLevel
-	inKafkaMdm.LogLevel = logLevel
-	api.LogLevel = logLevel
-	// workaround for https://github.com/grafana/grafana/issues/4055
-	switch logLevel {
-	case 0:
-		log.SetLevel(log.PanicLevel)
-	case 1:
-		log.SetLevel(log.FatalLevel)
-	case 2:
-		log.SetLevel(log.ErrorLevel)
-	case 3:
-		log.SetLevel(log.WarnLevel)
-	case 4:
+	lvl, err := log.ParseLevel(*logLevel)
+	if err != nil {
 		log.SetLevel(log.InfoLevel)
-	case 5:
-		log.SetLevel(log.DebugLevel)
-	default:
-		log.SetLevel(log.InfoLevel)
+		log.Errorf("failed to parse log-level, setting logging level to 'info', err: %s", err.Error())
+	} else {
+		log.SetLevel(lvl)
+		log.Infof("logging level set to '%s'", *logLevel)
 	}
 
 	/***********************************

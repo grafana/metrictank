@@ -1,5 +1,5 @@
-//Package logger provides a custom TextFormatter for use with the github.com/sirupsen/logrus library.
-//Please refer to https://github.com/sirupsen/logrus#formatters for general usage guidelines.
+// Package logger provides a custom TextFormatter for use with the github.com/sirupsen/logrus library.
+// Please refer to https://github.com/sirupsen/logrus#formatters for general usage guidelines on logrus formatters.
 package logger
 
 import (
@@ -39,7 +39,7 @@ type TextFormatter struct {
 	QuoteCharacter string
 
 	// The name of the module (webserver, redis, cluster-kafka, etc...),
-	// prints before the log message
+	// prints before the log message, doesn't print if empty
 	ModuleName string
 
 	sync.Once

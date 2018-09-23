@@ -21,8 +21,6 @@ import (
 )
 
 var (
-	LogLevel int
-
 	// metric idx.memory.ops.update is the number of updates to the memory idx
 	statUpdate = stats.NewCounter32("idx.memory.ops.update")
 	// metric idx.memory.ops.add is the number of additions to the memory idx

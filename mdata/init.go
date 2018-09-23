@@ -16,8 +16,6 @@ import (
 )
 
 var (
-	LogLevel int
-
 	// metric tank.chunk_operations.create is a counter of how many chunks are created
 	chunkCreate = stats.NewCounter32("tank.chunk_operations.create")
 

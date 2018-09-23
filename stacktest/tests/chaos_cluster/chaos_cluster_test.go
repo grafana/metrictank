@@ -29,7 +29,6 @@ var fm *fakemetrics.FakeMetrics
 func init() {
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
-	formatter.ModuleName = "chaos_cluster_test"
 	log.SetFormatter(formatter)
 	log.SetLevel(log.InfoLevel)
 }

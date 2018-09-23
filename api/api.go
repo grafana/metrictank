@@ -20,8 +20,6 @@ import (
 	"gopkg.in/macaron.v1"
 )
 
-var LogLevel int
-
 var (
 	// metric api.get_target is how long it takes to get a target
 	getTargetDuration = stats.NewLatencyHistogram15s32("api.get_target")
@@ -152,7 +150,7 @@ func (s *Server) Stop() {
 
 func (s *Server) handleShutdown(l net.Listener) {
 	<-s.shutdown
-	log.Infof("API shutdown started.")
+	log.Info("API shutdown started.")
 	l.Close()
 }
 

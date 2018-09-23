@@ -44,7 +44,6 @@ func (k *KafkaMdm) Name() string {
 	return "kafka-mdm"
 }
 
-var LogLevel int
 var Enabled bool
 var orgId uint
 var brokerStr string

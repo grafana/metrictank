@@ -665,10 +665,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	span.SetTag("points_fetch", pointsFetch)
 	span.SetTag("points_return", pointsReturn)
 
-	if LogLevel >= 5 {
-		for _, req := range reqs {
-			log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
-		}
+	for _, req := range reqs {
+		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 	}
 
 	out, err := s.getTargets(ctx, reqs)
