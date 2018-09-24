@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/grafana/metrictank/stacktest/track"
+	log "github.com/sirupsen/logrus"
 )
 
 var cli *client.Client
@@ -16,7 +17,9 @@ func init() {
 	var err error
 	cli, err = client.NewEnvClient()
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to create new client")
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -56,7 +56,9 @@ func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Dur
 func (g *Graphite) reporter(interval int) {
 	ticker := tick(time.Duration(interval) * time.Second)
 	for now := range ticker {
-		log.Debug("stats flushing for", now, "to graphite")
+		log.WithFields(log.Fields{
+			"ticker": now,
+		}).Debug("stats flushing to graphite")
 		queueItems.Value(len(g.toGraphite))
 		if cap(g.toGraphite) != 0 && len(g.toGraphite) == cap(g.toGraphite) {
 			// no space in buffer, no use in doing any work
@@ -95,11 +97,16 @@ func (g *Graphite) writer() {
 			time.Sleep(time.Second)
 			conn, err = net.Dial("tcp", g.addr)
 			if err == nil {
-				log.Info("stats now connected to %s", g.addr)
+				log.WithFields(log.Fields{
+					"tcp.addr": g.addr,
+				}).Info("stats now connected to graphite")
 				wg.Add(1)
 				go g.checkEOF(conn, &wg)
 			} else {
-				log.Warn("stats dialing %s failed: %s. will retry", g.addr, err.Error())
+				log.WithFields(log.Fields{
+					"tcp.addr": g.addr,
+					"error":    err.Error(),
+				}).Warn("stats dialing failed, will retry")
 			}
 			connected.Set(conn != nil)
 		}
@@ -117,7 +124,10 @@ func (g *Graphite) writer() {
 				ok = true
 				flushDuration.Value(time.Since(pre))
 			} else {
-				log.Warn("stats failed to write to graphite: %s (took %s). will retry...", err, time.Now().Sub(pre))
+				log.WithFields(log.Fields{
+					"time.elapsed": time.Now().Sub(pre),
+					"error":        err.Error(),
+				}).Warn("stats failed to write to graphite, will retry")
 				conn.Close()
 				wg.Wait()
 				conn = nil
@@ -136,19 +146,23 @@ func (g *Graphite) checkEOF(conn net.Conn, wg *sync.WaitGroup) {
 	for {
 		num, err := conn.Read(b)
 		if err == io.EOF {
-			log.Info("Graphite.checkEOF: remote closed conn. closing conn")
+			log.Info("Graphite.checkEOF: remote closed conn, closing conn")
 			conn.Close()
 			return
 		}
 
 		// in case the remote behaves badly (out of spec for carbon protocol)
 		if num != 0 {
-			log.Warn("Graphite.checkEOF: read unexpected data from peer: %s\n", b[:num])
+			log.WithFields(log.Fields{
+				"data": b[:num],
+			}).Warn("Graphite.checkEOF: read unexpected data from peer")
 			continue
 		}
 
 		if err != io.EOF {
-			log.Warn("Graphite.checkEOF: %s. closing conn\n", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Warn("Graphite.checkEOF: error, closing conn\n")
 			conn.Close()
 			return
 		}

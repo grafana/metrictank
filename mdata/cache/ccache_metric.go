@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // CCacheMetric caches data chunks
@@ -106,15 +106,22 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			if prev == 0 {
 				prev = res
 			} else if prev != res {
-				log.Warn("CCacheMetric AddRange: 'prev' param disagrees with seek: key = %s, prev = %d, seek = %d",
-					mc.MKey.String(), prev, res)
+				log.WithFields(log.Fields{
+					"key":  mc.MKey.String(),
+					"prev": prev,
+					"seek": res,
+				}).Warn("CCacheMetric: AddRange(), 'prev' param disagrees with seek")
 			}
 		}
 
 		// if the previous chunk is cached, link it
 		if prev != 0 && (ts-prev) != (itergens[1].Ts-ts) {
-			log.Warn("CCacheMetric AddRange: Bad prev begin used: key = %s, prev = %d, itergens[0].Ts = %d, itergens[1].Ts = %d",
-				mc.MKey.String(), prev, itergens[0].Ts, itergens[1].Ts)
+			log.WithFields(log.Fields{
+				"key":           mc.MKey.String(),
+				"prev":          prev,
+				"itergens.0.ts": itergens[0].Ts,
+				"itergens.1.ts": itergens[1].Ts,
+			}).Warn("CCacheMetric: AddRange(), bad prev being used")
 			prev = 0
 		} else if _, ok := mc.chunks[prev]; ok {
 			mc.chunks[prev].Next = ts
@@ -217,7 +224,10 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 
 	nextTs := mc.nextTs(ts)
 
-	log.Debug("CCacheMetric Add: caching chunk ts %d, nextTs %d", ts, nextTs)
+	log.WithFields(log.Fields{
+		"timestamp":      ts,
+		"next.timestamp": nextTs,
+	}).Debug("CCacheMetric: Add(), caching chunk")
 
 	// if previous chunk has not been passed we try to be smart and figure it out.
 	// this is common in a scenario where a metric continuously gets queried
@@ -227,8 +237,11 @@ func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
 		if prev == 0 {
 			prev = res
 		} else if prev != res {
-			log.Warn("CCacheMetric Add: 'prev' param disagrees with seek: key = %s, prev = %d, seek = %d",
-				mc.MKey.String(), prev, res)
+			log.WithFields(log.Fields{
+				"key":  mc.MKey.String(),
+				"prev": prev,
+				"seek": res,
+			}).Warn("CCacheMetric: Add(), 'prev' param disagrees with seek")
 		}
 	}
 
@@ -314,16 +327,23 @@ func (mc *CCacheMetric) lastTs() uint32 {
 // if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekAsc(ts uint32) (uint32, bool) {
-	log.Debug("CCacheMetric seekAsc: seeking for %d in the keys %+d", ts, mc.keys)
+	log.WithFields(log.Fields{
+		"timestamp": ts,
+		"keys":      mc.keys,
+	}).Debug("CCacheMetric: seekAsc(), seeking for timestamp in the keys")
 
 	for i := 0; i < len(mc.keys) && mc.keys[i] <= ts; i++ {
 		if mc.nextTs(mc.keys[i]) > ts {
-			log.Debug("CCacheMetric seekAsc: seek found ts %d is between %d and %d", ts, mc.keys[i], mc.nextTs(mc.keys[i]))
+			log.WithFields(log.Fields{
+				"timestamp": ts,
+				"first.key": mc.keys[i],
+				"last.key":  mc.nextTs(mc.keys[i]),
+			}).Debug("CCacheMetric: seekAsc(), seek found ts between keys")
 			return mc.keys[i], true
 		}
 	}
 
-	log.Debug("CCacheMetric seekAsc: seekAsc unsuccessful")
+	log.Debug("CCacheMetric: seekAsc(), unsuccessful")
 	return 0, false
 }
 
@@ -331,16 +351,23 @@ func (mc *CCacheMetric) seekAsc(ts uint32) (uint32, bool) {
 // if not found or can't be sure returns 0, false
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) seekDesc(ts uint32) (uint32, bool) {
-	log.Debug("CCacheMetric seekDesc: seeking for %d in the keys %+d", ts, mc.keys)
+	log.WithFields(log.Fields{
+		"timestamp": ts,
+		"keys":      mc.keys,
+	}).Debug("CCacheMetric: seekDesc(), seeking for timestamp in keys")
 
 	for i := len(mc.keys) - 1; i >= 0 && mc.nextTs(mc.keys[i]) > ts; i-- {
 		if mc.keys[i] <= ts {
-			log.Debug("CCacheMetric seekDesc: seek found ts %d is between %d and %d", ts, mc.keys[i], mc.nextTs(mc.keys[i]))
+			log.WithFields(log.Fields{
+				"timestamp": ts,
+				"first.key": mc.keys[i],
+				"last.key":  mc.nextTs(mc.keys[i]),
+			}).Debug("CCacheMetric: seekDesc(), seek found timestamp between keys")
 			return mc.keys[i], true
 		}
 	}
 
-	log.Debug("CCacheMetric seekDesc: seekDesc unsuccessful")
+	log.Debug("CCacheMetric: seekDesc() unsuccessful")
 	return 0, false
 }
 
@@ -352,7 +379,9 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
-		log.Debug("CCacheMetric searchForward: forward search adds chunk ts %d to start", ts)
+		log.WithFields(log.Fields{
+			"timestamp": ts,
+		}).Debug("CCacheMetric: searchForward(), forward search adds chunk to start")
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
 		nextTs := mc.nextTs(ts)
 		res.From = nextTs
@@ -362,7 +391,13 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 			break
 		}
 		if mc.chunks[ts].Next != 0 && ts >= mc.chunks[ts].Next {
-			log.Warn("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
+			log.WithFields(log.Fields{
+				"metric":            metric,
+				"from":              from,
+				"until":             until,
+				"current.timestamp": ts,
+				"next.timestamp":    mc.chunks[ts].Next,
+			}).Warn("CCacheMetric: searchForward(), suspected bug suppressed")
 			span := opentracing.SpanFromContext(ctx)
 			span.SetTag("searchForwardBug", true)
 			searchFwdBug.Inc()
@@ -382,7 +417,9 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 			break
 		}
 
-		log.Debug("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
+		log.WithFields(log.Fields{
+			"timestamp": ts,
+		}).Debug("CCacheMetric: searchBackward(), backward search adds chunk to end")
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		res.Until = ts
 	}
@@ -417,7 +454,11 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 	}
 
 	if !res.Complete && res.From > res.Until {
-		log.Warn("CCacheMetric Search: Found from > until (%d/%d), key = %s, printing chunks\n", res.From, res.Until, mc.MKey.String())
+		log.WithFields(log.Fields{
+			"from":  res.From,
+			"until": res.Until,
+			"key":   mc.MKey.String(),
+		}).Warn("CCacheMetric: Search(), found  from > until, printing chunks")
 		mc.debugMetric(from-7200, until+7200)
 		res.Complete = false
 		res.Start = res.Start[:0]
@@ -428,11 +469,18 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 }
 
 func (mc *CCacheMetric) debugMetric(from, until uint32) {
-	log.Warn("CCacheMetric debugMetric: --- debugging metric between %d and %d ---\n", from, until)
+	log.WithFields(log.Fields{
+		"from":  from,
+		"until": until,
+	}).Warn("CCacheMetric: debugMetric(), debugging metric between timestamps")
 	for _, key := range mc.keys {
 		if key >= from && key <= until {
-			log.Warn("CCacheMetric debugMetric: ts %d; prev %d; next %d\n", key, mc.chunks[key].Prev, mc.chunks[key].Next)
+			log.WithFields(log.Fields{
+				"key":  key,
+				"prev": mc.chunks[key].Prev,
+				"next": mc.chunks[key].Next,
+			}).Warn("CCacheMetric: debugMetric()")
 		}
 	}
-	log.Warn("CCacheMetric debugMetric: ------------------------\n")
+	log.Warn("CCacheMetric: debugMetric() ------------------------\n")
 }

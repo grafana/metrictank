@@ -1,12 +1,11 @@
 package stats
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
-)
 
-var errFmtMetricExists = "fatal: metric %q already exists as type %T"
+	log "github.com/sirupsen/logrus"
+)
 
 // Registry tracks metrics and reporters
 type Registry struct {
@@ -31,7 +30,10 @@ func (r *Registry) getOrAdd(name string, metric GraphiteMetric) GraphiteMetric {
 			r.Unlock()
 			return existing
 		}
-		panic(fmt.Sprintf(errFmtMetricExists, name, existing))
+		log.WithFields(log.Fields{
+			"existing.metric.name": name,
+			"existing.metric.type": existing,
+		}).Panic("metric already exists")
 	}
 	r.metrics[name] = metric
 	r.Unlock()

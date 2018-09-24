@@ -10,6 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var QueryTime int64
@@ -108,7 +109,7 @@ func Template(format string) func(d schema.MetricDefinition) {
 	return func(d schema.MetricDefinition) {
 		err := tpl.Execute(os.Stdout, d)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	}
 }

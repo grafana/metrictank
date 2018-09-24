@@ -6,7 +6,7 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // AggMetrics is an in-memory store of AggMetric objects
@@ -48,7 +48,7 @@ func (ms *AggMetrics) GC() {
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
-		log.Info("checking for stale chunks that need persisting.")
+		log.Info("checking for stale chunks that need persisting")
 		now := uint32(time.Now().Unix())
 		chunkMinTs := now - uint32(ms.chunkMaxStale)
 		metricMinTs := now - uint32(ms.metricMaxStale)
@@ -68,7 +68,9 @@ func (ms *AggMetrics) GC() {
 			a := ms.Metrics[key]
 			ms.RUnlock()
 			if a.GC(now, chunkMinTs, metricMinTs) {
-				log.Debug("metric %s is stale. Purging data from memory.", key)
+				log.WithFields(log.Fields{
+					"metric": key,
+				}).Debug("metric is stale, purging data from memory")
 				ms.Lock()
 				delete(ms.Metrics, key)
 				metricsActive.Set(len(ms.Metrics))

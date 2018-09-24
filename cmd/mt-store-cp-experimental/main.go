@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -12,7 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
 )
@@ -61,6 +63,13 @@ var (
 )
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "mt-store-cp [flags] table-in [table-out]")
 		fmt.Fprintln(os.Stderr)
@@ -86,19 +95,23 @@ func main() {
 	}
 
 	if sourceCassandraAddrs == destCassandraAddrs && tableIn == tableOut {
-		panic("Source and destination cannot be the same")
+		log.Panic("source and destination cannot be the same")
 	}
 
 	sourceSession, err := NewCassandraStore(sourceCassandraAddrs)
 
 	if err != nil {
-		panic(fmt.Sprintf("Failed to instantiate source cassandra: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to instantiate source cassandra")
 	}
 
 	destSession, err := NewCassandraStore(destCassandraAddrs)
 
 	if err != nil {
-		panic(fmt.Sprintf("Failed to instantiate dest cassandra: %s", err))
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("failed to instantiate dest cassandra")
 	}
 
 	update(sourceSession, destSession, tableIn, tableOut)
@@ -160,29 +173,42 @@ func fetchPartitionIds(sourceSession *gocql.Session) {
 	if *partitions == "*" {
 		return
 	}
-	log.Println("Fetching ids for partitions ", *partitions)
+	log.WithFields(log.Fields{
+		"partitions": *partitions,
+	}).Info("fetching ids for partitions")
 	partitionIdMap = make(map[string]struct{})
 	partitionStrs := strings.Split(*partitions, ",")
 	selectQuery := fmt.Sprintf("SELECT id FROM %s where partition=?", *idxTable)
 	for _, p := range partitionStrs {
 		if *verbose {
-			log.Println("Fetching ids for partition ", p)
+			log.WithFields(log.Fields{
+				"partition": p,
+			}).Info("fetching ids for partition")
 		}
 		partition, err := strconv.Atoi(p)
 		if err != nil {
-			panic(fmt.Sprintf("Could not parse partition %q, error = %s", p, err))
+			log.WithFields(log.Fields{
+				"error":     err.Error(),
+				"partition": p,
+			}).Panic("could not parse partition")
 		}
 		keyItr := sourceSession.Query(selectQuery, partition).Iter()
 		var key string
 		for keyItr.Scan(&key) {
 			partitionIdMap[key] = struct{}{}
 			if len(partitionIdMap)%10000 == 0 {
-				log.Println("Loading...", len(partitionIdMap), " ids processed, processing partition ", p)
+				log.WithFields(log.Fields{
+					"num.ids.processed": len(partitionIdMap),
+					"current.partition": p,
+				}).Info("loading...")
 			}
 		}
 		err = keyItr.Close()
 		if err != nil {
-			panic(fmt.Sprintf("Failed querying for partition key %q, error = %s", p, err))
+			log.WithFields(log.Fields{
+				"error":         err.Error(),
+				"partition.key": p,
+			}).Panic("failed querying for partition key")
 		}
 	}
 }
@@ -224,8 +250,16 @@ func printProgress(id int, token int64, doneRowsSnap uint64) {
 	ratioLeft := (1 - completeness) / completeness
 	timeRemaining := time.Duration(float64(timeElapsed) * ratioLeft)
 	rowsPerSec := doneRowsSnap / (uint64(1) + uint64(timeElapsed/time.Second))
-	log.Printf("WORKING: id=%d processed %d keys, %d rows, last token = %d, %.1f%% complete, elapsed=%v, remaining=%v, rows/s=%d",
-		id, doneKeysSnap, doneRowsSnap, token, completeness*100, roundToSeconds(timeElapsed), roundToSeconds(timeRemaining), rowsPerSec)
+	log.WithFields(log.Fields{
+		"id":              id,
+		"keys.processed":  doneKeysSnap,
+		"rows.processed":  doneRowsSnap,
+		"last.token":      token,
+		"completed":       strconv.FormatFloat((completeness*100), 'f', 1, 64) + "%",
+		"elapsed":         roundToSeconds(timeElapsed),
+		"remaining":       roundToSeconds(timeRemaining),
+		"rows.per.second": rowsPerSec,
+	}).Info("working")
 }
 
 func publishBatchUntilSuccess(destSession *gocql.Session, batch *gocql.Batch) *gocql.Batch {
@@ -238,7 +272,9 @@ func publishBatchUntilSuccess(destSession *gocql.Session, batch *gocql.Batch) *g
 		if err == nil {
 			break
 		}
-		fmt.Fprintf(os.Stderr, "ERROR: failed to publish batch, trying again. error = %q\n", err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("failed to publish batch, trying again")
 	}
 
 	return destSession.NewBatch(gocql.UnloggedBatch)
@@ -270,14 +306,27 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 		for iter.Scan(&token, &ts, &data, &ttl) {
 
 			if *verbose {
-				log.Printf("id=%d processing rownum=%d table=%q key=%q ts=%d query=%q data='%x'\n", id, atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, query, data)
+				log.WithFields(log.Fields{
+					"id":    id,
+					"row":   atomic.LoadUint64(&doneRows),
+					"table": tableIn,
+					"key":   key,
+					"ts":    ts,
+					"query": query,
+					"data":  data,
+				}).Info("working")
 			}
 
 			batch.Query(insertQuery, data, key, ts, ttl)
 
 			if batch.Size() >= *maxBatchSize {
 				if *verbose {
-					log.Printf("id=%d sending batch size=%d for key=%q ts=%d'\n", id, batch.Size(), key, ts)
+					log.WithFields(log.Fields{
+						"id":         id,
+						"batch.size": batch.Size(),
+						"key":        key,
+						"ts":         ts,
+					}).Info("sending batch")
 				}
 				batch = publishBatchUntilSuccess(destSession, batch)
 			}
@@ -298,7 +347,13 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 		if err != nil {
 			doneKeysSnap := atomic.LoadUint64(&doneKeys)
 			doneRowsSnap := atomic.LoadUint64(&doneRows)
-			fmt.Fprintf(os.Stderr, "ERROR: id=%d failed querying %s: %q. processed %d keys, %d rows\n", id, tableIn, err, doneKeysSnap, doneRowsSnap)
+			log.WithFields(log.Fields{
+				"id":             id,
+				"table":          tableIn,
+				"error":          err,
+				"keys.processed": doneKeysSnap,
+				"rows.processed": doneRowsSnap,
+			}).Error("failed querying")
 		}
 		atomic.AddUint64(&doneKeys, 1)
 	}
@@ -332,7 +387,12 @@ func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string)
 
 		err := keyItr.Close()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows\n", tableIn, err, doneKeys, doneRows)
+			log.WithFields(log.Fields{
+				"table":          tableIn,
+				"error":          err,
+				"keys.processed": doneKeys,
+				"rows.processed": doneRows,
+			}).Error("failed querying")
 		} else {
 			break
 		}
@@ -341,5 +401,8 @@ func update(sourceSession, destSession *gocql.Session, tableIn, tableOut string)
 	close(jobs)
 
 	wg.Wait()
-	log.Printf("DONE.  Processed %d keys, %d rows\n", doneKeys, doneRows)
+	log.WithFields(log.Fields{
+		"keys.processed": doneKeys,
+		"rows.processed": doneRows,
+	}).Info("done")
 }

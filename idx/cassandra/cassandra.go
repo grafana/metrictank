@@ -16,8 +16,8 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -170,12 +170,14 @@ func (c *CasIdx) InitBare() error {
 
 	// create the keyspace or ensure it exists
 	if createKeyspace {
-		log.Info("cassandra-idx: ensuring that keyspace %s exist.", keyspace)
+		log.WithFields(log.Fields{
+			"keyspace": keyspace,
+		}).Info("cassandra-idx: ensuring that keyspace exists")
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		log.Info("cassandra-idx: ensuring that table metric_idx exist.")
+		log.Info("cassandra-idx: ensuring that table metric_idx exists")
 		err = tmpSession.Query(fmt.Sprintf(schemaTable, keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
@@ -188,7 +190,9 @@ func (c *CasIdx) InitBare() error {
 				if attempt >= 5 {
 					return fmt.Errorf("cassandra keyspace not found. %d attempts", attempt)
 				}
-				log.Warn("cassandra-idx cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
+				log.WithFields(log.Fields{
+					"attempt": attempt,
+				}).Warn("cassandra-idx: cassandra keyspace not found, retrying in 5s")
 				time.Sleep(5 * time.Second)
 			} else {
 				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
@@ -197,7 +201,9 @@ func (c *CasIdx) InitBare() error {
 					if attempt >= 5 {
 						return fmt.Errorf("cassandra table not found. %d attempts", attempt)
 					}
-					log.Warn("cassandra-idx cassandra table not found. retrying in 5s. attempt: %d", attempt)
+					log.WithFields(log.Fields{
+						"attempt": attempt,
+					}).Warn("cassandra-idx: cassandra table not found, retrying in 5s")
 					time.Sleep(5 * time.Second)
 				}
 			}
@@ -220,7 +226,9 @@ func (c *CasIdx) InitBare() error {
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
-	log.Info("initializing cassandra-idx. Hosts=%s", hosts)
+	log.WithFields(log.Fields{
+		"hosts": hosts,
+	}).Info("initializing cassandra-idx")
 	if err := c.MemoryIdx.Init(); err != nil {
 		return err
 	}
@@ -234,7 +242,9 @@ func (c *CasIdx) Init() error {
 		for i := 0; i < numConns; i++ {
 			go c.processWriteQueue()
 		}
-		log.Info("cassandra-idx started %d writeQueue handlers", numConns)
+		log.WithFields(log.Fields{
+			"num.write.queue.handlers": numConns,
+		}).Info("cassandra-idx: started write queue handlers")
 	}
 
 	//Rebuild the in-memory index.
@@ -368,7 +378,10 @@ func (c *CasIdx) rebuildIndex() {
 	defs = c.LoadPartitions(cluster.Manager.GetPartitions(), defs, staleTs)
 
 	num := c.MemoryIdx.Load(defs)
-	log.Info("cassandra-idx Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
+	log.WithFields(log.Fields{
+		"num.imported": num,
+		"time.elapsed": time.Since(pre),
+	}).Info("cassandra-idx: Rebuilding Memory Index Complete")
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
@@ -397,7 +410,10 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff u
 	for iter.Scan(&id, &orgId, &partition, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
 		mkey, err := schema.MKeyFromString(id)
 		if err != nil {
-			log.Error(3, "cassandra-idx: load() could not parse ID %q: %s -> skipping", id, err)
+			log.WithFields(log.Fields{
+				"id":    id,
+				"error": err.Error(),
+			}).Error("cassandra-idx: load() could not parse id, skipping")
 			continue
 		}
 		if orgId < 0 {
@@ -419,7 +435,9 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, cutoff u
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], mdef)
 	}
 	if err := iter.Close(); err != nil {
-		log.Fatal(4, "Could not close iterator: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("could not close iterator")
 	}
 
 NAMES:
@@ -447,7 +465,9 @@ func (c *CasIdx) processWriteQueue() {
 	qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
-			log.Error(3, "Failed to marshal metricDef. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("failed to marshal metricDef")
 			continue
 		}
 		statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
@@ -471,7 +491,9 @@ func (c *CasIdx) processWriteQueue() {
 				statQueryInsertFail.Inc()
 				errmetrics.Inc(err)
 				if (attempts % 20) == 0 {
-					log.Warn("cassandra-idx Failed to write def to cassandra. it will be retried. %s", err)
+					log.WithFields(log.Fields{
+						"error": err,
+					}).Warn("cassandra-idx: failed to write def to cassandra, it will be retried")
 				}
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -483,7 +505,9 @@ func (c *CasIdx) processWriteQueue() {
 				success = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
 				statQueryInsertOk.Inc()
-				log.Debug("cassandra-idx metricDef saved to cassandra. %s", req.def.Id)
+				log.WithFields(log.Fields{
+					"id": req.def.Id,
+				}).Warn("cassandra-idx: metricDef saved to cassandra")
 			}
 		}
 	}
@@ -501,7 +525,9 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 		for _, def := range defs {
 			err = c.deleteDef(def.Id, def.Partition)
 			if err != nil {
-				log.Error(3, "cassandra-idx: %s", err.Error())
+				log.WithFields(log.Fields{
+					"error": err.Error(),
+				}).Error("cassandra-idx: ")
 			}
 		}
 	}
@@ -519,7 +545,10 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
-			log.Error(3, "cassandra-idx Failed to delete metricDef %s from cassandra. %s", keyStr, err)
+			log.WithFields(log.Fields{
+				"key":   keyStr,
+				"error": err,
+			}).Error("cassandra-idx: Failed to delete metricDef from cassandra")
 			time.Sleep(time.Second)
 		} else {
 			statQueryDeleteOk.Inc()
@@ -533,7 +562,9 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
 	go func() {
 		if err := c.deleteDef(key, part); err != nil {
-			log.Error(3, err.Error())
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("cassandra-idx: ")
 		}
 	}()
 }
@@ -548,11 +579,15 @@ func (c *CasIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 func (c *CasIdx) prune() {
 	ticker := time.NewTicker(pruneInterval)
 	for range ticker.C {
-		log.Debug("cassandra-idx: pruning items from index that have not been seen for %s", maxStale.String())
+		log.WithFields(log.Fields{
+			"time.stale": maxStale.String(),
+		}).Debug("cassandra-idx: pruning items from index that have not been seen in a while")
 		staleTs := time.Now().Add(maxStale * -1)
 		_, err := c.Prune(staleTs)
 		if err != nil {
-			log.Error(3, "cassandra-idx: prune error. %s", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("cassandra-idx: prune error")
 		}
 	}
 }

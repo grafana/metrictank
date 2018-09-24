@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -455,7 +456,9 @@ func insertDefs(ix idx.MetricIndex, i int) {
 		data.SetId()
 		mkey, err := schema.MKeyFromString(data.Id)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Panic("failed to get mkey from id")
 		}
 		ix.AddOrUpdate(mkey, data, 1)
 	}

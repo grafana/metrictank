@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded, expectAddFail, expectReordered uint32) []schema.Point {
@@ -371,7 +372,7 @@ func benchmarkROBAdd(b *testing.B, window, shufgroup int) {
 		out, _ = rob.Add(data[i].Ts, data[i].Val)
 	}
 	if len(out) > 1000 {
-		panic("this clause should never fire. only exists for compiler not to optimize away the results")
+		log.Panic("this clause should never fire. only exists for compiler not to optimize away the results")
 	}
 }
 

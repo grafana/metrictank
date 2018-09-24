@@ -3,12 +3,13 @@ package chaos_cluster
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"reflect"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/stacktest/docker"
@@ -33,7 +34,9 @@ func TestMain(m *testing.M) {
 	cmd.Dir = docker.Path("docker/docker-chaos")
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("docker-compose down failed")
 	}
 
 	fmt.Println("launching docker-chaos stack...")
@@ -42,12 +45,16 @@ func TestMain(m *testing.M) {
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to create new tracker")
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("docker-compose up failed")
 	}
 
 	retcode := m.Run()
@@ -56,7 +63,9 @@ func TestMain(m *testing.M) {
 	fmt.Println("stopping docker-compose stack...")
 	cancelFunc()
 	if err := cmd.Wait(); err != nil {
-		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("could not cleanly shutdown running docker-compose command")
 		retcode = 1
 	}
 

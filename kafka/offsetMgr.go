@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/storage"
@@ -56,7 +56,7 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 	db, err := leveldb.OpenFile(dbFile, &opt.Options{})
 	if err != nil {
 		if _, ok := err.(*storage.ErrCorrupted); ok {
-			log.Warn("partitionOffsets.db is corrupt. Recovering.")
+			log.Warn("partitionOffsets.db is corrupt, recovering")
 			db, err = leveldb.RecoverFile(dbFile, &opt.Options{})
 			if err != nil {
 				return nil, err
@@ -65,7 +65,9 @@ func NewOffsetMgr(dir string) (*OffsetMgr, error) {
 			return nil, err
 		}
 	}
-	log.Info("Opened %s", dbFile)
+	log.WithFields(log.Fields{
+		"file": dbFile,
+	}).Info("opened file")
 	mgr := &OffsetMgr{
 		path:  dbFile,
 		db:    db,
@@ -89,7 +91,7 @@ func (o *OffsetMgr) Close() {
 	o.Lock()
 	o.users--
 	if o.users == 0 {
-		log.Info("Closing partitionsOffset DB.")
+		log.Info("closing partitionsOffset DB")
 		o.db.Close()
 
 		// remove the mgr from the registry
@@ -106,7 +108,11 @@ func (o *OffsetMgr) Commit(topic string, partition int32, offset int64) error {
 	if err := binary.Write(data, binary.LittleEndian, offset); err != nil {
 		return err
 	}
-	log.Debug("committing offset %d for %s:%d to partitionsOffset.db", offset, topic, partition)
+	log.WithFields(log.Fields{
+		"offset":    offset,
+		"topic":     topic,
+		"partition": partition,
+	}).Debug("committing offsent to partitionsOffset.db")
 	return o.db.Put(key.Bytes(), data.Bytes(), &opt.WriteOptions{Sync: true})
 }
 
@@ -116,7 +122,10 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	data, err := o.db.Get(key.Bytes(), nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			log.Debug("no offset recorded for %s:%d", topic, partition)
+			log.WithFields(log.Fields{
+				"topic":     topic,
+				"partition": partition,
+			}).Debug("no offset recorded")
 			return -1, nil
 		}
 		return 0, err
@@ -126,6 +135,10 @@ func (o *OffsetMgr) Last(topic string, partition int32) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	log.Debug("found saved offset %d for %s:%d", offset, topic, partition)
+	log.WithFields(log.Fields{
+		"offset":    offset,
+		"topic":     topic,
+		"partition": partition,
+	}).Debug("found saved offset")
 	return offset, nil
 }

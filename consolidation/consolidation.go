@@ -3,11 +3,11 @@ package consolidation
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/batch"
+	log "github.com/sirupsen/logrus"
 )
 
 // consolidator is a highlevel description of a point consolidation method
@@ -60,7 +60,11 @@ func (c Consolidator) String() string {
 	case Sum:
 		return "SumConsolidator"
 	}
-	panic(fmt.Sprintf("Consolidator.String(): unknown consolidator %d", c))
+	log.WithFields(log.Fields{
+		"consolidator": c,
+	}).Panic("Consolidator.String(): unknown consolidator")
+	// This return will never be reached due to the Panic, but Go complains if it is omitted
+	return ""
 }
 
 // provide the name of a stored archive
@@ -68,9 +72,9 @@ func (c Consolidator) String() string {
 func (c Consolidator) Archive() schema.Method {
 	switch c {
 	case None:
-		panic("cannot get an archive for no consolidation")
+		log.Panic("cannot get an archive for no consolidation")
 	case Avg:
-		panic("avg consolidator has no matching Archive(). you need sum and cnt")
+		log.Panic("avg consolidator has no matching Archive(). you need sum and cnt")
 	case Cnt:
 		return schema.Cnt
 	case Lst:
@@ -82,7 +86,11 @@ func (c Consolidator) Archive() schema.Method {
 	case Sum:
 		return schema.Sum
 	}
-	panic(fmt.Sprintf("Consolidator.Archive(): unknown consolidator %q", c))
+	log.WithFields(log.Fields{
+		"consolidator": c,
+	}).Panic("Consolidator.Archive(): unknown consolidator")
+	// This return will never be reached due to the Panic, but Go complains if it is omitted
+	return schema.Sum
 }
 
 func FromArchive(archive schema.Method) Consolidator {

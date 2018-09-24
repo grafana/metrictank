@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var renderClient *http.Client
@@ -25,7 +27,9 @@ func renderQuery(base, target, from string) Response {
 	url := fmt.Sprintf("%s/render?target=%s&format=json&from=%s", base, target, from)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Panic("request failed")
 	}
 	req.Header.Add("X-Org-Id", "1") // only really needed for MT, not for graphite. oh well...
 	//fmt.Println("requesting", url)
@@ -157,7 +161,10 @@ func CheckMT(endpoints []int, query, from string, dur time.Duration, reqs int, v
 	// note: could take 2 seconds longer than foreseen due to the client timeout, but anything longer may be a problem,
 	wg.Wait()
 	if time.Since(pre) > (110*dur/100)+2*time.Second {
-		panic(fmt.Sprintf("checkMT ran too long for some reason. expected %s. took actually %s. system overloaded?", dur, time.Since(pre)))
+		log.WithFields(log.Fields{
+			"expected.duration": dur,
+			"actual.duration":   time.Since(pre),
+		}).Panic("checkMT ran too long, system overloaded?")
 	}
 	return CheckResults{
 		Valid:      ret.valid,

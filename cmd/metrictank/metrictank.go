@@ -27,6 +27,7 @@ import (
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
 	inPrometheus "github.com/grafana/metrictank/input/prometheus"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/notifierKafka"
@@ -35,8 +36,8 @@ import (
 	statsConfig "github.com/grafana/metrictank/stats/config"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -79,7 +80,7 @@ var (
 )
 
 func init() {
-	flag.IntVar(&logLevel, "log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
+	flag.IntVar(&logLevel, "log-level", 4, "log level. 0=PANIC|1=FATAL|2=ERROR|3=WARN|4=INFO|5=DEBUG")
 }
 
 func main() {
@@ -139,7 +140,11 @@ func main() {
 		Set up Logger
 	***********************************/
 
-	log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, logLevel))
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
 
 	mdata.LogLevel = logLevel
 	memory.LogLevel = logLevel
@@ -148,26 +153,26 @@ func main() {
 	// workaround for https://github.com/grafana/grafana/issues/4055
 	switch logLevel {
 	case 0:
-		log.Level(log.TRACE)
+		log.SetLevel(log.PanicLevel)
 	case 1:
-		log.Level(log.DEBUG)
+		log.SetLevel(log.FatalLevel)
 	case 2:
-		log.Level(log.INFO)
+		log.SetLevel(log.ErrorLevel)
 	case 3:
-		log.Level(log.WARN)
+		log.SetLevel(log.WarnLevel)
 	case 4:
-		log.Level(log.ERROR)
+		log.SetLevel(log.InfoLevel)
 	case 5:
-		log.Level(log.CRITICAL)
-	case 6:
-		log.Level(log.FATAL)
+		log.SetLevel(log.DebugLevel)
+	default:
+		log.SetLevel(log.InfoLevel)
 	}
 
 	/***********************************
 		Validate  settings needed for clustering
 	***********************************/
 	if *instance == "" {
-		log.Fatal(4, "instance can't be empty")
+		log.Fatal("instance can't be empty")
 	}
 
 	/***********************************
@@ -182,7 +187,9 @@ func main() {
 	addrParts := strings.Split(api.Addr, ":")
 	port, err := strconv.ParseInt(addrParts[len(addrParts)-1], 10, 64)
 	if err != nil {
-		log.Fatal(4, "Could not parse port from listenAddr. %s", api.Addr)
+		log.WithFields(log.Fields{
+			"listen.address": api.Addr,
+		}).Fatal("could not parse port from listen address")
 	}
 	cluster.Init(*instance, gitHash, startupTime, scheme, int(port))
 
@@ -198,7 +205,7 @@ func main() {
 	mdata.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
-		log.Fatal(4, "you should enable at least 1 input plugin")
+		log.Fatal("you should enable at least 1 input plugin")
 	}
 
 	sec := dur.MustParseNDuration("warm-up-period", *warmUpPeriodStr)
@@ -215,7 +222,9 @@ func main() {
 		trigger, _ := heap.New(*proftrigPath, *proftrigHeapThresh, proftrigMinDiff, time.Duration(proftrigFreq)*time.Second, errors)
 		go func() {
 			for e := range errors {
-				log.Error(0, "profiletrigger heap: %s", e)
+				log.WithFields(log.Fields{
+					"error": e.Error(),
+				}).Error("profiletrigger heap")
 			}
 		}()
 		go trigger.Run()
@@ -236,7 +245,10 @@ func main() {
 	/***********************************
 		Report Version
 	***********************************/
-	log.Info("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
+	log.WithFields(log.Fields{
+		"build.git.hash": gitHash,
+		"go.version":     runtime.Version(),
+	}).Info("metrictank starting")
 	// metric version.%s is the version of metrictank running.  The metric value is always 1
 	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
 	mtVersion.Set(true)
@@ -257,14 +269,18 @@ func main() {
 		for _, tagSpec := range tagSpecs {
 			split := strings.Split(tagSpec, ":")
 			if len(split) != 2 {
-				log.Fatal(4, "cannot parse tracing-add-tags value %q", tagSpec)
+				log.WithFields(log.Fields{
+					"value": tagSpec,
+				}).Fatal("cannot parse tracing-add-tags value")
 			}
 			tags[split[0]] = split[1]
 		}
 	}
 	tracer, traceCloser, err := conf.GetTracer(*tracingEnabled, *tracingAddr, tags)
 	if err != nil {
-		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("could not initialize jaeger tracer")
 	}
 	defer traceCloser.Close()
 
@@ -273,7 +289,9 @@ func main() {
 	***********************************/
 	store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 	if err != nil {
-		log.Fatal(4, "failed to initialize cassandra. %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to initialize cassandra")
 	}
 	store.SetTracer(tracer)
 
@@ -306,7 +324,11 @@ func main() {
 	}
 
 	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
-		log.Warn("It is not recommended to run a multi-node cluster with more than 1 input plugin.")
+		log.WithFields(log.Fields{
+			"carbon.enabled":     inCarbon.Enabled,
+			"prometheus.enabled": inPrometheus.Enabled,
+			"kafkamdm.enabled":   inKafkaMdm.Enabled,
+		}).Warn("it is not recommended to run a multi-node cluster with more than 1 input plugin")
 	}
 
 	/***********************************
@@ -320,26 +342,26 @@ func main() {
 	pre := time.Now()
 
 	if *publicOrg < 0 {
-		log.Fatal(4, "public-org cannot be <0")
+		log.Fatal("public-org cannot be < 0")
 	}
 
 	idx.OrgIdPublic = uint32(*publicOrg)
 
 	if memory.Enabled {
 		if metricIndex != nil {
-			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
+			log.Fatal("only 1 metricIndex handler can be enabled")
 		}
 		metricIndex = memory.New()
 	}
 	if cassandra.Enabled {
 		if metricIndex != nil {
-			log.Fatal(4, "Only 1 metricIndex handler can be enabled.")
+			log.Fatal("only 1 metricIndex handler can be enabled")
 		}
 		metricIndex = cassandra.New()
 	}
 
 	if metricIndex == nil {
-		log.Fatal(4, "No metricIndex handlers enabled.")
+		log.Fatal("no metricIndex handlers enabled")
 	}
 
 	/***********************************
@@ -347,7 +369,9 @@ func main() {
 	***********************************/
 	apiServer, err = api.NewServer()
 	if err != nil {
-		log.Fatal(4, "Failed to start API. %s", err.Error())
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to start API")
 	}
 
 	apiServer.BindMetricIndex(metricIndex)
@@ -364,9 +388,13 @@ func main() {
 	***********************************/
 	err = metricIndex.Init()
 	if err != nil {
-		log.Fatal(4, "failed to initialize metricIndex: %s", err)
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Fatal("failed to initialize metricIndex")
 	}
-	log.Info("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
+	log.WithFields(log.Fields{
+		"initialization.duration": time.Now().Sub(pre),
+	}).Info("metricIndex initialized, starting data consumption")
 
 	/***********************************
 		Initialize MetricPersist notifiers
@@ -423,9 +451,11 @@ func main() {
 	***********************************/
 	select {
 	case sig := <-sigChan:
-		log.Info("Received signal %q. Shutting down", sig)
+		log.WithFields(log.Fields{
+			"signal": sig,
+		}).Info("received signal. shutting down")
 	case <-pluginFatal:
-		log.Info("An input plugin signalled a fatal error. Shutting down")
+		log.Info("an input plugin signalled a fatal error. shutting down")
 	}
 	shutdown()
 }
@@ -445,9 +475,13 @@ func shutdown() {
 	for _, plugin := range inputs {
 		wg.Add(1)
 		go func(plugin input.Plugin) {
-			log.Info("Shutting down %s consumer", plugin.Name())
+			log.WithFields(log.Fields{
+				"plugin.name": plugin.Name(),
+			}).Info("shutting down consumer")
 			plugin.Stop()
-			log.Info("%s consumer finished shutdown", plugin.Name())
+			log.WithFields(log.Fields{
+				"plugin.name": plugin.Name(),
+			}).Info("consumer finished shutdown")
 			wg.Done()
 		}(plugin)
 	}
@@ -458,7 +492,7 @@ func shutdown() {
 	}()
 	select {
 	case <-timer.C:
-		log.Warn("Plugins taking too long to shutdown, not waiting any longer.")
+		log.Warn("plugins taking too long to shutdown, not waiting any longer")
 	case <-pluginsStopped:
 		timer.Stop()
 	}
@@ -466,6 +500,5 @@ func shutdown() {
 	log.Info("closing store")
 	store.Stop()
 	metricIndex.Stop()
-	log.Info("terminating.")
-	log.Close()
+	log.Info("terminating")
 }

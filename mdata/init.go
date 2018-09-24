@@ -11,8 +11,8 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -93,7 +93,10 @@ func ConfigProcess() {
 
 	Schemas, err = conf.ReadSchemas(schemasFile)
 	if err != nil {
-		log.Fatal(3, "can't read schemas file %q: %s", schemasFile, err.Error())
+		log.WithFields(log.Fields{
+			"file":  schemasFile,
+			"error": err.Error(),
+		}).Fatal("can't read schemas file")
 	}
 
 	// === read storage-aggregation.conf ===
@@ -108,10 +111,16 @@ func ConfigProcess() {
 	if err == nil {
 		Aggregations, err = conf.ReadAggregations(aggFile)
 		if err != nil {
-			log.Fatal(3, "can't read storage-aggregation file %q: %s", aggFile, err.Error())
+			log.WithFields(log.Fields{
+				"file":  aggFile,
+				"error": err.Error(),
+			}).Fatal("can't read storage-aggregation file")
 		}
 	} else {
-		log.Info("Could not read %s: %s: using defaults", aggFile, err)
+		log.WithFields(log.Fields{
+			"file":  aggFile,
+			"error": err.Error(),
+		}).Info("could not read file using defaults")
 		Aggregations = conf.NewAggregations()
 	}
 }

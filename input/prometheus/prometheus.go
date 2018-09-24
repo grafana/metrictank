@@ -13,8 +13,8 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -71,14 +71,18 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 		if err != nil {
 			w.WriteHeader(400)
 			w.Write([]byte(fmt.Sprintf("Read Error, %v", err)))
-			log.Error(3, "Read Error, %v", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("prometheus-in: read error")
 			return
 		}
 		reqBuf, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			w.WriteHeader(400)
 			w.Write([]byte(fmt.Sprintf("Decode Error, %v", err)))
-			log.Error(3, "Decode Error, %v", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("prometheus-in: decode error")
 			return
 		}
 
@@ -86,7 +90,9 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 		if err := proto.Unmarshal(reqBuf, &req); err != nil {
 			w.WriteHeader(400)
 			w.Write([]byte(fmt.Sprintf("Unmarshal Error, %v", err)))
-			log.Error(3, "Unmarshal Error, %v", err)
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("prometheus-in: unmarshal error")
 			return
 		}
 
@@ -119,7 +125,9 @@ func (p *prometheusWriteHandler) handle(w http.ResponseWriter, req *http.Request
 			} else {
 				w.WriteHeader(400)
 				w.Write([]byte("invalid metric received: __name__ label can not equal \"\""))
-				log.Warn("prometheus metric received with empty name: %v", ts.String())
+				log.WithFields(log.Fields{
+					"timeseries": ts.String(),
+				}).Warn("prometheus-in: metric received with empty name")
 				return
 			}
 		}

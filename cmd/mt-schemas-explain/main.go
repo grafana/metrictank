@@ -7,9 +7,10 @@ import (
 	"runtime"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,6 +22,13 @@ var (
 )
 
 func main() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	formatter.QuoteEmptyFields = true
+
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+
 	flag.Usage = func() {
 		fmt.Println("mt-schemas-explain")
 		fmt.Println()
@@ -48,7 +56,10 @@ func main() {
 	}
 	schemas, err := conf.ReadSchemas(schemasFile)
 	if err != nil {
-		log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
+		log.WithFields(log.Fields{
+			"file":  schemasFile,
+			"error": err.Error(),
+		}).Fatal("can't read schemas files")
 	}
 
 	if *metric != "" {
