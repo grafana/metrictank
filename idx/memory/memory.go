@@ -1318,20 +1318,23 @@ DEFS:
 		pruned = append(pruned, defs...)
 	}
 
+ORGS:
 	for org, paths := range toPruneUntagged {
 		if len(paths) == 0 {
 			continue
 		}
 
-		m.Lock()
-		tree, ok := m.tree[org]
-		if !ok {
-			m.Unlock()
-			continue
-		}
-
 		for path := range paths {
+			m.Lock()
+			tree, ok := m.tree[org]
+
+			if !ok {
+				m.Unlock()
+				continue ORGS
+			}
+
 			n, ok := tree.Items[path]
+
 			if !ok {
 				m.Unlock()
 				log.Debug("memory-idx: series %s for orgId:%d was identified for pruning but cannot be found.", path, org)
@@ -1340,9 +1343,10 @@ DEFS:
 
 			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 			defs := m.delete(org, n, true, false)
+			m.Unlock()
 			pruned = append(pruned, defs...)
 		}
-		m.Unlock()
+
 	}
 
 	statMetricsActive.Add(-1 * len(pruned))
