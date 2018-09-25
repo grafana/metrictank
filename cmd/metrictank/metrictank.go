@@ -196,6 +196,7 @@ func main() {
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
+	memory.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
 		log.Fatal(4, "you should enable at least 1 input plugin")

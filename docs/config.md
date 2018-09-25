@@ -441,6 +441,8 @@ tag-support = false
 tag-query-workers = 50
 # size of regular expression cache in tag query evaluation
 match-cache-size = 1000
+# maximum duration each second a prune job can lock the index.
+max-prune-lock-time = 100ms
 ```
 
 # storage-schemas.conf
