@@ -857,6 +857,72 @@ func BenchmarkDeletes(b *testing.B) {
 	ix.Delete(1, "some.*")
 }
 
+func BenchmarkPrune(b *testing.B) {
+	ix := New()
+	ix.Init()
+
+	var data *schema.MetricData
+	var key string
+	for i := 1; i <= b.N; i++ {
+		key = fmt.Sprintf("some.metric.%d.%d", i, i)
+		data = &schema.MetricData{
+			Name:     key,
+			OrgId:    1,
+			Interval: 10,
+			Time:     100,
+		}
+		data.SetId()
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	items, err := ix.Prune(time.Unix(200, 0))
+	if err != nil {
+		b.Fatal(err)
+	}
+	if len(items) != b.N {
+		b.Fatalf("only %d of %d items pruned", len(items), b.N)
+	}
+}
+
+func BenchmarkPruneLongSeriesNames(b *testing.B) {
+	ix := New()
+	ix.Init()
+
+	var data *schema.MetricData
+	var key string
+	for i := 1; i <= b.N; i++ {
+		key = fmt.Sprintf("stats.%d.some.really.long.metric.that.is.slow.to.delete.and.really.hurts.pruning.performance", i)
+		data = &schema.MetricData{
+			Name:     key,
+			OrgId:    1,
+			Interval: 10,
+			Time:     100,
+		}
+		data.SetId()
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			b.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, data, 1)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	items, err := ix.Prune(time.Unix(200, 0))
+	if err != nil {
+		b.Fatal(err)
+	}
+	if len(items) != b.N {
+		b.Fatalf("only %d of %d items pruned", len(items), b.N)
+	}
+}
+
 func TestMatchSchemaWithTags(t *testing.T) {
 	_tagSupport := TagSupport
 	_schemas := mdata.Schemas
