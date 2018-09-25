@@ -30,6 +30,7 @@ func main() {
 	var tags string
 	var from string
 	var maxAge string
+	var minAge string
 	var verbose bool
 	var limit int
 	var partitionStr string
@@ -42,7 +43,8 @@ func main() {
 	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
-	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
+	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (lastUpdate diff with now) of metricdefs.  use 0 to disable")
+	globalFlags.StringVar(&minAge, "min-age", "0", "min age (lastUpdate diff with now) of metricdefs.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
 
@@ -180,17 +182,24 @@ func main() {
 		perror(err)
 	}
 
-	var cutoff uint32
+	var cutoff, cutoffMin int64
+	now := time.Now().Unix()
 	if maxAge != "0" {
 		maxAgeInt, err := dur.ParseNDuration(maxAge)
 		perror(err)
-		cutoff = uint32(time.Now().Unix() - int64(maxAgeInt))
+		cutoff = now - int64(maxAgeInt)
 	}
+	if minAge != "0" {
+		minAgeInt, err := dur.ParseNDuration(minAge)
+		perror(err)
+		cutoffMin = now - int64(minAgeInt)
+	}
+
 	var defs []schema.MetricDefinition
 	if len(partitions) == 0 {
-		defs = idx.Load(nil, cutoff)
+		defs = idx.Load(nil, uint32(cutoff))
 	} else {
-		defs = idx.LoadPartitions(partitions, nil, cutoff)
+		defs = idx.LoadPartitions(partitions, nil, uint32(cutoff))
 	}
 	// set this after doing the query, to assure age can't possibly be negative
 	out.QueryTime = time.Now().Unix()
@@ -222,6 +231,9 @@ func main() {
 			if valid != (tags == "valid") {
 				continue
 			}
+		}
+		if cutoffMin != 0 && d.LastUpdate >= cutoffMin {
+			continue
 		}
 		show(d)
 		shown += 1

@@ -65,7 +65,9 @@ global config flags:
   -limit int
     	only show this many metrics.  use 0 to disable
   -max-age string
-    	max age (last update diff with now) of metricdefs.  use 0 to disable (default "6h30min")
+    	max age (lastUpdate diff with now) of metricdefs.  use 0 to disable (default "6h30min")
+  -min-age string
+    	min age (lastUpdate diff with now) of metricdefs.  use 0 to disable (default "0")
   -partitions string
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
