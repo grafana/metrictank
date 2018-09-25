@@ -835,7 +835,9 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		// 0 disables the check, so only check if maxSeriesPerReq > 0
 		if maxSeriesPerReq > 0 && len(resp.Metrics)+len(allSeries) > maxSeries {
 			return nil,
-				response.NewError(413, fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+				response.NewError(
+					http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
 		}
 
 		for _, series := range resp.Metrics {
