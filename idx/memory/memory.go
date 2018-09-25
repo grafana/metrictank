@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"regexp"
@@ -47,10 +48,11 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled         bool
-	matchCacheSize  int
-	TagSupport      bool
-	TagQueryWorkers int // number of workers to spin up when evaluation tag expressions
+	Enabled          bool
+	matchCacheSize   int
+	maxPruneLockTime = time.Millisecond * 100
+	TagSupport       bool
+	TagQueryWorkers  int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
@@ -59,6 +61,7 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.DurationVar(&maxPruneLockTime, "max-prune-lock-time", time.Millisecond*100, "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx)
 }
 
@@ -1308,13 +1311,24 @@ DEFS:
 	}
 	m.RUnlock()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create a new timeLimiter that allows us to limit the amount of time we spend
+	// holding a lock to maxPruneLockTime (default 100ms) every second.
+	tl := NewTimeLimiter(ctx, time.Second, maxPruneLockTime)
+
 	for org, ids := range toPruneTagged {
 		if len(ids) == 0 {
 			continue
 		}
+		// make sure we are not locking for too long.
+		tl.Wait()
+		lockStart := time.Now()
 		m.Lock()
 		defs := m.deleteTaggedByIdSet(org, ids)
 		m.Unlock()
+		tl.Add(time.Since(lockStart))
 		pruned = append(pruned, defs...)
 	}
 
@@ -1325,11 +1339,14 @@ ORGS:
 		}
 
 		for path := range paths {
+			tl.Wait()
+			lockStart := time.Now()
 			m.Lock()
 			tree, ok := m.tree[org]
 
 			if !ok {
 				m.Unlock()
+				tl.Add(time.Since(lockStart))
 				continue ORGS
 			}
 
@@ -1337,6 +1354,7 @@ ORGS:
 
 			if !ok {
 				m.Unlock()
+				tl.Add(time.Since(lockStart))
 				log.Debug("memory-idx: series %s for orgId:%d was identified for pruning but cannot be found.", path, org)
 				continue
 			}
@@ -1344,9 +1362,10 @@ ORGS:
 			log.Debug("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
 			defs := m.delete(org, n, true, false)
 			m.Unlock()
+			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
-		}
 
+		}
 	}
 
 	statMetricsActive.Add(-1 * len(pruned))
