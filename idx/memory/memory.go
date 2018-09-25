@@ -48,11 +48,12 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled          bool
-	matchCacheSize   int
-	maxPruneLockTime = time.Millisecond * 100
-	TagSupport       bool
-	TagQueryWorkers  int // number of workers to spin up when evaluation tag expressions
+	Enabled             bool
+	matchCacheSize      int
+	maxPruneLockTime    = time.Millisecond * 100
+	maxPruneLockTimeStr string
+	TagSupport          bool
+	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
 )
 
 func ConfigSetup() {
@@ -61,8 +62,16 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.DurationVar(&maxPruneLockTime, "max-prune-lock-time", time.Millisecond*100, "Maximum duration each second a prune job can lock the index.")
+	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx)
+}
+
+func ConfigProcess() {
+	var err error
+	maxPruneLockTime, err = time.ParseDuration(maxPruneLockTimeStr)
+	if err != nil {
+		log.Fatal(4, "could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
+	}
 }
 
 type Tree struct {
