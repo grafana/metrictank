@@ -32,12 +32,14 @@ func main() {
 	var maxAge string
 	var verbose bool
 	var limit int
+	var partitionStr string
 
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
+	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (last update diff with now) of metricdefs.  use 0 to disable")
@@ -91,6 +93,26 @@ func main() {
 	if len(os.Args) < 3 {
 		flag.Usage()
 		os.Exit(-1)
+	}
+
+	var partitions []int32
+	if partitionStr != "*" {
+		for _, p := range strings.Split(partitionStr, ",") {
+			p = strings.TrimSpace(p)
+
+			// handle trailing "," on the list of partitions.
+			if p == "" {
+				continue
+			}
+
+			id, err := strconv.ParseInt(p, 10, 32)
+			if err != nil {
+				log.Printf("invalid partition id %q. must be a int32", p)
+				flag.Usage()
+				os.Exit(-1)
+			}
+			partitions = append(partitions, int32(id))
+		}
 	}
 
 	format := os.Args[len(os.Args)-1]
@@ -164,8 +186,12 @@ func main() {
 		perror(err)
 		cutoff = uint32(time.Now().Unix() - int64(maxAgeInt))
 	}
-
-	defs := idx.Load(nil, cutoff)
+	var defs []schema.MetricDefinition
+	if len(partitions) == 0 {
+		defs = idx.Load(nil, cutoff)
+	} else {
+		defs = idx.LoadPartitions(partitions, nil, cutoff)
+	}
 	// set this after doing the query, to assure age can't possibly be negative
 	out.QueryTime = time.Now().Unix()
 	total := len(defs)
