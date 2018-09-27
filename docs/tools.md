@@ -54,30 +54,30 @@ In particular, the vegeta outputs are handy to pipe requests for given series in
 
 Usage:
 
-  mt-index-cat [global config flags] <idxtype> [idx config flags] output
+  mt-index-cat [global config flags] <idxtype> [idx config flags] output 
 
 global config flags:
 
   -addr string
-        graphite/metrictank address (default "http://localhost:6060")
+    	graphite/metrictank address (default "http://localhost:6060")
   -from string
-        for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
+    	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
-        only show this many metrics.  use 0 to disable
+    	only show this many metrics.  use 0 to disable
   -max-age string
-        max age (last update diff with now) of metricdefs.  use 0 to disable (default "6h30min")
+    	max age (last update diff with now) of metricdefs.  use 0 to disable (default "6h30min")
   -partitions string
-        only show metrics from the comma separated list of partitions or * for all (default "*")
+    	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
-        only show metrics that have this prefix
+    	only show metrics that have this prefix
   -substr string
-        only show metrics that have this substring
+    	only show metrics that have this substring
   -suffix string
-        only show metrics that have this suffix
+    	only show metrics that have this suffix
   -tags string
-        tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'
+    	tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'
   -verbose
-        print stats to stderr
+    	print stats to stderr
 
 tags filter:
      ''        no filtering based on tags
@@ -91,47 +91,47 @@ idxtype: only 'cass' supported for now
 cass config flags:
 
   -auth
-        enable cassandra user authentication
+    	enable cassandra user authentication
   -ca-path string
-        cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+    	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
   -consistency string
-        write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
-        enable the creation of the index keyspace and tables, only one node needs this (default true)
+    	enable the creation of the index keyspace and tables, only one node needs this (default true)
   -disable-initial-host-lookup
-        instruct the driver to not attempt to get host info from the system.peers table
+    	instruct the driver to not attempt to get host info from the system.peers table
   -enabled
-         (default true)
+    	 (default true)
   -host-verification
-        host (hostname and server cert) verification when using SSL (default true)
+    	host (hostname and server cert) verification when using SSL (default true)
   -hosts string
-        comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+    	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
   -keyspace string
-        Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+    	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -max-stale duration
-        clear series from the index if they have not been seen for this much time.
+    	clear series from the index if they have not been seen for this much time.
   -num-conns int
-        number of concurrent connections to cassandra (default 10)
+    	number of concurrent connections to cassandra (default 10)
   -password string
-        password for authentication (default "cassandra")
+    	password for authentication (default "cassandra")
   -protocol-version int
-        cql protocol version to use (default 4)
+    	cql protocol version to use (default 4)
   -prune-interval duration
-        Interval at which the index should be checked for stale series. (default 3h0m0s)
+    	Interval at which the index should be checked for stale series. (default 3h0m0s)
   -schema-file string
-        File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
-        enable SSL connection to cassandra
+    	enable SSL connection to cassandra
   -timeout duration
-        cassandra request timeout (default 1s)
+    	cassandra request timeout (default 1s)
   -update-cassandra-index
-        synchronize index changes to cassandra. not all your nodes need to do this. (default true)
+    	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
   -update-interval duration
-        frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
   -username string
-        username for authentication (default "cassandra")
+    	username for authentication (default "cassandra")
   -write-queue-size int
-        Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
+    	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
 
 output: either presets like dump|list|vegeta-render|vegeta-render-patterns
 output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
