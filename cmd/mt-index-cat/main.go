@@ -29,8 +29,8 @@ func main() {
 	var suffix string
 	var tags string
 	var from string
-	var maxAge string
-	var minAge string
+	var maxStale string
+	var minStale string
 	var verbose bool
 	var limit int
 	var partitionStr string
@@ -43,8 +43,8 @@ func main() {
 	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
-	globalFlags.StringVar(&maxAge, "max-age", "6h30min", "max age (lastUpdate diff with now) of metricdefs.  use 0 to disable")
-	globalFlags.StringVar(&minAge, "min-age", "0", "min age (lastUpdate diff with now) of metricdefs.  use 0 to disable")
+	globalFlags.StringVar(&maxStale, "max-stale", "6h30min", "exclude series that have not been seen for this much time.  use 0 to disable")
+	globalFlags.StringVar(&minStale, "min-stale", "0", "exclude series that have been seen in this much time.  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
 
@@ -184,15 +184,15 @@ func main() {
 
 	var cutoff, cutoffMin int64
 	now := time.Now().Unix()
-	if maxAge != "0" {
-		maxAgeInt, err := dur.ParseNDuration(maxAge)
+	if maxStale != "0" {
+		maxStaleInt, err := dur.ParseNDuration(maxStale)
 		perror(err)
-		cutoff = now - int64(maxAgeInt)
+		cutoff = now - int64(maxStaleInt)
 	}
-	if minAge != "0" {
-		minAgeInt, err := dur.ParseNDuration(minAge)
+	if minStale != "0" {
+		minStaleInt, err := dur.ParseNDuration(minStale)
 		perror(err)
-		cutoffMin = now - int64(minAgeInt)
+		cutoffMin = now - int64(minStaleInt)
 	}
 
 	var defs []schema.MetricDefinition

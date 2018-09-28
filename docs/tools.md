@@ -64,10 +64,10 @@ global config flags:
     	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
     	only show this many metrics.  use 0 to disable
-  -max-age string
-    	max age (lastUpdate diff with now) of metricdefs.  use 0 to disable (default "6h30min")
-  -min-age string
-    	min age (lastUpdate diff with now) of metricdefs.  use 0 to disable (default "0")
+  -max-stale string
+    	exclude series that have not been seen for this much time.  use 0 to disable (default "6h30min")
+  -min-stale string
+    	exclude series that have been seen in this much time.  use 0 to disable (default "0")
   -partitions string
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
