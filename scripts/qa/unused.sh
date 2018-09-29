@@ -16,7 +16,7 @@ go get -u github.com/Dieterbe/go-misc/deadcode
 ret=0
 
 echo "## running unused"
-unused .
+unused ./...
 r=$?
 [ $r -gt $ret ] && ret=$r
 
