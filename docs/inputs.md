@@ -46,7 +46,7 @@ See the [MetricData](https://godoc.org/github.com/raintank/schema#MetricData) do
 This format is a hand-written binary format that is much more compact and fast to encode/decode compared to MetricData.
 See the [MetricPoint](https://godoc.org/github.com/raintank/schema#MetricPoint) documentation for format and implementation details.
 It is a minimal format that only contains the series identifier, value and timestamp.
-As such, it is paramount that MetricPoint messages for each series has been preceeded by a MetricData message for that series.
+As such, it is paramount that MetricPoint messages for each series has been preceded by a MetricData message for that series.
 Otherwise metrictank will not recognize the ID and will not be able handle it and discard the message.
 
 Note that the implementation has encode/decode function for the standard MetricPoint format, as well as a variant that does not encode the org-id
