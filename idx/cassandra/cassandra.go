@@ -114,7 +114,6 @@ type CasIdx struct {
 	cluster    *gocql.ClusterConfig
 	session    *gocql.Session
 	writeQueue chan writeReq
-	shutdown   chan struct{}
 	wg         sync.WaitGroup
 }
 
@@ -147,7 +146,6 @@ func New() *CasIdx {
 	idx := &CasIdx{
 		MemoryIdx: *memory.New(),
 		cluster:   cluster,
-		shutdown:  make(chan struct{}),
 	}
 	if updateCassIdx {
 		idx.writeQueue = make(chan writeReq, writeQueueSize)
