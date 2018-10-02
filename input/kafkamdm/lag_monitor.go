@@ -61,10 +61,10 @@ func (l *lagLogger) Min() int {
 	if len(l.measurements) == 0 {
 		return -1
 	}
-	min := -1
-	for _, m := range l.measurements {
+	min := int(l.measurements[0].highWaterMark - l.measurements[0].readOffset)
+	for _, m := range l.measurements[1:] {
 		lag := int(m.highWaterMark - m.readOffset)
-		if min < 0 || lag < min {
+		if lag < min {
 			min = lag
 		}
 	}
