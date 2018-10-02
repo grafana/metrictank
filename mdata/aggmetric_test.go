@@ -393,7 +393,7 @@ func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	keys := make([]schema.MKey, 1000)
+	keys := make([]schema.MKey, 10000)
 	for i := 0; i < 1000; i++ {
 		keys[i] = test.GetMKey(i)
 	}
