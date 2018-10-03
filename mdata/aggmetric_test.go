@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/schema"
-
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -302,143 +300,29 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	}
 }
 
-// basic expected RAM usage for 1 iteration (= 1 days)
-// 1000 metrics * (3600 * 24 / 10 ) points per metric * 1.3 B/point = 11 MB
-// 1000 metrics * 5 agg metrics per metric * (3600 * 24 / 300) points per aggmetric * 1.3B/point = 1.9 MB
-// total -> 13 MB
-// go test -run=XX -bench=Bench -benchmem -v -memprofile mem.out
-// go tool pprof -inuse_space metrictank.test mem.out -> shows 25 MB in use
-
-// TODO update once we clean old data, then we should look at numChunks
-func BenchmarkAggMetrics1000Metrics1Day(b *testing.B) {
-	cluster.Init("default", "test", time.Now(), "http", 6060)
+func BenchmarkAggMetricAdd(b *testing.B) {
 	mockstore.Reset()
 	mockstore.Drop = true
 	defer func() {
 		mockstore.Drop = false
 	}()
-	// we will store 10s metrics in 5 chunks of 2 hours
-	// aggregate them in 5min buckets, stored in 1 chunk of 24hours
-	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	SetSingleSchema(
-		conf.NewRetentionMT(1, 84600, 2*3600, 5, true),
-		conf.NewRetentionMT(300, 30*84600, 24*3600, 1, true),
-	)
-	chunkMaxStale := uint32(3600)
-	metricMaxStale := uint32(21600)
-
-	keys := make([]schema.MKey, 1000)
-	for i := 0; i < 1000; i++ {
-		keys[i] = test.GetMKey(i)
-	}
-
-	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
-
-	maxT := 3600 * 24 * uint32(b.N) // b.N in days
-	for t := uint32(1); t < maxT; t += 10 {
-		for metricI := 0; metricI < 1000; metricI++ {
-			k := keys[metricI]
-			m := metrics.GetOrCreate(k, 0, 0)
-			m.Add(t, float64(t))
-		}
-	}
-}
-
-func BenchmarkAggMetrics1kSeries2Chunks1kQueueSize(b *testing.B) {
-	chunkMaxStale := uint32(3600)
-	metricMaxStale := uint32(21600)
-	mockstore.Reset()
-	mockstore.Drop = true
-	defer func() {
-		mockstore.Drop = false
-	}()
-	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	SetSingleSchema(
-		conf.NewRetentionMT(1, 84600, 600, 5, true),
-		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
-	)
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	keys := make([]schema.MKey, 1000)
-	for i := 0; i < 1000; i++ {
-		keys[i] = test.GetMKey(i)
+	retentions := conf.Retentions{
+		{
+			SecondsPerPoint: 10,
+			NumberOfPoints:  10e9, // TTL
+			ChunkSpan:       1800, // 30 min. contains 180 points at 10s resolution
+			NumChunks:       1,
+			Ready:           true,
+		},
 	}
 
-	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
+	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), retentions, 0, nil, false)
 
-	maxT := uint32(1200)
-	for t := uint32(1); t < maxT; t += 10 {
-		for metricI := 0; metricI < 1000; metricI++ {
-			k := keys[metricI]
-			m := metrics.GetOrCreate(k, 0, 0)
-			m.Add(t, float64(t))
-		}
-	}
-}
-
-func BenchmarkAggMetrics10kSeries2Chunks10kQueueSize(b *testing.B) {
-	chunkMaxStale := uint32(3600)
-	metricMaxStale := uint32(21600)
-	mockstore.Reset()
-	mockstore.Drop = true
-	defer func() {
-		mockstore.Drop = false
-	}()
-	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	SetSingleSchema(
-		conf.NewRetentionMT(1, 84600, 600, 5, true),
-		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
-	)
-
-	cluster.Init("default", "test", time.Now(), "http", 6060)
-
-	keys := make([]schema.MKey, 1000)
-	for i := 0; i < 1000; i++ {
-		keys[i] = test.GetMKey(i)
-	}
-
-	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
-
-	maxT := uint32(1200)
-	for t := uint32(1); t < maxT; t += 10 {
-		for metricI := 0; metricI < 10000; metricI++ {
-			k := keys[metricI]
-			m := metrics.GetOrCreate(k, 0, 0)
-			m.Add(t, float64(t))
-		}
-	}
-}
-
-func BenchmarkAggMetrics100kSeries2Chunks100kQueueSize(b *testing.B) {
-	chunkMaxStale := uint32(3600)
-	metricMaxStale := uint32(21600)
-	mockstore.Reset()
-	mockstore.Drop = true
-	defer func() {
-		mockstore.Drop = false
-	}()
-	SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	SetSingleSchema(
-		conf.NewRetentionMT(1, 84600, 600, 5, true),
-		conf.NewRetentionMT(300, 84600, 24*3600, 2, true),
-	)
-
-	cluster.Init("default", "test", time.Now(), "http", 6060)
-
-	keys := make([]schema.MKey, 1000)
-	for i := 0; i < 1000; i++ {
-		keys[i] = test.GetMKey(i)
-	}
-
-	metrics := NewAggMetrics(mockstore, &cache.MockCache{}, false, chunkMaxStale, metricMaxStale, 0)
-
-	maxT := uint32(1200)
-	for t := uint32(1); t < maxT; t += 10 {
-		for metricI := 0; metricI < 100000; metricI++ {
-			k := keys[metricI]
-			m := metrics.GetOrCreate(k, 0, 0)
-			m.Add(t, float64(t))
-		}
+	max := uint32(b.N*10 + 1)
+	for t := uint32(1); t < max; t += 10 {
+		metric.Add(t, float64(t))
 	}
 }
