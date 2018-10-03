@@ -6,9 +6,10 @@ import (
 	"os"
 	"runtime"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/logger"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -16,6 +17,13 @@ var (
 	showVersion = flag.Bool("version", false, "print version string")
 	metric      = flag.String("metric", "", "specify a metric name to see which aggregation rule it matches")
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	flag.Usage = func() {

@@ -8,7 +8,7 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -54,21 +54,21 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 		batch := PersistMessageBatch{}
 		err := json.Unmarshal(data[1:], &batch)
 		if err != nil {
-			log.Error(3, "failed to unmarsh batch message. skipping.", err)
+			log.Errorf("failed to unmarsh batch message: %s -- skipping", err)
 			return
 		}
 		messagesReceived.Add(len(batch.SavedChunks))
 		for _, c := range batch.SavedChunks {
 			amkey, err := schema.AMKeyFromString(c.Key)
 			if err != nil {
-				log.Error(3, "notifier: failed to convert %q to AMKey: %s -- skipping", c.Key, err)
+				log.Errorf("notifier: failed to convert %q to AMKey: %s -- skipping", c.Key, err)
 				continue
 			}
 			// we only need to handle saves for series that we know about.
 			// if the series is not in the index, then we dont need to worry about it.
 			def, ok := idx.Get(amkey.MKey)
 			if !ok {
-				log.Debug("notifier: skipping metric with MKey %s as it is not in the index", amkey.MKey)
+				log.Debugf("notifier: skipping metric with MKey %s as it is not in the index", amkey.MKey)
 				continue
 			}
 			agg := metrics.GetOrCreate(amkey.MKey, def.SchemaId, def.AggId)
@@ -81,7 +81,7 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 			}
 		}
 	} else {
-		log.Error(3, "notifier: unknown version %d", version)
+		log.Errorf("notifier: unknown version %d", version)
 	}
 	return
 }

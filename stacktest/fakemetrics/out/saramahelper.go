@@ -2,7 +2,7 @@ package out
 
 import (
 	"github.com/Shopify/sarama"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 func GetCompression(codec string) sarama.CompressionCodec {
@@ -14,7 +14,7 @@ func GetCompression(codec string) sarama.CompressionCodec {
 	case "snappy":
 		return sarama.CompressionSnappy
 	default:
-		log.Fatal(5, "unknown compression codec %q", codec)
+		log.Fatalf("unknown compression codec %q", codec)
 		return 0 // make go compiler happy, needs a return *roll eyes*
 	}
 }

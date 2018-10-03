@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/raintank/dur"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -61,12 +61,12 @@ func ConfigProcess() {
 	//validate the addr
 	_, err := net.ResolveTCPAddr("tcp", Addr)
 	if err != nil {
-		log.Fatal(4, "API listen address is not a valid TCP address.")
+		log.Fatal("API listen address is not a valid TCP address.")
 	}
 
 	u, err := url.Parse(fallbackGraphite)
 	if err != nil {
-		log.Fatal(4, "API Cannot parse fallback-graphite-addr: %s", err)
+		log.Fatalf("API Cannot parse fallback-graphite-addr: %s", err.Error())
 	}
 	graphiteProxy = NewGraphiteProxy(u)
 
@@ -75,7 +75,7 @@ func ConfigProcess() {
 	} else {
 		timeZone, err = time.LoadLocation(timeZoneStr)
 		if err != nil {
-			log.Fatal(4, "API Cannot load timezone %q: %s", timeZoneStr, err)
+			log.Fatalf("API Cannot load timezone %q: %s", timeZoneStr, err.Error())
 		}
 	}
 }

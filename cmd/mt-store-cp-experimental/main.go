@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -13,8 +12,10 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
+	log "github.com/sirupsen/logrus"
 )
 
 const minToken = math.MinInt64
@@ -59,6 +60,13 @@ var (
 	doneRows       uint64
 	partitionIdMap map[string]struct{}
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	flag.Usage = func() {

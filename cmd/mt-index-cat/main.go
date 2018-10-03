@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -11,13 +10,22 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func perror(err error) {
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 }
 

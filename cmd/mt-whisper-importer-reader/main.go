@@ -18,12 +18,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -103,6 +104,13 @@ var (
 	skippedCount   uint32
 )
 
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
+
 func main() {
 	var err error
 	flag.Parse()
@@ -122,7 +130,7 @@ func main() {
 	if len(*positionFile) > 0 {
 		pos, err = NewPositionTracker(*positionFile)
 		if err != nil {
-			log.Fatalf("Error instantiating position tracker: %s", err)
+			log.Fatalf("Error instantiating position tracker: %s", err.Error())
 		}
 		defer pos.Close()
 	}
@@ -148,12 +156,12 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 	for file := range files {
 		fd, err := os.Open(file)
 		if err != nil {
-			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
+			log.Errorf("Failed to open whisper file %q: %q\n", file, err.Error())
 			continue
 		}
 		w, err := whisper.OpenWhisper(fd)
 		if err != nil {
-			log.Errorf("Failed to open whisper file %q: %q\n", file, err)
+			log.Errorf("Failed to open whisper file %q: %q\n", file, err.Error())
 			continue
 		}
 
@@ -161,7 +169,7 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 		log.Debugf("Processing file %s (%s)", file, name)
 		met, err := getMetric(w, file, name)
 		if err != nil {
-			log.Errorf("Failed to get metric: %q", err)
+			log.Errorf("Failed to get metric: %q", err.Error())
 			continue
 		}
 
@@ -170,14 +178,14 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 		for !success {
 			b, err := met.MarshalCompressed()
 			if err != nil {
-				log.Errorf("Failed to encode metric: %q", err)
+				log.Errorf("Failed to encode metric: %q", err.Error())
 				continue
 			}
 			size := b.Len()
 
 			req, err := http.NewRequest("POST", *httpEndpoint, io.Reader(b))
 			if err != nil {
-				log.Fatal(fmt.Sprintf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err))
+				log.Fatalf("Cannot construct request to http endpoint %q: %q", *httpEndpoint, err.Error())
 			}
 
 			req.Header.Set("Content-Type", "application/json")
@@ -192,7 +200,7 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 			passed := time.Now().Sub(pre).Seconds()
 			if err != nil || resp.StatusCode >= 300 {
 				if err != nil {
-					log.Warningf("Error posting %s (%d bytes), to endpoint %q (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, attempts, passed, err)
+					log.Warningf("Error posting %s (%d bytes), to endpoint %q (attempt %d/%fs, retrying): %s", name, size, *httpEndpoint, attempts, passed, err.Error())
 					attempts++
 					continue
 				} else {

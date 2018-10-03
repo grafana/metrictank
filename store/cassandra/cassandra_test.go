@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/raintank/worldping-api/pkg/log"
+	"github.com/grafana/metrictank/logger"
+	log "github.com/sirupsen/logrus"
 )
 
 type testCase struct {
@@ -27,6 +28,13 @@ const oneHour = 60 * 60
 const oneDay = 24 * 60 * 60
 const oneMonth = oneDay * 30
 const oneYear = oneMonth * 12
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func TestGetTTLTables(t *testing.T) {
 	tcs := []testCase{
@@ -85,8 +93,6 @@ func TestBackwardsCompatibleTimeout(t *testing.T) {
 // copied from https://blog.antoine-augusti.fr/2015/12/testing-an-os-exit-scenario-in-golang/
 func TestBackwardsCompatibleTimeoutFatalIfInvalid(t *testing.T) {
 	if os.Getenv("CONVERT_INVALID_TIMEOUT") == "1" {
-		log.NewLogger(0, "console", fmt.Sprintf(`{"level": %d, "formatting":false}`, log.DEBUG))
-		defer log.Close()
 		ConvertTimeout("invalid", time.Millisecond)
 		return
 	}
@@ -100,7 +106,7 @@ func TestBackwardsCompatibleTimeoutFatalIfInvalid(t *testing.T) {
 
 	gotBytes, _ := ioutil.ReadAll(stdout)
 	got := string(gotBytes)
-	expected := "cassandra_store: invalid duration value \"invalid\""
+	expected := "invalid duration value \"invalid\""
 	if !strings.HasSuffix(got[:len(got)-1], expected) {
 		t.Fatalf("Unexpected log message. Expected message to contain \"%s\" but got \"%s\"", expected, got)
 	}

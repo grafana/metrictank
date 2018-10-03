@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var enabled bool
@@ -42,7 +42,7 @@ func Start() {
 
 		_, err := stats.NewProcessReporter()
 		if err != nil {
-			log.Fatal(2, "stats: could not initialize process reporter: %v", err)
+			log.Fatalf("stats: could not initialize process reporter: %v", err)
 		}
 		stats.NewGraphite(prefix, addr, interval, bufferSize, timeout)
 	} else {

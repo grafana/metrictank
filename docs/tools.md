@@ -168,8 +168,8 @@ Flags:
     	Address of cassandra host to migrate to. (default "localhost")
   -dst-keyspace string
     	Cassandra keyspace in use on destination. (default "raintank")
-  -log-level int
-    	log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+  -log-level string
+    	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
     	number of partitions in cluster (default 1)
   -partition-scheme string

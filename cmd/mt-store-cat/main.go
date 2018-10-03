@@ -11,9 +11,10 @@ import (
 
 	"github.com/raintank/schema"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/logger"
 	opentracing "github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
@@ -37,6 +38,13 @@ var (
 	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	storeConfig := cassandra.NewStoreConfig()
@@ -135,14 +143,14 @@ func main() {
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
-		log.Fatal(4, "error with configuration file: %s", err)
+		log.Fatalf("error with configuration file: %s", err.Error())
 		os.Exit(1)
 	}
 
 	config.ParseAll()
 
 	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
-		log.Fatal(4, "groupTTL must be one of s/m/h/d")
+		log.Fatal("groupTTL must be one of s/m/h/d")
 		os.Exit(1)
 	}
 
@@ -159,30 +167,30 @@ func main() {
 		var err error
 		loc, err = time.LoadLocation(*timeZoneStr)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 	}
 
 	store, err := cassandra.NewCassandraStore(storeConfig, nil)
 	if err != nil {
-		log.Fatal(4, "failed to initialize cassandra. %s", err)
+		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}
 	tracer, traceCloser, err := conf.GetTracer(false, "", nil)
 	if err != nil {
-		log.Fatal(4, "Could not initialize jaeger tracer: %s", err.Error())
+		log.Fatalf("Could not initialize jaeger tracer: %s", err.Error())
 	}
 	defer traceCloser.Close()
 	store.SetTracer(tracer)
 
 	err = store.FindExistingTables(storeConfig.Keyspace)
 	if err != nil {
-		log.Fatal(4, "failed to read tables from cassandra. %s", err)
+		log.Fatalf("failed to read tables from cassandra. %s", err.Error())
 	}
 
 	if tableSelector == "tables" {
 		tables, err := getTables(store, "")
 		if err != nil {
-			log.Fatal(4, "%s", err)
+			log.Fatal(err.Error())
 		}
 		for _, table := range tables {
 			fmt.Printf("%s (ttl %d hours)\n", table.Name, table.TTL)
@@ -191,7 +199,7 @@ func main() {
 	}
 	tables, err := getTables(store, tableSelector)
 	if err != nil {
-		log.Fatal(4, "%s", err)
+		log.Fatal(err.Error())
 	}
 
 	var fromUnix, toUnix uint32
@@ -203,12 +211,12 @@ func main() {
 
 		fromUnix, err = dur.ParseDateTime(*from, loc, now, defaultFrom)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 
 		toUnix, err = dur.ParseDateTime(*to, loc, now, defaultTo)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 	}
 	var metrics []Metric
@@ -219,7 +227,7 @@ func main() {
 		if format == "points" || format == "point-summary" {
 			metrics, err = getMetrics(store, "")
 			if err != nil {
-				log.Error(3, "cassandra query error. %s", err)
+				log.Errorf("cassandra query error. %s", err.Error())
 				return
 			}
 		}
@@ -227,7 +235,7 @@ func main() {
 		fmt.Println("# Looking for these metrics:")
 		metrics, err = getMetrics(store, strings.Replace(metricSelector, "prefix:", "", 1))
 		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
+			log.Errorf("cassandra query error. %s", err.Error())
 			return
 		}
 		for _, m := range metrics {
@@ -236,7 +244,7 @@ func main() {
 	} else {
 		amkey, err := schema.AMKeyFromString(metricSelector)
 		if err != nil {
-			log.Error(3, "can't parse metric selector as AMKey: %s", err)
+			log.Errorf("can't parse metric selector as AMKey: %s", err.Error())
 			return
 		}
 
@@ -244,7 +252,7 @@ func main() {
 
 		metrics, err = getMetric(store, amkey)
 		if err != nil {
-			log.Error(3, "cassandra query error. %s", err)
+			log.Errorf("cassandra query error. %s", err.Error())
 			return
 		}
 		if len(metrics) == 0 {

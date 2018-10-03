@@ -6,7 +6,7 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/raintank/schema"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // AggMetrics is an in-memory store of AggMetric objects
@@ -68,7 +68,7 @@ func (ms *AggMetrics) GC() {
 			a := ms.Metrics[key]
 			ms.RUnlock()
 			if a.GC(now, chunkMinTs, metricMinTs) {
-				log.Debug("metric %s is stale. Purging data from memory.", key)
+				log.Debugf("metric %s is stale. Purging data from memory.", key)
 				ms.Lock()
 				delete(ms.Metrics, key)
 				metricsActive.Set(len(ms.Metrics))

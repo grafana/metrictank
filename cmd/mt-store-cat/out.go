@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gocql/gocql"
+	log "github.com/sirupsen/logrus"
 )
 
 type bucket struct {
@@ -60,6 +60,6 @@ func showKeyTTL(iter *gocql.Iter, groupTTL string) {
 	}
 	err := iter.Close()
 	if err != nil {
-		log.Error(3, "cassandra query error. %s", err)
+		log.Errorf("cassandra query error. %s", err)
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/rakyll/globalconf"
+	log "github.com/sirupsen/logrus"
 )
 
 var Enabled bool
@@ -63,7 +63,7 @@ func ConfigProcess(instance string) {
 	default:
 		offsetDuration, err = time.ParseDuration(offsetStr)
 		if err != nil {
-			log.Fatal(4, "kafka-cluster: invalid offest format. %s", err)
+			log.Fatalf("kafka-cluster: invalid offest format. %s", err)
 		}
 	}
 	brokers = strings.Split(brokerStr, ",")
@@ -78,12 +78,12 @@ func ConfigProcess(instance string) {
 	config.Producer.Partitioner = sarama.NewManualPartitioner
 	err = config.Validate()
 	if err != nil {
-		log.Fatal(2, "kafka-cluster invalid consumer config: %s", err)
+		log.Fatalf("kafka-cluster: invalid consumer config: %s", err)
 	}
 
 	backlogProcessTimeout, err = time.ParseDuration(backlogProcessTimeoutStr)
 	if err != nil {
-		log.Fatal(4, "kafka-cluster: unable to parse backlog-process-timeout. %s", err)
+		log.Fatalf("kafka-cluster: unable to parse backlog-process-timeout. %s", err)
 	}
 
 	if partitionStr != "*" {
@@ -91,7 +91,7 @@ func ConfigProcess(instance string) {
 		for _, part := range parts {
 			i, err := strconv.Atoi(part)
 			if err != nil {
-				log.Fatal(4, "kafka-cluster: could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
+				log.Fatalf("kafka-cluster: could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
 			}
 			partitions = append(partitions, int32(i))
 		}
@@ -99,20 +99,20 @@ func ConfigProcess(instance string) {
 	// validate our partitions
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
-		log.Fatal(4, "kafka-cluster failed to create client. %s", err)
+		log.Fatalf("kafka-cluster: failed to create client. %s", err)
 	}
 	defer client.Close()
 
 	availParts, err := kafka.GetPartitions(client, []string{topic})
 	if err != nil {
-		log.Fatal(4, "kafka-cluster: %s", err.Error())
+		log.Fatalf("kafka-cluster: %s", err.Error())
 	}
 	if partitionStr == "*" {
 		partitions = availParts
 	} else {
 		missing := kafka.DiffPartitions(partitions, availParts)
 		if len(missing) > 0 {
-			log.Fatal(4, "kafka-cluster: configured partitions not in list of available partitions. missing %v", missing)
+			log.Fatalf("kafka-cluster: configured partitions not in list of available partitions. missing %v", missing)
 		}
 	}
 
@@ -128,7 +128,7 @@ func ConfigProcess(instance string) {
 	for _, part := range partitions {
 		offset, err := client.GetOffset(topic, part, sarama.OffsetNewest)
 		if err != nil {
-			log.Fatal(4, "kakfa-cluster: failed to get newest offset for topic %s part %d: %s", topic, part, err)
+			log.Fatalf("kafka-cluster: failed to get newest offset for topic %s part %d: %s", topic, part, err)
 		}
 		bootTimeOffsets[part] = offset
 		// metric cluster.notifier.kafka.partition.%d.offset is the current offset for the partition (%d) that we have consumed
@@ -139,5 +139,5 @@ func ConfigProcess(instance string) {
 		// partition (%d) that we have not yet consumed.
 		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.lag", part))
 	}
-	log.Info("kafka-cluster: consuming from partitions %v", partitions)
+	log.Infof("kafka-cluster: consuming from partitions %v", partitions)
 }

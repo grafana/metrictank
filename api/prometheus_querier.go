@@ -13,7 +13,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // Querier creates a new querier that will operate on the subject server
@@ -103,13 +103,13 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	reqs, _, _, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
 	if err != nil {
-		log.Error(3, "HTTP Render alignReq error: %s", err)
+		log.Errorf("HTTP Render alignReq error: %s", err.Error())
 		return nil, err
 	}
 
 	out, err := q.getTargets(q.ctx, reqs)
 	if err != nil {
-		log.Error(3, "HTTP Render %s", err.Error())
+		log.Errorf("HTTP Render %s", err.Error())
 		return nil, err
 	}
 

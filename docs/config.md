@@ -70,8 +70,8 @@ proftrigger-min-diff = 1h
 # if process consumes this many bytes (see bytes_sys in dashboard), trigger a heap profile for developer diagnosis
 # set it higher than your typical memory usage, but lower than how much RAM the process can take before its get killed
 proftrigger-heap-thresh = 25000000000
-# only log log-level and higher. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL
-log-level = 2
+# only log log-level and lower (read right to left: to the left is lower). panic|fatal|error|warning|info|debug
+log-level = info
 # enable/disable distributed opentracing via jaeger
 tracing-enabled = false
 # address of the jaeger agent to send data to

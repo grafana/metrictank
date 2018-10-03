@@ -13,7 +13,7 @@ import (
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
-	"github.com/raintank/worldping-api/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:generate stringer -type=NodeState
@@ -157,7 +157,7 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 	carrier := opentracing.HTTPHeadersCarrier(req.Header)
 	err = Tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier)
 	if err != nil {
-		log.Error(3, "CLU failed to inject span into headers: %s", err)
+		log.Errorf("CLU failed to inject span into headers: %s", err.Error())
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -178,7 +178,7 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 	// then abort the http request.
 	select {
 	case <-ctx.Done():
-		log.Debug("CLU HTTPNode: context canceled. terminating request to peer %s", n.Name)
+		log.Debugf("CLU HTTPNode: context canceled. terminating request to peer %s", n.Name)
 		transport.CancelRequest(req)
 		<-c // Wait for client.Do but ignore result
 	case resp := <-c:
@@ -186,7 +186,7 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 		rsp := resp.r
 		if err != nil {
 			tags.Error.Set(span, true)
-			log.Error(3, "CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
+			log.Errorf("CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
 			return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
 		}
 		return handleResp(rsp)
