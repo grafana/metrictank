@@ -46,12 +46,10 @@ func main() {
 	log.SetFormatter(formatter)
 	lvl, err := log.ParseLevel(*logLevel)
 	if err != nil {
-		log.SetLevel(log.InfoLevel)
-		log.Errorf("failed to parse log-level, setting logging level to 'info', err: %s", err.Error())
-	} else {
-		log.SetLevel(lvl)
-		log.Infof("logging level set to '%s'", *logLevel)
+		log.Fatalf("failed to parse log-level, %s", err.Error())
 	}
+	log.SetLevel(lvl)
+	log.Infof("logging level set to '%s'", *logLevel)
 
 	defsChan := make(chan *schema.MetricDefinition, 100)
 

@@ -51,9 +51,6 @@ var (
 	inputs      []input.Plugin
 	store       mdata.Store
 
-	// Logging:
-	logLevel = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
-
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
 	showVersion = flag.Bool("version", false, "print version string")
@@ -68,6 +65,8 @@ var (
 	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
 
 	// Profiling, instrumentation and logging:
+	logLevel = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
+
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
