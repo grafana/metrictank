@@ -244,14 +244,14 @@ func TestCorruptionCase2(t *testing.T) {
 		switch action {
 		case 0:
 			chunk := getRandomNumber(0, 100)
-			t.Logf("adding chunk %d", chunk)
+			//t.Logf("adding chunk %d", chunk)
 			ccm.Add(0, chunks[chunk])
 			cached[chunk] = true
 			opAdd++
 			adds++
 		case 1:
 			from, to := getRandomRange(0, 100)
-			t.Logf("adding range %d-%d", from, to)
+			//t.Logf("adding range %d-%d", from, to)
 			ccm.AddRange(0, chunks[from:to])
 			for chunk := from; chunk < to; chunk++ {
 				cached[chunk] = true
@@ -260,14 +260,14 @@ func TestCorruptionCase2(t *testing.T) {
 			opAddRange++
 		case 2:
 			chunk := getRandomNumber(0, 100)
-			t.Logf("deleting chunk %d", chunk)
+			//t.Logf("deleting chunk %d", chunk)
 			ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
 			cached[chunk] = false
 			opDel++
 			dels++
 		case 3:
 			from, to := getRandomRange(0, 100)
-			t.Logf("deleting range %d-%d", from, to)
+			//t.Logf("deleting range %d-%d", from, to)
 			for chunk := from; chunk < to; chunk++ {
 				ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
 				cached[chunk] = false
