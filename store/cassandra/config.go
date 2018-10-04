@@ -51,13 +51,13 @@ func NewStoreConfig() *StoreConfig {
 		CqlProtocolVersion:       4,
 		CreateKeyspace:           true,
 		DisableInitialHostLookup: false,
-		SSL:              false,
-		CaPath:           "/etc/metrictank/ca.pem",
-		HostVerification: true,
-		Auth:             false,
-		Username:         "cassandra",
-		Password:         "cassandra",
-		SchemaFile:       "/etc/metrictank/schema-store-cassandra.toml",
+		SSL:                      false,
+		CaPath:                   "/etc/metrictank/ca.pem",
+		HostVerification:         true,
+		Auth:                     false,
+		Username:                 "cassandra",
+		Password:                 "cassandra",
+		SchemaFile:               "/etc/metrictank/schema-store-cassandra.toml",
 	}
 }
 
