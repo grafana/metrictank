@@ -301,7 +301,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				rowKeys = failedRowKeys
 				muts = failedMutations
 				buf = retryBuf
-				log.Errorf("btStore: failed to write %s rows. %s", len(failedRowKeys), err)
+				log.Errorf("btStore: failed to write %d rows. %s", len(failedRowKeys), err)
 				chunkSaveFail.Add(len(failedRowKeys))
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -312,7 +312,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 			} else {
 				success = true
 				chunkSaveOk.Add(len(rowKeys))
-				log.Debugf("btStore: %d chunks saved to bigtable. %s", len(rowKeys))
+				log.Debugf("btStore: %d chunks saved to bigtable.", len(rowKeys))
 				for _, cwr := range buf {
 					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
 					mdata.SendPersistMessage(cwr.Key.String(), cwr.Chunk.T0)

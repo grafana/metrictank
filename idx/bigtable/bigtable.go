@@ -438,7 +438,7 @@ func (b *BigtableIdx) processWriteQueue() {
 				}
 				rowKeys = failedRowKeys
 				mutations = failedMutations
-				log.Errorf("bigtable-idx: failed to write %s rows. %s", len(failedRowKeys), err)
+				log.Errorf("bigtable-idx: failed to write %d rows. %s", len(failedRowKeys), err)
 				statQueryInsertFail.Add(len(failedRowKeys))
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -450,7 +450,7 @@ func (b *BigtableIdx) processWriteQueue() {
 				success = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
 				statQueryInsertOk.Add(len(rowKeys))
-				log.Debugf("bigtable-idx: %d metricDefs saved to bigtable. %s", len(rowKeys))
+				log.Debugf("bigtable-idx: %d metricDefs saved to bigtable.", len(rowKeys))
 			}
 
 		}
