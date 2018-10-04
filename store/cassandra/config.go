@@ -7,6 +7,7 @@ import (
 )
 
 type StoreConfig struct {
+	Enabled                  bool
 	Addrs                    string
 	Keyspace                 string
 	Consistency              string
@@ -34,6 +35,7 @@ type StoreConfig struct {
 // return StoreConfig with default values set.
 func NewStoreConfig() *StoreConfig {
 	return &StoreConfig{
+		Enabled:                  true,
 		Addrs:                    "localhost",
 		Keyspace:                 "metrictank",
 		Consistency:              "one",
@@ -49,13 +51,13 @@ func NewStoreConfig() *StoreConfig {
 		CqlProtocolVersion:       4,
 		CreateKeyspace:           true,
 		DisableInitialHostLookup: false,
-		SSL:                      false,
-		CaPath:                   "/etc/metrictank/ca.pem",
-		HostVerification:         true,
-		Auth:                     false,
-		Username:                 "cassandra",
-		Password:                 "cassandra",
-		SchemaFile:               "/etc/metrictank/schema-store-cassandra.toml",
+		SSL:              false,
+		CaPath:           "/etc/metrictank/ca.pem",
+		HostVerification: true,
+		Auth:             false,
+		Username:         "cassandra",
+		Password:         "cassandra",
+		SchemaFile:       "/etc/metrictank/schema-store-cassandra.toml",
 	}
 }
 
@@ -63,6 +65,7 @@ var CliConfig = NewStoreConfig()
 
 func ConfigSetup() *flag.FlagSet {
 	cas := flag.NewFlagSet("cassandra", flag.ExitOnError)
+	cas.BoolVar(&CliConfig.Enabled, "enabled", CliConfig.Enabled, "enable the cassandra backend store plugin")
 	cas.StringVar(&CliConfig.Addrs, "addrs", CliConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
 	cas.StringVar(&CliConfig.Keyspace, "keyspace", CliConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
 	cas.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
