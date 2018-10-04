@@ -51,6 +51,7 @@ jobs:
       - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
       - run: go test -v ./stacktest/tests/end2end_carbon
+      - run: go test -v ./stacktest/tests/end2end_carbon_bigtable
 
   deploy:
     docker:

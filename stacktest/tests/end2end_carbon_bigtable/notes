@@ -1,0 +1,7 @@
+on my laptop:
+replay: 20s startup + 30s wait + 10s test + 5s shutdown = 1m05
+me: 20s startup + 8s test + 5 shutdown = 33s
+
+circle:
+me: startup 59/66s + 8/7s test + 50s = 121/122s
+replay: startup 43s + 40s test + 3s shutdown = 86s

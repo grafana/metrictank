@@ -1729,9 +1729,9 @@
     },
     {
       "aliasColors": {
-        "cassandra get": "#052B51",
-        "cassandra get chunks": "#70DBED",
-        "cassandra to iter": "#1F78C1",
+        "store get": "#052B51",
+        "store get chunks": "#70DBED",
+        "store to iter": "#1F78C1",
         "mem to iter": "#EAB839",
         "total request handle": "#890F02"
       },
@@ -1778,11 +1778,11 @@
         },
         {
           "refId": "B",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.get_chunks.latency.mean.gauge32), 'cassandra get chunks')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.get_chunks.latency.mean.gauge32), 'store get chunks')"
         },
         {
           "refId": "C",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.to_iter.latency.mean.gauge32), 'cassandra to iter')",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.to_iter.latency.mean.gauge32), 'store to iter')",
           "textEditor": false
         },
         {
@@ -1921,17 +1921,17 @@
         {
           "hide": false,
           "refId": "A",
-          "target": "aliasSub(sumSeriesWithWildcards(metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.max.gauge32, 3), '.*write_queue.(.*).items.*', 'write_queue-\\1')"
+          "target": "aliasSub(sumSeriesWithWildcards(metrictank.stats.$environment.$instance.store.*.write_queue.*.items.max.gauge32, 3), '.*write_queue.(.*).items.*', 'write_queue-\\1')"
         },
         {
           "hide": false,
           "refId": "B",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.cassandra.write_queue.size.gauge32), 'write queue items limit (each)')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.*.write_queue.size.gauge32), 'write queue items limit (each)')"
         },
         {
           "hide": false,
           "refId": "C",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.cassandra.num_writers.gauge32), 'num write-workers')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.*.num_writers.gauge32), 'num write-workers')"
         },
         {
           "hide": false,
@@ -2156,28 +2156,28 @@
       "targets": [
         {
           "refId": "E",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.get.wait.latency.p90.gauge32), 'get p90')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.get.wait.latency.p90.gauge32), 'get p90')"
         },
         {
           "refId": "F",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.put.wait.latency.p90.gauge32), 'put p90')",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.put.wait.latency.p90.gauge32), 'put p90')",
           "textEditor": false
         },
         {
           "refId": "A",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.store.cassandra.omitted_old_reads.counter32)), 'dropped reads')",
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.store.*.omitted_old_reads.counter32)), 'dropped reads')",
           "textEditor": false
         },
         {
           "refId": "B",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.store.cassandra.read_queue_full.counter32)), 'read queue full')",
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.store.*.read_queue_full.counter32)), 'read queue full')",
           "textEditor": false
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "cassandra queue wait durations",
+      "title": "store queue wait durations",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2275,27 +2275,27 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.median.gauge32), 'size at load median')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_load.median.gauge32), 'size at load median')"
         },
         {
           "refId": "B",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.p90.gauge32), 'size at load p90')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_load.p90.gauge32), 'size at load p90')"
         },
         {
           "refId": "C",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_load.max.gauge32), 'size at load max')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_load.max.gauge32), 'size at load max')"
         },
         {
           "refId": "D",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.median.gauge32), 'size at save median')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_save.median.gauge32), 'size at save median')"
         },
         {
           "refId": "E",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.p90.gauge32), 'size at save p90')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_save.p90.gauge32), 'size at save p90')"
         },
         {
           "refId": "F",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.chunk_size.at_save.max.gauge32), 'size at save max')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.chunk_size.at_save.max.gauge32), 'size at save max')"
         }
       ],
       "thresholds": [],
@@ -2386,17 +2386,17 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.cassandra.put.exec.values.rate32), 'put/s')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.*.put.exec.values.rate32), 'put/s')"
         },
         {
           "refId": "B",
-          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.cassandra.get.exec.values.rate32), 'get/s')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.store.*.get.exec.values.rate32), 'get/s')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "store cassandra req/s",
+      "title": "store req/s",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2483,25 +2483,25 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.p90.gauge32), 'put p90')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.put.exec.latency.p90.gauge32), 'put p90')"
         },
         {
           "refId": "B",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.put.exec.latency.mean.gauge32), 'put mean')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.put.exec.latency.mean.gauge32), 'put mean')"
         },
         {
           "refId": "C",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.p90.gauge32), 'get p90')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.get.exec.latency.p90.gauge32), 'get p90')"
         },
         {
           "refId": "D",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.get.exec.latency.mean.gauge32), 'get mean')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.get.exec.latency.mean.gauge32), 'get mean')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "cassandra query durations",
+      "title": "store query durations",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2610,33 +2610,33 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.median.gauge32), 'chunks per row med')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.chunks_per_row.median.gauge32), 'chunks per row med')"
         },
         {
           "refId": "B",
-          "target": "alias(minSeries(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.min.gauge32), 'chunks per row min')"
+          "target": "alias(minSeries(metrictank.stats.$environment.$instance.store.*.chunks_per_row.min.gauge32), 'chunks per row min')"
         },
         {
           "refId": "C",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.chunks_per_row.max.gauge32), 'chunks per row max')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.chunks_per_row.max.gauge32), 'chunks per row max')"
         },
         {
           "refId": "D",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.median.gauge32), 'rows per resp med')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.store.*.rows_per_response.median.gauge32), 'rows per resp med')"
         },
         {
           "refId": "E",
-          "target": "alias(minSeries(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.min.gauge32), 'rows per resp min')"
+          "target": "alias(minSeries(metrictank.stats.$environment.$instance.store.*.rows_per_response.min.gauge32), 'rows per resp min')"
         },
         {
           "refId": "F",
-          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.cassandra.rows_per_response.max.gauge32), 'rows per resp max')"
+          "target": "alias(maxSeries(metrictank.stats.$environment.$instance.store.*.rows_per_response.max.gauge32), 'rows per resp max')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "cassandra responses",
+      "title": "store responses",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2720,17 +2720,17 @@
       "targets": [
         {
           "refId": "A",
-          "target": "aliasByNode(sumSeriesWithWildcards(perSecond(metrictank.stats.$environment.$instance.store.cassandra.error.*.counter32), 2, 3), 5)"
+          "target": "aliasByNode(sumSeriesWithWildcards(perSecond(metrictank.stats.$environment.$instance.store.*.error.*.counter32), 2, 3), 5)"
         },
         {
           "refId": "B",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.store.cassandra.omit_read.*.counter32, 7)"
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.store.*.omit_read.*.counter32, 7)"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "cassandra store errors",
+      "title": "store errors",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -3070,6 +3070,8 @@
         "add-to-bulk-index-ok": "#3F6833",
         "cassandra.fail": "#E24D42",
         "cassandra.ok": "#3F6833",
+        "bigtable.fail": "#E24D42",
+        "bigtable.ok": "#3F6833",
         "indexed-fail": "#E0752D",
         "indexed-ok": "#629E51",
         "max": "#DEDAF7",
@@ -3239,11 +3241,11 @@
       "targets": [
         {
           "refId": "A",
-          "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.idx.cassandra.error.*.counter32), 7, 'sum')"
+          "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.error.*.counter32), 7, 'sum')"
         },
         {
           "refId": "B",
-          "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.idx.cassandra.save.skipped.counter32), 7, 'sum')"
+          "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.save.skipped.counter32), 7, 'sum')"
         },
         {
           "refId": "C",

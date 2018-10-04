@@ -1,0 +1,12 @@
+apiVersion: 1
+datasources:
+- name: metrictank
+  type: graphite
+  access: proxy
+  orgId: 1
+  url: http://metrictank:6060
+  isDefault: true
+  jsonData:
+     graphiteVersion: "1.1"
+  version: 1
+  editable: true
