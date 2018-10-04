@@ -140,6 +140,7 @@ disable-initial-host-lookup = false
 ```
 
 ## Bigtable backend Store Settings ##
+
 ```
 [bigtable-store]
 # enable the bigtable backend store plugin
@@ -481,8 +482,8 @@ match-cache-size = 1000
 max-prune-lock-time = 100ms
 ```
 
-
 ### Bigtable index
+
 ```
 [bigtable-idx]
 enabled = false
@@ -507,7 +508,6 @@ max-stale = 0
 # Interval at which the index should be checked for stale series.
 prune-interval = 3h
 # enable the creation of the table and column families
-create-cf = true
 ```
 
 # storage-schemas.conf
