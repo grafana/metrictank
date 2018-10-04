@@ -22,7 +22,7 @@ services:
       MT_INSTANCE: metrictank0
       MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
       MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
-      MT_LOG_LEVEL: 2
+      MT_LOG_LEVEL: info
     links:
      - cassandra
 
@@ -46,7 +46,7 @@ services:
       MT_INSTANCE: metrictank1
       MT_KAFKA_CLUSTER_PARTITIONS: 0,1,2,3
       MT_KAFKA_MDM_IN_PARTITIONS: 0,1,2,3
-      MT_LOG_LEVEL: 2
+      MT_LOG_LEVEL: info
     links:
      - cassandra
      - metrictank0
@@ -71,7 +71,7 @@ services:
       MT_INSTANCE: metrictank2
       MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
       MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
-      MT_LOG_LEVEL: 2
+      MT_LOG_LEVEL: info
     links:
      - cassandra
      - metrictank0
@@ -96,7 +96,7 @@ services:
       MT_INSTANCE: metrictank3
       MT_KAFKA_CLUSTER_PARTITIONS: 4,5,6,7
       MT_KAFKA_MDM_IN_PARTITIONS: 4,5,6,7
-      MT_LOG_LEVEL: 2
+      MT_LOG_LEVEL: info
     links:
      - cassandra
      - metrictank0

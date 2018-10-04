@@ -13,7 +13,7 @@ Settings within section names in the config just require you to prefix the secti
 Examples:
 
 ```
-MT_LOG_LEVEL: 1                           # MT_<setting_name>
+MT_LOG_LEVEL: info                        # MT_<setting_name>
 MT_CASSANDRA_WRITE_CONCURRENCY: 10        # MT_<setting_name>
 MT_KAFKA_MDM_IN_DATA_DIR: /your/data/dir  # MT_<section_title>_<setting_name>
 ```
