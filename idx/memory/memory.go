@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"regexp"
@@ -1316,12 +1315,9 @@ DEFS:
 	}
 	m.RUnlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// create a new timeLimiter that allows us to limit the amount of time we spend
 	// holding a lock to maxPruneLockTime (default 100ms) every second.
-	tl := NewTimeLimiter(ctx, time.Second, maxPruneLockTime)
+	tl := NewTimeLimiter(time.Second, maxPruneLockTime, time.Now())
 
 	for org, ids := range toPruneTagged {
 		if len(ids) == 0 {
