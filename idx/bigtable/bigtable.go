@@ -68,7 +68,7 @@ var (
 func ConfigSetup() {
 	btIdx := flag.NewFlagSet("bigtable-idx", flag.ExitOnError)
 
-	btIdx.BoolVar(&Enabled, "enabled", true, "")
+	btIdx.BoolVar(&Enabled, "enabled", false, "")
 	btIdx.StringVar(&gcpProject, "gcp-project", "default", "Name of GCP project the bigtable cluster resides in")
 	btIdx.StringVar(&bigtableInstance, "bigtable-instance", "default", "Name of bigtable instance")
 	btIdx.StringVar(&tableName, "table-name", "metric_idx", "Name of bigtable table used for metricDefs")
