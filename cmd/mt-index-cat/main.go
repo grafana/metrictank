@@ -105,26 +105,6 @@ func main() {
 		os.Exit(-1)
 	}
 
-	var partitions []int32
-	if partitionStr != "*" {
-		for _, p := range strings.Split(partitionStr, ",") {
-			p = strings.TrimSpace(p)
-
-			// handle trailing "," on the list of partitions.
-			if p == "" {
-				continue
-			}
-
-			id, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				log.Printf("invalid partition id %q. must be a int32", p)
-				flag.Usage()
-				os.Exit(-1)
-			}
-			partitions = append(partitions, int32(id))
-		}
-	}
-
 	format := os.Args[len(os.Args)-1]
 	var found bool
 	if strings.Contains(format, "{{") {
@@ -203,10 +183,33 @@ func main() {
 		cutoffMin = now - int64(minStaleInt)
 	}
 
+	var partitions []int32
+	log.Infof("parsing partitionStr %s", partitionStr)
+	if partitionStr != "*" {
+		for _, p := range strings.Split(partitionStr, ",") {
+			p = strings.TrimSpace(p)
+
+			// handle trailing "," on the list of partitions.
+			if p == "" {
+				continue
+			}
+
+			id, err := strconv.ParseInt(p, 10, 32)
+			if err != nil {
+				log.Printf("invalid partition id %q. must be a int32", p)
+				flag.Usage()
+				os.Exit(-1)
+			}
+			partitions = append(partitions, int32(id))
+		}
+	}
+
 	var defs []schema.MetricDefinition
 	if len(partitions) == 0 {
+		log.Info("loading series from all partitions.")
 		defs = idx.Load(nil, uint32(cutoff))
 	} else {
+		log.Infof("loading series from partitiosn %v", partitions)
 		defs = idx.LoadPartitions(partitions, nil, uint32(cutoff))
 	}
 	// set this after doing the query, to assure age can't possibly be negative
