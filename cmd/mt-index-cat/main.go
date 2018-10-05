@@ -184,7 +184,6 @@ func main() {
 	}
 
 	var partitions []int32
-	log.Infof("parsing partitionStr %s", partitionStr)
 	if partitionStr != "*" {
 		for _, p := range strings.Split(partitionStr, ",") {
 			p = strings.TrimSpace(p)
@@ -206,10 +205,8 @@ func main() {
 
 	var defs []schema.MetricDefinition
 	if len(partitions) == 0 {
-		log.Info("loading series from all partitions.")
 		defs = idx.Load(nil, uint32(cutoff))
 	} else {
-		log.Infof("loading series from partitiosn %v", partitions)
 		defs = idx.LoadPartitions(partitions, nil, uint32(cutoff))
 	}
 	// set this after doing the query, to assure age can't possibly be negative
