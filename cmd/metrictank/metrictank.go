@@ -271,13 +271,13 @@ func main() {
 	if bigtableStore.CliConfig.Enabled {
 		store, err = bigtableStore.NewStore(bigtableStore.CliConfig, mdata.TTLs())
 		if err != nil {
-			log.Fatalf("failed to initialize cassandra. %s", err)
+			log.Fatalf("failed to initialize bigtable backend store. %s", err)
 		}
 	}
 	if cassandraStore.CliConfig.Enabled {
 		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 		if err != nil {
-			log.Fatalf("failed to initialize cassandra. %s", err)
+			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}
 	}
 	store.SetTracer(tracer)
