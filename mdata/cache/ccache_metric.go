@@ -84,9 +84,6 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	mc.Lock()
 	defer mc.Unlock()
 
-	// pre-allocate 1 slice, cheaper than allocating one by one
-	chunks := make([]CCacheChunk, 0, len(itergens))
-
 	// handle the first one
 	itergen := itergens[0]
 	ts := itergen.Ts
@@ -122,13 +119,12 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			prev = 0
 		}
 
-		chunks = append(chunks, CCacheChunk{
+		mc.chunks[ts] = &CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
 			Next:  itergens[1].Ts,
 			Itgen: itergen,
-		})
-		mc.chunks[ts] = &chunks[len(chunks)-1]
+		}
 		mc.keys = append(mc.keys, ts)
 	} else {
 		mc.chunks[ts].Next = itergens[1].Ts
@@ -146,13 +142,12 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		}
 
 		// add chunk, potentially overwriting pre-existing chunk (unlikely)
-		chunks = append(chunks, CCacheChunk{
+		mc.chunks[ts] = &CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
 			Next:  itergens[i+1].Ts,
 			Itgen: itergen,
-		})
-		mc.chunks[ts] = &chunks[len(chunks)-1]
+		}
 
 		prev = ts
 	}
@@ -177,13 +172,12 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 			}
 		}
 
-		chunks = append(chunks, CCacheChunk{
+		mc.chunks[ts] = &CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
 			Next:  next,
 			Itgen: itergen,
-		})
-		mc.chunks[ts] = &chunks[len(chunks)-1]
+		}
 		mc.keys = append(mc.keys, ts)
 	} else {
 		mc.chunks[ts].Prev = prev
