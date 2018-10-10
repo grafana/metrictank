@@ -821,7 +821,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64, maxSeries int) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	responseChan, errorChan := s.peerQuerySpeculativeChan(ctx, data, "clusterFindByTag", "/index/find_by_tag")
+	newCtx, cancel := context.WithCancel(ctx)
+	responseChan, errorChan := s.peerQuerySpeculativeChan(newCtx, data, "clusterFindByTag", "/index/find_by_tag")
 
 	var allSeries []Series
 
@@ -829,11 +830,13 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		resp := models.IndexFindByTagResp{}
 		_, err := resp.UnmarshalMsg(r.buf)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
 
 		// 0 disables the check, so only check if maxSeriesPerReq > 0
 		if maxSeriesPerReq > 0 && len(resp.Metrics)+len(allSeries) > maxSeries {
+			cancel()
 			return nil,
 				response.NewError(
 					http.StatusRequestEntityTooLarge,
