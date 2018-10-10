@@ -31,7 +31,7 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 func TestMain(m *testing.M) {
-	log.Println("launching docker-bigtable stack...")
+	log.Println("launching docker-dev-bigtable stack...")
 	version := exec.Command("docker-compose", "version")
 	output, err := version.CombinedOutput()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
 	cmd := exec.Command("docker-compose", "up", "--force-recreate")
-	cmd.Dir = docker.Path("docker/docker-bigtable")
+	cmd.Dir = docker.Path("docker/docker-dev-bigtable")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
