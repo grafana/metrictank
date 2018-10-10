@@ -232,7 +232,7 @@ func main() {
 	} else {
 		defs = idx.LoadPartitions(partitions, nil, uint32(cutoff))
 	}
-	// set this after doing the query, to assure age can't possibly be negative
+	// set this after doing the query, to assure age can't possibly be negative unless if clocks are misconfigured.
 	out.QueryTime = time.Now().Unix()
 	total := len(defs)
 	shown := 0

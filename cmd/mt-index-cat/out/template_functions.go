@@ -37,19 +37,23 @@ func age(in int64) int64 {
 
 // roundDuration rounds a second-specified duration for rough classification
 func roundDuration(in int64) int64 {
-	if in <= 10 { // 10s -> don't round
+	abs := in
+	if abs < 0 {
+		abs = -abs
+	}
+	if abs <= 10 { // 10s -> don't round
 		return in
-	} else if in <= 60 { // 1min -> round to 10s
+	} else if abs <= 60 { // 1min -> round to 10s
 		return round(in, 10)
-	} else if in <= 600 { // 10min -> round to 1min
+	} else if abs <= 600 { // 10min -> round to 1min
 		return round(in, 60)
-	} else if in <= 3600 { // 1h -> round to 10min
+	} else if abs <= 3600 { // 1h -> round to 10min
 		return round(in, 600)
-	} else if in <= 3600*24 { // 24h -> round to 1h
+	} else if abs <= 3600*24 { // 24h -> round to 1h
 		return round(in, 3600)
-	} else if in <= 3600*24*7 { // 7d -> round to 1d
+	} else if abs <= 3600*24*7 { // 7d -> round to 1d
 		return round(in, 3600*24)
-	} else if in <= 3600*24*30 { // 30d -> round to 7d
+	} else if abs <= 3600*24*30 { // 30d -> round to 7d
 		return round(in, 3600*24*7)
 	}
 	// default to rounding to months
