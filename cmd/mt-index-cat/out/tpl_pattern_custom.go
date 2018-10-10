@@ -13,18 +13,21 @@ type bucket struct {
 	fn     func(in string) string
 }
 
+func PatternCustomUsage() {
+	fmt.Println("patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:")
+	fmt.Println("    patternCustom <chance> <operation>[ <chance> <operation>...]")
+	fmt.Println("    the chances need to add up to 100")
+	fmt.Println("    operation is one of:")
+	fmt.Println("        * pass        (passthrough)")
+	fmt.Println("        * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards")
+	fmt.Println("        * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards")
+	fmt.Println("    example: {{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n")
+}
+
 // percentage chance, and function
 func patternCustom(in ...interface{}) string {
 	usage := func() {
-		fmt.Println("usage of patternCustom:")
-		fmt.Println("input | patternCustom <chance> <operation>")
-		fmt.Println("the chances need to add up to 100")
-		fmt.Println("operation is one of:")
-		fmt.Println("       pass         (passthrough)")
-		fmt.Println("       <number>rcnw (replace <number> random consecutive nodes with wildcards")
-		fmt.Println("       <number>rccw (replace <number> random consecutive characters with wildcards")
-		fmt.Println("example:")
-		fmt.Println("{{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n")
+		PatternCustomUsage()
 		os.Exit(-1)
 	}
 

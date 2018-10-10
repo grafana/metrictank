@@ -143,14 +143,15 @@ output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.In
 
 You may also use processing functions in templates:
 pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
-         an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough
+    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough
 patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:
-         patternCustom <chance> <operation> [,<chance> <operation>, ...]
-         the chances need to add up to 100
-         operation is one of:
-         pass         (passthrough)
-         <number>rcnw (replace <number> random consecutive nodes with wildcards
-         <number>rccw (replace <number> random consecutive characters with wildcards
+    patternCustom <chance> <operation>[ <chance> <operation>...]
+    the chances need to add up to 100
+    operation is one of:
+        * pass        (passthrough)
+        * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards
+        * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards
+    example: {{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n
 age: subtracts the passed integer (typically .LastUpdate) from the query time
 roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 EXAMPLES:
