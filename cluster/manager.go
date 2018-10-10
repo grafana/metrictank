@@ -83,7 +83,8 @@ func NewMemberlistManager(thisNode HTTPNode) *MemberlistManager {
 		mgr.cfg = memberlist.DefaultLANConfig() // use this as base so that the other settings have proper defaults
 		mgr.cfg.BindPort = swimBindAddr.Port
 		mgr.cfg.BindAddr = swimBindAddr.IP.String()
-		mgr.cfg.AdvertisePort = swimBindAddr.Port
+		mgr.cfg.AdvertisePort = swimAdvertiseAddr.Port
+		mgr.cfg.AdvertiseAddr = swimAdvertiseAddr.IP.String()
 		mgr.cfg.TCPTimeout = swimTCPTimeout
 		mgr.cfg.IndirectChecks = swimIndirectChecks
 		mgr.cfg.RetransmitMult = swimRetransmitMult
