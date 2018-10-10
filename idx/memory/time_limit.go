@@ -26,12 +26,14 @@ type TimeLimiter struct {
 	limit     time.Duration // maximum timeSpent value before blocking.
 	wg        sync.WaitGroup
 	limited   bool
+	stopped   bool
 }
 
-// NewTimeLimiter creates a new TimeLimiter.  A background goroutine will run until the
-// provided context is done.  When the amount of time spent on task (the time is determined
-// by calls to "Add()") every "window" duration is more then "limit",  then calls to
-// Wait() will block until the start if the next window period.
+// NewTimeLimiter creates a new TimeLimiter. When the amount of time spent on task
+// (the time is determined by calls to "Add()") every "window" duration is more then "limit",
+// then calls to Wait() will block until the start if the next window period.
+// The limiter will continue to run until the passed context is done.  Any calls to Wait() after
+// the context is done will immediate return.
 func NewTimeLimiter(ctx context.Context, window, limit time.Duration) *TimeLimiter {
 	l := &TimeLimiter{
 		ctx:    ctx,
@@ -42,16 +44,17 @@ func NewTimeLimiter(ctx context.Context, window, limit time.Duration) *TimeLimit
 	return l
 }
 
+// core loop.  At every `window` interval will reset timeSpent to 0
+// and unblock any callers to Wait() if we had reached the limit during the window.
 func (l *TimeLimiter) run() {
 	done := l.ctx.Done()
-	l.RLock()
 	ticker := time.NewTicker(l.window)
-	l.RUnlock()
 	for {
 		select {
 		case <-done:
 			ticker.Stop()
 			l.Lock()
+			l.stopped = true
 			// if we were limited, then unblock anyone waiting
 			if l.limited {
 				l.wg.Done()
@@ -74,8 +77,10 @@ func (l *TimeLimiter) run() {
 	}
 }
 
+// ensure that any callers to Wait() will be blocked.
+// Assumes the caller has a write Lock acquired with l.Lock()
 func (l *TimeLimiter) block() {
-	if l.limited {
+	if l.limited || l.stopped {
 		return
 	}
 	l.limited = true
@@ -83,6 +88,7 @@ func (l *TimeLimiter) block() {
 }
 
 // Add increments the "time spent" counter by "d"
+// If after adding the limit is reached, any new callers to Wait() will be blocked.
 func (l *TimeLimiter) Add(d time.Duration) {
 	l.Lock()
 	l.timeSpent = l.timeSpent + d
