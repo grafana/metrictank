@@ -33,6 +33,9 @@ var (
 
 	cacheSizeMax          = stats.NewGauge64("cache.size.max")
 	cacheSizeUsed         = stats.NewGauge64("cache.size.used")
+	cacheOverheadChunk    = stats.NewGauge64("cache.overhead.chunk")
+	cacheOverheadFlat     = stats.NewGauge64("cache.overhead.flat")
+	cacheOverheadLru      = stats.NewGauge64("cache.overhead.lru")
 	accntEventAddDuration = stats.NewLatencyHistogram15s32("cache.accounting.queue.add")
 	accntEventQueueUsed   = stats.NewRange32("cache.accounting.queue.size.used")
 	accntEventQueueMax    = stats.NewGauge64("cache.accounting.queue.size.max")

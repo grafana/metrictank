@@ -8,7 +8,27 @@ import (
 	"github.com/raintank/schema"
 )
 
-const evictQSize = 1000
+const (
+	evictQSize = 1000
+
+	// these numbers are estimates and could still use some fine tuning
+	// they do not account for map growth
+
+	// EvictTarget (24 bytes + 4 bytes) (AMKey, uint32) + 8 bytes (pointer from map[interface{}]*EvictTarget)
+	// + 40 bytes (Element in List)
+	lruItemSize = 76
+
+	// k: 4 bytes + v: 8 bytes (map[uint32]uint64)
+	flatChunkSize = 12
+	// k: 24 bytes + v: 16 bytes (map[schema.AMKey]*FlatAccntMet)
+	flatAccntMetSize = 40
+
+	// 24 bytes + 8 bytes + 24 bytes + 20 bytes (sync.RWMutex, map, slice, MKey) + 4 bytes for alignment
+	// + 24 bytes for map entry in CCache schema.AMKey (map[schema.AMKey]*CCacheMetric)
+	ccacheCacheMetSize = 104
+	// k: 4 bytes + v: 48 bytes (map[uint32]chunk.IterGen) + 4 bytes for []keys
+	ccacheMetChunkSize = 56
+)
 
 // it's easily possible for many events to happen in one request,
 // we never want this to fill up because otherwise events get dropped
@@ -221,6 +241,9 @@ func (a *FlatAccnt) eventLoop() {
 				a.metrics = make(map[schema.AMKey]*FlatAccntMet)
 				a.lru.reset()
 				cacheSizeUsed.SetUint64(0)
+				cacheOverheadChunk.SetUint64(0)
+				cacheOverheadFlat.SetUint64(0)
+				cacheOverheadLru.SetUint64(0)
 			}
 
 			// evict until we're below the max
@@ -230,6 +253,11 @@ func (a *FlatAccnt) eventLoop() {
 		}
 	}
 }
+
+// // totalUsed returns the sum of cacheSizeUsed, cacheOverheadChunk, cacheOverheadFlat, and cacheOverheadLru
+// func (a *FlatAccnt) totalUsed() uint64 {
+// 	return (cacheSizeUsed.Peek() + cacheOverheadChunk.Peek() + cacheOverheadFlat.Peek() + cacheOverheadLru.Peek())
+// }
 
 func (a *FlatAccnt) getTotal(res_chan chan uint64) {
 	res_chan <- cacheSizeUsed.Peek()
@@ -241,6 +269,11 @@ func (a *FlatAccnt) delMet(metric schema.AMKey) {
 		return
 	}
 
+	lenChunks := len(met.chunks)
+	totalFlat := uint64((lenChunks * flatChunkSize) + flatAccntMetSize)
+	totalChunk := uint64((lenChunks * ccacheMetChunkSize) + ccacheCacheMetSize)
+	totalLru := uint64((lenChunks * lruItemSize))
+
 	for ts := range met.chunks {
 		a.lru.del(
 			EvictTarget{
@@ -251,12 +284,16 @@ func (a *FlatAccnt) delMet(metric schema.AMKey) {
 	}
 
 	cacheSizeUsed.DecUint64(met.total)
+	cacheOverheadFlat.DecUint64(totalFlat)
+	cacheOverheadLru.DecUint64(totalLru)
+	cacheOverheadChunk.DecUint64(totalChunk)
 	delete(a.metrics, metric)
 }
 
 func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 	var met *FlatAccntMet
 	var ok bool
+	var totalFlat, totalChunk, totalLru uint64
 
 	if met, ok = a.metrics[metric]; !ok {
 		met = &FlatAccntMet{
@@ -265,6 +302,8 @@ func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
+		totalFlat += flatAccntMetSize
+		totalChunk += ccacheCacheMetSize
 	}
 
 	if _, ok = met.chunks[ts]; ok {
@@ -273,13 +312,22 @@ func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 	}
 
 	met.chunks[ts] = size
+
+	totalFlat += flatChunkSize
+	totalChunk += ccacheMetChunkSize
+	// this func is called from the event loop so lru will be touched with new EvictTarget
+	totalLru += lruItemSize
 	met.total = met.total + size
 	cacheSizeUsed.AddUint64(size)
+	cacheOverheadFlat.AddUint64(totalFlat)
+	cacheOverheadChunk.AddUint64(totalChunk)
+	cacheOverheadLru.AddUint64(totalLru)
 }
 
 func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 	var met *FlatAccntMet
 	var ok bool
+	var totalFlat, totalChunk, totalLru uint64
 
 	if met, ok = a.metrics[metric]; !ok {
 		met = &FlatAccntMet{
@@ -288,6 +336,8 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
+		totalFlat += flatAccntMetSize
+		totalChunk += ccacheCacheMetSize
 	}
 
 	var sizeDiff uint64
@@ -300,10 +350,18 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 		size := chunk.Size()
 		sizeDiff += size
 		met.chunks[chunk.Ts] = size
+		totalFlat += flatChunkSize
+		totalChunk += ccacheMetChunkSize
+		// this func is called from the event loop so lru will be touched with new EvictTarget
+		totalLru += lruItemSize
+
 	}
 
 	met.total = met.total + sizeDiff
 	cacheSizeUsed.AddUint64(sizeDiff)
+	cacheOverheadFlat.AddUint64(totalFlat)
+	cacheOverheadChunk.AddUint64(totalChunk)
+	cacheOverheadLru.AddUint64(totalLru)
 }
 
 func (a *FlatAccnt) evict() {
@@ -314,6 +372,7 @@ func (a *FlatAccnt) evict() {
 	var ok bool
 	var e interface{}
 	var target EvictTarget
+	var totalFlat, totalChunk uint64
 
 	e = a.lru.pop()
 
@@ -324,6 +383,9 @@ func (a *FlatAccnt) evict() {
 
 	// convert to EvictTarget otherwise
 	target = e.(EvictTarget)
+	// the item is already removed from the LRU and will not be re-added in this call path
+	// so it is safe to decrement the stat
+	cacheOverheadLru.DecUint64(lruItemSize)
 
 	if met, ok = a.metrics[target.Metric]; !ok {
 		return
@@ -339,6 +401,7 @@ func (a *FlatAccnt) evict() {
 
 	sort.Sort(Uint32Asc(targets))
 
+	lenChunks := len(targets)
 	for _, ts = range targets {
 		size = met.chunks[ts]
 		met.total = met.total - size
@@ -351,10 +414,25 @@ func (a *FlatAccnt) evict() {
 		delete(met.chunks, ts)
 	}
 
+	// technically none of the *CCacheChunk or *CCacheMetric will be deleted until
+	// after CCache processes its evictLoop, so these reductions in size
+	// might be inaccurate for a short period of time. In an environment where more
+	// items are waiting to be added to the cache this could allow the cache to grow more
+	// than it should until the evictions can be processed in ccache and then the
+	// memory reclaimed by GC at some time in the hopefully near future
+
+	totalChunk += uint64(lenChunks * ccacheMetChunkSize)
+	totalFlat += uint64(lenChunks * flatChunkSize)
+
 	if met.total <= 0 {
 		cacheMetricEvict.Inc()
 		delete(a.metrics, target.Metric)
+		totalChunk += ccacheCacheMetSize
+		totalFlat += flatAccntMetSize
 	}
+
+	cacheOverheadChunk.DecUint64(totalChunk)
+	cacheOverheadFlat.DecUint64(totalFlat)
 
 }
 
