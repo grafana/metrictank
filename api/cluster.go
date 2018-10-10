@@ -342,11 +342,11 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 
 		peerGroups, err := cluster.MembersForSpeculativeQuery()
 		if err != nil {
-			log.Error(3, "HTTP peerQuery unable to get peers, %s", err)
+			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
 			errorChan <- err
 			return
 		}
-		log.Debug("HTTP %s across %d instances", name, len(peerGroups)-1)
+		log.Debugf("HTTP %s across %d instances", name, len(peerGroups)-1)
 
 		reqCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -361,7 +361,7 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 		}, 1)
 
 		askPeer := func(shardGroup int32, peer cluster.Node) {
-			log.Debug("HTTP Render querying %s%s", peer.GetName(), path)
+			log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 			buf, err := peer.Post(reqCtx, name, path, data)
 
 			select {
@@ -373,7 +373,7 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 
 			if err != nil {
 				cancel()
-				log.Error(4, "HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
+				log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
 			}
 			responses <- struct {
 				shardGroup int32
