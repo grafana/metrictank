@@ -1,11 +1,6 @@
 package memory
 
-import (
-	"fmt"
-	"time"
-
-	"github.com/davecgh/go-spew/spew"
-)
+import "time"
 
 // TimeLimiter limits the rate of a set of serial operations.
 // It does this by tracking how much time has been spent (updated via Add()),
@@ -32,7 +27,6 @@ func NewTimeLimiter(window, limit time.Duration, now time.Time) *TimeLimiter {
 		window: window,
 		limit:  limit,
 	}
-	spew.Dump(l)
 	return &l
 }
 
@@ -47,8 +41,6 @@ func (l *TimeLimiter) add(now time.Time, d time.Duration) {
 		l.timeSpent = d
 		l.since = now.Add(-d)
 		l.next = l.since.Add(l.window)
-		fmt.Println("added and updated")
-		spew.Dump(l)
 		return
 	}
 	l.timeSpent += d
@@ -77,25 +69,22 @@ func (l *TimeLimiter) wait(now time.Time) time.Duration {
 		l.timeSpent = 0
 		l.since = now
 		l.next = now.Add(l.window)
-		fmt.Println("wait and update")
-		spew.Dump(l)
 		return 0
 	}
 	if l.timeSpent < l.limit {
 		return 0
 	}
 
-	// now <= next
-	// now >= since
+	// here we know that:
+	// since <= now <= next
 	// timespent >= limit
-	excess := l.timeSpent - l.limit
 	multiplier := l.window / l.limit
-	timeToPass := excess * multiplier
+	timeToPass := l.timeSpent * multiplier
 	timePassed := now.Sub(l.since)
+
 	// not sure if this should happen, but let's be safe anyway
-	if timePassed >= timeToPass {
+	if timePassed > timeToPass {
 		return 0
 	}
-	fmt.Println("wait and now is", now)
 	return timeToPass - timePassed
 }
