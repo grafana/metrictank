@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -607,7 +608,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			for i, e := range exprs {
 				exprs[i] = strings.Trim(e, " '\"")
 			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From))
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs))
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		}
@@ -798,7 +799,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filte
 
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
 	reqCtx := ctx.Req.Context()
-	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, request.Expr, request.From)
+	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, request.Expr, request.From, maxSeriesPerReq)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -818,28 +819,30 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
-func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64) ([]Series, error) {
+func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64, maxSeries int) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
-	resps, err := s.peerQuerySpeculative(ctx, data, "clusterFindByTag", "/index/find_by_tag")
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
+	newCtx, cancel := context.WithCancel(ctx)
+	responseChan, errorChan := s.peerQuerySpeculativeChan(newCtx, data, "clusterFindByTag", "/index/find_by_tag")
 
 	var allSeries []Series
 
-	for _, r := range resps {
+	for r := range responseChan {
 		resp := models.IndexFindByTagResp{}
-		_, err = resp.UnmarshalMsg(r.buf)
+		_, err := resp.UnmarshalMsg(r.buf)
 		if err != nil {
+			cancel()
 			return nil, err
 		}
+
+		// 0 disables the check, so only check if maxSeriesPerReq > 0
+		if maxSeriesPerReq > 0 && len(resp.Metrics)+len(allSeries) > maxSeries {
+			cancel()
+			return nil,
+				response.NewError(
+					http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		}
+
 		for _, series := range resp.Metrics {
 			allSeries = append(allSeries, Series{
 				Pattern: series.Path,
@@ -849,7 +852,8 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		}
 	}
 
-	return allSeries, nil
+	err := <-errorChan
+	return allSeries, err
 }
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
