@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"cloud.google.com/go/bigtable"
@@ -11,9 +12,15 @@ import (
 	"github.com/raintank/schema"
 )
 
-func SchemaToRow(def *schema.MetricDefinition) map[string][]byte {
+// FormatRowKey takes an id and partition and returns a rowKey
+func FormatRowKey(id string, partition int32) string {
+	return strconv.Itoa(int(partition)) + "_" + id
+}
+
+// SchemaToRow takes a metricDefintion and returns a rowKey and column data.
+func SchemaToRow(def *schema.MetricDefinition) (string, map[string][]byte) {
 	row := map[string][]byte{
-		"Id":         []byte(def.Id.String()),
+		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),
 		"Name":       []byte(def.Name),
 		"Interval":   make([]byte, 8),
@@ -21,15 +28,25 @@ func SchemaToRow(def *schema.MetricDefinition) map[string][]byte {
 		"Mtype":      []byte(def.Mtype),
 		"Tags":       []byte(strings.Join(def.Tags, ";")),
 		"LastUpdate": make([]byte, 8),
-		"Partition":  make([]byte, 8),
+		//"Partition" omitted as it is part of te rowKey
 	}
 	binary.PutVarint(row["OrgId"], int64(def.OrgId))
 	binary.PutVarint(row["Interval"], int64(def.Interval))
 	binary.PutVarint(row["LastUpdate"], def.LastUpdate)
-	binary.PutVarint(row["Partition"], int64(def.Partition))
-	return row
+	return FormatRowKey(def.Id.String(), def.Partition), row
 }
 
+// DecodeRowKey takes a rowKey string and returns the id and partition it contains
+func DecodeRowKey(key string) (string, int32, error) {
+	parts := strings.SplitN(key, "_", 2)
+	partition, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return "", 0, err
+	}
+	return parts[1], int32(partition), nil
+}
+
+// RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
 func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	if def == nil {
 		return fmt.Errorf("cant write row to nill MetricDefinition")
@@ -41,14 +58,19 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	*def = schema.MetricDefinition{}
 	var err error
 	var val int64
+
+	id, partition, err := DecodeRowKey(row.Key())
+	if err != nil {
+		return err
+	}
+	mkey, err := schema.MKeyFromString(id)
+	if err != nil {
+		return err
+	}
+	def.Id = mkey
+	def.Partition = partition
 	for _, col := range columns {
 		switch strings.SplitN(col.Column, ":", 2)[1] {
-		case "Id":
-			mkey, err := schema.MKeyFromString(string(col.Value))
-			if err != nil {
-				return err
-			}
-			def.Id = mkey
 		case "OrgId":
 			val, err = binary.ReadVarint(bytes.NewReader(col.Value))
 			if err != nil {
@@ -81,12 +103,6 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 			if err != nil {
 				return err
 			}
-		case "Partition":
-			val, err = binary.ReadVarint(bytes.NewReader(col.Value))
-			if err != nil {
-				return err
-			}
-			def.Partition = int32(val)
 		default:
 			return fmt.Errorf("unknown column: %s", col.Column)
 		}

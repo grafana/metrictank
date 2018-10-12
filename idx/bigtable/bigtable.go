@@ -89,10 +89,6 @@ func ConfigProcess() {
 	return
 }
 
-func FormatRowKey(id string, partition int32) string {
-	return fmt.Sprintf("%d_%s", partition, id)
-}
-
 type writeReq struct {
 	def      *schema.MetricDefinition
 	recvTime time.Time
@@ -398,9 +394,10 @@ func (b *BigtableIdx) processWriteQueue() {
 		byteCount := 0
 		for i, req := range buffer {
 			statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
-			rowKeys[i] = FormatRowKey(req.def.Id.String(), req.def.Partition)
+			key, cols := SchemaToRow(req.def)
+			rowKeys[i] = key
 			mut := bigtable.NewMutation()
-			for col, val := range SchemaToRow(req.def) {
+			for col, val := range cols {
 				mut.Set(COLUMN_FAMILY, col, bigtable.Now(), val)
 				byteCount += len(val)
 			}
