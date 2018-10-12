@@ -271,6 +271,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 			cancel()
 			btblPutExecDuration.Value(time.Since(pre))
 			if err != nil {
+				// all chunks in the batch failed to be written.
 				log.Errorf("btStore: unable to apply writes to bigtable. %s", err)
 				chunkSaveFail.Add(len(rowKeys))
 				if (attempts % 20) == 0 {
@@ -283,6 +284,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 				attempts++
 			} else if len(errs) > 0 {
+				// only some chunks in the batch failed to get written.
 				failedRowKeys := make([]string, 0)
 				failedMutations := make([]*bigtable.Mutation, 0)
 				retryBuf := make([]*mdata.ChunkWriteRequest, 0)
@@ -384,7 +386,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than wi will miss some data at
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>). ChunkSpans may change
 	// over time. We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
 	// Bigtable doesnt allow us to fetch the most recent chunk older then start, so instead we just fetch from (start - maxChunkSpan) to enure we get the data. This
@@ -431,6 +433,9 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 					return false
 				}
 				chunks++
+
+				// This function is called serially so we dont need synchronization around adding to
+				// itgens.
 				itgens = append(itgens, *itgen)
 			}
 		}
