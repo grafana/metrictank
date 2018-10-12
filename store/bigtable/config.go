@@ -31,10 +31,10 @@ func NewStoreConfig() *StoreConfig {
 		TableName:         "metrics",
 		WriteQueueSize:    100000,
 		WriteMaxFlushSize: 10000,
-		WriteConcurrency:  5,
-		ReadConcurrency:   50,
+		WriteConcurrency:  10,
+		ReadConcurrency:   20,
 		MaxChunkSpan:      time.Hour * 6,
-		ReadTimeout:       time.Minute,
+		ReadTimeout:       time.Second * 5,
 		WriteTimeout:      time.Second * 5,
 		CreateCF:          true,
 	}

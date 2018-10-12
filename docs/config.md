@@ -156,13 +156,13 @@ write-queue-size = 100000
 # Max number of chunks in each batch write to bigtable
 write-max-flush-size = 10000
 # Number of writer threads to use
-write-concurrency = 5
+write-concurrency = 10
 # Number concurrent reads that can be processed
-read-concurrency = 50
+read-concurrency = 20
 # Maximum chunkspan size used.
 max-chunkspan = 6h
 # read timeout
-read-timeout = 60s
+read-timeout = 5s
 # write timeout
 write-timeout = 5s
 # enable the creation of the table and column families
