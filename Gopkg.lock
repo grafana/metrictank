@@ -61,14 +61,6 @@
   revision = "26b2fe18bee125de2a3090d6fadb7e280e63eba6"
 
 [[projects]]
-  digest = "1:9752dad5e89cd779096bf2477a4ded16bea7ac62de453c8d6b4bf841d51a8512"
-  name = "github.com/apache/thrift"
-  packages = ["lib/go/thrift"]
-  pruneopts = "NUT"
-  revision = "b2a4d4ae21c789b689dd162deb819665567f481c"
-  version = "0.10.0"
-
-[[projects]]
   digest = "1:83d2df48a266f46005650d416c5350de0305071f448bc48497af45a70c53fbe5"
   name = "github.com/armon/go-metrics"
   packages = ["."]
@@ -509,8 +501,7 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:ad4b1c3644c3eabc60e08d3f1236e5213f6bbe0e1392de1bc13cbc562c411ce8"
+  digest = "1:7da29c22bcc5c2ffb308324377dc00b5084650348c2799e573ed226d8cc9faf0"
   name = "github.com/opentracing/opentracing-go"
   packages = [
     ".",
@@ -518,7 +509,8 @@
     "log",
   ]
   pruneopts = "NUT"
-  revision = "bd9c3193394760d98b2fa6ebb2291f0cd1d06a7d"
+  revision = "1949ddbfd147afd4d964a9f00b24eb291e0e7c38"
+  version = "v1.0.2"
 
 [[projects]]
   digest = "1:13b8f1a2ce177961dc9231606a52f709fab896c565f3988f60a7f6b4e543a902"
@@ -797,7 +789,7 @@
   version = "v1.0-beta"
 
 [[projects]]
-  digest = "1:bc3f87b24b06931e9c1ae68b4a70e0e5bef20a4f1f579b8b34efbdddb7787eec"
+  digest = "1:87dee780f88f86f300bbd90116e933347cf4a3c65c1960072d412597a8896d50"
   name = "github.com/uber/jaeger-client-go"
   packages = [
     ".",
@@ -805,19 +797,23 @@
     "internal/baggage",
     "internal/baggage/remote",
     "internal/spanlog",
+    "internal/throttler",
+    "internal/throttler/remote",
     "log",
     "rpcmetrics",
+    "thrift",
     "thrift-gen/agent",
     "thrift-gen/baggage",
     "thrift-gen/jaeger",
     "thrift-gen/sampling",
     "thrift-gen/zipkincore",
+    "transport",
     "utils",
   ]
   pruneopts = "NUT"
-  revision = "ff3efa227b65e419701a4f48985379ca106a89e7"
+  revision = "1a782e2da844727691fef1757c72eb190c2909f0"
   source = "https://github.com/jaegertracing/jaeger-client-go.git"
-  version = "v2.11.0"
+  version = "v2.15.0"
 
 [[projects]]
   digest = "1:0da2810678a062e0567c3215911869b0423da0e497c56683ff8e87e7a6952597"
