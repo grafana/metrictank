@@ -255,7 +255,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 				}
 			}()
 		}
-		// check if we need to save to cassandra.
+		// check if we need to save to bigtable.
 		now := uint32(time.Now().Unix())
 		if archive.LastSave < (now - updateInterval32) {
 			archive = b.updateBigtable(now, inMemory, archive, partition)
@@ -461,18 +461,23 @@ LOOP:
 	for {
 		select {
 		case <-timer.C:
+			timer.Reset(time.Second)
 			if len(buffer) > 0 {
 				flush()
 			}
-			timer.Reset(time.Second)
 		case req, ok := <-b.writeQueue:
 			if !ok {
 				break LOOP
 			}
 			buffer = append(buffer, req)
 			if len(buffer) >= writeMaxFlushSize {
-				flush()
+				// make sure the timer hasn't already fired. If it has we read
+				// from the chan and consume the event.
+				if !timer.Stop() {
+					<-timer.C
+				}
 				timer.Reset(time.Second)
+				flush()
 			}
 		}
 	}

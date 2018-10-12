@@ -327,15 +327,20 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 	for {
 		select {
 		case <-timer.C:
+			timer.Reset(time.Second)
 			if len(buf) > 0 {
 				flush()
 			}
-			timer.Reset(time.Second)
 		case cwr := <-queue:
 			buf = append(buf, cwr)
 			if len(buf) >= s.cfg.WriteMaxFlushSize {
-				flush()
+				// make sure the timer hasn't already fired. If it has we read
+				// from the chan and consume the event.
+				if !timer.Stop() {
+					<-timer.C
+				}
 				timer.Reset(time.Second)
+				flush()
 			}
 		case <-s.shutdown:
 			return
