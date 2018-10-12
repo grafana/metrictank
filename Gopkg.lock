@@ -669,7 +669,6 @@
   revision = "cb73203311ae2489b845469f622678f24ff98a16"
 
 [[projects]]
-  branch = "deprecate-gopkg-in"
   digest = "1:d456de3a61bdb023a90d62584b5697f8a905cd82f002cbd683caa5aae1164d26"
   name = "github.com/raintank/schema"
   packages = [
@@ -677,7 +676,8 @@
     "msg",
   ]
   pruneopts = "NUT"
-  revision = "0e21f36ce70d0edcae3af09c851534c46f7a18cc"
+  revision = "0140483a390ec5e52dd79c5d37c699d9cfe6c9f8"
+  version = "v2.1"
 
 [[projects]]
   branch = "master"

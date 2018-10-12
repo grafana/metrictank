@@ -126,7 +126,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/schema"
-  branch = "deprecate-gopkg-in"
+  version = "^2"
 
 [[constraint]]
   name = "github.com/rakyll/globalconf"
