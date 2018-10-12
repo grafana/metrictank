@@ -9,7 +9,6 @@ import (
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
-	log "github.com/sirupsen/logrus"
 )
 
 func SchemaToRow(def *schema.MetricDefinition) map[string][]byte {
@@ -47,10 +46,8 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 		case "Id":
 			mkey, err := schema.MKeyFromString(string(col.Value))
 			if err != nil {
-				log.Errorf("bigtable-idx: load() could not parse ID %q: %s -> skipping", string(col.Value), err)
-				continue
+				return err
 			}
-
 			def.Id = mkey
 		case "OrgId":
 			val, err = binary.ReadVarint(bytes.NewReader(col.Value))
@@ -91,8 +88,7 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 			}
 			def.Partition = int32(val)
 		default:
-			// we only load from bigtable at startup. So causing MT to exit if we get bad data doesnt seem unreasonable.
-			log.Fatalf("bigtable-idx: unknown column: %s", col.Column)
+			return fmt.Errorf("unknown column: %s", col.Column)
 		}
 	}
 	return nil
