@@ -124,10 +124,8 @@ func ConfigProcess() {
 		if swimAdvertiseAddrStr != "" {
 			swimAdvertiseAddr, err = net.ResolveTCPAddr("tcp", swimAdvertiseAddrStr)
 			if err != nil {
-				log.Fatal(4, "CLU Config: swim-advertise-addr is not a valid TCP address: %s", err.Error())
+				log.Fatalf("CLU Config: swim-advertise-addr is not a valid TCP address: %s", err.Error())
 			}
-		} else {
-			swimAdvertiseAddr = swimBindAddr
 		}
 	}
 }
