@@ -420,7 +420,8 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	var err error
 	rowCount := 0
 	pre = time.Now()
-	reqErr := s.tbl.ReadRows(ctx, rr, func(row bigtable.Row) bool {
+	queryCtx, cancel := context.WithTimeout(ctx, s.cfg.ReadTimeout)
+	reqErr := s.tbl.ReadRows(queryCtx, rr, func(row bigtable.Row) bool {
 		rowCount++
 		chunks := 0
 		var itgen *chunk.IterGen
@@ -448,6 +449,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 
 		return true
 	}, bigtable.RowFilter(filter))
+	cancel()
 	btblRowsPerResponse.Value(rowCount)
 	btblGetExecDuration.Value(time.Since(pre))
 
