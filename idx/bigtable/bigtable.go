@@ -353,11 +353,11 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
 	defsBySeries := make(map[string][]schema.MetricDefinition)
+	var marshalErr error
 	err := b.tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
 		def := schema.MetricDefinition{}
-		err := RowToSchema(r, &def)
-		if err != nil {
-			log.Errorf("bigtable-idx: failed to marshal row to metricDef. %s", err)
+		marshalErr = RowToSchema(r, &def)
+		if marshalErr != nil {
 			return false
 		}
 		log.Debugf("bigtable-idx: found def %+v", def)
@@ -366,6 +366,9 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 	}, bigtable.RowFilter(bigtable.FamilyFilter(COLUMN_FAMILY)))
 	if err != nil {
 		log.Fatalf("bigtable-idx: failed to load defs form Bigtable. %s", err)
+	}
+	if marshalErr != nil {
+		log.Fatalf("bigtable-idx: failed to marshal row to metricDef. %s", marshalErr)
 	}
 
 LOOP:
