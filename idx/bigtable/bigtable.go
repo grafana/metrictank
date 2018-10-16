@@ -49,16 +49,17 @@ var (
 	// metric idx.bigtable.save.bytes-per-request is the number of bytes written to bigtable in each request.
 	statSaveBytesPerRequest = stats.NewMeter32("idx.bigtable.save.bytes-per-request", true)
 
+	Enabled           bool
 	maxStale          time.Duration
 	pruneInterval     time.Duration
-	updateIdx         bool
+	updateBigTableIdx bool
 	updateInterval    time.Duration
 	updateInterval32  uint32
+
 	writeQueueSize    int
 	writeConcurrency  int
 	writeMaxFlushSize int
 
-	Enabled          bool
 	bigtableInstance string
 	gcpProject       string
 	tableName        string
@@ -75,7 +76,7 @@ func ConfigSetup() {
 	btIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to bigtable. Must be larger then write-max-flush-size")
 	btIdx.IntVar(&writeConcurrency, "write-concurrency", 5, "Number of writer threads to use")
 	btIdx.IntVar(&writeMaxFlushSize, "write-max-flush-size", 10000, "Max number of metricDefs in each batch write to bigtable")
-	btIdx.BoolVar(&updateIdx, "update-bigtable-index", true, "synchronize index changes to bigtable. not all your nodes need to do this.")
+	btIdx.BoolVar(&updateBigTableIdx, "update-bigtable-index", true, "synchronize index changes to bigtable. not all your nodes need to do this.")
 	btIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
 	btIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
 	btIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
@@ -179,7 +180,7 @@ func New() *BigtableIdx {
 		tbl:       client.Open(tableName),
 		shutdown:  make(chan struct{}),
 	}
-	if updateIdx {
+	if updateBigTableIdx {
 		idx.writeQueue = make(chan writeReq, writeQueueSize-writeMaxFlushSize)
 	}
 	updateInterval32 = uint32(updateInterval.Nanoseconds() / int64(time.Second))
@@ -191,7 +192,7 @@ func (b *BigtableIdx) Init() error {
 	if err := b.MemoryIdx.Init(); err != nil {
 		return err
 	}
-	if updateIdx {
+	if updateBigTableIdx {
 		b.wg.Add(writeConcurrency)
 		for i := 0; i < writeConcurrency; i++ {
 			go b.processWriteQueue()
@@ -213,7 +214,7 @@ func (b *BigtableIdx) Init() error {
 func (b *BigtableIdx) Stop() {
 	b.MemoryIdx.Stop()
 	close(b.shutdown)
-	if updateIdx {
+	if updateBigTableIdx {
 		close(b.writeQueue)
 	}
 	b.wg.Wait()
@@ -224,12 +225,14 @@ func (b *BigtableIdx) Stop() {
 	}
 }
 
+// Update updates an existing archive, if found.
+// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
 func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := b.MemoryIdx.Update(point, partition)
 
-	if !updateIdx {
+	if !updateBigTableIdx {
 		statUpdateDuration.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -264,12 +267,15 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 
 func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
+
 	archive, oldPartition, inMemory := b.MemoryIdx.AddOrUpdate(mkey, data, partition)
+
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
 	}
-	if !updateIdx {
+
+	if !updateBigTableIdx {
 		stat.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -303,6 +309,8 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 	return archive, oldPartition, inMemory
 }
 
+// updateBigtable saves the archive to bigtable and
+// updates the memory index with the updated fields.
 func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
@@ -491,7 +499,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	if err != nil {
 		return defs, err
 	}
-	if updateIdx {
+	if updateBigTableIdx {
 		for _, def := range defs {
 			err = b.deleteDef(&def.MetricDefinition)
 			if err != nil {
