@@ -138,7 +138,6 @@ func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
 		}
 		if !found {
 			log.Infof("btStore: table %s does not exist. Creating it.", cfg.TableName)
-			// table doesnt exist. So lets create it with all of the CF's we need.
 			table := bigtable.TableConf{
 				TableID:  cfg.TableName,
 				Families: make(map[string]bigtable.GCPolicy),

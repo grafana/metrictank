@@ -127,7 +127,6 @@ func New() *BigtableIdx {
 		}
 		if !found {
 			log.Infof("bigtable-idx: table %s does not yet exist. Creating it.", tableName)
-			// table doesnt exist. So lets create it with all of the CF's we need.
 			table := bigtable.TableConf{
 				TableID: tableName,
 				Families: map[string]bigtable.GCPolicy{
