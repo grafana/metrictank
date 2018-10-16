@@ -436,8 +436,8 @@ func (b *BigtableIdx) processWriteQueue() {
 				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 				attempts++
 			} else if len(errs) > 0 {
-				failedRowKeys := make([]string, 0)
-				failedMutations := make([]*bigtable.Mutation, 0)
+				var failedRowKeys []string
+				var failedMutations []*bigtable.Mutation
 				for i, err := range errs {
 					if err != nil {
 						failedRowKeys = append(failedRowKeys, rowKeys[i])
