@@ -154,24 +154,24 @@ func New() *BigtableIdx {
 				log.Infof("bigtable-idx: column family %s/%s does not exist. Creating it.", tableName, COLUMN_FAMILY)
 				err = adminClient.CreateColumnFamily(ctx, tableName, COLUMN_FAMILY)
 				if err != nil {
-					log.Fatalf("btStore: failed to create cf %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Fatalf("bigtable-idx: failed to create cf %s/%s. %s", tableName, COLUMN_FAMILY, err)
 				}
 				err = adminClient.SetGCPolicy(ctx, tableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Fatalf("btStore: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Fatalf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
 				}
 			} else if policy == "" {
 				log.Infof("bigtable-idx: column family %s/%s exists but has no GCPolicy. Creating it.", tableName, COLUMN_FAMILY)
 				err = adminClient.SetGCPolicy(ctx, tableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Fatalf("btStore: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Fatalf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
 				}
 			}
 		}
 	}
 	client, err := bigtable.NewClient(ctx, gcpProject, bigtableInstance)
 	if err != nil {
-		log.Fatalf("failed to create bigtable client. %s", err)
+		log.Fatalf("bigtable-idx: failed to create bigtable client. %s", err)
 	}
 
 	idx := &BigtableIdx{
