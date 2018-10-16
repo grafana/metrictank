@@ -63,12 +63,10 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	var err error
 	var val int64
 
-	mkey, partition, err := DecodeRowKey(row.Key())
+	def.Id, def.Partition, err = DecodeRowKey(row.Key())
 	if err != nil {
 		return err
 	}
-	def.Id = mkey
-	def.Partition = partition
 	for _, col := range columns {
 		switch strings.SplitN(col.Column, ":", 2)[1] {
 		case "OrgId":
