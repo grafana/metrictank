@@ -491,9 +491,9 @@ enabled = false
 gcp-project = default
 # Name of bigtable instance
 bigtable-instance = default
-# Name of bigtable table used for chunks
+# Name of bigtable table used for MetricDefs
 table-name = metric_idx
-# Max number of metricDefs, per write thread, allowed to be unwritten to bigtable. Must be larger then write-max-flush-size
+# Max number of metricDefs allowed to be unwritten to bigtable. Must be larger then write-max-flush-size
 write-queue-size = 100000
 # Max number of metricDefs in each batch write to bigtable
 write-max-flush-size = 10000
@@ -508,6 +508,7 @@ max-stale = 0
 # Interval at which the index should be checked for stale series.
 prune-interval = 3h
 # enable the creation of the table and column families
+create-cf = true
 ```
 
 # storage-schemas.conf
