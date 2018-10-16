@@ -16,7 +16,7 @@ scripts/dev/tools-to-doc.sh > $tmp
 diff docs/tools.md $tmp
 ret=$?
 rm $tmp
-if [ $ret -gt 0 ]; then 
+if [ $ret -gt 0 ]; then
   echo "docs/tools.md does not match output of scripts/dev/tools-to-doc.sh"
   exit $ret
 fi
