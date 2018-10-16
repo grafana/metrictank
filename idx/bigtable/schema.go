@@ -49,7 +49,7 @@ func DecodeRowKey(key string) (string, int32, error) {
 // RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
 func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	if def == nil {
-		return fmt.Errorf("cant write row to nill MetricDefinition")
+		return fmt.Errorf("cant write row to nil MetricDefinition")
 	}
 	columns, ok := row[COLUMN_FAMILY]
 	if !ok {
@@ -76,9 +76,10 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 			if err != nil {
 				return err
 			}
-			def.OrgId = uint32(val)
-			if def.OrgId < 0 {
+			if val < 0 {
 				def.OrgId = idx.OrgIdPublic
+			} else {
+				def.OrgId = uint32(val)
 			}
 		case "Name":
 			def.Name = string(col.Value)
