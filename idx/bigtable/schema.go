@@ -12,9 +12,9 @@ import (
 	"github.com/raintank/schema"
 )
 
-// FormatRowKey takes an id and partition and returns a rowKey
-func FormatRowKey(id string, partition int32) string {
-	return strconv.Itoa(int(partition)) + "_" + id
+// FormatRowKey formats an MKey and partition into a rowKey
+func FormatRowKey(mkey schema.MKey, partition int32) string {
+	return strconv.Itoa(int(partition)) + "_" + mkey.String()
 }
 
 // SchemaToRow takes a metricDefintion and returns a rowKey and column data.
@@ -33,17 +33,21 @@ func SchemaToRow(def *schema.MetricDefinition) (string, map[string][]byte) {
 	binary.PutVarint(row["OrgId"], int64(def.OrgId))
 	binary.PutVarint(row["Interval"], int64(def.Interval))
 	binary.PutVarint(row["LastUpdate"], def.LastUpdate)
-	return FormatRowKey(def.Id.String(), def.Partition), row
+	return FormatRowKey(def.Id, def.Partition), row
 }
 
-// DecodeRowKey takes a rowKey string and returns the id and partition it contains
-func DecodeRowKey(key string) (string, int32, error) {
+// DecodeRowKey takes a rowKey string and returns the corresponding MKey and partition
+func DecodeRowKey(key string) (schema.MKey, int32, error) {
 	parts := strings.SplitN(key, "_", 2)
 	partition, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return "", 0, err
+		return schema.MKey{}, 0, err
 	}
-	return parts[1], int32(partition), nil
+	mkey, err := schema.MKeyFromString(parts[1])
+	if err != nil {
+		return schema.MKey{}, 0, err
+	}
+	return mkey, int32(partition), nil
 }
 
 // RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
@@ -59,11 +63,7 @@ func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	var err error
 	var val int64
 
-	id, partition, err := DecodeRowKey(row.Key())
-	if err != nil {
-		return err
-	}
-	mkey, err := schema.MKeyFromString(id)
+	mkey, partition, err := DecodeRowKey(row.Key())
 	if err != nil {
 		return err
 	}

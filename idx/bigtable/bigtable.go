@@ -241,7 +241,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 		if oldPartition != partition {
 			go func() {
 				for {
-					err := b.deleteRow(FormatRowKey(archive.Id.String(), oldPartition))
+					err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
 					if err != nil {
 						log.Errorf("bigtable-idx: failed to delete row. %s", err)
 						time.Sleep(time.Second)
@@ -281,7 +281,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 		if oldPartition != partition {
 			go func() {
 				for {
-					err := b.deleteRow(FormatRowKey(archive.Id.String(), oldPartition))
+					err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
 					if err != nil {
 						log.Errorf("bigtable-idx: failed to delete row. %s", err)
 						time.Sleep(time.Second)
@@ -504,7 +504,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 }
 
 func (b *BigtableIdx) deleteDef(def *schema.MetricDefinition) error {
-	return b.deleteRow(FormatRowKey(def.Id.String(), def.Partition))
+	return b.deleteRow(FormatRowKey(def.Id, def.Partition))
 }
 
 func (b *BigtableIdx) deleteRow(key string) error {
