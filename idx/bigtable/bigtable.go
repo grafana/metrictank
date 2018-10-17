@@ -242,14 +242,9 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
-				for {
-					err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
-					if err != nil {
-						log.Errorf("bigtable-idx: failed to delete row. %s", err)
-						time.Sleep(time.Second)
-					} else {
-						return
-					}
+				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
+				if err != nil {
+					log.Errorf("bigtable-idx: failed to delete row. %s", err)
 				}
 			}()
 		}
@@ -285,14 +280,9 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
-				for {
-					err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
-					if err != nil {
-						log.Errorf("bigtable-idx: failed to delete row. %s", err)
-						time.Sleep(time.Second)
-					} else {
-						return
-					}
+				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
+				if err != nil {
+					log.Errorf("bigtable-idx: failed to delete row. %s", err)
 				}
 			}()
 		}
@@ -423,10 +413,10 @@ func (b *BigtableIdx) processWriteQueue() {
 			errs, err := b.tbl.ApplyBulk(ctx, rowKeys, mutations)
 			cancel()
 			if err != nil {
-				log.Errorf("bigtable-idx: unable to apply writes to bigtable. %s", err)
 				statQueryInsertFail.Add(len(rowKeys))
+				// log the first error then every 20th after that.
 				if (attempts % 20) == 0 {
-					log.Warnf("bigtable-idx: Failed to write %d defs to bigtable. they will be retried. %s", len(rowKeys), err)
+					log.Warnf("bigtable-idx: Failed to write %d defs to bigtable after %d attempts. they will be retried. %s", len(rowKeys), attempts+1, err)
 				}
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
@@ -443,10 +433,12 @@ func (b *BigtableIdx) processWriteQueue() {
 						failedMutations = append(failedMutations, mutations[i])
 					}
 				}
+				log.Warnf("bigtable-idx: failed to write %d/%d rows.  They will be retried. %s", len(failedRowKeys), len(rowKeys), err)
+				statQueryInsertFail.Add(len(failedRowKeys))
+
 				rowKeys = failedRowKeys
 				mutations = failedMutations
-				log.Errorf("bigtable-idx: failed to write %d rows. %s", len(failedRowKeys), err)
-				statQueryInsertFail.Add(len(failedRowKeys))
+
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
 					sleepTime = 2000
