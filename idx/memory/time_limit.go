@@ -19,76 +19,88 @@ import (
 // Thus, TimeLimiter is designed for, and works best with, serially running operations,
 // each of which takes a fraction of the limit.
 type TimeLimiter struct {
-	sync.Mutex
+	sync.RWMutex
 	ctx       context.Context
-	timeSpent time.Duration
-	window    time.Duration
-	limit     time.Duration
-	addCh     chan time.Duration
-	queryCh   chan chan struct{}
+	timeSpent time.Duration // cummulative time spent in the current window
+	window    time.Duration // size of the window
+	limit     time.Duration // maximum timeSpent value before blocking.
+	wg        sync.WaitGroup
+	limited   bool
+	stopped   bool
 }
 
-// NewTimeLimiter creates a new TimeLimiter.  A background goroutine will run until the
-// provided context is done.  When the amount of time spent on task (the time is determined
-// by calls to "Add()") every "window" duration is more then "limit",  then calls to
-// Wait() will block until the start if the next window period.
+// NewTimeLimiter creates a new TimeLimiter. When the amount of time spent on task
+// (the time is determined by calls to "Add()") every "window" duration is more then "limit",
+// then calls to Wait() will block until the start if the next window period.
+// The limiter will continue to run until the passed context is done.  Any calls to Wait() after
+// the context is done will immediate return.
 func NewTimeLimiter(ctx context.Context, window, limit time.Duration) *TimeLimiter {
 	l := &TimeLimiter{
-		ctx:     ctx,
-		window:  window,
-		limit:   limit,
-		addCh:   make(chan time.Duration),
-		queryCh: make(chan chan struct{}),
+		ctx:    ctx,
+		window: window,
+		limit:  limit,
 	}
 	go l.run()
 	return l
 }
 
+// core loop.  At every `window` interval will reset timeSpent to 0
+// and unblock any callers to Wait() if we had reached the limit during the window.
 func (l *TimeLimiter) run() {
-	ticker := time.NewTicker(l.window)
 	done := l.ctx.Done()
-	var blockedQueries []chan struct{}
+	ticker := time.NewTicker(l.window)
 	for {
 		select {
 		case <-done:
-			//context done. shutting down
-			for _, ch := range blockedQueries {
-				close(ch)
+			ticker.Stop()
+			l.Lock()
+			l.stopped = true
+			// if we were limited, then unblock anyone waiting
+			if l.limited {
+				l.wg.Done()
+				l.limited = false
 			}
+			l.Unlock()
 			return
 		case <-ticker.C:
+			l.Lock()
+			// reset timeSpent
 			l.timeSpent = 0
-			for _, ch := range blockedQueries {
-				close(ch)
+
+			// if we were limited, then unblock anyone waiting
+			if l.limited {
+				l.wg.Done()
+				l.limited = false
 			}
-			blockedQueries = blockedQueries[:0]
-		case d := <-l.addCh:
-			l.timeSpent += d
-		case respCh := <-l.queryCh:
-			if l.timeSpent < l.limit {
-				close(respCh)
-			} else {
-				// rate limit exceeded.  On the next tick respCh will be closed
-				// notifying the caller that they can continue.
-				blockedQueries = append(blockedQueries, respCh)
-			}
+			l.Unlock()
 		}
 	}
 }
 
+// ensure that any callers to Wait() will be blocked.
+// Assumes the caller has a write Lock acquired with l.Lock()
+func (l *TimeLimiter) block() {
+	if l.limited || l.stopped {
+		return
+	}
+	l.limited = true
+	l.wg.Add(1)
+}
+
 // Add increments the "time spent" counter by "d"
+// If after adding the limit is reached, any new callers to Wait() will be blocked.
 func (l *TimeLimiter) Add(d time.Duration) {
-	l.addCh <- d
+	l.Lock()
+	l.timeSpent = l.timeSpent + d
+	if l.timeSpent > l.limit {
+		l.block()
+	}
+	l.Unlock()
 }
 
 // Wait returns when we are not rate limited, which may be
 // anywhere between immediately or after the window.
 func (l *TimeLimiter) Wait() {
-	respCh := make(chan struct{})
-	l.queryCh <- respCh
-
-	// if we have not exceeded our locking quota then respCh will be
-	// immediately closed. Otherwise it wont be closed until the next tick (duration of "l.window")
-	// and we will block until then.
-	<-respCh
+	l.wg.Wait()
+	return
 }

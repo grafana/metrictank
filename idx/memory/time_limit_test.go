@@ -69,3 +69,39 @@ func TestTimeLimiter(t *testing.T) {
 	time.AfterFunc(500*time.Millisecond, cancel)
 	shouldTakeAbout(t, tl.Wait, 500*time.Millisecond, 500, "window 3: work done: 130ms, canceling after 500ms - wait should be 500ms")
 }
+
+func BenchmarkTimeLimiterWaitNotLimited(b *testing.B) {
+	window := time.Second
+	limit := time.Second
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tl := NewTimeLimiter(ctx, window, limit)
+	for i := 0; i < b.N; i++ {
+		tl.Wait()
+	}
+}
+
+func BenchmarkTimeLimiterAddNotLimited(b *testing.B) {
+	window := time.Hour
+	limit := time.Hour
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tl := NewTimeLimiter(ctx, window, limit)
+	for i := 0; i < b.N; i++ {
+		tl.Add(1)
+	}
+}
+
+func BenchmarkTimeLimiterAddLimited(b *testing.B) {
+	window := time.Hour
+	limit := time.Nanosecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tl := NewTimeLimiter(ctx, window, limit)
+	for i := 0; i < b.N; i++ {
+		tl.Add(1)
+	}
+}
