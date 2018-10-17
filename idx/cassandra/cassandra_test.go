@@ -61,14 +61,17 @@ func (i *testIterator) Close() error {
 }
 
 func init() {
+	CasIdxConfig = NewCasIdxConfig()
 	CasIdxConfig.keyspace = "metrictank"
 	CasIdxConfig.hosts = ""
 	CasIdxConfig.consistency = "one"
 	CasIdxConfig.timeout = 1
+	timeout = time.Second
 	CasIdxConfig.numConns = 1
 	CasIdxConfig.writeQueueSize = 1000
 	CasIdxConfig.protoVer = 4
 	CasIdxConfig.updateCassIdx = false
+	updateInterval = time.Hour
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 }
@@ -174,15 +177,19 @@ func TestAddToWriteQueue(t *testing.T) {
 	originalUpdateCassIdx := CasIdxConfig.updateCassIdx
 	originalUpdateInterval := CasIdxConfig.updateInterval
 	originalWriteQSize := CasIdxConfig.writeQueueSize
+	originalUpdateIntervalDur := updateInterval
 
 	defer func() {
 		CasIdxConfig.updateCassIdx = originalUpdateCassIdx
+		updateCassIdx = originalUpdateCassIdx
 		CasIdxConfig.updateInterval = originalUpdateInterval
 		CasIdxConfig.writeQueueSize = originalWriteQSize
+		updateInterval = originalUpdateIntervalDur
 	}()
 
 	CasIdxConfig.updateCassIdx = true
-	CasIdxConfig.updateInterval = 10
+	updateCassIdx = true
+	updateInterval = 10
 	CasIdxConfig.writeQueueSize = 5
 	ix := New()
 	initForTests(ix)
@@ -419,10 +426,12 @@ func BenchmarkIndexing(b *testing.B) {
 	CasIdxConfig.hosts = "localhost:9042"
 	CasIdxConfig.consistency = "one"
 	CasIdxConfig.timeout = 1
+	timeout = time.Second
 	CasIdxConfig.numConns = 10
 	CasIdxConfig.writeQueueSize = 10
 	CasIdxConfig.protoVer = 4
 	CasIdxConfig.updateInterval = 3600
+	updateInterval = time.Hour
 	CasIdxConfig.updateCassIdx = true
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
@@ -467,10 +476,12 @@ func BenchmarkLoad(b *testing.B) {
 	CasIdxConfig.hosts = "localhost:9042"
 	CasIdxConfig.consistency = "one"
 	CasIdxConfig.timeout = 1
+	timeout = time.Second
 	CasIdxConfig.numConns = 10
 	CasIdxConfig.writeQueueSize = 10
 	CasIdxConfig.protoVer = 4
 	CasIdxConfig.updateInterval = 3600
+	updateInterval = time.Hour
 	CasIdxConfig.updateCassIdx = true
 	ix := New()
 
@@ -500,10 +511,12 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 	CasIdxConfig.hosts = "localhost:9042"
 	CasIdxConfig.consistency = "one"
 	CasIdxConfig.timeout = 1
+	timeout = time.Second
 	CasIdxConfig.numConns = 10
 	CasIdxConfig.writeQueueSize = 10
 	CasIdxConfig.protoVer = 4
 	CasIdxConfig.updateInterval = 3600
+	updateInterval = time.Hour
 	CasIdxConfig.updateCassIdx = true
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
