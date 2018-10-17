@@ -254,11 +254,6 @@ func (a *FlatAccnt) eventLoop() {
 	}
 }
 
-// // totalUsed returns the sum of cacheSizeUsed, cacheOverheadChunk, cacheOverheadFlat, and cacheOverheadLru
-// func (a *FlatAccnt) totalUsed() uint64 {
-// 	return (cacheSizeUsed.Peek() + cacheOverheadChunk.Peek() + cacheOverheadFlat.Peek() + cacheOverheadLru.Peek())
-// }
-
 func (a *FlatAccnt) getTotal(res_chan chan uint64) {
 	res_chan <- cacheSizeUsed.Peek()
 }
