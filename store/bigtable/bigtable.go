@@ -38,7 +38,7 @@ var (
 	btblPutExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.put.exec")
 	// metric store.bigtable.put.wait is the duration of a put in the wait queue
 	btblPutWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.put.wait")
-	// metroc store.bigtable.get.error is the count of reads that failed
+	// metric store.bigtable.get.error is the count of reads that failed
 	btblReadError = stats.NewCounter32("store.bigtable.get.error")
 
 	// metric store.bigtable.chunks_per_row is how many chunks are retrieved per row in get queries
@@ -369,6 +369,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	defer span.Finish()
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "bigtable")
+
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
 		tracing.Failure(span)
@@ -391,9 +392,10 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
 	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
-	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>). ChunkSpans may change
-	// over time. We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
-	// Bigtable doesnt allow us to fetch the most recent chunk older then start, so instead we just fetch from (start - maxChunkSpan) to enure we get the data. This
+	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because ChunkSpans
+	// may change over time.
+	// We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
+	// Bigtable doesn't allow us to fetch the most recent chunk older then start, so instead we just fetch from (start - maxChunkSpan) to enure we get the data. This
 	// will usually result in more data being fetched then is needed, but that is an acceptable tradeoff.
 	adjustedStart := start - uint32(s.cfg.MaxChunkSpan.Seconds())
 

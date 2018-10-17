@@ -35,10 +35,10 @@ const Table_name_format = `metric_%d`
 var (
 	errChunkTooSmall = errors.New("impossibly small chunk in cassandra")
 	errInvalidRange  = errors.New("CassandraStore: invalid range: from must be less than to")
+	errCtxCanceled   = errors.New("context canceled")
 	errReadQueueFull = errors.New("the read queue is full")
 	errReadTooOld    = errors.New("the read is too old")
 	errTableNotFound = errors.New("table for given TTL not found")
-	errCtxCanceled   = errors.New("context canceled")
 
 	// metric store.cassandra.get.exec is the duration of getting from cassandra store
 	cassGetExecDuration = stats.NewLatencyHistogram15s32("store.cassandra.get.exec")
@@ -452,8 +452,9 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than will miss some data at the beginning
-	// we can't assume we know the chunkSpan so we can't just calculate the t0 >= start - <some-predefined-number> because chunkSpans may change over time.
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
+	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because chunkSpans
+	// may change over time.
 	// we effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
 	// since we make sure that you can only use chunkSpans so that Month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
 	// as the one that has start_month.
