@@ -61,14 +61,14 @@ func (i *testIterator) Close() error {
 }
 
 func init() {
-	keyspace = "metrictank"
-	hosts = ""
-	consistency = "one"
-	timeout = time.Second
-	numConns = 1
-	writeQueueSize = 1000
-	protoVer = 4
-	updateCassIdx = false
+	CasIdxConfig.keyspace = "metrictank"
+	CasIdxConfig.hosts = ""
+	CasIdxConfig.consistency = "one"
+	CasIdxConfig.timeout = 1
+	CasIdxConfig.numConns = 1
+	CasIdxConfig.writeQueueSize = 1000
+	CasIdxConfig.protoVer = 4
+	CasIdxConfig.updateCassIdx = false
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 }
@@ -171,19 +171,19 @@ func TestGetAddKey(t *testing.T) {
 }
 
 func TestAddToWriteQueue(t *testing.T) {
-	originalUpdateCassIdx := updateCassIdx
-	originalUpdateInterval := updateInterval
-	originalWriteQSize := writeQueueSize
+	originalUpdateCassIdx := CasIdxConfig.updateCassIdx
+	originalUpdateInterval := CasIdxConfig.updateInterval
+	originalWriteQSize := CasIdxConfig.writeQueueSize
 
 	defer func() {
-		updateCassIdx = originalUpdateCassIdx
-		updateInterval = originalUpdateInterval
-		writeQueueSize = originalWriteQSize
+		CasIdxConfig.updateCassIdx = originalUpdateCassIdx
+		CasIdxConfig.updateInterval = originalUpdateInterval
+		CasIdxConfig.writeQueueSize = originalWriteQSize
 	}()
 
-	updateCassIdx = true
-	updateInterval = 10
-	writeQueueSize = 5
+	CasIdxConfig.updateCassIdx = true
+	CasIdxConfig.updateInterval = 10
+	CasIdxConfig.writeQueueSize = 5
 	ix := New()
 	initForTests(ix)
 	metrics := getMetricData(1, 2, 5, 10, "metric.demo")
@@ -415,15 +415,15 @@ func TestFind(t *testing.T) {
 
 func BenchmarkIndexing(b *testing.B) {
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
+	CasIdxConfig.keyspace = "metrictank"
+	CasIdxConfig.hosts = "localhost:9042"
+	CasIdxConfig.consistency = "one"
+	CasIdxConfig.timeout = 1
+	CasIdxConfig.numConns = 10
+	CasIdxConfig.writeQueueSize = 10
+	CasIdxConfig.protoVer = 4
+	CasIdxConfig.updateInterval = 3600
+	CasIdxConfig.updateCassIdx = true
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
@@ -463,15 +463,15 @@ func insertDefs(ix idx.MetricIndex, i int) {
 
 func BenchmarkLoad(b *testing.B) {
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
+	CasIdxConfig.keyspace = "metrictank"
+	CasIdxConfig.hosts = "localhost:9042"
+	CasIdxConfig.consistency = "one"
+	CasIdxConfig.timeout = 1
+	CasIdxConfig.numConns = 10
+	CasIdxConfig.writeQueueSize = 10
+	CasIdxConfig.protoVer = 4
+	CasIdxConfig.updateInterval = 3600
+	CasIdxConfig.updateCassIdx = true
 	ix := New()
 
 	tmpSession, err := ix.cluster.CreateSession()
@@ -496,15 +496,15 @@ func BenchmarkLoad(b *testing.B) {
 
 func BenchmarkIndexingWithUpdates(b *testing.B) {
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
+	CasIdxConfig.keyspace = "metrictank"
+	CasIdxConfig.hosts = "localhost:9042"
+	CasIdxConfig.consistency = "one"
+	CasIdxConfig.timeout = 1
+	CasIdxConfig.numConns = 10
+	CasIdxConfig.writeQueueSize = 10
+	CasIdxConfig.protoVer = 4
+	CasIdxConfig.updateInterval = 3600
+	CasIdxConfig.updateCassIdx = true
 	ix := New()
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {

@@ -1,12 +1,13 @@
 package cassandra
 
 import (
-	"flag"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/raintank/dur"
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
@@ -16,7 +17,6 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -49,59 +49,13 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
-	Enabled                  bool
-	ssl                      bool
-	auth                     bool
-	hostverification         bool
-	createKeyspace           bool
-	schemaFile               string
-	keyspace                 string
-	hosts                    string
-	capath                   string
-	username                 string
-	password                 string
-	consistency              string
-	timeout                  time.Duration
-	numConns                 int
-	writeQueueSize           int
-	protoVer                 int
-	maxStale                 time.Duration
-	pruneInterval            time.Duration
-	updateCassIdx            bool
-	updateInterval           time.Duration
-	updateInterval32         uint32
-	disableInitialHostLookup bool
+	timeout          time.Duration
+	maxStale         time.Duration
+	pruneInterval    time.Duration
+	updateInterval   time.Duration
+	updateInterval32 uint32
+	updateCassIdx    bool
 )
-
-func ConfigSetup() *flag.FlagSet {
-	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
-
-	casIdx.BoolVar(&Enabled, "enabled", true, "")
-	casIdx.StringVar(&hosts, "hosts", "localhost:9042", "comma separated list of cassandra addresses in host:port form")
-	casIdx.StringVar(&keyspace, "keyspace", "metrictank", "Cassandra keyspace to store metricDefinitions in.")
-	casIdx.StringVar(&consistency, "consistency", "one", "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	casIdx.DurationVar(&timeout, "timeout", time.Second, "cassandra request timeout")
-	casIdx.IntVar(&numConns, "num-conns", 10, "number of concurrent connections to cassandra")
-	casIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to cassandra")
-	casIdx.BoolVar(&updateCassIdx, "update-cassandra-index", true, "synchronize index changes to cassandra. not all your nodes need to do this.")
-	casIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
-	casIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
-	casIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
-	casIdx.IntVar(&protoVer, "protocol-version", 4, "cql protocol version to use")
-	casIdx.BoolVar(&createKeyspace, "create-keyspace", true, "enable the creation of the index keyspace and tables, only one node needs this")
-	casIdx.StringVar(&schemaFile, "schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
-	casIdx.BoolVar(&disableInitialHostLookup, "disable-initial-host-lookup", false, "instruct the driver to not attempt to get host info from the system.peers table")
-	casIdx.BoolVar(&ssl, "ssl", false, "enable SSL connection to cassandra")
-	casIdx.StringVar(&capath, "ca-path", "/etc/metrictank/ca.pem", "cassandra CA certficate path when using SSL")
-	casIdx.BoolVar(&hostverification, "host-verification", true, "host (hostname and server cert) verification when using SSL")
-
-	casIdx.BoolVar(&auth, "auth", false, "enable cassandra user authentication")
-	casIdx.StringVar(&username, "username", "cassandra", "username for authentication")
-	casIdx.StringVar(&password, "password", "cassandra", "password for authentication")
-
-	globalconf.Register("cassandra-idx", casIdx)
-	return casIdx
-}
 
 type writeReq struct {
 	def      *schema.MetricDefinition
@@ -123,23 +77,23 @@ type cqlIterator interface {
 }
 
 func New() *CasIdx {
-	cluster := gocql.NewCluster(strings.Split(hosts, ",")...)
-	cluster.Consistency = gocql.ParseConsistency(consistency)
+	cluster := gocql.NewCluster(strings.Split(CasIdxConfig.hosts, ",")...)
+	cluster.Consistency = gocql.ParseConsistency(CasIdxConfig.consistency)
 	cluster.Timeout = timeout
 	cluster.ConnectTimeout = cluster.Timeout
-	cluster.NumConns = numConns
-	cluster.ProtoVersion = protoVer
-	cluster.DisableInitialHostLookup = disableInitialHostLookup
-	if ssl {
+	cluster.NumConns = CasIdxConfig.numConns
+	cluster.ProtoVersion = CasIdxConfig.protoVer
+	cluster.DisableInitialHostLookup = CasIdxConfig.disableInitialHostLookup
+	if CasIdxConfig.ssl {
 		cluster.SslOpts = &gocql.SslOptions{
-			CaPath:                 capath,
-			EnableHostVerification: hostverification,
+			CaPath:                 CasIdxConfig.capath,
+			EnableHostVerification: CasIdxConfig.hostverification,
 		}
 	}
-	if auth {
+	if CasIdxConfig.auth {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: username,
-			Password: password,
+			Username: CasIdxConfig.username,
+			Password: CasIdxConfig.password,
 		}
 	}
 
@@ -147,8 +101,8 @@ func New() *CasIdx {
 		MemoryIdx: *memory.New(),
 		cluster:   cluster,
 	}
-	if updateCassIdx {
-		idx.writeQueue = make(chan writeReq, writeQueueSize)
+	if CasIdxConfig.updateCassIdx {
+		idx.writeQueue = make(chan writeReq, CasIdxConfig.writeQueueSize)
 	}
 	updateInterval32 = uint32(updateInterval.Nanoseconds() / int64(time.Second))
 	return idx
@@ -163,25 +117,25 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	// read templates
-	schemaKeyspace := util.ReadEntry(schemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(schemaFile, "schema_table").(string)
+	schemaKeyspace := util.ReadEntry(CasIdxConfig.schemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(CasIdxConfig.schemaFile, "schema_table").(string)
 
 	// create the keyspace or ensure it exists
-	if createKeyspace {
-		log.Infof("cassandra-idx: ensuring that keyspace %s exist.", keyspace)
-		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, keyspace)).Exec()
+	if CasIdxConfig.createKeyspace {
+		log.Infof("cassandra-idx: ensuring that keyspace %s exist.", CasIdxConfig.keyspace)
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, CasIdxConfig.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
 		log.Info("cassandra-idx: ensuring that table metric_idx exist.")
-		err = tmpSession.Query(fmt.Sprintf(schemaTable, keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaTable, CasIdxConfig.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
-			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(CasIdxConfig.keyspace)
 			if err != nil {
 				if attempt >= 5 {
 					return fmt.Errorf("cassandra keyspace not found. %d attempts", attempt)
@@ -204,7 +158,7 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	tmpSession.Close()
-	c.cluster.Keyspace = keyspace
+	c.cluster.Keyspace = CasIdxConfig.keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("failed to create cassandra session: %s", err)
@@ -218,7 +172,37 @@ func (c *CasIdx) InitBare() error {
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
-	log.Infof("initializing cassandra-idx. Hosts=%s", hosts)
+	tm, tmErr := dur.ParseDuration(CasIdxConfig.timeoutStr)
+	if tmErr != nil {
+		log.Fatalf("cassandra-idx: failed to parse timeout (%s), %s", CasIdxConfig.timeoutStr, tmErr)
+	}
+	CasIdxConfig.timeout = tm
+	timeout = time.Duration(tm) * time.Second
+
+	ui, uiErr := dur.ParseDuration(CasIdxConfig.updateIntervalStr)
+	if uiErr != nil {
+		log.Fatalf("cassandra-idx: failed to parse update-internval (%s), %s", CasIdxConfig.updateIntervalStr, uiErr)
+	}
+	CasIdxConfig.updateInterval = ui
+	updateInterval = time.Duration(ui) * time.Second
+
+	ms, msErr := dur.ParseDuration(CasIdxConfig.maxStaleStr)
+	if msErr != nil {
+		log.Fatalf("cassandra-idx: failed to parse max-stale (%s), %s", CasIdxConfig.maxStaleStr, msErr)
+	}
+	CasIdxConfig.maxStale = ms
+	maxStale = time.Duration(ms) * time.Second
+
+	pi, piErr := dur.ParseDuration(CasIdxConfig.pruneIntervalStr)
+	if piErr != nil {
+		log.Fatalf("cassandra-idx: failed to prase prune-interval (%s), %s", CasIdxConfig.pruneIntervalStr, piErr)
+	}
+	CasIdxConfig.pruneInterval = pi
+	pruneInterval = time.Duration(pi) * time.Second
+
+	updateCassIdx = CasIdxConfig.updateCassIdx
+
+	log.Infof("initializing cassandra-idx. Hosts=%s", CasIdxConfig.hosts)
 	if err := c.MemoryIdx.Init(); err != nil {
 		return err
 	}
@@ -228,11 +212,11 @@ func (c *CasIdx) Init() error {
 	}
 
 	if updateCassIdx {
-		c.wg.Add(numConns)
-		for i := 0; i < numConns; i++ {
+		c.wg.Add(CasIdxConfig.numConns)
+		for i := 0; i < CasIdxConfig.numConns; i++ {
 			go c.processWriteQueue()
 		}
-		log.Infof("cassandra-idx: started %d writeQueue handlers", numConns)
+		log.Infof("cassandra-idx: started %d writeQueue handlers", CasIdxConfig.numConns)
 	}
 
 	//Rebuild the in-memory index.
@@ -545,9 +529,11 @@ func (c *CasIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 
 func (c *CasIdx) prune() {
 	ticker := time.NewTicker(pruneInterval)
+	msStr := maxStale.String()
+	msNeg := maxStale * -1
 	for range ticker.C {
-		log.Debugf("cassandra-idx: pruning items from index that have not been seen for %s", maxStale.String())
-		staleTs := time.Now().Add(maxStale * -1)
+		log.Debugf("cassandra-idx: pruning items from index that have not been seen for %s", msStr)
+		staleTs := time.Now().Add(msNeg)
 		_, err := c.Prune(staleTs)
 		if err != nil {
 			log.Errorf("cassandra-idx: prune error. %s", err)

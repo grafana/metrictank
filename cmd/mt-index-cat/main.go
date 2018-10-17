@@ -142,7 +142,7 @@ func main() {
 
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
-	cassandra.Enabled = true
+	cassandra.CasIdxConfig.Enabled = true
 
 	var show func(d schema.MetricDefinition)
 

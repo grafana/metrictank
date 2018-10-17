@@ -110,26 +110,26 @@ cass config flags:
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
-  -max-stale duration
-    	clear series from the index if they have not been seen for this much time.
+  -max-stale string
+    	clear series from the index if they have not been seen for this much time. (default "0s")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string
     	password for authentication (default "cassandra")
   -protocol-version int
     	cql protocol version to use (default 4)
-  -prune-interval duration
-    	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -prune-interval string
+    	Interval at which the index should be checked for stale series. (default "3h")
   -schema-file string
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
-  -timeout duration
-    	cassandra request timeout (default 1s)
+  -timeout string
+    	cassandra request timeout (default "1s")
   -update-cassandra-index
     	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
-  -update-interval duration
-    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+  -update-interval string
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default "3h")
   -username string
     	username for authentication (default "cassandra")
   -write-queue-size int
@@ -663,26 +663,26 @@ cass config flags:
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
-  -max-stale duration
-    	clear series from the index if they have not been seen for this much time.
+  -max-stale string
+    	clear series from the index if they have not been seen for this much time. (default "0s")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string
     	password for authentication (default "cassandra")
   -protocol-version int
     	cql protocol version to use (default 4)
-  -prune-interval duration
-    	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -prune-interval string
+    	Interval at which the index should be checked for stale series. (default "3h")
   -schema-file string
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
-  -timeout duration
-    	cassandra request timeout (default 1s)
+  -timeout string
+    	cassandra request timeout (default "1s")
   -update-cassandra-index
     	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
-  -update-interval duration
-    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+  -update-interval string
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default "3h")
   -username string
     	username for authentication (default "cassandra")
   -write-queue-size int

@@ -155,7 +155,7 @@ func main() {
 
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
-	cassandra.Enabled = true
+	cassandra.CasIdxConfig.Enabled = true
 
 	if *verbose {
 		log.SetLevel(log.DebugLevel)

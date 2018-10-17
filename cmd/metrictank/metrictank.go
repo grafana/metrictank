@@ -316,7 +316,7 @@ func main() {
 		}
 		metricIndex = memory.New()
 	}
-	if cassandra.Enabled {
+	if cassandra.CasIdxConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
