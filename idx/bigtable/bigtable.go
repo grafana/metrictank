@@ -466,6 +466,9 @@ LOOP:
 			}
 		case req, ok := <-b.writeQueue:
 			if !ok {
+				// writeQueue was closed.  Flush and exit.
+				timer.Stop()
+				flush()
 				break LOOP
 			}
 			buffer = append(buffer, req)
