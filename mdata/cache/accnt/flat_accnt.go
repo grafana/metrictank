@@ -19,15 +19,15 @@ const (
 	lruItemSize = 76
 
 	// k: 4 bytes + v: 8 bytes (map[uint32]uint64)
-	flatChunkSize = 12
+	famChunkSize = 12
 	// k: 24 bytes + v: 16 bytes (map[schema.AMKey]*FlatAccntMet)
-	flatAccntMetSize = 40
+	famSize = 40
 
 	// 24 bytes + 8 bytes + 24 bytes + 20 bytes (sync.RWMutex, map, slice, MKey) + 4 bytes for alignment
 	// + 24 bytes for map entry in CCache schema.AMKey (map[schema.AMKey]*CCacheMetric)
-	ccacheCacheMetSize = 104
+	ccmSize = 104
 	// k: 4 bytes + v: 48 bytes (map[uint32]chunk.IterGen) + 4 bytes for []keys
-	ccacheMetChunkSize = 56
+	ccmChunkSize = 56
 )
 
 // it's easily possible for many events to happen in one request,
@@ -265,9 +265,10 @@ func (a *FlatAccnt) delMet(metric schema.AMKey) {
 	}
 
 	lenChunks := len(met.chunks)
-	totalFlat := uint64((lenChunks * flatChunkSize) + flatAccntMetSize)
-	totalChunk := uint64((lenChunks * ccacheMetChunkSize) + ccacheCacheMetSize)
-	totalLru := uint64((lenChunks * lruItemSize))
+	cacheSizeUsed.DecUint64(met.total)
+	cacheOverheadFlat.DecUint64(uint64(lenChunks*famChunkSize + famSize))
+	cacheOverheadLru.DecUint64(uint64(lenChunks * lruItemSize))
+	cacheOverheadChunk.DecUint64(uint64(lenChunks*ccmChunkSize + ccmSize))
 
 	for ts := range met.chunks {
 		a.lru.del(
@@ -278,10 +279,6 @@ func (a *FlatAccnt) delMet(metric schema.AMKey) {
 		)
 	}
 
-	cacheSizeUsed.DecUint64(met.total)
-	cacheOverheadFlat.DecUint64(totalFlat)
-	cacheOverheadLru.DecUint64(totalLru)
-	cacheOverheadChunk.DecUint64(totalChunk)
 	delete(a.metrics, metric)
 }
 
@@ -297,8 +294,8 @@ func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
-		totalFlat += flatAccntMetSize
-		totalChunk += ccacheCacheMetSize
+		totalFlat += famSize
+		totalChunk += ccmSize
 	}
 
 	if _, ok = met.chunks[ts]; ok {
@@ -308,8 +305,8 @@ func (a *FlatAccnt) add(metric schema.AMKey, ts uint32, size uint64) {
 
 	met.chunks[ts] = size
 
-	totalFlat += flatChunkSize
-	totalChunk += ccacheMetChunkSize
+	totalFlat += famChunkSize
+	totalChunk += ccmChunkSize
 	// this func is called from the event loop so lru will be touched with new EvictTarget
 	totalLru += lruItemSize
 	met.total = met.total + size
@@ -331,8 +328,8 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 		}
 		a.metrics[metric] = met
 		cacheMetricAdd.Inc()
-		totalFlat += flatAccntMetSize
-		totalChunk += ccacheCacheMetSize
+		totalFlat += famSize
+		totalChunk += ccmSize
 	}
 
 	var sizeDiff uint64
@@ -345,11 +342,10 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 		size := chunk.Size()
 		sizeDiff += size
 		met.chunks[chunk.Ts] = size
-		totalFlat += flatChunkSize
-		totalChunk += ccacheMetChunkSize
+		totalFlat += famChunkSize
+		totalChunk += ccmChunkSize
 		// this func is called from the event loop so lru will be touched with new EvictTarget
 		totalLru += lruItemSize
-
 	}
 
 	met.total = met.total + sizeDiff
@@ -416,14 +412,14 @@ func (a *FlatAccnt) evict() {
 	// than it should until the evictions can be processed in ccache and then the
 	// memory reclaimed by GC at some time in the hopefully near future
 
-	totalChunk += uint64(lenChunks * ccacheMetChunkSize)
-	totalFlat += uint64(lenChunks * flatChunkSize)
+	totalChunk += uint64(lenChunks * ccmChunkSize)
+	totalFlat += uint64(lenChunks * famChunkSize)
 
 	if met.total <= 0 {
 		cacheMetricEvict.Inc()
 		delete(a.metrics, target.Metric)
-		totalChunk += ccacheCacheMetSize
-		totalFlat += flatAccntMetSize
+		totalChunk += ccmSize
+		totalFlat += famSize
 	}
 
 	cacheOverheadChunk.DecUint64(totalChunk)
