@@ -116,8 +116,10 @@ type Store struct {
 }
 
 func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
-	if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
-		return nil, fmt.Errorf("btStore: write-queue-size must be larger then write-max-flush-size")
+	// Hopefully the caller has already validated their config, but just in case,
+	// lets make sure.
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 	ctx := context.Background()
 	if cfg.CreateCF {
@@ -199,8 +201,9 @@ func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
 	}
 	for i := 0; i < cfg.WriteConcurrency; i++ {
 		s.wg.Add(1)
-		// The writeQueue is comprised of 2 components.  The chan and a buffer in the procesWriteQueue thread.
-		// The buffer in the thread has a limit of writeMaxFlushSize.
+		// Each processWriteQueue thread uses a channel and a buffer for queuing unwritten chunks.
+		// In total, each processWriteQueue thread should not have more then "write-queue-size" chunks
+		// that are queued.  To ensure this, set the channel size to "write-queue-size" - "write-max-flush-size"
 		s.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, cfg.WriteQueueSize-cfg.WriteMaxFlushSize)
 		s.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.bigtable.write_queue.%d.items", i+1))
 		go s.processWriteQueue(s.writeQueues[i], s.writeQueueMeters[i])
@@ -214,7 +217,7 @@ func (s *Store) Stop() {
 	s.wg.Wait()
 	err := s.client.Close()
 	if err != nil {
-		log.Errorf("Error closing bigtable client. %s", err)
+		log.Errorf("btStore: theError closing bigtable client. %s", err)
 	}
 }
 

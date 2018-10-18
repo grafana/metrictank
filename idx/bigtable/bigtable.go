@@ -2,7 +2,6 @@ package bigtable
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,47 +46,7 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.bigtable.save.skipped")
 	// metric idx.bigtable.save.bytes-per-request is the number of bytes written to bigtable in each request.
 	statSaveBytesPerRequest = stats.NewMeter32("idx.bigtable.save.bytes-per-request", true)
-
-	Enabled           bool
-	maxStale          time.Duration
-	pruneInterval     time.Duration
-	updateBigTableIdx bool
-	updateInterval    time.Duration
-	updateInterval32  uint32
-
-	writeQueueSize    int
-	writeConcurrency  int
-	writeMaxFlushSize int
-
-	bigtableInstance string
-	gcpProject       string
-	tableName        string
-	createCF         bool
 )
-
-func ConfigSetup() {
-	btIdx := flag.NewFlagSet("bigtable-idx", flag.ExitOnError)
-
-	btIdx.BoolVar(&Enabled, "enabled", false, "")
-	btIdx.StringVar(&gcpProject, "gcp-project", "default", "Name of GCP project the bigtable cluster resides in")
-	btIdx.StringVar(&bigtableInstance, "bigtable-instance", "default", "Name of bigtable instance")
-	btIdx.StringVar(&tableName, "table-name", "metric_idx", "Name of bigtable table used for metricDefs")
-	btIdx.IntVar(&writeQueueSize, "write-queue-size", 100000, "Max number of metricDefs allowed to be unwritten to bigtable. Must be larger then write-max-flush-size")
-	btIdx.IntVar(&writeMaxFlushSize, "write-max-flush-size", 10000, "Max number of metricDefs in each batch write to bigtable")
-	btIdx.IntVar(&writeConcurrency, "write-concurrency", 5, "Number of writer threads to use")
-	btIdx.BoolVar(&updateBigTableIdx, "update-bigtable-index", true, "synchronize index changes to bigtable. not all your nodes need to do this.")
-	btIdx.DurationVar(&updateInterval, "update-interval", time.Hour*3, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
-	btIdx.DurationVar(&maxStale, "max-stale", 0, "clear series from the index if they have not been seen for this much time.")
-	btIdx.DurationVar(&pruneInterval, "prune-interval", time.Hour*3, "Interval at which the index should be checked for stale series.")
-	btIdx.BoolVar(&createCF, "create-cf", true, "enable the creation of the table and column families")
-
-	globalconf.Register("bigtable-idx", btIdx)
-	return
-}
-
-func ConfigProcess() {
-	return
-}
 
 type writeReq struct {
 	def      *schema.MetricDefinition
@@ -97,6 +55,7 @@ type writeReq struct {
 
 type BigtableIdx struct {
 	memory.MemoryIdx
+	cfg        *IdxConfig
 	tbl        *bigtable.Table
 	client     *bigtable.Client
 	writeQueue chan writeReq
@@ -104,45 +63,64 @@ type BigtableIdx struct {
 	wg         sync.WaitGroup
 }
 
-func New() *BigtableIdx {
-	if writeMaxFlushSize >= writeQueueSize {
-		log.Fatal("bigtable-idx: write-queue-size must be larger then write-max-flush-size")
+func New(cfg *IdxConfig) *BigtableIdx {
+	// Hopefully the caller has already validated their config, but just in case,
+	// lets make sure.
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("bigtable-idx: %s", err)
 	}
+	idx := &BigtableIdx{
+		MemoryIdx: *memory.New(),
+		cfg:       cfg,
+		shutdown:  make(chan struct{}),
+	}
+	if cfg.UpdateBigtableIdx {
+		idx.writeQueue = make(chan writeReq, cfg.WriteQueueSize-cfg.WriteMaxFlushSize)
+	}
+	return idx
+}
+
+// InitBare makes sure the tables and columFamilies exist. It also opens the table for reads/writes.
+func (b *BigtableIdx) InitBare() error {
 	ctx := context.Background()
-	if createCF {
-		adminClient, err := bigtable.NewAdminClient(ctx, gcpProject, bigtableInstance)
+	if b.cfg.CreateCF {
+		adminClient, err := bigtable.NewAdminClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
 		if err != nil {
-			log.Fatalf("bigtable-idx: failed to create bigtable admin client. %s", err)
+			log.Errorf("bigtable-idx: failed to create bigtable admin client. %s", err)
+			return err
 		}
 		tables, err := adminClient.Tables(ctx)
 		if err != nil {
-			log.Fatalf("bigtable-idx: failed to list tables. %s", err)
+			log.Errorf("bigtable-idx: failed to list tables. %s", err)
+			return err
 		}
 		found := false
 		for _, t := range tables {
-			if t == tableName {
+			if t == b.cfg.TableName {
 				found = true
 				break
 			}
 		}
 		if !found {
-			log.Infof("bigtable-idx: table %s does not yet exist. Creating it.", tableName)
+			log.Infof("bigtable-idx: table %s does not yet exist. Creating it.", b.cfg.TableName)
 			table := bigtable.TableConf{
-				TableID: tableName,
+				TableID: b.cfg.TableName,
 				Families: map[string]bigtable.GCPolicy{
 					COLUMN_FAMILY: bigtable.MaxVersionsPolicy(1),
 				},
 			}
 			err := adminClient.CreateTableFromConf(ctx, &table)
 			if err != nil {
-				log.Fatalf("bigtable-idx: failed to create %s table. %s", tableName, err)
+				log.Errorf("bigtable-idx: failed to create %s table. %s", b.cfg.TableName, err)
+				return err
 			}
 		} else {
-			log.Infof("bigtable-idx: table %s exists.", tableName)
+			log.Infof("bigtable-idx: table %s exists.", b.cfg.TableName)
 			// table exists.  Lets make sure that it has all of the CF's we need.
-			table, err := adminClient.TableInfo(ctx, tableName)
+			table, err := adminClient.TableInfo(ctx, b.cfg.TableName)
 			if err != nil {
-				log.Fatalf("bigtable-idx: failed to get tableInfo of %s. %s", tableName, err)
+				log.Errorf("bigtable-idx: failed to get tableInfo of %s. %s", b.cfg.TableName, err)
+				return err
 			}
 			existingFamilies := make(map[string]string)
 			for _, cf := range table.FamilyInfos {
@@ -150,60 +128,60 @@ func New() *BigtableIdx {
 			}
 			policy, ok := existingFamilies[COLUMN_FAMILY]
 			if !ok {
-				log.Infof("bigtable-idx: column family %s/%s does not exist. Creating it.", tableName, COLUMN_FAMILY)
-				err = adminClient.CreateColumnFamily(ctx, tableName, COLUMN_FAMILY)
+				log.Infof("bigtable-idx: column family %s/%s does not exist. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
+				err = adminClient.CreateColumnFamily(ctx, b.cfg.TableName, COLUMN_FAMILY)
 				if err != nil {
-					log.Fatalf("bigtable-idx: failed to create cf %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to create cf %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					return err
 				}
-				err = adminClient.SetGCPolicy(ctx, tableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
+				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Fatalf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					return err
 				}
 			} else if policy == "" {
-				log.Infof("bigtable-idx: column family %s/%s exists but has no GCPolicy. Creating it.", tableName, COLUMN_FAMILY)
-				err = adminClient.SetGCPolicy(ctx, tableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
+				log.Infof("bigtable-idx: column family %s/%s exists but has no GCPolicy. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
+				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Fatalf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", tableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					return err
 				}
 			}
 		}
 	}
-	client, err := bigtable.NewClient(ctx, gcpProject, bigtableInstance)
+	client, err := bigtable.NewClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
 	if err != nil {
-		log.Fatalf("bigtable-idx: failed to create bigtable client. %s", err)
+		log.Errorf("bigtable-idx: failed to create bigtable client. %s", err)
+		return err
 	}
 
-	idx := &BigtableIdx{
-		MemoryIdx: *memory.New(),
-		client:    client,
-		tbl:       client.Open(tableName),
-		shutdown:  make(chan struct{}),
-	}
-	if updateBigTableIdx {
-		idx.writeQueue = make(chan writeReq, writeQueueSize-writeMaxFlushSize)
-	}
-	updateInterval32 = uint32(updateInterval.Nanoseconds() / int64(time.Second))
-	return idx
+	b.client = client
+	b.tbl = client.Open(b.cfg.TableName)
+	return nil
 }
 
+// makes sure the tables and columFamilies exist. It also opens the table for reads/writes. Then
+// rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (b *BigtableIdx) Init() error {
-	log.Infof("initializing bigtable-idx. Project=%s, Instance=%s", gcpProject, bigtableInstance)
+	log.Infof("initializing bigtable-idx. Project=%s, Instance=%s", b.cfg.GcpProject, b.cfg.BigtableInstance)
 	if err := b.MemoryIdx.Init(); err != nil {
 		return err
 	}
-	if updateBigTableIdx {
-		b.wg.Add(writeConcurrency)
-		for i := 0; i < writeConcurrency; i++ {
+
+	if err := b.InitBare(); err != nil {
+		return err
+	}
+
+	if b.cfg.UpdateBigtableIdx {
+		b.wg.Add(b.cfg.WriteConcurrency)
+		for i := 0; i < b.cfg.WriteConcurrency; i++ {
 			go b.processWriteQueue()
 		}
-		log.Infof("bigtable-idx: started %d writeQueue handlers", writeConcurrency)
+		log.Infof("bigtable-idx: started %d writeQueue handlers", b.cfg.WriteConcurrency)
 	}
 
 	b.rebuildIndex()
-	if maxStale > 0 {
-		if pruneInterval == 0 {
-			return fmt.Errorf("bigtable-idx: pruneInterval must be greater then 0")
-		}
+	if b.cfg.MaxStale > 0 {
 		b.wg.Add(1)
 		go b.prune()
 	}
@@ -213,7 +191,7 @@ func (b *BigtableIdx) Init() error {
 func (b *BigtableIdx) Stop() {
 	b.MemoryIdx.Stop()
 	close(b.shutdown)
-	if updateBigTableIdx {
+	if b.cfg.UpdateBigtableIdx {
 		close(b.writeQueue)
 	}
 	b.wg.Wait()
@@ -231,7 +209,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 
 	archive, oldPartition, inMemory := b.MemoryIdx.Update(point, partition)
 
-	if !updateBigTableIdx {
+	if !b.cfg.UpdateBigtableIdx {
 		statUpdateDuration.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -250,7 +228,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 		}
 		// check if we need to save to bigtable.
 		now := uint32(time.Now().Unix())
-		if archive.LastSave < (now - updateInterval32) {
+		if archive.LastSave < (now - b.cfg.updateInterval32) {
 			archive = b.updateBigtable(now, inMemory, archive, partition)
 		}
 	}
@@ -269,7 +247,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 		stat = statAddDuration
 	}
 
-	if !updateBigTableIdx {
+	if !b.cfg.UpdateBigtableIdx {
 		stat.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -290,7 +268,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 	// check if we need to save to bigtable.
 	now := uint32(time.Now().Unix())
-	if archive.LastSave < (now - updateInterval32) {
+	if archive.LastSave < (now - b.cfg.updateInterval32) {
 		archive = b.updateBigtable(now, inMemory, archive, partition)
 	}
 
@@ -303,7 +281,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if archive.LastSave < (now - updateInterval32 - (updateInterval32 / 2)) {
+	if archive.LastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
 		log.Debugf("bigtable-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
@@ -333,8 +311,8 @@ func (b *BigtableIdx) rebuildIndex() {
 	pre := time.Now()
 
 	var staleTs uint32
-	if maxStale != 0 {
-		staleTs = uint32(time.Now().Add(maxStale * -1).Unix())
+	if b.cfg.MaxStale != 0 {
+		staleTs = uint32(time.Now().Add(b.cfg.MaxStale * -1).Unix())
 	}
 	num := 0
 	var defs []schema.MetricDefinition
@@ -472,7 +450,7 @@ LOOP:
 				break LOOP
 			}
 			buffer = append(buffer, req)
-			if len(buffer) >= writeMaxFlushSize {
+			if len(buffer) >= b.cfg.WriteMaxFlushSize {
 				// make sure the timer hasn't already fired. If it has we read
 				// from the chan and consume the event.
 				if !timer.Stop() {
@@ -493,7 +471,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	if err != nil {
 		return defs, err
 	}
-	if updateBigTableIdx {
+	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
 			err = b.deleteDef(&def.MetricDefinition)
 			if err != nil {
@@ -534,12 +512,12 @@ func (b *BigtableIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 
 func (b *BigtableIdx) prune() {
 	defer b.wg.Done()
-	ticker := time.NewTicker(pruneInterval)
+	ticker := time.NewTicker(b.cfg.PruneInterval)
 	for {
 		select {
 		case <-ticker.C:
-			log.Debugf("bigtable-idx: pruning items from index that have not been seen for %s", maxStale.String())
-			staleTs := time.Now().Add(maxStale * -1)
+			log.Debugf("bigtable-idx: pruning items from index that have not been seen for %s", b.cfg.MaxStale.String())
+			staleTs := time.Now().Add(b.cfg.MaxStale * -1)
 			_, err := b.Prune(staleTs)
 			if err != nil {
 				log.Errorf("bigtable-idx: prune error. %s", err)

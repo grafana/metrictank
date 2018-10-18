@@ -187,6 +187,7 @@ func main() {
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 	memory.ConfigProcess()
+	bigtable.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
 		log.Fatal("you should enable at least 1 input plugin")
@@ -342,11 +343,11 @@ func main() {
 		}
 		metricIndex = cassandra.New()
 	}
-	if bigtable.Enabled {
+	if bigtable.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = bigtable.New()
+		metricIndex = bigtable.New(bigtable.CliConfig)
 	}
 
 	if metricIndex == nil {

@@ -2,6 +2,8 @@ package bigtable
 
 import (
 	"flag"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/rakyll/globalconf"
@@ -20,6 +22,17 @@ type StoreConfig struct {
 	ReadTimeout       time.Duration
 	WriteTimeout      time.Duration
 	CreateCF          bool
+}
+
+func (cfg *StoreConfig) Validate() error {
+	// If we dont have any write threads, then we dont WriteMaxFlushSize and WriteQueueSize
+	// are not used.  If we do have write threads, then we need to make sure that
+	if cfg.WriteConcurrency > 0 {
+		if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
+			return fmt.Errorf("write-queue-size must be larger then write-max-flush-size")
+		}
+	}
+	return nil
 }
 
 // return StoreConfig with default values set.
@@ -50,7 +63,7 @@ func ConfigSetup() {
 	btStore.StringVar(&CliConfig.TableName, "table-name", CliConfig.TableName, "Name of bigtable table used for chunks")
 	btStore.IntVar(&CliConfig.WriteQueueSize, "write-queue-size", CliConfig.WriteQueueSize, "Max number of chunks, per write thread, allowed to be unwritten to bigtable. Must be larger then write-max-flush-size")
 	btStore.IntVar(&CliConfig.WriteMaxFlushSize, "write-max-flush-size", CliConfig.WriteMaxFlushSize, "Max number of chunks in each batch write to bigtable")
-	btStore.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "Number of writer threads to use")
+	btStore.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "Number of writer threads to use.")
 	btStore.IntVar(&CliConfig.ReadConcurrency, "read-concurrency", CliConfig.ReadConcurrency, "Number concurrent reads that can be processed")
 	btStore.DurationVar(&CliConfig.MaxChunkSpan, "max-chunkspan", CliConfig.MaxChunkSpan, "Maximum chunkspan size used.")
 	btStore.DurationVar(&CliConfig.ReadTimeout, "read-timeout", CliConfig.ReadTimeout, "read timeout")
@@ -62,5 +75,7 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
-	return
+	if err := CliConfig.Validate(); err != nil {
+		log.Fatalf("bigtable-store: Config validation error. %s", err)
+	}
 }
