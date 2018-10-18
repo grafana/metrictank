@@ -92,6 +92,7 @@ func TestLRUDelete(t *testing.T) {
 	}
 }
 
+// BenchmarkLRUGrowth is used to create comparisons of memory allocations as the LRU is optimized
 func BenchmarkLRUGrowth(b *testing.B) {
 	b.StopTimer()
 

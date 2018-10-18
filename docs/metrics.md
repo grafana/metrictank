@@ -52,6 +52,16 @@ how many metrics were hit fully (all needed chunks in cache)
 how many metrics were hit partially (some of the needed chunks in cache, but not all)
 * `cache.ops.metric.miss`:  
 how many metrics were missed fully (no needed chunks in cache)
+* `cache.overhead.chunk`:  
+an approximation of the overhead used to store chunks in the cache
+* `cache.overhead.flat`:  
+an approximation of the overhead used by flat accounting
+* `cache.overhead.lru`:  
+an approximation of the overhead used by the LRU
+* `cache.size.max`:  
+the maximum size of the cache (overhead does not count towards this limit)
+* `cache.size.used`:  
+how much of the cache is used (sum of the chunk data without overhead)
 * `cluster.decode_err.join`:  
 a counter of json unmarshal errors
 * `cluster.decode_err.update`:  
