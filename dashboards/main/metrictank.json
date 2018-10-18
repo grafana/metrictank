@@ -965,7 +965,7 @@
       "yaxes": [
         {
           "format": "percentunit",
-          "label": "allocation",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": 0,

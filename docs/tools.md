@@ -72,6 +72,8 @@ global config flags:
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
     	only show metrics that have this prefix
+  -regex string
+    	only show metrics that match this regex
   -substr string
     	only show metrics that have this substring
   -suffix string
@@ -141,6 +143,15 @@ output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.In
 
 You may also use processing functions in templates:
 pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
+    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough
+patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:
+    patternCustom <chance> <operation>[ <chance> <operation>...]
+    the chances need to add up to 100
+    operation is one of:
+        * pass        (passthrough)
+        * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards
+        * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards
+    example: {{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n
 age: subtracts the passed integer (typically .LastUpdate) from the query time
 roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 EXAMPLES:
@@ -148,6 +159,7 @@ mt-index-cat -from 60min cass -hosts cassandra:9042 list
 mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
 mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\nX-Org-Id: 1\n\n'
 mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\n' | sort | uniq -c
+mt-index-cat cass -hosts localhost:9042 -schema-file ../../scripts/config/schema-idx-cassandra.toml '{{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n'
 ```
 
 

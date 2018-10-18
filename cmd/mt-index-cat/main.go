@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,8 @@ func main() {
 	var prefix string
 	var substr string
 	var suffix string
+	var regexStr string
+	var regex *regexp.Regexp
 	var tags string
 	var from string
 	var maxStale string
@@ -49,6 +52,7 @@ func main() {
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
 	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
+	globalFlags.StringVar(&regexStr, "regex", "", "only show metrics that match this regex")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
 	globalFlags.StringVar(&maxStale, "max-stale", "6h30min", "exclude series that have not been seen for this much time.  use 0 to disable")
@@ -86,6 +90,8 @@ func main() {
 		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
+		fmt.Println("    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")
+		out.PatternCustomUsage()
 		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
 		fmt.Println("roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
 		fmt.Println("EXAMPLES:")
@@ -93,6 +99,7 @@ func main() {
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\\nX-Org-Id: 1\\n\\n'")
 		fmt.Println("mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\\n' | sort | uniq -c")
+		fmt.Println("mt-index-cat cass -hosts localhost:9042 -schema-file ../../scripts/config/schema-idx-cassandra.toml '{{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n'")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
@@ -117,6 +124,7 @@ func main() {
 			}
 		}
 	}
+
 	if !found {
 		log.Printf("invalid output %q", format)
 		flag.Usage()
@@ -143,6 +151,15 @@ func main() {
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
 	cassandra.Enabled = true
+
+	if regexStr != "" {
+		var err error
+		regex, err = regexp.Compile(regexStr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	}
 
 	var show func(d schema.MetricDefinition)
 
@@ -209,7 +226,7 @@ func main() {
 	} else {
 		defs = idx.LoadPartitions(partitions, nil, uint32(cutoff))
 	}
-	// set this after doing the query, to assure age can't possibly be negative
+	// set this after doing the query, to assure age can't possibly be negative unless if clocks are misconfigured.
 	out.QueryTime = time.Now().Unix()
 	total := len(defs)
 	shown := 0
@@ -230,6 +247,9 @@ func main() {
 			continue
 		}
 		if tags == "some" && len(d.Tags) == 0 {
+			continue
+		}
+		if regex != nil && !regex.MatchString(d.Name) {
 			continue
 		}
 		if tags == "valid" || tags == "invalid" {
