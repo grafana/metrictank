@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/jaeger"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -150,6 +150,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	jaeger.ConfigSetup()
+	jaeger.ConfigProcess()
+	jaeger.Enabled = false
+
 	config.ParseAll()
 
 	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
@@ -178,7 +182,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}
-	tracer, traceCloser, err := conf.GetTracer(false, "", nil)
+	tracer, traceCloser, err := jaeger.Get()
 	if err != nil {
 		log.Fatalf("Could not initialize jaeger tracer: %s", err.Error())
 	}
