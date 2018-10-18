@@ -21,6 +21,7 @@ type TimeLimiter struct {
 }
 
 // NewTimeLimiter creates a new TimeLimiter.
+// limit must <= window
 func NewTimeLimiter(window, limit time.Duration, now time.Time) *TimeLimiter {
 	l := TimeLimiter{
 		since:  now,

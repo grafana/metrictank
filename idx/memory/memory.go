@@ -69,6 +69,9 @@ func ConfigProcess() {
 	if err != nil {
 		log.Fatal(4, "could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
 	}
+	if maxPruneLockTime > time.Second {
+		log.Fatal(4, "invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
+	}
 }
 
 type Tree struct {
