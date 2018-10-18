@@ -3,18 +3,12 @@
 package idx
 
 import (
-	"errors"
 	"time"
 
 	"github.com/raintank/schema"
 )
 
 var OrgIdPublic = uint32(0)
-
-var (
-	BothBranchAndLeaf = errors.New("node can't be both branch and leaf")
-	BranchUnderLeaf   = errors.New("can't add branch under leaf")
-)
 
 //go:generate msgp
 type Node struct {
