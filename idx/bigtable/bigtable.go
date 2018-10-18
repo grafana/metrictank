@@ -383,25 +383,14 @@ func (b *BigtableIdx) processWriteQueue() {
 		}
 		statSaveBytesPerRequest.Value(byteCount)
 		pre := time.Now()
-		success := false
+		complete := false
 		attempts := 0
-
-		for !success {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			errs, err := b.tbl.ApplyBulk(ctx, rowKeys, mutations)
-			cancel()
+		for !complete {
+			errs, err := b.tbl.ApplyBulk(context.Background(), rowKeys, mutations)
 			if err != nil {
 				statQueryInsertFail.Add(len(rowKeys))
-				// log the first error then every 20th after that.
-				if (attempts % 20) == 0 {
-					log.Warnf("bigtable-idx: Failed to write %d defs to bigtable after %d attempts. they will be retried. %s", len(rowKeys), attempts+1, err)
-				}
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-				attempts++
+				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they wont be retried. %s", len(rowKeys), err)
+				complete = true
 			} else if len(errs) > 0 {
 				var failedRowKeys []string
 				var failedMutations []*bigtable.Mutation
@@ -424,12 +413,11 @@ func (b *BigtableIdx) processWriteQueue() {
 				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 				attempts++
 			} else {
-				success = true
+				complete = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
 				statQueryInsertOk.Add(len(rowKeys))
 				log.Debugf("bigtable-idx: %d metricDefs saved to bigtable.", len(rowKeys))
 			}
-
 		}
 		buffer = buffer[:0]
 	}
@@ -473,9 +461,10 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	}
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
-			err = b.deleteDef(&def.MetricDefinition)
-			if err != nil {
-				break
+			delErr := b.deleteDef(&def.MetricDefinition)
+			// the last error encountered will be passed back to the caller
+			if delErr != nil {
+				err = delErr
 			}
 		}
 	}
