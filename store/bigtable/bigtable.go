@@ -16,6 +16,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
+	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/schema"
@@ -108,7 +109,7 @@ type Store struct {
 	client           *bigtable.Client
 	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
-	readQueue        chan struct{}
+	readLimiter      util.Limiter
 	shutdown         chan struct{}
 	wg               sync.WaitGroup
 	tracer           opentracing.Tracer
@@ -196,7 +197,7 @@ func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
 		shutdown:         make(chan struct{}),
 		writeQueues:      make([]chan *mdata.ChunkWriteRequest, cfg.WriteConcurrency),
 		writeQueueMeters: make([]*stats.Range32, cfg.WriteConcurrency),
-		readQueue:        make(chan struct{}, cfg.ReadConcurrency),
+		readLimiter:      util.NewLimiter(cfg.ReadConcurrency),
 		cfg:              cfg,
 	}
 	for i := 0; i < cfg.WriteConcurrency; i++ {
@@ -376,16 +377,12 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	}
 
 	// limit number of inflight requests
-	log.Debugf("btStore: waiting for free slot in readQ. len=%d cap=%d", len(s.readQueue), cap(s.readQueue))
+	log.Debugf("btStore: waiting for free slot in readQ. len=%d cap=%d", len(s.readLimiter), cap(s.readLimiter))
 	pre := time.Now()
-	select {
-	case s.readQueue <- struct{}{}:
-		// slot reserved for this query.
-		log.Debug("btStore: acquired slot in readQ")
-	case <-ctx.Done():
-		// context done before we were able to reserve a slot
+	if !s.readLimiter.Acquire(ctx) {
 		return itgens, errCtxCanceled
 	}
+	log.Debug("btStore: acquired slot in readQ")
 	btblGetWaitDuration.Value(time.Since(pre))
 
 	startMonth := start - (start % Month_sec)       // starting row has to be at, or before, requested start
@@ -455,8 +452,8 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	btblRowsPerResponse.Value(rowCount)
 	btblGetExecDuration.Value(time.Since(pre))
 
-	// free a slot in the readQueue
-	<-s.readQueue
+	// free a slot in the readLimiter
+	s.readLimiter.Release()
 
 	if reqErr != nil {
 		log.Errorf("btStore: bigtable readRows error. %s", reqErr)
