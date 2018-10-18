@@ -28,6 +28,9 @@ func (cfg *StoreConfig) Validate() error {
 	// If we dont have any write threads, then we dont WriteMaxFlushSize and WriteQueueSize
 	// are not used.  If we do have write threads, then we need to make sure that
 	if cfg.WriteConcurrency > 0 {
+		if cfg.WriteMaxFlushSize > 100000 {
+			return fmt.Errorf("write-max-flush-size must be <= 100000.")
+		}
 		if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
 			return fmt.Errorf("write-queue-size must be larger then write-max-flush-size")
 		}
