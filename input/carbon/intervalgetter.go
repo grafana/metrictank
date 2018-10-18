@@ -23,7 +23,7 @@ func NewIndexIntervalGetter(idx idx.MetricIndex) IntervalGetter {
 func (i IndexIntervalGetter) GetInterval(name string) int {
 	archives := i.idx.GetPath(1, name)
 	for _, a := range archives {
-		// since the schema rules can't change at runtime and are the schemas are determined at runtime for new entries, they will be the same
+		// since the schema rules can't change at runtime and the schemas are determined at runtime for new entries, they will be the same
 		// for any archive with the given name. so the first one we find is enough.
 		return a.Interval
 	}
