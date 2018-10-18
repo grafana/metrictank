@@ -17,6 +17,7 @@ type TimeLimiter struct {
 	timeSpent time.Duration
 	window    time.Duration
 	limit     time.Duration
+	factor    float64
 }
 
 // NewTimeLimiter creates a new TimeLimiter.
@@ -26,6 +27,7 @@ func NewTimeLimiter(window, limit time.Duration, now time.Time) *TimeLimiter {
 		next:   now.Add(window),
 		window: window,
 		limit:  limit,
+		factor: float64(window) / float64(limit),
 	}
 	return &l
 }
@@ -78,8 +80,7 @@ func (l *TimeLimiter) wait(now time.Time) time.Duration {
 	// here we know that:
 	// since <= now <= next
 	// timespent >= limit
-	multiplier := l.window / l.limit
-	timeToPass := l.timeSpent * multiplier
+	timeToPass := time.Duration(float64(l.timeSpent) * l.factor)
 	timePassed := now.Sub(l.since)
 
 	// not sure if this should happen, but let's be safe anyway
