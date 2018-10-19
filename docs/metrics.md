@@ -112,6 +112,32 @@ the number of nodes we know to be primary and ready
 the number of nodes we know to be secondary and not ready
 * `cluster.total.state.secondary-ready`:  
 the number of nodes we know to be secondary and ready
+* `idx.bigtable.add`:  
+the duration of an add of one metric to the bigtable idx, including the add to the in-memory index, excluding the insert query
+* `idx.bigtable.delete`:  
+the duration of a delete of one or more metrics from the bigtable idx, including the delete from the in-memory index and the delete query
+* `idx.bigtable.prune`:  
+the duration of a prune of the bigtable idx, including the prune of the in-memory index and all needed delete queries
+* `idx.bigtable.query-delete.exec`:  
+time spent executing deletes (possibly repeatedly until success)
+* `idx.bigtable.query-delete.fail`:  
+how many delete queries for a metric failed (triggered by an update or a delete)
+* `idx.bigtable.query-delete.ok`:  
+how many delete queries for a metric completed successfully (triggered by an update or a delete)
+* `idx.bigtable.query-insert.exec`:  
+time spent executing inserts (possibly repeatedly until success)
+* `idx.bigtable.query-insert.fail`:  
+how many insert queries for a metric failed (triggered by an add or an update)
+* `idx.bigtable.query-insert.ok`:  
+how many insert queries for a metric completed successfully (triggered by an add or an update)
+* `idx.bigtable.query-insert.wait`:  
+time inserts spent in queue before being executed
+* `idx.bigtable.save.bytes-per-request`:  
+the number of bytes written to bigtable in each request.
+* `idx.bigtable.save.skipped`:  
+how many saves have been skipped due to the writeQueue being full
+* `idx.bigtable.update`:  
+the duration of an update of one metric to the bigtable idx, including the update to the in-memory index, excluding any insert/delete queries
 * `idx.cassadra.query-delete.ok`:  
 how many delete queries for a metric completed successfully (triggered by an update or a delete)
 * `idx.cassadra.query-insert.ok`:  
@@ -240,6 +266,30 @@ an invalid tag for a metric is encountered.
 each time this happens, an error is logged with more details.
 * `stats.generate_message`:  
 how long it takes to generate the stats
+* `store.bigtable.chunk_operations.save_fail`:  
+counter of failed saves
+* `store.bigtable.chunk_operations.save_ok`:  
+counter of successful saves
+* `store.bigtable.chunk_size.at_load`:  
+the sizes of chunks seen when loading them
+* `store.bigtable.chunk_size.at_save`:  
+the sizes of chunks seen when saving them
+* `store.bigtable.chunks_per_row`:  
+how many chunks are retrieved per row in get queries
+* `store.bigtable.get.error`:  
+the count of reads that failed
+* `store.bigtable.get.exec`:  
+the duration of getting from bigtable store
+* `store.bigtable.get.wait`:  
+the duration of the get spent in the queue
+* `store.bigtable.put.bytes`:  
+the number of chunk bytes saved in each bulkApply
+* `store.bigtable.put.exec`:  
+the duration of putting in bigtable store
+* `store.bigtable.put.wait`:  
+the duration of a put in the wait queue
+* `store.bigtable.rows_per_response`:  
+how many rows come per get response
 * `store.cassandra.chunk_operations.save_fail`:  
 counter of failed saves
 * `store.cassandra.chunk_operations.save_ok`:  

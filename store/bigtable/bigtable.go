@@ -38,6 +38,8 @@ var (
 	btblPutExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.put.exec")
 	// metric store.bigtable.put.wait is the duration of a put in the wait queue
 	btblPutWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.put.wait")
+	// metric store.bigtable.put.bytes is the number of chunk bytes saved in each bulkApply
+	btblPutBytes = stats.NewMeter32("store.bigtable.put.bytes", true)
 	// metric store.bigtable.get.error is the count of reads that failed
 	btblReadError = stats.NewCounter32("store.bigtable.get.error")
 
@@ -54,8 +56,6 @@ var (
 	chunkSizeAtSave = stats.NewMeter32("store.bigtable.chunk_size.at_save", true)
 	// metric store.bigtable.chunk_size.at_load is the sizes of chunks seen when loading them
 	chunkSizeAtLoad = stats.NewMeter32("store.bigtable.chunk_size.at_load", true)
-	// metric store.bigtable.byte_size.at_save is the number of chunk bytes saved in each bulkApply
-	chunkBytesAtSave = stats.NewMeter32("store.bigtable.chunk_bytes.at_save", true)
 )
 
 func formatRowKey(key schema.AMKey, ts uint32) string {
@@ -255,7 +255,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 			btblPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 			bytesPerFlush += n
 		}
-		chunkBytesAtSave.Value(bytesPerFlush)
+		btblPutBytes.Value(bytesPerFlush)
 		success := false
 		attempts := 0
 		for !success {
