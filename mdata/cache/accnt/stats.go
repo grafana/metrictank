@@ -31,8 +31,21 @@ var (
 	// metric cache.ops.chunk.evict is how many chunks were evicted from the cache
 	cacheChunkEvict = stats.NewCounter32("cache.ops.chunk.evict")
 
-	cacheSizeMax          = stats.NewGauge64("cache.size.max")
-	cacheSizeUsed         = stats.NewGauge64("cache.size.used")
+	// metric cache.size.max is the maximum size of the cache (overhead does not count towards this limit)
+	cacheSizeMax = stats.NewGauge64("cache.size.max")
+
+	// metric cache.size.used is how much of the cache is used (sum of the chunk data without overhead)
+	cacheSizeUsed = stats.NewGauge64("cache.size.used")
+
+	// metric cache.overhead.chunk is an approximation of the overhead used to store chunks in the cache
+	cacheOverheadChunk = stats.NewGauge64("cache.overhead.chunk")
+
+	// metric cache.overhead.flat is an approximation of the overhead used by flat accounting
+	cacheOverheadFlat = stats.NewGauge64("cache.overhead.flat")
+
+	// metric cache.overhead.lru is an approximation of the overhead used by the LRU
+	cacheOverheadLru = stats.NewGauge64("cache.overhead.lru")
+
 	accntEventAddDuration = stats.NewLatencyHistogram15s32("cache.accounting.queue.add")
 	accntEventQueueUsed   = stats.NewRange32("cache.accounting.queue.size.used")
 	accntEventQueueMax    = stats.NewGauge64("cache.accounting.queue.size.max")

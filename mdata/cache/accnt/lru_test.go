@@ -2,6 +2,8 @@ package accnt
 
 import (
 	"testing"
+
+	"github.com/grafana/metrictank/test"
 )
 
 func TestLRU(t *testing.T) {
@@ -88,4 +90,30 @@ func TestLRUDelete(t *testing.T) {
 	if len(lru.items) != expectedSize || lru.list.Len() != expectedSize {
 		t.Fatalf("Expected lru to contain %d items, but have %d / %d", expectedSize, len(lru.items), lru.list.Len())
 	}
+}
+
+// BenchmarkLRUGrowth is used to create comparisons of memory allocations as the LRU is optimized
+func BenchmarkLRUGrowth(b *testing.B) {
+	b.StopTimer()
+
+	lru := NewLRU()
+
+	var targets []EvictTarget
+
+	amkey := test.GetAMKey(1)
+
+	// create our EvictTargets
+	for i := 0; i < (100 * 1024); i++ {
+		targets = append(targets, EvictTarget{
+			Metric: amkey,
+			Ts:     uint32(i)})
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		for _, target := range targets {
+			lru.touch(target)
+		}
+	}
+
 }

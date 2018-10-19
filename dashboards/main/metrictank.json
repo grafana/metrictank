@@ -3650,6 +3650,34 @@
           "pointradius": 1,
           "points": true,
           "yaxis": 2
+        },
+        {
+          "alias": "chunk",
+          "lines": false,
+          "pointradius": 1,
+          "points": true,
+          "yaxis": 2
+        },
+        {
+          "alias": "total used",
+          "lines": false,
+          "points": true,
+          "pointradius": 1,
+          "yaxis": 2
+        },
+        {
+          "alias": "flat",
+          "lines": false,
+          "points": true,
+          "pointradius": 1,
+          "yaxis": 2
+        },
+        {
+          "alias": "lru",
+          "lines": false,
+          "points": true,
+          "pointradius": 1,
+          "yaxis": 2
         }
       ],
       "spaceLength": 10,
@@ -3657,18 +3685,34 @@
       "steppedLine": false,
       "targets": [
         {
+          "refCount": 0,
           "refId": "A",
           "target": "alias(sumSeries(metrictank.stats.$environment.$instance.cache.size.max.gauge64), 'max')",
           "textEditor": false
         },
         {
+          "refCount": -1,
           "refId": "B",
           "target": "alias(sumSeries(metrictank.stats.$environment.$instance.cache.size.used.gauge64), 'used')"
         },
         {
+          "refCount": 0,
           "refId": "C",
           "target": "alias(divideSeries(sumSeries(metrictank.stats.$environment.$instance.cache.size.used.gauge64),sumSeries(metrictank.stats.$environment.$instance.cache.size.max.gauge64)), 'utilisation')",
           "textEditor": true
+        },
+        {
+          "refId": "D",
+          "target": "groupByNodes(aliasByNode(metrictank.stats.$environment.$instance.cache.overhead.*.gauge64, 6), 'sum', 0)",
+          "refCount": -1,
+          "hide": false
+        },
+        {
+          "refCount": 0,
+          "refId": "E",
+          "target": "alias(sum(#B, #D),'total used')",
+          "textEditor": true,
+          "targetFull": "alias(sum(alias(sumSeries(metrictank.stats.$environment.$instance.cache.size.used.gauge64), 'used'), groupByNodes(aliasByNode(metrictank.stats.$environment.$instance.cache.overhead.*.gauge64, 6), 'sum', 0)),'total used')"
         }
       ],
       "thresholds": [],
