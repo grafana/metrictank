@@ -218,7 +218,7 @@ func (s *Store) Stop() {
 	s.wg.Wait()
 	err := s.client.Close()
 	if err != nil {
-		log.Errorf("btStore: theError closing bigtable client. %s", err)
+		log.Errorf("btStore: error closing bigtable client. %s", err)
 	}
 }
 

@@ -80,7 +80,8 @@ func New(cfg *IdxConfig) *BigtableIdx {
 	return idx
 }
 
-// InitBare makes sure the tables and columFamilies exist. It also opens the table for reads/writes.
+// InitBare creates the client and makes sure the tables and columFamilies exist.
+// It also opens the table for reads/writes.
 func (b *BigtableIdx) InitBare() error {
 	ctx := context.Background()
 	if b.cfg.CreateCF {
@@ -160,10 +161,10 @@ func (b *BigtableIdx) InitBare() error {
 	return nil
 }
 
-// makes sure the tables and columFamilies exist. It also opens the table for reads/writes. Then
+// Init makes sure the tables and columFamilies exist. It also opens the table for reads/writes. Then
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (b *BigtableIdx) Init() error {
-	log.Infof("initializing bigtable-idx. Project=%s, Instance=%s", b.cfg.GcpProject, b.cfg.BigtableInstance)
+	log.Infof("bigtable-idx: Initializing. Project=%s, Instance=%s", b.cfg.GcpProject, b.cfg.BigtableInstance)
 	if err := b.MemoryIdx.Init(); err != nil {
 		return err
 	}

@@ -1,8 +1,8 @@
 package bigtable
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"time"
 
 	"github.com/rakyll/globalconf"
@@ -28,13 +28,13 @@ type IdxConfig struct {
 func (cfg *IdxConfig) Validate() error {
 	cfg.updateInterval32 = uint32(cfg.UpdateInterval.Nanoseconds() / int64(time.Second))
 	if cfg.WriteMaxFlushSize > 100000 {
-		return fmt.Errorf("write-max-flush-size must be <= 100000.")
+		return errors.New("write-max-flush-size must be <= 100000.")
 	}
 	if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
-		return fmt.Errorf("write-queue-size must be larger then write-max-flush-size")
+		return errors.New("write-queue-size must be larger then write-max-flush-size")
 	}
 	if cfg.MaxStale > 0 && cfg.PruneInterval == 0 {
-		return fmt.Errorf("pruneInterval must be greater then 0")
+		return errors.New("pruneInterval must be greater then 0")
 	}
 	return nil
 }
