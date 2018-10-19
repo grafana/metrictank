@@ -49,6 +49,16 @@ func ParseNDuration(s string) (uint32, error) {
 	return i, e
 }
 
+const (
+	sMulti   = 1
+	mMulti   = 60
+	hMulti   = 60 * 60
+	dMulti   = 60 * 60 * 24
+	wMulti   = 60 * 60 * 24 * 7
+	monMulti = 60 * 60 * 24 * 30
+	yMulti   = 60 * 60 * 24 * 365
+)
+
 // ParseDuration parses a format string to a number of seconds, or error otherwise
 // valid units are s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours, d/day/days, w/week/weeks, mon/month/months, y/year/years
 // unit defaults to s if not specified
@@ -77,19 +87,19 @@ func ParseDuration(s string) (uint32, error) {
 		var units int
 		switch unitStr {
 		case "", "s", "sec", "secs", "second", "seconds":
-			units = 1
+			units = sMulti
 		case "m", "min", "mins", "minute", "minutes":
-			units = 60
+			units = mMulti
 		case "h", "hour", "hours":
-			units = 60 * 60
+			units = hMulti
 		case "d", "day", "days":
-			units = 24 * 60 * 60
+			units = dMulti
 		case "w", "week", "weeks":
-			units = 7 * 24 * 60 * 60
+			units = wMulti
 		case "mon", "month", "months":
-			units = 30 * 24 * 60 * 60
+			units = monMulti
 		case "y", "year", "years":
-			units = 365 * 24 * 60 * 60
+			units = yMulti
 		default:
 			return 0, errUnknownTimeUnit
 		}
@@ -101,4 +111,44 @@ func ParseDuration(s string) (uint32, error) {
 		sum += uint32(num * units)
 	}
 	return sum, nil
+}
+
+// FormatDuration takes a number of seconds and returns a minimal string represention
+// that can be parsed by ParseDuration(). Due to its ambiguity and length, we don't
+// use "month" units in the returned value.
+func FormatDuration(seconds uint32) string {
+	output := ""
+
+	if seconds == 0 {
+		return "0s"
+	}
+
+	var numUnits uint32
+	for seconds > 0 {
+		if seconds >= yMulti {
+			numUnits = seconds / yMulti
+			seconds = seconds - (numUnits * yMulti)
+			output += fmt.Sprintf("%dy", numUnits)
+		} else if seconds >= wMulti {
+			numUnits = seconds / wMulti
+			seconds = seconds - (numUnits * wMulti)
+			output += fmt.Sprintf("%dw", numUnits)
+		} else if seconds >= dMulti {
+			numUnits = seconds / dMulti
+			seconds = seconds - (numUnits * dMulti)
+			output += fmt.Sprintf("%dd", numUnits)
+		} else if seconds >= hMulti {
+			numUnits = seconds / hMulti
+			seconds = seconds - (numUnits * hMulti)
+			output += fmt.Sprintf("%dh", numUnits)
+		} else if seconds >= mMulti {
+			numUnits = seconds / mMulti
+			seconds = seconds - (numUnits * mMulti)
+			output += fmt.Sprintf("%dm", numUnits)
+		} else {
+			output += fmt.Sprintf("%ds", seconds)
+			seconds = 0
+		}
+	}
+	return output
 }

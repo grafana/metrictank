@@ -660,11 +660,12 @@
   revision = "f6c76078f5a1b4a0e56bd1c8caaeaf3ccbc447e3"
 
 [[projects]]
-  digest = "1:0e8e38a2e787f9ece13967287be28c2371eb7225f05643f8081e2d4925d3931a"
+  branch = "master"
+  digest = "1:73dee4e020a134e08bb4e3ec47fa38c5a155b4fa0abbd15718b30b8c7e6d0ae8"
   name = "github.com/raintank/dur"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "master"
+  revision = "955e3a77c6a8294c013cb1bf45ed3965e5f19299"
 
 [[projects]]
   branch = "master"

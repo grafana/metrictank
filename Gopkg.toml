@@ -110,7 +110,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/dur"
-  revision = "master"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/raintank/gziper"
