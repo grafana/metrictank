@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -86,9 +85,8 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	mut := bigtable.NewMutation()
 	family := formatFamily(cwr.TTL)
 	column := "raw"
-	parts := strings.SplitN(cwr.Key.String(), "_", 2)
-	if len(parts) > 1 {
-		column = parts[1]
+	if cwr.Key.Archive > 0 {
+		column = cwr.Key.Archive.String()
 	}
 	value := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
 	chunkSizeAtSave.Value(len(value))
