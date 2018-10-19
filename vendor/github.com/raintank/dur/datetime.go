@@ -13,6 +13,15 @@ var absoluteTimeFormats = []string{"20060102", "01/02/06", "01/02/2006"}
 var errUnknownDateTimeFormat = errors.New("parse error. unknown DateTime format")
 var errUnknownTimeFormat = errors.New("parse error. unknown Time format")
 
+// MustParseDateTime parses a format string to a unix timestamp, or panics otherwise
+func MustParseDateTime(s string, loc *time.Location, now time.Time, def uint32) uint32 {
+	v, err := ParseDateTime(s, loc, now, def)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // ParseDateTime parses a format string to a unix timestamp, or error otherwise.
 // 'loc' is the timezone to use for interpretation (when applicable)
 // 'now' is a reference, in case a relative specification is given.

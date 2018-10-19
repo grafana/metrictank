@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
+	"github.com/raintank/dur"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -62,7 +63,7 @@ func formatRowKey(key schema.AMKey, ts uint32) string {
 }
 
 func formatFamily(ttl uint32) string {
-	return fmt.Sprintf("ret_%d", ttlToHours(ttl))
+	return dur.FormatDuration(dur)
 }
 
 func PrepareChunkData(span uint32, data []byte) []byte {
@@ -92,14 +93,6 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	chunkSizeAtSave.Value(len(value))
 	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), value)
 	return mut, len(value)
-}
-
-func ttlToHours(ttl uint32) uint32 {
-	hours := ttl / (60 * 60)
-	if hours < 1 {
-		hours = 1
-	}
-	return hours
 }
 
 type Store struct {
@@ -144,7 +137,7 @@ func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
 				Families: make(map[string]bigtable.GCPolicy),
 			}
 			for _, ttl := range ttls {
-				table.Families[formatFamily(ttl)] = bigtable.MaxAgePolicy(time.Duration(ttl/(60*60)) * time.Hour)
+				table.Families[formatFamily(ttl)] = bigtable.MaxAgePolicy(time.Duration(ttl) * time.Second)
 			}
 			err := adminClient.CreateTableFromConf(ctx, &table)
 			if err != nil {
@@ -169,13 +162,13 @@ func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
 					if err != nil {
 						return nil, fmt.Errorf("btStore: failed to create cf %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
 					}
-					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl/(60*60))*time.Hour))
+					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl)*time.Second))
 					if err != nil {
 						return nil, fmt.Errorf("btStore: failed to set GCPolicy of %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
 					}
 				} else if policy == "" {
 					log.Infof("btStore: column family %s/%s exists but has no GCPolicy. creating it", cfg.TableName, formatFamily(ttl))
-					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl/(60*60))*time.Hour))
+					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl)*time.Second))
 					if err != nil {
 						return nil, fmt.Errorf("btStore: failed to set GCPolicy of %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
 					}

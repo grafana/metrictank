@@ -25,8 +25,10 @@ type StoreConfig struct {
 }
 
 func (cfg *StoreConfig) Validate() error {
-	// If we dont have any write threads, then we dont WriteMaxFlushSize and WriteQueueSize
+	// If we dont have any write threads, then WriteMaxFlushSize and WriteQueueSize
 	// are not used.  If we do have write threads, then we need to make sure that
+	// the the writeMaxFlushSize is not larger then the bigtable hardcoded limit of 100k
+	// and that the writeQueue size is larger then the maxFlush.
 	if cfg.WriteConcurrency > 0 {
 		if cfg.WriteMaxFlushSize > 100000 {
 			return fmt.Errorf("write-max-flush-size must be <= 100000.")

@@ -8,6 +8,7 @@ func MaxChunkSpan() uint32 {
 	return Schemas.MaxChunkSpan()
 }
 
+// TTLs returns the full set of unique TTLs (in seconds) used by the current schema config.
 func TTLs() []uint32 {
 	return Schemas.TTLs()
 }
