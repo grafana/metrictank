@@ -188,6 +188,7 @@ func main() {
 	mdata.ConfigProcess()
 	memory.ConfigProcess()
 	bigtable.ConfigProcess()
+	bigtableStore.ConfigProcess()
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
 		log.Fatal("you should enable at least 1 input plugin")
