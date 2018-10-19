@@ -21,8 +21,7 @@ func TestLimiter(t *testing.T) {
 			ch := make(chan bool)
 			ctx, cancel := context.WithCancel(ctx)
 			go func(ctx context.Context) {
-				ok := limiter.Acquire(ctx)
-				ch <- ok
+				ch <- limiter.Acquire(ctx)
 			}(ctx)
 			blocked := true
 			select {

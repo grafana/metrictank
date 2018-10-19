@@ -378,12 +378,12 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	}
 
 	// limit number of inflight requests
-	log.Debugf("btStore: waiting for free slot in readQ. len=%d cap=%d", len(s.readLimiter), cap(s.readLimiter))
+	log.Debugf("btStore: waiting for Search slot. len=%d cap=%d", len(s.readLimiter), cap(s.readLimiter))
 	pre := time.Now()
 	if !s.readLimiter.Acquire(ctx) {
 		return itgens, errCtxCanceled
 	}
-	log.Debug("btStore: acquired slot in readQ")
+	log.Debug("btStore: acquired a Search slot")
 	btblGetWaitDuration.Value(time.Since(pre))
 
 	startMonth := start - (start % Month_sec)       // starting row has to be at, or before, requested start

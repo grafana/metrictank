@@ -9,10 +9,15 @@ import "context"
 // unblock when another thread calls Release(), or the passed context is canceled.
 type Limiter chan struct{}
 
-// Acquire() will block if the limit is reached.  It will unblock
-// when another thread calls Release(), or if the context is done.
-// If we unblock due to the context being done, the return value will be
-// "false".
+// NewLimiter creates a limiter with l slots
+func NewLimiter(l int) Limiter {
+	return make(chan struct{}, l)
+}
+
+// Acquire returns when a slot is available.
+// If the limit is reached it will block until
+// another thread calls Release() or the context is done.
+// In the latter case we return false.
 func (l Limiter) Acquire(ctx context.Context) bool {
 
 	// if the ctx is already canceled return straight away.
@@ -31,7 +36,3 @@ func (l Limiter) Acquire(ctx context.Context) bool {
 }
 
 func (l Limiter) Release() { <-l }
-
-func NewLimiter(l int) Limiter {
-	return make(chan struct{}, l)
-}
