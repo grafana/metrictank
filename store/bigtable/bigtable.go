@@ -63,7 +63,7 @@ func formatRowKey(key schema.AMKey, ts uint32) string {
 }
 
 func formatFamily(ttl uint32) string {
-	return dur.FormatDuration(dur)
+	return dur.FormatDuration(ttl)
 }
 
 func PrepareChunkData(span uint32, data []byte) []byte {
