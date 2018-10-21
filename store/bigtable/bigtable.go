@@ -219,7 +219,6 @@ func (s *Store) Add(cwr *mdata.ChunkWriteRequest) {
 		sum += int(b)
 	}
 	which := sum % len(s.writeQueues)
-	s.writeQueueMeters[which].Value(len(s.writeQueues[which]))
 	s.writeQueues[which] <- cwr
 }
 
