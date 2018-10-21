@@ -107,10 +107,10 @@ type Store struct {
 	cfg              *StoreConfig
 }
 
-func NewStore(cfg *StoreConfig, ttls []uint32) (*Store, error) {
+func NewStore(cfg *StoreConfig, ttls []uint32, schemaMaxChunkSpan uint32) (*Store, error) {
 	// Hopefully the caller has already validated their config, but just in case,
 	// lets make sure.
-	if err := cfg.Validate(); err != nil {
+	if err := cfg.Validate(schemaMaxChunkSpan); err != nil {
 		return nil, err
 	}
 	ctx := context.Background()

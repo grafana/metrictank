@@ -1,6 +1,7 @@
 package bigtable
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -24,18 +25,24 @@ type StoreConfig struct {
 	CreateCF          bool
 }
 
-func (cfg *StoreConfig) Validate() error {
+func (cfg *StoreConfig) Validate(schemaMaxChunkSpan uint32) error {
 	// If we dont have any write threads, then WriteMaxFlushSize and WriteQueueSize
 	// are not used.  If we do have write threads, then we need to make sure that
 	// the the writeMaxFlushSize is not larger then the bigtable hardcoded limit of 100k
 	// and that the writeQueue size is larger then the maxFlush.
 	if cfg.WriteConcurrency > 0 {
 		if cfg.WriteMaxFlushSize > 100000 {
-			return fmt.Errorf("write-max-flush-size must be <= 100000.")
+			return errors.New("write-max-flush-size must be <= 100000.")
 		}
 		if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
-			return fmt.Errorf("write-queue-size must be larger then write-max-flush-size")
+			return errors.New("write-queue-size must be larger then write-max-flush-size")
 		}
+	}
+	if CliConfig.MaxChunkSpan%time.Second != 0 {
+		return errors.New("max-chunkspan must be a whole number of seconds")
+	}
+	if uint32(CliConfig.MaxChunkSpan.Seconds()) < schemaMaxChunkSpan {
+		return fmt.Errorf("max-chunkspan must be at least as high as the max chunkspan used in your storage-schemas (which is %d)", schemaMaxChunkSpan)
 	}
 	return nil
 }
@@ -79,8 +86,8 @@ func ConfigSetup() {
 	return
 }
 
-func ConfigProcess() {
-	if err := CliConfig.Validate(); err != nil {
+func ConfigProcess(schemaMaxChunkSpan uint32) {
+	if err := CliConfig.Validate(schemaMaxChunkSpan); err != nil {
 		log.Fatalf("bigtable-store: Config validation error. %s", err)
 	}
 }
