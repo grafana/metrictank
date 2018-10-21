@@ -217,7 +217,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 
 	if inMemory {
 		// bigtable uses partition ID in the key prefix, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
@@ -255,7 +255,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 	if inMemory {
 		// bigtable uses partition ID in the key prefix, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
@@ -289,7 +289,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		b.MemoryIdx.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
-		// this will fail and we wont update the LastSave timestamp. The next time
+		// this will fail and we won't update the LastSave timestamp. The next time
 		// the metric is seen, the previous lastSave timestamp will still be in place and so
 		// we will try and save again.  This will continue until we are successful or the
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
@@ -341,7 +341,7 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 		return true
 	}, bigtable.RowFilter(bigtable.FamilyFilter(COLUMN_FAMILY)))
 	if err != nil {
-		log.Fatalf("bigtable-idx: failed to load defs form Bigtable. %s", err)
+		log.Fatalf("bigtable-idx: failed to load defs from Bigtable. %s", err)
 	}
 	if marshalErr != nil {
 		log.Fatalf("bigtable-idx: failed to marshal row to metricDef. %s", marshalErr)
@@ -390,7 +390,7 @@ func (b *BigtableIdx) processWriteQueue() {
 			errs, err := b.tbl.ApplyBulk(context.Background(), rowKeys, mutations)
 			if err != nil {
 				statQueryInsertFail.Add(len(rowKeys))
-				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they wont be retried. %s", len(rowKeys), err)
+				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they won't be retried. %s", len(rowKeys), err)
 				complete = true
 			} else if len(errs) > 0 {
 				var failedRowKeys []string

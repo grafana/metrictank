@@ -275,7 +275,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive,
 
 	if inMemory {
 		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			c.deleteDefAsync(point.MKey, oldPartition)
@@ -309,7 +309,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	if inMemory {
 		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			c.deleteDefAsync(mkey, oldPartition)
@@ -338,7 +338,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		c.MemoryIdx.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
-		// this will fail and we wont update the LastSave timestamp. The next time
+		// this will fail and we won't update the LastSave timestamp. The next time
 		// the metric is seen, the previous lastSave timestamp will still be in place and so
 		// we will try and save again.  This will continue until we are successful or the
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will

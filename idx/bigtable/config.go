@@ -76,7 +76,6 @@ func ConfigSetup() {
 	btIdx.BoolVar(&CliConfig.CreateCF, "create-cf", CliConfig.CreateCF, "enable the creation of the table and column families")
 
 	globalconf.Register("bigtable-idx", btIdx)
-	return
 }
 
 func ConfigProcess() {

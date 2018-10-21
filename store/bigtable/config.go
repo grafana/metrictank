@@ -26,7 +26,7 @@ type StoreConfig struct {
 }
 
 func (cfg *StoreConfig) Validate(schemaMaxChunkSpan uint32) error {
-	// If we dont have any write threads, then WriteMaxFlushSize and WriteQueueSize
+	// If we don't have any write threads, then WriteMaxFlushSize and WriteQueueSize
 	// are not used.  If we do have write threads, then we need to make sure that
 	// the the writeMaxFlushSize is not larger then the bigtable hardcoded limit of 100k
 	// and that the writeQueue size is larger then the maxFlush.

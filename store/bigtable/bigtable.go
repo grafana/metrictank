@@ -191,8 +191,8 @@ func NewStore(cfg *StoreConfig, ttls []uint32, schemaMaxChunkSpan uint32) (*Stor
 		readLimiter:      util.NewLimiter(cfg.ReadConcurrency),
 		cfg:              cfg,
 	}
+	s.wg.Add(cfg.WriteConcurrency)
 	for i := 0; i < cfg.WriteConcurrency; i++ {
-		s.wg.Add(1)
 		// Each processWriteQueue thread uses a channel and a buffer for queuing unwritten chunks.
 		// In total, each processWriteQueue thread should not have more then "write-queue-size" chunks
 		// that are queued.  To ensure this, set the channel size to "write-queue-size" - "write-max-flush-size"
@@ -398,7 +398,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 		agg = key.Archive.String()
 	}
 	// filter the results to just the agg method (Eg raw, min_60, max_1800, etc..) and the timerange we want.
-	// we fetch all columnFamilies (which are the different TTLS).  Typically there will be only one columnFamily
+	// we fetch all columnFamilies (which are the different TTLs).  Typically there will be only one columnFamily
 	// that has data, unless the TTL of the agg has changed.  In which case we want all columnFamilies anyway.
 	filter := bigtable.ChainFilters(
 		bigtable.ColumnFilter(agg),
@@ -431,8 +431,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 				}
 				chunks++
 
-				// This function is called serially so we dont need synchronization around adding to
-				// itgens.
+				// This function is called serially so we don't need synchronization here
 				itgens = append(itgens, *itgen)
 			}
 		}
