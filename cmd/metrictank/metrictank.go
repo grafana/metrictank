@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/idx/bigtable"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/input"
@@ -34,6 +35,7 @@ import (
 	"github.com/grafana/metrictank/mdata/notifierNsq"
 	"github.com/grafana/metrictank/stats"
 	statsConfig "github.com/grafana/metrictank/stats/config"
+	bigtableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
 	"github.com/rakyll/globalconf"
@@ -115,6 +117,7 @@ func main() {
 	// load config for metricIndexers
 	memory.ConfigSetup()
 	cassandra.ConfigSetup()
+	bigtable.ConfigSetup()
 
 	// load config for API
 	api.ConfigSetup()
@@ -130,6 +133,9 @@ func main() {
 
 	// cassandra Store
 	cassandraStore.ConfigSetup()
+
+	// bigtable store
+	bigtableStore.ConfigSetup()
 
 	config.ParseAll()
 
@@ -181,6 +187,8 @@ func main() {
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 	memory.ConfigProcess()
+	bigtable.ConfigProcess()
+	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 
 	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
 		log.Fatal("you should enable at least 1 input plugin")
@@ -256,9 +264,24 @@ func main() {
 	/***********************************
 		Initialize our backendStore
 	***********************************/
-	store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
-	if err != nil {
-		log.Fatalf("failed to initialize cassandra. %s", err)
+	if cassandraStore.CliConfig.Enabled && bigtableStore.CliConfig.Enabled {
+		log.Fatal("only 1 backend store plugin can be enabled at once.")
+	}
+	if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
+		log.Fatal("at least 1 backend store plugin needs to be enabled.")
+	}
+	if bigtableStore.CliConfig.Enabled {
+		schemaMaxChunkSpan := mdata.MaxChunkSpan()
+		store, err = bigtableStore.NewStore(bigtableStore.CliConfig, mdata.TTLs(), schemaMaxChunkSpan)
+		if err != nil {
+			log.Fatalf("failed to initialize bigtable backend store. %s", err)
+		}
+	}
+	if cassandraStore.CliConfig.Enabled {
+		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
+		if err != nil {
+			log.Fatalf("failed to initialize cassandra backend store. %s", err)
+		}
 	}
 	store.SetTracer(tracer)
 
@@ -321,6 +344,12 @@ func main() {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = cassandra.New()
+	}
+	if bigtable.CliConfig.Enabled {
+		if metricIndex != nil {
+			log.Fatal("Only 1 metricIndex handler can be enabled.")
+		}
+		metricIndex = bigtable.New(bigtable.CliConfig)
 	}
 
 	if metricIndex == nil {

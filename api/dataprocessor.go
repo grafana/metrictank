@@ -39,15 +39,6 @@ func doRecover(errp *error) {
 	return
 }
 
-type limiter chan struct{}
-
-func (l limiter) enter() { l <- struct{}{} }
-func (l limiter) leave() { <-l }
-
-func newLimiter(l int) limiter {
-	return make(chan struct{}, l)
-}
-
 type getTargetsResp struct {
 	series []models.Series
 	err    error
@@ -253,22 +244,18 @@ func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]mode
 	responses := make(chan getTargetsResp, len(reqs))
 
 	var wg sync.WaitGroup
-	reqLimiter := newLimiter(getTargetsConcurrency)
+	reqLimiter := util.NewLimiter(getTargetsConcurrency)
 
 	rCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 LOOP:
 	for _, req := range reqs {
-		// check to see if the request has been canceled, if so abort now.
-		select {
-		case <-rCtx.Done():
+		// if there are already getDataConcurrency goroutines running, then block
+		// until a slot becomes free or our context is canceled.
+		if !reqLimiter.Acquire(rCtx) {
 			//request canceled
 			break LOOP
-		default:
 		}
-		// if there are already getDataConcurrency goroutines running, then block
-		// until a slot becomes free.
-		reqLimiter.enter()
 		wg.Add(1)
 		go func(req models.Req) {
 			rCtx, span := tracing.NewSpan(rCtx, s.Tracer, "getTargetsLocal")
@@ -294,7 +281,7 @@ LOOP:
 			}
 			wg.Done()
 			// pop an item of our limiter so that other requests can be processed.
-			reqLimiter.leave()
+			reqLimiter.Release()
 			span.Finish()
 		}(req)
 	}

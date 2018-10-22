@@ -24,6 +24,9 @@ Comes with 1 dashboard: the metrictank dashboard
 Similar to docker-standard, but custom metrictank build is loaded, custom configs from scripts/config
 also: tag support, main+extra dashboards
 
+### docker-dev-bigtable
+
+Same as docker-dev but instead of using cassandra as the backend store and index store it uses Bigtable via a bigtable emulator.
 
 ### docker-dev-scylla
 

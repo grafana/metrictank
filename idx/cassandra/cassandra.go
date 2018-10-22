@@ -49,7 +49,15 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
-	Enabled                  bool
+	Enabled          bool
+	maxStale         time.Duration
+	pruneInterval    time.Duration
+	updateCassIdx    bool
+	updateInterval   time.Duration
+	updateInterval32 uint32
+
+	writeQueueSize int
+
 	ssl                      bool
 	auth                     bool
 	hostverification         bool
@@ -63,13 +71,7 @@ var (
 	consistency              string
 	timeout                  time.Duration
 	numConns                 int
-	writeQueueSize           int
 	protoVer                 int
-	maxStale                 time.Duration
-	pruneInterval            time.Duration
-	updateCassIdx            bool
-	updateInterval           time.Duration
-	updateInterval32         uint32
 	disableInitialHostLookup bool
 )
 
@@ -273,7 +275,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive,
 
 	if inMemory {
 		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			c.deleteDefAsync(point.MKey, oldPartition)
@@ -307,7 +309,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	if inMemory {
 		// Cassandra uses partition id as the partitioning key, so an "update" that changes the partition for
-		// an existing metricDef will just create a new row in the table and wont remove the old row.
+		// an existing metricDef will just create a new row in the table and won't remove the old row.
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			c.deleteDefAsync(mkey, oldPartition)
@@ -327,17 +329,16 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 // updateCassandra saves the archive to cassandra and
 // updates the memory index with the updated fields.
 func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
-
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
 	if archive.LastSave < (now - updateInterval32 - updateInterval32/2) {
-		log.Debug("cassandra-idx: updating def in index.")
+		log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
 		c.MemoryIdx.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
-		// this will fail and we wont update the LastSave timestamp. The next time
+		// this will fail and we won't update the LastSave timestamp. The next time
 		// the metric is seen, the previous lastSave timestamp will still be in place and so
 		// we will try and save again.  This will continue until we are successful or the
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
@@ -348,7 +349,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 			c.MemoryIdx.UpdateArchive(archive)
 		default:
 			statSaveSkipped.Inc()
-			log.Debug("writeQueue is full, update not saved.")
+			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinition.Id)
 		}
 	}
 
@@ -358,11 +359,12 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	var defs []schema.MetricDefinition
+
 	var staleTs uint32
 	if maxStale != 0 {
 		staleTs = uint32(time.Now().Add(maxStale * -1).Unix())
 	}
+	var defs []schema.MetricDefinition
 	defs = c.LoadPartitions(cluster.Manager.GetPartitions(), defs, staleTs)
 
 	num := c.MemoryIdx.Load(defs)

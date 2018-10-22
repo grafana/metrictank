@@ -266,7 +266,7 @@ func testFind(t *testing.T) {
 		So(nodes, ShouldHaveLength, 0)
 	})
 
-	Convey("When searching nodes that dont exist", t, func() {
+	Convey("When searching nodes that don't exist", t, func() {
 		nodes, err := ix.Find(1, "foo.demo.blah.*", 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)

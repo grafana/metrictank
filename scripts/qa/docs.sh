@@ -16,7 +16,10 @@ scripts/dev/tools-to-doc.sh > $tmp
 diff docs/tools.md $tmp
 ret=$?
 rm $tmp
-[ $ret -gt 0 ] && exit $ret
+if [ $ret -gt 0 ]; then
+  echo "docs/tools.md does not match output of scripts/dev/tools-to-doc.sh"
+  exit $ret
+fi
 
 echo "checking configs"
 if [ ! -r docs/config.md ]; then
@@ -27,6 +30,9 @@ scripts/dev/config-to-doc.sh > $tmp
 diff docs/config.md $tmp
 ret=$?
 rm $tmp
+if [ $ret -gt 0 ]; then
+  echo "docs/config.md does not match output of scripts/dev/config-to-doc.sh"
+fi
 exit $ret
 
 # metrics2docs .> docs/metrics.md this doesn't work very well yet
