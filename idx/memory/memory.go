@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"regexp"
@@ -69,6 +68,9 @@ func ConfigProcess() {
 	maxPruneLockTime, err = time.ParseDuration(maxPruneLockTimeStr)
 	if err != nil {
 		log.Fatal(4, "could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
+	}
+	if maxPruneLockTime > time.Second {
+		log.Fatal(4, "invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
 	}
 }
 
@@ -1316,12 +1318,9 @@ DEFS:
 	}
 	m.RUnlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// create a new timeLimiter that allows us to limit the amount of time we spend
 	// holding a lock to maxPruneLockTime (default 100ms) every second.
-	tl := NewTimeLimiter(ctx, time.Second, maxPruneLockTime)
+	tl := NewTimeLimiter(time.Second, maxPruneLockTime, time.Now())
 
 	for org, ids := range toPruneTagged {
 		if len(ids) == 0 {

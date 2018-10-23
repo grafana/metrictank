@@ -1,94 +1,92 @@
 package memory
 
-import (
-	"context"
-	"sync"
-	"time"
-)
+import "time"
 
-// TimeLimiter limits the rate of a set of operations.
-// It does this by slowing down further operations as soon
+// TimeLimiter limits the rate of a set of serial operations.
+// It does this by tracking how much time has been spent (updated via Add()),
+// and comparing this to the window size and the limit, slowing down further operations as soon
 // as one Add() is called informing it the per-window allowed budget has been exceeded.
 // Limitations:
-// * concurrently running operations can all exceed the budget,
-//   so it works best for serial operations.
-// * for serial operations, the last operation is allowed to exceed the budget
-// * when an operation takes very long (e.g. 10 seconds, with a 100ms limit per second), it
-//   is counted as exceeding the 100ms budget, but no other provisions are being made.
+// * the last operation is allowed to exceed the budget (but the next call will be delayed to compensate)
+// * concurrency is not supported
 //
-// Thus, TimeLimiter is designed for, and works best with, serially running operations,
-// each of which takes a fraction of the limit.
+// For correctness, you should always follow up an Add() with a Wait()
 type TimeLimiter struct {
-	sync.Mutex
-	ctx       context.Context
+	since     time.Time
+	next      time.Time
 	timeSpent time.Duration
 	window    time.Duration
 	limit     time.Duration
-	addCh     chan time.Duration
-	queryCh   chan chan struct{}
+	factor    float64
 }
 
-// NewTimeLimiter creates a new TimeLimiter.  A background goroutine will run until the
-// provided context is done.  When the amount of time spent on task (the time is determined
-// by calls to "Add()") every "window" duration is more then "limit",  then calls to
-// Wait() will block until the start if the next window period.
-func NewTimeLimiter(ctx context.Context, window, limit time.Duration) *TimeLimiter {
-	l := &TimeLimiter{
-		ctx:     ctx,
-		window:  window,
-		limit:   limit,
-		addCh:   make(chan time.Duration),
-		queryCh: make(chan chan struct{}),
+// NewTimeLimiter creates a new TimeLimiter.
+// limit must <= window
+func NewTimeLimiter(window, limit time.Duration, now time.Time) *TimeLimiter {
+	l := TimeLimiter{
+		since:  now,
+		next:   now.Add(window),
+		window: window,
+		limit:  limit,
+		factor: float64(window) / float64(limit),
 	}
-	go l.run()
-	return l
-}
-
-func (l *TimeLimiter) run() {
-	ticker := time.NewTicker(l.window)
-	done := l.ctx.Done()
-	var blockedQueries []chan struct{}
-	for {
-		select {
-		case <-done:
-			//context done. shutting down
-			for _, ch := range blockedQueries {
-				close(ch)
-			}
-			return
-		case <-ticker.C:
-			l.timeSpent = 0
-			for _, ch := range blockedQueries {
-				close(ch)
-			}
-			blockedQueries = blockedQueries[:0]
-		case d := <-l.addCh:
-			l.timeSpent += d
-		case respCh := <-l.queryCh:
-			if l.timeSpent < l.limit {
-				close(respCh)
-			} else {
-				// rate limit exceeded.  On the next tick respCh will be closed
-				// notifying the caller that they can continue.
-				blockedQueries = append(blockedQueries, respCh)
-			}
-		}
-	}
+	return &l
 }
 
 // Add increments the "time spent" counter by "d"
 func (l *TimeLimiter) Add(d time.Duration) {
-	l.addCh <- d
+	l.add(time.Now(), d)
 }
 
-// Wait returns when we are not rate limited, which may be
-// anywhere between immediately or after the window.
-func (l *TimeLimiter) Wait() {
-	respCh := make(chan struct{})
-	l.queryCh <- respCh
+// add increments the "time spent" counter by "d" at a given time
+func (l *TimeLimiter) add(now time.Time, d time.Duration) {
+	if now.After(l.next) {
+		l.timeSpent = d
+		l.since = now.Add(-d)
+		l.next = l.since.Add(l.window)
+		return
+	}
+	l.timeSpent += d
+}
 
-	// if we have not exceeded our locking quota then respCh will be
-	// immediately closed. Otherwise it wont be closed until the next tick (duration of "l.window")
-	// and we will block until then.
-	<-respCh
+// Wait returns when we are not rate limited
+// * if we passed the window, we reset everything (this is only safe for callers
+//     that behave correctly, i.e. that wait the instructed time after each add)
+// * if limit is not reached, no sleep is needed
+// * if limit has been exceeded, sleep until next period + extra multiple to compensate
+//    this is perhaps best explained with an example:
+//    if window is 1s and limit 100ms, but we spent 250ms, then we spent effectively 2.5 seconds worth of work.
+//    let's say we are 800ms into the 1s window, that means we should sleep 2500-800 = 1.7s
+//    in order to maximize work while honoring the imposed limit.
+// * if limit has been met exactly, sleep until next period (this is a special case of the above)
+func (l *TimeLimiter) Wait() {
+	time.Sleep(l.wait(time.Now()))
+}
+
+// wait returns how long should be slept at a given time. See Wait() for more info
+func (l *TimeLimiter) wait(now time.Time) time.Duration {
+
+	// if we passed the window, reset and start over
+	// if clock is adjusted backwards, best we can do is also just reset and start over
+	if now.After(l.next) || now.Before(l.since) {
+		l.timeSpent = 0
+		l.since = now
+		l.next = now.Add(l.window)
+		return 0
+	}
+	if l.timeSpent < l.limit {
+		return 0
+	}
+
+	// here we know that:
+	// since <= now <= next
+	// timespent >= limit
+	timeToPass := time.Duration(float64(l.timeSpent) * l.factor)
+	timePassed := now.Sub(l.since)
+
+	// not sure if this should happen, but let's be safe anyway
+	if timePassed > timeToPass {
+		return 0
+	}
+	return timeToPass - timePassed
 }

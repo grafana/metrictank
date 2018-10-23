@@ -1,71 +1,45 @@
 package memory
 
 import (
-	"context"
 	"testing"
 	"time"
 )
 
-func shouldTakeAbout(t *testing.T, fn func(), expDur time.Duration, sloppynessFactor int, info string) {
-	// on Dieter's laptop:
-	// takes about <=15 micros for add/wait sequences
-	// takes about 150micros for a add + blocking wait
-	// on circleCI, takes 75micros for add/wait sequence
-	slop := time.Duration(sloppynessFactor) * time.Microsecond
-	pre := time.Now()
-	fn()
-	dur := time.Since(pre)
-	if dur > expDur+slop || dur < expDur-slop {
-		t.Fatalf("scenario %s. was supposed to take %s, but took %s", info, expDur, dur)
+var now = time.Unix(10, 0)
+
+func shouldTake(t *testing.T, tl *TimeLimiter, workDone, expDur time.Duration, info string) {
+
+	// account for work done, as well as moving our clock forward by the same amount
+	now = now.Add(workDone)
+	tl.add(now, workDone)
+
+	dur := tl.wait(now)
+	if dur != expDur {
+		t.Fatalf("scenario %s. expected wait %s, got wait %s", info, expDur, dur)
 	}
+
+	// fake the "sleep" so we're a properly behaving caller
+	now = now.Add(dur)
 }
 
 func TestTimeLimiter(t *testing.T) {
 	window := time.Second
 	limit := 100 * time.Millisecond
 
-	ctx, cancel := context.WithCancel(context.Background())
-	tl := NewTimeLimiter(ctx, window, limit)
+	tl := NewTimeLimiter(window, limit, now)
 
 	// TEST 1 : Start first window by doing work and seeing when it starts blocking
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 1: work done: 0 - wait should be 0")
-
-	tl.Add(5 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 1: work done: 5ms - wait should be 0")
-
-	tl.Add(10 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 1: work done: 15ms - wait should be 0")
-
-	tl.Add(80 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 1: work done: 95ms - wait should be 0")
-
-	tl.Add(4 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 1: work done: 99ms - wait should be 0")
-
-	tl.Add(3 * time.Millisecond)
-
-	shouldTakeAbout(t, tl.Wait, time.Second, 500, "window 1: work done: 102ms - almost no time has passed, so wait should be full window")
+	shouldTake(t, tl, 0, 0, "window 1: work done: 0")
+	shouldTake(t, tl, 5*time.Millisecond, 0, "window 1: work done: 5ms")
+	shouldTake(t, tl, 10*time.Millisecond, 0, "window 1: work done: 15ms")
+	shouldTake(t, tl, 80*time.Millisecond, 0, "window 1: work done: 95ms")
+	shouldTake(t, tl, 4*time.Millisecond, 0, "window 1: work done: 99ms")
+	// we should spend at least 1020ms to do 102ms of work
+	shouldTake(t, tl, 3*time.Millisecond, (1020-102)*time.Millisecond, "window 1: work done: 102ms")
 
 	// TEST 2 : Now that we waited until a full window, should be able to up to limit work again
-	tl.Add(50 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 2: work done: 50ms - wait should be 0")
-
-	tl.Add(40 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 2: work done: 90ms - wait should be 0")
-
-	tl.Add(40 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, time.Second, 500, "window 2: work done: 130ms - wait should be 1s")
-
-	// TEST 3 : Now that we waited until a full window, should be able to up to limit work again
-	// but this time we cancel, so we don't have to wait as long
-	tl.Add(50 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 3: work done: 50ms - wait should be 0")
-
-	tl.Add(40 * time.Millisecond)
-	shouldTakeAbout(t, tl.Wait, 0, 100, "window 3: work done: 90ms - wait should be 0")
-
-	tl.Add(40 * time.Millisecond)
-
-	time.AfterFunc(500*time.Millisecond, cancel)
-	shouldTakeAbout(t, tl.Wait, 500*time.Millisecond, 500, "window 3: work done: 130ms, canceling after 500ms - wait should be 500ms")
+	shouldTake(t, tl, 50*time.Millisecond, 0, "window 2: work done: 50ms")
+	shouldTake(t, tl, 40*time.Millisecond, 0, "window 2: work done: 90ms")
+	// we should spend at least 1300ms to do 130ms of work
+	shouldTake(t, tl, 40*time.Millisecond, (1300-130)*time.Millisecond, "window 2: work done: 130ms")
 }
