@@ -46,6 +46,7 @@ func (k *KafkaMdm) Name() string {
 
 var Enabled bool
 var orgId uint
+var kafkaVersionStr string
 var brokerStr string
 var brokers []string
 var topicStr string
@@ -73,6 +74,7 @@ func ConfigSetup() {
 	inKafkaMdm.BoolVar(&Enabled, "enabled", false, "")
 	inKafkaMdm.UintVar(&orgId, "org-id", 0, "For incoming MetricPoint messages without org-id, assume this org id")
 	inKafkaMdm.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be be given multiple times as a comma-separated list)")
+	inKafkaMdm.StringVar(&kafkaVersionStr, "kafka-version", "V0_10_0_0", "Kafka version. All brokers must be this version or newer.")
 	inKafkaMdm.StringVar(&topicStr, "topics", "mdm", "kafka topic (may be given multiple times as a comma-separated list)")
 	inKafkaMdm.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
 	inKafkaMdm.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's")
@@ -92,6 +94,11 @@ func ConfigProcess(instance string) {
 		return
 	}
 
+	kafkaVersion, err := sarama.ParseKafkaVersion(kafkaVersionStr)
+	if err != nil {
+		log.Fatalf("kafkamdm: invalid kafka-version. %s", err)
+	}
+
 	if offsetCommitInterval == 0 {
 		log.Fatal("kafkamdm: offset-commit-interval must be greater then 0")
 	}
@@ -101,7 +108,7 @@ func ConfigProcess(instance string) {
 	if consumerMaxProcessingTime == 0 {
 		log.Fatal("kafkamdm: consumer-max-processing-time must be greater then 0")
 	}
-	var err error
+
 	switch offsetStr {
 	case "last":
 	case "oldest":
@@ -129,7 +136,7 @@ func ConfigProcess(instance string) {
 	config.Consumer.MaxWaitTime = consumerMaxWaitTime
 	config.Consumer.MaxProcessingTime = consumerMaxProcessingTime
 	config.Net.MaxOpenRequests = netMaxOpenRequests
-	config.Version = sarama.V0_10_0_0
+	config.Version = kafkaVersion
 	err = config.Validate()
 	if err != nil {
 		log.Fatalf("kafkamdm: invalid config: %s", err)
