@@ -15,6 +15,7 @@ import (
 )
 
 var Enabled bool
+var kafkaVersionStr string
 var brokerStr string
 var brokers []string
 var topic string
@@ -42,6 +43,7 @@ func init() {
 	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
 	fs.BoolVar(&Enabled, "enabled", false, "")
 	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
+	fs.StringVar(&kafkaVersionStr, "kafka-version", "0.10.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
 	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
 	fs.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
@@ -55,7 +57,12 @@ func ConfigProcess(instance string) {
 	if !Enabled {
 		return
 	}
-	var err error
+
+	kafkaVersion, err := sarama.ParseKafkaVersion(kafkaVersionStr)
+	if err != nil {
+		log.Fatalf("kafka-cluster: invalid kafka-version. %s", err)
+	}
+
 	switch offsetStr {
 	case "last":
 	case "oldest":
@@ -70,7 +77,7 @@ func ConfigProcess(instance string) {
 
 	config = sarama.NewConfig()
 	config.ClientID = instance + "-cluster"
-	config.Version = sarama.V0_10_0_0
+	config.Version = kafkaVersion
 	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack the message
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
 	config.Producer.Compression = sarama.CompressionSnappy
