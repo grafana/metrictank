@@ -456,6 +456,14 @@
   revision = "6834731faf32e62a2dd809d99fb24d1e4ae5a92d"
 
 [[projects]]
+  digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   branch = "master"
   digest = "1:f91bb67d051a94cf6ab2cf07eee0550432afc31655838d42cdec258db4b348f0"
   name = "github.com/kr/logfmt"
@@ -756,12 +764,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:b2339e83ce9b5c4f79405f949429a7f68a9a904fed903c672aac1e7ceb7f5f02"
+  digest = "1:807da2ada16d2e0c37c825753667a4d5d05e89bc93aa617fce7ad6b155293e56"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
-  version = "v1.0.6"
+  revision = "08e90462da344fbb3880e8e47a0ddacc37508579"
 
 [[projects]]
   digest = "1:1f0b284a6858827de4c27c66b49b2b25df3e16b031c2b57b7892273131e7dd2b"
