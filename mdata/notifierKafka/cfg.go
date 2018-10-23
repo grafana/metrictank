@@ -43,7 +43,7 @@ func init() {
 	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
 	fs.BoolVar(&Enabled, "enabled", false, "")
 	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
-	fs.StringVar(&kafkaVersionStr, "kafka-version", "V0_10_0_0", "Kafka version. All brokers must be this version or newer.")
+	fs.StringVar(&kafkaVersionStr, "kafka-version", "0.10.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
 	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
 	fs.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
