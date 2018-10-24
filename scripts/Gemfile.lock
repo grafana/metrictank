@@ -11,7 +11,7 @@ GEM
     colorize (0.7.7)
     domain_name (0.5.24)
       unf (>= 0.0.5, < 1.0.0)
-    ffi (1.9.10)
+    ffi (1.9.25)
     fpm (1.4.0)
       arr-pm (~> 0.0.10)
       backports (>= 2.6.2)
@@ -46,8 +46,9 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  ffi (>= 1.9.24)
   fpm (~> 1.4)
   package_cloud (~> 0.2)
 
 BUNDLED WITH
-   1.10.5
+   1.16.6
