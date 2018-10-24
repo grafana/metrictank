@@ -72,18 +72,18 @@ func ConfigProcess() {
 	var err error
 	maxPruneLockTime, err = time.ParseDuration(maxPruneLockTimeStr)
 	if err != nil {
-		log.Fatal(4, "could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
+		log.Fatalf("could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
 	}
 	if maxPruneLockTime > time.Second {
-		log.Fatal(4, "invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
+		log.Fatalf("invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
 	}
 	// read index-rules.conf
 	IndexRules, err = conf.ReadIndexRules(indexRulesFile)
 	if os.IsNotExist(err) {
-		log.Info("Index-rules.conf file %s does not exist; using defaults", indexRulesFile)
+		log.Infof("Index-rules.conf file %s does not exist; using defaults", indexRulesFile)
 		IndexRules = conf.NewIndexRules()
 	} else if err != nil {
-		log.Fatal(3, "can't read index-rules file %q: %s", indexRulesFile, err.Error())
+		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
 }
 

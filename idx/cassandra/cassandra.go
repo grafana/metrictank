@@ -50,7 +50,6 @@ var (
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
 	Enabled          bool
-	maxStale         time.Duration
 	pruneInterval    time.Duration
 	updateCassIdx    bool
 	updateInterval   time.Duration
@@ -73,11 +72,6 @@ var (
 	numConns                 int
 	protoVer                 int
 	disableInitialHostLookup bool
-
-	pruneInterval    time.Duration
-	updateCassIdx    bool
-	updateInterval   time.Duration
-	updateInterval32 uint32
 )
 
 func ConfigSetup() *flag.FlagSet {

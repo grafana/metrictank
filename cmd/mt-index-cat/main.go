@@ -198,15 +198,17 @@ func main() {
 		},
 	}
 
-	if maxAge != "0" {
-		maxAgeInt, err := dur.ParseNDuration(maxAge)
+	if maxStale != "0" {
+		maxStaleInt, err := dur.ParseNDuration(maxStale)
 		perror(err)
-		memory.IndexRules.Default.MaxStale = time.Duration(maxAgeInt) * time.Second
+		memory.IndexRules.Default.MaxStale = time.Duration(maxStaleInt) * time.Second
 	}
+
+	var cutoffMin int64
 	if minStale != "0" {
 		minStaleInt, err := dur.ParseNDuration(minStale)
 		perror(err)
-		cutoffMin = now - int64(minStaleInt)
+		cutoffMin = time.Now().Unix() - int64(minStaleInt)
 	}
 
 	var partitions []int32
