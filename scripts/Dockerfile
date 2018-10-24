@@ -5,6 +5,7 @@ RUN apk add -U tzdata
 
 RUN mkdir -p /etc/metrictank /usr/share/metrictank/examples
 COPY config/metrictank-docker.ini /etc/metrictank/metrictank.ini
+COPY config/index-rules.conf /etc/metrictank/index-rules.conf
 COPY config/storage-schemas.conf /etc/metrictank/storage-schemas.conf
 COPY config/storage-aggregation.conf /etc/metrictank/storage-aggregation.conf
 COPY config/schema-store-cassandra.toml /etc/metrictank/schema-store-cassandra.toml

@@ -3,13 +3,18 @@ package cassandra
 import (
 	"crypto/rand"
 	"fmt"
+	"reflect"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
@@ -545,82 +550,130 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 }
 
 func TestPruneStaleOnLoad(t *testing.T) {
+
+	now := time.Now()
+
 	iter := testIterator{}
+	memory.IndexRules = conf.IndexRules{
+		Rules: []conf.IndexRule{
+			{
+				Name:     "longterm",
+				Pattern:  regexp.MustCompile("^long"),
+				MaxStale: time.Duration(365*24) * time.Hour,
+			},
+			{
+				Name:     "default",
+				Pattern:  regexp.MustCompile("foobar"),
+				MaxStale: time.Duration(24*7) * time.Hour,
+			},
+		},
+		Default: conf.IndexRule{
+			Name:     "default",
+			Pattern:  regexp.MustCompile(""),
+			MaxStale: 0,
+		},
+	}
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(1).String(),
-		orgId:      1,
-		partition:  1,
-		name:       "met1",
+		name:       "longtermrecentenough",
 		interval:   1,
-		lastUpdate: 1,
+		lastUpdate: now.Add(-350 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(2).String(),
-		orgId:      1,
-		partition:  1,
-		name:       "met1",
-		interval:   3,
-		lastUpdate: 2,
+		name:       "longtermtooold",
+		interval:   1,
+		lastUpdate: now.Add(-380 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(3).String(),
-		orgId:      1,
-		partition:  1,
-		name:       "met2",
-		interval:   1,
-		lastUpdate: 1,
+		name:       "foobarrecentenough",
+		interval:   3,
+		lastUpdate: now.Add(-5 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
-		orgId:      1,
-		partition:  1,
-		name:       "met2",
+		name:       "foobartooold",
 		interval:   3,
-		lastUpdate: 1,
+		lastUpdate: now.Add(-9 * 24 * time.Hour).Unix(),
+	})
+	iter.rows = append(iter.rows, cassRow{
+		id:         test.GetMKey(5).String(),
+		name:       "default-super-old-but-never-pruned",
+		interval:   1,
+		lastUpdate: now.Add(-2 * 365 * 24 * time.Hour).Unix(),
 	})
 
 	idx := &CasIdx{}
-	var defs []schema.MetricDefinition
-	defs = idx.load(defs, &iter, uint32(2))
+	defs := idx.load(nil, &iter, now)
 
-	expectedLen := 2
-	if len(defs) != expectedLen {
-		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	exp := []schema.MKey{
+		test.GetMKey(1),
+		test.GetMKey(3),
+		test.GetMKey(5),
 	}
-
-	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(2) {
-		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
+	var got []schema.MKey
+	for _, def := range defs {
+		got = append(got, def.Id)
+	}
+	sort.Sort(MKeyAsc(got))
+	if !reflect.DeepEqual(got, exp) {
+		t.Fatalf("Expected defs %v, got %v", exp, got)
 	}
 }
 
 func TestPruneStaleOnLoadWithTags(t *testing.T) {
+
+	now := time.Now()
+
 	iter := testIterator{}
+	memory.IndexRules = conf.IndexRules{
+		Rules: []conf.IndexRule{
+			{
+				Name:     "longterm",
+				Pattern:  regexp.MustCompile("long=term"),
+				MaxStale: time.Duration(365*24) * time.Hour,
+			},
+			{
+				Name:     "foo=bar",
+				Pattern:  regexp.MustCompile("foo=bar"),
+				MaxStale: time.Duration(24*7) * time.Hour,
+			},
+		},
+		Default: conf.IndexRule{
+			Name:     "default",
+			Pattern:  regexp.MustCompile(""),
+			MaxStale: 0,
+		},
+	}
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(1).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
 		interval:   1,
-		lastUpdate: 1,
+		lastUpdate: now.Add(-380 * 24 * time.Hour).Unix(),
 		tags:       []string{"tag1=val1"},
 	})
+	// because this one has been recently updated, the one before that is not pruned either
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(2).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
 		interval:   2,
-		lastUpdate: 2,
+		lastUpdate: now.Add(-350 * 24 * time.Hour).Unix(),
 		tags:       []string{"tag1=val1"},
 	})
+	// next 2 are to show that tag matching works
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(3).String(),
 		orgId:      1,
 		partition:  1,
 		name:       "met1",
 		interval:   3,
-		lastUpdate: 1,
-		tags:       []string{"tag1=val1;tag2=val2"},
+		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one will expire
+		tags:       []string{"tag1=val1;foo=bar"},
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
@@ -628,20 +681,37 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		partition:  1,
 		name:       "met1",
 		interval:   4,
-		lastUpdate: 1,
-		tags:       []string{"tag1=val1;tag2=val2"},
+		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one won't because it doesn't match the tag
+		tags:       []string{"tag1=val1;foo=baz"},
 	})
 
 	idx := &CasIdx{}
-	var defs []schema.MetricDefinition
-	defs = idx.load(defs, &iter, uint32(2))
-
-	expectedLen := 2
-	if len(defs) != expectedLen {
-		t.Fatalf("Expected %d defs, but got %d", expectedLen, len(defs))
+	defs := idx.load(nil, &iter, now)
+	exp := []schema.MKey{
+		test.GetMKey(1),
+		test.GetMKey(2),
+		test.GetMKey(4),
 	}
-
-	if defs[0].Id != test.GetMKey(1) || defs[1].Id != test.GetMKey(2) {
-		t.Fatalf("Expected IDs 1 & 2, but got %s & %s", defs[0].Id, defs[1].Id)
+	var got []schema.MKey
+	for _, def := range defs {
+		got = append(got, def.Id)
 	}
+	sort.Sort(MKeyAsc(got))
+	if !reflect.DeepEqual(got, exp) {
+		t.Fatalf("Expected defs %v, got %v", exp, got)
+	}
+}
+
+type MKeyAsc []schema.MKey
+
+func (m MKeyAsc) Len() int      { return len(m) }
+func (m MKeyAsc) Swap(i, j int) { m[i], m[j] = m[j], m[i] }
+func (m MKeyAsc) Less(i, j int) bool {
+	for pos, vi := range m[i].Key {
+		vj := m[j].Key[pos]
+		if vi < vj {
+			return true
+		}
+	}
+	return false
 }

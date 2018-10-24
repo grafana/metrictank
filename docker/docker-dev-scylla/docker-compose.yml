@@ -10,8 +10,9 @@ services:
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
       - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
-      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ../../scripts/config/index-rules.conf:/etc/metrictank/index-rules.conf
       - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ../../scripts/config/schema-store-scylladb.toml:/etc/metrictank/schema-store-cassandra.toml
       - ../../scripts/config/schema-idx-scylladb.toml:/etc/metrictank/schema-idx-cassandra.toml
 

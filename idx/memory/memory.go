@@ -3,6 +3,7 @@ package memory
 import (
 	"flag"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
@@ -51,6 +53,8 @@ var (
 	maxPruneLockTimeStr string
 	TagSupport          bool
 	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
+	indexRulesFile      string
+	IndexRules          conf.IndexRules
 )
 
 func ConfigSetup() {
@@ -59,6 +63,7 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx)
 }
@@ -67,10 +72,18 @@ func ConfigProcess() {
 	var err error
 	maxPruneLockTime, err = time.ParseDuration(maxPruneLockTimeStr)
 	if err != nil {
-		log.Fatal(4, "could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
+		log.Fatalf("could not parse max-prune-lock-time %q: %s", maxPruneLockTimeStr, err)
 	}
 	if maxPruneLockTime > time.Second {
-		log.Fatal(4, "invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
+		log.Fatalf("invalid max-prune-lock-time of %s. Must be <= 1 second", maxPruneLockTimeStr)
+	}
+	// read index-rules.conf
+	IndexRules, err = conf.ReadIndexRules(indexRulesFile)
+	if os.IsNotExist(err) {
+		log.Infof("Index-rules.conf file %s does not exist; using defaults", indexRulesFile)
+		IndexRules = conf.NewIndexRules()
+	} else if err != nil {
+		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
 }
 
@@ -399,11 +412,13 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
+	irId, _ := IndexRules.Match(path)
 	sort.Strings(def.Tags)
 	archive := &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
 		AggId:            aggId,
+		IrId:             irId,
 	}
 
 	if TagSupport && len(def.Tags) > 0 {
@@ -941,7 +956,7 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
 						continue
 					}
-					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.LastSave)
+					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, def.LastSave)
 					idxNode.Defs = append(idxNode.Defs, *def)
 				}
 				if len(idxNode.Defs) == 0 {
@@ -1251,11 +1266,10 @@ func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChil
 	return deletedDefs
 }
 
-// delete series from the index if they have not been seen since "oldest"
-func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
-	oldestUnix := oldest.Unix()
+// Prune prunes series from the index if they have become stale per their index-rule
+func (m *MemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
+	log.Info("memory-idx: start pruning of series across all orgs")
 	orgs := make(map[uint32]struct{})
-	log.Info("memory-idx: pruning stale metricDefs across all orgs")
 	m.RLock()
 	for org := range m.tree {
 		orgs[org] = struct{}{}
@@ -1276,10 +1290,15 @@ func (m *MemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	}
 	pre := time.Now()
 
+	// getting all cutoffs once saves having to recompute everytime we have a match
+	cutoffs := IndexRules.Cutoffs(now)
+
 	m.RLock()
+
 DEFS:
 	for _, def := range m.defById {
-		if atomic.LoadInt64(&def.LastUpdate) >= oldestUnix {
+		cutoff := cutoffs[def.IrId]
+		if atomic.LoadInt64(&def.LastUpdate) >= cutoff {
 			continue DEFS
 		}
 
@@ -1295,7 +1314,7 @@ DEFS:
 			}
 
 			for _, id := range n.Defs {
-				if atomic.LoadInt64(&m.defById[id].LastUpdate) >= oldestUnix {
+				if atomic.LoadInt64(&m.defById[id].LastUpdate) >= cutoff {
 					continue DEFS
 				}
 			}
@@ -1306,7 +1325,7 @@ DEFS:
 			// if any other MetricDef with the same tag set is not expired yet,
 			// then we do not want to prune any of them
 			for def := range defs {
-				if atomic.LoadInt64(&def.LastUpdate) >= oldestUnix {
+				if atomic.LoadInt64(&def.LastUpdate) >= cutoff {
 					continue DEFS
 				}
 			}
@@ -1374,9 +1393,10 @@ ORGS:
 
 	statMetricsActive.Add(-1 * len(pruned))
 
-	log.Infof("memory-idx: pruning stale metricDefs from memory for all orgs took %s", time.Since(pre).String())
+	duration := time.Since(pre)
+	log.Infof("memory-idx: finished pruning of %d series in %s", len(pruned), duration)
 
-	statPruneDuration.Value(time.Since(pre))
+	statPruneDuration.Value(duration)
 	return pruned, nil
 }
 

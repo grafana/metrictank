@@ -59,6 +59,7 @@ cat << EOF
 Metrictank comes with an [example main config file](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini),
 a [storage-schemas.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-schemas.conf) and
 a [storage-aggregation.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-aggregation.conf)
+an [index-rules.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/index-rules.conf)
 
 The files themselves are well documented, but for your convenience, they are replicated below.  
 
@@ -86,11 +87,12 @@ process metrictank-sample.ini
 
 cat << EOF
 
-# storage-schemas.conf
+# index-rules.conf
 
 \`\`\`
 EOF
-cat scripts/config/storage-schemas.conf
+
+cat scripts/config/index-rules.conf
 
 cat << EOF
 \`\`\`
@@ -101,6 +103,16 @@ cat << EOF
 EOF
 
 cat scripts/config/storage-aggregation.conf
+
+cat << EOF
+\`\`\`
+
+# storage-schemas.conf
+
+\`\`\`
+EOF
+
+cat scripts/config/storage-schemas.conf
 
 cat << EOF
 \`\`\`

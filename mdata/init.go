@@ -60,8 +60,8 @@ var (
 	badAggSpan = stats.NewCounter32("recovered_errors.aggmetric.getaggregated.bad-aggspan")
 
 	// set either via ConfigProcess or from the unit tests. other code should not touch
-	Schemas      conf.Schemas
 	Aggregations conf.Aggregations
+	Schemas      conf.Schemas
 
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
