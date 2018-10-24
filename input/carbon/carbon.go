@@ -4,6 +4,7 @@ package carbon
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"io"
 	"net"
@@ -106,7 +107,7 @@ func (c *Carbon) IntervalGetter(i IntervalGetter) {
 	c.intervalGetter = i
 }
 
-func (c *Carbon) Start(handler input.Handler, fatal chan struct{}) error {
+func (c *Carbon) Start(handler input.Handler, cancel context.CancelFunc) error {
 	c.Handler = handler
 	l, err := net.ListenTCP("tcp", c.addr)
 	if nil != err {

@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -25,7 +26,6 @@ var (
 
 type prometheusWriteHandler struct {
 	input.Handler
-	quit chan struct{}
 }
 
 func New() *prometheusWriteHandler {
@@ -36,9 +36,8 @@ func (p *prometheusWriteHandler) Name() string {
 	return "prometheus"
 }
 
-func (p *prometheusWriteHandler) Start(handler input.Handler, fatal chan struct{}) error {
+func (p *prometheusWriteHandler) Start(handler input.Handler, cancel context.CancelFunc) error {
 	p.Handler = handler
-	p.quit = fatal
 	ConfigSetup()
 
 	mux := http.NewServeMux()
