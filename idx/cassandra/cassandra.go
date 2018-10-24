@@ -357,8 +357,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	var defs []schema.MetricDefinition
-	defs = c.LoadPartitions(cluster.Manager.GetPartitions(), defs, pre)
+	defs := c.LoadPartitions(cluster.Manager.GetPartitions(), nil, pre)
 	num := c.MemoryIdx.Load(defs)
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
