@@ -194,7 +194,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 					if _, ok := keyspaceMetadata.Tables[table.Name]; !ok {
 						log.Warnf("cassandra table %s not found; attempt: %v", table.Name, attempt)
 						if attempt >= 5 {
-							return nil, err
+							return nil, fmt.Errorf("cassandra table %s not found after %d attempts", table.Name, attempt)
 						}
 						time.Sleep(5 * time.Second)
 						continue AttemptLoop
