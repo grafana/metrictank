@@ -11,25 +11,23 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
 type NotifierKafka struct {
-	instance  string
-	in        chan mdata.SavedChunk
-	buf       []mdata.SavedChunk
-	wg        sync.WaitGroup
-	idx       idx.MetricIndex
-	metrics   mdata.Metrics
-	bPool     *util.BufferPool
-	client    sarama.Client
-	consumer  sarama.Consumer
-	producer  sarama.SyncProducer
-	offsetMgr *kafka.OffsetMgr
-	StopChan  chan int
+	instance string
+	in       chan mdata.SavedChunk
+	buf      []mdata.SavedChunk
+	wg       sync.WaitGroup
+	idx      idx.MetricIndex
+	metrics  mdata.Metrics
+	bPool    *util.BufferPool
+	client   sarama.Client
+	consumer sarama.Consumer
+	producer sarama.SyncProducer
+	StopChan chan int
 
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
@@ -51,21 +49,15 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 		log.Fatalf("kafka-cluster: failed to initialize producer: %s", err)
 	}
 
-	offsetMgr, err := kafka.NewOffsetMgr(dataDir)
-	if err != nil {
-		log.Fatalf("kafka-cluster: couldnt create offsetMgr. %s", err)
-	}
-
 	c := NotifierKafka{
-		instance:  instance,
-		in:        make(chan mdata.SavedChunk),
-		idx:       idx,
-		metrics:   metrics,
-		bPool:     util.NewBufferPool(),
-		client:    client,
-		consumer:  consumer,
-		producer:  producer,
-		offsetMgr: offsetMgr,
+		instance: instance,
+		in:       make(chan mdata.SavedChunk),
+		idx:      idx,
+		metrics:  metrics,
+		bPool:    util.NewBufferPool(),
+		client:   client,
+		consumer: consumer,
+		producer: producer,
 
 		StopChan:      make(chan int),
 		stopConsuming: make(chan struct{}),
@@ -87,11 +79,6 @@ func (c *NotifierKafka) start() {
 			offset = -2
 		case "newest":
 			offset = -1
-		case "last":
-			offset, err = c.offsetMgr.Last(topic, partition)
-			if err != nil {
-				log.Fatalf("kafka-cluster: Failed to get %q duration offset for %s:%d. %q", offsetStr, topic, partition, err)
-			}
 		default:
 			offset, err = c.client.GetOffset(topic, partition, time.Now().Add(-1*offsetDuration).UnixNano()/int64(time.Millisecond))
 			if err != nil {
@@ -138,7 +125,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 	log.Infof("kafka-cluster: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 
 	messages := pc.Messages()
-	ticker := time.NewTicker(offsetCommitInterval)
+	ticker := time.NewTicker(5 * time.Second)
 	startingUp := true
 	// the bootTimeOffset is the next available offset. There may not be a message with that
 	// offset yet, so we subtract 1 to get the highest offset that we can fetch.
@@ -153,9 +140,6 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			mdata.Handle(c.metrics, msg.Value, c.idx)
 			currentOffset = msg.Offset
 		case <-ticker.C:
-			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Errorf("kafka-cluster: failed to commit offset for %s:%d, %s", topic, partition, err)
-			}
 			if startingUp && currentOffset >= bootTimeOffset {
 				processBacklog.Done()
 				startingUp = false
@@ -176,9 +160,6 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 			}
 		case <-c.stopConsuming:
 			pc.Close()
-			if err := c.offsetMgr.Commit(topic, partition, currentOffset); err != nil {
-				log.Errorf("kafka-cluster: failed to commit offset for %s:%d, %s", topic, partition, err)
-			}
 			log.Infof("kafka-cluster: consumer for %s:%d ended.", topic, partition)
 			return
 		}
@@ -195,7 +176,6 @@ func (c *NotifierKafka) Stop() {
 
 	go func() {
 		c.wg.Wait()
-		c.offsetMgr.Close()
 		close(c.StopChan)
 	}()
 }

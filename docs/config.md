@@ -281,17 +281,12 @@ brokers = kafka:9092
 kafka-version = 0.10.0.0
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
-# offset to start consuming from. Can be one of newest, oldest,last or a time duration
+# offset to start consuming from. Can be oldest, newest or a time duration
 # When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # the further back in time you go, the more old data you can load into metrictank, but the longer it takes to catch up to realtime data
-offset = last
+offset = newest
 # kafka partitions to consume. use '*' or a comma separated list of id's
 partitions = *
-# save interval for offsets
-offset-commit-interval = 5s
-# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
-# it will be created (incl parent dirs) if not existing.
-data-dir =
 # The number of metrics to buffer in internal and external channels
 channel-buffer-size = 1000
 # The minimum number of message bytes to fetch in a request
@@ -392,17 +387,12 @@ kafka-version = 0.10.0.0
 topic = metricpersist
 # kafka partitions to consume. use '*' or a comma separated list of id's. Should match kafka-mdm-in's partitions.
 partitions = *
-# offset to start consuming from. Can be one of newest, oldest,last or a time duration
+# offset to start consuming from. Can be oldest, newest or a time duration
 # When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # Should match your kafka-mdm-in setting
-offset = last
-# save interval for offsets
-offset-commit-interval = 5s
+offset = newest
 # Maximum time backlog processing can block during metrictank startup.
 backlog-process-timeout = 60s
-# directory to store partition offsets index. supports relative or absolute paths. empty means working dir.
-# it will be created (incl parent dirs) if not existing.
-data-dir =
 ```
 
 ### nsq as transport for clustering messages
