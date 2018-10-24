@@ -20,7 +20,6 @@ type IdxConfig struct {
 	UpdateBigtableIdx bool
 	UpdateInterval    time.Duration
 	updateInterval32  uint32
-	MaxStale          time.Duration
 	PruneInterval     time.Duration
 	CreateCF          bool
 }
@@ -33,7 +32,7 @@ func (cfg *IdxConfig) Validate() error {
 	if cfg.WriteMaxFlushSize >= cfg.WriteQueueSize {
 		return errors.New("write-queue-size must be larger then write-max-flush-size")
 	}
-	if cfg.MaxStale > 0 && cfg.PruneInterval == 0 {
+	if cfg.PruneInterval == 0 {
 		return errors.New("pruneInterval must be greater then 0")
 	}
 	return nil
@@ -51,7 +50,6 @@ func NewIdxConfig() *IdxConfig {
 		WriteConcurrency:  5,
 		UpdateBigtableIdx: true,
 		UpdateInterval:    time.Hour * 3,
-		MaxStale:          0,
 		PruneInterval:     time.Hour * 3,
 		CreateCF:          true,
 	}
@@ -71,7 +69,6 @@ func ConfigSetup() {
 	btIdx.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "Number of writer threads to use")
 	btIdx.BoolVar(&CliConfig.UpdateBigtableIdx, "update-bigtable-index", CliConfig.UpdateBigtableIdx, "synchronize index changes to bigtable. not all your nodes need to do this.")
 	btIdx.DurationVar(&CliConfig.UpdateInterval, "update-interval", CliConfig.UpdateInterval, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
-	btIdx.DurationVar(&CliConfig.MaxStale, "max-stale", CliConfig.MaxStale, "clear series from the index if they have not been seen for this much time.")
 	btIdx.DurationVar(&CliConfig.PruneInterval, "prune-interval", CliConfig.PruneInterval, "Interval at which the index should be checked for stale series.")
 	btIdx.BoolVar(&CliConfig.CreateCF, "create-cf", CliConfig.CreateCF, "enable the creation of the table and column families")
 
