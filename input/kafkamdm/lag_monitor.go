@@ -22,9 +22,7 @@ func newLagLogger(size int) *lagLogger {
 // Store saves the current value, potentially overwriting an old value
 // if needed.
 // Note: negative values are ignored.  We rely on previous data - if any - in such case.
-// negative values can happen when:
-//  - kafka had to recover, and a previous offset loaded from offsetMgr was bigger than current offset
-//  - a rollover of the offset counter
+// negative values can happen upon a rollover of the offset counter
 func (l *lagLogger) Store(lag int) {
 	if lag < 0 {
 		return

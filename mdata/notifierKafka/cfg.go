@@ -20,10 +20,8 @@ var brokerStr string
 var brokers []string
 var topic string
 var offsetStr string
-var dataDir string
 var config *sarama.Config
 var offsetDuration time.Duration
-var offsetCommitInterval time.Duration
 var partitionStr string
 var partitions []int32
 var bootTimeOffsets map[int32]int64
@@ -46,9 +44,7 @@ func init() {
 	fs.StringVar(&kafkaVersionStr, "kafka-version", "0.10.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
 	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
-	fs.StringVar(&offsetStr, "offset", "last", "Set the offset to start consuming from. Can be one of newest, oldest,last or a time duration")
-	fs.StringVar(&dataDir, "data-dir", "", "Directory to store partition offsets index")
-	fs.DurationVar(&offsetCommitInterval, "offset-commit-interval", time.Second*5, "Interval at which offsets should be saved.")
+	fs.StringVar(&offsetStr, "offset", "newest", "Set the offset to start consuming from. Can be oldest, newest or a time duration")
 	fs.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
 	globalconf.Register("kafka-cluster", fs)
 }
@@ -64,7 +60,6 @@ func ConfigProcess(instance string) {
 	}
 
 	switch offsetStr {
-	case "last":
 	case "oldest":
 	case "newest":
 	default:

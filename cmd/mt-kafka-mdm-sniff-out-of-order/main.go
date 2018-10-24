@@ -204,8 +204,6 @@ func main() {
 
 	// config may have had it disabled
 	inKafkaMdm.Enabled = true
-	// important: we don't want to share the same offset tracker as the mdm input of MT itself
-	inKafkaMdm.DataDir = "/tmp/" + instance
 
 	inKafkaMdm.ConfigProcess(instance)
 
