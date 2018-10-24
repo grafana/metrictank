@@ -795,27 +795,6 @@
   revision = "ef6db91d284a0e7badaa1f0c404c30aa7dee3aed"
 
 [[projects]]
-  branch = "master"
-  digest = "1:f17f92a9a10415f4e0cfd03e9e8af2ceed41b2903265086c3225740ad6262d74"
-  name = "github.com/syndtr/goleveldb"
-  packages = [
-    "leveldb",
-    "leveldb/cache",
-    "leveldb/comparer",
-    "leveldb/errors",
-    "leveldb/filter",
-    "leveldb/iterator",
-    "leveldb/journal",
-    "leveldb/memdb",
-    "leveldb/opt",
-    "leveldb/storage",
-    "leveldb/table",
-    "leveldb/util",
-  ]
-  pruneopts = "NUT"
-  revision = "3d8f4155ffd9029d32e5cf03853b58759b6e3710"
-
-[[projects]]
   digest = "1:5f9202ad4fbceea76631df26de47b4960861ae7bc3889aece44d6aa8e5171dac"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
@@ -1141,9 +1120,6 @@
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",
     "github.com/smartystreets/goconvey/convey",
-    "github.com/syndtr/goleveldb/leveldb",
-    "github.com/syndtr/goleveldb/leveldb/opt",
-    "github.com/syndtr/goleveldb/leveldb/storage",
     "github.com/tinylib/msgp/msgp",
     "github.com/uber/jaeger-client-go",
     "github.com/uber/jaeger-client-go/config",
