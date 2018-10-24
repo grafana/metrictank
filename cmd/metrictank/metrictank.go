@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	l "log"
@@ -402,12 +403,12 @@ func main() {
 	/***********************************
 		Start our inputs
 	***********************************/
-	pluginFatal := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	for _, plugin := range inputs {
 		if carbonPlugin, ok := plugin.(*inCarbon.Carbon); ok {
 			carbonPlugin.IntervalGetter(inCarbon.NewIndexIntervalGetter(metricIndex))
 		}
-		err = plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()), pluginFatal)
+		err = plugin.Start(input.NewDefaultHandler(metrics, metricIndex, plugin.Name()), cancel)
 		if err != nil {
 			shutdown()
 			return
@@ -439,7 +440,7 @@ func main() {
 	select {
 	case sig := <-sigChan:
 		log.Infof("Received signal %q. Shutting down", sig)
-	case <-pluginFatal:
+	case <-ctx.Done():
 		log.Info("An input plugin signalled a fatal error. Shutting down")
 	}
 	shutdown()

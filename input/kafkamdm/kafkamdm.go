@@ -1,6 +1,7 @@
 package kafkamdm
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strconv"
@@ -37,7 +38,7 @@ type KafkaMdm struct {
 	// signal to PartitionConsumers to shutdown
 	stopConsuming chan struct{}
 	// signal to caller that it should shutdown
-	fatal chan struct{}
+	cancel context.CancelFunc
 }
 
 func (k *KafkaMdm) Name() string {
@@ -209,9 +210,9 @@ func New() *KafkaMdm {
 	return &k
 }
 
-func (k *KafkaMdm) Start(handler input.Handler, fatal chan struct{}) error {
+func (k *KafkaMdm) Start(handler input.Handler, cancel context.CancelFunc) error {
 	k.Handler = handler
-	k.fatal = fatal
+	k.cancel = cancel
 	var err error
 	for _, topic := range topics {
 		for _, partition := range partitions {
@@ -288,7 +289,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
 	if err != nil {
 		log.Errorf("kafkamdm: %s", err.Error())
-		close(k.fatal)
+		k.cancel()
 		return
 	}
 	if currentOffset == sarama.OffsetNewest {
@@ -297,7 +298,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		currentOffset, err = k.tryGetOffset(topic, partition, sarama.OffsetOldest, 7, time.Second*10)
 		if err != nil {
 			log.Errorf("kafkamdm: %s", err.Error())
-			close(k.fatal)
+			k.cancel()
 			return
 		}
 	}
@@ -310,7 +311,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
 	if err != nil {
 		log.Errorf("kafkamdm: failed to start partitionConsumer for %s:%d. %s", topic, partition, err)
-		close(k.fatal)
+		k.cancel()
 		return
 	}
 	messages := pc.Messages()
@@ -324,7 +325,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 				if err := offsetMgr.Commit(topic, partition, currentOffset); err != nil {
 					log.Errorf("kafkamdm: failed to commit offset for %s:%d, %s", topic, partition, err)
 				}
-				close(k.fatal)
+				k.cancel()
 				return
 			}
 			log.Debugf("kafkamdm: received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)

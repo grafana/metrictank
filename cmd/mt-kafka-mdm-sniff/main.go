@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -158,14 +159,14 @@ func main() {
 	stats.NewDevnull() // make sure metrics don't pile up without getting discarded
 
 	mdm := inKafkaMdm.New()
-	pluginFatal := make(chan struct{})
-	mdm.Start(newInputPrinter(*formatMd, *formatP), pluginFatal)
+	ctx, cancel := context.WithCancel(context.Background())
+	mdm.Start(newInputPrinter(*formatMd, *formatP), cancel)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case sig := <-sigChan:
 		log.Infof("Received signal %q. Shutting down", sig)
-	case <-pluginFatal:
+	case <-ctx.Done():
 		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
 	}
 	mdm.Stop()
