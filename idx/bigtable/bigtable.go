@@ -182,7 +182,7 @@ func (b *BigtableIdx) Init() error {
 	}
 
 	b.rebuildIndex()
-	if b.cfg.MaxStale > 0 {
+	if memory.IndexRules.Prunable() {
 		b.wg.Add(1)
 		go b.prune()
 	}
@@ -311,24 +311,20 @@ func (b *BigtableIdx) rebuildIndex() {
 	log.Info("bigtable-idx: Rebuilding Memory Index from metricDefinitions in bigtable")
 	pre := time.Now()
 
-	var staleTs uint32
-	if b.cfg.MaxStale != 0 {
-		staleTs = uint32(time.Now().Add(b.cfg.MaxStale * -1).Unix())
-	}
 	num := 0
 	var defs []schema.MetricDefinition
 	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = b.LoadPartition(partition, defs[:0], staleTs)
+		defs = b.LoadPartition(partition, defs[:0], pre)
 		num += b.MemoryIdx.Load(defs)
 	}
 
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, cutoff uint32) []schema.MetricDefinition {
+func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
-	defsBySeries := make(map[string][]schema.MetricDefinition)
+	defsByNames := make(map[string][]schema.MetricDefinition)
 	var marshalErr error
 	err := b.tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
 		def := schema.MetricDefinition{}
@@ -337,7 +333,8 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 			return false
 		}
 		log.Debugf("bigtable-idx: found def %+v", def)
-		defsBySeries[def.Name] = append(defsBySeries[def.Name], def)
+		nameWithTags := def.NameWithTags()
+		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], def)
 		return true
 	}, bigtable.RowFilter(bigtable.FamilyFilter(COLUMN_FAMILY)))
 	if err != nil {
@@ -347,17 +344,23 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 		log.Fatalf("bigtable-idx: failed to marshal row to metricDef. %s", marshalErr)
 	}
 
-LOOP:
-	for series, defList := range defsBySeries {
-		for _, def := range defList {
-			if def.LastUpdate > int64(cutoff) {
-				// add all defs for this series.
-				defs = append(defs, defsBySeries[series]...)
-				continue LOOP
+	// getting all cutoffs once saves having to recompute everytime we have a match
+	cutoffs := memory.IndexRules.Cutoffs(now)
+
+NAMES:
+	for nameWithTags, defsByName := range defsByNames {
+		irId, _ := memory.IndexRules.Match(nameWithTags)
+		cutoff := cutoffs[irId]
+		for _, def := range defsByName {
+			if def.LastUpdate > cutoff {
+				// if any of the defs for a given nameWithTags is not stale, then we need to load
+				// all the defs for that nameWithTags.
+				defs = append(defs, defsByNames[nameWithTags]...)
+				continue NAMES
 			}
 		}
 		// all defs are stale
-		delete(defsBySeries, series)
+		delete(defsByNames, nameWithTags)
 	}
 
 	return defs
@@ -493,10 +496,17 @@ func (b *BigtableIdx) deleteRow(key string) error {
 	return nil
 }
 
-func (b *BigtableIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
-	pre := time.Now()
-	pruned, err := b.MemoryIdx.Prune(oldest)
-	statPruneDuration.Value(time.Since(pre))
+func (b *BigtableIdx) Prune(now time.Time) ([]idx.Archive, error) {
+	log.Info("bigtable-idx: start pruning of series")
+	pruned, err := b.MemoryIdx.Prune(now)
+	duration := time.Since(now)
+	if err != nil {
+		log.Errorf("bigtable-idx: prune error. %s", err)
+	} else {
+		statPruneDuration.Value(duration)
+		log.Infof("bigtable-idx: finished pruning of %d series in %s", len(pruned), duration)
+
+	}
 	return pruned, err
 }
 
@@ -505,13 +515,8 @@ func (b *BigtableIdx) prune() {
 	ticker := time.NewTicker(b.cfg.PruneInterval)
 	for {
 		select {
-		case <-ticker.C:
-			log.Debugf("bigtable-idx: pruning items from index that have not been seen for %s", b.cfg.MaxStale.String())
-			staleTs := time.Now().Add(b.cfg.MaxStale * -1)
-			_, err := b.Prune(staleTs)
-			if err != nil {
-				log.Errorf("bigtable-idx: prune error. %s", err)
-			}
+		case now := <-ticker.C:
+			b.Prune(now)
 		case <-b.shutdown:
 			return
 		}
