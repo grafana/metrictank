@@ -514,7 +514,7 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
-			log.Errorf("cassandra-idx: Failed to delete metricDef %s from cassandra. %s", keyStr, err)
+			log.Warnf("cassandra-idx: Failed to delete metricDef %s from cassandra: %s", keyStr, err)
 			time.Sleep(time.Second)
 		} else {
 			statQueryDeleteOk.Inc()
