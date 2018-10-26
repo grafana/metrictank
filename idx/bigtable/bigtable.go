@@ -87,12 +87,12 @@ func (b *BigtableIdx) InitBare() error {
 	if b.cfg.CreateCF {
 		adminClient, err := bigtable.NewAdminClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
 		if err != nil {
-			log.Errorf("bigtable-idx: failed to create bigtable admin client. %s", err)
+			log.Errorf("bigtable-idx: failed to create bigtable admin client: %s", err)
 			return err
 		}
 		tables, err := adminClient.Tables(ctx)
 		if err != nil {
-			log.Errorf("bigtable-idx: failed to list tables. %s", err)
+			log.Errorf("bigtable-idx: failed to list tables: %s", err)
 			return err
 		}
 		found := false
@@ -103,7 +103,7 @@ func (b *BigtableIdx) InitBare() error {
 			}
 		}
 		if !found {
-			log.Infof("bigtable-idx: table %s does not yet exist. Creating it.", b.cfg.TableName)
+			log.Infof("bigtable-idx: table %q does not yet exist. Creating it.", b.cfg.TableName)
 			table := bigtable.TableConf{
 				TableID: b.cfg.TableName,
 				Families: map[string]bigtable.GCPolicy{
@@ -112,7 +112,7 @@ func (b *BigtableIdx) InitBare() error {
 			}
 			err := adminClient.CreateTableFromConf(ctx, &table)
 			if err != nil {
-				log.Errorf("bigtable-idx: failed to create %s table. %s", b.cfg.TableName, err)
+				log.Errorf("bigtable-idx: failed to create table %q: %s", b.cfg.TableName, err)
 				return err
 			}
 		} else {
@@ -120,7 +120,7 @@ func (b *BigtableIdx) InitBare() error {
 			// table exists.  Lets make sure that it has all of the CF's we need.
 			table, err := adminClient.TableInfo(ctx, b.cfg.TableName)
 			if err != nil {
-				log.Errorf("bigtable-idx: failed to get tableInfo of %s. %s", b.cfg.TableName, err)
+				log.Errorf("bigtable-idx: failed to get tableInfo of %q: %s", b.cfg.TableName, err)
 				return err
 			}
 			existingFamilies := make(map[string]string)
@@ -132,19 +132,19 @@ func (b *BigtableIdx) InitBare() error {
 				log.Infof("bigtable-idx: column family %s/%s does not exist. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
 				err = adminClient.CreateColumnFamily(ctx, b.cfg.TableName, COLUMN_FAMILY)
 				if err != nil {
-					log.Errorf("bigtable-idx: failed to create cf %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to create cf %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
 					return err
 				}
 				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
 					return err
 				}
 			} else if policy == "" {
 				log.Infof("bigtable-idx: column family %s/%s exists but has no GCPolicy. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
 				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
 				if err != nil {
-					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s. %s", b.cfg.TableName, COLUMN_FAMILY, err)
+					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
 					return err
 				}
 			}
@@ -152,7 +152,7 @@ func (b *BigtableIdx) InitBare() error {
 	}
 	client, err := bigtable.NewClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
 	if err != nil {
-		log.Errorf("bigtable-idx: failed to create bigtable client. %s", err)
+		log.Errorf("bigtable-idx: failed to create bigtable client: %s", err)
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (b *BigtableIdx) Stop() {
 
 	err := b.client.Close()
 	if err != nil {
-		log.Errorf("bigtable-idx: Error closing bigtable client. %s", err)
+		log.Errorf("bigtable-idx: Error closing bigtable client: %s", err)
 	}
 }
 
@@ -223,7 +223,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 			go func() {
 				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
 				if err != nil {
-					log.Errorf("bigtable-idx: failed to delete row. %s", err)
+					log.Errorf("bigtable-idx: Failed to delete row %s: %s", archive.Id, err)
 				}
 			}()
 		}
@@ -261,7 +261,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 			go func() {
 				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
 				if err != nil {
-					log.Errorf("bigtable-idx: failed to delete row. %s", err)
+					log.Errorf("bigtable-idx: Failed to delete row %s: %s", archive.Id, err)
 				}
 			}()
 		}
@@ -390,7 +390,7 @@ func (b *BigtableIdx) processWriteQueue() {
 			errs, err := b.tbl.ApplyBulk(context.Background(), rowKeys, mutations)
 			if err != nil {
 				statQueryInsertFail.Add(len(rowKeys))
-				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they won't be retried. %s", len(rowKeys), err)
+				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they won't be retried: %s", len(rowKeys), err)
 				complete = true
 			} else if len(errs) > 0 {
 				var failedRowKeys []string
@@ -465,6 +465,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 			delErr := b.deleteDef(&def.MetricDefinition)
 			// the last error encountered will be passed back to the caller
 			if delErr != nil {
+				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinition.Id, err)
 				err = delErr
 			}
 		}
@@ -484,7 +485,6 @@ func (b *BigtableIdx) deleteRow(key string) error {
 	err := b.tbl.Apply(context.Background(), key, mut)
 	if err != nil {
 		statQueryDeleteFail.Inc()
-		log.Errorf("bigtable-idx: Failed to delete row %s from bigtable. %s", key, err)
 		return err
 	}
 
