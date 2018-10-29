@@ -24,6 +24,7 @@ services:
       MT_CASSANDRA_IDX_ENABLED: "false"
       MT_BIGTABLE_STORE_ENABLED: "true"
       MT_BIGTABLE_IDX_ENABLED: "true"
+      MT_BIGTABLE_STORE_WRITE_MAX_FLUSH_SIZE: 1000
       BIGTABLE_EMULATOR_HOST: bigtable:8086
     links:
      - bigtable
