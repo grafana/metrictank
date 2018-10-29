@@ -65,7 +65,7 @@ type ClusterManager interface {
 
 type MemberlistManager struct {
 	sync.RWMutex
-	members  map[string]HTTPNode // all members in the cluster, including this node.
+	members  map[string]HTTPNode // all members in the cluster, guaranteed to always have this node
 	nodeName string
 	list     *memberlist.Memberlist
 	cfg      *memberlist.Config
@@ -227,15 +227,28 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 		unmarshalErrJoin.Inc()
 		return
 	}
+
 	member.RemoteAddr = node.Addr.String()
-	if member.Name == c.nodeName {
-		member.local = true
+	member.local = (member.Name == c.nodeName)
+
+	// we never want anyone else in the cluster to tell us anything about ourselves
+	// cause we know ourself best.
+	if member.local {
+		return
+	}
+
+	existing, ok := c.members[node.Name]
+	if ok && !member.Updated.After(existing.Updated) {
+		return
 	}
 	c.members[node.Name] = member
 	c.clusterStats()
 }
 
 func (c *MemberlistManager) NotifyLeave(node *memberlist.Node) {
+	if node.Name == c.nodeName {
+		return
+	}
 	eventsLeave.Inc()
 	c.Lock()
 	defer c.Unlock()
@@ -256,8 +269,9 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 	if err != nil {
 		log.Errorf("CLU manager: Failed to decode node meta from %s: %s", node.Name, err.Error())
 		unmarshalErrUpdate.Inc()
-		// if the node is known, lets mark it as notReady until it starts sending valid data again.
-		if p, ok := c.members[node.Name]; ok {
+		// if the node is known and it is not thisNode,
+		// lets mark it as notReady until it starts sending valid data again.
+		if p, ok := c.members[node.Name]; ok && node.Name != c.nodeName {
 			p.State = NodeNotReady
 			p.StateChange = time.Now()
 			// we dont set Updated as we dont want the NotReady state to propagate incase we are the only node
@@ -266,9 +280,19 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 		}
 		return
 	}
+
 	member.RemoteAddr = node.Addr.String()
-	if member.Name == c.nodeName {
-		member.local = true
+	member.local = (member.Name == c.nodeName)
+
+	// we never want anyone else in the cluster to tell us anything about ourselves
+	// cause we know ourself best.
+	if member.local {
+		return
+	}
+
+	existing, ok := c.members[node.Name]
+	if ok && !member.Updated.After(existing.Updated) {
+		return
 	}
 	c.members[node.Name] = member
 	log.Infof("CLU manager: HTTPNode %s at %s has been updated - %s", node.Name, node.Addr.String(), node.Meta)
@@ -353,6 +377,7 @@ func (c *MemberlistManager) SetState(state NodeState) {
 	node := c.members[c.nodeName]
 	node.State = state
 	node.Updated = time.Now()
+	node.StateChange = time.Now()
 	c.members[c.nodeName] = node
 	c.Unlock()
 	nodeReady.Set(state == NodeReady)
