@@ -227,10 +227,10 @@ func (c *MemberlistManager) NotifyJoin(node *memberlist.Node) {
 		unmarshalErrJoin.Inc()
 		return
 	}
+
 	member.RemoteAddr = node.Addr.String()
-	if member.Name == c.nodeName {
-		member.local = true
-	}
+	member.local = (member.Name == c.nodeName)
+
 	existing, ok := c.members[node.Name]
 	if ok && !member.Updated.After(existing.Updated) {
 		return
@@ -270,10 +270,10 @@ func (c *MemberlistManager) NotifyUpdate(node *memberlist.Node) {
 		}
 		return
 	}
+
 	member.RemoteAddr = node.Addr.String()
-	if member.Name == c.nodeName {
-		member.local = true
-	}
+	member.local = (member.Name == c.nodeName)
+
 	existing, ok := c.members[node.Name]
 	if ok && !member.Updated.After(existing.Updated) {
 		return
