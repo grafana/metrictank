@@ -198,6 +198,25 @@ curl -s http://localhost:6060/priority | jsonpp
         }
     }
 ]
+
+## Cache delete
+
+```
+GET /ccache/delete
+POST /ccache/delete
+```
+
+* `X-Org-Id`: required
+* patterns: one or more query (glob) patterns. Use `**` to mean "all data" (full reset)
+* expr: tag expressions
+* propagate: whether to propagate to other cluster nodes. true/false
+
+Remove chunks from the cache for matching series, or wipe the entire cache
+
+#### Example
+
+```bash
+curl -v -X POST -d '{"propagate": true, "orgId": 1, "patterns": ["**"]}' -H 'Content-Type: application/json' http://localhost:6060/ccache/delete
 ```
 
 ## Misc
