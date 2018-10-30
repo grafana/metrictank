@@ -31,11 +31,11 @@ var (
 	confFile    = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 
 	// our own flags
-	from        = flag.String("from", "-24h", "get data from (inclusive). only for points and points-summary format")
-	to          = flag.String("to", "now", "get data until (exclusive). only for points and points-summary format")
-	fix         = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and points-summary format")
-	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and poins-summary format")
-	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
+	from        = flag.String("from", "-24h", "get data from (inclusive). only for points and point-summary format")
+	to          = flag.String("to", "now", "get data until (exclusive). only for points and point-summary format")
+	fix         = flag.Int("fix", 0, "fix data to this interval like metrictank does quantization. only for points and point-summary format")
+	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and point-summary format")
+	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
 )
 
