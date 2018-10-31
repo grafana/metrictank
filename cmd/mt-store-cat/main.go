@@ -193,7 +193,7 @@ func main() {
 			log.Fatal(err.Error())
 		}
 		for _, table := range tables {
-			fmt.Printf("%s (ttl %d hours)\n", table.Name, table.TTL)
+			fmt.Printf("%s (%d hours <= ttl < %d hours)\n", table.Name, table.TTL, table.TTL*2)
 		}
 		return
 	}
