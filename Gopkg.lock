@@ -126,13 +126,6 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:6cd9e0519541e4b07a72b5aedecca2a072912a3b635c3daec48d31958f3f400b"
-  name = "github.com/dgryski/go-bits"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "2c7641e7dfe3945a0fe755f58c85ab306624956d"
-
-[[projects]]
   branch = "master"
   digest = "1:07e80adc1161a63d37f382328ebabbf4f50e027cfaadf718515c3f39a65eb18f"
   name = "github.com/dgryski/go-linlog"
@@ -141,14 +134,14 @@
   revision = "edcf2dfd90ff209a4434491d7f38e203b3163de2"
 
 [[projects]]
-  digest = "1:00d4c9e5197f9ffb3f067e363298a25b4ff59eead77a24c839505d185caef176"
+  digest = "1:99f1b1a6d08214aa4a455e3ed3b20c0385e5d5eaa6f246f8230ee3679bd3fd98"
   name = "github.com/dgryski/go-tsz"
   packages = [
     ".",
     "testdata",
   ]
   pruneopts = "NUT"
-  revision = "5f4c484a9e838989c201ff437b3cab59cfdc46c8"
+  revision = "03b7d791f4fe79270d114e1ea6929332dbf028b7"
 
 [[projects]]
   digest = "1:3cabbabc9e0e4aa7e12b882bdc213f41cf8bd2b2ce2a7b5e0aceaf8a6a78049b"

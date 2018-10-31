@@ -59,7 +59,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/dgryski/go-tsz"
-  revision = "5f4c484a9e838989c201ff437b3cab59cfdc46c8"
+  revision = "03b7d791f4fe79270d114e1ea6929332dbf028b7"
 
 [[constraint]]
   name = "github.com/docker/docker"
