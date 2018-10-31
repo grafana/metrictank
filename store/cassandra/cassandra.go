@@ -123,6 +123,7 @@ func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	return timeoutD
 }
 
+// NewCassandraStore creates a new cassandra store, using the provided retention ttl's in seconds
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)

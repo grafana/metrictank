@@ -19,6 +19,7 @@ type Table struct {
 	TTL        uint32
 }
 
+// GetTTLTables returns table definitions for the given specifications (ttls is in seconds)
 func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables {
 	tables := make(TTLTables)
 	for _, ttl := range ttls {
