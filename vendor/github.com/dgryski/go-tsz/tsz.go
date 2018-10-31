@@ -194,6 +194,64 @@ func NewIterator(b []byte) (*Iter, error) {
 	return bstreamIterator(newBReader(b))
 }
 
+func (it *Iter) dod() (int32, bool) {
+	var d byte
+	for i := 0; i < 4; i++ {
+		d <<= 1
+		bit, err := it.br.readBit()
+		if err != nil {
+			it.err = err
+			return 0, false
+		}
+		if bit == zero {
+			break
+		}
+		d |= 1
+	}
+
+	var dod int32
+	var sz uint
+	switch d {
+	case 0x00:
+		// dod == 0
+	case 0x02:
+		sz = 7
+	case 0x06:
+		sz = 9
+	case 0x0e:
+		sz = 12
+	case 0x0f:
+		bits, err := it.br.readBits(32)
+		if err != nil {
+			it.err = err
+			return 0, false
+		}
+
+		// end of stream
+		if bits == 0xffffffff {
+			it.finished = true
+			return 0, false
+		}
+
+		dod = int32(bits)
+	}
+
+	if sz != 0 {
+		bits, err := it.br.readBits(int(sz))
+		if err != nil {
+			it.err = err
+			return 0, false
+		}
+		if bits > (1 << (sz - 1)) {
+			// or something
+			bits = bits - (1 << sz)
+		}
+		dod = int32(bits)
+	}
+
+	return dod, true
+}
+
 // Next iteration of the series iterator
 func (it *Iter) Next() bool {
 
@@ -222,58 +280,9 @@ func (it *Iter) Next() bool {
 	}
 
 	// read delta-of-delta
-	var d byte
-	for i := 0; i < 4; i++ {
-		d <<= 1
-		bit, err := it.br.readBit()
-		if err != nil {
-			it.err = err
-			return false
-		}
-		if bit == zero {
-			break
-		}
-		d |= 1
-	}
-
-	var dod int32
-	var sz uint
-	switch d {
-	case 0x00:
-		// dod == 0
-	case 0x02:
-		sz = 7
-	case 0x06:
-		sz = 9
-	case 0x0e:
-		sz = 12
-	case 0x0f:
-		bits, err := it.br.readBits(32)
-		if err != nil {
-			it.err = err
-			return false
-		}
-
-		// end of stream
-		if bits == 0xffffffff {
-			it.finished = true
-			return false
-		}
-
-		dod = int32(bits)
-	}
-
-	if sz != 0 {
-		bits, err := it.br.readBits(int(sz))
-		if err != nil {
-			it.err = err
-			return false
-		}
-		if bits > (1 << (sz - 1)) {
-			// or something
-			bits = bits - (1 << sz)
-		}
-		dod = int32(bits)
+	dod, ok := it.dod()
+	if !ok {
+		return false
 	}
 
 	tDelta := it.tDelta + uint32(dod)
