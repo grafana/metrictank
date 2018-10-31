@@ -387,17 +387,17 @@ Flags:
   -cql-protocol-version int
     	cql protocol version to use (default 4)
   -fix int
-    	fix data to this interval like metrictank does quantization. only for points and points-summary format
+    	fix data to this interval like metrictank does quantization. only for points and point-summary format
   -from string
-    	get data from (inclusive). only for points and points-summary format (default "-24h")
+    	get data from (inclusive). only for points and point-summary format (default "-24h")
   -groupTTL string
-    	group chunks in TTL buckets based on s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
+    	group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
   -print-ts
-    	print time stamps instead of formatted dates. only for points and poins-summary format
+    	print time stamps instead of formatted dates. only for points and point-summary format
   -time-zone string
     	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
   -to string
-    	get data until (exclusive). only for points and points-summary format (default "now")
+    	get data until (exclusive). only for points and point-summary format (default "now")
   -version
     	print version string
   -window-factor int

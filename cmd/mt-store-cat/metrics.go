@@ -28,7 +28,7 @@ func (m MetricsByName) Less(i, j int) bool { return m[i].name < m[j].name }
 // prefix is optional
 func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error) {
 	var metrics []Metric
-	iter := store.Session.Query("select id, metric from metric_idx").Iter()
+	iter := store.Session.Query("select id, name from metric_idx").Iter()
 	var m Metric
 	var idString string
 	for iter.Scan(&idString, &m.name) {
@@ -54,10 +54,10 @@ func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error
 func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, error) {
 	var metrics []Metric
 	// index only stores MKey's, not AMKey's.
-	iter := store.Session.Query("select id, metric from metric_idx where id=? ALLOW FILTERING", amkey.MKey).Iter()
+	iter := store.Session.Query("select id, name from metric_idx where id=? ALLOW FILTERING", amkey.MKey.String()).Iter()
 	var m Metric
 	var idString string
-	for iter.Scan(idString, &m.name) {
+	for iter.Scan(&idString, &m.name) {
 		mkey, err := schema.MKeyFromString(idString)
 		if err != nil {
 			panic(err)
