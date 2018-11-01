@@ -1,9 +1,7 @@
 package bigtable
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -66,22 +64,6 @@ func formatFamily(ttl uint32) string {
 	return dur.FormatDuration(ttl)
 }
 
-func PrepareChunkData(span uint32, data []byte) []byte {
-	chunkSizeAtSave.Value(len(data))
-	version := chunk.FormatStandardGoTszWithSpan
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, version)
-
-	spanCode, ok := chunk.RevChunkSpans[span]
-	if !ok {
-		// it's probably better to panic than to persist the chunk with a wrong length
-		panic(fmt.Sprintf("Chunk span invalid: %d", span))
-	}
-	binary.Write(buf, binary.LittleEndian, spanCode)
-	buf.Write(data)
-	return buf.Bytes()
-}
-
 func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation, int) {
 	mut := bigtable.NewMutation()
 	family := formatFamily(cwr.TTL)
@@ -89,10 +71,10 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	if cwr.Key.Archive > 0 {
 		column = cwr.Key.Archive.String()
 	}
-	value := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
-	chunkSizeAtSave.Value(len(value))
-	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), value)
-	return mut, len(value)
+	buf := cwr.Chunk.Encode(cwr.Span, chunk.FormatStandardGoTszWithSpan)
+	chunkSizeAtSave.Value(len(buf))
+	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), buf)
+	return mut, len(buf)
 }
 
 type Store struct {

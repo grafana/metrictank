@@ -46,3 +46,10 @@ func (c *Chunk) Finish() {
 	c.Closed = true
 	c.Series.Finish()
 }
+
+// Encode encodes the chunk in the requested format.
+// note: chunks don't know their own span, the caller/owner manages that,
+// so for formats that encode it, it needs to be passed in.
+func (c *Chunk) Encode(span uint32, format Format) []byte {
+	return encode(span, format, c.Series.Bytes())
+}

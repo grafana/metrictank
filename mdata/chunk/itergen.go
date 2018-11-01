@@ -69,6 +69,13 @@ func (ig IterGen) EndTs() uint32 {
 	return ig.Ts + ig.Span
 }
 
+// Encode encodes the itergen back into a chunk using the requested format.
+// it is the callers responsibility to assure that when a format is chosen that
+// encodes the span, the IterGen actually has a valid span
+func (ig *IterGen) Encode(format Format) []byte {
+	return encode(ig.Span, format, ig.B)
+}
+
 //msgp:ignore IterGensAsc
 type IterGensAsc []IterGen
 

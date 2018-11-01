@@ -1,9 +1,7 @@
 package cassandra
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -91,22 +89,6 @@ type CassandraStore struct {
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
 	timeout          time.Duration
-}
-
-func PrepareChunkData(span uint32, data []byte) []byte {
-	chunkSizeAtSave.Value(len(data))
-	version := chunk.FormatStandardGoTszWithSpan
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, version)
-
-	spanCode, ok := chunk.RevChunkSpans[span]
-	if !ok {
-		// it's probably better to panic than to persist the chunk with a wrong length
-		panic(fmt.Sprintf("Chunk span invalid: %d", span))
-	}
-	binary.Write(buf, binary.LittleEndian, spanCode)
-	buf.Write(data)
-	return buf.Bytes()
 }
 
 // ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
@@ -334,7 +316,8 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
-			buf := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
+			buf := cwr.Chunk.Encode(cwr.Span, chunk.FormatStandardGoTszWithSpan)
+			chunkSizeAtSave.Value(len(buf))
 			success := false
 			attempts := 0
 			keyStr := cwr.Key.String()
