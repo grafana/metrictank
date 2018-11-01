@@ -276,6 +276,30 @@ func (it *Iter) Next() bool {
 
 		it.val = math.Float64frombits(v)
 
+		// special case: read upcoming dod
+		// if delta+dod <0, the delta overflowed, and should rectify it.
+		// see https://github.com/grafana/metrictank/pull/1126
+		// but we must take a backup of the stream because reading from the
+		// stream modifies it.
+		brBackup := it.br.clone()
+		dod, ok := it.dod()
+		if !ok {
+			// in this case we can't know if the point is right or wrong.
+			// long chunks with a single point in them may lead to a wrong read, but this should be rare.
+			// we can't just adjust the timestamp because we don't know the length of the chunk
+			// (though this could be done by having the caller pass us that information), nor whether
+			// a delta that may seem low compared to chunk length was intentional or not.
+			// so, nothing much to do in this case. return the possibly incorrect point.
+			// and for return value, stick to normal iter semantics:
+			// this read succeeded, though we already know the next one will fail
+			it.br = *brBackup
+			return true
+		}
+		if dod+int32(tDelta) < 0 {
+			it.tDelta += 16384
+			it.t += 16384
+		}
+		it.br = *brBackup
 		return true
 	}
 
