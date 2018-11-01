@@ -468,6 +468,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		if err := a.Chunks[0].Push(ts, val); err != nil {
 			panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos 0 failed: %q", ts, val, err))
 		}
+		totalPoints.Inc()
 
 		log.Debugf("AM: %s Add(): created first chunk with first point: %v", a.Key, a.Chunks[0])
 		a.lastWrite = uint32(time.Now().Unix())
@@ -495,6 +496,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 			metricsTooOld.Inc()
 			return
 		}
+		totalPoints.Inc()
 		a.lastWrite = uint32(time.Now().Unix())
 		log.Debugf("AM: %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
@@ -528,14 +530,17 @@ func (a *AggMetric) add(ts uint32, val float64) {
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 			}
+			totalPoints.Inc()
 			log.Debugf("AM: %s Add(): added new chunk to buffer. now %d chunks. and added the new point: %s", a.Key, a.CurrentChunkPos+1, a.Chunks[a.CurrentChunkPos])
 		} else {
 			chunkClear.Inc()
-			a.Chunks[a.CurrentChunkPos].Clear()
+			totalPoints.DecUint64(uint64(a.Chunks[a.CurrentChunkPos].NumPoints))
+
 			a.Chunks[a.CurrentChunkPos] = chunk.New(t0)
 			if err := a.Chunks[a.CurrentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.CurrentChunkPos, err))
 			}
+			totalPoints.Inc()
 			log.Debugf("AM: %s Add(): cleared chunk at %d of %d and replaced with new. and added the new point: %s", a.Key, a.CurrentChunkPos, len(a.Chunks), a.Chunks[a.CurrentChunkPos])
 		}
 		a.lastWrite = uint32(time.Now().Unix())

@@ -4,11 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/mdata/chunk/tsz"
-	"github.com/grafana/metrictank/stats"
 )
-
-// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
-var totalPoints = stats.NewGauge64("tank.total_points")
 
 // Chunk is a chunk of data. not concurrency safe.
 type Chunk struct {
@@ -43,12 +39,7 @@ func (c *Chunk) Push(t uint32, v float64) error {
 	c.Series.Push(t, v)
 	c.NumPoints += 1
 	c.LastTs = t
-	totalPoints.Inc()
 	return nil
-}
-
-func (c *Chunk) Clear() {
-	totalPoints.DecUint64(uint64(c.NumPoints))
 }
 
 func (c *Chunk) Finish() {
