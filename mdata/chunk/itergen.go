@@ -9,27 +9,35 @@ import (
 var (
 	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
 	errUnknownSpanCode    = errors.New("corrupt data, chunk span code is not known")
+	errShort              = errors.New("chunk is too short")
 )
 
 //go:generate msgp
 type IterGen struct {
 	T0 uint32
 	B  []byte
-	Span uint32
 }
 
 func NewGen(t0 uint32, b []byte) (*IterGen, error) {
-	var span uint32 = 0
-
 	switch Format(b[0]) {
 	case FormatStandardGoTsz:
-		b = b[1:]
+		if len(b) == 1 {
+			return nil, errShort
+		}
 	case FormatStandardGoTszWithSpan:
+		if len(b) <= 2 {
+			return nil, errShort
+		}
 		if int(b[1]) >= len(ChunkSpans) {
 			return nil, errUnknownSpanCode
 		}
-		span = ChunkSpans[SpanCode(b[1])]
-		b = b[2:]
+	case FormatGoTszLongWithSpan:
+		if len(b) <= 2 {
+			return nil, errShort
+		}
+		if int(b[1]) >= len(ChunkSpans) {
+			return nil, errUnknownSpanCode
+		}
 	default:
 		return nil, errUnknownChunkFormat
 	}
@@ -37,43 +45,57 @@ func NewGen(t0 uint32, b []byte) (*IterGen, error) {
 	return &IterGen{
 		t0,
 		b,
-		span,
 	}, nil
 }
 
-func NewBareIterGen(t0 uint32, b []byte, span uint32) *IterGen {
-	return &IterGen{t0, b, span}
+func NewBareIterGen(t0 uint32, b []byte) *IterGen {
+	return &IterGen{t0, b}
 }
 
-func (ig *IterGen) Get() (*Iter, error) {
-	b := make([]byte, len(ig.B), len(ig.B))
-	copy(b, ig.B)
-	it, err := tsz.NewIterator4h(b)
-	if err != nil {
-		return nil, err
+func (ig IterGen) Format() Format {
+	return Format(ig.B[0])
+}
+
+func (ig *IterGen) Get() (Iter, error) {
+	// note: the tsz iterators modify the stream as they read it, so we must always give it a copy.
+	switch ig.Format() {
+	case FormatStandardGoTsz:
+		src := ig.B[1:]
+		dest := make([]byte, len(src))
+		copy(dest, src)
+		return tsz.NewIterator4h(dest)
+	case FormatStandardGoTszWithSpan:
+		src := ig.B[2:]
+		dest := make([]byte, len(src))
+		copy(dest, src)
+		return tsz.NewIterator4h(dest)
 	}
-
-	return &Iter{it}, nil
+	// FormatGoTszLongWithSpan:
+	src := ig.B[2:]
+	dest := make([]byte, len(src))
+	copy(dest, src)
+	return tsz.NewIteratorLong(ig.T0, dest)
 }
 
-func (ig *IterGen) Size() uint64 {
+func (ig *IterGen) Span() uint32 {
+	if Format(ig.B[0]) == FormatStandardGoTsz {
+		return 0 // we don't know what the span is. sorry.
+	}
+	// already validated at IterGen creation time
+	return ChunkSpans[SpanCode(ig.B[1])]
+}
+
+func (ig *IterGen) Size() uint64 { // TODO this is different than before. problem?
 	return uint64(len(ig.B))
 }
 
-func (ig IterGen) Bytes() []byte {
+func (ig IterGen) Bytes() []byte { // TODO this is different than before. problem?
 	return ig.B
 }
 
-// end of itergen (exclusive)
+// end of itergen (exclusive). next t0
 func (ig IterGen) EndTs() uint32 {
 	return ig.T0 + ig.Span()
-}
-
-// Encode encodes the itergen back into a chunk using the requested format.
-// it is the callers responsibility to assure that when a format is chosen that
-// encodes the span, the IterGen actually has a valid span
-func (ig *IterGen) Encode(format Format) []byte {
-	return encode(ig.Span, format, ig.B)
 }
 
 //msgp:ignore IterGensAsc

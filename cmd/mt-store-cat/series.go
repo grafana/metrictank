@@ -78,7 +78,7 @@ func getSeries(ctx context.Context, store *cassandra.CassandraStore, table cassa
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Printf("#### chunk %d (t0:%s, span:%d)\n", i, printTime(ig.T0), ig.Span)
+		fmt.Printf("#### chunk %d (t0:%s, span:%d)\n", i, printTime(ig.T0), ig.Span())
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)

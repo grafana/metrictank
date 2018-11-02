@@ -309,7 +309,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
 	for {
 		c := a.getChunk(oldestPos)
-		result.Iters = append(result.Iters, chunk.NewIter(c.Iter()))
+		result.Iters = append(result.Iters, c.Iter())
 
 		if oldestPos == newestPos {
 			break
@@ -347,11 +347,7 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	go a.cachePusher.AddIfHot(
 		a.Key,
 		0,
-		*chunk.NewBareIterGen(
-			c.Bytes(),
-			c.T0,
-			a.ChunkSpan,
-		),
+		*chunk.NewBareIterGen(c.T0, c.Encode(a.ChunkSpan)),
 	)
 }
 

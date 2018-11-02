@@ -278,7 +278,7 @@ func (mc *CCacheMetric) nextTs(ts uint32) uint32 {
 // (to the extent we know them). It guesses if necessary.
 // assumes we already have at least a read lock
 func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, prev, next uint32) uint32 {
-	span := itgen.Span
+	span := itgen.Span()
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
 		return itgen.T0 + span
