@@ -122,7 +122,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 
 		// decode chunk.
 		// note typically the storage system stores and retrieves the t0 along with the chunk data
-		itgen := NewBareIterGen(bytes, c.t0, 6*3600)
+		itgen := NewBareIterGen(c.t0, bytes)
 		iter, err := itgen.Get()
 		if err != nil {
 			t.Errorf("case %d: %s: could not get iterator: %s", i, c.desc, err)

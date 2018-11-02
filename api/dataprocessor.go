@@ -454,7 +454,7 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema
 				points = append(points, schema.Point{Val: val, Ts: ts})
 			}
 		}
-		log.Debugf("DP getSeries: iter %d values good/total %d/%d", iter.T0, good, total)
+		log.Debugf("DP getSeries: iter values good/total %d/%d", good, total)
 	}
 	itersToPointsDuration.Value(time.Now().Sub(pre))
 	return points
@@ -516,7 +516,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 			tracing.Errorf(span, "itergen: error getting iter from Start list %+v", err)
 			return iters, err
 		}
-		iters = append(iters, *iter)
+		iters = append(iters, iter)
 	}
 
 	// check to see if the request has been canceled, if so abort now.
@@ -554,7 +554,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 					}
 					return iters, err
 				}
-				iters = append(iters, *it)
+				iters = append(iters, it)
 			}
 			// it's important that the itgens get added in chronological order,
 			// currently we rely on store returning results in order
@@ -569,7 +569,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 				log.Errorf("itergen: error getting iter from cache result end slice %+v", err.Error())
 				return iters, err
 			}
-			iters = append(iters, *it)
+			iters = append(iters, it)
 		}
 	}
 
