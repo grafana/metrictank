@@ -281,7 +281,8 @@ func (it *Iter) Next() bool {
 		it.val = math.Float64frombits(v)
 
 		// special case: read upcoming dod
-		// if delta+dod <0, the delta overflowed, and should rectify it.
+		// if delta+dod <0 (aka the upcoming delta < 0),
+		// our current delta overflowed, and should rectify it.
 		// see https://github.com/grafana/metrictank/pull/1126
 		// but we must take a backup of the stream because reading from the
 		// stream modifies it.
