@@ -11,4 +11,5 @@ type Format uint8
 const (
 	FormatStandardGoTsz Format = iota
 	FormatStandardGoTszWithSpan
+	FormatGoTszLongWithSpan // like FormatStandardGoTszWithSpan but using tsz.SeriesLong
 )

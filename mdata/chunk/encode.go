@@ -9,7 +9,7 @@ import (
 // encode is a helper function to encode a chunk of data into various formats
 func encode(span uint32, format Format, data []byte) []byte {
 	switch format {
-	case FormatStandardGoTszWithSpan:
+	case FormatStandardGoTszWithSpan, FormatGoTszLongWithSpan:
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.LittleEndian, format)
 

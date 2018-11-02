@@ -316,7 +316,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
-			buf := cwr.Chunk.Encode(cwr.Span, chunk.FormatStandardGoTszWithSpan)
+			buf := cwr.Chunk.Encode(cwr.Span)
 			chunkSizeAtSave.Value(len(buf))
 			success := false
 			attempts := 0

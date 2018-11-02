@@ -574,7 +574,7 @@ func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
 		return a.lastWrite < chunkMinTs
 	}
 
-	return a.lastWrite < chunkMinTs && currentChunk.Series4h.T0+a.ChunkSpan+15*60 < now
+	return a.lastWrite < chunkMinTs && currentChunk.SeriesLong.T0+a.ChunkSpan+15*60 < now
 }
 
 // GC returns whether or not this AggMetric is stale and can be removed

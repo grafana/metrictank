@@ -71,7 +71,7 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	if cwr.Key.Archive > 0 {
 		column = cwr.Key.Archive.String()
 	}
-	buf := cwr.Chunk.Encode(cwr.Span, chunk.FormatStandardGoTszWithSpan)
+	buf := cwr.Chunk.Encode(cwr.Span)
 	chunkSizeAtSave.Value(len(buf))
 	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), buf)
 	return mut, len(buf)
