@@ -58,10 +58,6 @@ unused-packages = true
   branch = "master"
 
 [[constraint]]
-  name = "github.com/dgryski/go-tsz"
-  revision = "5f4c484a9e838989c201ff437b3cab59cfdc46c8"
-
-[[constraint]]
   name = "github.com/docker/docker"
   version = "v1.13.1"
 
