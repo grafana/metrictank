@@ -345,12 +345,6 @@ func (s *Store) SetTracer(t opentracing.Tracer) {
 	s.tracer = t
 }
 
-type SortedIterGen []chunk.IterGen
-
-func (a SortedIterGen) Len() int           { return len(a) }
-func (a SortedIterGen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a SortedIterGen) Less(i, j int) bool { return a[i].Ts < a[j].Ts }
-
 // Basic search of bigtable for data chunks
 // start inclusive, end exclusive
 func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
@@ -456,6 +450,6 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 		btblReadError.Inc()
 	}
 	// TODO: do we need to ensure that itgens is sorted by chunk T0?
-	sort.Sort(SortedIterGen(itgens))
+	sort.Sort(chunk.IterGensAsc(itgens))
 	return itgens, err
 }
