@@ -295,7 +295,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(itgens) != 2 || itgens[0].Ts != 20 || itgens[1].Ts != 30 {
+	if len(itgens) != 2 || itgens[0].T0 != 20 || itgens[1].T0 != 30 {
 		t.Fatalf("expected 2 itgens for chunks 20 and 30 since the first one should be dropped. Got %v", itgens)
 	}
 }

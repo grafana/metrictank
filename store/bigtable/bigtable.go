@@ -400,7 +400,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 					err = errChunkTooSmall
 					return false
 				}
-				itgen, err = chunk.NewGen(rItem.Value, uint32(rItem.Timestamp/1e6))
+				itgen, err = chunk.NewGen(uint32(rItem.Timestamp/1e6), rItem.Value)
 				if err != nil {
 					log.Errorf("btStore: unable to create chunk from bytes. %s", err)
 					return false

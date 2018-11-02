@@ -523,15 +523,15 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	pre = time.Now()
 
 	var b []byte
-	var ts int
-	for res.i.Scan(&ts, &b) {
+	var t0 int
+	for res.i.Scan(&t0, &b) {
 		chunkSizeAtLoad.Value(len(b))
 		if len(b) < 2 {
 			tracing.Failure(span)
 			tracing.Error(span, errChunkTooSmall)
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewGen(b, uint32(ts))
+		itgen, err := chunk.NewGen(uint32(t0), b)
 		if err != nil {
 			tracing.Failure(span)
 			tracing.Error(span, err)

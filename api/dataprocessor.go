@@ -509,7 +509,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chun
 
 	for _, itgen := range cacheRes.Start {
 		iter, err := itgen.Get()
-		prevts = itgen.Ts
+		prevts = itgen.T0
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
 			tracing.Failure(span)

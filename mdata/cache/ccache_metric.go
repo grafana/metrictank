@@ -86,7 +86,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 
 	// handle the first one
 	itergen := itergens[0]
-	ts := itergen.Ts
+	ts := itergen.T0
 
 	// if we add data that is older than chunks already cached,
 	// we will have to sort the keys once we're done adding them
@@ -109,9 +109,9 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		}
 
 		// if the previous chunk is cached, link it
-		if prev != 0 && (ts-prev) != (itergens[1].Ts-ts) {
+		if prev != 0 && (ts-prev) != (itergens[1].T0-ts) {
 			log.Warnf("CCacheMetric AddRange: Bad prev begin used: key = %s, prev = %d, itergens[0].Ts = %d, itergens[1].Ts = %d",
-				mc.MKey.String(), prev, itergens[0].Ts, itergens[1].Ts)
+				mc.MKey.String(), prev, itergens[0].T0, itergens[1].T0)
 			prev = 0
 		} else if _, ok := mc.chunks[prev]; ok {
 			mc.chunks[prev].Next = ts
@@ -122,12 +122,12 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		mc.chunks[ts] = &CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
-			Next:  itergens[1].Ts,
+			Next:  itergens[1].T0,
 			Itgen: itergen,
 		}
 		mc.keys = append(mc.keys, ts)
 	} else {
-		mc.chunks[ts].Next = itergens[1].Ts
+		mc.chunks[ts].Next = itergens[1].T0
 	}
 
 	prev = ts
@@ -135,7 +135,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	// handle the 2nd until the last-but-one
 	for i := 1; i < len(itergens)-1; i++ {
 		itergen = itergens[i]
-		ts = itergen.Ts
+		ts = itergen.T0
 		// Only append key if we didn't have this chunk already
 		if _, ok := mc.chunks[ts]; !ok {
 			mc.keys = append(mc.keys, ts)
@@ -145,7 +145,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 		mc.chunks[ts] = &CCacheChunk{
 			Ts:    ts,
 			Prev:  prev,
-			Next:  itergens[i+1].Ts,
+			Next:  itergens[i+1].T0,
 			Itgen: itergen,
 		}
 
@@ -154,7 +154,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 
 	// handle the last one
 	itergen = itergens[len(itergens)-1]
-	ts = itergen.Ts
+	ts = itergen.T0
 
 	// add chunk if we don't have it yet (most likely)
 	if _, ok := mc.chunks[ts]; !ok {
@@ -192,7 +192,7 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 
 // Add adds a chunk to the cache
 func (mc *CCacheMetric) Add(prev uint32, itergen chunk.IterGen) {
-	ts := itergen.Ts
+	ts := itergen.T0
 
 	mc.Lock()
 	defer mc.Unlock()
@@ -281,7 +281,7 @@ func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, prev, next uint32) uint3
 	span := itgen.Span
 	if span > 0 {
 		// if the chunk is span-aware we don't need anything else
-		return itgen.Ts + span
+		return itgen.T0 + span
 	}
 
 	// if chunk has a next chunk, then that's the ts we need
@@ -290,10 +290,10 @@ func (mc *CCacheMetric) nextTsCore(itgen chunk.IterGen, prev, next uint32) uint3
 	}
 	// if chunk has no next chunk, but has a previous one, we assume the length of this one is same as the previous one
 	if prev != 0 {
-		return itgen.Ts + (itgen.Ts - prev)
+		return itgen.T0 + (itgen.T0 - prev)
 	}
 	// if a chunk has no next and no previous chunk we have to assume it's length is 0
-	return itgen.Ts
+	return itgen.T0
 }
 
 // lastTs returns the last Ts of this metric cache

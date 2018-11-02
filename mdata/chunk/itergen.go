@@ -13,12 +13,12 @@ var (
 
 //go:generate msgp
 type IterGen struct {
-	B    []byte
-	Ts   uint32
+	T0 uint32
+	B  []byte
 	Span uint32
 }
 
-func NewGen(b []byte, ts uint32) (*IterGen, error) {
+func NewGen(t0 uint32, b []byte) (*IterGen, error) {
 	var span uint32 = 0
 
 	switch Format(b[0]) {
@@ -35,14 +35,14 @@ func NewGen(b []byte, ts uint32) (*IterGen, error) {
 	}
 
 	return &IterGen{
+		t0,
 		b,
-		ts,
 		span,
 	}, nil
 }
 
-func NewBareIterGen(b []byte, ts uint32, span uint32) *IterGen {
-	return &IterGen{b, ts, span}
+func NewBareIterGen(t0 uint32, b []byte, span uint32) *IterGen {
+	return &IterGen{t0, b, span}
 }
 
 func (ig *IterGen) Get() (*Iter, error) {
@@ -66,7 +66,7 @@ func (ig IterGen) Bytes() []byte {
 
 // end of itergen (exclusive)
 func (ig IterGen) EndTs() uint32 {
-	return ig.Ts + ig.Span
+	return ig.T0 + ig.Span()
 }
 
 // Encode encodes the itergen back into a chunk using the requested format.
@@ -81,4 +81,4 @@ type IterGensAsc []IterGen
 
 func (a IterGensAsc) Len() int           { return len(a) }
 func (a IterGensAsc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a IterGensAsc) Less(i, j int) bool { return a[i].Ts < a[j].Ts }
+func (a IterGensAsc) Less(i, j int) bool { return a[i].T0 < a[j].T0 }

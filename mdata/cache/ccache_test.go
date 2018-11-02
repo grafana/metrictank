@@ -77,7 +77,7 @@ func TestAddIfHotWithoutPrevTsOnHotMetric(t *testing.T) {
 		t.Fatalf("expected cache chunk to have been cached")
 	}
 
-	if itgen3.Ts != chunk.Ts {
+	if itgen3.T0 != chunk.Ts {
 		t.Fatalf("cached chunk wasn't the expected one")
 	}
 
@@ -137,7 +137,7 @@ func TestAddIfHotWithPrevTsOnHotMetric(t *testing.T) {
 		t.Fatalf("expected cache chunk to have been cached")
 	}
 
-	if itgen3.Ts != chunk.Ts {
+	if itgen3.T0 != chunk.Ts {
 		t.Fatalf("cached chunk wasn't the expected one")
 	}
 
@@ -242,7 +242,7 @@ func TestDisconnectedAdding(t *testing.T) {
 		t.Fatalf("expected to get 3 itergens in End, got %d", len(res.End))
 	}
 
-	if res.End[0].Ts != 1010 || res.End[len(res.End)-1].Ts != 1000 {
+	if res.End[0].T0 != 1010 || res.End[len(res.End)-1].T0 != 1000 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -280,7 +280,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 		t.Fatalf("expected to get 3 itergens in End, got %d", len(res.End))
 	}
 
-	if res.End[0].Ts != 1010 || res.End[len(res.End)-1].Ts != 1000 {
+	if res.End[0].T0 != 1010 || res.End[len(res.End)-1].T0 != 1000 {
 		t.Fatalf("result set is wrong")
 	}
 
@@ -316,7 +316,7 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 		t.Fatalf("expected to get 4 itergens, got %d", len(res.Start))
 	}
 
-	if res.Start[0].Ts != 1005 || res.Start[len(res.Start)-1].Ts != 1020 {
+	if res.Start[0].T0 != 1005 || res.Start[len(res.Start)-1].T0 != 1020 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -337,7 +337,7 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 		t.Fatalf("expected to get 4 itergens, got %d", len(res.Start))
 	}
 
-	if res.Start[0].Ts != 1005 || res.Start[len(res.Start)-1].Ts != 1020 {
+	if res.Start[0].T0 != 1005 || res.Start[len(res.Start)-1].T0 != 1020 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -367,7 +367,7 @@ func TestSearchFromEnd(t *testing.T) {
 		t.Fatalf("Until is expected to be 1000, got %d", res.Until)
 	}
 
-	if res.End[0].Ts != 1020 || res.End[len(res.End)-1].Ts != 1000 {
+	if res.End[0].T0 != 1020 || res.End[len(res.End)-1].T0 != 1000 {
 		t.Fatalf("result set is wrong")
 	}
 }
@@ -430,7 +430,7 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 				t.Fatalf("from %d, until %d: expected to get %d itergens at start, got %d", from, until, 6, len(res.Start))
 			}
 
-			if res.Start[0].Ts != 1000 || res.Start[len(res.Start)-1].Ts != 1050 {
+			if res.Start[0].T0 != 1000 || res.Start[len(res.Start)-1].T0 != 1050 {
 				t.Fatalf("from %d, until %d: result set at Start is wrong", from, until)
 			}
 
@@ -508,7 +508,7 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 				t.Fatalf("from %d, until %d: expected to get 3 itergens at start, got %d", from, until, len(res.Start))
 			}
 
-			if res.Start[0].Ts != 1000 || res.Start[len(res.Start)-1].Ts != 1020 {
+			if res.Start[0].T0 != 1000 || res.Start[len(res.Start)-1].T0 != 1020 {
 				t.Fatalf("from %d, until %d: result set at Start is wrong", from, until)
 			}
 
@@ -520,7 +520,7 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 				t.Fatalf("from %d, until %d: expected to get 3 itergens at end, got %d", from, until, len(res.End))
 			}
 
-			if res.End[0].Ts != 1060 || res.End[len(res.End)-1].Ts != 1040 {
+			if res.End[0].T0 != 1060 || res.End[len(res.End)-1].T0 != 1040 {
 				t.Fatalf("from %d, until %d: result set at End is wrong", from, until)
 			}
 

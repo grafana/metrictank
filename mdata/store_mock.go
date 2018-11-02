@@ -57,7 +57,7 @@ func (c *MockStore) Search(ctx context.Context, metric schema.AMKey, ttl, start,
 
 	for _, itgen := range itgens {
 		// start is inclusive, end is exclusive
-		if itgen.Ts < end && itgen.EndTs() > start && start < end {
+		if itgen.T0 < end && itgen.EndTs() > start && start < end {
 			res = append(res, itgen)
 		}
 	}

@@ -274,11 +274,11 @@ func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.Ite
 	}
 	log.Debug(query)
 	for _, ig := range itergens {
-		rowKey := fmt.Sprintf("%s_%d", id, ig.Ts/cassandraStore.Month_sec)
+		rowKey := fmt.Sprintf("%s_%d", id, ig.T0/cassandraStore.Month_sec)
 		success := false
 		attempts := 0
 		for !success {
-			err := s.Session.Query(query, rowKey, ig.Ts, ig.Encode(chunk.FormatStandardGoTszWithSpan)).Exec()
+			err := s.Session.Query(query, rowKey, ig.T0, ig.Encode(chunk.FormatStandardGoTszWithSpan)).Exec()
 			if err != nil {
 				if (attempts % 20) == 0 {
 					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)
