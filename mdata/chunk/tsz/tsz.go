@@ -1,9 +1,13 @@
-// Package tsz implement time-series compression
-/*
-
-http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-
-*/
+// Package tsz implements time-series compression
+// it is a fork of https://github.com/dgryski/go-tsz
+// which implements http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
+// with the following exceptions:
+// * t-1 is here t0 (see devdocs)
+// * we renamed the package to be more clearly about the limitation that
+// you shouldn't use it for chunks longer than 4.5 hours, due to overflow
+// of the first delta (14 bits), see https://github.com/grafana/metrictank/pull/1126
+// * we patched a workaround to reconstruct corrupted chunks that were
+//   affected by the above issue. (only works for chunks <= 9h)
 package tsz
 
 import (

@@ -134,16 +134,6 @@
   revision = "edcf2dfd90ff209a4434491d7f38e203b3163de2"
 
 [[projects]]
-  digest = "1:99f1b1a6d08214aa4a455e3ed3b20c0385e5d5eaa6f246f8230ee3679bd3fd98"
-  name = "github.com/dgryski/go-tsz"
-  packages = [
-    ".",
-    "testdata",
-  ]
-  pruneopts = "NUT"
-  revision = "03b7d791f4fe79270d114e1ea6929332dbf028b7"
-
-[[projects]]
   digest = "1:3cabbabc9e0e4aa7e12b882bdc213f41cf8bd2b2ce2a7b5e0aceaf8a6a78049b"
   name = "github.com/docker/distribution"
   packages = [
@@ -1074,7 +1064,6 @@
     "github.com/bitly/go-hostpool",
     "github.com/davecgh/go-spew/spew",
     "github.com/dgryski/go-linlog",
-    "github.com/dgryski/go-tsz",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",
     "github.com/go-macaron/binding",

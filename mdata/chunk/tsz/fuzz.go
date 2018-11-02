@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dgryski/go-tsz/testdata"
+	"github.com/grafana/metrictank/mdata/chunk/tsz/testdata"
 )
 
 func Fuzz(data []byte) int {

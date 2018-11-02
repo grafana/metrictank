@@ -3,7 +3,7 @@ package chunk
 import (
 	"fmt"
 
-	"github.com/dgryski/go-tsz"
+	"github.com/grafana/metrictank/mdata/chunk/tsz"
 	"github.com/grafana/metrictank/stats"
 )
 
