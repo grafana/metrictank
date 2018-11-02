@@ -1,13 +1,7 @@
 // Package tsz implements time-series compression
 // it is a fork of https://github.com/dgryski/go-tsz
 // which implements http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-// with the following exceptions:
-// * t-1 is here t0 (see devdocs)
-// * we renamed the package to be more clearly about the limitation that
-// you shouldn't use it for chunks longer than 4.5 hours, due to overflow
-// of the first delta (14 bits), see https://github.com/grafana/metrictank/pull/1126
-// * we patched a workaround to reconstruct corrupted chunks that were
-//   affected by the above issue. (only works for chunks <= 9h)
+// see devdocs/gorilla-compression.md for more info
 package tsz
 
 import (
@@ -19,9 +13,13 @@ import (
 	"sync"
 )
 
-// Series is the basic series primitive
+// Series4h is the basic series primitive
 // you can concurrently put values, finish the stream, and create iterators
-type Series struct {
+// you shouldn't use it for chunks longer than 4.5 hours, due to overflow
+// of the first delta (14 bits), though in some cases, the corresponding iterator
+// can reconstruct the data. Only works for <=9h deltas/chunks though.
+// See https://github.com/grafana/metrictank/pull/1126
+type Series4h struct {
 	sync.Mutex
 
 	// TODO(dgryski): timestamps in the paper are uint64
@@ -37,9 +35,9 @@ type Series struct {
 	tDelta uint32
 }
 
-// New series
-func New(t0 uint32) *Series {
-	s := Series{
+// NewSeries4h creates a new Series4h
+func NewSeries4h(t0 uint32) *Series4h {
+	s := Series4h{
 		T0:      t0,
 		leading: ^uint8(0),
 	}
@@ -52,7 +50,7 @@ func New(t0 uint32) *Series {
 }
 
 // Bytes value of the series stream
-func (s *Series) Bytes() []byte {
+func (s *Series4h) Bytes() []byte {
 	s.Lock()
 	defer s.Unlock()
 	return s.bw.bytes()
@@ -66,7 +64,7 @@ func finish(w *bstream) {
 }
 
 // Finish the series by writing an end-of-stream record
-func (s *Series) Finish() {
+func (s *Series4h) Finish() {
 	s.Lock()
 	if !s.finished {
 		finish(&s.bw)
@@ -76,7 +74,7 @@ func (s *Series) Finish() {
 }
 
 // Push a timestamp and value to the series
-func (s *Series) Push(t uint32, v float64) {
+func (s *Series4h) Push(t uint32, v float64) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -150,19 +148,20 @@ func (s *Series) Push(t uint32, v float64) {
 
 }
 
-// Iter lets you iterate over a series.  It is not concurrency-safe.
-func (s *Series) Iter() *Iter {
+// Iter4h lets you iterate over a series.  It is not concurrency-safe.
+func (s *Series4h) Iter() *Iter4h {
 	s.Lock()
 	w := s.bw.clone()
 	s.Unlock()
 
 	finish(w)
-	iter, _ := bstreamIterator(w)
+	iter, _ := bstreamIterator4h(w)
 	return iter
 }
 
-// Iter lets you iterate over a series.  It is not concurrency-safe.
-type Iter struct {
+// Iter4h lets you iterate over a Series4h.  It is not concurrency-safe.
+// For more info, see Series4h
+type Iter4h struct {
 	T0 uint32
 
 	t   uint32
@@ -178,7 +177,7 @@ type Iter struct {
 	err    error
 }
 
-func bstreamIterator(br *bstream) (*Iter, error) {
+func bstreamIterator4h(br *bstream) (*Iter4h, error) {
 
 	br.count = 8
 
@@ -187,18 +186,18 @@ func bstreamIterator(br *bstream) (*Iter, error) {
 		return nil, err
 	}
 
-	return &Iter{
+	return &Iter4h{
 		T0: uint32(t0),
 		br: *br,
 	}, nil
 }
 
-// NewIterator for the series
-func NewIterator(b []byte) (*Iter, error) {
-	return bstreamIterator(newBReader(b))
+// NewIterator4h creates an Iter4h
+func NewIterator4h(b []byte) (*Iter4h, error) {
+	return bstreamIterator4h(newBReader(b))
 }
 
-func (it *Iter) dod() (int32, bool) {
+func (it *Iter4h) dod() (int32, bool) {
 	var d byte
 	for i := 0; i < 4; i++ {
 		d <<= 1
@@ -257,7 +256,7 @@ func (it *Iter) dod() (int32, bool) {
 }
 
 // Next iteration of the series iterator
-func (it *Iter) Next() bool {
+func (it *Iter4h) Next() bool {
 
 	if it.err != nil || it.finished {
 		return false
@@ -373,12 +372,12 @@ func (it *Iter) Next() bool {
 }
 
 // Values at the current iterator position
-func (it *Iter) Values() (uint32, float64) {
+func (it *Iter4h) Values() (uint32, float64) {
 	return it.t, it.val
 }
 
 // Err error at the current iterator position
-func (it *Iter) Err() error {
+func (it *Iter4h) Err() error {
 	return it.err
 }
 
@@ -403,7 +402,7 @@ func (em *errMarshal) read(t interface{}) {
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface
-func (s *Series) MarshalBinary() ([]byte, error) {
+func (s *Series4h) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	em := &errMarshal{w: buf}
 	em.write(s.T0)
@@ -424,7 +423,7 @@ func (s *Series) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface
-func (s *Series) UnmarshalBinary(b []byte) error {
+func (s *Series4h) UnmarshalBinary(b []byte) error {
 	buf := bytes.NewReader(b)
 	em := &errMarshal{r: buf}
 	em.read(&s.T0)

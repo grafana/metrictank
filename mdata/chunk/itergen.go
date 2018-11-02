@@ -48,7 +48,7 @@ func NewBareIterGen(b []byte, ts uint32, span uint32) *IterGen {
 func (ig *IterGen) Get() (*Iter, error) {
 	b := make([]byte, len(ig.B), len(ig.B))
 	copy(b, ig.B)
-	it, err := tsz.NewIterator(b)
+	it, err := tsz.NewIterator4h(b)
 	if err != nil {
 		return nil, err
 	}

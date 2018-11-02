@@ -5,10 +5,10 @@ import (
 )
 
 type Iter struct {
-	*tsz.Iter
+	*tsz.Iter4h
 }
 
-func NewIter(i *tsz.Iter) Iter {
+func NewIter(i *tsz.Iter4h) Iter {
 	return Iter{
 		i,
 	}
