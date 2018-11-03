@@ -347,7 +347,7 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	go a.cachePusher.AddIfHot(
 		a.Key,
 		0,
-		*chunk.NewBareIterGen(c.T0, c.Encode(a.ChunkSpan)),
+		chunk.NewBareIterGen(c.T0, c.Encode(a.ChunkSpan)),
 	)
 }
 

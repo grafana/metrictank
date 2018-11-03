@@ -365,7 +365,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 		} else if prevT0 != t0 {
 			c.Finish()
 
-			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.T0, c.Encode(chunkSpan)))
+			encodedChunks = append(encodedChunks, chunk.NewBareIterGen(c.T0, c.Encode(chunkSpan)))
 
 			c = chunk.New(t0)
 			prevT0 = t0
@@ -381,7 +381,7 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 	// or if writeUnfinishedChunks is on, we close the chunk and push it
 	if point.Timestamp == t0+chunkSpan-intervalIn || *writeUnfinishedChunks {
 		c.Finish()
-		encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.T0, c.Encode(chunkSpan)))
+		encodedChunks = append(encodedChunks, chunk.NewBareIterGen(c.T0, c.Encode(chunkSpan)))
 	}
 
 	return encodedChunks

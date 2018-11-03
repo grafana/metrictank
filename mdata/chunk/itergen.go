@@ -18,38 +18,37 @@ type IterGen struct {
 	B  []byte
 }
 
-func NewGen(t0 uint32, b []byte) (*IterGen, error) {
+// NewBareIterGen creates an IterGen without validation
+func NewBareIterGen(t0 uint32, b []byte) IterGen {
+	return IterGen{t0, b}
+}
+
+// NewIterGen creates an IterGen and performs crude validation of the data
+func NewIterGen(t0 uint32, b []byte) (IterGen, error) {
 	switch Format(b[0]) {
 	case FormatStandardGoTsz:
 		if len(b) == 1 {
-			return nil, errShort
+			return IterGen{}, errShort
 		}
 	case FormatStandardGoTszWithSpan:
 		if len(b) <= 2 {
-			return nil, errShort
+			return IterGen{}, errShort
 		}
 		if int(b[1]) >= len(ChunkSpans) {
-			return nil, errUnknownSpanCode
+			return IterGen{}, errUnknownSpanCode
 		}
 	case FormatGoTszLongWithSpan:
 		if len(b) <= 2 {
-			return nil, errShort
+			return IterGen{}, errShort
 		}
 		if int(b[1]) >= len(ChunkSpans) {
-			return nil, errUnknownSpanCode
+			return IterGen{}, errUnknownSpanCode
 		}
 	default:
-		return nil, errUnknownChunkFormat
+		return IterGen{}, errUnknownChunkFormat
 	}
 
-	return &IterGen{
-		t0,
-		b,
-	}, nil
-}
-
-func NewBareIterGen(t0 uint32, b []byte) *IterGen {
-	return &IterGen{t0, b}
+	return IterGen{t0, b}, nil
 }
 
 func (ig IterGen) Format() Format {

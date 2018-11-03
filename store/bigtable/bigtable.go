@@ -391,7 +391,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	reqErr := s.tbl.ReadRows(queryCtx, rr, func(row bigtable.Row) bool {
 		rowCount++
 		chunks := 0
-		var itgen *chunk.IterGen
+		var itgen chunk.IterGen
 		for _, items := range row {
 			for _, rItem := range items {
 				chunkSizeAtLoad.Value(len(rItem.Value))
@@ -400,7 +400,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 					err = errChunkTooSmall
 					return false
 				}
-				itgen, err = chunk.NewGen(uint32(rItem.Timestamp/1e6), rItem.Value)
+				itgen, err = chunk.NewIterGen(uint32(rItem.Timestamp/1e6), rItem.Value)
 				if err != nil {
 					log.Errorf("btStore: unable to create chunk from bytes. %s", err)
 					return false
@@ -408,7 +408,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 				chunks++
 
 				// This function is called serially so we don't need synchronization here
-				itgens = append(itgens, *itgen)
+				itgens = append(itgens, itgen)
 			}
 		}
 		btblChunksPerRow.Value(chunks)
