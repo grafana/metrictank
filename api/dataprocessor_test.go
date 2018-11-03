@@ -461,7 +461,7 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 		}
 	}
 	// if end was not quantized we have to finish the last chunk
-	if !c.Closed {
+	if !c.Finished {
 		c.Finish()
 		chunks = append(chunks, *c)
 	}

@@ -19,14 +19,14 @@ type SeriesLong struct {
 	sync.Mutex
 
 	// TODO(dgryski): timestamps in the paper are uint64
-	T0  uint32
-	t   uint32
+	T0  uint32 // exposed for caller convenience. do NOT set directly. set via constructor
+	T   uint32 // exposed for caller convenience. do NOT set directly. may only be set via Push()
 	val float64
 
 	bw       bstream
 	leading  uint8
 	trailing uint8
-	finished bool
+	Finished bool // exposed for caller convenience. do NOT set directly.
 
 	tDelta uint32
 }
@@ -52,9 +52,9 @@ func (s *SeriesLong) Bytes() []byte {
 // Finish the series by writing an end-of-stream record
 func (s *SeriesLong) Finish() {
 	s.Lock()
-	if !s.finished {
+	if !s.Finished {
 		finish(&s.bw)
-		s.finished = true
+		s.Finished = true
 	}
 	s.Unlock()
 }
@@ -66,8 +66,8 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 
 	var first bool
 
-	tDelta := t - s.t
-	if s.t == 0 {
+	tDelta := t - s.T
+	if s.T == 0 {
 		first = true
 		tDelta = t - s.T0
 	}
@@ -91,7 +91,7 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 	}
 
 	s.tDelta = tDelta
-	s.t = t
+	s.T = t
 
 	if first {
 		// first point; write full float value
@@ -343,7 +343,7 @@ func (s *SeriesLong) MarshalBinary() ([]byte, error) {
 	em := &errMarshal{w: buf}
 	em.write(s.T0)
 	em.write(s.leading)
-	em.write(s.t)
+	em.write(s.T)
 	em.write(s.tDelta)
 	em.write(s.trailing)
 	em.write(s.val)
@@ -364,7 +364,7 @@ func (s *SeriesLong) UnmarshalBinary(b []byte) error {
 	em := &errMarshal{r: buf}
 	em.read(&s.T0)
 	em.read(&s.leading)
-	em.read(&s.t)
+	em.read(&s.T)
 	em.read(&s.tDelta)
 	em.read(&s.trailing)
 	em.read(&s.val)
