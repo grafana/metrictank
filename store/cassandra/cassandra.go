@@ -531,13 +531,13 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 			tracing.Error(span, errChunkTooSmall)
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewGen(uint32(t0), b)
+		itgen, err := chunk.NewIterGen(uint32(t0), b)
 		if err != nil {
 			tracing.Failure(span)
 			tracing.Error(span, err)
 			return itgens, err
 		}
-		itgens = append(itgens, *itgen)
+		itgens = append(itgens, itgen)
 	}
 
 	err := res.i.Close()
