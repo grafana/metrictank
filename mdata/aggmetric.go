@@ -480,7 +480,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 	if t0 == currentChunk.T0 {
 		// last prior data was in same chunk as new point
-		if currentChunk.Closed {
+		if currentChunk.Finished {
 			// if we've already 'finished' the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
 			addToClosedChunk.Inc()
@@ -496,16 +496,14 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		a.lastWrite = uint32(time.Now().Unix())
 		log.Debugf("AM: %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.T0 {
-		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.LastTs)
+		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.T0, currentChunk.T)
 		metricsTooOld.Inc()
 		return
 	} else {
 		// Data belongs in a new chunk.
 
-		//  If it isnt finished already, add the end-of-stream marker and flag the chunk as "closed"
-		if !currentChunk.Closed {
-			currentChunk.Finish()
-		}
+		// If it isn't finished already, add the end-of-stream marker and flag the chunk as "closed"
+		currentChunk.Finish()
 
 		a.pushToCache(currentChunk)
 		// If we are a primary node, then add the chunk to the write queue to be saved to Cassandra
@@ -615,7 +613,7 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
-	if currentChunk.Closed {
+	if currentChunk.Finished {
 		// already closed and should be saved, though we cant guarantee that.
 		// Check if we should just delete the metric from memory.
 		if a.lastWrite < metricMinTs {
