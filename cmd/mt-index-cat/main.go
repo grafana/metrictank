@@ -11,6 +11,7 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
@@ -163,7 +164,7 @@ func main() {
 		}
 	}
 
-	var show func(d schema.MetricDefinition)
+	var show func(d idx.MetricDefinition)
 
 	switch format {
 	case "dump":
@@ -178,8 +179,8 @@ func main() {
 		show = out.Template(format)
 	}
 
-	idx := cassandra.New()
-	err := idx.InitBare()
+	cassIdx := cassandra.New()
+	err := cassIdx.InitBare()
 	perror(err)
 
 	// from should either be a unix timestamp, or a specification that graphite/metrictank will recognize.
@@ -231,11 +232,11 @@ func main() {
 		}
 	}
 
-	var defs []schema.MetricDefinition
+	var defs []idx.MetricDefinition
 	if len(partitions) == 0 {
-		defs = idx.Load(nil, time.Now())
+		defs = cassIdx.Load(nil, time.Now())
 	} else {
-		defs = idx.LoadPartitions(partitions, nil, time.Now())
+		defs = cassIdx.LoadPartitions(partitions, nil, time.Now())
 	}
 	// set this after doing the query, to assure age can't possibly be negative unless if clocks are misconfigured.
 	out.QueryTime = time.Now().Unix()
@@ -243,15 +244,16 @@ func main() {
 	shown := 0
 
 	for _, d := range defs {
+		name := d.Name.String()
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
-		if !strings.HasPrefix(d.Name, prefix) {
+		if !strings.HasPrefix(name, prefix) {
 			continue
 		}
-		if !strings.HasSuffix(d.Name, suffix) {
+		if !strings.HasSuffix(name, suffix) {
 			continue
 		}
-		if !strings.Contains(d.Name, substr) {
+		if !strings.Contains(name, substr) {
 			continue
 		}
 		if tags == "none" && len(d.Tags) != 0 {
@@ -260,11 +262,11 @@ func main() {
 		if tags == "some" && len(d.Tags) == 0 {
 			continue
 		}
-		if regex != nil && !regex.MatchString(d.Name) {
+		if regex != nil && !regex.MatchString(name) {
 			continue
 		}
 		if tags == "valid" || tags == "invalid" {
-			valid := schema.ValidateTags(d.Tags)
+			valid := schema.ValidateTags(d.Tags.Strings())
 
 			// skip the metric if the validation result is not what we want
 			if valid != (tags == "valid") {

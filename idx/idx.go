@@ -9,6 +9,7 @@ import (
 )
 
 var OrgIdPublic = uint32(0)
+var stringPool = NewStringPool()
 
 //go:generate msgp
 type Node struct {
@@ -19,7 +20,7 @@ type Node struct {
 }
 
 type Archive struct {
-	schema.MetricDefinition
+	MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
@@ -28,11 +29,9 @@ type Archive struct {
 
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
-	return Archive{
-		MetricDefinition: schema.MetricDefinition{
-			Name: name,
-		},
-	}
+	arc := Archive{}
+	arc.MetricDefinition.SetMetricName(name)
+	return arc
 }
 
 // The MetricIndex interface supports Graphite style queries.

@@ -104,7 +104,7 @@ func ConfigSetup() *flag.FlagSet {
 }
 
 type writeReq struct {
-	def      *schema.MetricDefinition
+	def      *idx.MetricDefinition
 	recvTime time.Time
 }
 
@@ -294,7 +294,6 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := c.MemoryIdx.AddOrUpdate(mkey, data, partition)
-
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
@@ -362,12 +361,12 @@ func (c *CasIdx) rebuildIndex() {
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
+func (c *CasIdx) Load(defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
 	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter, now)
 }
 
-func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
+func (c *CasIdx) LoadPartitions(partitions []int32, defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
 	placeholders := make([]string, len(partitions))
 	for i, p := range partitions {
 		placeholders[i] = strconv.Itoa(int(p))
@@ -377,8 +376,8 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 	return c.load(defs, iter, now)
 }
 
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time.Time) []schema.MetricDefinition {
-	defsByNames := make(map[string][]*schema.MetricDefinition)
+func (c *CasIdx) load(defs []idx.MetricDefinition, iter cqlIterator, now time.Time) []idx.MetricDefinition {
+	defsByNames := make(map[string][]*idx.MetricDefinition)
 	var id, name, unit, mtype string
 	var orgId, interval int
 	var partition int32
@@ -394,17 +393,19 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time
 			orgId = int(idx.OrgIdPublic)
 		}
 
-		mdef := &schema.MetricDefinition{
+		mdef := &idx.MetricDefinition{
 			Id:         mkey,
 			OrgId:      uint32(orgId),
 			Partition:  partition,
-			Name:       name,
 			Interval:   interval,
-			Unit:       unit,
-			Mtype:      mtype,
-			Tags:       tags,
 			LastUpdate: lastupdate,
 		}
+
+		mdef.SetMetricName(name)
+		mdef.SetMType(mtype)
+		mdef.SetTags(tags)
+		mdef.SetUnit(unit)
+
 		nameWithTags := mdef.NameWithTags()
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], mdef)
 	}
@@ -456,11 +457,11 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Id.String(),
 				req.def.OrgId,
 				req.def.Partition,
-				req.def.Name,
+				req.def.Name.String(),
 				req.def.Interval,
 				req.def.Unit,
-				req.def.Mtype,
-				req.def.Tags,
+				req.def.Mtype(),
+				req.def.Tags.Strings(),
 				req.def.LastUpdate).Exec(); err != nil {
 
 				statQueryInsertFail.Inc()
