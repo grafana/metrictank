@@ -16,11 +16,11 @@ for line in $(env | sed -n '/^MT_GO/s/MT_//p'); do
 done
 
 # set offsets
-if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xauto" ]; then
+if [ x"$MT_KAFKA_MDM_IN_OFFSET" = "xauto" ] && [ x"$MT_KAFKA_MDM_IN_ENABLED" = "xtrue" ]; then
   export MT_KAFKA_MDM_IN_OFFSET=$(/getOffset.py $MT_KAFKA_MDM_IN_TOPICS)
 fi
 
-if [ x"$MT_KAFKA_CLUSTER_OFFSET" = "xauto" ]; then
+if [ x"$MT_KAFKA_CLUSTER_OFFSET" = "xauto" ] && [ x"$MT_KAFKA_CLUSTER_ENABLED" = "xtrue" ]; then
   export MT_KAFKA_CLUSTER_OFFSET=$(/getOffset.py $MT_KAFKA_CLUSTER_TOPIC)
 fi
 
