@@ -35,10 +35,8 @@ func getRandomPaths(paths, nodes, nodeLen int) []string {
 	return res
 }
 
-func BenchmarkTreeSearch(b *testing.B) {
-
-	randomPaths := getRandomPaths(1000000, 3, 3)
-	pathCount := len(randomPaths)
+func BenchmarkSliceTreeInsert(b *testing.B) {
+	randomPaths := getRandomPaths(b.N, 3, 6)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -49,6 +47,21 @@ func BenchmarkTreeSearch(b *testing.B) {
 	for _, k := range randomPaths {
 		tree.insert(strings.Split(k, "."), mkey)
 	}
+}
+
+func BenchmarkSliceTreeSearch(b *testing.B) {
+	randomPaths := getRandomPaths(1000000, 3, 3)
+	pathCount := len(randomPaths)
+
+	tree := newSliceTree()
+
+	mkey, _ := schema.MKeyFromString("1.01234567890123456789012345678901")
+	for _, k := range randomPaths {
+		tree.insert(strings.Split(k, "."), mkey)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
 		walker := tree.walker()
