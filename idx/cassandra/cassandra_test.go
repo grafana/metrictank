@@ -66,14 +66,14 @@ func (i *testIterator) Close() error {
 }
 
 func init() {
-	keyspace = "metrictank"
-	hosts = ""
-	consistency = "one"
-	timeout = time.Second
-	numConns = 1
-	writeQueueSize = 1000
-	protoVer = 4
-	updateCassIdx = false
+	CliConfig.keyspace = "metrictank"
+	CliConfig.hosts = ""
+	CliConfig.consistency = "one"
+	CliConfig.timeout = time.Second
+	CliConfig.numConns = 1
+	CliConfig.writeQueueSize = 1000
+	CliConfig.protoVer = 4
+	CliConfig.updateCassIdx = false
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 }
@@ -128,7 +128,7 @@ func TestGetAddKey(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
+	ix := New(CliConfig)
 	initForTests(ix)
 
 	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public")
@@ -176,20 +176,20 @@ func TestGetAddKey(t *testing.T) {
 }
 
 func TestAddToWriteQueue(t *testing.T) {
-	originalUpdateCassIdx := updateCassIdx
-	originalUpdateInterval := updateInterval
-	originalWriteQSize := writeQueueSize
+	originalUpdateCassIdx := CliConfig.updateCassIdx
+	originalUpdateInterval := CliConfig.updateInterval
+	originalWriteQSize := CliConfig.writeQueueSize
 
 	defer func() {
-		updateCassIdx = originalUpdateCassIdx
-		updateInterval = originalUpdateInterval
-		writeQueueSize = originalWriteQSize
+		CliConfig.updateCassIdx = originalUpdateCassIdx
+		CliConfig.updateInterval = originalUpdateInterval
+		CliConfig.writeQueueSize = originalWriteQSize
 	}()
 
-	updateCassIdx = true
-	updateInterval = 10
-	writeQueueSize = 5
-	ix := New()
+	CliConfig.updateCassIdx = true
+	CliConfig.updateInterval = 10
+	CliConfig.writeQueueSize = 5
+	ix := New(CliConfig)
 	initForTests(ix)
 	metrics := getMetricData(1, 2, 5, 10, "metric.demo")
 	Convey("When writeQueue is enabled", t, func() {
@@ -300,7 +300,7 @@ func TestAddToWriteQueue(t *testing.T) {
 func TestFind(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
-	ix := New()
+	ix := New(CliConfig)
 	initForTests(ix)
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo") {
 		mkey, err := schema.MKeyFromString(s.Id)
@@ -423,16 +423,16 @@ func BenchmarkIndexing(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
-	ix := New()
+	CliConfig.keyspace = "metrictank"
+	CliConfig.hosts = "localhost:9042"
+	CliConfig.consistency = "one"
+	CliConfig.timeout = time.Second
+	CliConfig.numConns = 10
+	CliConfig.writeQueueSize = 10
+	CliConfig.protoVer = 4
+	CliConfig.updateInterval = time.Hour
+	CliConfig.updateCassIdx = true
+	ix := New(CliConfig)
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
@@ -474,16 +474,16 @@ func BenchmarkLoad(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
-	ix := New()
+	CliConfig.keyspace = "metrictank"
+	CliConfig.hosts = "localhost:9042"
+	CliConfig.consistency = "one"
+	CliConfig.timeout = time.Second
+	CliConfig.numConns = 10
+	CliConfig.writeQueueSize = 10
+	CliConfig.protoVer = 4
+	CliConfig.updateInterval = time.Hour
+	CliConfig.updateCassIdx = true
+	ix := New(CliConfig)
 
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
@@ -500,7 +500,7 @@ func BenchmarkLoad(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	ix = New()
+	ix = New(CliConfig)
 	ix.Init()
 	ix.Stop()
 }
@@ -510,16 +510,16 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	keyspace = "metrictank"
-	hosts = "localhost:9042"
-	consistency = "one"
-	timeout = time.Second
-	numConns = 10
-	writeQueueSize = 10
-	protoVer = 4
-	updateInterval = time.Hour
-	updateCassIdx = true
-	ix := New()
+	CliConfig.keyspace = "metrictank"
+	CliConfig.hosts = "localhost:9042"
+	CliConfig.consistency = "one"
+	CliConfig.timeout = time.Second
+	CliConfig.numConns = 10
+	CliConfig.writeQueueSize = 10
+	CliConfig.protoVer = 4
+	CliConfig.updateInterval = time.Hour
+	CliConfig.updateCassIdx = true
+	ix := New(CliConfig)
 	tmpSession, err := ix.cluster.CreateSession()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)

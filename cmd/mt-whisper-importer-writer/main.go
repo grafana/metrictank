@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/schema"
-
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/cluster/partitioner"
@@ -22,6 +20,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk/archive"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
+	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -155,7 +154,7 @@ func main() {
 
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
-	cassandra.Enabled = true
+	cassandra.CliConfig.Enabled = true
 
 	if *verbose {
 		log.SetLevel(log.DebugLevel)
@@ -186,7 +185,7 @@ func main() {
 		Session:     store.Session,
 		TTLTables:   ttlTables,
 		Partitioner: p,
-		Index:       cassandra.New(),
+		Index:       cassandra.New(cassandra.CliConfig),
 		HTTPServer: &http.Server{
 			Addr:        *httpEndpoint,
 			ReadTimeout: 10 * time.Minute,
