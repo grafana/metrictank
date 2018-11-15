@@ -1,4 +1,4 @@
-package chunk
+package tsz
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ func makeVals(from, to, delta uint32, startSkip, skipEvery int) []schema.Point {
 	return out
 }
 
-func TestChunkEncodeDecode(t *testing.T) {
+func TestSeriesEncodeDecode(t *testing.T) {
 	// assume 6h chunks
 	cases := []testCase{
 		{
@@ -78,12 +78,11 @@ func TestChunkEncodeDecode(t *testing.T) {
 			1540728000,
 			[]schema.Point{{1540728000 + 60, 1540728000 + 60}},
 		},
-		// this case can't be made to work, but should be very rare, so just take the hit.
-		//{
-		//	"a single point right at the end",
-		//	1540728000,
-		//	[]schema.Point{{1540749600 - 60, 1540749600 - 60}},
-		//},
+		{
+			"a single point right at the end",
+			1540728000,
+			[]schema.Point{{1540749600 - 60, 1540749600 - 60}},
+		},
 		{
 			"a single point in the beginning + one at the end",
 			1540728000,
@@ -110,33 +109,52 @@ func TestChunkEncodeDecode(t *testing.T) {
 			makeVals(1540728000+3600*5, 1540728000+3600*6, 60, 1, 1),
 		},
 	}
-	for i, c := range cases {
 
-		// create chunk
-		chunk := New(c.t0)
+	for i, c := range cases {
+		series4h := NewSeries4h(c.t0)
+		seriesLong := NewSeriesLong(c.t0)
 		for _, point := range c.vals {
-			chunk.Push(point.Ts, point.Val)
+			series4h.Push(point.Ts, point.Val)
+			seriesLong.Push(point.Ts, point.Val)
 		}
-		chunk.Finish()
-		bytes := chunk.Series.Bytes()
+		series4h.Finish()
+		seriesLong.Finish()
+		bytes4h := series4h.Bytes()
+		bytesLong := seriesLong.Bytes()
 
 		// decode chunk.
 		// note typically the storage system stores and retrieves the t0 along with the chunk data
-		itgen := NewBareIterGen(c.t0, bytes)
-		iter, err := itgen.Get()
+
+		iter4h, err := NewIterator4h(bytes4h)
 		if err != nil {
-			t.Errorf("case %d: %s: could not get iterator: %s", i, c.desc, err)
+			t.Errorf("case %d: %s: could not get iterator for series4h: %s", i, c.desc, err)
 		}
-		var out []schema.Point
-		for iter.Next() {
-			ts, val := iter.Values()
-			out = append(out, schema.Point{
+		iterLong, err := NewIteratorLong(c.t0, bytesLong)
+		if err != nil {
+			t.Errorf("case %d: %s: could not get iterator for seriesLong: %s", i, c.desc, err)
+		}
+
+		var out4h []schema.Point
+		for iter4h.Next() {
+			ts, val := iter4h.Values()
+			out4h = append(out4h, schema.Point{
 				Val: val,
 				Ts:  ts,
 			})
 		}
-		if !reflect.DeepEqual(c.vals, out) {
-			t.Errorf("case %d: %s: decoded chunk does not match encoded data!\nexpected:\n%s\ngot:\n%s\n", i, c.desc, pretty(c.vals), pretty(out))
+		if !reflect.DeepEqual(c.vals, out4h) {
+			t.Errorf("case %d: %s: decoded series4h does not match encoded data!\nexpected:\n%s\ngot:\n%s\n", i, c.desc, pretty(c.vals), pretty(out4h))
+		}
+		var outLong []schema.Point
+		for iterLong.Next() {
+			ts, val := iterLong.Values()
+			outLong = append(outLong, schema.Point{
+				Val: val,
+				Ts:  ts,
+			})
+		}
+		if !reflect.DeepEqual(c.vals, outLong) {
+			t.Errorf("case %d: %s: decoded seriesLong does not match encoded data!\nexpected:\n%s\ngot:\n%s\n", i, c.desc, pretty(c.vals), pretty(outLong))
 		}
 	}
 }
