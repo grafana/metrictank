@@ -55,7 +55,7 @@ func (ig IterGen) Format() Format {
 	return Format(ig.B[0])
 }
 
-func (ig *IterGen) Get() (Iter, error) {
+func (ig *IterGen) Get() (tsz.Iter, error) {
 	// note: the tsz iterators modify the stream as they read it, so we must always give it a copy.
 	switch ig.Format() {
 	case FormatStandardGoTsz:

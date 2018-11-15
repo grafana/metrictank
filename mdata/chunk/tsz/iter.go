@@ -1,4 +1,4 @@
-package chunk
+package tsz
 
 type Iter interface {
 	Next() bool
