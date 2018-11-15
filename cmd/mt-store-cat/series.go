@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"time"
 
 	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/mdata/chunk"
@@ -77,7 +76,7 @@ func getSeries(ctx context.Context, store *cassandra.CassandraStore, table cassa
 func printNormal(igens []chunk.IterGen, from, to uint32) {
 	fmt.Println("number of chunks:", len(igens))
 	for i, ig := range igens {
-		fmt.Printf("#### chunk %d (span %d)\n", i, ig.Span)
+		fmt.Printf("#### chunk %d (t0:%s, span:%d)\n", i, printTime(ig.Ts), ig.Span)
 		iter, err := ig.Get()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "chunk %d itergen.Get: %s", i, err)
@@ -98,25 +97,14 @@ func printPointsNormal(points []schema.Point, from, to uint32) {
 }
 
 func printRecord(ts uint32, val float64, in, nan bool) {
-	printTime := func(ts uint32) string {
-		if *printTs {
-			return fmt.Sprintf("%d", ts)
-		} else {
-			return time.Unix(int64(ts), 0).Format(tsFormat)
-		}
-	}
+	prefix := "- "
 	if in {
-		if nan {
-			fmt.Println("> ", printTime(ts), "NAN")
-		} else {
-			fmt.Println("> ", printTime(ts), val)
-		}
+		prefix = "> "
+	}
+	if nan {
+		fmt.Println(prefix, printTime(ts), "NAN")
 	} else {
-		if nan {
-			fmt.Println("- ", printTime(ts), "NAN")
-		} else {
-			fmt.Println("- ", printTime(ts), val)
-		}
+		fmt.Println(prefix, printTime(ts), val)
 	}
 }
 

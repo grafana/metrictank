@@ -37,6 +37,8 @@ var (
 	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and point-summary format")
 	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+
+	printTime func(ts uint32) string
 )
 
 func init() {
@@ -157,6 +159,11 @@ func main() {
 	if *showVersion {
 		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
 		return
+	}
+
+	printTime = printTimeFormatted
+	if *printTs {
+		printTime = printTimeUnix
 	}
 
 	var loc *time.Location
