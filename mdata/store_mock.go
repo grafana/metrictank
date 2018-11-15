@@ -47,9 +47,8 @@ func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 
 // searches through the mock results and returns the right ones according to start / end
 func (c *MockStore) Search(ctx context.Context, metric schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
-	var itgens []chunk.IterGen
+	var itgens, res []chunk.IterGen
 	var ok bool
-	res := make([]chunk.IterGen, 0)
 
 	if itgens, ok = c.results[metric]; !ok {
 		return res, errors.New("metric not found")
