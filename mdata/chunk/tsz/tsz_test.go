@@ -50,12 +50,6 @@ func BenchmarkIterLong(b *testing.B) {
 	V = v
 }
 
-type IterIface interface {
-	Next() bool
-	Values() (uint32, float64)
-	Err() error
-}
-
 func BenchmarkIterLongInterface(b *testing.B) {
 	s := NewSeriesLong(0)
 	N := uint32(b.N)
@@ -65,7 +59,7 @@ func BenchmarkIterLongInterface(b *testing.B) {
 	b.ResetTimer()
 	var t uint32
 	var v float64
-	var iter IterIface
+	var iter Iter
 	// avoid compiler optimization where it can statically assign the right type
 	// and skip the overhead of the interface
 	if rand.Intn(1) == 0 {

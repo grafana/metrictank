@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/chunk/tsz"
 	"github.com/grafana/metrictank/tracing"
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -439,7 +439,7 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 
 // itersToPoints converts the iters to points if they are within the from/to range
 // TODO: just work on the result directly
-func (s *Server) itersToPoints(ctx *requestContext, iters []chunk.Iter) []schema.Point {
+func (s *Server) itersToPoints(ctx *requestContext, iters []tsz.Iter) []schema.Point {
 	pre := time.Now()
 
 	points := pointSlicePool.Get().([]schema.Point)
@@ -479,8 +479,8 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) 
 }
 
 // will only fetch until until, but uses ctx.To for debug logging
-func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]chunk.Iter, error) {
-	var iters []chunk.Iter
+func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.Iter, error) {
+	var iters []tsz.Iter
 	var prevts uint32
 
 	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesCachedStore")
