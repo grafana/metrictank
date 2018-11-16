@@ -553,7 +553,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// populate cache and store according to pattern definition
 				var prevts uint32
 				for i := 0; i < len(tc.Pattern); i++ {
-					itgen := chunk.NewBareIterGen(chunks[i].SeriesLong.T0, chunks[i].SeriesLong.Bytes())
+					itgen := chunk.NewBareIterGen(chunks[i].SeriesLong.T0, chunks[i].Encode(span))
 					if pattern[i] == 'c' || pattern[i] == 'b' {
 						c.Add(metric, prevts, itgen)
 					}
