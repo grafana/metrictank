@@ -30,14 +30,7 @@ func NewIterGen(t0 uint32, b []byte) (IterGen, error) {
 		if len(b) == 1 {
 			return IterGen{}, errShort
 		}
-	case FormatStandardGoTszWithSpan:
-		if len(b) <= 2 {
-			return IterGen{}, errShort
-		}
-		if int(b[1]) >= len(ChunkSpans) {
-			return IterGen{}, errUnknownSpanCode
-		}
-	case FormatGoTszLongWithSpan:
+	case FormatStandardGoTszWithSpan, FormatGoTszLongWithSpan:
 		if len(b) <= 2 {
 			return IterGen{}, errShort
 		}
