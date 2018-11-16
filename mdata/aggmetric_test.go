@@ -163,71 +163,73 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, true)}
 	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, nil, false))
 
+	// chunk t0's: 120, 240, 360, 480, 600, 720, 840, 960
+
 	// basic case, single range
-	c.Add(101, 101)
-	c.Verify(true, 100, 200, 101, 101)
-	c.Add(105, 105)
-	c.Verify(true, 100, 199, 101, 105)
-	c.Add(115, 115)
+	c.Add(121, 121)
+	c.Verify(true, 120, 240, 121, 121)
 	c.Add(125, 125)
+	c.Verify(true, 120, 239, 121, 125)
 	c.Add(135, 135)
-	c.Verify(true, 100, 199, 101, 135)
+	c.Add(145, 145)
+	c.Add(155, 155)
+	c.Verify(true, 120, 239, 121, 155)
 
 	// add new ranges, aligned and unaligned
-	c.Add(200, 200)
-	c.Add(315, 315)
-	c.Verify(true, 100, 399, 101, 315)
-	c.Verify(false, 100, 399, 101, 315)
+	c.Add(240, 240)
+	c.Add(375, 375)
+	c.Verify(true, 120, 479, 121, 375)
+	c.Verify(false, 120, 479, 121, 375)
 
 	// get subranges
-	c.Verify(true, 120, 299, 101, 200)
-	c.Verify(true, 220, 299, 200, 200)
-	c.Verify(true, 312, 330, 315, 315)
+	c.Verify(true, 140, 359, 121, 240)
+	c.Verify(true, 260, 359, 240, 240)
+	c.Verify(true, 372, 390, 375, 375)
 
 	// border dancing. good for testing inclusivity and exclusivity
-	c.Verify(true, 100, 199, 101, 135)
-	c.Verify(true, 100, 200, 101, 135)
-	c.Verify(true, 100, 201, 101, 200)
-	c.Verify(true, 198, 199, 101, 135)
-	c.Verify(true, 199, 200, 101, 135)
-	c.Verify(true, 200, 201, 200, 200)
-	c.Verify(true, 201, 202, 200, 200)
-	c.Verify(true, 299, 300, 200, 200)
-	c.Verify(true, 300, 301, 315, 315)
+	c.Verify(true, 120, 199, 121, 155)
+	c.Verify(true, 120, 240, 121, 155)
+	c.Verify(true, 120, 241, 121, 240)
+	c.Verify(true, 238, 239, 121, 155)
+	c.Verify(true, 239, 240, 121, 155)
+	c.Verify(true, 240, 241, 240, 240)
+	c.Verify(true, 241, 242, 240, 240)
+	c.Verify(true, 359, 360, 240, 240)
+	c.Verify(true, 360, 361, 375, 375)
 
 	// skipping
-	c.Add(510, 510)
-	c.Add(512, 512)
-	c.Verify(true, 100, 599, 101, 512)
-
-	// basic wraparound
 	c.Add(610, 610)
 	c.Add(612, 612)
-	c.Add(710, 710)
-	c.Add(712, 712)
+	c.Verify(true, 120, 719, 121, 612)
+
+	// basic wraparound
+	c.Add(730, 730)
+	c.Add(732, 732)
+	c.Add(850, 850)
+	c.Add(852, 852)
 	// TODO would be nice to test that it panics when requesting old range. something with recover?
-	//c.Verify(true, 100, 799, 101, 512)
+	//c.Verify(true, 120, 959, 121, 612)
 
 	// largest range we have so far
-	c.Verify(true, 300, 799, 315, 712)
+	c.Verify(true, 360, 959, 375, 852)
 	// a smaller range
-	c.Verify(true, 502, 799, 510, 712)
+	c.Verify(true, 602, 959, 610, 852)
 
 	// the circular buffer had these ranges:
-	// 100 200 300 skipped 500
+	// 120 240 360 skipped 600
 	// then we made it:
-	// 600 700 300 skipped 500
+	// 720 840 360 skipped 600
 	// now we want to do another wrap around with skip (must have cleared old data)
-	// let's jump to 1200. the accessible range should then be 800-1200
-	// clea 1200 clea clea clea
+	// let's jump to 12*120=1440. the accessible range should then be 960-1440
+	// clea 1440 clea clea clea
 	// we can't (and shouldn't, due to abstraction) test the clearing itself
-	// but we just check we only get this point
-	c.Add(1299, 1299)
+	// but we just check we only get this point right before 13*120
+	c.Add(1559, 1559)
 	// TODO: implement skips and enable this
-	//	c.Verify(true, 800, 1299, 1299, 1299)
+	//	c.Verify(true, 960, 1559, 1559, 1559)
 }
 
 func TestAggMetricWithReorderBuffer(t *testing.T) {
@@ -239,33 +241,33 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		XFilesFactor:      0.5,
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 100, 5, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, true)}
 	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, &agg, false))
 
 	// basic adds and verifies with test data
-	c.Add(101, 101)
-	c.Verify(true, 100, 200, 101, 101)
-	c.Add(105, 105)
-	c.Verify(true, 100, 199, 101, 105)
-	c.Add(115, 115)
+	c.Add(121, 121)
+	c.Verify(true, 120, 240, 121, 121)
 	c.Add(125, 125)
+	c.Verify(true, 120, 239, 121, 125)
 	c.Add(135, 135)
-	c.Verify(true, 100, 199, 101, 135)
-	c.Add(200, 200)
-	c.Add(315, 315)
-	c.Verify(true, 100, 399, 101, 315)
+	c.Add(145, 145)
+	c.Add(155, 155)
+	c.Verify(true, 120, 239, 121, 155)
+	c.Add(240, 240)
+	c.Add(375, 375)
+	c.Verify(true, 120, 479, 121, 375)
 
 	metricsTooOld.SetUint32(0)
 
 	// adds 10 entries that are out of order and the reorder buffer should order the first 9
-	// the last item (305) will be too old, so it increases metricsTooOld counter
-	for i := uint32(314); i > 304; i-- {
+	// the last item (365) will be too old, so it increases metricsTooOld counter
+	for i := uint32(374); i > 364; i-- {
 		c.Add(i, float64(i))
 	}
-	c.DropPointByTs(305)
+	c.DropPointByTs(365)
 
 	// get subranges
-	c.Verify(true, 100, 320, 101, 315)
+	c.Verify(true, 120, 380, 121, 375)
 
 	// one point has been added out of order and too old for the buffer to reorder
 	if metricsTooOld.Peek() != 1 {
