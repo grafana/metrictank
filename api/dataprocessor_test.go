@@ -553,9 +553,9 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// populate cache and store according to pattern definition
 				var prevts uint32
 				for i := 0; i < len(tc.Pattern); i++ {
-					itgen := chunk.NewBareIterGen(chunks[i].Series.Bytes(), chunks[i].Series.T0, span)
+					itgen := chunk.NewBareIterGen(chunks[i].SeriesLong.T0, chunks[i].SeriesLong.Bytes())
 					if pattern[i] == 'c' || pattern[i] == 'b' {
-						c.Add(metric, prevts, *itgen)
+						c.Add(metric, prevts, itgen)
 					}
 					if pattern[i] == 's' || pattern[i] == 'b' {
 						cwr := mdata.NewChunkWriteRequest(nil, metric, &chunks[i], 0, span, time.Now())
