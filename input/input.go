@@ -4,6 +4,7 @@ package input
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
@@ -62,7 +63,9 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 	} else {
 		in.receivedMPNO.Inc()
 	}
-	if !point.Valid() {
+	// in cassandra we store timestamps as 32bit signed integers.
+	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
+	if !point.Valid() || point.Time >= math.MaxInt32 {
 		in.invalidMP.Inc()
 		log.Debugf("in: Invalid metric %v", point)
 		return
@@ -89,9 +92,16 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		log.Debugf("in: Invalid metric %v: %s", md, err)
 		return
 	}
-	if md.Time == 0 {
+	// in cassandra we store timestamps and interval as 32bit signed integers.
+	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
+	if md.Time <= 0 || md.Time >= math.MaxInt32 {
 		in.invalidMD.Inc()
-		log.Warnf("in: invalid metric. metric.Time is 0. %s", md.Id)
+		log.Warnf("in: invalid metric %q: .Time %d out of range", md.Id, md.Time)
+		return
+	}
+	if md.Interval <= 0 || md.Interval >= math.MaxInt32 {
+		in.invalidMD.Inc()
+		log.Warnf("in: invalid metric %q. .Interval %d out of range", md.Id, md.Interval)
 		return
 	}
 
