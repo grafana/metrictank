@@ -94,9 +94,14 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	}
 	// in cassandra we store timestamps and interval as 32bit signed integers.
 	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
-	if md.Time == 0 || md.Time >= math.MaxInt32 || md.Interval >= math.MaxInt32 {
+	if md.Time == 0 || md.Time >= math.MaxInt32 {
 		in.invalidMD.Inc()
-		log.Warnf("in: invalid metric %q. Time/Interval out of range", md.Id)
+		log.Warnf("in: invalid metric %q: .Time %d out of range", md.Id, md.Time)
+		return
+	}
+	if md.Interval >= math.MaxInt32 {
+		in.invalidMD.Inc()
+		log.Warnf("in: invalid metric %q. .Interval %d out of range", md.Id, md.Interval)
 		return
 	}
 
