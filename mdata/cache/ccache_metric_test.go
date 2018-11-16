@@ -321,7 +321,7 @@ func verifyCcm(ccm *CCacheMetric, expKeys []uint32) error {
 			}
 		} else {
 			if chunk.Prev == 0 {
-				if ccm.chunks[ccm.keys[i-1]].Ts == chunk.Ts-chunk.Itgen.Span {
+				if ccm.chunks[ccm.keys[i-1]].Ts == chunk.Ts-chunk.Itgen.Span() {
 					return fmt.Errorf("Chunk of ts %d has Prev == 0, but the previous chunk is present", ts)
 				}
 			} else {
@@ -346,7 +346,7 @@ func verifyCcm(ccm *CCacheMetric, expKeys []uint32) error {
 		}
 
 		if chunk.Next == 0 {
-			if chunk.Ts+chunk.Itgen.Span == nextChunk.Ts {
+			if chunk.Ts+chunk.Itgen.Span() == nextChunk.Ts {
 				return fmt.Errorf("Next of chunk at ts %d is set to 0, but the next chunk is present", ts)
 			}
 		} else {
