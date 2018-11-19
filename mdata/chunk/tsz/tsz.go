@@ -1,7 +1,7 @@
 // Package tsz implements time-series compression
 // it is a fork of https://github.com/dgryski/go-tsz
 // which implements http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-// see devdocs/gorilla-compression.md for more info
+// see devdocs/chunk-format.md for more info
 package tsz
 
 import (
