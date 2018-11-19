@@ -15,7 +15,7 @@ func BenchmarkIter4h(b *testing.B) {
 		s.Push(i, 123.45)
 	}
 	b.ResetTimer()
-	iter := s.Iter()
+	iter := s.Iter(1)
 	var t uint32
 	var v float64
 	for iter.Next() {

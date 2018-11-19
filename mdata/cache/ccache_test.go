@@ -31,7 +31,7 @@ func getItgen(t testing.TB, values []uint32, ts uint32, spanaware bool) chunk.It
 	}
 	buf.Write(b)
 
-	return chunk.NewBareIterGen(ts, buf.Bytes())
+	return chunk.NewBareIterGen(ts, 1, buf.Bytes())
 }
 
 func getConnectedChunks(t *testing.T, metric schema.AMKey) *CCache {

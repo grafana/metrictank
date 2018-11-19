@@ -10,9 +10,10 @@ import (
 )
 
 type testCase struct {
-	desc string
-	t0   uint32
-	vals []schema.Point
+	desc         string
+	t0           uint32
+	intervalHint uint32
+	vals         []schema.Point
 }
 
 // skipEvery: -1 to disable skipping, otherwise every skipEvery valid points, skip a point
@@ -41,71 +42,85 @@ func TestSeriesEncodeDecode(t *testing.T) {
 		{
 			"regular chunk with dense, 60s spread data",
 			1540728000,
+			60,
 			makeVals(1540728000, 1540728000+3600*6, 60, 0, -1),
 		},
 		{
 			"regular chunk with dense, 1s spread data",
 			1540728000,
+			1,
 			makeVals(1540728000, 1540728000+3600*6, 1, 0, -1),
 		},
 		{
 			"regular chunk with sparse, 60s spread data",
 			1540728000,
+			60,
 			makeVals(1540728000, 1540728000+3600*6, 60, 0, 3),
 		},
 		{
 			"regular chunk with sparse, 1s spread data",
 			1540728000,
+			1,
 			makeVals(1540728000, 1540728000+3600*6, 1, 0, 3),
 		},
 		{
 			"regular chunk with sparse, 60s spread data. start with a skip",
 			1540728000,
+			60,
 			makeVals(1540728000, 1540728000+3600*6, 60, 3, 3),
 		},
 		{
 			"regular chunk with sparse, 1s spread data. start with a skip",
 			1540728000,
+			1,
 			makeVals(1540728000, 1540728000+3600*6, 1, 3, 3),
 		},
 		{
 			"a single point in the beginning",
 			1540728000,
+			60,
 			[]schema.Point{{1540728000, 1540728000}},
 		},
 		{
 			"a single point (the 2nd point after to)",
 			1540728000,
+			60,
 			[]schema.Point{{1540728000 + 60, 1540728000 + 60}},
 		},
 		{
 			"a single point right at the end",
 			1540728000,
+			60,
 			[]schema.Point{{1540749600 - 60, 1540749600 - 60}},
 		},
 		{
 			"a single point in the beginning + one at the end",
 			1540728000,
+			60,
 			[]schema.Point{{1540728000, 1540728000}, {1540749600 - 60, 1540749600 - 60}},
 		},
 		{
 			"a point (the 2nd point after to) + one at the end",
 			1540728000,
+			60,
 			[]schema.Point{{1540728000 + 60, 1540728000 + 60}, {1540749600 - 60, 1540749600 - 60}},
 		},
 		{
 			"no data for 5 hours, then 1 hour of 60s dense data",
 			1540728000,
+			60,
 			makeVals(1540728000+3600*5, 1540728000+3600*6, 60, 0, -1),
 		},
 		{
 			"no data for 5 hours, then 1 hour of 60s sparse data",
 			1540728000,
+			60,
 			makeVals(1540728000+3600*5, 1540728000+3600*6, 60, 0, 3),
 		},
 		{
 			"no data for 5 hours, then 1 hour of 60s sparser data",
 			1540728000,
+			60,
 			makeVals(1540728000+3600*5, 1540728000+3600*6, 60, 1, 1),
 		},
 	}
@@ -125,7 +140,7 @@ func TestSeriesEncodeDecode(t *testing.T) {
 		// decode chunk.
 		// note typically the storage system stores and retrieves the t0 along with the chunk data
 
-		iter4h, err := NewIterator4h(bytes4h)
+		iter4h, err := NewIterator4h(bytes4h, c.intervalHint)
 		if err != nil {
 			t.Errorf("case %d: %s: could not get iterator for series4h: %s", i, c.desc, err)
 		}

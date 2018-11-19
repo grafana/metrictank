@@ -142,20 +142,21 @@ func (s *Series4h) Push(t uint32, v float64) {
 }
 
 // Iter4h lets you iterate over a series.  It is not concurrency-safe.
-func (s *Series4h) Iter() *Iter4h {
+func (s *Series4h) Iter(intervalHint uint32) *Iter4h {
 	s.Lock()
 	w := s.bw.clone()
 	s.Unlock()
 
 	finishV1(w)
-	iter, _ := bstreamIterator4h(w)
+	iter, _ := bstreamIterator4h(w, intervalHint)
 	return iter
 }
 
 // Iter4h lets you iterate over a Series4h.  It is not concurrency-safe.
 // For more info, see Series4h
 type Iter4h struct {
-	T0 uint32
+	T0           uint32
+	intervalHint uint32 // hint to recover corrupted delta's
 
 	t   uint32
 	val float64
@@ -170,7 +171,7 @@ type Iter4h struct {
 	err    error
 }
 
-func bstreamIterator4h(br *bstream) (*Iter4h, error) {
+func bstreamIterator4h(br *bstream, intervalHint uint32) (*Iter4h, error) {
 
 	br.count = 8
 
@@ -180,14 +181,15 @@ func bstreamIterator4h(br *bstream) (*Iter4h, error) {
 	}
 
 	return &Iter4h{
-		T0: uint32(t0),
-		br: *br,
+		T0:           uint32(t0),
+		intervalHint: intervalHint,
+		br:           *br,
 	}, nil
 }
 
 // NewIterator4h creates an Iter4h
-func NewIterator4h(b []byte) (*Iter4h, error) {
-	return bstreamIterator4h(newBReader(b))
+func NewIterator4h(b []byte, intervalHint uint32) (*Iter4h, error) {
+	return bstreamIterator4h(newBReader(b), intervalHint)
 }
 
 func (it *Iter4h) dod() (int32, bool) {
@@ -272,21 +274,37 @@ func (it *Iter4h) Next() bool {
 
 		it.val = math.Float64frombits(v)
 
-		// special case: read upcoming dod
+		// look for delta overflow and remediate it
+		// see https://github.com/grafana/metrictank/pull/1126 and
+		// https://github.com/grafana/metrictank/pull/1129
+
+		// first, let's try the hint based check
+		// if we're aware of a consistent interval that the points should have
+		// - which is the case for rollup archives: they have known, consistent intervals -
+		// then we can simply rely on that to tell whether our delta overflowed.
+		// this requires the interval to be >1 (always true for rollup chunks)
+		// and not be a divisor of 16384 (also true for rollup chunks, they use long, round intervals like 300)
+		if it.intervalHint > 0 && it.t%it.intervalHint != 0 {
+			it.tDelta += 16384
+			it.t += 16384
+			return true
+		}
+
+		// if we don't have a hint - e.g. for raw data - read upcoming dod
 		// if delta+dod <0 (aka the upcoming delta < 0),
-		// our current delta overflowed, and should rectify it.
-		// see https://github.com/grafana/metrictank/pull/1126
-		// but we must take a backup of the stream because reading from the
-		// stream modifies it.
+		// our current delta overflowed, because points should always be in increasing time order
+		// (have delta's > 0)
+		// we must take a backup of the stream because reading from the stream reader modifies it.
+		// note that potentially we could skip this remediation by using another hint: the chunkspan,
+		// since we know the overflow cannot possibly happen for chunks <=4h in length. perhaps a future optimization.
 		brBackup := it.br.clone()
 		dod, ok := it.dod()
 		if !ok {
+			// this case should only happen if we're out of data (only a single point in the chunk)
 			// in this case we can't know if the point is right or wrong.
-			// long chunks with a single point in them may lead to a wrong read, but this should be rare.
-			// we can't just adjust the timestamp because we don't know the length of the chunk
-			// (though this could be done by having the caller pass us that information), nor whether
-			// a delta that may seem low compared to chunk length was intentional or not.
 			// so, nothing much to do in this case. return the possibly incorrect point.
+			// though it is very unlikely to be wrong, because the overflow problem only tends to happen in long aggregated chunks
+			// that have an intervalHint.
 			// and for return value, stick to normal iter semantics:
 			// this read succeeded, though we already know the next one will fail
 			it.br = *brBackup

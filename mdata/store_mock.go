@@ -39,7 +39,11 @@ func (c *MockStore) Items() int {
 // Add adds a chunk to the store
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 	if !c.Drop {
-		itgen := chunk.NewBareIterGen(cwr.Chunk.SeriesLong.T0, cwr.Chunk.Encode(cwr.Span))
+		var intervalHint uint32
+		if cwr.Key.Archive > 0 {
+			intervalHint = cwr.Key.Archive.Span()
+		}
+		itgen := chunk.NewBareIterGen(cwr.Chunk.SeriesLong.T0, intervalHint, cwr.Chunk.Encode(cwr.Span))
 		c.results[cwr.Key] = append(c.results[cwr.Key], itgen)
 		c.items++
 	}
