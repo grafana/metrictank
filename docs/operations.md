@@ -1,5 +1,10 @@
 # Operations
 
+## Primer
+
+For a primer on various issues that may appear with a Graphite based system,
+please see this article: [25 Graphite, Grafana and statsd gotchas](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/)
+
 ## Monitoring
 
 You should monitor the dependencies according to their best practices.
