@@ -56,18 +56,11 @@ func (s *Series4h) Bytes() []byte {
 	return s.bw.bytes()
 }
 
-func finish(w *bstream) {
-	// write an end-of-stream record
-	w.writeBits(0x0f, 4)
-	w.writeBits(0xffffffff, 32)
-	w.writeBit(zero)
-}
-
 // Finish the series by writing an end-of-stream record
 func (s *Series4h) Finish() {
 	s.Lock()
 	if !s.finished {
-		finish(&s.bw)
+		finishV1(&s.bw)
 		s.finished = true
 	}
 	s.Unlock()
@@ -154,7 +147,7 @@ func (s *Series4h) Iter() *Iter4h {
 	w := s.bw.clone()
 	s.Unlock()
 
-	finish(w)
+	finishV1(w)
 	iter, _ := bstreamIterator4h(w)
 	return iter
 }
@@ -217,13 +210,13 @@ func (it *Iter4h) dod() (int32, bool) {
 	switch d {
 	case 0x00:
 		// dod == 0
-	case 0x02:
+	case 0x02: // '10'
 		sz = 7
-	case 0x06:
+	case 0x06: // '110'
 		sz = 9
-	case 0x0e:
+	case 0x0e: // '1110'
 		sz = 12
-	case 0x0f:
+	case 0x0f: // '1111'
 		bits, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
