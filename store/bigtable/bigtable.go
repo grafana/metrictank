@@ -370,8 +370,10 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 		adjustedStart = startMonth
 	}
 	agg := "raw"
+	var intervalHint uint32
 	if key.Archive > 0 {
 		agg = key.Archive.String()
+		intervalHint = key.Archive.Span()
 	}
 	// filter the results to just the agg method (Eg raw, min_60, max_1800, etc..) and the timerange we want.
 	// we fetch all columnFamilies (which are the different TTLs).  Typically there will be only one columnFamily
@@ -400,7 +402,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 					err = errChunkTooSmall
 					return false
 				}
-				itgen, err = chunk.NewIterGen(uint32(rItem.Timestamp/1e6), rItem.Value)
+				itgen, err = chunk.NewIterGen(uint32(rItem.Timestamp/1e6), intervalHint, rItem.Value)
 				if err != nil {
 					log.Errorf("btStore: unable to create chunk from bytes. %s", err)
 					return false

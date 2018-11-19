@@ -14,17 +14,22 @@ var (
 
 //go:generate msgp
 type IterGen struct {
-	T0 uint32
-	B  []byte
+	T0           uint32
+	intervalHint uint32 // a hint wrt expected alignment of points. useful to recover delta overflows in tsz.Series4h
+	B            []byte
 }
 
 // NewBareIterGen creates an IterGen without validation
-func NewBareIterGen(t0 uint32, b []byte) IterGen {
-	return IterGen{t0, b}
+// note: it's ok for intervalHint to be 0 or 1 to mean unknown.
+// it just means that series4h corruptions can't be remediated in single-point-per-chunk scenarios
+func NewBareIterGen(t0, intervalHint uint32, b []byte) IterGen {
+	return IterGen{t0, intervalHint, b}
 }
 
 // NewIterGen creates an IterGen and performs crude validation of the data
-func NewIterGen(t0 uint32, b []byte) (IterGen, error) {
+// note: it's ok for intervalHint to be 0 or 1 to mean unknown.
+// it just means that series4h corruptions can't be remediated in single-point-per-chunk scenarios
+func NewIterGen(t0, intervalHint uint32, b []byte) (IterGen, error) {
 	switch Format(b[0]) {
 	case FormatStandardGoTsz:
 		if len(b) == 1 {
@@ -41,7 +46,7 @@ func NewIterGen(t0 uint32, b []byte) (IterGen, error) {
 		return IterGen{}, errUnknownChunkFormat
 	}
 
-	return IterGen{t0, b}, nil
+	return IterGen{t0, intervalHint, b}, nil
 }
 
 func (ig IterGen) Format() Format {
@@ -55,12 +60,12 @@ func (ig *IterGen) Get() (tsz.Iter, error) {
 		src := ig.B[1:]
 		dest := make([]byte, len(src))
 		copy(dest, src)
-		return tsz.NewIterator4h(dest)
+		return tsz.NewIterator4h(dest, ig.intervalHint)
 	case FormatStandardGoTszWithSpan:
 		src := ig.B[2:]
 		dest := make([]byte, len(src))
 		copy(dest, src)
-		return tsz.NewIterator4h(dest)
+		return tsz.NewIterator4h(dest, ig.intervalHint)
 	}
 	// FormatGoTszLongWithSpan:
 	src := ig.B[2:]

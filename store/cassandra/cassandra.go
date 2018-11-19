@@ -522,6 +522,11 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	cassGetChunksDuration.Value(time.Since(pre))
 	pre = time.Now()
 
+	var intervalHint uint32
+	if key.Archive != 0 {
+		intervalHint = key.Archive.Span()
+	}
+
 	var b []byte
 	var t0 int
 	for res.i.Scan(&t0, &b) {
@@ -531,7 +536,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 			tracing.Error(span, errChunkTooSmall)
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewIterGen(uint32(t0), b)
+		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, b)
 		if err != nil {
 			tracing.Failure(span)
 			tracing.Error(span, err)
