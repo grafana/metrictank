@@ -1,3 +1,5 @@
+// package chunk encodes timeseries in chunks of data
+// see devdocs/chunk-format.md for more information.
 package chunk
 
 import (
