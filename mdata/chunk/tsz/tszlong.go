@@ -15,6 +15,7 @@ import (
 // * it doesn't write t0 to the stream (for callers that track t0 corresponding to a chunk separately)
 // * it doesn't store an initial delta. instead, it assumes a starting delta of 60 and uses delta-of-delta
 //   encoding from the get-go.
+// * it uses a more compact way to mark end-of-stream
 type SeriesLong struct {
 	sync.Mutex
 
@@ -53,7 +54,7 @@ func (s *SeriesLong) Bytes() []byte {
 func (s *SeriesLong) Finish() {
 	s.Lock()
 	if !s.Finished {
-		finish(&s.bw)
+		finishV2(&s.bw)
 		s.Finished = true
 	}
 	s.Unlock()
@@ -86,7 +87,7 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 		s.bw.writeBits(0x0e, 4) // '1110'
 		s.bw.writeBits(uint64(dod), 12)
 	default:
-		s.bw.writeBits(0x0f, 4) // '1111'
+		s.bw.writeBits(0x1e, 5) // '11110'
 		s.bw.writeBits(uint64(dod), 32)
 	}
 
@@ -144,7 +145,7 @@ func (s *SeriesLong) Iter() *IterLong {
 	w := s.bw.clone()
 	s.Unlock()
 
-	finish(w)
+	finishV2(w)
 	iter, _ := bstreamIteratorLong(s.T0, w)
 	return iter
 }
@@ -184,7 +185,7 @@ func NewIteratorLong(t0 uint32, b []byte) (*IterLong, error) {
 
 func (it *IterLong) dod() (int32, bool) {
 	var d byte
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		d <<= 1
 		bit, err := it.br.readBit()
 		if err != nil {
@@ -202,26 +203,22 @@ func (it *IterLong) dod() (int32, bool) {
 	switch d {
 	case 0x00:
 		// dod == 0
-	case 0x02:
+	case 0x02: // '10'
 		sz = 7
-	case 0x06:
+	case 0x06: // '110'
 		sz = 9
-	case 0x0e:
+	case 0x0e: // '1110'
 		sz = 12
-	case 0x0f:
+	case 0x1e: // '11110'
 		bits, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
 			return 0, false
 		}
-
-		// end of stream
-		if bits == 0xffffffff {
-			it.finished = true
-			return 0, false
-		}
-
 		dod = int32(bits)
+	case 0x1f: // '11111': end-of-stream
+		it.finished = true
+		return 0, false
 	}
 
 	if sz != 0 {
