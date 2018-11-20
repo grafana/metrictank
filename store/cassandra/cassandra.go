@@ -312,7 +312,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
-			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
+			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.Series.T0, cwr.Chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
@@ -322,13 +322,13 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			attempts := 0
 			keyStr := cwr.Key.String()
 			for !success {
-				err := c.insertChunk(keyStr, cwr.Chunk.T0, cwr.TTL, buf)
+				err := c.insertChunk(keyStr, cwr.Chunk.Series.T0, cwr.TTL, buf)
 
 				if err == nil {
 					success = true
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(keyStr, cwr.Chunk.T0)
-					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.T0, cwr.Chunk)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.Series.T0)
+					mdata.SendPersistMessage(keyStr, cwr.Chunk.Series.T0)
+					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.Series.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)

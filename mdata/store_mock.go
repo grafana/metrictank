@@ -43,7 +43,7 @@ func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 		if cwr.Key.Archive > 0 {
 			intervalHint = cwr.Key.Archive.Span()
 		}
-		itgen := chunk.NewBareIterGen(cwr.Chunk.SeriesLong.T0, intervalHint, cwr.Chunk.Encode(cwr.Span))
+		itgen := chunk.NewBareIterGen(cwr.Chunk.Series.T0, intervalHint, cwr.Chunk.Encode(cwr.Span))
 		c.results[cwr.Key] = append(c.results[cwr.Key], itgen)
 		c.items++
 	}

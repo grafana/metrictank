@@ -73,7 +73,7 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	}
 	buf := cwr.Chunk.Encode(cwr.Span)
 	chunkSizeAtSave.Value(len(buf))
-	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), buf)
+	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.Series.T0)*1e6), buf)
 	return mut, len(buf)
 }
 
@@ -230,7 +230,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 		rowKeys := make([]string, len(buf))
 		muts := make([]*bigtable.Mutation, len(buf))
 		for i, cwr := range buf {
-			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.T0)
+			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.Series.T0)
 			muts[i], n = mutationFromWriteRequest(cwr)
 			//record how long the chunk waited in the queue before we attempted to save to bigtable
 			btblPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
@@ -269,9 +269,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 						failedMutations = append(failedMutations, muts[i])
 						retryBuf = append(retryBuf, buf[i])
 					} else {
-						buf[i].Metric.SyncChunkSaveState(buf[i].Chunk.T0)
-						mdata.SendPersistMessage(buf[i].Key.String(), buf[i].Chunk.T0)
-						log.Debugf("btStore: save complete. %s:%d %v", buf[i].Key, buf[i].Chunk.T0, buf[i].Chunk)
+						buf[i].Metric.SyncChunkSaveState(buf[i].Chunk.Series.T0)
+						mdata.SendPersistMessage(buf[i].Key.String(), buf[i].Chunk.Series.T0)
+						log.Debugf("btStore: save complete. %s:%d %v", buf[i].Key, buf[i].Chunk.Series.T0, buf[i].Chunk)
 						chunkSaveOk.Inc()
 					}
 				}
@@ -291,9 +291,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				chunkSaveOk.Add(len(rowKeys))
 				log.Debugf("btStore: %d chunks saved to bigtable.", len(rowKeys))
 				for _, cwr := range buf {
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(cwr.Key.String(), cwr.Chunk.T0)
-					log.Debugf("btStore: save complete. %s:%d %v", cwr.Key.String(), cwr.Chunk.T0, cwr.Chunk)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.Series.T0)
+					mdata.SendPersistMessage(cwr.Key.String(), cwr.Chunk.Series.T0)
+					log.Debugf("btStore: save complete. %s:%d %v", cwr.Key.String(), cwr.Chunk.Series.T0, cwr.Chunk)
 				}
 			}
 		}
