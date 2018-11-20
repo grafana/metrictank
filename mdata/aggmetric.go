@@ -339,6 +339,8 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	}
 }
 
+// pushToCache adds the chunk into the cache if it is hot
+// assumes lock held by caller
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	if a.cachePusher == nil {
 		return
@@ -348,14 +350,14 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	if a.Key.Archive != 0 {
 		intervalHint = a.Key.Archive.Span()
 	}
-	go a.cachePusher.AddIfHot(
-		a.Key,
-		0,
-		chunk.NewBareIterGen(c.T0, intervalHint, c.Encode(a.ChunkSpan)),
-	)
+
+	itergen := chunk.NewBareIterGen(c.Series.T0, intervalHint, c.Encode(a.ChunkSpan))
+	go a.cachePusher.AddIfHot(a.Key, 0, itergen)
 }
 
 // write a chunk to persistent storage. This should only be called while holding a.Lock()
+// never persist a chunk that may receive further updates!
+// (because the stores will read out chunk data on the unlocked chunk)
 func (a *AggMetric) persist(pos int) {
 	chunk := a.Chunks[pos]
 	pre := time.Now()
