@@ -7,6 +7,7 @@ import (
 )
 
 // encode is a helper function to encode a chunk of data into various formats
+// input data is copied
 func encode(span uint32, format Format, data []byte) []byte {
 	switch format {
 	case FormatStandardGoTszWithSpan, FormatGoTszLongWithSpan:
