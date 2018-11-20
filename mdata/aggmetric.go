@@ -373,14 +373,8 @@ func (a *AggMetric) persist(pos int) {
 	// create an array of chunks that need to be sent to the writeQueue.
 	pending := make([]*ChunkWriteRequest, 1)
 	// add the current chunk to the list of chunks to send to the writeQueue
-	pending[0] = &ChunkWriteRequest{
-		Metric:    a,
-		Key:       a.Key,
-		Span:      a.ChunkSpan,
-		TTL:       a.ttl,
-		Chunk:     chunk,
-		Timestamp: time.Now(),
-	}
+	cwr := NewChunkWriteRequest(a, a.Key, chunk, a.ttl, a.ChunkSpan, time.Now())
+	pending[0] = &cwr
 
 	// if we recently became the primary, there may be older chunks
 	// that the old primary did not save.  We should check for those
@@ -392,14 +386,8 @@ func (a *AggMetric) persist(pos int) {
 	previousChunk := a.Chunks[previousPos]
 	for (previousChunk.T0 < chunk.T0) && (a.lastSaveStart < previousChunk.T0) {
 		log.Debugf("AM: persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.Key, previousChunk.T0)
-		pending = append(pending, &ChunkWriteRequest{
-			Metric:    a,
-			Key:       a.Key,
-			Span:      a.ChunkSpan,
-			TTL:       a.ttl,
-			Chunk:     previousChunk,
-			Timestamp: time.Now(),
-		})
+		cwr := NewChunkWriteRequest(a, a.Key, previousChunk, a.ttl, a.ChunkSpan, time.Now())
+		pending = append(pending, &cwr)
 		previousPos--
 		if previousPos < 0 {
 			previousPos += len(a.Chunks)
