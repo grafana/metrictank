@@ -12,7 +12,8 @@ import (
 	"github.com/raintank/schema"
 )
 
-func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
+// printPoints prints points in the store corresponding to the given requirements
+func printPoints(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {
@@ -31,7 +32,8 @@ func points(ctx context.Context, store *cassandra.CassandraStore, tables []cassa
 	}
 }
 
-func pointSummary(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
+// printPointSummary prints a summarized view of the points in the store corresponding to the given requirements
+func printPointSummary(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, fromUnix, toUnix, fix uint32) {
 	for _, metric := range metrics {
 		fmt.Println("## Metric", metric)
 		for _, table := range tables {

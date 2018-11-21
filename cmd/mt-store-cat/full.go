@@ -8,7 +8,8 @@ import (
 	"github.com/grafana/metrictank/store/cassandra"
 )
 
-func chunkSummary(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, groupTTL string) error {
+// printChunkSummary prints a summary of chunks in the store matching the given conditions, grouped in buckets of groupTTL size by their TTL
+func printChunkSummary(ctx context.Context, store *cassandra.CassandraStore, tables []cassandra.Table, metrics []Metric, groupTTL string) error {
 	now := uint32(time.Now().Unix())
 	end_month := now - (now % cassandra.Month_sec)
 

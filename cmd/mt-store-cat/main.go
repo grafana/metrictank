@@ -194,16 +194,19 @@ func main() {
 		log.Fatalf("failed to read tables from cassandra. %s", err.Error())
 	}
 
+	// set up is done, now actually execute the business logic
+
+	// handle "tables"
 	if tableSelector == "tables" {
-		tables, err := getTables(store, "")
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		for _, table := range tables {
-			fmt.Printf("%s (%d hours <= ttl < %d hours)\n", table.Name, table.TTL, table.TTL*2)
-		}
+		printTables(store)
 		return
 	}
+
+	// handle the case where we have a table-selector, metric-selector and format
+	// table-selector: '*' or name of a table. e.g. 'metric_128'
+	// metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring>
+	// format: points, point-summary, chunk-summary or chunk-csv
+
 	tables, err := getTables(store, tableSelector)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -278,10 +281,10 @@ func main() {
 
 	switch format {
 	case "points":
-		points(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
+		printPoints(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "point-summary":
-		pointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
+		printPointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
-		chunkSummary(ctx, store, tables, metrics, *groupTTL)
+		printChunkSummary(ctx, store, tables, metrics, *groupTTL)
 	}
 }
