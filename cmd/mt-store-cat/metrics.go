@@ -25,14 +25,14 @@ func (m MetricsByName) Len() int           { return len(m) }
 func (m MetricsByName) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m MetricsByName) Less(i, j int) bool { return m[i].name < m[j].name }
 
-// prefix is optional
-func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error) {
+// getMetrics lists all metrics from the store matching the given condition.
+func getMetrics(store *cassandra.CassandraStore, prefix, substr string) ([]Metric, error) {
 	var metrics []Metric
 	iter := store.Session.Query("select id, name from metric_idx").Iter()
 	var m Metric
 	var idString string
 	for iter.Scan(&idString, &m.name) {
-		if strings.HasPrefix(m.name, prefix) {
+		if strings.HasPrefix(m.name, prefix) && strings.Contains(m.name, substr) {
 			mkey, err := schema.MKeyFromString(idString)
 			if err != nil {
 				panic(err)
