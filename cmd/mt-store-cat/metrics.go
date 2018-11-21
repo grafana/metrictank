@@ -51,21 +51,14 @@ func getMetrics(store *cassandra.CassandraStore, prefix string) ([]Metric, error
 	return metrics, nil
 }
 
+// getMetric returns the metric for the given AMKey
 func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, error) {
 	var metrics []Metric
 	// index only stores MKey's, not AMKey's.
-	iter := store.Session.Query("select id, name from metric_idx where id=? ALLOW FILTERING", amkey.MKey.String()).Iter()
+	iter := store.Session.Query("select name from metric_idx where id=? ALLOW FILTERING", amkey.MKey.String()).Iter()
 	var m Metric
-	var idString string
-	for iter.Scan(&idString, &m.name) {
-		mkey, err := schema.MKeyFromString(idString)
-		if err != nil {
-			panic(err)
-		}
-		m.AMKey = schema.AMKey{
-			MKey:    mkey,
-			Archive: amkey.Archive,
-		}
+	for iter.Scan(&m.name) {
+		m.AMKey = amkey
 		metrics = append(metrics, m)
 	}
 	if len(metrics) > 1 {
