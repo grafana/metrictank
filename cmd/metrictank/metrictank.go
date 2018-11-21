@@ -17,6 +17,7 @@ import (
 
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
@@ -37,7 +38,6 @@ import (
 	bigtableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 

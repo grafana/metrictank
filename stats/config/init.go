@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/stats"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,7 +25,7 @@ func ConfigSetup() {
 	inStats.IntVar(&interval, "interval", 1, "interval at which to send statistics")
 	inStats.DurationVar(&timeout, "timeout", time.Second*10, "timeout after which a write is considered not successful")
 	inStats.IntVar(&bufferSize, "buffer-size", 20000, "how many messages (holding all measurements from one interval. rule of thumb: a message is ~25kB) to buffer up in case graphite endpoint is unavailable. With the default of 20k you will use max about 500MB and bridge 5 hours of downtime when needed")
-	globalconf.Register("stats", inStats)
+	globalconf.Register("stats", inStats, flag.ExitOnError)
 }
 
 func ConfigProcess(instance string) {

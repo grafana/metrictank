@@ -9,17 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
-
 	"github.com/Shopify/sarama"
-	"github.com/rakyll/globalconf"
-	log "github.com/sirupsen/logrus"
-
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
+	log "github.com/sirupsen/logrus"
 )
 
 // metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
@@ -82,7 +80,7 @@ func ConfigSetup() {
 	inKafkaMdm.DurationVar(&consumerMaxWaitTime, "consumer-max-wait-time", time.Second, "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
 	inKafkaMdm.DurationVar(&consumerMaxProcessingTime, "consumer-max-processing-time", time.Second, "The maximum amount of time the consumer expects a message takes to process")
 	inKafkaMdm.IntVar(&netMaxOpenRequests, "net-max-open-requests", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
-	globalconf.Register("kafka-mdm-in", inKafkaMdm)
+	globalconf.Register("kafka-mdm-in", inKafkaMdm, flag.ExitOnError)
 }
 
 func ConfigProcess(instance string) {

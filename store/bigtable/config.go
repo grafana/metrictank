@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/rakyll/globalconf"
+	"github.com/grafana/globalconf"
 )
 
 type StoreConfig struct {
@@ -82,7 +82,7 @@ func ConfigSetup() {
 	btStore.DurationVar(&CliConfig.WriteTimeout, "write-timeout", CliConfig.WriteTimeout, "write timeout")
 	btStore.BoolVar(&CliConfig.CreateCF, "create-cf", CliConfig.CreateCF, "enable the creation of the table and column families")
 
-	globalconf.Register("bigtable-store", btStore)
+	globalconf.Register("bigtable-store", btStore, flag.ExitOnError)
 	return
 }
 

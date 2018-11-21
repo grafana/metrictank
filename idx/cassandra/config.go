@@ -5,7 +5,7 @@ import (
 	"flag"
 	"time"
 
-	"github.com/rakyll/globalconf"
+	"github.com/grafana/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -70,9 +70,6 @@ func NewIdxConfig() *IdxConfig {
 
 // Validate validates IdxConfig settings
 func (cfg *IdxConfig) Validate() error {
-	if cfg.updateInterval == 0 {
-		return errors.New("updateInterval must be greater than 0. " + timeUnits)
-	}
 	if cfg.pruneInterval == 0 {
 		return errors.New("pruneInterval must be greater then 0. " + timeUnits)
 	}
@@ -108,7 +105,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.StringVar(&CliConfig.username, "username", CliConfig.username, "username for authentication")
 	casIdx.StringVar(&CliConfig.password, "password", CliConfig.password, "password for authentication")
 
-	globalconf.Register("cassandra-idx", casIdx)
+	globalconf.Register("cassandra-idx", casIdx, flag.ExitOnError)
 	return casIdx
 }
 

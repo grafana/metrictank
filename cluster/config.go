@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rakyll/globalconf"
+	"github.com/grafana/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -54,7 +54,7 @@ func ConfigSetup() {
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
-	globalconf.Register("cluster", clusterCfg)
+	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
 	swimCfg.StringVar(&swimUseConfig, "use-config", "manual", "config setting to use. If set to anything but manual, will override all other swim settings. Use manual|default-lan|default-local|default-wan. see https://godoc.org/github.com/hashicorp/memberlist#Config . Note all our swim settings correspond to default-lan")
@@ -75,7 +75,7 @@ func ConfigSetup() {
 	swimCfg.DurationVar(&swimGossipToTheDeadTime, "gossip-to-the-dead-time", 30*time.Second, "interval after which a node has died that we will still try to gossip to it. This gives it a chance to refute")
 	swimCfg.BoolVar(&swimEnableCompression, "enable-compression", true, "message compression")
 	swimCfg.StringVar(&swimDNSConfigPath, "dns-config-path", "/etc/resolv.conf", "system's DNS config file. Override allows for easier testing")
-	globalconf.Register("swim", swimCfg)
+	globalconf.Register("swim", swimCfg, flag.ExitOnError)
 }
 
 func ConfigProcess() {

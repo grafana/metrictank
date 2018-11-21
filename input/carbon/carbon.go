@@ -11,12 +11,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -81,7 +81,7 @@ func ConfigSetup() {
 	inCarbon.BoolVar(&Enabled, "enabled", false, "")
 	inCarbon.StringVar(&addr, "addr", ":2003", "tcp listen address")
 	inCarbon.IntVar(&partitionId, "partition", 0, "partition Id.")
-	globalconf.Register("carbon-in", inCarbon)
+	globalconf.Register("carbon-in", inCarbon, flag.ExitOnError)
 }
 
 func ConfigProcess() {

@@ -7,13 +7,13 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +27,7 @@ func init() {
 	flags := flag.NewFlagSet("chunk-cache", flag.ExitOnError)
 	// (1024 ^ 3) * 4 = 4294967296 = 4G
 	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes. 0 disables cache")
-	globalconf.Register("chunk-cache", flags)
+	globalconf.Register("chunk-cache", flags, flag.ExitOnError)
 }
 
 type CCache struct {

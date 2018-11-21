@@ -9,16 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/schema"
-
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/logger"
-	opentracing "github.com/opentracing/opentracing-go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/grafana/metrictank/store/cassandra"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
-	"github.com/rakyll/globalconf"
+	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 const tsFormat = "2006-01-02 15:04:05"
