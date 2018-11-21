@@ -68,7 +68,7 @@ func NewIdxConfig() *IdxConfig {
 	}
 }
 
-// Validate validates specific settings. It also sets updateInterval32 to an appropriate value.
+// Validate validates IdxConfig settings
 func (cfg *IdxConfig) Validate() error {
 	if cfg.updateInterval == 0 {
 		return errors.New("updateInterval must be greater than 0. " + timeUnits)
@@ -79,7 +79,6 @@ func (cfg *IdxConfig) Validate() error {
 	if cfg.timeout == 0 {
 		return errors.New("timeout must be greater than 0. " + timeUnits)
 	}
-	cfg.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
 	return nil
 }
 

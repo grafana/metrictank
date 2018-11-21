@@ -100,6 +100,9 @@ func New(cfg *IdxConfig) *CasIdx {
 	if cfg.updateCassIdx {
 		idx.writeQueue = make(chan writeReq, cfg.writeQueueSize)
 	}
+
+	cfg.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
+
 	return idx
 }
 
