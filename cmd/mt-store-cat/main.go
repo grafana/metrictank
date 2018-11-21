@@ -90,6 +90,7 @@ func main() {
 		fmt.Printf("	                            - points\n")
 		fmt.Printf("	                            - point-summary\n")
 		fmt.Printf("	                            - chunk-summary (shows TTL's, optionally bucketed. See groupTTL flag)\n")
+		fmt.Printf("	                            - chunk-csv (for importing into cassandra)\n")
 		fmt.Println()
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points")
@@ -125,14 +126,13 @@ func main() {
 		}
 		metricSelector = flag.Arg(1)
 		format = flag.Arg(2)
-		if format != "points" && format != "point-summary" && format != "chunk-summary" {
+		if format != "points" && format != "point-summary" && format != "chunk-summary" && format != "chunk-csv" {
 			flag.Usage()
 			os.Exit(-1)
 		}
 		if metricSelector == "prefix:" || metricSelector == "substr:" || metricSelector == "glob:" {
 			log.Fatal("prefix/substr/glob cannot be empty")
 		}
-
 	}
 
 	// Only try and parse the conf file if it exists
@@ -207,6 +207,10 @@ func main() {
 	// metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring> or glob:<pattern>
 	// format: points, point-summary, chunk-summary or chunk-csv
 
+	if format == "chunk-csv" && (tableSelector == "*" || tableSelector == "") {
+		log.Fatal("chunk-csv format can be used with 1 cassandra table only")
+	}
+
 	tables, err := getTables(store, tableSelector)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -214,7 +218,7 @@ func main() {
 
 	var fromUnix, toUnix uint32
 
-	if format == "points" || format == "point-summary" {
+	if format == "points" || format == "point-summary" || format == "chunk-csv" {
 		now := time.Now()
 		defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 		defaultTo := uint32(now.Add(time.Duration(1) * time.Second).Unix())
@@ -296,5 +300,7 @@ func main() {
 		printPointSummary(ctx, store, tables, metrics, fromUnix, toUnix, uint32(*fix))
 	case "chunk-summary":
 		printChunkSummary(ctx, store, tables, metrics, *groupTTL)
+	case "chunk-csv":
+		printChunkCsv(ctx, store, tables[0], metrics, fromUnix, toUnix)
 	}
 }

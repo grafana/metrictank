@@ -339,6 +339,7 @@ Usage:
 	                            - points
 	                            - point-summary
 	                            - chunk-summary (shows TTL's, optionally bucketed. See groupTTL flag)
+	                            - chunk-csv (for importing into cassandra)
 
 EXAMPLES:
 mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points
