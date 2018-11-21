@@ -9,6 +9,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// time units accepted by time.ParseDuration
+const timeUnits = "Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'"
+
+// CliConfig is a cassandra IdxConfig. It is instantiated with default values which can then be changed.
+var CliConfig = NewIdxConfig()
+
+// IdxConfig stores configuration settings for a cassandra index
 type IdxConfig struct {
 	Enabled          bool
 	pruneInterval    time.Duration
@@ -35,23 +42,7 @@ type IdxConfig struct {
 	disableInitialHostLookup bool
 }
 
-const timeUnits = "Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'"
-
-func (cfg *IdxConfig) Validate() error {
-	if cfg.updateInterval == 0 {
-		return errors.New("updateInterval must be greater than 0. " + timeUnits)
-	}
-	if cfg.pruneInterval == 0 {
-		return errors.New("pruneInterval must be greater then 0. " + timeUnits)
-	}
-	if cfg.timeout == 0 {
-		return errors.New("timeout must be greater than 0. " + timeUnits)
-	}
-	cfg.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
-	return nil
-}
-
-// NewIdxConfig returns StoreConfig with default values set.
+// NewIdxConfig returns IdxConfig with default values set.
 func NewIdxConfig() *IdxConfig {
 	return &IdxConfig{
 		Enabled:                  true,
@@ -77,8 +68,22 @@ func NewIdxConfig() *IdxConfig {
 	}
 }
 
-var CliConfig = NewIdxConfig()
+// Validate validates specific settings. It also sets updateInterval32 to an appropriate value.
+func (cfg *IdxConfig) Validate() error {
+	if cfg.updateInterval == 0 {
+		return errors.New("updateInterval must be greater than 0. " + timeUnits)
+	}
+	if cfg.pruneInterval == 0 {
+		return errors.New("pruneInterval must be greater then 0. " + timeUnits)
+	}
+	if cfg.timeout == 0 {
+		return errors.New("timeout must be greater than 0. " + timeUnits)
+	}
+	cfg.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
+	return nil
+}
 
+// ConfigSetup sets up and registers a FlagSet in globalconf for cassandra index and returns it
 func ConfigSetup() *flag.FlagSet {
 	casIdx := flag.NewFlagSet("cassandra-idx", flag.ExitOnError)
 
@@ -108,6 +113,7 @@ func ConfigSetup() *flag.FlagSet {
 	return casIdx
 }
 
+// ConfigProcess calls IdxConfig.Validate() on CliConfig. If an error is discovered this will exist with status set to 1.
 func ConfigProcess() {
 	if err := CliConfig.Validate(); err != nil {
 		log.Fatalf("cassandra-idx: Config validation error. %s", err)
