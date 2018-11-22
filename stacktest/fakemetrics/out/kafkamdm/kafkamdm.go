@@ -79,16 +79,14 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	var part *p.Kafka
 	var lmPart LastNumPartitioner
 	switch partitionScheme {
-	case "byOrg":
-		part, err = p.NewKafka("byOrg")
-	case "bySeries":
-		part, err = p.NewKafka("bySeries")
+	case "byOrg", "bySeries", "bySeriesWithTags":
+		part, err = p.NewKafka(partitionScheme)
 	case "lastNum":
 		lmPart = LastNumPartitioner{}
 		// sets partition based on message partition field
 		config.Producer.Partitioner = sarama.NewManualPartitioner
 	default:
-		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|lastNum'. got %s", partitionScheme)
+		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
 	}
 	if err != nil {
 		return nil, err

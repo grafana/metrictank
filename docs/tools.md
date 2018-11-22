@@ -189,7 +189,7 @@ Flags:
   -num-partitions int
     	number of partitions in cluster (default 1)
   -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries) (default "byOrg")
+    	method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags) (default "byOrg")
   -schema-file string
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -src-cass-addr string
@@ -763,7 +763,7 @@ global config flags:
   -overwrite-chunks
     	If true existing chunks may be overwritten (default true)
   -partition-scheme string
-    	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries) (default "bySeries")
+    	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags) (default "bySeries")
   -ttls string
     	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string

@@ -20,8 +20,9 @@ func NewKafka(partitionBy string) (*Kafka, error) {
 	switch partitionBy {
 	case "byOrg":
 	case "bySeries":
+	case "bySeriesWithTags":
 	default:
-		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries'. got %s", partitionBy)
+		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
 	}
 	return &Kafka{
 		PartitionBy: partitionBy,
@@ -47,6 +48,11 @@ func (k *Kafka) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, e
 		// partition by series: metrics are distrubted across all metrictank instances
 		// to allow horizontal scalability
 		return m.KeyBySeries(b), nil
+	case "bySeriesWithTags":
+		// partition by series: metrics are distrubted across all metrictank instances
+		// to allow horizontal scalability, the tags are also considered as a factor
+		// for the partitioner
+		return m.KeyBySeriesWithTags(b), nil
 	}
 	return b, fmt.Errorf("unknown partitionBy setting.")
 }

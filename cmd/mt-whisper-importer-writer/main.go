@@ -50,7 +50,7 @@ var (
 	partitionScheme = globalFlags.String(
 		"partition-scheme",
 		"bySeries",
-		"method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)",
+		"method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags)",
 	)
 	uriPath = globalFlags.String(
 		"uri-path",
