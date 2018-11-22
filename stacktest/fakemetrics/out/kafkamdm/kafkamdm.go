@@ -88,7 +88,7 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		// sets partition based on message partition field
 		config.Producer.Partitioner = sarama.NewManualPartitioner
 	default:
-		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|lastNum'. got %s", partitionScheme)
+		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
 	}
 	if err != nil {
 		return nil, err
