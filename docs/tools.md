@@ -334,11 +334,12 @@ Usage:
 
 	mt-store-cat [flags] <table-selector> <metric-selector> <format>
 	                     table-selector: '*' or name of a table. e.g. 'metric_128'
-	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix>
+	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring> or glob:<pattern>
 	                     format:
 	                            - points
 	                            - point-summary
 	                            - chunk-summary (shows TTL's, optionally bucketed. See groupTTL flag)
+	                            - chunk-csv (for importing into cassandra)
 
 EXAMPLES:
 mt-store-cat -cassandra-keyspace metrictank -from='-1min' '*' '1.77c8c77afa22b67ef5b700c2a2b88d5f' points
@@ -346,6 +347,8 @@ mt-store-cat -cassandra-keyspace metrictank -from='-1month' '*' 'prefix:fake' po
 mt-store-cat -cassandra-keyspace metrictank '*' 'prefix:fake' chunk-summary
 mt-store-cat -groupTTL h -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary
 Flags:
+  -archive string
+    	archive to fetch for given metric. e.g. 'sum_1800'
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
   -cassandra-auth
@@ -398,6 +401,8 @@ Flags:
     	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
   -to string
     	get data until (exclusive). only for points and point-summary format (default "now")
+  -verbose
+    	verbose (print stuff about the request)
   -version
     	print version string
   -window-factor int

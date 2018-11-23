@@ -85,31 +85,20 @@ func GetAMKey(m MKey, method Method, span uint32) AMKey {
 func AMKeyFromString(s string) (AMKey, error) {
 	underscores := strings.Count(s, "_")
 	amk := AMKey{}
+	var err error
 	switch underscores {
 	case 0:
-		mk, err := MKeyFromString(s)
-		amk.MKey = mk
+		amk.MKey, err = MKeyFromString(s)
 		return amk, err
 	case 2:
-		splits := strings.Split(s, "_")
-		mk, err := MKeyFromString(splits[0])
+		pos := strings.Index(s, "_")
+		amk.MKey, err = MKeyFromString(s[:pos])
 		if err != nil {
 			return amk, err
 		}
-		amk.MKey = mk
-		method, err := MethodFromString(splits[1])
-		if err != nil {
-			return amk, err
-		}
-		span, err := strconv.ParseInt(splits[2], 10, 32)
-		if err != nil {
-			return amk, err
-		}
-		if !IsSpanValid(uint32(span)) {
-			return amk, fmt.Errorf("invalid span %d", span)
-		}
-		amk.Archive = NewArchive(method, uint32(span))
-		return amk, nil
+		amk.Archive, err = ArchiveFromString(s[pos+1:])
+		return amk, err
+
 	}
 	return amk, ErrInvalidFormat
 }
