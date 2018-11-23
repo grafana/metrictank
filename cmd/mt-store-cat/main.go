@@ -37,6 +37,7 @@ var (
 	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and point-summary format")
 	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+	archiveStr  = flag.String("archive", "", "archive to fetch for given metric. e.g. 'sum_1800'")
 	verbose     bool
 
 	printTime func(ts uint32) string
@@ -196,6 +197,14 @@ func main() {
 		log.Fatalf("failed to read tables from cassandra. %s", err.Error())
 	}
 
+	var archive schema.Archive
+	if *archiveStr != "" {
+		archive, err = schema.ArchiveFromString(*archiveStr)
+		if err != nil {
+			log.Fatalf("could not parse archive %q: %s", *archiveStr, err)
+		}
+	}
+
 	// set up is done, now actually execute the business logic
 
 	// handle "tables"
@@ -243,7 +252,7 @@ func main() {
 		// chunk-summary doesn't need an explicit listing. it knows if metrics is empty, to query all
 		// but the other two do need an explicit listing.
 		if format == "points" || format == "point-summary" {
-			metrics, err = getMetrics(store, "", "", "")
+			metrics, err = getMetrics(store, "", "", "", archive)
 			if err != nil {
 				log.Errorf("cassandra query error. %s", err.Error())
 				return
@@ -263,7 +272,7 @@ func main() {
 		if verbose {
 			fmt.Println("# Looking for these metrics:")
 		}
-		metrics, err = getMetrics(store, prefix, substr, glob)
+		metrics, err = getMetrics(store, prefix, substr, glob, archive)
 		if err != nil {
 			log.Errorf("cassandra query error. %s", err.Error())
 			return

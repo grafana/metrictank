@@ -50,7 +50,7 @@ func match(prefix, substr, glob string, metric Metric) bool {
 }
 
 // getMetrics lists all metrics from the store matching the given condition.
-func getMetrics(store *cassandra.CassandraStore, prefix, substr, glob string) ([]Metric, error) {
+func getMetrics(store *cassandra.CassandraStore, prefix, substr, glob string, archive schema.Archive) ([]Metric, error) {
 	var metrics []Metric
 	iter := store.Session.Query("select id, name from metric_idx").Iter()
 	var m Metric
@@ -62,7 +62,8 @@ func getMetrics(store *cassandra.CassandraStore, prefix, substr, glob string) ([
 				panic(err)
 			}
 			m.AMKey = schema.AMKey{
-				MKey: mkey,
+				MKey:    mkey,
+				Archive: archive,
 			}
 			metrics = append(metrics, m)
 		}

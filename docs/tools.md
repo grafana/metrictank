@@ -347,6 +347,8 @@ mt-store-cat -cassandra-keyspace metrictank -from='-1month' '*' 'prefix:fake' po
 mt-store-cat -cassandra-keyspace metrictank '*' 'prefix:fake' chunk-summary
 mt-store-cat -groupTTL h -cassandra-keyspace metrictank 'metric_512' '1.37cf8e3731ee4c79063c1d55280d1bbe' chunk-summary
 Flags:
+  -archive string
+    	archive to fetch for given metric. e.g. 'sum_1800'
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
   -cassandra-auth
