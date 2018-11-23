@@ -399,6 +399,8 @@ Flags:
     	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
   -to string
     	get data until (exclusive). only for points and point-summary format (default "now")
+  -verbose
+    	verbose (print stuff about the request)
   -version
     	print version string
   -window-factor int

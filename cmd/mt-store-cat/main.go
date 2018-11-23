@@ -37,6 +37,7 @@ var (
 	printTs     = flag.Bool("print-ts", false, "print time stamps instead of formatted dates. only for points and point-summary format")
 	groupTTL    = flag.String("groupTTL", "d", "group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format")
 	timeZoneStr = flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
+	verbose     bool
 
 	printTime func(ts uint32) string
 )
@@ -46,6 +47,7 @@ func init() {
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
 	log.SetFormatter(formatter)
 	log.SetLevel(log.InfoLevel)
+	flag.BoolVar(&verbose, "verbose", false, "verbose (print stuff about the request)")
 }
 
 func main() {
@@ -235,7 +237,9 @@ func main() {
 	}
 	var metrics []Metric
 	if metricSelector == "*" {
-		fmt.Println("# Looking for ALL metrics")
+		if verbose {
+			fmt.Println("# Looking for ALL metrics")
+		}
 		// chunk-summary doesn't need an explicit listing. it knows if metrics is empty, to query all
 		// but the other two do need an explicit listing.
 		if format == "points" || format == "point-summary" {
@@ -256,14 +260,18 @@ func main() {
 		if strings.HasPrefix(metricSelector, "glob:") {
 			glob = strings.Replace(metricSelector, "glob:", "", 1)
 		}
-		fmt.Println("# Looking for these metrics:")
+		if verbose {
+			fmt.Println("# Looking for these metrics:")
+		}
 		metrics, err = getMetrics(store, prefix, substr, glob)
 		if err != nil {
 			log.Errorf("cassandra query error. %s", err.Error())
 			return
 		}
-		for _, m := range metrics {
-			fmt.Println(m)
+		if verbose {
+			for _, m := range metrics {
+				fmt.Println(m)
+			}
 		}
 	} else {
 		amkey, err := schema.AMKeyFromString(metricSelector)
@@ -272,7 +280,9 @@ func main() {
 			return
 		}
 
-		fmt.Println("# Looking for this metric:")
+		if verbose {
+			fmt.Println("# Looking for this metric:")
+		}
 
 		metrics, err = getMetric(store, amkey)
 		if err != nil {
@@ -283,12 +293,16 @@ func main() {
 			fmt.Printf("metric id %v not found", amkey.MKey)
 			return
 		}
-		for _, m := range metrics {
-			fmt.Println(m)
+		if verbose {
+			for _, m := range metrics {
+				fmt.Println(m)
+			}
 		}
 	}
 
-	fmt.Printf("# Keyspace %q:\n", storeConfig.Keyspace)
+	if verbose {
+		fmt.Printf("# Keyspace %q:\n", storeConfig.Keyspace)
+	}
 
 	span := tracer.StartSpan("mt-store-cat " + format)
 	ctx := opentracing.ContextWithSpan(context.Background(), span)
