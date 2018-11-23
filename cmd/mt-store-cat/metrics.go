@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/store/cassandra"
 )
@@ -25,14 +27,36 @@ func (m MetricsByName) Len() int           { return len(m) }
 func (m MetricsByName) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m MetricsByName) Less(i, j int) bool { return m[i].name < m[j].name }
 
+func match(prefix, substr, glob string, metric Metric) bool {
+	if !strings.HasPrefix(metric.name, prefix) {
+		return false
+	}
+	if !strings.Contains(metric.name, substr) {
+		return false
+	}
+	if glob == "" {
+		return true
+	}
+
+	// graphite separates by . -- Match separates by /
+	glob2 := strings.Replace(glob, ".", "/", -1)
+	name := strings.Replace(metric.name, ".", "/", -1)
+
+	ok, err := filepath.Match(glob2, name)
+	if err != nil {
+		log.Fatalf("invalid match pattern %q: %s", glob, err)
+	}
+	return ok
+}
+
 // getMetrics lists all metrics from the store matching the given condition.
-func getMetrics(store *cassandra.CassandraStore, prefix, substr string) ([]Metric, error) {
+func getMetrics(store *cassandra.CassandraStore, prefix, substr, glob string) ([]Metric, error) {
 	var metrics []Metric
 	iter := store.Session.Query("select id, name from metric_idx").Iter()
 	var m Metric
 	var idString string
 	for iter.Scan(&idString, &m.name) {
-		if strings.HasPrefix(m.name, prefix) && strings.Contains(m.name, substr) {
+		if match(prefix, substr, glob, m) {
 			mkey, err := schema.MKeyFromString(idString)
 			if err != nil {
 				panic(err)

@@ -85,7 +85,7 @@ func main() {
 		fmt.Println()
 		fmt.Printf("	mt-store-cat [flags] <table-selector> <metric-selector> <format>\n")
 		fmt.Printf("	                     table-selector: '*' or name of a table. e.g. 'metric_128'\n")
-		fmt.Printf("	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring>\n")
+		fmt.Printf("	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring> or glob:<pattern>\n")
 		fmt.Printf("	                     format:\n")
 		fmt.Printf("	                            - points\n")
 		fmt.Printf("	                            - point-summary\n")
@@ -129,8 +129,8 @@ func main() {
 			flag.Usage()
 			os.Exit(-1)
 		}
-		if metricSelector == "prefix:" || metricSelector == "substr:" {
-			log.Fatal("prefix cannot be empty")
+		if metricSelector == "prefix:" || metricSelector == "substr:" || metricSelector == "glob:" {
+			log.Fatal("prefix/substr/glob cannot be empty")
 		}
 
 	}
@@ -204,7 +204,7 @@ func main() {
 
 	// handle the case where we have a table-selector, metric-selector and format
 	// table-selector: '*' or name of a table. e.g. 'metric_128'
-	// metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring>
+	// metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring> or glob:<pattern>
 	// format: points, point-summary, chunk-summary or chunk-csv
 
 	tables, err := getTables(store, tableSelector)
@@ -235,22 +235,25 @@ func main() {
 		// chunk-summary doesn't need an explicit listing. it knows if metrics is empty, to query all
 		// but the other two do need an explicit listing.
 		if format == "points" || format == "point-summary" {
-			metrics, err = getMetrics(store, "", "")
+			metrics, err = getMetrics(store, "", "", "")
 			if err != nil {
 				log.Errorf("cassandra query error. %s", err.Error())
 				return
 			}
 		}
-	} else if strings.HasPrefix(metricSelector, "prefix:") || strings.HasPrefix(metricSelector, "substr:") {
-		var prefix, substr string
+	} else if strings.HasPrefix(metricSelector, "prefix:") || strings.HasPrefix(metricSelector, "substr:") || strings.HasPrefix(metricSelector, "glob:") {
+		var prefix, substr, glob string
 		if strings.HasPrefix(metricSelector, "prefix:") {
 			prefix = strings.Replace(metricSelector, "prefix:", "", 1)
 		}
 		if strings.HasPrefix(metricSelector, "substr:") {
 			substr = strings.Replace(metricSelector, "substr:", "", 1)
 		}
+		if strings.HasPrefix(metricSelector, "glob:") {
+			glob = strings.Replace(metricSelector, "glob:", "", 1)
+		}
 		fmt.Println("# Looking for these metrics:")
-		metrics, err = getMetrics(store, prefix, substr)
+		metrics, err = getMetrics(store, prefix, substr, glob)
 		if err != nil {
 			log.Errorf("cassandra query error. %s", err.Error())
 			return

@@ -334,7 +334,7 @@ Usage:
 
 	mt-store-cat [flags] <table-selector> <metric-selector> <format>
 	                     table-selector: '*' or name of a table. e.g. 'metric_128'
-	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix>
+	                     metric-selector: '*' or an id (of raw or aggregated series) or prefix:<prefix> or substr:<substring> or glob:<pattern>
 	                     format:
 	                            - points
 	                            - point-summary
