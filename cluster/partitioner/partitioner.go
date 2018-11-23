@@ -1,9 +1,11 @@
 package partitioner
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/Shopify/sarama"
+	jump "github.com/dgryski/go-jump"
 	"github.com/raintank/schema"
 )
 
@@ -12,47 +14,62 @@ type Partitioner interface {
 }
 
 type Kafka struct {
-	PartitionBy string
-	Partitioner sarama.Partitioner
+	PartitionBy     string
+	Partitioner     sarama.Partitioner
+	GetPartitionKey func(schema.PartitionedMetric, []byte) []byte
 }
 
 func NewKafka(partitionBy string) (*Kafka, error) {
 	switch partitionBy {
 	case "byOrg":
+		return &Kafka{
+			PartitionBy:     partitionBy,
+			Partitioner:     sarama.NewHashPartitioner(""),
+			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyByOrgId(b) },
+		}, nil
 	case "bySeries":
+		return &Kafka{
+			PartitionBy:     partitionBy,
+			Partitioner:     sarama.NewHashPartitioner(""),
+			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) },
+		}, nil
 	case "bySeriesWithTags":
+		return &Kafka{
+			PartitionBy:     partitionBy,
+			Partitioner:     &jumpPartitioner{},
+			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) },
+		}, nil
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
 	}
-	return &Kafka{
-		PartitionBy: partitionBy,
-		Partitioner: sarama.NewHashPartitioner(""),
-	}, nil
 }
 
 func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
-	key, err := k.GetPartitionKey(m, nil)
-	if err != nil {
-		return 0, err
-	}
+	key := k.GetPartitionKey(m, nil)
 	return k.Partitioner.Partition(&sarama.ProducerMessage{Key: sarama.ByteEncoder(key)}, numPartitions)
 }
 
-func (k *Kafka) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, error) {
-	switch k.PartitionBy {
-	case "byOrg":
-		// partition by organisation: metrics for the same org should go to the same
-		// partition/MetricTank (optimize for locality~performance)
-		return m.KeyByOrgId(b), nil
-	case "bySeries":
-		// partition by series: metrics are distrubted across all metrictank instances
-		// to allow horizontal scalability
-		return m.KeyBySeries(b), nil
-	case "bySeriesWithTags":
-		// partition by series: metrics are distrubted across all metrictank instances
-		// to allow horizontal scalability, the tags are also considered as a factor
-		// for the partitioner
-		return m.KeyBySeriesWithTags(b), nil
+type jumpPartitioner struct{}
+
+func (p *jumpPartitioner) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
+	key, err := message.Key.Encode()
+	if err != nil {
+		return 0, err
 	}
-	return b, fmt.Errorf("unknown partitionBy setting.")
+
+	// we need to get from a []byte key to a uint64 key, because jump requires that as input
+	// so we keep adding slices of 8 bytes to the jump key as uint64 values
+	// if the result wraps around the uin64 boundary it doesn't matter because
+	// this only needs to be fast and consistent
+	key = append(key, make([]byte, 8-len(key)%8)...)
+	var jumpKey uint64
+	for pos := 8; pos <= len(key); pos += 8 {
+		jumpKey += binary.BigEndian.Uint64(key[pos-8 : pos])
+	}
+
+	return jump.Hash(jumpKey, int(numPartitions)), nil
+}
+
+func (p *jumpPartitioner) RequiresConsistency() bool {
+	return true
 }
