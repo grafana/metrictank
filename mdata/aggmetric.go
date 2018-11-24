@@ -346,10 +346,7 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 		return
 	}
 	// push into cache
-	var intervalHint uint32
-	if a.Key.Archive != 0 {
-		intervalHint = a.Key.Archive.Span()
-	}
+	intervalHint := a.Key.Archive.Span()
 
 	itergen := chunk.NewBareIterGen(c.Series.T0, intervalHint, c.Encode(a.ChunkSpan))
 	go a.cachePusher.AddIfHot(a.Key, 0, itergen)
