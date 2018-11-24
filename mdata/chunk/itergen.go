@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	errUnknownChunkFormat = errors.New("unrecognized chunk format in cassandra")
+	errUnknownChunkFormat = errors.New("unrecognized chunk format")
 	errUnknownSpanCode    = errors.New("corrupt data, chunk span code is not known")
 	errShort              = errors.New("chunk is too short")
 )
@@ -66,12 +66,13 @@ func (ig *IterGen) Get() (tsz.Iter, error) {
 		dest := make([]byte, len(src))
 		copy(dest, src)
 		return tsz.NewIterator4h(dest, ig.intervalHint)
+	case FormatGoTszLongWithSpan:
+		src := ig.B[2:]
+		dest := make([]byte, len(src))
+		copy(dest, src)
+		return tsz.NewIteratorLong(ig.T0, dest)
 	}
-	// FormatGoTszLongWithSpan:
-	src := ig.B[2:]
-	dest := make([]byte, len(src))
-	copy(dest, src)
-	return tsz.NewIteratorLong(ig.T0, dest)
+	return nil, errUnknownChunkFormat
 }
 
 func (ig *IterGen) Span() uint32 {
@@ -82,12 +83,8 @@ func (ig *IterGen) Span() uint32 {
 	return ChunkSpans[SpanCode(ig.B[1])]
 }
 
-func (ig *IterGen) Size() uint64 { // TODO this is different than before. problem?
+func (ig *IterGen) Size() uint64 {
 	return uint64(len(ig.B))
-}
-
-func (ig IterGen) Bytes() []byte { // TODO this is different than before. problem?
-	return ig.B
 }
 
 // end of itergen (exclusive). next t0
