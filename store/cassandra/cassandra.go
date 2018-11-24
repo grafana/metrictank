@@ -522,10 +522,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	cassGetChunksDuration.Value(time.Since(pre))
 	pre = time.Now()
 
-	var intervalHint uint32
-	if key.Archive != 0 {
-		intervalHint = key.Archive.Span()
-	}
+	intervalHint := key.Archive.Span()
 
 	var b []byte
 	var t0 int
