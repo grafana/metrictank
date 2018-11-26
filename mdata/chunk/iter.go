@@ -1,7 +1,7 @@
 package chunk
 
 import (
-	"github.com/grafana/metrictank/mdata/chunk/tsz"
+	"github.com/dgryski/go-tsz"
 )
 
 type Iter struct {

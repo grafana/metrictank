@@ -1,22 +1,16 @@
-// Package tsz implements time-series compression
-// it is a fork of https://github.com/dgryski/go-tsz
-// which implements http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
-// with the following exceptions:
-// * t-1 is here t0 (see devdocs)
-// * we renamed the package to be more clearly about the limitation that
-// you shouldn't use it for chunks longer than 4.5 hours, due to overflow
-// of the first delta (14 bits), see https://github.com/grafana/metrictank/pull/1126
-// * we patched a workaround to reconstruct corrupted chunks that were
-//   affected by the above issue. (only works for chunks <= 9h)
+// Package tsz implement time-series compression
+/*
+
+http://www.vldb.org/pvldb/vol8/p1816-teller.pdf
+
+*/
 package tsz
 
 import (
-	"bytes"
-	"encoding/binary"
-	"io"
 	"math"
-	"math/bits"
 	"sync"
+
+	"github.com/dgryski/go-bits"
 )
 
 // Series is the basic series primitive
@@ -37,7 +31,6 @@ type Series struct {
 	tDelta uint32
 }
 
-// New series
 func New(t0 uint32) *Series {
 	s := Series{
 		T0:      t0,
@@ -51,7 +44,6 @@ func New(t0 uint32) *Series {
 
 }
 
-// Bytes value of the series stream
 func (s *Series) Bytes() []byte {
 	s.Lock()
 	defer s.Unlock()
@@ -65,7 +57,6 @@ func finish(w *bstream) {
 	w.writeBit(zero)
 }
 
-// Finish the series by writing an end-of-stream record
 func (s *Series) Finish() {
 	s.Lock()
 	if !s.finished {
@@ -75,7 +66,6 @@ func (s *Series) Finish() {
 	s.Unlock()
 }
 
-// Push a timestamp and value to the series
 func (s *Series) Push(t uint32, v float64) {
 	s.Lock()
 	defer s.Unlock()
@@ -117,8 +107,8 @@ func (s *Series) Push(t uint32, v float64) {
 	} else {
 		s.bw.writeBit(one)
 
-		leading := uint8(bits.LeadingZeros64(vDelta))
-		trailing := uint8(bits.TrailingZeros64(vDelta))
+		leading := uint8(bits.Clz(vDelta))
+		trailing := uint8(bits.Ctz(vDelta))
 
 		// clamp number of leading zeros to avoid overflow when encoding
 		if leading >= 32 {
@@ -150,7 +140,6 @@ func (s *Series) Push(t uint32, v float64) {
 
 }
 
-// Iter lets you iterate over a series.  It is not concurrency-safe.
 func (s *Series) Iter() *Iter {
 	s.Lock()
 	w := s.bw.clone()
@@ -193,70 +182,10 @@ func bstreamIterator(br *bstream) (*Iter, error) {
 	}, nil
 }
 
-// NewIterator for the series
 func NewIterator(b []byte) (*Iter, error) {
 	return bstreamIterator(newBReader(b))
 }
 
-func (it *Iter) dod() (int32, bool) {
-	var d byte
-	for i := 0; i < 4; i++ {
-		d <<= 1
-		bit, err := it.br.readBit()
-		if err != nil {
-			it.err = err
-			return 0, false
-		}
-		if bit == zero {
-			break
-		}
-		d |= 1
-	}
-
-	var dod int32
-	var sz uint
-	switch d {
-	case 0x00:
-		// dod == 0
-	case 0x02:
-		sz = 7
-	case 0x06:
-		sz = 9
-	case 0x0e:
-		sz = 12
-	case 0x0f:
-		bits, err := it.br.readBits(32)
-		if err != nil {
-			it.err = err
-			return 0, false
-		}
-
-		// end of stream
-		if bits == 0xffffffff {
-			it.finished = true
-			return 0, false
-		}
-
-		dod = int32(bits)
-	}
-
-	if sz != 0 {
-		bits, err := it.br.readBits(int(sz))
-		if err != nil {
-			it.err = err
-			return 0, false
-		}
-		if bits > (1 << (sz - 1)) {
-			// or something
-			bits = bits - (1 << sz)
-		}
-		dod = int32(bits)
-	}
-
-	return dod, true
-}
-
-// Next iteration of the series iterator
 func (it *Iter) Next() bool {
 
 	if it.err != nil || it.finished {
@@ -280,38 +209,62 @@ func (it *Iter) Next() bool {
 
 		it.val = math.Float64frombits(v)
 
-		// special case: read upcoming dod
-		// if delta+dod <0 (aka the upcoming delta < 0),
-		// our current delta overflowed, and should rectify it.
-		// see https://github.com/grafana/metrictank/pull/1126
-		// but we must take a backup of the stream because reading from the
-		// stream modifies it.
-		brBackup := it.br.clone()
-		dod, ok := it.dod()
-		if !ok {
-			// in this case we can't know if the point is right or wrong.
-			// long chunks with a single point in them may lead to a wrong read, but this should be rare.
-			// we can't just adjust the timestamp because we don't know the length of the chunk
-			// (though this could be done by having the caller pass us that information), nor whether
-			// a delta that may seem low compared to chunk length was intentional or not.
-			// so, nothing much to do in this case. return the possibly incorrect point.
-			// and for return value, stick to normal iter semantics:
-			// this read succeeded, though we already know the next one will fail
-			it.br = *brBackup
-			return true
-		}
-		if dod+int32(tDelta) < 0 {
-			it.tDelta += 16384
-			it.t += 16384
-		}
-		it.br = *brBackup
 		return true
 	}
 
 	// read delta-of-delta
-	dod, ok := it.dod()
-	if !ok {
-		return false
+	var d byte
+	for i := 0; i < 4; i++ {
+		d <<= 1
+		bit, err := it.br.readBit()
+		if err != nil {
+			it.err = err
+			return false
+		}
+		if bit == zero {
+			break
+		}
+		d |= 1
+	}
+
+	var dod int32
+	var sz uint
+	switch d {
+	case 0x00:
+		// dod == 0
+	case 0x02:
+		sz = 7
+	case 0x06:
+		sz = 9
+	case 0x0e:
+		sz = 12
+	case 0x0f:
+		bits, err := it.br.readBits(32)
+		if err != nil {
+			it.err = err
+			return false
+		}
+
+		// end of stream
+		if bits == 0xffffffff {
+			it.finished = true
+			return false
+		}
+
+		dod = int32(bits)
+	}
+
+	if sz != 0 {
+		bits, err := it.br.readBits(int(sz))
+		if err != nil {
+			it.err = err
+			return false
+		}
+		if bits > (1 << (sz - 1)) {
+			// or something
+			bits = bits - (1 << sz)
+		}
+		dod = int32(bits)
 	}
 
 	tDelta := it.tDelta + uint32(dod)
@@ -329,8 +282,8 @@ func (it *Iter) Next() bool {
 	if bit == zero {
 		// it.val = it.val
 	} else {
-		bit, itErr := it.br.readBit()
-		if itErr != nil {
+		bit, err := it.br.readBit()
+		if err != nil {
 			it.err = err
 			return false
 		}
@@ -372,75 +325,10 @@ func (it *Iter) Next() bool {
 	return true
 }
 
-// Values at the current iterator position
 func (it *Iter) Values() (uint32, float64) {
 	return it.t, it.val
 }
 
-// Err error at the current iterator position
 func (it *Iter) Err() error {
 	return it.err
-}
-
-type errMarshal struct {
-	w   io.Writer
-	r   io.Reader
-	err error
-}
-
-func (em *errMarshal) write(t interface{}) {
-	if em.err != nil {
-		return
-	}
-	em.err = binary.Write(em.w, binary.BigEndian, t)
-}
-
-func (em *errMarshal) read(t interface{}) {
-	if em.err != nil {
-		return
-	}
-	em.err = binary.Read(em.r, binary.BigEndian, t)
-}
-
-// MarshalBinary implements the encoding.BinaryMarshaler interface
-func (s *Series) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	em := &errMarshal{w: buf}
-	em.write(s.T0)
-	em.write(s.leading)
-	em.write(s.t)
-	em.write(s.tDelta)
-	em.write(s.trailing)
-	em.write(s.val)
-	bStream, err := s.bw.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	em.write(bStream)
-	if em.err != nil {
-		return nil, em.err
-	}
-	return buf.Bytes(), nil
-}
-
-// UnmarshalBinary implements the encoding.BinaryUnmarshaler interface
-func (s *Series) UnmarshalBinary(b []byte) error {
-	buf := bytes.NewReader(b)
-	em := &errMarshal{r: buf}
-	em.read(&s.T0)
-	em.read(&s.leading)
-	em.read(&s.t)
-	em.read(&s.tDelta)
-	em.read(&s.trailing)
-	em.read(&s.val)
-	outBuf := make([]byte, buf.Len())
-	em.read(outBuf)
-	err := s.bw.UnmarshalBinary(outBuf)
-	if err != nil {
-		return err
-	}
-	if em.err != nil {
-		return em.err
-	}
-	return nil
 }

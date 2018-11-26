@@ -19,7 +19,6 @@ type Table struct {
 	TTL        uint32
 }
 
-// GetTTLTables returns table definitions for the given specifications (ttls is in seconds)
 func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables {
 	tables := make(TTLTables)
 	for _, ttl := range ttls {
@@ -30,14 +29,9 @@ func GetTTLTables(ttls []uint32, windowFactor int, nameFormat string) TTLTables 
 
 func GetTable(ttl uint32, windowFactor int, nameFormat string) Table {
 	/*
-	 * The purpose of this is to bucket metrics of similar TTLs in well-tuned tables.
-	 * We first calculate the preFactorWindow, which is the largest power of 2 that's
-	 * smaller or equal to the TTL in hours.
-	 * The table gets named after the preFactorWindow corresponding to the given TTL,
-	 * assuring that we have a correctly tuned table for each given TTL.
-	 * Then we divide the preFactorWindow by the windowFactor to obtain the window size
-	 * in hours. This lets us control the amount of sstables used for each table/TTL.
-	 * For example with a window factor of 20 we want to group the metrics like this:
+	 * the purpose of this is to bucket metrics of similar TTLs.
+	 * we first calculate the largest power of 2 that's smaller than the TTL and then divide the result by
+	 * the window factor. for example with a window factor of 20 we want to group the metrics like this:
 	 *
 	 * generated with: https://gist.github.com/replay/69ad7cfd523edfa552cd12851fa74c58
 	 *
@@ -64,17 +58,14 @@ func GetTable(ttl uint32, windowFactor int, nameFormat string) Table {
 	 * +------------------------+---------------+---------------------+----------+
 	 */
 
-	// preFactorWindow is the largest power of 2 that's <= ttl
-	// for example ttl of 1024 hours -> preFactorWindow of 1024,
-	// but ttl of 1000 or 1023.99 hours -> prefactorWindow of 512
+	// calculate the pre factor window by finding the largest power of 2 that's smaller than ttl
 	preFactorWindow := uint32(math.Exp2(math.Floor(math.Log2(ttlUnits(ttl)))))
 	tableName := fmt.Sprintf(nameFormat, preFactorWindow)
-	windowSize := preFactorWindow/uint32(windowFactor) + 1
 	return Table{
 		Name:       tableName,
 		QueryRead:  fmt.Sprintf(QueryFmtRead, tableName),
 		QueryWrite: fmt.Sprintf(QueryFmtWrite, tableName),
-		WindowSize: windowSize,
+		WindowSize: preFactorWindow/uint32(windowFactor) + 1,
 		TTL:        ttl,
 	}
 }

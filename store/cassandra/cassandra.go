@@ -123,7 +123,6 @@ func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	return timeoutD
 }
 
-// NewCassandraStore creates a new cassandra store, using the provided retention ttl's in seconds
 func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)
@@ -269,9 +268,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 // FindExistingTables set's the store's table definitions to what it can find
 // in the database.
 // WARNING:
-// * does not set the windowSize property, because we don't know what the windowFactor was
-//   we could actually figure it based on the table definition, assuming the schema isn't tampered with,
-//   but there is no use case for this so we haven't implemented this.
+// * does not set windowFactor property, because we can't know what it was
 // * each table covers a range of TTL's. we set the TTL to the lower limit
 //   so remember the TTL might have been up to twice as much
 func (c *CassandraStore) FindExistingTables(keyspace string) error {

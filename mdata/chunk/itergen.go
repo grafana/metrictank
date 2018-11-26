@@ -3,7 +3,7 @@ package chunk
 import (
 	"errors"
 
-	"github.com/grafana/metrictank/mdata/chunk/tsz"
+	"github.com/dgryski/go-tsz"
 )
 
 var (
