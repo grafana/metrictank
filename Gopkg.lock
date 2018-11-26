@@ -119,6 +119,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:3db74f0cf75d9759d2bdfb6cb55f7d7d372c01f847c5e1ab2fe03773dc2bf024"
+  name = "github.com/dgryski/go-jump"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "e1f439676b570800a863c37b78d1f868f51a85fc"
+
+[[projects]]
+  branch = "master"
   digest = "1:07e80adc1161a63d37f382328ebabbf4f50e027cfaadf718515c3f39a65eb18f"
   name = "github.com/dgryski/go-linlog"
   packages = ["."]
@@ -1037,6 +1045,7 @@
     "github.com/Shopify/sarama",
     "github.com/alyu/configparser",
     "github.com/davecgh/go-spew/spew",
+    "github.com/dgryski/go-jump",
     "github.com/dgryski/go-linlog",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",
