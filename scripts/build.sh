@@ -35,6 +35,7 @@ for bin in *; do
   if [ "$1" == "-race" ]
   then
     set -x
+    # -race requires CGO
     CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$bin || fail
   else
     set -x
