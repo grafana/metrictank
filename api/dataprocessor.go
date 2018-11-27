@@ -543,7 +543,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 			}
 
 			for i, itgen := range storeIterGens {
-				it, err := itgen.Get()
+				iter, err := itgen.Get()
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
 					tracing.Failure(span)
@@ -554,7 +554,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 					}
 					return iters, err
 				}
-				iters = append(iters, it)
+				iters = append(iters, iter)
 			}
 			// it's important that the itgens get added in chronological order,
 			// currently we rely on store returning results in order
@@ -563,13 +563,13 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 
 		// the End slice is in reverse order
 		for i := len(cacheRes.End) - 1; i >= 0; i-- {
-			it, err := cacheRes.End[i].Get()
+			iter, err := cacheRes.End[i].Get()
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt
 				log.Errorf("itergen: error getting iter from cache result end slice %+v", err.Error())
 				return iters, err
 			}
-			iters = append(iters, it)
+			iters = append(iters, iter)
 		}
 	}
 
