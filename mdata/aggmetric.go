@@ -348,7 +348,10 @@ func (a *AggMetric) pushToCache(c *chunk.Chunk) {
 	// push into cache
 	intervalHint := a.Key.Archive.Span()
 
-	itergen := chunk.NewBareIterGen(c.Series.T0, intervalHint, c.Encode(a.ChunkSpan))
+	itergen, err := chunk.NewIterGen(c.Series.T0, intervalHint, c.Encode(a.ChunkSpan))
+	if err != nil {
+		log.Errorf("AM: %s failed to generate IterGen. this should never happen: %s", a.Key, err)
+	}
 	go a.cachePusher.AddIfHot(a.Key, 0, itergen)
 }
 

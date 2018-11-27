@@ -31,7 +31,12 @@ func getItgen(t testing.TB, values []uint32, ts uint32, spanaware bool) chunk.It
 	}
 	buf.Write(b)
 
-	return chunk.NewBareIterGen(ts, 1, buf.Bytes())
+	itgen, err := chunk.NewIterGen(ts, 1, buf.Bytes())
+	if err != nil {
+		t.Fatalf("invalid IterGen: %s", err)
+	}
+	return itgen
+
 }
 
 func getConnectedChunks(t *testing.T, metric schema.AMKey) *CCache {

@@ -19,13 +19,6 @@ type IterGen struct {
 	B            []byte
 }
 
-// NewBareIterGen creates an IterGen without validation
-// note: it's ok for intervalHint to be 0 or 1 to mean unknown.
-// it just means that series4h corruptions can't be remediated in single-point-per-chunk scenarios
-func NewBareIterGen(t0, intervalHint uint32, b []byte) IterGen {
-	return IterGen{t0, intervalHint, b}
-}
-
 // NewIterGen creates an IterGen and performs crude validation of the data
 // note: it's ok for intervalHint to be 0 or 1 to mean unknown.
 // it just means that series4h corruptions can't be remediated in single-point-per-chunk scenarios

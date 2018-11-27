@@ -40,7 +40,10 @@ func TestRealProduction4hChunksWithSinglePointThatNeedRemediation(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		itgen := NewBareIterGen(rc.t0, 30*60, data)
+		itgen, err := NewIterGen(rc.t0, 30*60, data)
+		if err != nil {
+			t.Errorf("case %d: could not construct itergen: %s", i, err)
+		}
 		iter, err := itgen.Get()
 		if err != nil {
 			t.Errorf("case %d: could not get iterator: %s", i, err)
