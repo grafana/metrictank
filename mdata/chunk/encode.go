@@ -22,6 +22,11 @@ func encode(span uint32, format Format, data []byte) []byte {
 		binary.Write(buf, binary.LittleEndian, spanCode)
 		buf.Write(data)
 		return buf.Bytes()
+	case FormatStandardGoTsz:
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.LittleEndian, format)
+		buf.Write(data)
+		return buf.Bytes()
 	}
 	return nil
 }
