@@ -309,7 +309,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
 	for {
 		c := a.getChunk(oldestPos)
-		result.Iters = append(result.Iters, c.Series.Iter())
+		result.Iters = append(result.Iters, c.Series.Iter(0))
 
 		if oldestPos == newestPos {
 			break
@@ -471,7 +471,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 	if t0 == currentChunk.Series.T0 {
 		// last prior data was in same chunk as new point
-		if currentChunk.Series.Finished {
+		if currentChunk.Finished {
 			// if we've already 'finished' the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
 			addToClosedChunk.Inc()
@@ -487,7 +487,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		a.lastWrite = uint32(time.Now().Unix())
 		log.Debugf("AM: %s Add(): pushed new value to last chunk: %v", a.Key, a.Chunks[0])
 	} else if t0 < currentChunk.Series.T0 {
-		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.Series.T)
+		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.T)
 		metricsTooOld.Inc()
 		return
 	} else {
@@ -604,7 +604,7 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
-	if currentChunk.Series.Finished {
+	if currentChunk.Finished {
 		// already closed and should be saved, though we cant guarantee that.
 		// Check if we should just delete the metric from memory.
 		if a.lastWrite < metricMinTs {

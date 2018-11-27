@@ -16,38 +16,42 @@ import (
 // asynchronously, and chunk properties will be read (the series.T0, chunk.Encode(), etc)
 // But it can be proven that we only call NewChunkWriteRequest() on chunks that are no longer being modified.
 type Chunk struct {
-	Series    tsz.SeriesLong
+	Series    tsz.Series4h
 	NumPoints uint32
 	First     bool
+	Finished  bool
+	T         uint32
 }
 
 func New(t0 uint32) *Chunk {
 	return &Chunk{
-		Series: *tsz.NewSeriesLong(t0),
+		Series: *tsz.NewSeries4h(t0),
 	}
 }
 
 func NewFirst(t0 uint32) *Chunk {
 	return &Chunk{
-		Series: *tsz.NewSeriesLong(t0),
+		Series: *tsz.NewSeries4h(t0),
 		First:  true,
 	}
 }
 
 func (c *Chunk) String() string {
-	return fmt.Sprintf("<chunk T0=%d, LastTs=%d, NumPoints=%d, First=%t, Closed=%t>", c.Series.T0, c.Series.T, c.NumPoints, c.First, c.Series.Finished)
+	return fmt.Sprintf("<chunk T0=%d, LastTs=%d, NumPoints=%d, First=%t>", c.Series.T0, c.T, c.NumPoints, c.First)
 }
 
 func (c *Chunk) Push(t uint32, v float64) error {
-	if t <= c.Series.T {
-		return fmt.Errorf("Point must be newer than already added points. t:%d lastTs: %d", t, c.Series.T)
+	if t <= c.T {
+		return fmt.Errorf("Point must be newer than already added points. t:%d lastTs: %d", t, c.T)
 	}
+	c.T = t
 	c.Series.Push(t, v)
 	c.NumPoints++
 	return nil
 }
 
 func (c *Chunk) Finish() {
+	c.Finished = true
 	c.Series.Finish()
 }
 
@@ -56,5 +60,5 @@ func (c *Chunk) Finish() {
 // so for formats that encode it, it needs to be passed in.
 // the returned value contains no references to the chunk. data is copied.
 func (c *Chunk) Encode(span uint32) []byte {
-	return encode(span, FormatGoTszLongWithSpan, c.Series.Bytes())
+	return encode(span, FormatStandardGoTszWithSpan, c.Series.Bytes())
 }
