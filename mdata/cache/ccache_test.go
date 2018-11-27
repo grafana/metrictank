@@ -12,6 +12,8 @@ import (
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values
 // it assumes the data has step=1, deriving the span as len(values)
+// TODO: these chunks do not honor the format they claim to be in. would be nicer if
+// they did
 func getItgen(t testing.TB, values []uint32, ts uint32, spanaware bool) chunk.IterGen {
 	var b []byte
 	buf := new(bytes.Buffer)
