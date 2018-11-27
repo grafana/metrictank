@@ -8,7 +8,7 @@ import (
 var T uint32
 var V float64
 
-func BenchmarkIter4h(b *testing.B) {
+func BenchmarkIterSeries4h(b *testing.B) {
 	s := NewSeries4h(0)
 	N := uint32(b.N)
 	for i := uint32(1); i <= N; i++ {
@@ -29,7 +29,7 @@ func BenchmarkIter4h(b *testing.B) {
 	V = v
 }
 
-func BenchmarkIterLong(b *testing.B) {
+func BenchmarkIterSeriesLong(b *testing.B) {
 	s := NewSeriesLong(0)
 	N := uint32(b.N)
 	for i := uint32(1); i <= N; i++ {
@@ -50,7 +50,7 @@ func BenchmarkIterLong(b *testing.B) {
 	V = v
 }
 
-func BenchmarkIterLongInterface(b *testing.B) {
+func BenchmarkIterSeriesLongInterface(b *testing.B) {
 	s := NewSeriesLong(0)
 	N := uint32(b.N)
 	for i := uint32(1); i <= N; i++ {
