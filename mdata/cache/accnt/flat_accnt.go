@@ -207,7 +207,7 @@ func (a *FlatAccnt) eventLoop() {
 					a.lru.touch(
 						EvictTarget{
 							Metric: payload.metric,
-							Ts:     chunk.Ts,
+							Ts:     chunk.T0,
 						},
 					)
 				}
@@ -225,7 +225,7 @@ func (a *FlatAccnt) eventLoop() {
 					a.lru.touch(
 						EvictTarget{
 							Metric: payload.metric,
-							Ts:     chunk.Ts,
+							Ts:     chunk.T0,
 						},
 					)
 				}
@@ -335,13 +335,13 @@ func (a *FlatAccnt) addRange(metric schema.AMKey, chunks []chunk.IterGen) {
 	var sizeDiff uint64
 
 	for _, chunk := range chunks {
-		if _, ok = met.chunks[chunk.Ts]; ok {
+		if _, ok = met.chunks[chunk.T0]; ok {
 			// we already have that chunk
 			continue
 		}
 		size := chunk.Size()
 		sizeDiff += size
-		met.chunks[chunk.Ts] = size
+		met.chunks[chunk.T0] = size
 		totalFlat += famChunkSize
 		totalChunk += ccmChunkSize
 		// this func is called from the event loop so lru will be touched with new EvictTarget

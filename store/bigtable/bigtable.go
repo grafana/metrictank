@@ -1,9 +1,7 @@
 package bigtable
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -66,22 +64,6 @@ func formatFamily(ttl uint32) string {
 	return dur.FormatDuration(ttl)
 }
 
-func PrepareChunkData(span uint32, data []byte) []byte {
-	chunkSizeAtSave.Value(len(data))
-	version := chunk.FormatStandardGoTszWithSpan
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, version)
-
-	spanCode, ok := chunk.RevChunkSpans[span]
-	if !ok {
-		// it's probably better to panic than to persist the chunk with a wrong length
-		panic(fmt.Sprintf("Chunk span invalid: %d", span))
-	}
-	binary.Write(buf, binary.LittleEndian, spanCode)
-	buf.Write(data)
-	return buf.Bytes()
-}
-
 func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation, int) {
 	mut := bigtable.NewMutation()
 	family := formatFamily(cwr.TTL)
@@ -89,10 +71,10 @@ func mutationFromWriteRequest(cwr *mdata.ChunkWriteRequest) (*bigtable.Mutation,
 	if cwr.Key.Archive > 0 {
 		column = cwr.Key.Archive.String()
 	}
-	value := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
-	chunkSizeAtSave.Value(len(value))
-	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.T0)*1e6), value)
-	return mut, len(value)
+	buf := cwr.Chunk.Encode(cwr.Span)
+	chunkSizeAtSave.Value(len(buf))
+	mut.Set(family, column, bigtable.Timestamp(int64(cwr.Chunk.Series.T0)*1e6), buf)
+	return mut, len(buf)
 }
 
 type Store struct {
@@ -248,7 +230,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 		rowKeys := make([]string, len(buf))
 		muts := make([]*bigtable.Mutation, len(buf))
 		for i, cwr := range buf {
-			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.T0)
+			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.Series.T0)
 			muts[i], n = mutationFromWriteRequest(cwr)
 			//record how long the chunk waited in the queue before we attempted to save to bigtable
 			btblPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
@@ -287,9 +269,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 						failedMutations = append(failedMutations, muts[i])
 						retryBuf = append(retryBuf, buf[i])
 					} else {
-						buf[i].Metric.SyncChunkSaveState(buf[i].Chunk.T0)
-						mdata.SendPersistMessage(buf[i].Key.String(), buf[i].Chunk.T0)
-						log.Debugf("btStore: save complete. %s:%d %v", buf[i].Key, buf[i].Chunk.T0, buf[i].Chunk)
+						buf[i].Metric.SyncChunkSaveState(buf[i].Chunk.Series.T0)
+						mdata.SendPersistMessage(buf[i].Key.String(), buf[i].Chunk.Series.T0)
+						log.Debugf("btStore: save complete. %s:%d %v", buf[i].Key, buf[i].Chunk.Series.T0, buf[i].Chunk)
 						chunkSaveOk.Inc()
 					}
 				}
@@ -309,9 +291,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				chunkSaveOk.Add(len(rowKeys))
 				log.Debugf("btStore: %d chunks saved to bigtable.", len(rowKeys))
 				for _, cwr := range buf {
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(cwr.Key.String(), cwr.Chunk.T0)
-					log.Debugf("btStore: save complete. %s:%d %v", cwr.Key.String(), cwr.Chunk.T0, cwr.Chunk)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.Series.T0)
+					mdata.SendPersistMessage(cwr.Key.String(), cwr.Chunk.Series.T0)
+					log.Debugf("btStore: save complete. %s:%d %v", cwr.Key.String(), cwr.Chunk.Series.T0, cwr.Chunk)
 				}
 			}
 		}
@@ -388,8 +370,10 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 		adjustedStart = startMonth
 	}
 	agg := "raw"
+	var intervalHint uint32
 	if key.Archive > 0 {
 		agg = key.Archive.String()
+		intervalHint = key.Archive.Span()
 	}
 	// filter the results to just the agg method (Eg raw, min_60, max_1800, etc..) and the timerange we want.
 	// we fetch all columnFamilies (which are the different TTLs).  Typically there will be only one columnFamily
@@ -409,7 +393,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	reqErr := s.tbl.ReadRows(queryCtx, rr, func(row bigtable.Row) bool {
 		rowCount++
 		chunks := 0
-		var itgen *chunk.IterGen
+		var itgen chunk.IterGen
 		for _, items := range row {
 			for _, rItem := range items {
 				chunkSizeAtLoad.Value(len(rItem.Value))
@@ -418,7 +402,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 					err = errChunkTooSmall
 					return false
 				}
-				itgen, err = chunk.NewGen(rItem.Value, uint32(rItem.Timestamp/1e6))
+				itgen, err = chunk.NewIterGen(uint32(rItem.Timestamp/1e6), intervalHint, rItem.Value)
 				if err != nil {
 					log.Errorf("btStore: unable to create chunk from bytes. %s", err)
 					return false
@@ -426,7 +410,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 				chunks++
 
 				// This function is called serially so we don't need synchronization here
-				itgens = append(itgens, *itgen)
+				itgens = append(itgens, itgen)
 			}
 		}
 		btblChunksPerRow.Value(chunks)

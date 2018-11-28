@@ -365,7 +365,11 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 		} else if prevT0 != t0 {
 			c.Finish()
 
-			encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
+			itgen, err := chunk.NewIterGen(c.Series.T0, intervalIn, c.Encode(chunkSpan))
+			if err != nil {
+				panic(fmt.Sprintf("ERROR: failed to construct IterGen: %s", err))
+			}
+			encodedChunks = append(encodedChunks, itgen)
 
 			c = chunk.New(t0)
 			prevT0 = t0
@@ -381,7 +385,11 @@ func encodedChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint3
 	// or if writeUnfinishedChunks is on, we close the chunk and push it
 	if point.Timestamp == t0+chunkSpan-intervalIn || *writeUnfinishedChunks {
 		c.Finish()
-		encodedChunks = append(encodedChunks, *chunk.NewBareIterGen(c.Bytes(), c.T0, chunkSpan))
+		itgen, err := chunk.NewIterGen(c.Series.T0, intervalIn, c.Encode(chunkSpan))
+		if err != nil {
+			panic(fmt.Sprintf("ERROR: failed to construct IterGen: %s", err))
+		}
+		encodedChunks = append(encodedChunks, itgen)
 	}
 
 	return encodedChunks

@@ -22,18 +22,18 @@ func (z *IterGen) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
+		case "T0":
+			z.T0, err = dc.ReadUint32()
+			if err != nil {
+				return
+			}
+		case "IntervalHint":
+			z.IntervalHint, err = dc.ReadUint32()
+			if err != nil {
+				return
+			}
 		case "B":
 			z.B, err = dc.ReadBytes(z.B)
-			if err != nil {
-				return
-			}
-		case "Ts":
-			z.Ts, err = dc.ReadUint32()
-			if err != nil {
-				return
-			}
-		case "Span":
-			z.Span, err = dc.ReadUint32()
 			if err != nil {
 				return
 			}
@@ -50,30 +50,30 @@ func (z *IterGen) DecodeMsg(dc *msgp.Reader) (err error) {
 // EncodeMsg implements msgp.Encodable
 func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	// map header, size 3
+	// write "T0"
+	err = en.Append(0x83, 0xa2, 0x54, 0x30)
+	if err != nil {
+		return
+	}
+	err = en.WriteUint32(z.T0)
+	if err != nil {
+		return
+	}
+	// write "IntervalHint"
+	err = en.Append(0xac, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c, 0x48, 0x69, 0x6e, 0x74)
+	if err != nil {
+		return
+	}
+	err = en.WriteUint32(z.IntervalHint)
+	if err != nil {
+		return
+	}
 	// write "B"
-	err = en.Append(0x83, 0xa1, 0x42)
+	err = en.Append(0xa1, 0x42)
 	if err != nil {
 		return
 	}
 	err = en.WriteBytes(z.B)
-	if err != nil {
-		return
-	}
-	// write "Ts"
-	err = en.Append(0xa2, 0x54, 0x73)
-	if err != nil {
-		return
-	}
-	err = en.WriteUint32(z.Ts)
-	if err != nil {
-		return
-	}
-	// write "Span"
-	err = en.Append(0xa4, 0x53, 0x70, 0x61, 0x6e)
-	if err != nil {
-		return
-	}
-	err = en.WriteUint32(z.Span)
 	if err != nil {
 		return
 	}
@@ -84,15 +84,15 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 func (z *IterGen) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 3
+	// string "T0"
+	o = append(o, 0x83, 0xa2, 0x54, 0x30)
+	o = msgp.AppendUint32(o, z.T0)
+	// string "IntervalHint"
+	o = append(o, 0xac, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c, 0x48, 0x69, 0x6e, 0x74)
+	o = msgp.AppendUint32(o, z.IntervalHint)
 	// string "B"
-	o = append(o, 0x83, 0xa1, 0x42)
+	o = append(o, 0xa1, 0x42)
 	o = msgp.AppendBytes(o, z.B)
-	// string "Ts"
-	o = append(o, 0xa2, 0x54, 0x73)
-	o = msgp.AppendUint32(o, z.Ts)
-	// string "Span"
-	o = append(o, 0xa4, 0x53, 0x70, 0x61, 0x6e)
-	o = msgp.AppendUint32(o, z.Span)
 	return
 }
 
@@ -112,18 +112,18 @@ func (z *IterGen) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
+		case "T0":
+			z.T0, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				return
+			}
+		case "IntervalHint":
+			z.IntervalHint, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				return
+			}
 		case "B":
 			z.B, bts, err = msgp.ReadBytesBytes(bts, z.B)
-			if err != nil {
-				return
-			}
-		case "Ts":
-			z.Ts, bts, err = msgp.ReadUint32Bytes(bts)
-			if err != nil {
-				return
-			}
-		case "Span":
-			z.Span, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
 				return
 			}
@@ -140,6 +140,6 @@ func (z *IterGen) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *IterGen) Msgsize() (s int) {
-	s = 1 + 2 + msgp.BytesPrefixSize + len(z.B) + 3 + msgp.Uint32Size + 5 + msgp.Uint32Size
+	s = 1 + 3 + msgp.Uint32Size + 13 + msgp.Uint32Size + 2 + msgp.BytesPrefixSize + len(z.B)
 	return
 }

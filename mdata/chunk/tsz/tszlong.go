@@ -6,82 +6,72 @@ package tsz
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
 	"math"
 	"math/bits"
 	"sync"
 )
 
-// Series4h is the basic series primitive
-// you can concurrently put values, finish the stream, and create iterators
-// you shouldn't use it for chunks longer than 4.5 hours, due to overflow
-// of the first delta (14 bits), though in some cases, the corresponding iterator
-// can reconstruct the data. Only works for <=9h deltas/chunks though.
-// See https://github.com/grafana/metrictank/pull/1126
-type Series4h struct {
+// SeriesLong similar to Series4h, except:
+// * it doesn't write t0 to the stream (for callers that track t0 corresponding to a chunk separately)
+// * it doesn't store an initial delta. instead, it assumes a starting delta of 60 and uses delta-of-delta
+//   encoding from the get-go.
+// * it uses a more compact way to mark end-of-stream
+type SeriesLong struct {
 	sync.Mutex
 
 	// TODO(dgryski): timestamps in the paper are uint64
-	T0  uint32
-	t   uint32
+	T0  uint32 // exposed for caller convenience. do NOT set directly. set via constructor
+	T   uint32 // exposed for caller convenience. do NOT set directly. may only be set via Push()
 	val float64
 
 	bw       bstream
 	leading  uint8
 	trailing uint8
-	finished bool
+	Finished bool // exposed for caller convenience. do NOT set directly.
 
 	tDelta uint32
 }
 
-// NewSeries4h creates a new Series4h
-func NewSeries4h(t0 uint32) *Series4h {
-	s := Series4h{
+// New series
+func NewSeriesLong(t0 uint32) *SeriesLong {
+	s := SeriesLong{
 		T0:      t0,
 		leading: ^uint8(0),
+		tDelta:  60,
 	}
-
-	// block header
-	s.bw.writeBits(uint64(t0), 32)
-
 	return &s
 
 }
 
 // Bytes value of the series stream
-func (s *Series4h) Bytes() []byte {
+func (s *SeriesLong) Bytes() []byte {
 	s.Lock()
 	defer s.Unlock()
 	return s.bw.bytes()
 }
 
 // Finish the series by writing an end-of-stream record
-func (s *Series4h) Finish() {
+func (s *SeriesLong) Finish() {
 	s.Lock()
-	if !s.finished {
-		finishV1(&s.bw)
-		s.finished = true
+	if !s.Finished {
+		finishV2(&s.bw)
+		s.Finished = true
 	}
 	s.Unlock()
 }
 
 // Push a timestamp and value to the series
-func (s *Series4h) Push(t uint32, v float64) {
+func (s *SeriesLong) Push(t uint32, v float64) {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.t == 0 {
-		// first point
-		s.t = t
-		s.val = v
-		s.tDelta = t - s.T0
-		s.bw.writeBits(uint64(s.tDelta), 14)
-		s.bw.writeBits(math.Float64bits(v), 64)
-		return
-	}
+	var first bool
 
-	tDelta := t - s.t
+	tDelta := t - s.T
+	if s.T == 0 {
+		first = true
+		tDelta = t - s.T0
+	}
 	dod := int32(tDelta - s.tDelta)
 
 	switch {
@@ -97,8 +87,18 @@ func (s *Series4h) Push(t uint32, v float64) {
 		s.bw.writeBits(0x0e, 4) // '1110'
 		s.bw.writeBits(uint64(dod), 12)
 	default:
-		s.bw.writeBits(0x0f, 4) // '1111'
+		s.bw.writeBits(0x1e, 5) // '11110'
 		s.bw.writeBits(uint64(dod), 32)
+	}
+
+	s.tDelta = tDelta
+	s.T = t
+
+	if first {
+		// first point; write full float value
+		s.bw.writeBits(math.Float64bits(v), 64)
+		s.val = v
+		return
 	}
 
 	vDelta := math.Float64bits(v) ^ math.Float64bits(s.val)
@@ -135,28 +135,24 @@ func (s *Series4h) Push(t uint32, v float64) {
 		}
 	}
 
-	s.tDelta = tDelta
-	s.t = t
 	s.val = v
 
 }
 
-// Iter4h lets you iterate over a series.  It is not concurrency-safe.
-func (s *Series4h) Iter(intervalHint uint32) *Iter4h {
+// IterLong lets you iterate over a series.  It is not concurrency-safe.
+func (s *SeriesLong) Iter() *IterLong {
 	s.Lock()
 	w := s.bw.clone()
 	s.Unlock()
 
-	finishV1(w)
-	iter, _ := bstreamIterator4h(w, intervalHint)
+	finishV2(w)
+	iter, _ := bstreamIteratorLong(s.T0, w)
 	return iter
 }
 
-// Iter4h lets you iterate over a Series4h.  It is not concurrency-safe.
-// For more info, see Series4h
-type Iter4h struct {
-	T0           uint32
-	intervalHint uint32 // hint to recover corrupted delta's
+// IterLong lets you iterate over a series.  It is not concurrency-safe.
+type IterLong struct {
+	T0 uint32
 
 	t   uint32
 	val float64
@@ -171,30 +167,25 @@ type Iter4h struct {
 	err    error
 }
 
-func bstreamIterator4h(br *bstream, intervalHint uint32) (*Iter4h, error) {
+func bstreamIteratorLong(t0 uint32, br *bstream) (*IterLong, error) {
 
 	br.count = 8
 
-	t0, err := br.readBits(32)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Iter4h{
-		T0:           uint32(t0),
-		intervalHint: intervalHint,
-		br:           *br,
+	return &IterLong{
+		T0:     t0,
+		br:     *br,
+		tDelta: 60,
 	}, nil
 }
 
-// NewIterator4h creates an Iter4h
-func NewIterator4h(b []byte, intervalHint uint32) (*Iter4h, error) {
-	return bstreamIterator4h(newBReader(b), intervalHint)
+// NewIteratorLong for the series
+func NewIteratorLong(t0 uint32, b []byte) (*IterLong, error) {
+	return bstreamIteratorLong(t0, newBReader(b))
 }
 
-func (it *Iter4h) dod() (int32, bool) {
+func (it *IterLong) dod() (int32, bool) {
 	var d byte
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		d <<= 1
 		bit, err := it.br.readBit()
 		if err != nil {
@@ -218,20 +209,16 @@ func (it *Iter4h) dod() (int32, bool) {
 		sz = 9
 	case 0x0e: // '1110'
 		sz = 12
-	case 0x0f: // '1111'
+	case 0x1e: // '11110'
 		bits, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
 			return 0, false
 		}
-
-		// end of stream
-		if bits == 0xffffffff {
-			it.finished = true
-			return 0, false
-		}
-
 		dod = int32(bits)
+	case 0x1f: // '11111': end-of-stream
+		it.finished = true
+		return 0, false
 	}
 
 	if sz != 0 {
@@ -251,71 +238,16 @@ func (it *Iter4h) dod() (int32, bool) {
 }
 
 // Next iteration of the series iterator
-func (it *Iter4h) Next() bool {
+func (it *IterLong) Next() bool {
 
 	if it.err != nil || it.finished {
 		return false
 	}
 
+	var first bool
 	if it.t == 0 {
-		// read first t and v
-		tDelta, err := it.br.readBits(14)
-		if err != nil {
-			it.err = err
-			return false
-		}
-		it.tDelta = uint32(tDelta)
-		it.t = it.T0 + it.tDelta
-		v, err := it.br.readBits(64)
-		if err != nil {
-			it.err = err
-			return false
-		}
-
-		it.val = math.Float64frombits(v)
-
-		// look for delta overflow and remediate it
-		// see https://github.com/grafana/metrictank/pull/1126 and
-		// https://github.com/grafana/metrictank/pull/1129
-
-		// first, let's try the hint based check
-		// if we're aware of a consistent interval that the points should have
-		// - which is the case for rollup archives: they have known, consistent intervals -
-		// then we can simply rely on that to tell whether our delta overflowed.
-		// this requires the interval to be >1 (always true for rollup chunks)
-		// and not be a divisor of 16384 (also true for rollup chunks, they use long, round intervals like 300)
-		if it.intervalHint > 0 && it.t%it.intervalHint != 0 {
-			it.tDelta += 16384
-			it.t += 16384
-			return true
-		}
-
-		// if we don't have a hint - e.g. for raw data - read upcoming dod
-		// if delta+dod <0 (aka the upcoming delta < 0),
-		// our current delta overflowed, because points should always be in increasing time order
-		// (have delta's > 0)
-		// we must take a backup of the stream because reading from the stream reader modifies it.
-		// note that potentially we could skip this remediation by using another hint: the chunkspan,
-		// since we know the overflow cannot possibly happen for chunks <=4h in length. perhaps a future optimization.
-		brBackup := it.br.clone()
-		dod, ok := it.dod()
-		if !ok {
-			// this case should only happen if we're out of data (only a single point in the chunk)
-			// in this case we can't know if the point is right or wrong.
-			// so, nothing much to do in this case. return the possibly incorrect point.
-			// though it is very unlikely to be wrong, because the overflow problem only tends to happen in long aggregated chunks
-			// that have an intervalHint.
-			// and for return value, stick to normal iter semantics:
-			// this read succeeded, though we already know the next one will fail
-			it.br = *brBackup
-			return true
-		}
-		if dod+int32(tDelta) < 0 {
-			it.tDelta += 16384
-			it.t += 16384
-		}
-		it.br = *brBackup
-		return true
+		it.t = it.T0
+		first = true
 	}
 
 	// read delta-of-delta
@@ -324,10 +256,20 @@ func (it *Iter4h) Next() bool {
 		return false
 	}
 
-	tDelta := it.tDelta + uint32(dod)
-
-	it.tDelta = tDelta
+	it.tDelta += uint32(dod)
 	it.t = it.t + it.tDelta
+
+	if first {
+		// first point. read the float raw
+		v, err := it.br.readBits(64)
+		if err != nil {
+			it.err = err
+			return false
+		}
+
+		it.val = math.Float64frombits(v)
+		return true
+	}
 
 	// read compressed value
 	bit, err := it.br.readBit()
@@ -383,42 +325,22 @@ func (it *Iter4h) Next() bool {
 }
 
 // Values at the current iterator position
-func (it *Iter4h) Values() (uint32, float64) {
+func (it *IterLong) Values() (uint32, float64) {
 	return it.t, it.val
 }
 
 // Err error at the current iterator position
-func (it *Iter4h) Err() error {
+func (it *IterLong) Err() error {
 	return it.err
 }
 
-type errMarshal struct {
-	w   io.Writer
-	r   io.Reader
-	err error
-}
-
-func (em *errMarshal) write(t interface{}) {
-	if em.err != nil {
-		return
-	}
-	em.err = binary.Write(em.w, binary.BigEndian, t)
-}
-
-func (em *errMarshal) read(t interface{}) {
-	if em.err != nil {
-		return
-	}
-	em.err = binary.Read(em.r, binary.BigEndian, t)
-}
-
 // MarshalBinary implements the encoding.BinaryMarshaler interface
-func (s *Series4h) MarshalBinary() ([]byte, error) {
+func (s *SeriesLong) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	em := &errMarshal{w: buf}
 	em.write(s.T0)
 	em.write(s.leading)
-	em.write(s.t)
+	em.write(s.T)
 	em.write(s.tDelta)
 	em.write(s.trailing)
 	em.write(s.val)
@@ -434,12 +356,12 @@ func (s *Series4h) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface
-func (s *Series4h) UnmarshalBinary(b []byte) error {
+func (s *SeriesLong) UnmarshalBinary(b []byte) error {
 	buf := bytes.NewReader(b)
 	em := &errMarshal{r: buf}
 	em.read(&s.T0)
 	em.read(&s.leading)
-	em.read(&s.t)
+	em.read(&s.T)
 	em.read(&s.tDelta)
 	em.read(&s.trailing)
 	em.read(&s.val)

@@ -1,9 +1,7 @@
 package cassandra
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -91,22 +89,6 @@ type CassandraStore struct {
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
 	timeout          time.Duration
-}
-
-func PrepareChunkData(span uint32, data []byte) []byte {
-	chunkSizeAtSave.Value(len(data))
-	version := chunk.FormatStandardGoTszWithSpan
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, version)
-
-	spanCode, ok := chunk.RevChunkSpans[span]
-	if !ok {
-		// it's probably better to panic than to persist the chunk with a wrong length
-		panic(fmt.Sprintf("Chunk span invalid: %d", span))
-	}
-	binary.Write(buf, binary.LittleEndian, spanCode)
-	buf.Write(data)
-	return buf.Bytes()
 }
 
 // ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
@@ -330,22 +312,23 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
-			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.T0, cwr.Chunk)
+			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.Series.T0, cwr.Chunk)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
-			buf := PrepareChunkData(cwr.Span, cwr.Chunk.Series.Bytes())
+			buf := cwr.Chunk.Encode(cwr.Span)
+			chunkSizeAtSave.Value(len(buf))
 			success := false
 			attempts := 0
 			keyStr := cwr.Key.String()
 			for !success {
-				err := c.insertChunk(keyStr, cwr.Chunk.T0, cwr.TTL, buf)
+				err := c.insertChunk(keyStr, cwr.Chunk.Series.T0, cwr.TTL, buf)
 
 				if err == nil {
 					success = true
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.T0)
-					mdata.SendPersistMessage(keyStr, cwr.Chunk.T0)
-					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.T0, cwr.Chunk)
+					cwr.Metric.SyncChunkSaveState(cwr.Chunk.Series.T0)
+					mdata.SendPersistMessage(keyStr, cwr.Chunk.Series.T0)
+					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.Series.T0, cwr.Chunk)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
@@ -539,22 +522,24 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	cassGetChunksDuration.Value(time.Since(pre))
 	pre = time.Now()
 
+	intervalHint := key.Archive.Span()
+
 	var b []byte
-	var ts int
-	for res.i.Scan(&ts, &b) {
+	var t0 int
+	for res.i.Scan(&t0, &b) {
 		chunkSizeAtLoad.Value(len(b))
 		if len(b) < 2 {
 			tracing.Failure(span)
 			tracing.Error(span, errChunkTooSmall)
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewGen(b, uint32(ts))
+		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, b)
 		if err != nil {
 			tracing.Failure(span)
 			tracing.Error(span, err)
 			return itgens, err
 		}
-		itgens = append(itgens, *itgen)
+		itgens = append(itgens, itgen)
 	}
 
 	err := res.i.Close()

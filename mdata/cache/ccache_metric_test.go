@@ -39,7 +39,7 @@ func TestAddAsc(t *testing.T) {
 		prev := uint32(1)
 		for _, chunk := range chunks {
 			ccm.Add(prev, chunk)
-			prev = chunk.Ts
+			prev = chunk.T0
 		}
 	})
 }
@@ -101,12 +101,12 @@ func testRun(t *testing.T, run func(*CCacheMetric)) {
 		t.Fatalf("Expected result to be complete, but it was not")
 	}
 
-	if res.Start[0].Ts != 20 {
-		t.Fatalf("Expected result to start at 20, but had %d", res.Start[0].Ts)
+	if res.Start[0].T0 != 20 {
+		t.Fatalf("Expected result to start at 20, but had %d", res.Start[0].T0)
 	}
 
-	if res.Start[len(res.Start)-1].Ts != 40 {
-		t.Fatalf("Expected result to start at 40, but had %d", res.Start[len(res.Start)-1].Ts)
+	if res.Start[len(res.Start)-1].T0 != 40 {
+		t.Fatalf("Expected result to start at 40, but had %d", res.Start[len(res.Start)-1].T0)
 	}
 }
 
@@ -118,7 +118,7 @@ func BenchmarkAddAsc(b *testing.B) {
 	b.ResetTimer()
 	for _, chunk := range chunks {
 		ccm.Add(prev, chunk)
-		prev = chunk.Ts
+		prev = chunk.T0
 	}
 }
 
@@ -261,7 +261,7 @@ func TestCorruptionCase2(t *testing.T) {
 		case 2:
 			chunk := getRandomNumber(0, 100)
 			//t.Logf("deleting chunk %d", chunk)
-			ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+			ccm.Del(chunks[chunk].T0) // note: chunk may not exist
 			cached[chunk] = false
 			opDel++
 			dels++
@@ -269,7 +269,7 @@ func TestCorruptionCase2(t *testing.T) {
 			from, to := getRandomRange(0, 100)
 			//t.Logf("deleting range %d-%d", from, to)
 			for chunk := from; chunk < to; chunk++ {
-				ccm.Del(chunks[chunk].Ts) // note: chunk may not exist
+				ccm.Del(chunks[chunk].T0) // note: chunk may not exist
 				cached[chunk] = false
 			}
 			opDelRange++
@@ -321,7 +321,7 @@ func verifyCcm(ccm *CCacheMetric, expKeys []uint32) error {
 			}
 		} else {
 			if chunk.Prev == 0 {
-				if ccm.chunks[ccm.keys[i-1]].Ts == chunk.Ts-chunk.Itgen.Span {
+				if ccm.chunks[ccm.keys[i-1]].Ts == chunk.Ts-chunk.Itgen.Span() {
 					return fmt.Errorf("Chunk of ts %d has Prev == 0, but the previous chunk is present", ts)
 				}
 			} else {
@@ -346,7 +346,7 @@ func verifyCcm(ccm *CCacheMetric, expKeys []uint32) error {
 		}
 
 		if chunk.Next == 0 {
-			if chunk.Ts+chunk.Itgen.Span == nextChunk.Ts {
+			if chunk.Ts+chunk.Itgen.Span() == nextChunk.Ts {
 				return fmt.Errorf("Next of chunk at ts %d is set to 0, but the next chunk is present", ts)
 			}
 		} else {

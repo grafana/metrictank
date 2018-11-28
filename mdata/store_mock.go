@@ -39,17 +39,20 @@ func (c *MockStore) Items() int {
 // Add adds a chunk to the store
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 	if !c.Drop {
-		itgen := chunk.NewBareIterGen(cwr.Chunk.Series.Bytes(), cwr.Chunk.Series.T0, cwr.Span)
-		c.results[cwr.Key] = append(c.results[cwr.Key], *itgen)
+		intervalHint := cwr.Key.Archive.Span()
+		itgen, err := chunk.NewIterGen(cwr.Chunk.Series.T0, intervalHint, cwr.Chunk.Encode(cwr.Span))
+		if err != nil {
+			panic(err)
+		}
+		c.results[cwr.Key] = append(c.results[cwr.Key], itgen)
 		c.items++
 	}
 }
 
 // searches through the mock results and returns the right ones according to start / end
 func (c *MockStore) Search(ctx context.Context, metric schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
-	var itgens []chunk.IterGen
+	var itgens, res []chunk.IterGen
 	var ok bool
-	res := make([]chunk.IterGen, 0)
 
 	if itgens, ok = c.results[metric]; !ok {
 		return res, errors.New("metric not found")
@@ -57,7 +60,7 @@ func (c *MockStore) Search(ctx context.Context, metric schema.AMKey, ttl, start,
 
 	for _, itgen := range itgens {
 		// start is inclusive, end is exclusive
-		if itgen.Ts < end && itgen.EndTs() > start && start < end {
+		if itgen.T0 < end && itgen.EndTs() > start && start < end {
 			res = append(res, itgen)
 		}
 	}

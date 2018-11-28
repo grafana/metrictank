@@ -4,9 +4,9 @@ package chunk
 
 import "strconv"
 
-const _Format_name = "FormatStandardGoTszFormatStandardGoTszWithSpan"
+const _Format_name = "FormatStandardGoTszFormatStandardGoTszWithSpanFormatGoTszLongWithSpan"
 
-var _Format_index = [...]uint8{0, 19, 46}
+var _Format_index = [...]uint8{0, 19, 46, 69}
 
 func (i Format) String() string {
 	if i >= Format(len(_Format_index)-1) {

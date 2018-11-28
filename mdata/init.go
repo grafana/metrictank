@@ -38,6 +38,9 @@ var (
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
 
+	// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
+	totalPoints = stats.NewGauge64("tank.total_points")
+
 	// metric mem.to_iter is how long it takes to transform in-memory chunks to iterators
 	memToIterDuration = stats.NewLatencyHistogram15s32("mem.to_iter")
 
