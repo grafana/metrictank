@@ -18,6 +18,11 @@ fi
 
 go get -u golang.org/x/tools/cmd/stringer github.com/tinylib/msgp
 
+# keep the generator tool "stuck" at a version compatible with the vendored msgp code
+cd $gopath/src/github.com/tinylib/msgp
+git checkout v1.0-beta
+go install
+
 go generate ./...
 out=$(git status --short)
 [ -z "$out" ] && echo "all good" && exit 0
