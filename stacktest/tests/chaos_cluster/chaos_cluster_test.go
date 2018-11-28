@@ -2,6 +2,7 @@ package chaos_cluster
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,6 +34,11 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		fmt.Println("skipping test in short mode")
+		return
+	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	fmt.Println("stopping docker-chaos stack should it be running...")

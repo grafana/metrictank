@@ -10,7 +10,8 @@ Thanks for your interest in contributing to metrictank!
 
 * `make bin`: for building all binaries.
 * `make docker`: for building docker image (after building binaries)
-* `make test`: unit tests
+* `make test`: unit tests minus expensive integration tests
+* `make test-all`: unit tests including expensive integration tests
 * `make qa`: run all QA (code quality) tests, same as CirceCI qa checks except CI also runs stack tests.
 
 see the [Makefile](../Makefile) for more targets

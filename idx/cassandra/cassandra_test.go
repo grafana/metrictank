@@ -419,6 +419,9 @@ func TestFind(t *testing.T) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
+	if testing.Short() {
+		b.Skip("skipping benchmark in short mode")
+	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
 	hosts = "localhost:9042"
@@ -467,6 +470,9 @@ func insertDefs(ix idx.MetricIndex, i int) {
 }
 
 func BenchmarkLoad(b *testing.B) {
+	if testing.Short() {
+		b.Skip("skipping benchmark in short mode")
+	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
 	hosts = "localhost:9042"
@@ -500,6 +506,9 @@ func BenchmarkLoad(b *testing.B) {
 }
 
 func BenchmarkIndexingWithUpdates(b *testing.B) {
+	if testing.Short() {
+		b.Skip("skipping benchmark in short mode")
+	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
 	hosts = "localhost:9042"
